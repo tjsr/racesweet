@@ -1,6 +1,7 @@
 import { humanDateStringToSystemDateString } from "./humandate.js";
 import { parseISO } from "date-fns/parseISO";
 import { tz } from "@date-fns/tz";
+import { validateTimeString } from "../validators/time.js";
 
 const systemDateString = /^(?<year>\d{4})[-/](?<month>\d{1,2})[-/](?<day>\d{1,2})$/;
 
@@ -32,22 +33,50 @@ export const parseUnknownDateTimeString = (input: string, sourceTimezone?: strin
   return parsedDate;
 };
 
+export const hasDateAndTime = (input: string): boolean => {
+  if (!input) {
+    return false;
+  }
+  if (input.includes('T')) {
+    return true; // ISO 8601 format
+  }
+  if (!input.includes(' ')) {
+    return false;
+  }
+  const dateTimeParts = input.split(' ');
+  if (dateTimeParts.length !== 2) {
+    return false;
+  }
+
+  return dateTimeParts.some(p => p.includes(':'));
+};
+
 export const splitDateTime = (input: string): { date: string; time: string } => {
   if (!input) {
     throw new Error("Input cannot be empty");
   }
-  if (input.includes('T')) {
-    // Handle ISO 8601 format
-    const dateTimeParts = input.split('T');
-    if (dateTimeParts.length === 2) {
-      return { date: dateTimeParts[0], time: dateTimeParts[1] };
-    }
+  let datePart: string | undefined = undefined;
+  let timePart: string | undefined = undefined;
+  if (!input.includes(' ') && !input.includes('T')) {
+    throw new Error(`Invalid date/time format - missing space or T separator: ${input}`);
   }
-  const dateTimeParts = input.split(' ');
+
+  const dateTimeParts = input.split(input.includes('T') ? 'T' : ' ');
   if (dateTimeParts.length === 2 && dateTimeParts[1].includes(':')) {
-    return { date: humanDateStringToSystemDateString(dateTimeParts[0]), time: dateTimeParts[1] };
+    timePart = dateTimeParts[1];
+    datePart = humanDateStringToSystemDateString(dateTimeParts[0]);
   } else if (dateTimeParts.length === 1 && systemDateString.test(dateTimeParts[0])) {
-    return { date: humanDateStringToSystemDateString(dateTimeParts[1]), time: dateTimeParts[0] };
+    datePart = humanDateStringToSystemDateString(dateTimeParts[1]);
+    timePart = dateTimeParts[0];
+  }
+
+  const isValidTimeString: boolean = validateTimeString(timePart);
+  if (!isValidTimeString) {
+    throw new Error(`Invalid time format: ${timePart}`);
+  }
+  
+  if (datePart && timePart) {
+    return { date: datePart, time: timePart };
   }
 
   throw new Error(`Invalid date/time format: ${input}`);

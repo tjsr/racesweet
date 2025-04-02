@@ -2,9 +2,10 @@ import { isValid } from "date-fns/isValid";
 import { validateDayMonthYear } from "../validators/date.js";
 
 const humanDateString = /^(?<day>\d{1,2})[-/](?<month>\d{1,2})[-/](?<year>\d{2,4})$/;
+const humanDateWithYearFirst = /^(?<year>\d{4})[-/](?<month>\d{1,2})[-/](?<day>\d{1,2})$/;
 
 export const humanDateStringToSystemDateString = (input: string): string => {
-  const match = input.match(humanDateString);
+  const match = input.match(humanDateString) || input.match(humanDateWithYearFirst);
   if (!match) {
     throw new Error(`Invalid date format: ${input}`);
   }

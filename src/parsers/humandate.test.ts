@@ -1,11 +1,10 @@
-import { describe, expect, it } from 'vitest';
-
 import { humanDateStringToSystemDateString } from './humandate.js';
 
 describe('humanDateStringToSystemDateString', () => {
   it('should convert a valid date with two-digit year to system format', () => {
     expect(humanDateStringToSystemDateString('12-05-23')).toBe('2023-05-12');
     expect(humanDateStringToSystemDateString('1/1/99')).toBe('2099-01-01');
+    expect(humanDateStringToSystemDateString('2023/05/12')).toBe('2023-05-12');
   });
 
   it('should convert a valid date with four-digit year to system format', () => {
@@ -15,7 +14,7 @@ describe('humanDateStringToSystemDateString', () => {
 
   it('should throw an error for invalid date formats', () => {
     expect(() => humanDateStringToSystemDateString('12-05')).toThrow('Invalid date format: 12-05');
-    expect(() => humanDateStringToSystemDateString('2023/05/12')).toThrow('Invalid date format: 2023/05/12');
+    expect(() => humanDateStringToSystemDateString('2023/05/12')).not.toThrow('Invalid date format: 2023/05/12');
     expect(() => humanDateStringToSystemDateString('12-05-202')).toThrow('Invalid date format: 12-05-202');
     expect(() => humanDateStringToSystemDateString('abc-def-ghi')).toThrow('Invalid date format: abc-def-ghi');
   });
