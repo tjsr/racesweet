@@ -32,7 +32,7 @@ describe('validateTimeString', () => {
       '12:00:60', // Seconds out of range
       'abc',      // Non-time string
       '12:00',    // Missing seconds
-      '12:00:00:00' // Extra component
+      '12:00:00:00', // Extra component
     ];
 
     expectAllInvalid(invalidTimes);
@@ -101,15 +101,20 @@ describe('validateTimeString', () => {
       '12:00:',
       ':00:00',
       '12::00',
-      '12:00:'
+      '12:00:',
     ];
 
     expectAllInvalid(emptyTimeStrings);
   });
 
   it('Should accept time values that have milliseconds', () => {
-    const validTimes = ['00:00:00.000', '23:59:59.999', '12:34:56.123',
-      '03:07:19.616', '12:34:56.789', '00:00:00.123'
+    const validTimes = [
+      '00:00:00.000',
+      '23:59:59.999',
+      '12:34:56.123',
+      '03:07:19.616',
+      '12:34:56.789',
+      '00:00:00.123'
     ];
 
     expectAllValid(validTimes);

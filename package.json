@@ -13,13 +13,21 @@
   "main": "index.js",
   "scripts": {
     "clean": "rimraf src/generated",
+    "lint": "npm run lint:ts && npm run lint:json",
+    "lint:json": "jsonlint src/**/*.json",
+    "lint:ts": "eslint",
+    "start": "electron .",
     "test": "vitest",
     "types": "mkdirp src/generated/typebox && ts2typebox --input src/model/index.ts --output src/generated/typebox/index.ts"
   },
   "devDependencies": {
+    "@electron-forge/cli": "^7.8.0",
+    "@tjsr/eslint-config": "github:tjsr/eslint-config#main",
     "@tsconfig/node-ts": "^23.6.1",
     "@tsconfig/node22": "^22.0.1",
     "@types/node": "^22.13.17",
+    "electron": "^35.1.4",
+    "eslint": "^9.23.0",
     "mkdirp": "^3.0.1",
     "rimraf": "^6.0.1",
     "ts2typebox": "^1.6.2",

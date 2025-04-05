@@ -49,7 +49,7 @@ describe("splitDateTime", () => {
     const emptyInputs = [
       undefined,
       null,
-      ""
+      "",
     ];
 
     emptyInputs.forEach((input) => {

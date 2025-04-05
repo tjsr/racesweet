@@ -1,4 +1,3 @@
-import { isValid } from "date-fns/isValid";
 import { validateDayMonthYear } from "../validators/date.js";
 
 const humanDateString = /^(?<day>\d{1,2})[-/](?<month>\d{1,2})[-/](?<year>\d{2,4})$/;
