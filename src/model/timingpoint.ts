@@ -1,6 +1,6 @@
-import { IdType, PhysicalLocation } from "./types.js";
+import type { IdType, PhysicalLocation } from "./types.js";
 
-import { TimingDeviceId } from "./timingdevice.js";
+import type { TimingDeviceId } from "./timingdevice.js";
 
 export type TimingPointId = IdType;
 

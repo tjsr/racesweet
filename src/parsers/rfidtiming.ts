@@ -25,7 +25,7 @@ const chipOrHexChip = (chipCode: string, hexChipCode: string): number => {
   throw new Error('No chip code provided');
 };
 
-const _fromRfidTimingLine = (line: string, sourceTimezone: string, eventDateHint: Date): ChipCrossingData | null => {
+export const fromRfidTimingLine = (line: string, sourceTimezone: string, eventDateHint: Date): ChipCrossingData | null => {
   const rfidTimingMatches: RegExpMatchArray | null = line.match(outreachRfidTimingFormatPattern);
   if (!rfidTimingMatches) {
     return null;

@@ -1,6 +1,6 @@
-import { EventCategoryId } from "./eventcategory.js";
-import { EventParticipantId } from "./eventparticipant.js";
-import { IdType } from "./types.js";
+import type { EventCategoryId } from "./eventcategory.js";
+import type { EventParticipantId } from "./eventparticipant.js";
+import type { IdType } from "./types.js";
 
 export type EventTeamId = IdType;
 

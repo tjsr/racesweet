@@ -1,4 +1,4 @@
-import { ISO8601DateTime, ISO8601Duration, IdType } from "./types.js";
+import type { ISO8601DateTime, ISO8601Duration, IdType } from "./types.js";
 
 export type EventCategoryId = IdType;
 

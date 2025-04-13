@@ -6,11 +6,12 @@
  * have a look there! :]
  */
 
-import { Type, Static } from "@sinclair/typebox";
+import type { Static } from "@sinclair/typebox";
+import { Type } from "@sinclair/typebox";
 
 export type RaceState = Static<typeof RaceState>;
 export const RaceState = Type.Object({
-  participants: Type.Array(EventParticipant),
-  categories: Type.Array(EventCategory),
-  teams: Type.Array(EventTeam),
+  // categories: Type.Array(EventCategory),
+  // participants: Type.Array(EventParticipant),
+  // teams: Type.Array(EventTeam),
 });

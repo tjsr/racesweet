@@ -1,4 +1,4 @@
-import { IdType } from "./types";
+import type { IdType } from "./types.js";
 
 export type TimingDeviceId = IdType;
 

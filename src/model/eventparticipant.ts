@@ -1,7 +1,7 @@
-import { ISO8601DateTime, ISO8601Duration, IdType } from "./types.js";
+import type { ISO8601DateTime, ISO8601Duration, IdType } from "./types.js";
 
-import { EventCategoryId } from "./eventcategory.js";
-import { TimingPointId } from "./timingpoint.js";
+import type { EventCategoryId } from "./eventcategory.js";
+import type { TimingPointId } from "./timingpoint.js";
 
 export type EventParticipantId = IdType;
 
