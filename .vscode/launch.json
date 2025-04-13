@@ -1,0 +1,54 @@
+{
+  "configurations": [
+  {
+    "name": "Electron Main",
+    "program": "${workspaceFolder}/index.mjs",
+    "request": "launch",
+    "runtimeExecutable": "electron",
+    "skipFiles": [
+      "<node_internals>/**"
+    ],
+    "type": "node"
+  },
+  {
+    "name": "Electron Renderer",
+    "request": "launch",
+    "type": "chrome",
+    "url": "http://localhost:3000",
+    "webRoot": "${workspaceFolder}/src",
+    "sourceMapPathOverrides": {
+      "webpack://*/*": "*"
+    }
+  },
+  {
+    "name": "Electron All",
+    "request": "launch",
+    "type": "node",
+    "program": "${workspaceFolder}/main.js",
+    "runtimeExecutable": "electron",
+    "runtimeArgs": [
+      "."
+    ],
+    "windows": {
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron.cmd"
+    },
+    "linux": {
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron"
+    },
+    "osx": {
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron"
+    },
+    "env": {
+      "NODE_ENV": "development"
+    },
+    "sourceMaps": true,
+    "outFiles": [
+      "${workspaceFolder}/**/*.js"
+    ],
+    "skipFiles": [
+      "<node_internals>/**"
+    ],
+    "console": "integratedTerminal"
+  }
+  ]
+}

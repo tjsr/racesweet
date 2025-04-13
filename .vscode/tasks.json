@@ -1,0 +1,25 @@
+// filepath: /h:/dev/racesweet/.vscode/tasks.json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "tsc: build",
+      "type": "shell",
+      "command": "npx tsc",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$tsc",
+      "detail": "Compiles TypeScript files"
+    },
+    {
+      "label": "tsc: watch",
+      "type": "shell",
+      "command": "npx tsc --watch",
+      "isBackground": true,
+      "problemMatcher": "$tsc-watch",
+      "detail": "Watches TypeScript files for changes"
+    }
+  ]
+}

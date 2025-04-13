@@ -1,0 +1,10 @@
+{
+  "typescript.tsserver.watchOptions": {
+    "watchFile": "useFsEvents",
+    "watchDirectory": "useFsEvents",
+    "watchFilePolling": 1000,
+    "watchDirectoryPolling": 1000,
+    "watchFileTimeout": 1000,
+    "watchDirectoryTimeout": 1000
+  }
+}
