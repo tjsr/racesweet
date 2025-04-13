@@ -1,8 +1,11 @@
 {
   "extends": ["@tsconfig/node22/tsconfig.json", "@tsconfig/node-ts/tsconfig.json"],
   "compilerOptions": {
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "dom"],
     "types": ["vitest/globals"],
+    "rootDir": ".",
+    "outDir": "./build",
+    "strict": true,
+    "target": "ESNext"
   },
-  
 }

@@ -10,8 +10,9 @@
   "license": "ISC",
   "author": "Tim Rowe <tim@tjsr.id.au>",
   "type": "module",
-  "main": "index.js",
+  "main": "index.mjs",
   "scripts": {
+    "build": "tsc",
     "clean": "rimraf src/generated",
     "lint": "npm run lint:ts && npm run lint:json",
     "lint:json": "jsonlint src/**/*.json",
@@ -26,6 +27,7 @@
     "@tsconfig/node-ts": "^23.6.1",
     "@tsconfig/node22": "^22.0.1",
     "@types/node": "^22.13.17",
+    "chokidar": "^4.0.3",
     "electron": "^35.1.4",
     "eslint": "^9.23.0",
     "mkdirp": "^3.0.1",
@@ -36,6 +38,8 @@
   },
   "dependencies": {
     "@date-fns/tz": "^1.2.0",
-    "date-fns": "^4.1.0"
+    "date-fns": "^4.1.0",
+    "electron-debug": "^4.1.0",
+    "electron-timber": "^1.0.0"
   }
 }
