@@ -2,7 +2,7 @@ import type { ChipCrossingData } from "../model/chipcrossing.js";
 import { parseUnknownDateTimeString } from "./datetime.js";
 import { safeIntOption } from "../utils.js";
 
-const outreachRfidTimingFormatPattern: RegExp = /(?<antenna>\d),(?<chipCode>\d),(?<hexChipCode>\d),"?(?<time>\s)"?(,(?<reader>\d),(?<antenna2>\d))?/;
+const outreachRfidTimingFormatPattern: RegExp = /(?<antenna>\d+),(?<chipCode>\d+),(?<hexChipCode>\d+),"?(?<time>\S+)"?(,(?<reader>\d+),(?<antenna2>\d+))?/;
 
 class InvalidRfidTimingFormatError extends Error {
   constructor(reason: string, line: string) {
@@ -25,8 +25,10 @@ const chipOrHexChip = (chipCode: string, hexChipCode: string): number => {
   throw new Error('No chip code provided');
 };
 
+export const matchRfidLine = (line: string): RegExpMatchArray | null => line.match(outreachRfidTimingFormatPattern);
+
 export const fromRfidTimingLine = (line: string, sourceTimezone: string, eventDateHint: Date): ChipCrossingData | null => {
-  const rfidTimingMatches: RegExpMatchArray | null = line.match(outreachRfidTimingFormatPattern);
+  const rfidTimingMatches: RegExpMatchArray | null = matchRfidLine(line);
   if (!rfidTimingMatches) {
     return null;
   }

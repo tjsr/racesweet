@@ -1,8 +1,11 @@
-import { parseFile, parseOutreachLine } from "./outreach.js";
+import { parseFile, parseOutreachLine, parseSimpleOutreachChipLine } from "./outreach.js";
 
-// import fs from 'node:fs';
 import type { ChipCrossingData } from "../model/chipcrossing.js";
 import path from 'node:path';
+
+// import fs from 'node:fs';
+
+
 
 const testdata_dir = path.resolve(path.join('.', 'src', 'testdata'));
 
@@ -27,19 +30,36 @@ describe('parseOutreachLine', () => {
   it('Should parse a valid line', async () => {
     const testLines = [
       '2,200306,200306,"25-08-2023 19:11:06.405"',
+      '200306\t25-08-2023 19:11:06.405',
     ];
 
     testLines.forEach(async (line) => {
-      const parsed: Promise<ChipCrossingData[]> = parseOutreachLine(line);
-      parsed.then((parsedData: ChipCrossingData[]) => {
-        expect(parsedData[0].chipCode).toBe(200306);
-        expect(parsedData[0].time).toBeDefined();
-        expect(parsedData[0].time?.getUTCFullYear()).toBe(2023);
-      });
-      expect(parsed).toBeDefined();
+      const parsed: ChipCrossingData = parseOutreachLine(line);
+      // parsed.forEach((parsedData: ChipCrossingData[]) => {
+        expect(parsed).toBeDefined();
+        expect(parsed.chipCode).toBe(200306);
+        expect(parsed.time).toBeDefined();
+        expect(parsed.time?.getUTCFullYear()).toBe(2023);
+    });
       // expect(parsed?.antenna).toBe(2);
       // expect(parsed?.chipCode).toBe(200306);
       // expect(parsed?.time).toBeDefined();
+  });
+});
+
+describe('parseSimpleOutreachChipLine', () => {
+  it('Should parse a valid line', () => {
+    const testLines = [
+      "200306 25-08-2023 19:11:06.405",
+    ];
+
+    testLines.forEach((line) => {
+      const parsed: ChipCrossingData = parseSimpleOutreachChipLine(line);
+      expect(parsed).toBeDefined();
+      expect(parsed.chipCode).toBe(200306);
+      expect(parsed.time).toBeDefined();
+      expect(parsed.time?.getUTCFullYear()).toBe(2023);
     });
   });
 });
+

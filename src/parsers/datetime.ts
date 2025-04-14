@@ -16,7 +16,8 @@ export const parseUnknownDateTimeString = (input: string, sourceTimezone?: strin
   // Check if the input is in ISO 8601 format
   const parsedIso = parseISO(input, { in: tz(sourceTimezone) });
 
-  if (parsedIso) {
+  if (parsedIso && !isNaN(parsedIso.getTime())) {
+    // If the input is a valid ISO 8601 date, return it
     return parsedIso;
   }
 
