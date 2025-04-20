@@ -3,7 +3,6 @@ import type { PathLike } from "node:fs";
 import { fromRfidTimingLine } from "./rfidtiming.js";
 import { open } from 'node:fs/promises';
 import { parseLineMatching } from "./genericLineMatcher.js";
-import { parseUnknownDateTimeString } from "./datetime.js";
 
 const MAX_ERRORS = 20;
 
