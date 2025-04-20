@@ -6,7 +6,7 @@ import { parseUnknownDateTimeString } from "./datetime.js";
 
 const MAX_ERRORS = 20;
 
-const simpleTransponderTimeEvent: RegExp = /^(?<chipCode>\d+)\s+(?<dateTime>[\w\s\-:\.]+)$/;
+const simpleTransponderTimeEvent: RegExp = /^(?<chipCode>\d+)\s+(?<dateTime>[\w\s\-:.]+)$/;
 
 export const parseSimpleOutreachChipLine = (line: string, sourceTimezone?: string | undefined): ChipCrossingData => {
   const match = line.match(simpleTransponderTimeEvent);
