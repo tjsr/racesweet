@@ -2,29 +2,19 @@ import type { ChipCrossingData } from "../model/chipcrossing.js";
 import type { PathLike } from "node:fs";
 import { fromRfidTimingLine } from "./rfidtiming.js";
 import { open } from 'node:fs/promises';
+import { parseLineMatching } from "./genericLineMatcher.js";
 import { parseUnknownDateTimeString } from "./datetime.js";
 
 const MAX_ERRORS = 20;
 
 const simpleTransponderTimeEvent: RegExp = /^(?<chipCode>\d+)\s+(?<dateTime>[\w\s\-:.]+)$/;
 
-export const parseSimpleOutreachChipLine = (line: string, sourceTimezone?: string | undefined): ChipCrossingData => {
-  const match = line.match(simpleTransponderTimeEvent);
-  if (!match || !match.groups) {
-    throw new Error(`Invalid line format: ${line}`);
-  }
-  const { chipCode, dateTime } = match.groups;
-  const parsedChipCode = parseInt(chipCode, 10);
+export const parseSimpleOutreachChipLine = (
+  line: string,
+  sourceTimezone?: string | undefined
+): ChipCrossingData =>
+  parseLineMatching(line, simpleTransponderTimeEvent, sourceTimezone);
 
-  const parsedTime: Date = parseUnknownDateTimeString(dateTime, sourceTimezone);
-  if (isNaN(parsedTime.getTime())) {
-    throw new Error(`Invalid date format: ${dateTime}`);
-  }
-  return {
-    chipCode: parsedChipCode,
-    time: parsedTime,
-  };
-};
 
 export const parseOutreachLine = (line: string): ChipCrossingData => {
   try {
