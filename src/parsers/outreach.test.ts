@@ -36,14 +36,14 @@ describe('parseOutreachLine', () => {
     testLines.forEach(async (line) => {
       const parsed: ChipCrossingData = parseOutreachLine(line);
       // parsed.forEach((parsedData: ChipCrossingData[]) => {
-        expect(parsed).toBeDefined();
-        expect(parsed.chipCode).toBe(200306);
-        expect(parsed.time).toBeDefined();
-        expect(parsed.time?.getUTCFullYear()).toBe(2023);
+      expect(parsed).toBeDefined();
+      expect(parsed.chipCode).toBe(200306);
+      expect(parsed.time).toBeDefined();
+      expect(parsed.time?.getUTCFullYear()).toBe(2023);
     });
-      // expect(parsed?.antenna).toBe(2);
-      // expect(parsed?.chipCode).toBe(200306);
-      // expect(parsed?.time).toBeDefined();
+    // expect(parsed?.antenna).toBe(2);
+    // expect(parsed?.chipCode).toBe(200306);
+    // expect(parsed?.time).toBeDefined();
   });
 });
 
