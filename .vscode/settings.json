@@ -6,5 +6,7 @@
     "watchDirectoryPolling": 1000,
     "watchFileTimeout": 1000,
     "watchDirectoryTimeout": 1000
-  }
+  },
+  "vitest.workspaceConfig": "vitest.workspace.ts",
+  "vitest.rootConfig": "vitest.config.mts"
 }
