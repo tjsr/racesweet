@@ -6,7 +6,7 @@ import { parseLineMatching } from "./genericLineMatcher.js";
 
 const MAX_ERRORS = 20;
 
-const simpleTransponderTimeEvent: RegExp = /^(?<chipCode>\d+)\s+(?<dateTime>[\w\s\-:.]+)$/;
+const simpleTransponderTimeEvent: RegExp = /^(?<chipCode>\d+)[\s,;]+"?(?<dateTime>[\w\s\-:.]+)"?$/;
 
 export const parseSimpleOutreachChipLine = (
   line: string,
@@ -28,6 +28,7 @@ export const parseOutreachLine = (line: string): ChipCrossingData => {
     } else {
       console.error(`Unknown error parsing line: ${line}`);
     }
+    throw error;
   }
 
   throw new Error(`Failed to parse line: ${line}`);

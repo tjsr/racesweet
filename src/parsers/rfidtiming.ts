@@ -2,12 +2,19 @@ import type { ChipCrossingData } from "../model/chipcrossing.js";
 import { parseUnknownDateTimeString } from "./datetime.js";
 import { safeIntOption } from "../utils.js";
 
-const outreachRfidTimingFormatPattern: RegExp = /(?<antenna>\d+),(?<chipCode>\d+),(?<hexChipCode>\d+),"?(?<time>\S+)"?(,(?<reader>\d+),(?<antenna2>\d+))?/;
+const outreachRfidTimingFormatPattern: RegExp = /(?<antenna>\d+),(?<chipCode>\d+),(?<hexChipCode>\d+),"?(?<time>[\d\-/\s:.]+)"?(,(?<reader>\d+),(?<antenna2>\d+))?/;
 
 class InvalidRfidTimingFormatError extends Error {
   constructor(reason: string, line: string) {
     super(`Invalid RFID timing format - ${reason}: ${line}`);
     this.name = 'InvalidRfidTimingFormatError';
+  }
+}
+
+class DateTimeParseError extends Error {
+  constructor(reason: string, line: string) {
+    super(`Invalid date/time format - ${reason}: ${line}`);
+    this.name = 'DateTimeParseError';
   }
 }
 
@@ -43,6 +50,10 @@ export const fromRfidTimingLine = (line: string, sourceTimezone: string, eventDa
   }
 
   const g = rfidTimingMatches.groups;
+  const fullYear = timeValue.getUTCFullYear();
+  if (fullYear < 2000) {
+    throw new DateTimeParseError(`Invalid year ${fullYear} in time value`, line);
+  }
 
   const data: RFIDTimingChipCrossingData = {
     antenna: safeIntOption(g.antenna, g.antenna2),

@@ -1,11 +1,18 @@
-import { parseDateTime, parseLineMatching } from "./genericLineMatcher.js";
+import { describe, expect, it } from 'vitest';
+
+import { parseDateTime } from "./genericLineMatcher.js";
+
+describe('Example Test Suite', () => {
+  it('should pass this test', () => {
+    expect(1 + 1).toBe(2);
+  });
+});
 
 describe('parseDateTime', () => {
   it('Should parse a time only', () => {
     const chipLine = '1245,19:11:06.405';
     const dateTimeFormat = 'HH:mm:ss.SSS';
     const parsed: Date = parseDateTime(chipLine, dateTimeFormat);
-
 
     const dateNow = new Date();
     expect(parsed).toBeDefined();

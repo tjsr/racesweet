@@ -5,6 +5,11 @@ import type { TimingPointId } from "./timingpoint.js";
 
 export type EventParticipantId = IdType;
 
+export interface ParticipantIdentifier {
+  fromTime: Date | undefined;
+  toTime: Date | undefined;
+}
+
 export interface EventParticipant {
   id: EventParticipantId;
   firstname: string;
@@ -14,4 +19,14 @@ export interface EventParticipant {
   resultDuration: ISO8601Duration | null;
   currentResult: string;
   categoryId: EventCategoryId;
+  identifiers: ParticipantIdentifier[];
 }
+
+export interface ParticipateRacePlate extends ParticipantIdentifier {
+  racePlate: string;
+}
+
+export interface ParticipantTransponder extends ParticipantIdentifier {
+  txNo: string | number;
+}
+

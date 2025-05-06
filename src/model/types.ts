@@ -15,3 +15,4 @@ export type positionAccuracy = number; // in metres
 
 export type PhysicalLocation = [latitude, longitude] | [latitude, longitude, elevation];
 
+export type TimeEventSourceId = uuid;

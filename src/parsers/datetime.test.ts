@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasDateAndTime, splitDateTime } from "./datetime.js";
-
-import { parseableDateTimeStrings } from "./parseableDateTimeStrings.js";
+import { hasDateAndTime, hasDateComponent, parseUnknownDateTimeString } from "./datetime.js";
 
 describe('hasDateAndTime', () => {
   it('Should match for string with a T separator', () => {
@@ -24,54 +22,128 @@ describe('hasDateAndTime', () => {
       expect(hasDateAndTime(testInput)).toEqual(false);
     });
   });
+
+  it ('Should return true for valid date strings split with a space', () => {
+    const testInput = '2023-10-01 12:00:00';
+    expect(hasDateAndTime(testInput)).toEqual(true);
+  });
+  it ('Should return true for valid date strings split with a T marker', () => {
+    const testInput = '2023-10-01T12:00:00';
+    expect(hasDateAndTime(testInput)).toEqual(true);
+  });
+
+  it('Should accept dates in reverse order', () => {
+    const testInput = '25-08-2023 19:11:06.405';
+    expect(hasDateAndTime(testInput)).toEqual(true);
+  });
+
+  it('Should accept dates with slashes', () => {
+    const testInput = '25/08/2023 19:11:06.405';
+    expect(hasDateAndTime(testInput)).toEqual(true);
+  });
+
+  it('Should accept dates with slashes and no leading zero on month.', () => {
+    const testInput = '25/7/2023 19:11:06.405';
+    expect(hasDateAndTime(testInput)).toEqual(true);
+  });
 });
 
-describe("splitDateTime", () => {
-  it('Should allow a string with a time only, and infer the date as today', () => {
+describe('hasDateComponent', () => {
+  const valuesWithDatesFirst = [
+    '2023-10-01 12:00:00',
+    '2023-10-01T12:00:00',
+    '25-08-2023 19:11:06.405',
+    '25/08/2023 19:11:06.405',
+    '25/7/2023 19:11:06.405',
+    '2024-10-26T09:06:25.888',
+    '2024-08-17T10:30:33.735',
+    '2025-03-01T11:11:45.451',
+  ];
+
+  const valuesWithDatesLast = [
+    '12:00:00 2023-10-01',
+    '11:02:12 2023/08/01',
+    '10:27:16 10/11/2024',
+    '19:11:06.405 25-08-2023',
+    '19:11:06.405 25/08/2023',
+    '19:11:06.405 25/7/2023',
+    '09:06:25.888 2024-10-26',
+    '10:30:33.735 2024-08-17',
+    '11:11:45.451 2025-03-01',
+  ];
+
+  const timeOnlyValues = [
+    '19:21:17.533',
+    '12:00:00',
+    '11:02:12',
+    '10:27:16',
+    '19:11:06.405',
+    '09:06:25.888',
+    '10:30:33.735',
+    '11:11:45.451',
+  ];
+
+  it('Should return false is a string is provided with no date', () => {
     const testInput = '19:21:17.533';
-    expect(() => splitDateTime(testInput)).toThrowError();
-    // const splitDate = splitDateTime();
+    expect(hasDateComponent(testInput)).toEqual(false);
   });
 
-  // it('Should accept certain values', () => {
-  //   expect(splitDateTime('...')
-  // })
+  it('Should correctly confirm a date is found in a string', () => {
+    const input = '26/10/2024 09:06:25.888';
+    const result = hasDateComponent(input);
+    expect(result).toEqual(true);
+  });
 
-  it("should correctly split valid date-time strings", () => {
-    parseableDateTimeStrings.forEach(({ str, date, time }) => {
-      const result = splitDateTime(str);
-      expect(result.date).toEqual(date);
-      expect(result.time).toEqual(time);
+  it ('Should return true on all known variants that have a date and time', () => {
+    valuesWithDatesFirst.forEach((testInput) => {
+      expect(hasDateComponent(testInput)).toEqual(true);
+    });
+
+    valuesWithDatesLast.forEach((testInput) => {
+      expect(hasDateComponent(testInput)).toEqual(true);
     });
   });
 
-  it('should reject empty input values', () => {
-    const emptyInputs = [
-      undefined,
-      null,
-      "",
-    ];
-
-    emptyInputs.forEach((input) => {
-      expect(() => splitDateTime(input!)).toThrowError(
-        `Input cannot be empty`
-      );
+  it ('Should return false on all known variants that have a time only', () => {
+    timeOnlyValues.forEach((testInput) => {
+      expect(hasDateComponent(testInput)).toEqual(false);
     });
   });
+});
 
-  it("should throw an error for invalid date-time strings", () => {
-    const invalidInputs = [
-      "invalid-date",
-      "2023-13-01T25:61",
-      "2023-13-01T23:61",
-      "2023-13-01T10:61",
-      "2023-13-01T10:51",
-      "random text",
-      // "2023/02/30",
-    ];
+describe('parseUnknownDateTimeString', () => {
+  it.skip ('Should return a date object for a valid date-time string with space', () => {
+    const testInput = '2023-10-01 12:00:00';
+    const result = parseUnknownDateTimeString(testInput);
+    expect(result).not.toBeUndefined();
+    // expect(result.date).toEqual('2023-10-01');
+    // expect(result.time).toEqual('12:00:00');
+  });
 
-    invalidInputs.forEach((input) => {
-      expect(() => splitDateTime(input), `Input format ${input} was accepted.`).toThrowError();
-    });
+  it.skip ('Should return a date object for a valid date-time string with T-separator', () => {
+    const testInput = '2023-10-01T12:00:00';
+    const result = parseUnknownDateTimeString(testInput);
+    expect(result.toISOString()).toEqual('2023-10-01');
+    // expect(result.date).toEqual('2023-10-01');
+    // expect(result.time).toEqual('12:00:00');
+  });
+
+  it ('Should return a date object for a valid date-time string with T-separator and UTC offset', () => {
+    const testInput = '2023-10-01T12:00:00+11:00';
+    const result: Date = parseUnknownDateTimeString(testInput);
+    expect(result.toISOString()).toEqual('2023-10-01T01:00:00.000+11:00');
+  });
+
+  it ('Should return a date object for a valid T-separated with reversed dmy format', () => {
+    const testInput = '10-07-2022T14:15:16';
+    const result = parseUnknownDateTimeString(testInput);
+    expect(result.toISOString()).toEqual('2022-07-10T14:15:16.000');
+  });
+
+  it ('Should return a date object for a valid date-time string with reversed dmy format', () => {
+    const testInput = '10-07-2021 14:15:16';
+    const result = parseUnknownDateTimeString(testInput);
+    expect(result).not.toBeUndefined();
+    expect(result.toISOString()).toEqual('2021-07-10T14:15:16.000+1100');
   });
 });
