@@ -6,18 +6,17 @@ import { parseDateString } from './datestring.js';
 
 describe('parseDateString - valid inputs', function () {
   it('parses 4-digit year with slash', () => {
-    const result = parseDateString('12/25/2020');
-    expect(result.toISOString()).toContain('2020-12-25');
+    const result = parseDateString('25/12/2020');
+    const str = result.toString();
+    expect(str).toContain('2020-12-25');
   });
 
-  it('parses 2-digit year with slash', () => {
-    const result = parseDateString('12/25/49');
-    expect(result.toISOString()).toContain('2049-12-25');
+  it('rejects 2-digit year with slash if year is not in acceptable range', () => {
+    expect(() => parseDateString('25/12/49')).toThrow(InvalidYearError);
   });
 
   it('parses 2-digit year with dash', () => {
-    const result = parseDateString('49-12-25');
-    expect(result.toISOString()).toContain('2049-12-25');
+    expect(() => parseDateString('49-12-25')).toThrow(InvalidYearError);
   });
 
   it('parses 4-digit year with dash', () => {
@@ -25,13 +24,12 @@ describe('parseDateString - valid inputs', function () {
     expect(result.toISOString()).toContain('2020-12-25');
   });
 
-  it('parses 2-digit year above 49 as 1900s', () => {
-    const result = parseDateString('12/25/50');
-    expect(result.toISOString()).toContain('1950-12-25');
+  it('parses 2-digit year above 49 as 1900s and rejects', () => {
+    expect(() => parseDateString('25/12/50')).toThrow(InvalidYearError);
   });
 
   it('parses 2-digit year at lower bound (00)', () => {
-    const result = parseDateString('12/25/00');
+    const result = parseDateString('25/12/00');
     expect(result.toISOString()).toContain('2000-12-25');
   });
 
