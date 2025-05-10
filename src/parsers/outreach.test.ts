@@ -1,11 +1,7 @@
+import type { OutreachChipCrossingData, UnsourcedOutreachChipCrossingData } from "./outreach.js";
 import { parseFile, parseOutreachLine, parseSimpleOutreachChipLine } from "./outreach.js";
 
-import type { ChipCrossingData } from "../model/chipcrossing.js";
 import path from 'node:path';
-
-// import fs from 'node:fs';
-
-
 
 const testdata_dir = path.resolve(path.join('.', 'src', 'testdata'));
 
@@ -36,7 +32,7 @@ describe('parsers/parseOutreachLine', () => {
   // const dateTimeRegex = /(?<date>\d{4}[\/-]\d{1,2}[\/-]\d{1,2}|\d{1,2}[\/-]\d{1,2}[\/-]\d{4})[ T](?<time>\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)/;
 
   it('Should parse a line split with tabs', () => {
-    let parsed: ChipCrossingData;
+    let parsed: UnsourcedOutreachChipCrossingData;
     expect(() => {
       parsed = parseOutreachLine(outreachTabDelimitedLine);
     }).not.toThrowError();
@@ -54,7 +50,7 @@ describe('parsers/parseOutreachLine', () => {
     ];
 
     testLines.forEach(async (line) => {
-      const parsed: ChipCrossingData = parseOutreachLine(line);
+      const parsed: UnsourcedOutreachChipCrossingData = parseOutreachLine(line);
       // parsed.forEach((parsedData: ChipCrossingData[]) => {
       expect(parsed).toBeDefined();
       expect(parsed.chipCode).toEqual(200306);
@@ -88,20 +84,20 @@ describe('parsers/parseOutreachLine', () => {
     const currentDate = new Date();
 
     testLines.forEach(async (line) => {
-      const parsed: ChipCrossingData = parseOutreachLine(line);
+      const parsed: Partial<OutreachChipCrossingData> | UnsourcedOutreachChipCrossingData = parseOutreachLine(line);
       // parsed.forEach((parsedData: ChipCrossingData[]) => {
       expect(parsed).toBeDefined();
       expect(parsed.chipCode).toBe(200455);
 
       expect(parsed.time).toBeDefined();
-      expect(parsed.time?.getUTCFullYear()).toEqual(currentDate.getUTCFullYear());
-      expect(parsed.time?.getUTCMonth()).toEqual(currentDate.getUTCMonth());
-      expect(parsed.time?.getUTCDate()).toEqual(currentDate.getUTCDate());
+      expect(parsed.time?.getUTCFullYear(), `Unmatched year in ${line}`).toEqual(currentDate.getUTCFullYear());
+      expect(parsed.time?.getUTCMonth(), `Unmatch month in ${line}`).toEqual(currentDate.getUTCMonth());
+      expect(parsed.time?.getUTCDate(), `Unmatched day in ${line}`).toEqual(currentDate.getUTCDate());
 
-      expect(parsed.time?.getHours()).toEqual(expectations[0].hour);
-      expect(parsed.time?.getMinutes()).toEqual(expectations[0].minute);
-      expect(parsed.time?.getSeconds()).toEqual(expectations[0].second);
-      expect(parsed.time?.getMilliseconds()).toEqual(expectations[0].millisecond);
+      expect(parsed.time?.getHours(), `Unmatched hours in ${line}`).toEqual(expectations[0].hour);
+      expect(parsed.time?.getMinutes(), `Unmatched minutes in ${line}`).toEqual(expectations[0].minute);
+      expect(parsed.time?.getSeconds(), `Unmatched seconds in ${line}`).toEqual(expectations[0].second);
+      expect(parsed.time?.getMilliseconds(), `Unmatched milliseconds in ${line}`).toEqual(expectations[0].millisecond);
     });
   });
 });
@@ -113,7 +109,7 @@ describe('parsers/parseSimpleOutreachChipLine', () => {
     ];
 
     testLines.forEach((line) => {
-      const parsed: ChipCrossingData = parseSimpleOutreachChipLine(line);
+      const parsed: UnsourcedOutreachChipCrossingData = parseSimpleOutreachChipLine(line);
       expect(parsed).toBeDefined();
       expect(parsed.chipCode).toBe(200306);
       expect(parsed.time).toBeDefined();

@@ -1,6 +1,7 @@
 import type { ChipCrossingData } from "../model/chipcrossing.js";
 import { parseUnknownDateTimeString } from "./datetime.js";
 import { safeIntOption } from "../utils.js";
+import { tryParseDateTime } from "./rfidTimingDate.js";
 
 const outreachRfidTimingFormatPattern: RegExp = /(?<antenna>\d+),(?<chipCode>\d+),(?<hexChipCode>\d+),"?(?<time>[\d\-/\s:.]+)"?(,(?<reader>\d+),(?<antenna2>\d+))?/;
 
@@ -34,7 +35,7 @@ const chipOrHexChip = (chipCode: string, hexChipCode: string): number => {
 
 export const matchRfidLine = (line: string): RegExpMatchArray | null => line.match(outreachRfidTimingFormatPattern);
 
-export const fromRfidTimingLine = (line: string, sourceTimezone: string, eventDateHint: Date): ChipCrossingData | null => {
+export const fromRfidTimingLine = (line: string, sourceTimezone: string, eventDateHint: Date): Partial<RFIDTimingChipCrossingData> | null => {
   const rfidTimingMatches: RegExpMatchArray | null = matchRfidLine(line);
   if (!rfidTimingMatches) {
     return null;
@@ -44,10 +45,15 @@ export const fromRfidTimingLine = (line: string, sourceTimezone: string, eventDa
   }
   const timeString: string = rfidTimingMatches.groups?.time;
 
-  const timeValue: Date = parseUnknownDateTimeString(timeString, sourceTimezone, eventDateHint);
-  if (timeValue === null) {
-    throw new InvalidRfidTimingFormatError('Unrecognised time value', line);
+  let timeValue: Date | null = null;
+  try {
+    timeValue = tryParseDateTime(timeString, eventDateHint);
+  } catch (_dateParseError) {
+    timeValue = parseUnknownDateTimeString(timeString, sourceTimezone, eventDateHint);
   }
+  if (timeValue === null) {
+    throw new InvalidRfidTimingFormatError(`Unrecognised time value: ${timeString}`, line);
+  }  
 
   const g = rfidTimingMatches.groups;
   const fullYear = timeValue.getUTCFullYear();
@@ -55,7 +61,7 @@ export const fromRfidTimingLine = (line: string, sourceTimezone: string, eventDa
     throw new DateTimeParseError(`Invalid year ${fullYear} in time value`, line);
   }
 
-  const data: RFIDTimingChipCrossingData = {
+  const data: Partial<RFIDTimingChipCrossingData> = {
     antenna: safeIntOption(g.antenna, g.antenna2),
     chipCode: chipOrHexChip(g.chipCode, g.hexChipCode),
     time: timeValue,

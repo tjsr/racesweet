@@ -112,7 +112,7 @@ describe('hasDateComponent', () => {
 });
 
 describe('parseUnknownDateTimeString', () => {
-  it.skip ('Should return a date object for a valid date-time string with space', () => {
+  it ('Should return a date object for a valid date-time string with space', () => {
     const testInput = '2023-10-01 12:00:00';
     const result = parseUnknownDateTimeString(testInput);
     expect(result).not.toBeUndefined();
@@ -120,7 +120,7 @@ describe('parseUnknownDateTimeString', () => {
     // expect(result.time).toEqual('12:00:00');
   });
 
-  it.skip ('Should return a date object for a valid date-time string with T-separator', () => {
+  it ('Should return a date object for a valid date-time string with T-separator', () => {
     const testInput = '2023-10-01T12:00:00';
     const result = parseUnknownDateTimeString(testInput);
     expect(result.toISOString()).toEqual('2023-10-01');
@@ -131,7 +131,7 @@ describe('parseUnknownDateTimeString', () => {
   it ('Should return a date object for a valid date-time string with T-separator and UTC offset', () => {
     const testInput = '2023-10-01T12:00:00+11:00';
     const result: Date = parseUnknownDateTimeString(testInput);
-    expect(result.toISOString()).toEqual('2023-10-01T01:00:00.000+11:00');
+    expect(result.toISOString()).toEqual('2023-10-01T01:00:00.000Z');
   });
 
   it ('Should return a date object for a valid T-separated with reversed dmy format', () => {

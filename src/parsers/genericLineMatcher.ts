@@ -13,7 +13,7 @@ export const parseLineMatching = (line: string,
   regex: RegExp,
   dateTimeFormat?: string | undefined,
   sourceTimezone?: string | undefined
-): ChipCrossingData => {
+): Partial<ChipCrossingData> => {
   const match = line.match(regex);
   if (!match) {
     throw new Error(`Line does not match regex: ${line}`);

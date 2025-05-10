@@ -1,31 +1,23 @@
 import { DateParseError } from "./errors.js";
-import { datePartsToDMY } from "./dateutils.js";
+import { TZDate } from "@date-fns/tz";
+import { parseSplitDateStringToDate } from "./splitStringToDate.js";
 
-export const parseDashedDateToDate = (input: string): Date => prseSplitDateStringToDate(input, '-');
+export const parseDashedDateToDate = (input: string, tz?: string): Date => {
+  const dashedDateRegex = /\b\d{2}-\d{2}-\d{2}\b(?!\d)/;
 
-export const parseSlashedDateToDate = (input: string): Date => prseSplitDateStringToDate(input, '/');
-
-export const prseSplitDateStringToDate = (input: string, delimiter: string = '-'): Date => {
-  if (input.includes(' ') || input.includes('T')) {
-    throw new DateParseError('Can parse date only - time not supported', input);
-  }
-
-  const parts: string[] = input.split(delimiter);
-  if (parts.length !== 3) {
+  if (dashedDateRegex.test(input)) {
     throw new DateParseError("Invalid dashed date format", input);
   }
 
-  const dmyParts: [string, string, string] = [parts[0], parts[1], parts[2]];
-
-  const dmy: { day: number; month: number; year: number } = datePartsToDMY(dmyParts);
-  return new Date(dmy.year, dmy.month - 1, dmy.day);
+  return parseSplitDateStringToDate(input, '-', tz);
 };
 
-export const parseDashedDateString = (input: string): Date => {
-  const date: Date = parseDashedDateToDate(input);
+export const parseDashedDateString = (input: string, tz: string = (new TZDate()).timeZone || 'UTC'): Date => {
+  const date: Date = parseDashedDateToDate(input, tz);
+  const dt = date.getTime();
 
-  if (isNaN(date.getTime())) {
-    throw new DateParseError(`Invalid dashed date value ${input}"`, input);
+  if (isNaN(dt)) {
+    throw new DateParseError(`Invalid dashed date value "${input}" resolved to ${dt}`, input);
   }
 
   return date;

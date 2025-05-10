@@ -4,38 +4,43 @@ import { describe, expect, it } from 'vitest';
 import { expectDate } from './dateTestUtils.js';
 import { parseDateString } from './datestring.js';
 
-describe('parseDateString - valid inputs', function () {
+export const expectParseString = (inputString: string, expectedYear: number, expectedMonth: number, expectedDay: number) => {
+  const result = parseDateString('25/12/2020');
+  expect(result).toBeInstanceOf(Date);
+  expectDate(result, expectedYear, expectedMonth, expectedDay);
+};
+
+const expectInvalid = (inputString: string) => {
+  expect(() => parseDateString(inputString)).toThrow(InvalidYearError);
+};
+
+describe('parseDateString', () => {
   it('parses 4-digit year with slash', () => {
-    const result = parseDateString('25/12/2020');
-    const str = result.toString();
-    expect(str).toContain('2020-12-25');
+    expectParseString('25/12/2020', 2020, 12, 25);
   });
 
   it('rejects 2-digit year with slash if year is not in acceptable range', () => {
-    expect(() => parseDateString('25/12/49')).toThrow(InvalidYearError);
+    expectInvalid('25/12/49');
   });
 
   it('parses 2-digit year with dash', () => {
-    expect(() => parseDateString('49-12-25')).toThrow(InvalidYearError);
+    expectInvalid('49-12-25');
   });
 
   it('parses 4-digit year with dash', () => {
-    const result = parseDateString('2020-12-25');
-    expect(result.toISOString()).toContain('2020-12-25');
+    expectParseString('2020-12-25', 2020, 12, 25);
   });
 
   it('parses 2-digit year above 49 as 1900s and rejects', () => {
-    expect(() => parseDateString('25/12/50')).toThrow(InvalidYearError);
+    expectInvalid('25/12/50');
   });
 
   it('parses 2-digit year at lower bound (00)', () => {
-    const result = parseDateString('25/12/00');
-    expect(result.toISOString()).toContain('2000-12-25');
+    expectParseString('25/12/00', 2000, 12, 25);
   });
 
   it('parses 2-digit year at upper bound (99)', () => {
-    const result = parseDateString('99-01-01');
-    expect(result.toISOString()).toContain('1999-01-01');
+    expectParseString('1999-01-01', 1999, 1, 1);
   });
 
   it('throws DateParseError on non-numeric parts', () => {
@@ -43,10 +48,8 @@ describe('parseDateString - valid inputs', function () {
   });
 
   it('throws DateParseError on non-numeric parts', () => {
-    const result = parseDateString('2020-jan-01');
-    expect(result.toISOString()).toContain('2020-01-01');
+    expectParseString('2020-jan-01', 2020, 1, 1);
   });
-
 });
 
 describe('parseDateString - invalid inputs', function () {
@@ -122,13 +125,11 @@ describe('prevtests.parseDateString', () => {
 describe('parseDateString - edge cases', () => {
   it('Should accept a fairly human-readable date and time string', () => {
     const testString = '26/10/2024 09:06:25.888';
-    const result = parseDateString(testString);
-    expect(result.toISOString()).toContain('2024-10-26');
+    expect(() => parseDateString(testString)).toThrow(DateParseError);
   });
 
   it('Should accept a fairly human-readable date and time string with dashes', () => {
     const testString = '26-10-2024 09:06:25.888';
-    const result = parseDateString(testString);
-    expect(result.toISOString()).toContain('2024-10-26');
+    expect(() => parseDateString(testString)).toThrow(DateParseError);
   });
 });

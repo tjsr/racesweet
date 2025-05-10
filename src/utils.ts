@@ -10,3 +10,13 @@ export const safeIntOption = (...values: string[]): number | undefined => {
   return undefined;
 };
 
+export const asSafeNumber = (value: string | number | undefined): number => {
+  if (value === undefined) {
+    return 0;
+  }
+  if (typeof value === 'number') {
+    return value;
+  }
+  const parsedValue = parseInt(value, 10);
+  return isNaN(parsedValue) ? 0 : parsedValue;
+};

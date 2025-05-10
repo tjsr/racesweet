@@ -1,4 +1,5 @@
-import { InvalidYearError } from "./errors.js";
+import { InvalidMonthError, InvalidYearError } from "./errors.js";
+
 import { TZDate } from "@date-fns/tz/date";
 import { expandTwoDigitYear } from "./datestring.js";
 import { toZonedTime } from "date-fns-tz";
@@ -39,6 +40,11 @@ export const datePartsToDMY = (parts: [string, string, string]): { day: number; 
     day = parts[0];
   }
 
+  const monthNum = parseInt(month, 10);
+  if (monthNum > 12) {
+    throw new InvalidMonthError(month);
+  }
+
   let numYear = parseInt(year, 10);
   if (!isValidYear(numYear)) {
     throw new InvalidYearError(year);
@@ -49,6 +55,6 @@ export const datePartsToDMY = (parts: [string, string, string]): { day: number; 
     numYear = parseInt(year, 10);
   }
 
-  return { day: parseInt(day, 10), month: parseInt(month, 10), year: numYear };
+  return { day: parseInt(day, 10), month: monthNum, year: numYear };
 };
 

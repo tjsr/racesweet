@@ -1,5 +1,6 @@
 import { InvalidDateTimeStringError, TimeParseError } from "./errors.js";
 
+import { formatRFC3339 } from "date-fns";
 import { parseDateString } from "./datestring.ts";
 import { parseISO } from "date-fns/parseISO";
 import { splitDateTime } from "./splitDateTime.ts";
@@ -20,17 +21,6 @@ export const combineDateWithTimeString = (date: Date, time: string): Date => {
   const newDate = new Date(date.getTime());
   newDate.setUTCHours(hour || 0, minute || 0, second || undefined, millisecond || undefined);
   return newDate;
-};
-
-const asSafeNumber = (value: string | number | undefined): number => {
-  if (value === undefined) {
-    return 0;
-  }
-  if (typeof value === 'number') {
-    return value;
-  }
-  const parsedValue = parseInt(value, 10);
-  return isNaN(parsedValue) ? 0 : parsedValue;
 };
 
 // export const parseDateString = (date: string): { day: number, month: number, year: number } => {
@@ -71,15 +61,36 @@ const dateAndTimeStringToDate = (date: string, time: string): Date => {
 
 const dateAndTimeStringToIsoFormat = (date: string, time: string): string => {
   const parsed = dateAndTimeStringToDate(date, time);
-  return parsed.toISOString();
+  return formatRFC3339(parsed, { fractionDigits: 3 });
+};
+
+const assertValidTimeString = (input: string): void => {
+  const hasValidTime = validateTimeString(input);
+
+  if (!hasValidTime) {
+    throw new InvalidDateTimeStringError(input);
+  }
 };
 
 export const parseUnknownDateTimeString = (input: string, sourceTimezone?: string | undefined, eventDateHint?: Date | undefined): Date => {
   if (sourceTimezone === undefined) {
     sourceTimezone = getUserTimezone();
   }
+
+  const hasDate = hasDateComponent(input);
+  if (hasDate) {
+    assertValidTimeString(input.split(' ')[1] || input.split('T')[1]);
+  } else {
+    assertValidTimeString(input);
+  }
+
+  if (!hasDate && !eventDateHint) {
+    throw new Error("Event date hint is required for time-only input");
+  }
+
+  const parseTz = input.includes('+') ? undefined : tz(sourceTimezone);
   // Check if the input is in ISO 8601 format
-  const parsedIso = parseISO(input, { in: tz(sourceTimezone) });
+  const parsedIso = parseISO(input, { in: parseTz });
 
   if (parsedIso && !isNaN(parsedIso.getTime())) {
     console.debug('Returning parsed ISO date:', parsedIso.toISOString());

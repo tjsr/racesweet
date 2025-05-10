@@ -1,4 +1,5 @@
 import { InvalidDateTimeStringError } from "./errors.ts";
+import { TZDate } from "@date-fns/tz";
 import { hasDateComponent } from "./datetime.ts";
 import { parseDateString } from "./datestring.ts";
 import { timeToLocal } from "./dateutils.js";
@@ -43,7 +44,7 @@ export const splitDateTime = (input: string, tzhint?: string): { isoDate?: Date;
     timePart = timePart + tzhint;
   }
   const isoDateString = datePart + 'T' + timePart;
-  isoDate = new Date(isoDateString);
+  isoDate = new TZDate(isoDateString, tzhint);
   return {
     date: datePart,
     isoDate: isoDate,
