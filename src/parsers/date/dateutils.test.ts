@@ -1,3 +1,4 @@
+import { DateParseError, InvalidYearError } from './errors.ts';
 import { datePartsToDMY, timeToLocal, validEpoch2DigitYear, validEpoch4DigitYear } from './dateutils.js';
 
 describe('validEpoch2DigitYear', () => {
@@ -64,6 +65,22 @@ describe('datePartsToDMY', () => {
     expect(result).toEqual({ day: 1, month: 10, year: 2037 });
 
     parts[2] = '38';
-    expect(() => datePartsToDMY(parts)).not.toThrow();
+    expect(() => datePartsToDMY(parts)).toThrow(InvalidYearError);
+  });
+
+  it ('Should determine correct year and day portion given 2-digit year', () => {
+    const parts: [string, string, string] = ['25', '10', '00'];
+    const result = datePartsToDMY(parts);
+    expect(result).toEqual({ day: 25, month: 10, year: 2000 });
+  });
+
+  it('Should reject invalid day if year is 2-digit', () => {
+    const parts: [string, string, string] = ['49', '10', '00'];
+    expect(() => datePartsToDMY(parts)).toThrow(DateParseError);
+  });
+
+  it('Should reject invalid day with valid 4-digit year', () => {
+    const parts: [string, string, string] = ['49', '10', '2020'];
+    expect(() => datePartsToDMY(parts)).toThrow(DateParseError);
   });
 });

@@ -1,4 +1,4 @@
-import type { EventParticipant, IdType, ParticipantIdentifier } from "../model/index.js";
+import type { EventParticipant, IdType, ParticipantIdentifier } from "../model/index.ts";
 
 const addParticipantIdentifier = (
   participant: EventParticipant,

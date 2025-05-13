@@ -1,11 +1,17 @@
-import { DateParseError, InvalidYearError } from "./errors.js";
+import { DateParseError, InvalidYearError } from "./errors.ts";
 
-import { isValidYear } from "./dateutils.js";
+import { isValidYear } from "./dateutils.ts";
 import { parseDashedDateString } from "./dashedDateString.ts";
 import { parseSlashedDateString } from "./slashedDateString.ts";
 
 export const expandTwoDigitYear = (yy: string): string => {
+  if (yy == undefined || yy.length !== 2) {
+    throw new DateParseError(`Invalid two-digit year: '${yy}'`);
+  }
   const yearNum: number = parseInt(yy, 10);
+  if (isNaN(yearNum)) {
+    throw new DateParseError(`Invalid two-digit year: '${yy}'`);
+  }
   if (yearNum < 50) return (2000 + yearNum).toString();
   return (1900 + yearNum).toString();
 };

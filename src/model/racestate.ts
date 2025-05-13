@@ -1,6 +1,6 @@
-import type { EventCategory } from "./eventcategory.js";
-import type { EventParticipant } from "./eventparticipant.js";
-import type { EventTeam } from "./eventteam.js";
+import type { EventCategory } from "./eventcategory.ts";
+import type { EventParticipant } from "./eventparticipant.ts";
+import type { EventTeam } from "./eventteam.ts";
 
 export interface RaceState {
   participants: EventParticipant[];

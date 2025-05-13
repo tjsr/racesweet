@@ -1,7 +1,7 @@
-import { DateParseError } from "./errors.js";
-import { expectDate } from './dateTestUtils.js';
-import { parseDashedDateString } from "./dashedDateString.js";
-import { parseDateString } from "./datestring.js";
+import { DateParseError } from "./errors.ts";
+import { expectDate } from './dateTestUtils.ts';
+import { parseDashedDateString } from "./dashedDateString.ts";
+import { parseDateString } from "./datestring.ts";
 
 const testTz: string = 'Australia/Melbourne';
 

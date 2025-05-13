@@ -1,9 +1,23 @@
-import type { OutreachChipCrossingData, UnsourcedOutreachChipCrossingData } from "./outreach.js";
+import type { OutreachChipCrossingData, UnsourcedOutreachChipCrossingData } from "./outreach.ts";
 import { parseFile, parseOutreachLine, parseSimpleOutreachChipLine } from "./outreach.js";
 
+import { TZDate } from "@date-fns/tz";
 import path from 'node:path';
 
 const testdata_dir = path.resolve(path.join('.', 'src', 'testdata'));
+const dateHint: TZDate = new TZDate();
+
+const timeToExpectation = (time: Date) => {
+  return {
+    "date": time.getUTCDate(),
+    "hour": time.getUTCHours(),
+    "millisecond": time.getUTCMilliseconds(),
+    "minute": time.getUTCMinutes(),
+    "month": time.getUTCMonth(),
+    "second": time.getUTCSeconds(),
+    "year": time.getUTCFullYear(),
+  };
+};
 
 describe('Read in a full outreach file', () => {
   it('should parse the file correctly', async () => {
@@ -23,10 +37,12 @@ describe('Read in a full outreach file', () => {
 });
 
 describe('parsers/parseOutreachLine', () => {
+  const currentDate = new Date();
+
   const rfidTimingDataLine = '2,200306,200306,"25-08-2023 19:11:06.405"';
   const outreachTabDelimitedLine = '200306\t25-08-2023 19:11:06.405';
   const outreachCommaDelimitedLineWithDate = '3,200306,200306,23-06-2023 19:09:05.202';
-  const outreachCommaDelimitedLineWithoutDate = '2,200455,200455,23-06-2023 14:24:34.542';
+  const outreachCommaDelimitedLineWithoutDate = '2,200455,200455,14:24:34.542';
 
   // (?<date>(\d{4}[\-/]\d{1,2}[\-/]\d{1,2})|mm/dd/yyyy)?[\sT])
   // const dateTimeRegex = /(?<date>\d{4}[\/-]\d{1,2}[\/-]\d{1,2}|\d{1,2}[\/-]\d{1,2}[\/-]\d{4})[ T](?<time>\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)/;
@@ -34,7 +50,7 @@ describe('parsers/parseOutreachLine', () => {
   it('Should parse a line split with tabs', () => {
     let parsed: UnsourcedOutreachChipCrossingData;
     expect(() => {
-      parsed = parseOutreachLine(outreachTabDelimitedLine);
+      parsed = parseOutreachLine(outreachTabDelimitedLine, dateHint);
     }).not.toThrowError();
     expect(parsed!).toBeDefined();
     parsed = parsed!;
@@ -50,7 +66,7 @@ describe('parsers/parseOutreachLine', () => {
     ];
 
     testLines.forEach(async (line) => {
-      const parsed: UnsourcedOutreachChipCrossingData = parseOutreachLine(line);
+      const parsed: UnsourcedOutreachChipCrossingData = parseOutreachLine(line, dateHint);
       // parsed.forEach((parsedData: ChipCrossingData[]) => {
       expect(parsed).toBeDefined();
       expect(parsed.chipCode).toEqual(200306);
@@ -62,43 +78,80 @@ describe('parsers/parseOutreachLine', () => {
     // expect(parsed?.time).toBeDefined();
   });
 
-  it ('Should parse a line with only a time value and no date hint provided', () => {
-    const testLines = [
-      '4,200455,200455,"17:59:56.568',
-      outreachCommaDelimitedLineWithoutDate,
-    ];
+  it('Should parse a line with a date and time', () => {
+    const line = outreachCommaDelimitedLineWithDate;
+    const expectation = {
+      "date": 23,
+      "hour": 19,
+      "millisecond": 202,
+      "minute": 9,
+      "month": 5,
+      "second": 5,
+      "year": 2023,
+    };
 
-    const expectations = [{
-      "hour": 17,
-      "millisecond": 568,
-      "minute": 59,
-      "second": 56,
-    },
-    {
+    const parsed: Partial<OutreachChipCrossingData> | UnsourcedOutreachChipCrossingData = parseOutreachLine(line, dateHint);
+    // parsed.forEach((parsedData: ChipCrossingData[]) => {
+    expect(parsed).toBeDefined();
+    expect(parsed.chipCode).toBe(200306);
+
+    expect(parsed.time).toBeDefined();
+    const result = timeToExpectation(parsed.time!);
+    expect(expectation, `Parsed date and time values do not match expectation for line ${line}`).toEqual(result);
+  });
+
+  it('Should parse a line with no date but time', () => {
+    const line = outreachCommaDelimitedLineWithoutDate;
+    const expectation = {
+      "date": currentDate.getUTCDate(),
       "hour": 14,
       "millisecond": 542,
       "minute": 24,
+      "month": currentDate.getUTCMonth(),
       "second": 34,
-    }];
+      "year": currentDate.getUTCFullYear(),
+    };
 
-    const currentDate = new Date();
+    const parsed: Partial<OutreachChipCrossingData> | UnsourcedOutreachChipCrossingData = parseOutreachLine(line, dateHint);
+    // parsed.forEach((parsedData: ChipCrossingData[]) => {
+    expect(parsed).toBeDefined();
+    expect(parsed.chipCode).toBe(200455);
 
-    testLines.forEach(async (line) => {
-      const parsed: Partial<OutreachChipCrossingData> | UnsourcedOutreachChipCrossingData = parseOutreachLine(line);
-      // parsed.forEach((parsedData: ChipCrossingData[]) => {
-      expect(parsed).toBeDefined();
-      expect(parsed.chipCode).toBe(200455);
+    expect(parsed.time).toBeDefined();
+    const result = timeToExpectation(parsed.time!);
+    expect(expectation, `Parsed date and time values do not match expectation for line ${line}`).toEqual(result);
+  });
 
-      expect(parsed.time).toBeDefined();
-      expect(parsed.time?.getUTCFullYear(), `Unmatched year in ${line}`).toEqual(currentDate.getUTCFullYear());
-      expect(parsed.time?.getUTCMonth(), `Unmatch month in ${line}`).toEqual(currentDate.getUTCMonth());
-      expect(parsed.time?.getUTCDate(), `Unmatched day in ${line}`).toEqual(currentDate.getUTCDate());
+  it ('Should parse a line with only a time value and no date hint provided', () => {
+    const line = '4,200455,200455,"17:59:56.568';
 
-      expect(parsed.time?.getHours(), `Unmatched hours in ${line}`).toEqual(expectations[0].hour);
-      expect(parsed.time?.getMinutes(), `Unmatched minutes in ${line}`).toEqual(expectations[0].minute);
-      expect(parsed.time?.getSeconds(), `Unmatched seconds in ${line}`).toEqual(expectations[0].second);
-      expect(parsed.time?.getMilliseconds(), `Unmatched milliseconds in ${line}`).toEqual(expectations[0].millisecond);
-    });
+    const expectation = {
+      "date": currentDate.getUTCDate(),
+      "hour": 17,
+      "millisecond": 568,
+      "minute": 59,
+      "month": currentDate.getUTCMonth(),
+      "second": 56,
+      "year": currentDate.getUTCFullYear(),
+    };
+
+    const parsed: Partial<OutreachChipCrossingData> | UnsourcedOutreachChipCrossingData = parseOutreachLine(line, dateHint);
+    // parsed.forEach((parsedData: ChipCrossingData[]) => {
+    expect(parsed).toBeDefined();
+    expect(parsed.chipCode).toBe(200455);
+
+    expect(parsed.time).toBeDefined();
+    const result = timeToExpectation(parsed.time!);
+    expect(expectation, `Parsed date and time values do not match expectation for line ${line}`).toEqual(result);
+
+    // expect(parsed.time?.getUTCFullYear(), `Unmatched year in line ${line}`).toEqual(expectation.year);
+    // expect(parsed.time?.getUTCMonth(), `Unmatch month in line ${line}`).toEqual(expectation.month);
+    // expect(parsed.time?.getUTCDate(), `Unmatched day in line ${line}`).toEqual(expectation.date);
+
+    // expect(parsed.time?.getHours(), `Unmatched hours in line ${line}`).toEqual(expectation.hour);
+    // expect(parsed.time?.getMinutes(), `Unmatched minutes in line ${line}`).toEqual(expectation.minute);
+    // expect(parsed.time?.getSeconds(), `Unmatched seconds in line ${line}`).toEqual(expectation.second);
+    // expect(parsed.time?.getMilliseconds(), `Unmatched milliseconds in line ${line}`).toEqual(expectation.millisecond);
   });
 });
 
@@ -109,7 +162,7 @@ describe('parsers/parseSimpleOutreachChipLine', () => {
     ];
 
     testLines.forEach((line) => {
-      const parsed: UnsourcedOutreachChipCrossingData = parseSimpleOutreachChipLine(line);
+      const parsed: UnsourcedOutreachChipCrossingData = parseSimpleOutreachChipLine(line, dateHint);
       expect(parsed).toBeDefined();
       expect(parsed.chipCode).toBe(200306);
       expect(parsed.time).toBeDefined();

@@ -1,5 +1,7 @@
-import { DateParseError } from './errors.ts';
+import { DateParseError } from './date/errors.ts';
+import type { TZDate } from '@date-fns/tz';
 import { parse } from 'date-fns';
+import { parseUnknownDateTimeString } from './date/datetime.ts';
 
 const knownDateFormats = [
   'dd/MM/yyyy',
@@ -13,7 +15,13 @@ const knownDateFormats = [
 
 const timeFormat  = 'HH:mm:ss.SSS';
 
-export const tryParseDateTime = (dateString: string, refDate: Date): Date | null => {
+export const tryParseDateTime = (dateString: string, refDate: TZDate): Date | null => {
+  const parsed = parseUnknownDateTimeString(dateString, refDate);
+  if (parsed !== null) {
+    return parsed;
+  }
+  throw new DateParseError(`Invalid date format: ${dateString}`);
+
   // RefDate is required because it gives us the timezone if not provided.
   for (const format of knownDateFormats) {
     const parseFormat = `${format} ${timeFormat}`.trim();

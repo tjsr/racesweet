@@ -1,5 +1,5 @@
-import type { TimeEventSource } from "../model/chipcrossing.js";
-import type { TimeEventSourceId } from "../model/types.js";
+import type { TimeEventSource } from "../model/chipcrossing.ts";
+import type { TimeEventSourceId } from "../model/types.ts";
 
 export const addTimeEventSource = (timeEventSources: Map<TimeEventSourceId, TimeEventSource>, source: TimeEventSource): void => {
   if (!source) {

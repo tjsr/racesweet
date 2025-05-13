@@ -1,11 +1,13 @@
-import { InvalidDateTimeStringError, TimeParseError } from "./errors.js";
+import { DateParseError, InvalidDateTimeStringError, TimeParseError } from "./errors.js";
+import { TZDate, tz } from "@date-fns/tz";
 
+import type { RFC3339DateStamp } from "./dateutils.ts";
+import adp from 'any-date-parser';
 import { formatRFC3339 } from "date-fns";
-import { parseDateString } from "./datestring.ts";
+import { parseDateString } from "./datestring.js";
 import { parseISO } from "date-fns/parseISO";
-import { splitDateTime } from "./splitDateTime.ts";
-import { tz } from "@date-fns/tz";
-import { validateTimeString } from "../validators/time.js";
+import { splitDateTime } from "./splitDateTime.js";
+import { validateTimeString } from "../../validators/time.js";
 
 export const systemDateString = /^(?<year>\d{4})[-/](?<month>\d{1,2})[-/](?<day>\d{1,2})$/;
 // const reverseDateString = /^(?<day>\d{1,2})[-/](?<month>\d{1,2})[-/](?<year>\d{4})$/;
@@ -16,9 +18,9 @@ const getUserTimezone = (): string => {
   return 'Australia/Melbourne'; // Replace with actual logic to get user's timezone
 };
 
-export const combineDateWithTimeString = (date: Date, time: string): Date => {
+export const combineDateWithTimeString = (date: Date, time: string): TZDate => {
   const [hour, minute, second, millisecond] = time.split(/[:.]/).map(Number);
-  const newDate = new Date(date.getTime());
+  const newDate = new TZDate(date.getTime());
   newDate.setUTCHours(hour || 0, minute || 0, second || undefined, millisecond || undefined);
   return newDate;
 };
@@ -40,10 +42,17 @@ export const combineDateWithTimeString = (date: Date, time: string): Date => {
 //   };
 // };
 
-const dateAndTimeStringToDate = (date: string, time: string): Date => {
+export const dateAndTimeStringToDate = (date: string, time: string, dateHint: TZDate): TZDate => {
   if (!time) {
     throw new TimeParseError('Time must be a valid string', time);
   }
+
+
+
+  const nDate = new TZDate(dateHint);
+  const dDate = TZDate.parse(date);
+  const tTime = TZDate.parse(time);
+
 
   // const { day, month, year } = parseDateString(date);
   const dateValue: Date = parseDateString(date); // Validate date format
@@ -53,14 +62,15 @@ const dateAndTimeStringToDate = (date: string, time: string): Date => {
   
   // const [day, month, year] = date.split(/[-/]/).map(Number);
   const [hour, minute, second, millisecond] = time.split(/[:.]/).map(Number);
-  console.log(hour, minute, second, millisecond);
+  console.debug(dateAndTimeStringToDate, hour, minute, second, millisecond);
 
-  const output = new Date(Date.UTC(year, month - 1, day, hour || 0, minute || 0, second || undefined, millisecond || undefined));
+  const output = new TZDate(year, month - 1, day, hour || 0, minute || 0, second || 0, millisecond || 0, dateHint.timeZone || getUserTimezone());
   return output;
 };
 
-const dateAndTimeStringToIsoFormat = (date: string, time: string): string => {
-  const parsed = dateAndTimeStringToDate(date, time);
+export const dateAndTimeStringToIsoFormat = (date: string, time: string, dateHint: TZDate): RFC3339DateStamp => {
+  const parsed = dateAndTimeStringToDate(date, time, dateHint);
+  console.debug(dateAndTimeStringToIsoFormat, date, time, parsed);
   return formatRFC3339(parsed, { fractionDigits: 3 });
 };
 
@@ -68,15 +78,20 @@ const assertValidTimeString = (input: string): void => {
   const hasValidTime = validateTimeString(input);
 
   if (!hasValidTime) {
-    throw new InvalidDateTimeStringError(input);
+    throw new TimeParseError('Time value could not be parsed.', input);
   }
 };
 
-export const parseUnknownDateTimeString = (input: string, sourceTimezone?: string | undefined, eventDateHint?: Date | undefined): Date => {
-  if (sourceTimezone === undefined) {
-    sourceTimezone = getUserTimezone();
+export const anyDateParseUnknownDateTimeString = (input: string): TZDate => {
+  const date = adp.fromString(input);
+  if (date !== null) {
+    return new TZDate(date);;
   }
 
+  throw new DateParseError('Date value could not be parsed.', input);
+};
+
+export const parseUnknownDateTimeString = (input: string, eventDateHint: TZDate): TZDate => {
   const hasDate = hasDateComponent(input);
   if (hasDate) {
     assertValidTimeString(input.split(' ')[1] || input.split('T')[1]);
@@ -88,27 +103,29 @@ export const parseUnknownDateTimeString = (input: string, sourceTimezone?: strin
     throw new Error("Event date hint is required for time-only input");
   }
 
-  const parseTz = input.includes('+') ? undefined : tz(sourceTimezone);
+  const useTz = tz(eventDateHint.timeZone || getUserTimezone());
+
+  const parseTz = input.includes('+') ? undefined : useTz;
   // Check if the input is in ISO 8601 format
   const parsedIso = parseISO(input, { in: parseTz });
 
   if (parsedIso && !isNaN(parsedIso.getTime())) {
-    console.debug('Returning parsed ISO date:', parsedIso.toISOString());
+    console.debug(parseUnknownDateTimeString, 'Returning parsed ISO date:', parsedIso.toISOString());
     // If the input is a valid ISO 8601 date, return it
     return parsedIso;
   }
 
   if (hasDateComponent(input)) {
     const dtParts = splitDateTime(input);
-    const isoDate = dateAndTimeStringToIsoFormat(dtParts.date, dtParts.time);
-    const parsedDate = parseISO(isoDate, { in: tz(sourceTimezone) });
+    const isoDate = dateAndTimeStringToIsoFormat(dtParts.date, dtParts.time, eventDateHint);
+    const parsedDate = parseISO(isoDate, { in: useTz });
     return parsedDate;
   } else if (validateTimeString(input)) {
     // If the input is a time string, use the eventDateHint to create a full date
     if (!eventDateHint) {
       throw new Error("Event date hint is required for time-only input");
     }
-    const newDate = combineDateWithTimeString(eventDateHint, input);
+    const newDate: TZDate = combineDateWithTimeString(eventDateHint, input);
     return newDate;
   }
 

@@ -1,18 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
+import { TZDate } from '@date-fns/tz';
 import { parseDateTime } from "./genericLineMatcher.js";
 
-describe('Example Test Suite', () => {
-  it('should pass this test', () => {
-    expect(1 + 1).toBe(2);
-  });
-});
-
 describe('parseDateTime', () => {
+  const msTimeFormat = 'HH:mm:ss.SSS';
   it('Should parse a time only', () => {
+    const dateHint = new TZDate();
     const chipLine = '1245,19:11:06.405';
-    const dateTimeFormat = 'HH:mm:ss.SSS';
-    const parsed: Date = parseDateTime(chipLine, dateTimeFormat);
+    const parsed: Date = parseDateTime(chipLine, dateHint, msTimeFormat);
 
     const dateNow = new Date();
     expect(parsed).toBeDefined();
@@ -24,10 +20,9 @@ describe('parseDateTime', () => {
   });
 
   it('Should parse a time with a date hint', () => {
-    const dateHint = new Date('2023-08-25');
+    const dateHint = new TZDate('2023-08-25');
     const chipLine = '1245,19:11:06.405';
-    const dateTimeFormat = 'HH:mm:ss.SSS';
-    const parsed: Date = parseDateTime(chipLine, dateTimeFormat, undefined, dateHint);
+    const parsed: Date = parseDateTime(chipLine, dateHint, msTimeFormat);
     expect(parsed).toBeDefined();
     expect(parsed.getUTCFullYear()).toBe(dateHint.getUTCFullYear());
     expect(parsed.getUTCMonth()).toBe(dateHint.getUTCMonth());

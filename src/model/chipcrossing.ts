@@ -1,4 +1,4 @@
-import type { IdType, TimeEventSourceId, uuid } from "./types.js";
+import type { IdType, TimeEventSourceId, uuid } from "./types.ts";
 
 import { v5 as uuidv5 } from 'uuid';
 
@@ -22,6 +22,10 @@ export interface TimeEvent {
   participant?: IdType | null | undefined;
 }
 
+export type UnparsedTimeEvent<TE extends TimeEvent> = Omit<TE, 'time'> & {
+  timeString: string;
+}
+
 export interface TimeEventSource {
   id: TimeEventSourceId;
   name: string;
@@ -35,6 +39,12 @@ export interface ChipCrossingData extends TimeEvent {
   chipCode: number;
 }
 
+export type UnparsedChipCrossingData = UnparsedTimeEvent<ChipCrossingData>;
+
 export interface PlateCrossingData extends TimeEvent {
   plateNumber: string | number;
 }
+
+export const isUnparsedChipCrossing = (crossing: ChipCrossingData): boolean => {
+  return crossing.chipCode === undefined || crossing.chipCode === null;
+};

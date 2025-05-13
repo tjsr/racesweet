@@ -1,5 +1,6 @@
-import type { ChipCrossingData } from "../model/chipcrossing.js";
+import type { ChipCrossingData } from "../model/chipcrossing.ts";
 import type { PathLike } from "node:fs";
+import { TZDate } from "@date-fns/tz";
 import { fromRfidTimingLine } from "./rfidtiming.js";
 import { open } from 'node:fs/promises';
 import { parseLineMatching } from "./genericLineMatcher.js";
@@ -22,9 +23,10 @@ export type UnsourcedOutreachChipCrossingData = Omit<OutreachChipCrossingData, '
 
 export const parseSimpleOutreachChipLine = (
   line: string,
-  sourceTimezone?: string | undefined
+  dateHint: TZDate
 ): UnsourcedOutreachChipCrossingData => {
-  const crossingLine  = parseLineMatching(line, simpleTransponderTimeEvent, sourceTimezone);
+  console.trace(parseSimpleOutreachChipLine, line, dateHint);
+  const crossingLine  = parseLineMatching(line, simpleTransponderTimeEvent, dateHint);
   return {
     ...crossingLine,
     chipCode: crossingLine.chipCode!,
@@ -32,9 +34,9 @@ export const parseSimpleOutreachChipLine = (
   };
 };
 
-export const parseOutreachLine = (line: string): UnsourcedOutreachChipCrossingData => {
+export const parseOutreachLine = (line: string, dateHint: TZDate): UnsourcedOutreachChipCrossingData => {
   try {
-    const parsed: Partial<ChipCrossingData> | null = fromRfidTimingLine(line, 'UTC', new Date()) || parseSimpleOutreachChipLine(line);
+    const parsed: Partial<ChipCrossingData> | null = fromRfidTimingLine(line, dateHint) || parseSimpleOutreachChipLine(line, dateHint);
     if (parsed) {
       return {
         ...parsed,
@@ -71,7 +73,8 @@ const parseOutreachFile = async  (filePath: PathLike): Promise<ChipCrossingData[
           console.warn('Skipping empty line');
           continue;
         }
-        const outreachCrossing = parseOutreachLine(line);
+        const dateHint = new TZDate();
+        const outreachCrossing = parseOutreachLine(line, dateHint);
         const source = uuidv5(filePathString, uuidv5.URL);
         const crossingId = createIdHash(source, outreachCrossing);
         const parsedLine: OutreachChipCrossingData = {

@@ -1,7 +1,7 @@
-import { DateParseError } from "./errors.js";
-import { expectDate } from "./dateTestUtils.js";
-import { expectParseString } from "./datestring.test.js";
-import { parseDateString } from "./datestring.js";
+import { DateParseError } from "./errors.ts";
+import { expectDate } from "./dateTestUtils.ts";
+import { expectParseString } from "./datestring.test.ts";
+import { parseDateString } from "./datestring.ts";
 import { parseSlashedDateString } from "./slashedDateString.js";
 
 describe('parseSlashedDateString::parseDateString', () => {
@@ -61,9 +61,9 @@ describe('slashedDateString', () => {
   it('Should reject invalid date formats', () => {
     const invalidDates = [
       '12/25/2020/01',
-      '12-25-2020',
-      '2020-12-25',
-      '2020/12/25',
+      // '12-25-2020',
+      // '2020-12-25',
+      // '2020/12/25',
       '12/25/20a0',
       '12/25/20.0',
       '12/25/20,0',

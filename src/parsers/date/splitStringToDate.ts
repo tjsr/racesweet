@@ -1,6 +1,6 @@
-import { DateParseError } from "./errors.js";
+import { DateParseError } from "./errors.ts";
 import { TZDate } from "@date-fns/tz";
-import { datePartsToDMY } from "./dateutils.js";
+import { datePartsToDMY } from "./dateutils.ts";
 
 export const parseSplitDateStringToDate = (input: string, delimiter: string = '-', tz?: string): TZDate => {
   if (input.includes(' ') || input.includes('T')) {

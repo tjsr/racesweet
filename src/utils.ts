@@ -17,6 +17,8 @@ export const asSafeNumber = (value: string | number | undefined): number => {
   if (typeof value === 'number') {
     return value;
   }
-  const parsedValue = parseInt(value, 10);
-  return isNaN(parsedValue) ? 0 : parsedValue;
+  if (typeof value === 'string' && value.trim() !== '' && !isNaN(Number(value))) {
+    return Number(value);
+  }
+  return 0;
 };
