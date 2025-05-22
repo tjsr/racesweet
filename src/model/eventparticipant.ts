@@ -14,10 +14,10 @@ export interface EventParticipant {
   id: EventParticipantId;
   firstname: string;
   surname: string;
-  lastRecordTime: ISO8601DateTime;
-  lastRecordTimingPoint: TimingPointId;
+  lastRecordTime: ISO8601DateTime | null;
+  lastRecordTimingPoint?: TimingPointId | undefined;
   resultDuration: ISO8601Duration | null;
-  currentResult: string;
+  currentResult: string | undefined;
   categoryId: EventCategoryId;
   identifiers: ParticipantIdentifier[];
 }
@@ -30,3 +30,6 @@ export interface ParticipantTransponder extends ParticipantIdentifier {
   txNo: string | number;
 }
 
+export type ChipCodeType = ParticipantTransponder['txNo'];
+export type RacePlateType = ParticipateRacePlate['racePlate'];
+export type TransponderType = ParticipantTransponder['txNo'];

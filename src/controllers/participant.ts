@@ -1,4 +1,15 @@
-import type { EventParticipant, IdType, ParticipantIdentifier } from "../model/index.ts";
+import type { ChipCodeType, EventParticipantId } from "../model/eventparticipant.ts";
+import type { EventCategory, EventParticipant, IdType, ParticipantIdentifier } from "../model/index.ts";
+import {
+  findCategoryByName,
+  findOrCreateCategory,
+  getCategoryList
+} from "./category.ts";
+
+import type { PathLike } from "fs";
+import type { WorkSheet } from 'xlsx';
+import { randomUUID } from "crypto";
+import xlsx from 'xlsx';
 
 const addParticipantIdentifier = (
   participant: EventParticipant,
@@ -7,7 +18,10 @@ const addParticipantIdentifier = (
   fromTime?: Date | undefined,
   toTime?: Date | undefined
 ): boolean => {
-  if (participant.identifiers?.some((existingIdentifier: ParticipantIdentifier) => {
+  if (participant.identifiers === undefined) {
+    participant.identifiers = [];
+  }
+  if (participant.identifiers.some((existingIdentifier: ParticipantIdentifier) => {
     if (identifierType in existingIdentifier) {
       const i = existingIdentifier as unknown as Record<string, unknown>;
       const identifier = i[identifierType];
@@ -78,12 +92,18 @@ const getParticipantIdentifier = (
     if (identifier.toTime && lookupTime && identifier.toTime > lookupTime) {
       return false;
     }
+    return true;
   });
 
   if (ids.length > 1) {
     throw new Error('Participant has multiple race plates assigned.');
   }
   const record = ids[0] as unknown as Record<string, unknown>;
+  if (!record) {
+    // const identifierList = participant.identifiers.map((identifier) => Object.keys(identifier));
+    // console.warn(`Participant ${participant.id} has no ${identifierType} identifiers but had ${identifierList}`);
+    return undefined;
+  }
   return record[identifierType] as string | number;
 };
 
@@ -92,7 +112,10 @@ const getParticipantIdentifiers = (
   identifierType: string,
   lookupTime?: Date | undefined
 ): (string|number)[] => {
-  let ids = participant.identifiers.filter((identifier) => identifierType in identifier);
+  // Object.keys(identifier).includes(identifierType)
+  let ids = participant.identifiers?.filter(
+    (identifier: ParticipantIdentifier) => Object.prototype.hasOwnProperty.call(identifier, identifierType)
+  );
   if (ids.length === 0) {
     return [];
   }
@@ -103,6 +126,7 @@ const getParticipantIdentifiers = (
     if (identifier.toTime && lookupTime && identifier.toTime > lookupTime) {
       return false;
     }
+    return true;
   });
 
   return ids.map((identifier) => {
@@ -133,18 +157,369 @@ export const getParticipantTransponders = (
   getParticipantIdentifiers(participant, 'txNo');
 
 
+export const validateIdentifierType = (identifierType: string): void => {
+  const validIdentifierTypes = ['txNo', 'racePlate'];
+  if (!validIdentifierTypes.includes(identifierType)) {
+    throw new Error(`Invalid identifier type: ${identifierType}. Valid types are: ${validIdentifierTypes.join(', ')}`);
+  }
+};
+
 export const matchParticipantToIdentifier = (
   participant: EventParticipant,
   identifier: string | number,
   identifierType: string,
   lookupTime: Date
 ): IdType | null => {
+  validateIdentifierType(identifierType);
   const identifiers = getParticipantIdentifiers(participant, identifierType, lookupTime);
   if (identifiers.length >= 1) {
     if (identifiers.length > 1) {
       console.warn(`Participant ${participant.id} has multiple mathing ${identifierType} identifiers: ${identifiers.join(', ')}`);
     }
-    return participant.id;
+    if (identifiers.some((id) => id === identifier)) {
+      return participant.id;
+    }
   }
   return null;
+};
+
+export const chipNumberInSeries = (series: number, chipCode: ChipCodeType): number | null => {
+  const chipCodeNo = Number(chipCode);
+  const numInSeries = chipCodeNo % series;
+  const range = chipCodeNo - numInSeries;
+  if (range === series) {
+    return numInSeries;
+  }
+  return null;
+};
+
+export const getPlateNumberFromChipCode = (chipCode: ChipCodeType): string|undefined => {
+  const plateNumber = chipNumberInSeries(200000, chipCode) ||
+    chipNumberInSeries(100000, chipCode) ||
+    chipNumberInSeries(1100000, chipCode);
+  
+  if (!plateNumber) {
+    return undefined;
+  }
+  return plateNumber.toString();
+};
+
+const createEntrantWithChipCode = (
+  categories: EventCategory[],
+  chipCode: ChipCodeType,
+  categoryName: string
+): EventParticipant => {
+  const plateNumber = getPlateNumberFromChipCode(chipCode);
+  const entrantId = `entrant-${chipCode}`;
+  const cat = findOrCreateCategory(categories, { name: categoryName });
+  const createdEntrant: EventParticipant = {
+    categoryId: cat.id,
+    currentResult: undefined,
+    firstname: `Entrant ${chipCode}`,
+    id: entrantId,
+    identifiers: [],
+    lastRecordTime: null,
+    resultDuration: null,
+    surname: `Surname ${chipCode}`,
+  };
+  assignTransponder(createdEntrant, chipCode);
+  if (plateNumber) {
+    assignParticipantNumber(createdEntrant, plateNumber);
+  }
+  return createdEntrant;
+};
+
+
+const createEntrant = (
+  categories: EventCategory[],
+  categoryName: string
+): Partial<EventParticipant> => {
+  
+  const entrantId = randomUUID();
+  const cat = findOrCreateCategory(categories, { name: categoryName });
+  const createdEntrant: Partial<EventParticipant> = {
+    categoryId: cat.id,
+    currentResult: undefined,
+    id: entrantId,
+    identifiers: [],
+    lastRecordTime: null,
+    resultDuration: null,
+  };
+  return createdEntrant;
+};
+
+export const createEntrantForUnmatchedChipCode = (
+  categories: EventCategory[],
+  chipCode: ChipCodeType,
+  assignPlateNumberAsChipCode: boolean = true,
+  categoryName: string = 'Unknown Chip'
+): EventParticipant => {
+  const plateNumber = getPlateNumberFromChipCode(chipCode);
+  const createdEntrant = createEntrantWithChipCode(categories, chipCode, categoryName);
+  if (assignPlateNumberAsChipCode && plateNumber) {
+    assignParticipantNumber(createdEntrant, plateNumber);
+  }
+  return createdEntrant;
+};
+
+export const findEntrantByChipCode = (entrants: Map<EventParticipantId, EventParticipant>, chipCode: number): EventParticipant | undefined => {
+  const foundEntrant = entrants.values().find((entrant) => {
+    const id = matchParticipantToIdentifier(entrant, chipCode, 'txNo', new Date());
+    if (id !== null) {
+      return true;
+    }
+    return false;
+  });
+
+  return foundEntrant;
+};
+
+type PlateNumberType = string | number;
+
+export const findEntrantByPlateNumber = (entrants: Map<EventParticipantId, EventParticipant>, plateNumber: PlateNumberType): EventParticipant | undefined => {
+  const entrant = entrants.values().find((entrant) => {
+    const id = matchParticipantToIdentifier(entrant, plateNumber, 'plateNumber', new Date());
+    if (id !== null) {
+      return true;
+    }
+    return false;
+  });
+
+  if (!entrant) {
+    const categoryName = 'Unknown Plate';
+    const categories = getCategoryList();
+    const createdEntrant = createEntrant(categories, categoryName);
+    assignParticipantNumber(createdEntrant as EventParticipant, plateNumber);
+    entrants.set(createdEntrant.id!, createdEntrant as EventParticipant);
+  }
+  return entrant;
+};
+
+interface SheetData {
+  headers: Record<string, unknown>;
+  data: Record<string, unknown>[];
+}
+
+export const readXlsxToJson = (filePath: PathLike): Promise<SheetData> => {
+  let path = filePath.toString();
+  let sheetName = undefined;
+  if (filePath.toString().includes('')) {
+    const workbookLocationParts = filePath.toString().split('!');
+    sheetName = workbookLocationParts[workbookLocationParts.length - 1];
+    path = workbookLocationParts[0];
+  }
+  const workbook = xlsx.readFile(path);
+  const workingSheet: WorkSheet = workbook.Sheets[sheetName || 'Sheet1'] || workbook.Sheets[workbook.SheetNames[0]] || workbook.Sheets[0];
+  const sheetJson: Record<string, unknown>[] = xlsx.utils.sheet_to_json(workingSheet, { header: "A" });
+  const headers = sheetJson.shift() as Record<string, unknown>;
+
+  sheetJson.forEach((row: unknown) => {
+    Object.keys(headers).forEach((key) => {
+      try {
+        const mappedKey: unknown = headers[key];
+        if (!mappedKey) {
+          return;
+        }
+        const rowRecord = row as unknown as Record<string, unknown>;
+        const mappedValue = rowRecord[key];
+        if (mappedValue) {
+          rowRecord[mappedKey as string] = mappedValue;
+        }
+      } catch (error) {
+        const hk = headers ? headers[key] : 'Unknown header mapping';
+        console.error(`Error mapping key ${key} to ${hk}:`, error);
+      }
+    });
+
+    
+    // const rowDataKeys = Object.keys(rowData);
+    // const rowDataValues = Object.values(rowData);
+    // console.log('Row', '>>>>', row);
+
+    console.log('Row', '>>>>', row);
+  });
+
+  const result: SheetData = {
+    data: sheetJson,
+    headers: headers,
+  };
+
+  return Promise.resolve(result);
+};
+
+interface ImportMappings {
+  [key: string]: string|number;
+}
+
+class DataImportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DataImportError";
+  }
+}
+
+class ParticipantSpreadsheetError extends DataImportError {
+  constructor(message: string) {
+    super(message);
+    this.name = "ParticipantSpreadsheetError";
+  }
+}
+
+class ColumnNotInSpreadsheetError extends ParticipantSpreadsheetError {
+  constructor(message: string) {
+    super(message);
+    this.name = "ColumnNotInSpreadsheetError";
+  }
+}
+
+const findColumnNameForSheetColumn = (headers: Record<string, string|undefined>, possibleNames: string[]): string|undefined => {
+  const checkNames = [...possibleNames];
+  
+  // , ...possibleNames.map((name) => name.toLowerCase())];
+  for (const name of checkNames) {
+    const foundName = Object.keys(headers).find((header) => {
+      const headerValue = headers[header];
+      if (headerValue && headerValue.toString().replaceAll(' ', '').toLowerCase() === name.replaceAll(' ', '').toLowerCase()) {
+        return true;
+      }
+    });
+    if (foundName) {
+      return foundName;
+    }
+  }
+
+  const possibleNamesString = possibleNames.map((name) => `"${name}"`).join(', ');
+  const errMsg = `Entrant sheet to import does not have a searched for header, looked for columns named ${possibleNamesString}`;
+  throw new ColumnNotInSpreadsheetError(errMsg);
+};
+
+class CategoryNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CategoryNotFoundError";
+  }
+}
+
+class NoTransponderError extends ParticipantSpreadsheetError {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoTransponderError";
+  }
+}
+
+class NoPlateNumberError extends ParticipantSpreadsheetError {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoPlateNumberError";
+  }
+}
+
+const findMappedTransponder = (mappings: ImportMappings, headings: Record<string, string|undefined>, row: Record<string, unknown>): string|undefined => {
+  const txNoProperty = mappings.Tx as string || mappings.Transponder as string || findColumnNameForSheetColumn(headings, ['Transponder', 'TxNo', 'Tx', 'Chip Code'])!;
+  return row[txNoProperty] as string;
+};
+
+const findMappedRiderNumber = (mappings: ImportMappings, headings: Record<string, string|undefined>, row: Record<string, unknown>): string|undefined => {
+  const riderNumberProperty = mappings.RacePlate as string || findColumnNameForSheetColumn(headings, ['Rider Number', 'Rider No'])!;
+  return row[riderNumberProperty] as string;
+};
+
+const findMappedSurname = (mappings: ImportMappings, headings: Record<string, string|undefined>, row: Record<string, unknown>): string|undefined => {
+  const surnameProperty = mappings.Surname as string || findColumnNameForSheetColumn(headings, ['Surname', 'Last Name', 'Last'])!;
+  return row[surnameProperty] as string;
+};
+
+const findMappedFirstname = (mappings: ImportMappings, headings: Record<string, string|undefined>, row: Record<string, unknown>): string|undefined => {
+  const firstnameProperty = mappings.Firstname as string || findColumnNameForSheetColumn(headings, ['Firstname', 'First Name', 'First', 'Given name'])!;
+  return row[firstnameProperty] as string;
+};
+
+const processParticipantRow = (
+  headers: Record<string, string|undefined>,
+  mappings: ImportMappings,
+  row: Record<string, unknown>,
+  categorySheetHeader: string,
+  categoryList: EventCategory[]
+): EventParticipant => {
+  const rowCategory = row[categorySheetHeader] as string;
+  if (!rowCategory) {
+    console.error(`Row does not have any category data.`);
+  }
+  const createUnknownCategories: boolean = true;
+
+  const categoryName = row[categorySheetHeader] as string;
+
+  const category: EventCategory | null = createUnknownCategories ? findOrCreateCategory(categoryList, { name: categoryName }) : findCategoryByName(categoryList, categoryName);
+  if (!category) {
+    const errMsg = `Category ${categoryName} specified in sheet does not match available category.`;
+
+    console.error(errMsg);
+    throw new CategoryNotFoundError(errMsg);
+  }
+  // let category: EventCategory | Partial<EventCategory>|null = findCategoryByName(categoryList, categoryName);
+  // if (!category && !createUnknownCategories) {
+  //   console.error(`Category ${categoryName} specified in sheet does not match available cagegory.`);
+  // } else {
+  //   category = createCategory({ name: categoryName });
+  //   categoryList.push(category);
+  // }
+
+  const firstname = findMappedFirstname(mappings, headers, row);
+  const surname = findMappedSurname(mappings, headers, row);
+
+  const participant: Partial<EventParticipant> = {
+    categoryId: category?.id,
+    currentResult: undefined,
+    firstname: firstname,
+    id: randomUUID(),
+    lastRecordTime: null,
+    // identifiers: [],
+    resultDuration: null,
+    surname: surname,
+  };
+  const tx = findMappedTransponder(mappings, headers, row);
+  if (tx) { // row[mappings['TxNo']]) {
+    // const txNoHeader = (headers['Transponder'] || headers['TxNo']) as string;
+    addParticipantIdentifier(participant as EventParticipant, 'txNo', tx);
+    console.log('Added transponder to participant', participant.id, tx, participant.firstname, participant.surname, tx);
+  } else {
+    throw new NoTransponderError(`Transponder not found in row: ${JSON.stringify(row)}`);
+  }
+
+  const no = findMappedRiderNumber(mappings, headers, row);
+
+  if (no) { // row[mappings['No']]) {
+    // const plateNoHeader = (headers['Plate Number'] || headers['No']) as string;
+    addParticipantIdentifier(participant as EventParticipant, 'racePlate', no);
+    console.log('Added plate number to participant', participant.id, no, participant.firstname, participant.surname);
+  } else {
+    throw new NoPlateNumberError(`Plate number not found in row: ${JSON.stringify(row)}`);
+  }
+
+  // Object.keys(mappings).forEach((key) => {
+  //   const mappedKey = mappings[key];
+  //   if (mappedKey && row[mappedKey]) {
+  //     participant[key] = row[mappedKey];
+  //   }
+  // });
+  return participant as EventParticipant;
+};
+
+export const readParticipantsXlsx = (filePath: PathLike, mappings: ImportMappings, categoryList: EventCategory[]): Promise<EventParticipant[]> => {
+  return readXlsxToJson(filePath).then((sheetData: SheetData) => {
+    const participants: EventParticipant[] = [];
+    const headers = sheetData.headers as Record<string, string|undefined>;
+    const data: Record<string, unknown>[] = sheetData.data;
+
+    const categorySheetHeader: string = findColumnNameForSheetColumn(headers, ['Category', 'Class', 'Category Name', 'Grade'])!;
+    if (!categorySheetHeader) {
+      throw new Error('Entrant sheet to import does not have a category header.');
+    }
+
+    data.forEach((row: Record<string, unknown>) => {
+      const participant = processParticipantRow(headers, mappings, row, categorySheetHeader, categoryList);
+      participants.push(participant as EventParticipant);
+    });
+    return participants;
+  });
 };

@@ -19,6 +19,7 @@
     "lint:ts": "eslint",
     "start": "electron .",
     "test": "vitest",
+    "test:table": "tsx ./src/printCrossings.ts",
     "types": "mkdirp src/generated/typebox && ts2typebox --input src/model/index.ts --output src/generated/typebox/index.ts"
   },
   "devDependencies": {
@@ -41,10 +42,13 @@
   "dependencies": {
     "@date-fns/tz": "^1.2.0",
     "any-date-parser": "^2.1.0",
+    "cli-table3": "^0.6.5",
+    "cli-tableau": "^2.0.1",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "electron-debug": "^4.1.0",
     "electron-timber": "^1.0.0",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "xlsx": "^0.18.5"
   }
 }

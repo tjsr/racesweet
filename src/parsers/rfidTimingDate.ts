@@ -1,7 +1,8 @@
+import { fixDateInDateTimeString, parseUnknownDateTimeString } from './date/datetime.ts';
+
 import { DateParseError } from './date/errors.ts';
 import type { TZDate } from '@date-fns/tz';
 import { parse } from 'date-fns';
-import { parseUnknownDateTimeString } from './date/datetime.ts';
 
 const knownDateFormats = [
   'dd/MM/yyyy',
@@ -35,4 +36,12 @@ export const tryParseDateTime = (dateString: string, refDate: TZDate): Date | nu
     }
   }
   throw new DateParseError(`Invalid date format: ${dateString}`);
+};
+
+export const parseRfidTimingDate = (dateString: string): Date => {
+  const date = new Date(Date.parse(fixDateInDateTimeString(dateString)));
+  if (Number.isNaN(date.getTime())) {
+    throw new DateParseError(`Invalid date format: ${dateString}`);
+  }
+  return date;
 };

@@ -1,11 +1,7 @@
-import type { ChipCrossingData, UnparsedTimeEvent } from "../model/chipcrossing.ts";
-
-import type { TZDate } from "@date-fns/tz";
-import { parseUnknownDateTimeString } from "./date/datetime.ts";
+import type { ChipCrossingData } from "../model/chipcrossing.ts";
 import { safeIntOption } from "../utils.ts";
-import { tryParseDateTime } from "./rfidTimingDate.ts";
 
-const outreachRfidTimingFormatPattern: RegExp = /(?<antenna>\d+),(?<chipCode>\d+),(?<hexChipCode>\d+),"?(?<timeString>[\d\-/\s:.]+)"?(,(?<reader>\d+),(?<antenna2>\d+))?/;
+const outreachRfidTimingFormatPattern: RegExp = /(?<antenna>\d+),(?<chipCode>\d+),(?<hexChipCode>[0-f]+),"?(?<timeString>[\d\-/\s:.]+)"?(,(?<reader>\d+),(?<antenna2>\d+))?/;
 
 class InvalidRfidTimingFormatError extends Error {
   constructor(reason: string, line: string) {
@@ -14,7 +10,7 @@ class InvalidRfidTimingFormatError extends Error {
   }
 }
 
-class DateTimeParseError extends Error {
+class _DateTimeParseError extends Error {
   constructor(reason: string, line: string) {
     super(`Invalid date/time format - ${reason}: ${line}`);
     this.name = 'DateTimeParseError';
@@ -37,37 +33,20 @@ const chipOrHexChip = (chipCode: string, hexChipCode: string): number => {
 
 export const matchRfidLine = (line: string): RegExpMatchArray | null => line.match(outreachRfidTimingFormatPattern);
 
-export const fromRfidTimingLine = (line: string, eventDateHint: TZDate): Partial<UnparsedTimeEvent<RFIDTimingChipCrossingData>> | null => {
-  console.trace(fromRfidTimingLine, line, eventDateHint);
+export const fromRfidTimingLine = (line: string): Partial<RFIDTimingChipCrossingData> | null => {
   const rfidTimingMatches: RegExpMatchArray | null = matchRfidLine(line);
   if (!rfidTimingMatches) {
     return null;
   }
-  if (rfidTimingMatches.groups?.timeString === undefined) {
+  const g = rfidTimingMatches.groups;
+  if (g?.timeString === undefined) {
     throw new InvalidRfidTimingFormatError('No time value', line);
   }
-  const timeString: string = rfidTimingMatches.groups?.timeString;
 
-  // let timeValue: Date | null = null;
-  // try {
-  //   timeValue = tryParseDateTime(timeString, eventDateHint);
-  // } catch (_dateParseError) {
-  //   timeValue = parseUnknownDateTimeString(timeString, eventDateHint);
-  // }
-  // if (timeValue === null) {
-  //   throw new InvalidRfidTimingFormatError(`Unrecognised time value: ${timeString}`, line);
-  // }  
-
-  const g = rfidTimingMatches.groups;
-  // const fullYear = timeValue.getUTCFullYear();
-  // if (fullYear < 2000) {
-  //   throw new DateTimeParseError(`Invalid year ${fullYear} in time value`, line);
-  // }
-
-  const data: Partial<UnparsedTimeEvent<RFIDTimingChipCrossingData>> = {
+  const data: Partial<RFIDTimingChipCrossingData> = {
     antenna: safeIntOption(g.antenna, g.antenna2),
     chipCode: chipOrHexChip(g.chipCode, g.hexChipCode),
-    timeString: timeString,
+    timeString: g.timeString,
   };
   return data;
 };

@@ -71,3 +71,79 @@ export const datePartsToDMY = (parts: [string, string, string]): { day: number; 
 
   return { day: numDay, month: numMonth, year: numYear };
 };
+
+export const isDate = (input: string): boolean => {
+  if (!input) {
+    return false;
+  }
+  if (!/.*([-/]).*/.test(input)) {
+    return false;
+  };
+  const parts = input.split(/[-/]/);
+  if (parts.length < 3) {
+    return false;
+  }
+  if (parts.some((part) => part.length !== 1 && part.length !== 2 && part.length !== 4)) {
+    return false;
+  }
+  if (parseInt(parts[1], 10) > 12) {
+    return false;
+  }
+
+  return true;
+};
+
+export const containsDate = (input: string): boolean => {
+  const parts = input.split(/[\sT]/);
+  if (parts.length < 1 || (!parts[0] && !parts[1])) {
+    return false;
+  }
+
+  return isDate(parts[0]);
+};
+
+export const formatDate = (input: string): string|undefined => {
+  const parts = input.split(/[\sT]/);
+  if (!containsDate(input)) {
+    throw new DateParseError('Invalid date string', input);
+  }
+  if (parts.length < 1) {
+    return undefined;
+  }
+  const dateParts: string[] = parts[0].split(/[-/]/);
+  if (dateParts.length < 3) {
+    throw new DateParseError(`Invalid date string: '${input}'`);
+  }
+  const { day, month, year } = datePartsToDMY([dateParts[0], dateParts[1], dateParts[2]]);
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`; 
+};
+
+const getTimeFromString = (input: string): string => {
+  const parts = input.split(/[\sT]/);
+  if (parts.length <= 1 || !parts[0] || !parts[1]) {
+    return '';
+  }
+  const timeParts = parts[parts.length - 1];
+  return timeParts;
+};
+
+const _getTimeOffsetFromString = (input: string): string|undefined => {
+  const time = getTimeFromString(input);
+  if (time.includes('Z')) {
+    return 'Z';
+  } else if (time.includes('+')) {
+    const parts = time.split('+');
+    if (parts.length > 1) {
+      return '+' + parts[1].trim();
+    }
+  };
+  return undefined;
+};
+
+export const containsTimezone = (input: string): boolean => {
+  const parts = input.split(/[\sT]/);
+  if (parts.length <= 1 || !parts[0] || !parts[1]) {
+    return false;
+  }
+  return /.*([+-]\d{2}:\d{2}|Z).*/.test(parts[parts.length - 1]);
+};

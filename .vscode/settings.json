@@ -18,6 +18,7 @@
   "vitest.cliArguments": "--silent",
   "vitest.logLevel": "verbose",
   "vitest.configSearchPatternExclude": "{.git/**,**/node_modules/**,**/.*/**,**/*.d.ts}",
-  "vitest.filesWatcherInclude": "**/*.{ts,tsx,mts},**/src/*.{js,jsx,mjs,cjs,json}",
+  // "vitest.filesWatcherInclude": "**/*.{ts,tsx,mts},src/*.{js,jsx,mjs,cjs,json}",
   "search.useParentIgnoreFiles": false,
+  "terminal.integrated.scrollback": 100000,
 }

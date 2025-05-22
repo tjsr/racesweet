@@ -20,6 +20,15 @@
       "isBackground": true,
       "problemMatcher": "$tsc-watch",
       "detail": "Watches TypeScript files for changes"
+    },
+    {
+      "label": "clear-terminal",
+      "type": "shell",
+      "command": "cls",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
     }
   ]
 }

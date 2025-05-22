@@ -1,5 +1,12 @@
 import { TZDate, tz } from "@date-fns/tz";
-import { dateAndTimeStringToDate, dateAndTimeStringToIsoFormat, hasDateAndTime, hasDateComponent, parseUnknownDateTimeString } from "./datetime.js";
+import {
+  dateAndTimeStringToDate,
+  dateAndTimeStringToIsoFormat,
+  fixDateInDateTimeString,
+  hasDateAndTime,
+  hasDateComponent,
+  parseUnknownDateTimeString
+} from "./datetime.ts";
 import { describe, expect, it } from "vitest";
 
 import { formatRFC3339 } from "date-fns";
@@ -142,7 +149,9 @@ describe('parseUnknownDateTimeString', () => {
   it ('Should return a date object for a valid T-separated with reversed dmy format', () => {
     const testInput = '10-07-2022T14:15:16';
     const result = parseUnknownDateTimeString(testInput, dateHint);
-    expect(result.toISOString()).toEqual('2022-07-10T14:15:16.000');
+    expect(
+      formatRFC3339(result, { fractionDigits: 3, in: tz('Australia/Melbourne') })
+    ).toEqual('2022-07-10T14:15:16.000+10:00');
   });
 
   it ('Should return a date object for a valid date-time string with reversed dmy format', () => {
@@ -150,7 +159,7 @@ describe('parseUnknownDateTimeString', () => {
     const result = parseUnknownDateTimeString(testInput, dateHint);
     expect(result).not.toBeUndefined();
     const rfcStr = formatRFC3339(result, { fractionDigits: 3, in: tz('Australia/Melbourne') });
-    expect(rfcStr).toEqual('2021-07-10T14:15:16.000+1100');
+    expect(rfcStr).toEqual('2021-07-10T14:15:16.000+11:00');
   });
 });
 
@@ -191,5 +200,36 @@ describe('dateAndTimeStringToDate', () => {
     expect(result).not.toBeUndefined();
     expect(result).not.toEqual('2023-10-01T12:00:00.000Z');
     expect(result).toContain('2023-10-01T12:00:00.000');
+  });
+});
+
+
+describe('fixDateInDateTimeString', () => {
+  it('Should return a valid date string for a valid date-time string with T-separator', () => {
+    const testInput = '2023-10-01T12:00:00';
+    const result = fixDateInDateTimeString(testInput);
+    expect(result).not.toBeUndefined();
+    expect(result).toContain('2023-10-01');
+  });
+
+  it('Should return a valid date string for a valid date-time string with space separator', () => {
+    const testInput = '2023-10-01 12:00:00';
+    const result = fixDateInDateTimeString(testInput);
+    expect(result).not.toBeUndefined();
+    expect(result).toContain('2023-10-01');
+  });
+
+  it('Should return a valid date when the date is in reverse order', () => {
+    const testInput = '25-08-2023 19:11:06.405';
+    const result = fixDateInDateTimeString(testInput);
+    expect(result).not.toBeUndefined();
+    expect(result).toContain('2023-08-25');
+  });
+
+  it('Should return a valid date when the date is in reverse order with slashes', () => {
+    const testInput = '25/08/2023 19:11:06.405';
+    const result = fixDateInDateTimeString(testInput);
+    expect(result).not.toBeUndefined();
+    expect(result).toContain('2023-08-25');
   });
 });

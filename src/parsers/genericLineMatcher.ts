@@ -3,6 +3,10 @@ import { TZDate } from "@date-fns/tz";
 import { parse } from "date-fns";
 import { parseUnknownDateTimeString } from "./date/datetime.ts";
 
+// import type { UnparsedChipCrossingData } from "../model/chipcrossing.ts";
+
+
+
 export const parseDateTime = (dateTime: string, dateHint: TZDate, dateTimeFormat?: string | undefined): Date => {
   if (dateTimeFormat) {
     return parse(dateTime, dateTimeFormat, dateHint);
@@ -11,9 +15,7 @@ export const parseDateTime = (dateTime: string, dateHint: TZDate, dateTimeFormat
 };
 
 export const parseLineMatching = (line: string,
-  regex: RegExp,
-  dateHint: TZDate,
-  dateTimeFormat?: string | undefined
+  regex: RegExp
 ): Partial<ChipCrossingData> => {
   const match = line.match(regex);
   if (!match) {
@@ -23,12 +25,8 @@ export const parseLineMatching = (line: string,
   const { chipCode, dateTime } = match.groups || {};
   const parsedChipCode = parseInt(chipCode, 10);
 
-  const parsedTime: Date = parseDateTime(dateTime, dateHint, dateTimeFormat);
-  if (isNaN(parsedTime.getTime())) {
-    throw new Error(`Invalid date format: ${dateTime}`);
-  }
   return {
     chipCode: parsedChipCode,
-    time: parsedTime,
+    timeString: dateTime,
   };
 };

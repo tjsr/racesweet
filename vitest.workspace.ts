@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const fullConfigPath = resolve(__dirname, vitestConfigFile);
-console.debug(`vitest config file (${vitestConfigFile}) in ${vitestWorkspaceFile} resolves to ${fullConfigPath}.`);
+// console.debug(`vitest config file (${vitestConfigFile}) in ${vitestWorkspaceFile} resolves to ${fullConfigPath}.`);
 
 export default [
   fullConfigPath,

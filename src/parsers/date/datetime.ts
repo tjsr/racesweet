@@ -1,7 +1,7 @@
 import { DateParseError, InvalidDateTimeStringError, TimeParseError } from "./errors.js";
 import { TZDate, tz } from "@date-fns/tz";
 
-import type { RFC3339DateStamp } from "./dateutils.ts";
+import type { RFC3339DateStamp } from "./dateutils.js";
 import adp from 'any-date-parser';
 import { formatRFC3339 } from "date-fns";
 import { parseDateString } from "./datestring.js";
@@ -14,7 +14,7 @@ export const systemDateString = /^(?<year>\d{4})[-/](?<month>\d{1,2})[-/](?<day>
 
 // const reverseDateString = /^(?<day>\d{1,2})[-/](?<month>\d{1,2})[-/](?<year>\d{4})$/;
 
-const getUserTimezone = (): string => {
+export const getUserTimezone = (): string => {
   return 'Australia/Melbourne'; // Replace with actual logic to get user's timezone
 };
 
@@ -42,11 +42,31 @@ export const combineDateWithTimeString = (date: Date, time: string): TZDate => {
 //   };
 // };
 
+export const fixDateInDateTimeString = (date: string): string => {
+  if (!date) {
+    throw new DateParseError('Date must be a valid string', date);
+  } 
+  const dateParts = date.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})[\sT](.*)$/);
+  if (dateParts) {
+    const day = dateParts[1];
+    const month = dateParts[2];
+    const year = dateParts[3];
+    return `${year}-${month}-${day}T${dateParts[4]}`;
+  }
+  return date;
+};
+
 export const dateAndTimeStringToDate = (date: string, time: string, dateHint: TZDate): TZDate => {
   if (!time) {
     throw new TimeParseError('Time must be a valid string', time);
   }
 
+  // const hasTz = containsTimezone(time);
+  // if (!hasTz && dateHint) {
+  //   time = time + tz(dateHint.getTimezoneOffset());
+  // } else if (!hasTz) {
+  //   time = time + timeOffsetToString(dateHint.getTimezoneOffset());
+  // }
 
 
   const nDate = new TZDate(dateHint);
