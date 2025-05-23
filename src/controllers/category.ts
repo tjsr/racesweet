@@ -74,4 +74,10 @@ export const loadCategoriesFromFile = (path: PathLike): EventCategory[] => {
   const loadedCategoriesFile = fs.readFileSync(path, 'utf8');
   const loadedCategories = JSON.parse(loadedCategoriesFile) as EventCategory[];
   return loadedCategories;
-};
+};export class CategoryNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CategoryNotFoundError";
+  }
+}
+

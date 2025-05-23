@@ -1,10 +1,12 @@
-import type { ChipCrossingData, PlateCrossingData, TimeEvent } from "./model/chipcrossing.ts";
+import type { ChipCrossingData, PlateCrossingData } from "./model/chipcrossing.ts";
 import type { EventCategory, EventCategoryId } from "./model/eventcategory.ts";
 import type { EventParticipant, EventParticipantId } from "./model/eventparticipant.ts";
-import { createEntrantForUnmatchedChipCode, findEntrantByChipCode, findEntrantByPlateNumber, getParticipantNumber, readParticipantsXlsx } from "./controllers/participant.ts";
+import { assignParticipantNumber, createEntrant, createEntrantForUnmatchedChipCode, findEntrantByChipCode, findEntrantByPlateNumber, getParticipantNumber, readParticipantsXlsx } from "./controllers/participant.ts";
 import { findCategoryById, getCategoryList, loadCategoriesFromFile } from "./controllers/category.ts";
 
+import { NoUnknownEntrantCategoryError } from "./model/eventcategory.ts";
 import Table from "cli-table3";
+import type { TimeEvent } from "./model/timeevent.ts";
 import { formatRFC3339 } from "date-fns";
 import { parseFile } from "./parsers/outreach.ts";
 import path from "path";
@@ -76,34 +78,63 @@ const getTimeEventIdentifier = (evt: TimeEvent): string => {
   return '';
 };
 
-const assignEntrantToChipCrossing = (entrants: Map<EventParticipantId, EventParticipant>, crossing: ChipCrossingData): void => {
+const assignEntrantToChipCrossing = (
+  entrants: Map<EventParticipantId, EventParticipant>,
+  crossing: ChipCrossingData,
+  createUnknownEntrants: boolean = false,
+  categoryList: EventCategory[]|undefined
+): void => {
+  if (createUnknownEntrants && !(categories?.length > 0)) {
+    throw new Error('No categories available to create unknown entrants');
+  }
   if (crossing.time === undefined) {
     console.error(`Crossing for chip ${crossing.chipCode} has no time`);
     return;
   }
   let entrant = findEntrantByChipCode(entrants, crossing.chipCode);
-  if (!entrant) {
-    const categories = getCategoryList();
-    entrant = createEntrantForUnmatchedChipCode(categories, crossing.chipCode);
+  if (!entrant && createUnknownEntrants) {
+    assert (categoryList !== undefined, 'Categories list must be passed when creating unnown entrants to create unknown entrants');
+    entrant = createEntrantForUnmatchedChipCode(categoryList!, crossing.chipCode);
     entrants.set(entrant.id, entrant);
   }
 
   crossing.participant = entrant?.id;
 };
 
-const assignEntrantToPlateCrossing = (entrants: Map<EventParticipantId, EventParticipant>, crossing: PlateCrossingData): void => {
+const assignEntrantToPlateCrossing = (
+  entrants: Map<EventParticipantId, EventParticipant>,
+  crossing: PlateCrossingData,
+  createUnknownEntrants: boolean = false,
+  categoryList: EventCategory[]|undefined = undefined
+): void => {
+  if (createUnknownEntrants && !(categories?.length > 0)) {
+    throw new NoUnknownEntrantCategoryError('No categories available to create unknown entrants');
+  }
   if (crossing.time === undefined) {
     console.error(`Crossing for plate ${crossing.plateNumber} has no time`);
     return;
   }
   const entrant = findEntrantByPlateNumber(entrants, crossing.plateNumber);
+
+  if (!entrant && createUnknownEntrants) {
+    const categoryName = 'Unknown Plate';
+    const createdEntrant = createEntrant(categoryList!, categoryName, false);
+    assignParticipantNumber(createdEntrant as EventParticipant, crossing.plateNumber);
+    entrants.set(createdEntrant.id!, createdEntrant as EventParticipant);
+  }
+
   crossing.participant = entrant?.id;
 };
 
-const assignEntrantToTime = (entrants: Map<EventParticipantId, EventParticipant>, evt: TimeEvent): void => {
+const assignEntrantToTime = (
+  entrants: Map<EventParticipantId, EventParticipant>,
+  evt: TimeEvent,
+  createUnknownEntrants: boolean = false,
+  categoryList: EventCategory[]|undefined = undefined
+): void => {
   if (Object.prototype.hasOwnProperty.call(evt, 'chipCode')) {
     const crossing = evt as ChipCrossingData;
-    assignEntrantToChipCrossing(entrants, crossing);
+    assignEntrantToChipCrossing(entrants, crossing, createUnknownEntrants, categoryList);
   } else if (Object.prototype.hasOwnProperty.call(evt, 'plateNumber')) {
     const crossing = evt as PlateCrossingData;
     const plateNumber = crossing.plateNumber;
@@ -111,7 +142,7 @@ const assignEntrantToTime = (entrants: Map<EventParticipantId, EventParticipant>
       console.error(`Crossing ${crossing.plateNumber} has no plate number`);
       return;
     }
-    assignEntrantToPlateCrossing(entrants, crossing);
+    assignEntrantToPlateCrossing(entrants, crossing, createUnknownEntrants);
   } else {
     console.error(`Crossing ${evt.dataLine} has no chip code or plate number - not assigne`);
   }
@@ -284,7 +315,7 @@ const assignParticpantsToCrossings = (participants: Map<EventParticipantId, Even
   });
 };
 
-const crossingTableRow = (evt: TimeEvent): string[] => {
+const crossingTableRow = (evt: TimeEvent, categoryList: EventCategory[]): string[] => {
   const ant = ''; // (crossing as unknown as any).antenna ?? '';
   const time: Date = evt.time!;
 
@@ -322,8 +353,7 @@ const crossingTableRow = (evt: TimeEvent): string[] => {
 
   let categoryName = 'No category';
   if (entrant?.categoryId) {
-    const cats = getCategoryList();
-    const cat = findCategoryById(cats, entrant?.categoryId);
+    const cat = findCategoryById(categoryList, entrant?.categoryId);
     if (cat) {
       elapsedTime = getElapsedTimeForCategory(cat, time) || elapsedTime || '00:00:00.000';
       if (cat.name) {
@@ -374,13 +404,14 @@ entrantsList.forEach((entrant) => {
 assignParticpantsToCrossings(entrants, sortedTimeEvents);
 const cachedLaps: Map<EventParticipantId, EntrantLap[]> = cacheParticipantLaps(sortedTimeEvents, eventStartTime, eventEndTime);
 
-const rowData = sortedTimeEvents.map((crossing: TimeEvent) => {
+const outputTableRowData = sortedTimeEvents.map((crossing: TimeEvent) => {
   if (crossing.time === undefined) {
     console.error(`Crossing for ${getTimeEventIdentifier(crossing)} has no time`);
   }
 
   try {
-    const row = crossingTableRow(crossing);
+    const categoryList = getCategoryList();
+    const row = crossingTableRow(crossing, categoryList);
     return row;
   } catch (error) {
     console.error('Error creating row data', error);
@@ -388,7 +419,7 @@ const rowData = sortedTimeEvents.map((crossing: TimeEvent) => {
   return undefined;
 });
 // .filter((row) => row !== undefined) as string[];
-const filteredData = rowData.filter((row) => row !== undefined);
+const filteredData = outputTableRowData.filter((row) => row !== undefined);
 
 filteredData.forEach((row) => {
   t.push(row);

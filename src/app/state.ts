@@ -1,5 +1,5 @@
-import type { TimeEvent, TimeEventSource } from "../model/chipcrossing.ts";
-
+import type { TimeEvent } from "../model/timeevent.ts";
+import type { TimeEventSource } from "../model/timeevent.ts";
 import type { TimeEventSourceId } from "../model/types.ts";
 
 export type AppState = {

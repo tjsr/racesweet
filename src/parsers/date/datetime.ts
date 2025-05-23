@@ -69,9 +69,9 @@ export const dateAndTimeStringToDate = (date: string, time: string, dateHint: TZ
   // }
 
 
-  const nDate = new TZDate(dateHint);
-  const dDate = TZDate.parse(date);
-  const tTime = TZDate.parse(time);
+  // const nDate = new TZDate(dateHint);
+  // const dDate = TZDate.parse(date);
+  // const tTime = TZDate.parse(time);
 
 
   // const { day, month, year } = parseDateString(date);

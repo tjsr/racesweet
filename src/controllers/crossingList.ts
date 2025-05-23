@@ -1,4 +1,5 @@
-import type { ChipCrossingData, TimeEvent } from "../model/chipcrossing.ts";
+import type { ChipCrossingData } from "../model/chipcrossing.ts";
+import type { TimeEvent } from "../model/timeevent.ts";
 
 const assertValidTimeEvent = (event: TimeEvent): void => {
   if (!event) {

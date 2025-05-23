@@ -1,6 +1,6 @@
-import type { ChipCrossingData, TimeEvent } from "../model/chipcrossing.ts";
-
+import type { ChipCrossingData } from "../model/chipcrossing.ts";
 import type { PathLike } from "node:fs";
+import type { TimeEvent } from "../model/timeevent.ts";
 import { formatRFC3339 } from "date-fns";
 import { fromRfidTimingLine } from "./rfidtiming.js";
 import { isUnparsedChipCrossing } from "../model/chipcrossing.ts";

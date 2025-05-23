@@ -1,10 +1,10 @@
+import {
+  CategoryNotFoundError,
+  findCategoryByName,
+  findOrCreateCategory
+} from "./category.ts";
 import type { ChipCodeType, EventParticipantId } from "../model/eventparticipant.ts";
 import type { EventCategory, EventParticipant, IdType, ParticipantIdentifier } from "../model/index.ts";
-import {
-  findCategoryByName,
-  findOrCreateCategory,
-  getCategoryList
-} from "./category.ts";
 
 import type { PathLike } from "fs";
 import type { WorkSheet } from 'xlsx';
@@ -207,11 +207,17 @@ export const getPlateNumberFromChipCode = (chipCode: ChipCodeType): string|undef
 const createEntrantWithChipCode = (
   categories: EventCategory[],
   chipCode: ChipCodeType,
-  categoryName: string
+  categoryName: string,
+  categoryMustExist: boolean = false
 ): EventParticipant => {
   const plateNumber = getPlateNumberFromChipCode(chipCode);
   const entrantId = `entrant-${chipCode}`;
-  const cat = findOrCreateCategory(categories, { name: categoryName });
+  const cat = categoryMustExist
+    ? findCategoryByName(categories, categoryName)
+    : findOrCreateCategory(categories, { name: categoryName });
+  if (!cat) {
+    throw new CategoryNotFoundError(`Category ${categoryName} not found to create new entrant for chip ${chipCode}.`);
+  }
   const createdEntrant: EventParticipant = {
     categoryId: cat.id,
     currentResult: undefined,
@@ -229,14 +235,19 @@ const createEntrantWithChipCode = (
   return createdEntrant;
 };
 
-
-const createEntrant = (
+export const createEntrant = (
   categories: EventCategory[],
-  categoryName: string
+  categoryName: string,
+  categoryMustExist: boolean = false
 ): Partial<EventParticipant> => {
   
   const entrantId = randomUUID();
-  const cat = findOrCreateCategory(categories, { name: categoryName });
+  const cat = categoryMustExist
+    ? findCategoryByName(categories, categoryName)
+    : findOrCreateCategory(categories, { name: categoryName });
+  if (!cat) {
+    throw new CategoryNotFoundError(`Category ${categoryName} not found to create new entrant.`);
+  }
   const createdEntrant: Partial<EventParticipant> = {
     categoryId: cat.id,
     currentResult: undefined,
@@ -276,7 +287,10 @@ export const findEntrantByChipCode = (entrants: Map<EventParticipantId, EventPar
 
 type PlateNumberType = string | number;
 
-export const findEntrantByPlateNumber = (entrants: Map<EventParticipantId, EventParticipant>, plateNumber: PlateNumberType): EventParticipant | undefined => {
+export const findEntrantByPlateNumber = (
+  entrants: Map<EventParticipantId, EventParticipant>,
+  plateNumber: PlateNumberType
+): EventParticipant | undefined => {
   const entrant = entrants.values().find((entrant) => {
     const id = matchParticipantToIdentifier(entrant, plateNumber, 'plateNumber', new Date());
     if (id !== null) {
@@ -285,13 +299,6 @@ export const findEntrantByPlateNumber = (entrants: Map<EventParticipantId, Event
     return false;
   });
 
-  if (!entrant) {
-    const categoryName = 'Unknown Plate';
-    const categories = getCategoryList();
-    const createdEntrant = createEntrant(categories, categoryName);
-    assignParticipantNumber(createdEntrant as EventParticipant, plateNumber);
-    entrants.set(createdEntrant.id!, createdEntrant as EventParticipant);
-  }
   return entrant;
 };
 
@@ -336,7 +343,7 @@ export const readXlsxToJson = (filePath: PathLike): Promise<SheetData> => {
     // const rowDataValues = Object.values(rowData);
     // console.log('Row', '>>>>', row);
 
-    console.log('Row', '>>>>', row);
+    // console.debug('Row', '>>>>', row);
   });
 
   const result: SheetData = {
@@ -392,13 +399,6 @@ const findColumnNameForSheetColumn = (headers: Record<string, string|undefined>,
   const errMsg = `Entrant sheet to import does not have a searched for header, looked for columns named ${possibleNamesString}`;
   throw new ColumnNotInSpreadsheetError(errMsg);
 };
-
-class CategoryNotFoundError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "CategoryNotFoundError";
-  }
-}
 
 class NoTransponderError extends ParticipantSpreadsheetError {
   constructor(message: string) {
@@ -478,34 +478,26 @@ const processParticipantRow = (
     surname: surname,
   };
   const tx = findMappedTransponder(mappings, headers, row);
-  if (tx) { // row[mappings['TxNo']]) {
-    // const txNoHeader = (headers['Transponder'] || headers['TxNo']) as string;
+  if (tx) {
     addParticipantIdentifier(participant as EventParticipant, 'txNo', tx);
-    console.log('Added transponder to participant', participant.id, tx, participant.firstname, participant.surname, tx);
+    console.debug('Added transponder to participant', participant.id, tx, participant.firstname, participant.surname, tx);
   } else {
     throw new NoTransponderError(`Transponder not found in row: ${JSON.stringify(row)}`);
   }
 
   const no = findMappedRiderNumber(mappings, headers, row);
 
-  if (no) { // row[mappings['No']]) {
-    // const plateNoHeader = (headers['Plate Number'] || headers['No']) as string;
+  if (no) {
     addParticipantIdentifier(participant as EventParticipant, 'racePlate', no);
-    console.log('Added plate number to participant', participant.id, no, participant.firstname, participant.surname);
+    console.debug('Added plate number to participant', participant.id, no, participant.firstname, participant.surname);
   } else {
     throw new NoPlateNumberError(`Plate number not found in row: ${JSON.stringify(row)}`);
   }
 
-  // Object.keys(mappings).forEach((key) => {
-  //   const mappedKey = mappings[key];
-  //   if (mappedKey && row[mappedKey]) {
-  //     participant[key] = row[mappedKey];
-  //   }
-  // });
   return participant as EventParticipant;
 };
 
-export const readParticipantsXlsx = (filePath: PathLike, mappings: ImportMappings, categoryList: EventCategory[]): Promise<EventParticipant[]> => {
+export const readParticipantsXlsx = async (filePath: PathLike, mappings: ImportMappings, categoryList: EventCategory[]): Promise<EventParticipant[]> => {
   return readXlsxToJson(filePath).then((sheetData: SheetData) => {
     const participants: EventParticipant[] = [];
     const headers = sheetData.headers as Record<string, string|undefined>;

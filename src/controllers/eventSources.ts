@@ -1,4 +1,4 @@
-import type { TimeEventSource } from "../model/chipcrossing.ts";
+import type { TimeEventSource } from "../model/timeevent.ts";
 import type { TimeEventSourceId } from "../model/types.ts";
 
 export const addTimeEventSource = (timeEventSources: Map<TimeEventSourceId, TimeEventSource>, source: TimeEventSource): void => {

@@ -1,5 +1,7 @@
 import type { ISO8601DateTime, ISO8601Duration, IdType } from "./types.ts";
 
+import { CategoryNotFoundError } from "../controllers/category.ts";
+
 export type EventCategoryId = IdType;
 
 export interface EventCategory {
@@ -9,4 +11,10 @@ export interface EventCategory {
   startTime?: ISO8601DateTime;
   distance?: number;
   duration?: ISO8601Duration;
+}export class NoUnknownEntrantCategoryError extends CategoryNotFoundError {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoUnknownEntrantCategoryError";
+  }
 }
+
