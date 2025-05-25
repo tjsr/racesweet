@@ -1,16 +1,25 @@
-import type { IdType, TimeEventSourceId, uuid } from "./types.ts";
+import type { TimeEventSourceId, uuid } from "./types.ts";
 
+import type { EventParticipantId } from "./eventparticipant.ts";
 import { v5 as uuidv5 } from "uuid";
 
 export const FILE_PATH_NAMESPACE = uuidv5('fs', '00000000-0000-0000-0000-000000000000');
 
-export type TimeEventId = uuid | number;export interface TimeEvent {
+export const EVENT_SESSION_START = 1;
+export const EVENT_SESSION_END = 2;
+export const EVENT_FLAG_DISPLAYED = 4;
+export const EVENT_FLAG_RETRACTED = 8;
+
+export type TimeEventId = uuid | number;
+
+export interface TimeEvent {
+  eventType: number;
   sequence: number;
   id: TimeEventId;
   source: TimeEventSourceId;
   time?: Date;
   timeString?: string | null | undefined;
-  participant?: IdType | null | undefined;
+  participantId?: EventParticipantId | null | undefined;
   dataLine?: string | null | undefined;
 }
 // export type UnparsedTimeEvent<TE extends TimeEvent> = Omit<TE, 'time'> & {

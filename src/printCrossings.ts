@@ -1,15 +1,25 @@
-import type { ChipCrossingData, PlateCrossingData } from "./model/chipcrossing.ts";
 import type { EventCategory, EventCategoryId } from "./model/eventcategory.ts";
 import type { EventParticipant, EventParticipantId } from "./model/eventparticipant.ts";
-import { assignParticipantNumber, createEntrant, createEntrantForUnmatchedChipCode, findEntrantByChipCode, findEntrantByPlateNumber, getParticipantNumber, readParticipantsXlsx } from "./controllers/participant.ts";
+import { addFlagEvent, isFlagEvent } from "./controllers/flag.ts";
+import { compareByTime, filterToEventsBetween, getTimeEventIdentifier } from "./controllers/timeevent.ts";
+import { createEntrantForUnmatchedChipCode, findEntrantByChipCode, getParticipantNumber, readParticipantsXlsx } from "./controllers/participant.ts";
+import { elapsedTimeMilliseconds, millisecondsToTime } from "./app/utils/timeutils.ts";
 import { findCategoryById, getCategoryList, loadCategoriesFromFile } from "./controllers/category.ts";
 
+import type { ChipCrossingData } from "./model/chipcrossing.ts";
+import type { EntrantLap } from "./model/lap.ts";
+import type { FlagEvent } from "./model/flag.ts";
 import { NoUnknownEntrantCategoryError } from "./model/eventcategory.ts";
 import Table from "cli-table3";
 import type { TimeEvent } from "./model/timeevent.ts";
+import { assignEntrantToTime } from "./controllers/crossing.ts";
 import { formatRFC3339 } from "date-fns";
 import { parseFile } from "./parsers/outreach.ts";
 import path from "path";
+
+const warn = (message?: string, ...optionalParams: unknown[]): void => {
+  console.warn(`Warning: ${message}`, optionalParams);
+};
 
 const testdata_dir = path.resolve(path.join('.', 'src', 'testdata'));
 
@@ -42,51 +52,23 @@ const noTimeRows = (event: TimeEvent, _idx: number, _arr: TimeEvent[]): boolean 
   return false;
 };
 
-const filterToCrossingsBetween = (data: TimeEvent[], start: Date, end: Date): TimeEvent[] => {
-  return data.filter((crossing) => {
-    if (crossing.time === undefined) {
-      return false;
-    }
-    const crossingTime = crossing.time.getTime();
-    return crossingTime >= start.getTime() && crossingTime <= end.getTime();
-  });
+export const validateCategoriesToCreate = (
+  categories: EventCategory[]|undefined,
+  createUnknownEntrants: boolean
+): void => {
+  const len = categories?.length || 0;
+  if (createUnknownEntrants && !len) {
+    throw new NoUnknownEntrantCategoryError('No categories available to create unknown entrants');
+  }
 };
 
-const compareTimes = (a: Date | undefined, b: Date | undefined): number => {
-  if (a === undefined && b === undefined) {
-    return 0;
-  }
-  if (a === undefined) {
-    return 1;
-  }
-  if (b === undefined) {
-    return -1;
-  }
-  return a.getTime() - b.getTime();
-};
-
-const compareCrossingsByTime = (
-  a: TimeEvent,
-  b: TimeEvent
-): number => compareTimes(a.time, b.time);
-
-const getTimeEventIdentifier = (evt: TimeEvent): string => {
-  if (Object.prototype.hasOwnProperty.call(evt, 'chipCode')) {
-    const crossing = evt as ChipCrossingData;
-    return `${crossing.chipCode}`;
-  };
-  return '';
-};
-
-const assignEntrantToChipCrossing = (
+export const assignEntrantToChipCrossing = (
   entrants: Map<EventParticipantId, EventParticipant>,
   crossing: ChipCrossingData,
   createUnknownEntrants: boolean = false,
   categoryList: EventCategory[]|undefined
 ): void => {
-  if (createUnknownEntrants && !(categories?.length > 0)) {
-    throw new Error('No categories available to create unknown entrants');
-  }
+  validateCategoriesToCreate(categories, createUnknownEntrants);
   if (crossing.time === undefined) {
     console.error(`Crossing for chip ${crossing.chipCode} has no time`);
     return;
@@ -98,69 +80,7 @@ const assignEntrantToChipCrossing = (
     entrants.set(entrant.id, entrant);
   }
 
-  crossing.participant = entrant?.id;
-};
-
-const assignEntrantToPlateCrossing = (
-  entrants: Map<EventParticipantId, EventParticipant>,
-  crossing: PlateCrossingData,
-  createUnknownEntrants: boolean = false,
-  categoryList: EventCategory[]|undefined = undefined
-): void => {
-  if (createUnknownEntrants && !(categories?.length > 0)) {
-    throw new NoUnknownEntrantCategoryError('No categories available to create unknown entrants');
-  }
-  if (crossing.time === undefined) {
-    console.error(`Crossing for plate ${crossing.plateNumber} has no time`);
-    return;
-  }
-  const entrant = findEntrantByPlateNumber(entrants, crossing.plateNumber);
-
-  if (!entrant && createUnknownEntrants) {
-    const categoryName = 'Unknown Plate';
-    const createdEntrant = createEntrant(categoryList!, categoryName, false);
-    assignParticipantNumber(createdEntrant as EventParticipant, crossing.plateNumber);
-    entrants.set(createdEntrant.id!, createdEntrant as EventParticipant);
-  }
-
-  crossing.participant = entrant?.id;
-};
-
-const assignEntrantToTime = (
-  entrants: Map<EventParticipantId, EventParticipant>,
-  evt: TimeEvent,
-  createUnknownEntrants: boolean = false,
-  categoryList: EventCategory[]|undefined = undefined
-): void => {
-  if (Object.prototype.hasOwnProperty.call(evt, 'chipCode')) {
-    const crossing = evt as ChipCrossingData;
-    assignEntrantToChipCrossing(entrants, crossing, createUnknownEntrants, categoryList);
-  } else if (Object.prototype.hasOwnProperty.call(evt, 'plateNumber')) {
-    const crossing = evt as PlateCrossingData;
-    const plateNumber = crossing.plateNumber;
-    if (plateNumber === undefined) {
-      console.error(`Crossing ${crossing.plateNumber} has no plate number`);
-      return;
-    }
-    assignEntrantToPlateCrossing(entrants, crossing, createUnknownEntrants);
-  } else {
-    console.error(`Crossing ${evt.dataLine} has no chip code or plate number - not assigne`);
-  }
-};
-
-const elapsedTimeMilliseconds = (start: Date, end: Date): number => {
-  const startTime = start.getTime();
-  const endTime = end.getTime();
-  return endTime - startTime;
-};
-
-const millisecondsToTime = (milliseconds: number): string => {
-  const seconds = Math.floor((milliseconds / 1000) % 60);
-  const minutes = Math.floor((milliseconds / (1000 * 60)) % 60);
-  const hours = Math.floor((milliseconds / (1000 * 60 * 60)) % 24);
-  milliseconds = Math.floor(milliseconds % 1000);
-  const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
-  return formattedTime;
+  crossing.participantId = entrant?.id;
 };
 
 const getElapsedTimeForCategory = (cat: EventCategory, time: Date): string | undefined => {
@@ -173,10 +93,10 @@ const getElapsedTimeForCategory = (cat: EventCategory, time: Date): string | und
 };
 
 const addCachedParticipantLap = (laps: Map<EventParticipantId, TimeEvent[]>, time: TimeEvent): void => {
-  if (time.participant === undefined) {
+  if (time.participantId === undefined) {
     return;
   }
-  const participantId = time.participant;
+  const participantId = time.participantId;
   if (!participantId) {
     return;
   }
@@ -195,71 +115,192 @@ const sortParticipantTimes = (laps: Map<EventParticipantId, TimeEvent[]>) => {
       console.error(`Participant ${key} has no laps`);
     }
     if (participantLaps && participantLaps.length > 0) {
-      participantLaps.sort(compareCrossingsByTime);
+      participantLaps.sort(compareByTime);
     }
   }
 };
 
-interface StartData {
-  overallStart: Date | undefined;
-  categories: Map<EventCategoryId, EventCategory>;
-}
+const calculateCategoryElapsedTime = (
+  lap: TimeEvent,
+  eventFlagEvents: FlagEvent[],
+  categoryId: EventCategoryId
+  // categoryList: Map<EventCategoryId, EventCategory>
+): number | undefined => {  
+  const startTime: FlagEvent|undefined = findSessionStart(eventFlagEvents, categoryId);
+  if (!startTime || startTime.time === undefined) {
+    console.debug(`Tried to calculate elapsed time for @${lap.id} with no start time`);
+    return undefined;
+  }
+  if (lap.time === undefined) {
+    console.debug(`Tried to calculate elapsed time for @${lap.id} with no event time`);
+    return undefined;
+  }
 
-interface EntrantLap {
-  timeEventId: TimeEvent['id'];
-  lapStartedBy: EventParticipant['id'];
-  elapsedTime: number;
-  lapTime: number | undefined;
-  lapNo: number | null;
-  isExcluded: boolean;
-  overallTrackPosition: number | undefined;
-  positionInClass: number | undefined;
+  const elapsed: number = elapsedTimeMilliseconds(startTime.time, lap.time);
+  return elapsed;
 };
 
-const calculateLapTimes = (laps: TimeEvent[], startTime: Date): EntrantLap[] => {
+// const calculateCategoryElapsedTime
+
+const isAfterStart = (
+  lap: TimeEvent,
+  eventOrCategoryStartEvent: TimeEvent
+): boolean => {
+  if (!lap || lap.time === undefined) {
+    return false;
+  }
+  if (!eventOrCategoryStartEvent || eventOrCategoryStartEvent.time === undefined) {
+    return false;
+  }
+  if (lap.time.getTime() < eventOrCategoryStartEvent.time.getTime()) {
+    return false;
+  }
+  return true;
+};
+
+const validTimeAfterLastLap = (
+  lap: TimeEvent,
+  prevCrossing: TimeEvent|undefined
+): number | undefined => {
+  if (!prevCrossing || prevCrossing.time === undefined) {
+    return undefined;
+  }
+  if (!lap?.time) {
+    if (lap) {
+      warn(`Lap ${lap.id} has no time`);
+    } else {
+      warn(validTimeAfterLastLap.name, 'lap is undefined');
+    }
+    return undefined;
+  }
+
+  let lapTime: number | undefined;
+
+  if (prevCrossing?.time && lap.time?.getTime() > prevCrossing.time.getTime()){
+    lapTime = elapsedTimeMilliseconds(prevCrossing.time, lap.time);
+  } else {
+    lapTime = undefined;
+  }
+  return lapTime;
+};
+
+class IllegalTimeEventError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'IllegalTimeEventError';
+  }
+}
+
+const calculateLapForTimeEvent = (
+  lap: TimeEvent,
+  prevCrossing: TimeEvent|undefined,
+  eventOrCategoryStartEvent: TimeEvent,
+  onLapNumber: number
+): EntrantLap | undefined => {
+  if (lap.time === undefined) {
+    throw new IllegalTimeEventError(`Tried to calculate lap time for @${lap.id} with no event time`);
+  }
+  if (eventOrCategoryStartEvent.time === undefined) {
+    throw new IllegalTimeEventError(`Tried to calculate lap time for @${lap.id} with no start time`);
+  }
+
+  let lapNo = onLapNumber;
+  let lapTime: number | undefined;
+  let lapStart: TimeEvent;
+  const elapsedTime: number | null | undefined = lapTimeAfterStart(lap, eventOrCategoryStartEvent); 
+  if (lapNo == 0) {
+    lapTime = elapsedTime;
+    lapStart = eventOrCategoryStartEvent;
+  } else {
+    lapTime = validTimeAfterLastLap(lap, prevCrossing);
+    lapStart = prevCrossing || eventOrCategoryStartEvent;
+  }
+
+  const minimumLapTime = 60000; // 1 minute
+
+  const isValidLap = lapTime && lapTime > minimumLapTime;
+  let isExcluded = false;
+  if (isValidLap) {
+    lapNo++;
+  } else {
+    isExcluded = true;
+  }
+
+  const lapData: EntrantLap = {
+    elapsedTime: elapsedTime || null,
+    isExcluded: isExcluded,
+    lapNo: lapNo,
+    lapStart: lapStart.id,
+    lapStartedBy: (prevCrossing?.participantId || lap.participantId)!,
+    lapTime: lapTime,
+    overallTrackPosition: undefined,
+    positionInClass: undefined,
+    timeEventId: lap.id,
+  };
+
+  return lapData;
+};
+
+class ParticipantNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ParticipantNotFoundError';
+  }
+}
+
+const getParticipantStartEvent = (
+  times: FlagEvent[],
+  participantId: EventParticipantId,
+  participantList: Map<EventParticipantId, EventParticipant>
+): TimeEvent | undefined => {
+  const participant: EventParticipant | undefined = participantList.get(participantId);
+  if (!participant) {
+    throw new ParticipantNotFoundError(`Participant ${participantId} not found`);
+  }
+
+  const startTime: TimeEvent|undefined = findSessionStart(times, participant.categoryId);
+  return startTime;
+};
+
+const calculateLapTimes = (participantLaps: TimeEvent[], participantList: Map<EventParticipantId, EventParticipant>, startEvent: FlagEvent): EntrantLap[] => {
   const lapTimes: EntrantLap[] = [];
   let lapNo = 0;
   // let previousValidIndex = undefined;
-  let lapStartedBy: EventParticipantId | null | undefined = undefined;
-  let prevLapStartTime = startTime;
-  laps.forEach((lap, index, _all) => {
-    if (lap.time === undefined) {
+  // let lapStartedBy: EventParticipantId | null | undefined = undefined;
+  // let prevLapStartTime = startTime;
+  let prevLap: TimeEvent | undefined = undefined;
+
+  participantLaps.forEach((time: TimeEvent, _index, _all) => {
+    const participant = time.participantId ? participantList.get(time.participantId) : undefined;
+    if (!participant) {
+      console.error(`Participant ${time.participantId} not found`);
       return;
     }
-    const isValidLap = true;
-    let isExcluded = false;
-    if (isValidLap) {
+
+    const completedLap = calculateLapForTimeEvent(time, prevLap, startEvent, lapNo);
+    // if (index === 0) {
+    //   lapData.lapTime = lapData.elapsedTime;
+    // }
+    // lapStartedBy = lap.participant;
+
+    if (!completedLap?.isExcluded) {
+      lapTimes.push(completedLap!);
+      // prevLapStartTime = time.time!;
+      prevLap = time;
       lapNo++;
-      // previousValidIndex = index;
-    } else {
-      isExcluded = true;
     }
-
-    const lapData: EntrantLap = {
-      elapsedTime: elapsedTimeMilliseconds(startTime, lap.time),
-      isExcluded: isExcluded,
-      lapNo: lapNo,
-      lapStartedBy: lapStartedBy!,
-      lapTime: index === 0 ? undefined : elapsedTimeMilliseconds(prevLapStartTime, lap.time),
-      overallTrackPosition: undefined,
-      positionInClass: undefined,
-      timeEventId: lap.id,
-    };
-    if (index === 0) {
-      lapData.lapTime = lapData.elapsedTime;
-    }
-    lapStartedBy = lap.participant;
-
-    lapTimes.push(lapData);
-    if (isValidLap) {
-      prevLapStartTime = lap.time;
-    }
-
+    // if (completedLap?.lapStart) {
+    //   const lapStart: EntrantLap | FlagEvent = completedLap.lapStart;
+    //   if (time.time) {
+        
+    //   }
+    //   prevLap = completedLap?.lapStart;
+    // }
   });
   return lapTimes;
 };
 
-const convertTimesToLaps = (times: Map<EventParticipantId, TimeEvent[]>, eventStarts: StartData): Map<EventParticipantId, EntrantLap[]> => {
+const convertParticipantTimesToLaps = (times: Map<EventParticipantId, TimeEvent[]>, participantsMap: Map<EventParticipantId, EventParticipant>, eventStartFlag: FlagEvent): Map<EventParticipantId, EntrantLap[]> => {
   const lapTimes: Map<EventParticipantId, EntrantLap[]> = new Map<EventParticipantId, EntrantLap[]>();
   for (const key of times.keys()) {
     const participantTimes = times.get(key);
@@ -268,40 +309,54 @@ const convertTimesToLaps = (times: Map<EventParticipantId, TimeEvent[]>, eventSt
       continue;
     }
     const startTime = eventStarts.overallStart || participantTimes[0].time;
-    if (!startTime) {
+    if (!eventStartFlag) {
       console.error(`Participant ${key} has no start time - can't calculate first lap.`);
       continue;
     }
-    const participantLaps = calculateLapTimes(times.get(key)!, startTime);
+
+    times.entries().filter(([_, v]) => isFlagEvent(v));
+    // let timeValues = times.values().toArray().filter((t: TimeEvent) => isFlagEvent(t));
+    
+    const categoryStart = findSessionStart(eventFlagEvents, participant.categoryId);
+    if (!categoryStart || categoryStart.time === undefined) {
+      return;
+    }
+
+
+    const participantLaps = calculateLapTimes(times.get(key)!, participantsMap, startTime);
     lapTimes.set(key, participantLaps);
   }
   return lapTimes;
 };
 
 const cacheParticipantLaps = (
-  time: TimeEvent[], eventStartTime: Date, eventEndTime: Date
+  allTimeEvents: TimeEvent[], eventStartTime: Date, eventEndTime: Date
 ): Map<EventParticipantId, EntrantLap[]> => {
-  const times = new Map<EventParticipantId, TimeEvent[]>();
-  time.forEach((crossing) => {
-    if (crossing.participant === undefined) {
+  const participantTimes = new Map<EventParticipantId, TimeEvent[]>();
+  allTimeEvents.forEach((timeEvent) => {
+    if (timeEvent.participantId === undefined) {
+      if (isFlagEvent(timeEvent)) {
+        addFlagEvent(participantTimes, timeEvent);
+      } else {
+        return;
+      }
+    }
+    if (timeEvent.time === undefined) {
+      console.error(`Crossing for ${getTimeEventIdentifier(timeEvent)} has no time`);
       return;
     }
-    if (crossing.time === undefined) {
-      console.error(`Crossing for ${getTimeEventIdentifier(crossing)} has no time`);
+    if (timeEvent.time.getTime() < eventStartTime.getTime()) {
+      console.error(`Crossing for ${getTimeEventIdentifier(timeEvent)} is before event start time`);
       return;
     }
-    if (crossing.time.getTime() < eventStartTime.getTime()) {
-      console.error(`Crossing for ${getTimeEventIdentifier(crossing)} is before event start time`);
+    if (timeEvent.time.getTime() > eventEndTime.getTime()) {
+      console.error(`Crossing for ${getTimeEventIdentifier(timeEvent)} is after event end time`);
       return;
     }
-    if (crossing.time.getTime() > eventEndTime.getTime()) {
-      console.error(`Crossing for ${getTimeEventIdentifier(crossing)} is after event end time`);
-      return;
-    }
-    addCachedParticipantLap(times, crossing);
+    addCachedParticipantLap(participantTimes, timeEvent);
   });
   sortParticipantTimes(times);
-  const laps: Map<EventParticipantId, EntrantLap[]> = convertTimesToLaps(
+  const laps: Map<EventParticipantId, EntrantLap[]> = convertParticipantTimesToLaps(
     times,
     { categories: new Map<EventCategoryId, EventCategory>(), overallStart: eventStartTime }
   );
@@ -328,7 +383,7 @@ const crossingTableRow = (evt: TimeEvent, categoryList: EventCategory[]): string
   }
 
   const identifier: string = getTimeEventIdentifier(evt);
-  const entrant = evt.participant ? entrants.get(evt.participant) : undefined;
+  const entrant = evt.participantId ? entrants.get(evt.participantId) : undefined;
   let plateNumber: string | number | undefined = undefined;
   let entrantName: string | undefined = undefined;
   let lapNo: string = '';
@@ -383,13 +438,13 @@ let validTimes = data.filter((d) => !rowsWithNoTime.includes(d));
 const eventStartTime = new Date('2025-03-03T18:00:00');
 const eventEndTime = new Date('2025-03-03T20:00:00');
 
-const categories = getCategoryList();
+export const categories = getCategoryList();
 const loadedCategories = loadCategoriesFromFile(path.join(testdata_dir, 'categories.json'));
 categories.push(...loadedCategories);
 
-validTimes = filterToCrossingsBetween(validTimes, eventStartTime, eventEndTime);
+validTimes = filterToEventsBetween(validTimes, eventStartTime, eventEndTime);
 console.log('Valid times:', validTimes.length);
-const sortedTimeEvents = validTimes.sort(compareCrossingsByTime);
+const sortedTimeEvents = validTimes.sort(compareByTime);
 const entrantsList = await readParticipantsXlsx(path.join(testdata_dir, '2025-03-03-entries.xlsx'), { Category: 'Grade', RacePlate: 'RaceNo', Tx: 'ChipNum' }, categories);
 const entrants: Map<EventParticipantId, EventParticipant> = new Map<EventParticipantId, EventParticipant>();
 entrantsList.forEach((entrant) => {
@@ -426,3 +481,15 @@ filteredData.forEach((row) => {
 });
 
 console.log(t.toString());
+const lapTimeAfterStart = (lap: TimeEvent, eventOrCategoryStartEvent: TimeEvent): number | undefined => {
+  if (!eventOrCategoryStartEvent?.time || !lap?.time) {
+    return undefined;
+  }
+
+  if (!isAfterStart(lap, eventOrCategoryStartEvent)) {
+    return undefined;
+  }
+  const lapTime = elapsedTimeMilliseconds(eventOrCategoryStartEvent.time, lap.time);
+  return lapTime;
+};
+

@@ -4,10 +4,6 @@ export interface ChipCrossingData extends TimeEvent {
   chipCode: number;
 }
 
-export interface PlateCrossingData extends TimeEvent {
-  plateNumber: string | number;
-}
-
 export const isUnparsedChipCrossing = (crossing: ChipCrossingData): (ChipCrossingData & UnparsedTimeStringEvent)|undefined => {
   if (crossing.chipCode && crossing.time === undefined) {
     return crossing as (ChipCrossingData & UnparsedTimeStringEvent);

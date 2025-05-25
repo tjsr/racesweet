@@ -1,5 +1,5 @@
 import type { EventCategoryId } from "./eventcategory.ts";
-import type { ParticipantIdentifier } from "./eventparticipant.ts";
+import type { EventParticipantId } from "./eventparticipant.ts";
 import type { TimeEvent } from "./timeevent.ts";
 import type { uuid } from "./types.ts";
 
@@ -13,7 +13,8 @@ export interface FlagEvent extends TimeEvent {
 
 export interface GreenFlagEvent extends FlagEvent {
   flagType: "green";
-  flagValue: "course";
+  flagValue: "course" | "local";
+  indicatesRaceStart?: boolean;
 }
 
 export interface WhiteFlagEvent extends FlagEvent {
@@ -38,5 +39,5 @@ export interface BlueFlagEvent extends FlagEvent {
   flagValue: "pass" | "slow" | "caution";
   point?: CheckpointId;
   target: string;
-  participantId?: ParticipantIdentifier;
+  participantId?: EventParticipantId;
 }
