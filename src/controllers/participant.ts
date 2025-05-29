@@ -1,13 +1,16 @@
+import type { ChipCodeType, EventParticipantId } from "../model/eventparticipant.ts";
+import type { EventCategory, EventParticipant, IdType, ParticipantIdentifier, TimeRecord } from "../model/index.ts";
 import {
-  CategoryNotFoundError,
   findCategoryByName,
   findOrCreateCategory
 } from "./category.ts";
-import type { ChipCodeType, EventParticipantId } from "../model/eventparticipant.ts";
-import type { EventCategory, EventParticipant, IdType, ParticipantIdentifier } from "../model/index.ts";
+import { isFlagRecord, isStartRecord } from "./flag.ts";
 
+import { CategoryNotFoundError } from "../model/eventcategory.ts";
+import type { ParticipantPassingRecord } from "../model/timerecord.ts";
 import type { PathLike } from "fs";
 import type { WorkSheet } from 'xlsx';
+import { assignEntrantToTime } from "./crossing.ts";
 import { randomUUID } from "crypto";
 import xlsx from 'xlsx';
 
@@ -515,3 +518,73 @@ export const readParticipantsXlsx = async (filePath: PathLike, mappings: ImportM
     return participants;
   });
 };
+// const calculateLapForTimeRecord = (
+//   passingRecord: ParticipantPassingRecord,
+//   prevLap: EntrantLap|undefined,
+//   participantStartRecord: StartRecord | undefined,
+//   onLapNumber: number
+// ): EntrantLap | undefined => {
+//   if (passingRecord.time === undefined) {
+//     throw new IllegalTimeRecordError(`Tried to calculate lap time for @${passingRecord.id} with no event time`);
+//   }
+//   let lapNo = onLapNumber;
+//   let lapTime: number | undefined;
+//   // let lapStart: TimeRecord;
+//   const elapsedTime: number | null | undefined = participantStartRecord?.time === undefined ? undefined : lapTimeAfterStart(passingRecord, participantStartRecord.time);
+//   if (lapNo == 0) {
+//     lapTime = elapsedTime;
+//     // lapStart = prevLap || eventOrCategoryStartEvent;
+//   } else {
+//     lapTime = validTimeAfterLastLap(passingRecord, prevPassing);
+//     // lapStart = prevCrossing || eventOrCategoryStartEvent;
+//   }
+//   const minimumLapTime = 60000; // 1 minute
+//   const isValidLap = lapTime && lapTime > minimumLapTime;
+//   let isExcluded = false;
+//   if (isValidLap) {
+//     lapNo++;
+//   } else {
+//     isExcluded = true;
+//   }
+//   let lapStartRecordId = null;
+//   if (prevLap) { // A lap has to be after the start record.
+//     lapStartRecordId = prevLap.timeRecordId;
+//   } else if (participantStartRecord?.time) {
+//     if (isRecordAfterStart(passingRecord, participantStartRecord)) {
+//       lapStartRecordId = participantStartRecord.id;
+//     }
+//   }
+//   const lapData: EntrantLap = {
+//     elapsedTime: elapsedTime || null,
+//     isExcluded: isExcluded,
+//     lapNo: lapNo,
+//     lapStart: lapStartRecordId,
+//     // lapStart: prevPassing?.id || passingRecord.id || null,
+//     // lapStartedBy: (prevPassing?.participantId || passingRecord.participantId)!,
+//     lapTime: lapTime,
+//     overallTrackPosition: undefined,
+//     positionInClass: undefined,
+//     timeRecordId: passingRecord.id,
+//   };
+//   return lapData;
+// };
+
+export class ParticipantNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ParticipantNotFoundError';
+  }
+}
+
+const isCrossingRecord = (crossing: TimeRecord): crossing is ParticipantPassingRecord => {
+  return !isStartRecord(crossing) && !isFlagRecord(crossing);
+};
+
+export const assignParticpantsToCrossings = (participants: Map<EventParticipantId, EventParticipant>, crossings: TimeRecord[]): void => {
+  crossings.forEach((crossing: TimeRecord) => {
+    if (isCrossingRecord(crossing)) {
+      assignEntrantToTime(participants, crossing);
+    }
+  });
+};
+

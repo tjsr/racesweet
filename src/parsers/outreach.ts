@@ -1,8 +1,10 @@
 import type { ChipCrossingData } from "../model/chipcrossing.ts";
 import type { PathLike } from "node:fs";
-import type { TimeEvent } from "../model/timeevent.ts";
+import type { TimeRecord } from "../model/timerecord.ts";
+import { createIdHash } from "../utils.ts";
 import { formatRFC3339 } from "date-fns";
 import { fromRfidTimingLine } from "./rfidtiming.js";
+import { getSequenceNumber } from "../app/utils/sequence.ts";
 import { isUnparsedChipCrossing } from "../model/chipcrossing.ts";
 import { open } from 'node:fs/promises';
 import { parseLineMatching } from "./genericLineMatcher.js";
@@ -10,14 +12,14 @@ import { parseRfidTimingDate } from "./rfidTimingDate.ts";
 import { v5 as uuidv5 } from 'uuid';
 
 const MAX_ERRORS = 20;
-type uuid = string;
-type uuid5 = uuid;
+export type uuid = string;
+export type uuid5 = uuid;
 
-const simpleTransponderTimeEvent: RegExp = /^(?<chipCode>\d+)[\s,;]+"?(?<dateTime>[\w\s\-:.]+)"?$/;
+const simpleTransponderTimeRecord: RegExp = /^(?<chipCode>\d+)[\s,;]+"?(?<dateTime>[\w\s\-:.]+)"?$/;
 
 export type OutreachChipCrossingData = ChipCrossingData & {
   id: unknown;
-  antenna?: string | undefined;
+  antenna?: string | number | undefined;
   hexChipCode?: string | undefined;
   lineNumber?: number | undefined;
 };
@@ -28,10 +30,12 @@ export const parseSimpleOutreachChipLine = (
   line: string
 ): UnsourcedOutreachChipCrossingData => {
   // console.trace(parseSimpleOutreachChipLine, line);
-  const crossingLine  = parseLineMatching(line, simpleTransponderTimeEvent);
+  const crossingLine  = parseLineMatching(line, simpleTransponderTimeRecord);
   return {
     ...crossingLine,
     chipCode: crossingLine.chipCode!,
+    recordType: 0,
+    sequence: getSequenceNumber(),
     timeString: crossingLine.timeString!,
   };
 };
@@ -45,10 +49,6 @@ export const parseOutreachLine = (line: string): UnsourcedOutreachChipCrossingDa
   }
 
   throw new Error(`Failed to parse line: ${line}`);
-};
-
-const createIdHash = (source: uuid, crossing: UnsourcedOutreachChipCrossingData): uuid5 => {
-  return uuidv5(JSON.stringify({ ...crossing, source: source }), source);
 };
 
 const parseOutreachFile = async  (filePath: PathLike): Promise<ChipCrossingData[]> => {
@@ -119,7 +119,7 @@ const timeOrTimeToday = (today: Date, time: string): Date => {
   return parsedDate;
 };
 
-export const parseFile = async (filePath: PathLike, fileEventDate: Date): Promise<TimeEvent[]> => {
+export const parseFile = async (filePath: PathLike, fileEventDate: Date): Promise<TimeRecord[]> => {
   if (!fileEventDate) {
     throw new Error('File event date is required');
   }
@@ -138,7 +138,7 @@ export const parseFile = async (filePath: PathLike, fileEventDate: Date): Promis
           return {
             ...crossing,
             time: parsedTime,
-          } as TimeEvent;
+          } as TimeRecord;
         } catch (_error) {
           return crossing;
         }

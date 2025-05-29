@@ -85,6 +85,18 @@
     "smartStep": true,
     "skipFiles": ["<node_internals>/**"],
     "console": "integratedTerminal"
+  },
+  {
+    "name": "Debug pmtk.ts",
+    "type": "node",
+    "request": "launch",
+    "runtimeExecutable": "tsx",
+    "program": "${workspaceFolder}/src/pmtk.ts",
+    "skipFiles": [
+      "<node_internals>/**"
+    ],
+    "console": "integratedTerminal",
+    "preLaunchTask": "clear-terminal"
   }
   ]
 }

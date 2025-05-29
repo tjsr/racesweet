@@ -1,11 +1,11 @@
 import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.ts";
-import { assignEntrantToChipCrossing, categories, validateCategoriesToCreate } from "../printCrossings.ts";
-import { assignParticipantNumber, createEntrant, findEntrantByPlateNumber } from "./participant.ts";
+import { assignParticipantNumber, createEntrant, createEntrantForUnmatchedChipCode, findEntrantByChipCode, findEntrantByPlateNumber } from "./participant.ts";
 
 import type { ChipCrossingData } from "../model/chipcrossing.ts";
 import type { EventCategory } from "../model/eventcategory.ts";
 import type { PlateCrossingData } from "../model/platecrossing.ts";
-import type { TimeEvent } from "../model/timeevent.ts";
+import type { TimeRecord } from "../model/timerecord.ts";
+import { validateCategoriesToCreate } from "./category.ts";
 
 export const assignEntrantToPlateCrossing = (
   entrants: Map<EventParticipantId, EventParticipant>,
@@ -13,7 +13,7 @@ export const assignEntrantToPlateCrossing = (
   createUnknownEntrants: boolean = false,
   categoryList: EventCategory[] | undefined = undefined
 ): void => {
-  validateCategoriesToCreate(categories, createUnknownEntrants);
+  validateCategoriesToCreate(categoryList, createUnknownEntrants);
   if (crossing.time === undefined) {
     console.error(`Crossing for plate ${crossing.plateNumber} has no time`);
     return;
@@ -28,9 +28,11 @@ export const assignEntrantToPlateCrossing = (
   }
 
   crossing.participantId = entrant?.id;
-};export const assignEntrantToTime = (
+};
+
+export const assignEntrantToTime = (
   entrants: Map<EventParticipantId, EventParticipant>,
-  evt: TimeEvent,
+  evt: TimeRecord,
   createUnknownEntrants: boolean = false,
   categoryList: EventCategory[] | undefined = undefined
 ): void => {
@@ -46,7 +48,28 @@ export const assignEntrantToPlateCrossing = (
     }
     assignEntrantToPlateCrossing(entrants, crossing, createUnknownEntrants);
   } else {
-    console.error(`Crossing ${evt.dataLine} has no chip code or plate number - not assigne`);
+    console.error(assignEntrantToTime.name, `Crossing ${evt.dataLine} has no chip code or plate number - not assigne`);
   }
+};
+
+export const assignEntrantToChipCrossing = (
+  entrants: Map<EventParticipantId, EventParticipant>,
+  crossing: ChipCrossingData,
+  createUnknownEntrants: boolean = false,
+  categoryList: EventCategory[] | undefined
+): void => {
+  validateCategoriesToCreate(categoryList, createUnknownEntrants);
+  if (crossing.time === undefined) {
+    console.error(`Crossing for chip ${crossing.chipCode} has no time`);
+    return;
+  }
+  let entrant = findEntrantByChipCode(entrants, crossing.chipCode);
+  if (!entrant && createUnknownEntrants) {
+    assert(categoryList !== undefined, 'Categories list must be passed when creating unnown entrants to create unknown entrants');
+    entrant = createEntrantForUnmatchedChipCode(categoryList!, crossing.chipCode);
+    entrants.set(entrant.id, entrant);
+  }
+
+  crossing.participantId = entrant?.id;
 };
 

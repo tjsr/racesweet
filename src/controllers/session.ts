@@ -1,30 +1,30 @@
-import { EVENT_FLAG_DISPLAYED, EVENT_SESSION_START, type TimeEvent } from "../model/timeevent.ts";
-import type { FlagEvent, GreenFlagEvent } from "../model/flag.ts";
+import { EVENT_FLAG_DISPLAYED, EVENT_SESSION_START, type TimeRecord } from "../model/timerecord.ts";
+import type { FlagRecord, GreenFlagRecord } from "../model/flag.ts";
 import type { EventCategoryId } from "../model/eventcategory.ts";
-import { compareByTime } from "./timeevent.ts";
+import { compareByTime } from "./timerecord.ts";
 
-export const isStartRecord = (event: TimeEvent): boolean => {
+export const isStartRecord = (event: TimeRecord): boolean => {
   if (event.time === undefined) {
     return false;
   }
-  if (event.eventType & EVENT_SESSION_START) {
+  if (event.recordType & EVENT_SESSION_START) {
     return true;
   }
-  if (event.eventType & EVENT_FLAG_DISPLAYED) {
-    const flagEvent = event as FlagEvent;
+  if (event.recordType & EVENT_FLAG_DISPLAYED) {
+    const flagEvent = event as FlagRecord;
     if (flagEvent.flagType !== 'green') {
       return false;
     }
-    const greenFlagEvent = flagEvent as GreenFlagEvent;
+    const greenFlagEvent = flagEvent as GreenFlagRecord;
     return greenFlagEvent.indicatesRaceStart == true;
   }
   return false;
 };
 
-export const isCategoryStartRecord = (event: TimeEvent, categoryId: EventCategoryId): boolean => {
+export const isCategoryStartRecord = (event: TimeRecord, categoryId: EventCategoryId): boolean => {
   const isStart = isStartRecord(event);
   if (isStart) {
-    const flagEvent = event as FlagEvent;
+    const flagEvent = event as FlagRecord;
     if (flagEvent.categoryIds === undefined || flagEvent.categoryIds.length === 0) {
       return true;
     }
@@ -34,18 +34,18 @@ export const isCategoryStartRecord = (event: TimeEvent, categoryId: EventCategor
 };
 
 export const findSessionStartTime = (
-  eventFlagEvents: FlagEvent[],
+  eventFlagEvents: FlagRecord[],
   category?: EventCategoryId
 ): Date | undefined => findSessionStart(eventFlagEvents, category)?.time;
 
 export const findSessionStart = (
-  eventFlagEvents: FlagEvent[],
+  eventFlagEvents: FlagRecord[],
   category?: EventCategoryId
-): FlagEvent|undefined => {
+): FlagRecord|undefined => {
   if (eventFlagEvents.length === 0) {
     return undefined;
   }
-  const startRecords: FlagEvent[] = eventFlagEvents.filter((event) => {
+  const startRecords: FlagRecord[] = eventFlagEvents.filter((event) => {
     if (event.time === undefined) {
       return false;
     }

@@ -1,6 +1,6 @@
-import type { ParsedTimeEvent, TimeEvent, UnparsedTimeStringEvent } from "./timeevent.ts";
+import type { ParsedTimeRecord, ParticipantPassingRecord, TimeRecord, UnparsedTimeStringEvent } from "./timerecord.ts";
 
-export interface ChipCrossingData extends TimeEvent {
+export interface ChipCrossingData extends TimeRecord, ParticipantPassingRecord {
   chipCode: number;
 }
 
@@ -12,10 +12,10 @@ export const isUnparsedChipCrossing = (crossing: ChipCrossingData): (ChipCrossin
   return undefined;
 };
 
-export const isParsedChipCrossing = (crossing: ChipCrossingData): crossing is ChipCrossingData & ParsedTimeEvent => {
+export const isParsedChipCrossing = (crossing: ChipCrossingData): crossing is ChipCrossingData & ParsedTimeRecord => {
   return crossing.time !== undefined;
   // if (crossing.time !== undefined) {
-  //   return crossing as ChipCrossingData & ParsedTimeEvent;
+  //   return crossing as ChipCrossingData & ParsedTimeRecord;
   // };
   // return undefined;
 };

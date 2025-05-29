@@ -1,12 +1,12 @@
 import type { EventParticipant } from "./eventparticipant.ts";
-import type { TimeEvent } from "./timeevent.ts";
+import type { TimeRecord } from "./timerecord.ts";
 
 export interface EntrantLap {
-  timeEventId: TimeEvent['id'];
+  timeRecordId: TimeRecord['id'];
   lapStartedBy: EventParticipant['id'];
   elapsedTime: number | null;
   lapTime: number | undefined;
-  lapStart: TimeEvent['id'] | null;
+  lapStart: TimeRecord['id'] | null;
   lapNo: number | null;
   isExcluded: boolean;
   overallTrackPosition: number | undefined;

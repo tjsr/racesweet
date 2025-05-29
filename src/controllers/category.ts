@@ -1,5 +1,6 @@
-import type { EventCategory } from "../model/eventcategory.ts";
+import type { EventCategory } from '../model/eventcategory.ts';
 import type { IdType } from "../model/types.ts";
+import { NoUnknownEntrantCategoryError } from "../model/eventcategory.ts";
 import { type PathLike } from "fs";
 import fs from 'fs';
 
@@ -74,10 +75,15 @@ export const loadCategoriesFromFile = (path: PathLike): EventCategory[] => {
   const loadedCategoriesFile = fs.readFileSync(path, 'utf8');
   const loadedCategories = JSON.parse(loadedCategoriesFile) as EventCategory[];
   return loadedCategories;
-};export class CategoryNotFoundError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "CategoryNotFoundError";
+};
+
+export const validateCategoriesToCreate = (
+  categories: EventCategory[] | undefined,
+  createUnknownEntrants: boolean
+): void => {
+  const len = categories?.length || 0;
+  if (createUnknownEntrants && !len) {
+    throw new NoUnknownEntrantCategoryError('No categories available to create unknown entrants');
   }
-}
+};
 

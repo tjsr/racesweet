@@ -1,40 +1,42 @@
 import type { EventCategoryId } from "./eventcategory.ts";
 import type { EventParticipantId } from "./eventparticipant.ts";
-import type { TimeEvent } from "./timeevent.ts";
+import type { TimeRecord } from "./timerecord.ts";
 import type { uuid } from "./types.ts";
 
 type CheckpointId = uuid | number;
 
-export interface FlagEvent extends TimeEvent {
+export interface FlagRecord extends TimeRecord {
   flagType: string;
   flagValue: string;
   categoryIds?: EventCategoryId[];
 }
 
-export interface GreenFlagEvent extends FlagEvent {
+export interface GreenFlagRecord extends FlagRecord {
   flagType: "green";
   flagValue: "course" | "local";
   indicatesRaceStart?: boolean;
 }
 
-export interface WhiteFlagEvent extends FlagEvent {
+export type StartRecord = GreenFlagRecord;
+
+export interface WhiteFlagRecord extends FlagRecord {
   flagType: "white";
   flagValue: "course";
 }
 
-export interface ChequeredFlagEvent extends FlagEvent {
+export interface ChequeredFlagRecord extends FlagRecord {
   flagType: "chequered";
   flagValue: "course";
   categoryId?: EventCategoryId;
 }
 
-export interface YellowFlagEvent extends FlagEvent {
+export interface YellowFlagRecord extends FlagRecord {
   flagType: "yellow";
   flagValue: "caution" | "full course" | "local" | "debris" | "slow";
   point?: CheckpointId;
 }
 
-export interface BlueFlagEvent extends FlagEvent {
+export interface BlueFlagRecord extends FlagRecord {
   flagType: "blue";
   flagValue: "pass" | "slow" | "caution";
   point?: CheckpointId;
