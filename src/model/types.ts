@@ -1,6 +1,10 @@
 export type uuidv5 = string;
 export type uuid = uuidv5;
-export type IdType = uuid;
+export type IdType = uuid | number;
+
+export interface WithId<Id extends IdType> {
+  id: Id;
+}
 
 export type ISO8601DateTime = string;
 export type ISO8601Date = string;
@@ -15,4 +19,21 @@ export type positionAccuracy = number; // in metres
 
 export type PhysicalLocation = [latitude, longitude] | [latitude, longitude, elevation];
 
-export type TimeEventSourceId = uuid;
+export type TimeRecordSourceId = uuid;export type MapOf<T extends WithId<IdType>> = Map<T['id'], T>;
+
+export type PlateNumberType = string | number;
+
+type MutationId = uuid;
+interface TypeMutation<T extends WithId<IdType>> {
+  type: 'create' | 'update' | 'delete';
+  mutationId: MutationId;
+  modificationTime: ISO8601DateTime;
+  modifiedBy: string; // User ID or username
+  automatedChange: boolean;
+  data: T;
+  previousData?: T; // Only for updates
+}
+
+export interface LedgerMutationType<T extends WithId<Id>, Id extends IdType> {
+  mutations: TypeMutation<T>[];
+}

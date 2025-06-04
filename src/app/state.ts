@@ -1,15 +1,15 @@
-import type { TimeEvent, TimeEventSource } from "../model/chipcrossing.js";
+import type { TimeRecord, TimeRecordSource } from "../model/timerecord.ts";
 
-import type { TimeEventSourceId } from "../model/types.js";
+import type { TimeRecordSourceId } from "../model/types.ts";
 
 export type AppState = {
-  crossings: TimeEvent[];
-  timeEventSources: Map<TimeEventSourceId, TimeEventSource>;
+  crossings: TimeRecord[];
+  timeRecordSources: Map<TimeRecordSourceId, TimeRecordSource>;
 };
 
 const globalState: AppState = {
   crossings: [],
-  timeEventSources: new Map(),
+  timeRecordSources: new Map(),
 };
 
 export const getGlobalState = (): AppState => {

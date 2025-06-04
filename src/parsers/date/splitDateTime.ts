@@ -1,7 +1,9 @@
 import { InvalidDateTimeStringError } from "./errors.ts";
+import { TZDate } from "@date-fns/tz";
+import { formatRFC3339 } from "date-fns";
 import { hasDateComponent } from "./datetime.ts";
 import { parseDateString } from "./datestring.ts";
-import { timeToLocal } from "./dateutils.js";
+import { timeToLocal } from "./dateutils.ts";
 
 const timeStringHasTimezone = (time: string): boolean => time?.includes('Z') || time?.includes('+');
 
@@ -15,20 +17,21 @@ export const splitDateTime = (input: string, tzhint?: string): { isoDate?: Date;
     throw new InvalidDateTimeStringError(`Invalid date/time format - missing space or T separator: '${input}'`);
   }
 
-  let isoDate = new Date(input);
+  const isoDate = new TZDate(input, timeStringHasTimezone(input) ? undefined : tzhint);
   if (!isNaN(isoDate.getTime())) {
     console.log('Returning acceptable ISO time.', input, isoDate);
+    const rfcDateString = formatRFC3339(isoDate, { fractionDigits: 3 });
     return {
-      date: isoDate.toISOString().split('T')[0],
+      date: rfcDateString.split('T')[0],
       isoDate: timeToLocal(isoDate),
-      time: isoDate.toISOString().split('T')[1],
+      time: rfcDateString.split('T')[1],
     };
   }
 
   const dateTimeParts = input.includes('T') ? input.split('T') : input.split(' ');
 
   if (input.includes('T')) {
-    console.warn('Input contains T but was not parsed as an ISO8601 DateTime.');
+    console.warn(`Input ${input} contains T but was not parsed as an ISO8601 DateTime.`);
   } else if (!input.includes(' ')) {
     throw new InvalidDateTimeStringError(`Invalid date/time format - missing space or T separator: '${input}'`);
   }
@@ -36,17 +39,18 @@ export const splitDateTime = (input: string, tzhint?: string): { isoDate?: Date;
   const timeIndex = dateTimeParts[1].includes(':') ? 1 : 0;
   const dateIndex = dateTimeParts[1].includes(':') ? 0 : 1;
 
-  let timePart = dateTimeParts[timeIndex];
-  const datePart = parseDateString(dateTimeParts[dateIndex]).toISOString().split('T')[0];
+  const timePart = dateTimeParts[timeIndex];
+  const parsedDateString = parseDateString(dateTimeParts[dateIndex]);
+  const datePart = formatRFC3339(parsedDateString, { fractionDigits: 3 }).split('T')[0];
 
-  if (!timeStringHasTimezone(timePart) && tzhint) {
-    timePart = timePart + tzhint;
-  }
-  const isoDateString = datePart + 'T' + timePart;
-  isoDate = new Date(isoDateString);
+  // if (!timeStringHasTimezone(timePart) && tzhint) {
+  //   timePart = timePart + tzhint;
+  // }
+  // const isoDateString = datePart + 'T' + timePart;
+  // isoDate = new TZDate(isoDateString, tzhint);
   return {
     date: datePart,
-    isoDate: isoDate,
+    isoDate: parsedDateString,
     time: timePart,
   };
 };

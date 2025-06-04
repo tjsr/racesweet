@@ -1,7 +1,7 @@
-import type { TimeEventSource } from "../model/chipcrossing.js";
-import type { TimeEventSourceId } from "../model/types.js";
+import type { TimeRecordSource } from "../model/timerecord.ts";
+import type { TimeRecordSourceId } from "../model/types.ts";
 
-export const addTimeEventSource = (timeEventSources: Map<TimeEventSourceId, TimeEventSource>, source: TimeEventSource): void => {
+export const addTimeRecordSource = (TimeRecordSources: Map<TimeRecordSourceId, TimeRecordSource>, source: TimeRecordSource): void => {
   if (!source) {
     throw new Error("Time event source is undefined");
   }
@@ -12,5 +12,5 @@ export const addTimeEventSource = (timeEventSources: Map<TimeEventSourceId, Time
     throw new Error("Time event source name is undefined");
   }
   
-  timeEventSources.set(source.id, source);
+  TimeRecordSources.set(source.id, source);
 };

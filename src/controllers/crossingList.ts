@@ -1,6 +1,6 @@
-import type { ChipCrossingData, TimeEvent } from "../model/chipcrossing.js";
+import type { TimeRecord } from "../model/timerecord.ts";
 
-const assertValidTimeEvent = (event: TimeEvent): void => {
+export const assertValidTimeRecord = (event: TimeRecord): void => {
   if (!event) {
     throw new Error("Crossing is undefined");
   }
@@ -12,19 +12,21 @@ const assertValidTimeEvent = (event: TimeEvent): void => {
   }
 };
 
-export const addCrossing = (crossings: TimeEvent[], crossing: ChipCrossingData): void => {
-  assertValidTimeEvent(crossing);
-  
-  let psn = crossings.push(crossing) - 1;
-  while (psn > 0) {
-    if (crossings[psn].time.getTime() < crossings[psn - 1].time.getTime()) {
-      const temp = crossings[psn];
-      crossings[psn] = crossings[psn - 1];
-      crossings[psn - 1] = temp;
-      psn--;
-    } else {
-      break;
-    }
+const swap = <T>(arr: T[], i: number, j: number): void => {
+  const temp = arr[i];
+  arr[i] = arr[j];
+  arr[j] = temp;
+};
+
+export const moveForwardIfUndefined = (crossings: TimeRecord[], index: number): void => {
+  if (index >= crossings.length) {
+    return;
+  }
+  let psn = index;
+  while (psn > 0 && crossings[psn]?.time === undefined && crossings[psn-1]?.time !== undefined) {
+    swap(crossings, psn, psn - 1);
+    psn--;
   }
 };
+
 

@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "name": "A Grade",
+    "gender": "Both"
+  },
+  {
+    "id": 2,
+    "name": "B Grade",
+    "gender": "Both"
+  },
+  {
+    "id": 3,
+    "name": "C Grade",
+    "gender": "Both"
+  },
+  {
+    "id": 4,
+    "name": "D Grade Men",
+    "gender": "Men"
+  },
+  {
+    "id": 31,
+    "name": "E-Bike",
+    "gender": "Both"
+  },
+  {
+    "id": 41,
+    "name": "Open",
+    "gender": "Open"
+  }
+]
