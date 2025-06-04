@@ -114,7 +114,8 @@ describe('validateTimeString', () => {
       '12:34:56.123',
       '03:07:19.616',
       '12:34:56.789',
-      '00:00:00.123'
+      '00:00:00.123',
+      '17:59:56.568',
     ];
 
     expectAllValid(validTimes);
@@ -122,5 +123,12 @@ describe('validateTimeString', () => {
 
   it('Should reject time values where period is provided and no millisecond value', () => {
     expectAllInvalid(['11:18:09.', '11:05.']);
+  });
+
+  it('Should accept time values that have an offset', () => {
+    expect(validateTimeString('01:02:03.543+11:00')).toBe(true);
+    expect(validateTimeString('01:02:03+11:00')).toBe(true);
+    expect(validateTimeString('01:02:03Z')).toBe(true);
+    expect(validateTimeString('01:02:03.123Z')).toBe(true);
   });
 });

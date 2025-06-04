@@ -19,6 +19,7 @@
     "lint:ts": "eslint",
     "start": "electron .",
     "test": "vitest",
+    "test:table": "tsx ./src/printCrossings.ts",
     "types": "mkdirp src/generated/typebox && ts2typebox --input src/model/index.ts --output src/generated/typebox/index.ts"
   },
   "devDependencies": {
@@ -26,20 +27,37 @@
     "@tjsr/eslint-config": "github:tjsr/eslint-config#main",
     "@tsconfig/node-ts": "^23.6.1",
     "@tsconfig/node22": "^22.0.1",
+    "@types/date-fns": "^2.5.3",
     "@types/node": "^22.13.17",
+    "@types/react": "^19.1.6",
     "chokidar": "^4.0.3",
     "electron": "^35.1.4",
     "eslint": "^9.23.0",
     "mkdirp": "^3.0.1",
     "rimraf": "^6.0.1",
     "ts2typebox": "^1.6.2",
+    "tsx": "^4.19.3",
     "typescript": "^5.8.2",
     "vitest": "^3.0.9"
   },
   "dependencies": {
     "@date-fns/tz": "^1.2.0",
+    "any-date-parser": "^2.1.0",
+    "cli-table3": "^0.6.5",
+    "cli-tableau": "^2.0.1",
+    "colors": "^1.4.0",
     "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
     "electron-debug": "^4.1.0",
-    "electron-timber": "^1.0.0"
+    "electron-timber": "^1.0.0",
+    "node-adodb": "^5.0.3",
+    "react": "^19.1.0",
+    "uuid": "^11.1.0",
+    "xlsx": "^0.18.5"
+  },
+  "engines": {
+
+    "node": ">=22.14.0",
+    "npm": ">=11.4.1"
   }
 }

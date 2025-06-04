@@ -1,30 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { hasDateAndTime, splitDateTime } from "./datetime.js";
-
 import { parseableDateTimeStrings } from "./parseableDateTimeStrings.js";
-
-describe('hasDateAndTime', () => {
-  it('Should match for string with a T separator', () => {
-    const testInput = '2023-10-01T12:00:00';
-    expect(hasDateAndTime(testInput)).toEqual(true);
-  });
-
-  it('Should match for string with a space separator', () => {
-    const testInput = '2023-10-01 12:00:00';
-    expect(hasDateAndTime(testInput)).toEqual(true);
-  });
-
-  it('Should not match for string with no separator', () => {
-    const invalidInputs = [
-      '20231001120000',
-      '2023-10-01X120000',
-      '10:19:17.533',
-    ];
-    invalidInputs.forEach((testInput) => {
-      expect(hasDateAndTime(testInput)).toEqual(false);
-    });
-  });
-});
+import { splitDateTime } from "./splitDateTime.js";
 
 describe("splitDateTime", () => {
   it('Should allow a string with a time only, and infer the date as today', () => {
@@ -40,9 +15,40 @@ describe("splitDateTime", () => {
   it("should correctly split valid date-time strings", () => {
     parseableDateTimeStrings.forEach(({ str, date, time }) => {
       const result = splitDateTime(str);
-      expect(result.date).toEqual(date);
-      expect(result.time).toEqual(time);
+      expect(result.date, `Input string: ${str}`).toEqual(date);
+      expect(result.time, `Input string: ${str}`).toEqual(time);
     });
+  });
+
+  it ('Should produce a default time value in the UTC timezone', () => {
+    const str = '2025-03-01 11:11:45.451';
+    const result = splitDateTime(str);
+
+    expect(result.time, `Input string: ${str}`).toEqual('00:11:45.451Z');
+  });
+
+  it ('Should produce a specified time value in a set timezone', () => {
+    const str = '2025-03-01 11:11:45.451+08:00';
+    const result = splitDateTime(str);
+    expect(result.time, `Input string: ${str}`).toEqual('03:11:45.451Z');
+  });
+
+  it ('Should produce a UTC time value', () => {
+    const str = '2025-03-01 11:11:45.451Z';
+    const result = splitDateTime(str);
+    expect(result.time, `Input string: ${str}`).toEqual('11:11:45.451Z');
+  });
+
+  // it ('Should get current tz time.', () => {
+  //   dateToRFC3339Local()
+  // });
+
+  it('Should accept a fairly human-readable date and time string', () => {
+    const testString = '26/10/2024 09:06:25.888';
+    const result = splitDateTime(testString);
+    expect(result.date).not.toEqual('26/10/2024');
+    expect(result.date).toEqual('2024-10-26');
+    expect(result.time).toEqual('09:06:25.888');
   });
 
   it('should reject empty input values', () => {

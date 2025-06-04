@@ -1,6 +1,31 @@
 {
   "configurations": [
   {
+    "name": "Launch via NPM",
+    "request": "launch",
+    "runtimeArgs": [
+      "run-script",
+      "debug"
+    ],
+    "runtimeExecutable": "npm",
+    "skipFiles": [
+      "<node_internals>/**"
+    ],
+    "type": "node"
+  },
+  {
+    "name": "Debug printCrossings.ts",
+    "type": "node",
+    "request": "launch",
+    "runtimeExecutable": "tsx",
+    "program": "${workspaceFolder}/src/printCrossings.ts",
+    "skipFiles": [
+      "<node_internals>/**"
+    ],
+    "console": "integratedTerminal",
+    "preLaunchTask": "clear-terminal"
+  },
+  {
     "name": "Electron Main",
     "program": "${workspaceFolder}/index.mjs",
     "request": "launch",
@@ -49,6 +74,29 @@
       "<node_internals>/**"
     ],
     "console": "integratedTerminal"
+  },
+  {
+    "type": "node",
+    "request": "launch",
+    "name": "Debug Vitest Tests",
+    "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+    "args": ["run", "--threads", "false"],
+    "autoAttachChildProcesses": true,
+    "smartStep": true,
+    "skipFiles": ["<node_internals>/**"],
+    "console": "integratedTerminal"
+  },
+  {
+    "name": "Debug pmtk.ts",
+    "type": "node",
+    "request": "launch",
+    "runtimeExecutable": "tsx",
+    "program": "${workspaceFolder}/src/pmtk.ts",
+    "skipFiles": [
+      "<node_internals>/**"
+    ],
+    "console": "integratedTerminal",
+    "preLaunchTask": "clear-terminal"
   }
   ]
 }

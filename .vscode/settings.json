@@ -5,8 +5,20 @@
     "watchFilePolling": 1000,
     "watchDirectoryPolling": 1000,
     "watchFileTimeout": 1000,
-    "watchDirectoryTimeout": 1000
+    "watchDirectoryTimeout": 1000,
+    "log": "off"
+  },
+  "files.watcherExclude": {
+    "**/.git/**": true,
+    "**/node_modules/**": true,
+    "**/dist/**": true
   },
   "vitest.workspaceConfig": "vitest.workspace.ts",
-  "vitest.rootConfig": "vitest.config.mts"
+  "vitest.rootConfig": "vitest.config.mts",
+  "vitest.cliArguments": "--silent",
+  "vitest.logLevel": "verbose",
+  "vitest.configSearchPatternExclude": "{.git/**,**/node_modules/**,**/.*/**,**/*.d.ts}",
+  // "vitest.filesWatcherInclude": "**/*.{ts,tsx,mts},src/*.{js,jsx,mjs,cjs,json}",
+  "search.useParentIgnoreFiles": false,
+  "terminal.integrated.scrollback": 100000,
 }

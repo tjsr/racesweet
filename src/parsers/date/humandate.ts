@@ -1,4 +1,4 @@
-import { validateDayMonthYear } from "../validators/date.js";
+import { validateDayMonthYear } from "../../validators/date.ts";
 
 const humanDateString = /^(?<day>\d{1,2})[-/](?<month>\d{1,2})[-/](?<year>\d{2,4})$/;
 const humanDateWithYearFirst = /^(?<year>\d{4})[-/](?<month>\d{1,2})[-/](?<day>\d{1,2})$/;

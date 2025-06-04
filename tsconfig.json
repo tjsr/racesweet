@@ -6,6 +6,9 @@
     "rootDir": ".",
     "outDir": "./build",
     "strict": true,
-    "target": "ESNext"
+    "sourceMap": true,
+    "module": "Node18",
+    "target": "ES2024",
+    "moduleResolution": "nodenext",
   },
 }

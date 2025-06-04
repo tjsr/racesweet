@@ -1,5 +1,13 @@
 import { humanDateStringToSystemDateString } from './humandate.js';
 
+describe('humandate', () => {
+  it('should convert a valid date with two-digit year to system format', () => {
+    expect(humanDateStringToSystemDateString('12-05-23')).toBe('2023-05-12');
+    expect(humanDateStringToSystemDateString('1/1/99')).toBe('2099-01-01');
+    expect(humanDateStringToSystemDateString('2023/05/12')).toBe('2023-05-12');
+  });
+});
+
 describe('humanDateStringToSystemDateString', () => {
   it('should convert a valid date with two-digit year to system format', () => {
     expect(humanDateStringToSystemDateString('12-05-23')).toBe('2023-05-12');
