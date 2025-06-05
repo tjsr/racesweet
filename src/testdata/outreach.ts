@@ -1,18 +1,20 @@
+import type { GreenFlagRecord } from "../model/flag.ts";
 import type { PathLike } from "fs";
 import type { RaceState } from "../model/racestate.ts";
 import { Session } from "../model/racestate.ts";
 import type { TestSession } from "./testsession.ts";
-import { createGreenFlagTestRecords } from "./greenFlagEvents.ts";
+import { createGreenFlagEvent } from "../controllers/flag.ts";
 import { loadCategoriesFromJsonFile } from "../controllers/category.ts";
 import { parseFile as parseOutreachCrossingsFile } from "../parsers/outreach.ts";
 import path from "path";
 import { readParticipantsXlsx } from "../controllers/participant.ts";
 
 const DATAFILE_DIR = path.resolve(path.join('.', 'src', 'testdata'));
-const CATEGORIES_TEST_FILE = path.join(DATAFILE_DIR, 'categories.json');
-const TEST_CROSSINGS_DATA_FILE = '192.168.1.119 2025-03-03.txt';
-const ENTRIES_DATA_FILE = path.join(DATAFILE_DIR, '2025-03-03-entries.xlsx');
-const TEST_EVENT_DATE = new Date('2025-03-03T00:00:00Z');
+const CATEGORIES_TEST_FILE = path.join(DATAFILE_DIR, '2025-02-07-categories.json');
+const TEST_CROSSINGS_DATA_FILE = '192.168.1.119 2025-02-07.txt';
+const ENTRIES_DATA_FILE = path.join(DATAFILE_DIR, '2025-02-07-entries.xlsx');
+const TEST_EVENT_START_TIME = new Date('2025-02-07T19:02:43.867+10:00');
+const TEST_EVENT_DATE = new Date('2025-02-07T00:00:00Z');
 
 export class OutreachFileTestSession extends Session implements TestSession {
 //   __loadingFiles: Promise<void>[] = [];
@@ -47,12 +49,13 @@ export class OutreachFileTestSession extends Session implements TestSession {
     });
   };
 
-  public loadTestData(): Promise<void> {
-    return this.loadCategoriesFromFile(CATEGORIES_TEST_FILE)
+  public async loadTestData(): Promise<void> {
+    return this.beginBulkProcess()
+      .then(() => this.loadCategoriesFromFile(CATEGORIES_TEST_FILE))
       .then(() =>
         readParticipantsXlsx(
           ENTRIES_DATA_FILE,
-          { Category: 'Grade', RacePlate: 'RaceNo', Tx: 'ChipNum' },
+          { Category: 'Grade', RacePlate: 'RaceNo', Tx: 'Transponder' },
           this.categories))
       .then((participants) => {
         this.addParticipants(participants);
@@ -67,13 +70,21 @@ export class OutreachFileTestSession extends Session implements TestSession {
         return parseOutreachCrossingsFile(filePath, TEST_EVENT_DATE);
       }).then((records) => {
         return this.addRecords(records);
+      }).then(() => 
+        this.endBulkProcess()
+      ).catch((error: unknown) => {
+        console.log('Error loading test data:', error);
       });
   }
 
   public createGreenFlagTestRecords(): Promise<void> {
     // This method is intentionally left empty for the test session.
-    const flags = createGreenFlagTestRecords();
-    this.addRecords(flags);
+    // const flags = createGreenFlagTestRecords();
+
+    const greenFlag: GreenFlagRecord = createGreenFlagEvent({
+      time: TEST_EVENT_START_TIME,
+    });
+    this.addRecords([greenFlag]);
 
     return Promise.resolve();
   }

@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "name": "A grade mens",
+    "gender": "Men"
+  },
+  {
+    "id": 2,
+    "name": "B grade mens",
+    "gender": "Men"
+  },
+  {
+    "id": 3,
+    "name": "C Grade",
+    "gender": "Men"
+  },
+  {
+    "id": 4,
+    "name": "D Grade Men",
+    "gender": "Men"
+  },
+  {
+    "id": 5,
+    "name": "A grade womens",
+    "gender": "Women"
+  },
+  {
+    "id": 6,
+    "name": "B grade womens",
+    "gender": "Women"
+  },
+  {
+    "id": 31,
+    "name": "E-Bike",
+    "gender": "Both"
+  },
+  {
+    "id": 41,
+    "name": "Open",
+    "gender": "Open"
+  },
+  {
+    "id": 42,
+    "name": "Under 17",
+    "gender": "Open"
+  },
+  {
+    "id": 43,
+    "name": "Male team",
+    "gender": "Men"
+  },
+  {
+    "id": 44,
+    "name": "Female team",
+    "gender": "Women"
+  },
+  {
+    "id": 45,
+    "name": "Mixed team",
+    "gender": "Open"
+  }
+]
