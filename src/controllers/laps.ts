@@ -3,7 +3,7 @@ import type { FlagRecord, GreenFlagRecord } from "../model/flag.ts";
 import { MINIMUM_LAP_TIME_SECONDS, warn } from "../printCrossings.ts";
 import type { ParticipantPassingRecord, TimeRecord } from "../model/timerecord.ts";
 import { ParticipantStartFlagError, StartFlagHasNoTimeError } from "../validators/errors.ts";
-import { calculateParticipantElapsedTimes, getParticipantNumber, getPassingsForParticipant } from "./participant.ts";
+import { calculateParticipantElapsedTimes, getParticipantNumber, getParticipantTransponders, getPassingsForParticipant } from "./participant.ts";
 import { elapsedTimeMilliseconds, millisecondsToTime } from "../app/utils/timeutils.ts";
 import { getFlagEvents, getOrCacheGreenFlagForCategory } from "./flag.ts";
 import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.ts";
@@ -71,6 +71,10 @@ export const processAllParticipantLaps = (
       return;
     }
     const participantPassings = getPassingsForParticipant(participantId, allTimeRecords);
+    if (participantPassings.length === 0) {
+      console.warn(`Participant ${getParticipantNumber(participant)} has no passings.  Has assignParticpantsToCrossings() been called?`);
+      return; // Skip processing this participant if they have no passings
+    }
     const participantCategoryStartFlag: GreenFlagRecord | null | undefined = eventFlags?.length > 0
       ? getOrCacheGreenFlagForCategory(
         participant.categoryId,
@@ -109,6 +113,14 @@ const validateParticipantStartFlag = (
   }
 };
 
+const getTxListStringForParticipant = (participant: EventParticipant): string => {
+  const txList = getParticipantTransponders(participant);
+  if (txList.length === 0) {
+    return 'No Tx';
+  }
+  return txList.map((tx) => `Tx${tx}`).join(', ');
+};
+
 export const calculateParticipantLapTimes = (
   participantCategoryStartFlag: GreenFlagRecord,
   passings: ParticipantPassingRecord[],
@@ -117,7 +129,8 @@ export const calculateParticipantLapTimes = (
 ): void => {
   const identifier = '#' + getParticipantNumber(participant);
   if (!(passings?.length > 0)) {
-    console.error(`No passings to calculate lap times for ${identifier}`);
+    const txNoList = getTxListStringForParticipant(participant);
+    console.error(`No passings to calculate lap times for ${identifier} with ${txNoList}`);
     return;
   }
   validateParticipantStartFlag(participantCategoryStartFlag, participant);

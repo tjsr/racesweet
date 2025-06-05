@@ -11,6 +11,7 @@ import { v1 as uuid1, v5 as uuid5 } from 'uuid';
 
 import type { EventCategoryId } from "../model/eventcategory.ts";
 import type { EventParticipantId } from '../model/eventparticipant.ts';
+import { NoEventFlagsError } from "../validators/errors.ts";
 
 const FLAG_NAMESPACE = uuid5('flag', '00000000-0000-0000-0000-000000000000');
 const EVENT_FLAG_GREEN = EVENT_FLAG_DISPLAYED | 16;
@@ -144,11 +145,7 @@ export const getOrCacheGreenFlagForCategory = (
   categoryEventFlags: Map<EventCategoryId, GreenFlagRecord>
 ): GreenFlagRecord | null => {
   if (!eventFlags || eventFlags.length === 0) {
-    console.error(
-      getOrCacheGreenFlagForCategory.name,
-      `No event flags in event when searching for relevant category ${categoryId} start flag.`
-    );
-    return null;
+    throw new NoEventFlagsError(`No event flags in event when searching for relevant category ${categoryId} start flag.`);
   }
   if (categoryEventFlags.has(categoryId)) {
     return categoryEventFlags.get(categoryId) || null;

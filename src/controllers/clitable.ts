@@ -4,6 +4,7 @@ import { categoryTextString, findCategoryById, getElapsedTimeForCategory } from 
 import { isFlagRecord, isGreenFlag } from "./flag.ts";
 
 import type { Cell } from "cli-table3";
+import type { ChipCrossingData } from "../model/chipcrossing.ts";
 import type { EventCategory } from "../model/eventcategory.ts";
 import type { FlagRecord } from "../model/flag.ts";
 import Table from "cli-table3";
@@ -48,9 +49,12 @@ export const crossingTableRow = (passing: ParticipantPassingRecord, categoryList
     }
   }
   if (!plateNumber) {
+    const txNo = (passing as ChipCrossingData).chipCode;
+    const txCount = rs.countTransponderCrossings(txNo, passing.time);
+    const content = `Unknown transponder ${getTimeRecordIdentifier(passing, true)} (${txCount})`;
     return [
       ant, identifier, timeString,
-      { colSpan: columns.length - 3, content: `Unknown transponder ${getTimeRecordIdentifier(passing, true)}`, hAlign: 'center' },
+      { colSpan: columns.length - 3, content, hAlign: 'center' },
     ];
   }
   const plateNumberString: string = plateNumber?.toString() || '';

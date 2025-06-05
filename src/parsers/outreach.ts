@@ -92,7 +92,7 @@ const parseOutreachFile = async  (filePath: PathLike): Promise<ChipCrossingData[
       }
     }
     return file.close().then(() => {
-      console.log('File closed');
+      console.log(parseOutreachFile.name, `Finished parsing and closed outreach data file.  ${unparsedData.length} unparsed crossings returned.`);
       return unparsedData;
     });
   });

@@ -23,7 +23,14 @@ class StartFlagError extends TimeRecordError {
 export class ParticipantStartFlagError extends StartFlagError {
   constructor(message: string) {
     super(message);
-    this.name = 'NoParticipantStartFlagError';
+    this.name = 'ParticipantStartFlagError';
+  }
+}
+
+export class NoEventFlagsError extends TimeRecordError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NoEventFlagsError';
   }
 }
 

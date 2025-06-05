@@ -19,6 +19,34 @@ import { randomUUID } from "crypto";
 import { validateStartFlag } from "../validators/startflag.ts";
 import xlsx from 'xlsx';
 
+const silent: string[] = ['addParticipantIdentifier'];
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+const isLogEnabled = (fn: Function): boolean => {
+  if (typeof fn !== 'function') {
+    return false;
+  }
+  if (silent.includes(fn.name)) {
+    return false;
+  }
+  return true;
+};
+
+const baseDebug  = console.debug;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+console.debug = (message?: any, ...optionalParams: any[]): void => {
+  if (typeof message === 'function') {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+    if (!isLogEnabled(message as Function)) {
+      return;
+    }
+    message = message.name;
+  }
+  
+  baseDebug(message, ...optionalParams);
+};
+
 const addParticipantIdentifier = (
   participant: EventParticipant,
   identifierType: string,
@@ -46,6 +74,7 @@ const addParticipantIdentifier = (
     [identifierType]: value,
     toTime,
   } as ParticipantIdentifier);
+  console.debug(addParticipantIdentifier, identifierType, 'Added identifier to participant', participant.id, value, participant.firstname, participant.surname);
   return true;
 };
 
@@ -418,7 +447,6 @@ const processParticipantRow = (
   const tx = findMappedTransponder(mappings, headers, row);
   if (tx) {
     addParticipantIdentifier(participant as EventParticipant, 'txNo', tx);
-    console.debug('Added transponder to participant', participant.id, tx, participant.firstname, participant.surname, tx);
   } else {
     throw new NoTransponderError(`Transponder not found in row: ${JSON.stringify(row)}`);
   }
@@ -427,7 +455,6 @@ const processParticipantRow = (
 
   if (no) {
     addParticipantIdentifier(participant as EventParticipant, 'racePlate', no);
-    console.debug('Added plate number to participant', participant.id, no, participant.firstname, participant.surname);
   } else {
     throw new NoPlateNumberError(`Plate number not found in row: ${JSON.stringify(row)}`);
   }
@@ -450,6 +477,7 @@ export const readParticipantsXlsx = async (filePath: PathLike, mappings: ImportM
       const participant = processParticipantRow(headers, mappings, row, categorySheetHeader, categoryList);
       participants.push(participant as EventParticipant);
     });
+    console.log(readParticipantsXlsx.name, `Finished reading ${participants.length} participants from input file ${filePath}.`);
     return participants;
   });
 };

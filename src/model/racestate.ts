@@ -5,16 +5,21 @@ import type { ParticipantPassingRecord, TimeRecord, TimeRecordId } from "./timer
 import { getOrCacheGreenFlagForCategory, isFlagRecord } from "../controllers/flag.ts";
 import { processAllParticipantLaps, processParticipantLaps } from "../controllers/laps.ts";
 
+import type { ChipCrossingData } from "./chipcrossing.ts";
 import type { EventTeam } from "./eventteam.ts";
 import type { MapOf } from "./types.ts";
+import { assignParticpantsToCrossings } from "../controllers/participant.ts";
 import { compareByTime } from "../controllers/timerecord.ts";
 import { crossingMatchesParticipantIdentifiers } from "../controllers/participantMatch.ts";
+import { isParsedChipCrossing } from "../controllers/chipCrossing.ts";
 import { listToMap } from "../utils.ts";
 
 export interface RaceStateLookup {
   getParticipantById(participantId: EventParticipantId): EventParticipant | undefined;
   getCategoryById(categoryId: EventCategoryId): EventCategory | undefined;
   getParticipantLaps(participantId: EventParticipantId): ParticipantPassingRecord[] | null | undefined;
+  countTransponderCrossings(txNo: ChipCrossingData['chipCode'], untilTime?: Date): number;
+  getTransponderCrossings(txNo: ChipCrossingData['chipCode'], untilTime?: Date): ChipCrossingData[];
 }
 
 export interface RaceState {
@@ -36,12 +41,14 @@ export class Session implements RaceState, RaceStateLookup {
   private _bulkProcess: boolean = false;
   private _categoryGreenFlags: Map<EventCategoryId, GreenFlagRecord> | undefined;
   private _minimumLapTimeMilliseconds: number | undefined = 60000;
+  private _cachedTransponderCrossings: Map<ChipCrossingData["chipCode"], ChipCrossingData[]>;
 
   public constructor(state: RaceState) {
     this._categories = listToMap(state.categories);
     this._participants = listToMap(state.participants);
     this._teams = listToMap(state.teams);
     this._records = listToMap(state.records);
+    this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
   }
 
   public get records(): TimeRecord[] {
@@ -75,6 +82,18 @@ export class Session implements RaceState, RaceStateLookup {
     // return newPromise;
     return Promise.resolve(true);
   }
+
+  public async endBulkProcess(): Promise<void> {
+    return Promise.resolve(true).then(() => {
+      assignParticpantsToCrossings(this._participants, this.records);
+      const processedLaps: Map<EventParticipantId, ParticipantPassingRecord[]> = processAllParticipantLaps(
+        this.records, this._participants
+      );
+
+      this._cachedParticipantLaps = processedLaps;
+      this._bulkProcess = false;
+    });
+  };
 
   public getCategoryById(categoryId: EventCategoryId): EventCategory | undefined {
     return this._categories.get(categoryId);
@@ -159,6 +178,9 @@ export class Session implements RaceState, RaceStateLookup {
       const minimumLapTimeMilliseconds = this._minimumLapTimeMilliseconds || 60000; // Default to 60 seconds if not set
 
       const affectedCrossings = this._records.values().filter((record) => crossingMatchesParticipantIdentifiers(participant, record)).map((record) => record as ParticipantPassingRecord);
+      if (this._bulkProcess) {
+        return; // If bulk processing, we will handle this later
+      }
       const participantCategoryStartFlag: GreenFlagRecord | null | undefined = this.getCategoryGreenFlag(participant.categoryId);
       if (participantCategoryStartFlag) {
       // validateParticipantStartFlag(participantCategoryStartFlag, participant);
@@ -220,5 +242,42 @@ export class Session implements RaceState, RaceStateLookup {
       }
     });
     return flags;
+  }
+
+  private cacheTransponderCrossings(txNo: ChipCrossingData["chipCode"]): void {
+    const crossings: ChipCrossingData[] = [];
+    this._records.values().forEach((record: TimeRecord) => {
+      const chipCrossing: ChipCrossingData = record as ChipCrossingData;
+      if (isParsedChipCrossing(chipCrossing)) {
+        if (chipCrossing.chipCode === txNo) {
+          crossings.push(chipCrossing);
+        }
+      }
+    });
+    if (!this._cachedTransponderCrossings) {
+      this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
+    }
+    this._cachedTransponderCrossings.set(txNo, crossings);
+  };
+
+  public getTransponderCrossings(txNo: ChipCrossingData["chipCode"], untilTime?: Date): ChipCrossingData[] {
+    if (!this._cachedTransponderCrossings.has(txNo)) {
+      this.cacheTransponderCrossings(txNo);
+    }
+    let crossings: ChipCrossingData[] = this._cachedTransponderCrossings.get(txNo) || [];
+    if (untilTime) {
+      crossings = crossings.filter((crossing) => {
+        if (crossing.time === undefined) {
+          return false;
+        }
+        return crossing.time.getTime() <= untilTime.getTime();
+      });
+    }
+    return crossings;
+  }
+
+  public countTransponderCrossings(txNo: ChipCrossingData["chipCode"], untilTime?: Date): number {
+    const crossings = this.getTransponderCrossings(txNo, untilTime);
+    return crossings.length;
   }
 }
