@@ -15,7 +15,7 @@ const ENTRIES_DATA_FILE = '2025-02-07-entries.xlsx';
 const TEST_EVENT_START_TIME = new Date('2025-02-07T19:02:43.867+10:00');
 const TEST_EVENT_DATE = new Date('2025-02-07T00:00:00Z');
 
-export class OutreachFileTestSession extends Session implements TestSession {
+export class OutreachTeamsRaceTestSession extends Session implements TestSession {
 //   __loadingFiles: Promise<void>[] = [];
 
   //   readonly async get waitFor(): Promise<void> {
@@ -34,8 +34,8 @@ export class OutreachFileTestSession extends Session implements TestSession {
   //   }
   // };
   
-  public static async create(): Promise<OutreachFileTestSession> {
-    return Promise.resolve(new OutreachFileTestSession({} as RaceState));
+  public static async create(): Promise<OutreachTeamsRaceTestSession> {
+    return Promise.resolve(new OutreachTeamsRaceTestSession({} as RaceState));
   
   };
   
