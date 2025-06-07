@@ -105,6 +105,7 @@ export const flagTableRow = (record: FlagRecord, categoryList: EventCategory[]):
 
 const createCliTableRows = (session: Session): Cell[][] => {
   const records: TimeRecord[] = session.records;
+  let flagCount = 0;
 
   const outputTableRowData = records.map((record: TimeRecord) => {
     if (record.time === undefined) {
@@ -116,6 +117,7 @@ const createCliTableRows = (session: Session): Cell[][] => {
       let row: Cell[];
       if (isFlagRecord(record)) {
         row = flagTableRow(record, categoryList);
+        flagCount++;
       } else {
         row = crossingTableRow(record, categoryList, session);
       }
@@ -127,6 +129,10 @@ const createCliTableRows = (session: Session): Cell[][] => {
   });
   // .filter((row) => row !== undefined) as string[];
   const filteredData = outputTableRowData.filter((row) => row !== undefined);
+  if (flagCount === 0) {
+    console.warn(createCliTableRows.name, `No flags (eg, start flags) were present in event data.`);
+  }
+
   return filteredData as Cell[][];
 };
 
