@@ -7,6 +7,7 @@ import { processAllParticipantLaps, processParticipantLaps } from "../controller
 
 import type { ChipCrossingData } from "./chipcrossing.ts";
 import type { EventTeam } from "./eventteam.ts";
+import { InvalidIdError } from "../validators/errors.ts";
 import type { MapOf } from "./types.ts";
 import { assignParticpantsToCrossings } from "../controllers/participant.ts";
 import { compareByTime } from "../controllers/timerecord.ts";
@@ -96,10 +97,16 @@ export class Session implements RaceState, RaceStateLookup {
   };
 
   public getCategoryById(categoryId: EventCategoryId): EventCategory | undefined {
+    if (!isValidId(categoryId)) {
+      throw new InvalidIdError(`ParticipantId ${categoryId} for category lookup by Id is not a valid Id type.`);
+    }
     return this._categories.get(categoryId);
   }
 
   public getParticipantById(participantId: EventParticipantId): EventParticipant | undefined {
+    if (!isValidId(participantId)) {
+      throw new InvalidIdError(`ParticipantId ${participantId} for participant lookup by Id is not a valid Id type.`);
+    }
     return this._participants.get(participantId);
   }
 
@@ -124,6 +131,9 @@ export class Session implements RaceState, RaceStateLookup {
   }
 
   public getParticipantLaps(participantId: EventParticipantId): ParticipantPassingRecord[] | null | undefined {
+    if (!isValidId(participantId)) {
+      throw new InvalidIdError(`ParticipantId ${participantId} for lookup is not a valid Id type.`);
+    }
     if (!this._cachedParticipantLaps) {
       console.warn("Participant laps have not been processed yet. Please call addParticipants first.");
       return undefined;
@@ -133,6 +143,9 @@ export class Session implements RaceState, RaceStateLookup {
 
   public addCategories(categories: EventCategory[]): void {
     categories.forEach((category) => {
+      if (!isValidId(category.id)) {
+        throw new InvalidIdError(`Category ID ${category.id} is invalid while adding category to session.`);
+      }
       if (category.id) {
         this._categories.set(category.id, category);
       } else {
