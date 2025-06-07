@@ -4,15 +4,14 @@ import type { RaceState } from "../model/racestate.ts";
 import { Session } from "../model/racestate.ts";
 import type { TestSession } from "./testsession.ts";
 import { createGreenFlagEvent } from "../controllers/flag.ts";
+import { getTestFilePath } from "../testing/testDataFiles.ts";
 import { loadCategoriesFromJsonFile } from "../controllers/category.ts";
 import { parseFile as parseOutreachCrossingsFile } from "../parsers/outreach.ts";
-import path from "path";
 import { readParticipantsXlsx } from "../controllers/participant.ts";
 
-const DATAFILE_DIR = path.resolve(path.join('.', 'src', 'testdata'));
-const CATEGORIES_TEST_FILE = path.join(DATAFILE_DIR, '2025-02-07-categories.json');
+const CATEGORIES_TEST_FILE = '2025-02-07-categories.json';
 const TEST_CROSSINGS_DATA_FILE = '192.168.1.119 2025-02-07.txt';
-const ENTRIES_DATA_FILE = path.join(DATAFILE_DIR, '2025-02-07-entries.xlsx');
+const ENTRIES_DATA_FILE = '2025-02-07-entries.xlsx';
 const TEST_EVENT_START_TIME = new Date('2025-02-07T19:02:43.867+10:00');
 const TEST_EVENT_DATE = new Date('2025-02-07T00:00:00Z');
 
@@ -51,22 +50,24 @@ export class OutreachFileTestSession extends Session implements TestSession {
 
   public async loadTestData(): Promise<void> {
     return this.beginBulkProcess()
-      .then(() => this.loadCategoriesFromFile(CATEGORIES_TEST_FILE))
-      .then(() =>
-        readParticipantsXlsx(
-          ENTRIES_DATA_FILE,
-          { Category: 'Grade', RacePlate: 'RaceNo', Tx: 'Transponder' },
-          this.categories))
+      .then(() => {
+        const categoriesFile = getTestFilePath(CATEGORIES_TEST_FILE);
+        return this.loadCategoriesFromFile(categoriesFile);
+      })
+      .then(() => {
+        const entriesFile = getTestFilePath(ENTRIES_DATA_FILE);
+        return readParticipantsXlsx(
+          entriesFile,
+          { Category: 'Grade', RacePlate: 'RaceNo' }, // , Tx: 'ChipCode' },
+          this.categories);
+      })
       .then((participants) => {
         this.addParticipants(participants);
         return;
       })
       .then(() => this.createGreenFlagTestRecords())
       .then(() => {
-        let filePath = path.join(DATAFILE_DIR, TEST_CROSSINGS_DATA_FILE);
-        if (filePath.startsWith('\\')) {
-          filePath = filePath.replace(/^\\/, '');
-        }
+        const filePath = getTestFilePath(TEST_CROSSINGS_DATA_FILE);
         return parseOutreachCrossingsFile(filePath, TEST_EVENT_DATE);
       }).then((records) => {
         return this.addRecords(records);

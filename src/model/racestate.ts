@@ -13,6 +13,7 @@ import { assignParticpantsToCrossings } from "../controllers/participant.ts";
 import { compareByTime } from "../controllers/timerecord.ts";
 import { crossingMatchesParticipantIdentifiers } from "../controllers/participantMatch.ts";
 import { isParsedChipCrossing } from "../controllers/chipCrossing.ts";
+import { isValidId } from "../validators/isValidId.ts";
 import { listToMap } from "../utils.ts";
 
 export interface RaceStateLookup {

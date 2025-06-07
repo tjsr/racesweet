@@ -1,4 +1,5 @@
-import { OutreachFileTestSession } from './testdata/outreach.ts';
+import { OutreachFileTestSession as OutreachTeamsRaceTestSession } from './testdata/outreach.ts';
+import type { ParticipantPassingRecord } from './model/timerecord.ts';
 import type { TestSession } from './testdata/testsession.ts';
 import colors from 'colors';
 import { getCliTable } from "./controllers/clitable.ts";
