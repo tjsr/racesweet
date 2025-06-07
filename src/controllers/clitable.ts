@@ -103,7 +103,7 @@ export const flagTableRow = (record: FlagRecord, categoryList: EventCategory[]):
   ];
 };
 
-const createCliTableRows = (session: Session): Cell[][] => {
+const createCliTableRows = (session: Session, filter: (data: ParticipantPassingRecord) => boolean): Cell[][] => {
   const records: TimeRecord[] = session.records;
   let flagCount = 0;
 
@@ -120,6 +120,9 @@ const createCliTableRows = (session: Session): Cell[][] => {
         flagCount++;
       } else {
         row = crossingTableRow(record, categoryList, session);
+        if (filter && filter(record as ParticipantPassingRecord) === false) {
+          return undefined; // Skip this row if it does not match the filter
+        }
       }
       return row;
     } catch (error) {
@@ -136,9 +139,9 @@ const createCliTableRows = (session: Session): Cell[][] => {
   return filteredData as Cell[][];
 };
 
-export const getCliTable = (session: Session): Table.Table => {
+export const getCliTable = (session: Session, filter: (data: ParticipantPassingRecord) => boolean): Table.Table => {
   const t: Table.Table = getTable();
-  const tableRows = createCliTableRows(session);
+  const tableRows = createCliTableRows(session, filter);
 
   tableRows.forEach((row: Cell[]) => {
     t.push(row);

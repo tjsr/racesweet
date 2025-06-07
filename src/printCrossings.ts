@@ -51,7 +51,23 @@ await eventSession.loadTestData();
 //   }
 // });
 
-console.log(getCliTable(eventSession).toString());
+const filter = (data: ParticipantPassingRecord): boolean => {
+  if (!data.participantId) {
+    return true;
+  }
+  const participant = eventSession.getParticipantById(data.participantId);
+  if (!participant?.categoryId) {
+    return true;
+  }
+  const participantCategory = eventSession.getCategoryById(participant?.categoryId);
+  if (participantCategory?.name === undefined || participantCategory?.name == 'No Category') {
+    warn(`Participant ${participant?.firstname} ${participant?.surname} has no category`);
+    return false;
+  }
+  return true;
+};
+
+console.log(getCliTable(eventSession, filter).toString());
 
 
 
