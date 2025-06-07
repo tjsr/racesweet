@@ -30,7 +30,7 @@ export const crossingTableRow = (passing: ParticipantPassingRecord, categoryList
   const ant = ''; // (crossing as unknown as any).antenna ?? '';
 
   const timeString = tableTimeString(passing.time);
-  const identifier: string = getTimeRecordIdentifier(passing);
+  const identifier: string = getTimeRecordIdentifier(passing, true);
   const entrant = passing.participantId ? rs.getParticipantById(passing.participantId) : undefined;
   let plateNumber: string | number | undefined = undefined;
   let entrantName: string | undefined = undefined;
@@ -49,13 +49,7 @@ export const crossingTableRow = (passing: ParticipantPassingRecord, categoryList
     }
   }
   if (!plateNumber) {
-    const txNo = (passing as ChipCrossingData).chipCode;
-    const txCount = rs.countTransponderCrossings(txNo, passing.time);
-    const content = `Unknown transponder ${getTimeRecordIdentifier(passing, true)} (${txCount})`;
-    return [
-      ant, identifier, timeString,
-      { colSpan: columns.length - 3, content, hAlign: 'center' },
-    ];
+    return rowForUnknownChip(passing, rs, identifier, ant, timeString);
   }
   const plateNumberString: string = plateNumber?.toString() || '';
 
@@ -148,4 +142,21 @@ export const getCliTable = (session: Session, filter: (data: ParticipantPassingR
   });
   return t;
 };
+
+const rowForUnknownChip = (
+  passing: ParticipantPassingRecord,
+  rs: RaceStateLookup,
+  identifier: string,
+  ant: string,
+  timeString: string
+): Cell[] => {
+  const txNo = (passing as ChipCrossingData).chipCode;
+  const txCount = rs.countTransponderCrossings(txNo, passing.time);
+  const content = `Unknown transponder ${identifier} (${txCount})`;
+  return [
+    ant, identifier, timeString,
+    { colSpan: columns.length - 3, content, hAlign: 'center' },
+  ];
+};
+
 

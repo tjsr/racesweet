@@ -21,7 +21,7 @@ export const MINIMUM_LAP_TIME_SECONDS = 300; // 5 minutes in milliseconds
 
 // const categories = getCategoryList();
 
-const eventSession: TestSession = new OutreachFileTestSession();
+const eventSession: TestSession = new OutreachTeamsRaceTestSession();
 await eventSession.loadTestData();
 
 // // If you want to get the rows with no valid time, assign the result to a variable:
