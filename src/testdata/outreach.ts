@@ -15,28 +15,29 @@ const ENTRIES_DATA_FILE = '2025-02-07-entries.xlsx';
 const TEST_EVENT_START_TIME = new Date('2025-02-07T19:02:43.867+10:00');
 const TEST_EVENT_DATE = new Date('2025-02-07T00:00:00Z');
 
-export class OutreachTeamsRaceTestSession extends Session implements TestSession {
-//   __loadingFiles: Promise<void>[] = [];
 
-  //   readonly async get waitFor(): Promise<void> {
-  //     return new Promise((resolve) => {
-  //       while (true) {
-  //         Promise.any(this.__loadingFiles)
-  //           .then(() => {
-  //             // Resolve the promise when at least one file has finished loading
-  //           });
-  //         Promise.any(this.__loadingFiles).then(() => {
+abstract class GenericTestSession extends Session implements TestSession {
+  public abstract loadCategories(): Promise<void>;
+  public abstract loadParticipants(): Promise<void>;
+  public abstract loadFlags(): Promise<void>;
+  public abstract loadCrossings(): Promise<void>;
 
-  //         });
-  //         // Wait for all promises to resolve
-  //       }
-  //     });
-  //   }
-  // };
-  
+  public async loadTestData(): Promise<void> {
+    return this.beginBulkProcess()
+      .then(this.loadCategories)
+      .then(this.loadParticipants)
+      .then(this.loadFlags)
+      .then(this.loadCrossings)
+      .then(this.endBulkProcess)
+      .catch((error: unknown) => {
+        console.log('Error loading test data:', error);
+      });
+  }
+}
+
+export class OutreachTeamsRaceTestSession extends GenericTestSession implements TestSession, GenericTestSession {
   public static async create(): Promise<OutreachTeamsRaceTestSession> {
     return Promise.resolve(new OutreachTeamsRaceTestSession({} as RaceState));
-  
   };
   
   public constructor(raceState?: RaceState) {
@@ -48,34 +49,28 @@ export class OutreachTeamsRaceTestSession extends Session implements TestSession
     });
   };
 
-  public async loadTestData(): Promise<void> {
-    return this.beginBulkProcess()
-      .then(() => {
-        const categoriesFile = getTestFilePath(CATEGORIES_TEST_FILE);
-        return this.loadCategoriesFromFile(categoriesFile);
-      })
-      .then(() => {
-        const entriesFile = getTestFilePath(ENTRIES_DATA_FILE);
-        return readParticipantsXlsx(
-          entriesFile,
-          { Category: 'Grade', RacePlate: 'RaceNo' }, // , Tx: 'ChipCode' },
-          this.categories);
-      })
-      .then((participants) => {
-        this.addParticipants(participants);
-        return;
-      })
-      .then(() => this.createGreenFlagTestRecords())
-      .then(() => {
-        const filePath = getTestFilePath(TEST_CROSSINGS_DATA_FILE);
-        return parseOutreachCrossingsFile(filePath, TEST_EVENT_DATE);
-      }).then((records) => {
-        return this.addRecords(records);
-      }).then(() => 
-        this.endBulkProcess()
-      ).catch((error: unknown) => {
-        console.log('Error loading test data:', error);
-      });
+  public async loadCategories(): Promise<void> {
+    const categoriesFile = getTestFilePath(CATEGORIES_TEST_FILE);
+    return this.loadCategoriesFromFile(categoriesFile);
+  }
+
+  public async loadParticipants(): Promise<void> {
+    const entriesFile = getTestFilePath(ENTRIES_DATA_FILE);
+    return readParticipantsXlsx(
+      entriesFile,
+      { Category: 'Grade', RacePlate: 'RaceNo' }, // , Tx: 'ChipCode' },
+      this.categories)
+      .then(this.addParticipants);
+  }
+
+  public async loadFlags(): Promise<void> {
+    return this.createGreenFlagTestRecords();
+  }
+
+  public async loadCrossings(): Promise<void> {
+    const filePath = getTestFilePath(TEST_CROSSINGS_DATA_FILE);
+    return parseOutreachCrossingsFile(filePath, TEST_EVENT_DATE)
+      .then(this.addRecords);
   }
 
   public createGreenFlagTestRecords(): Promise<void> {
