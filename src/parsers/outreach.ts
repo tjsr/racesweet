@@ -1,14 +1,12 @@
 import type { ChipCrossingData } from "../model/chipcrossing.ts";
 import type { PathLike } from "node:fs";
 import type { TimeRecord } from "../model/timerecord.ts";
-import { asUnparsedChipCrossing } from "../controllers/chipCrossing.ts";
 import { createIdHash } from "../utils.ts";
-import { formatRFC3339 } from "date-fns";
 import { fromRfidTimingLine } from "./rfidtiming.js";
 import { getSequenceNumber } from "../app/utils/sequence.ts";
 import { open } from 'node:fs/promises';
 import { parseLineMatching } from "./genericLineMatcher.js";
-import { timeOrTimeToday } from "./date/dateutils.ts";
+import { parseUnparsedChipCrossings } from "./genericTimeParser.ts";
 import { v5 as uuidv5 } from 'uuid';
 
 const MAX_ERRORS = 20;
@@ -103,27 +101,6 @@ export const parseFile = async (filePath: PathLike, fileEventDate: Date): Promis
     throw new Error('File event date is required');
   }
   
-  // const eventTimezone = getUserTimezone();
-  return parseOutreachFile(filePath).then((unparsedData: ChipCrossingData[]) => {
-    return unparsedData.map((crossing: ChipCrossingData) => {
-      if (asUnparsedChipCrossing(crossing)) {
-        if (!crossing.timeString) {
-          throw new Error(`Crossing ${crossing.chipCode} has no timeString`);
-        }
-        const parsedTime = timeOrTimeToday(fileEventDate, crossing.timeString!);
-        try {
-          const _checkFormattable = formatRFC3339(parsedTime, { fractionDigits: 3 });
-          const _t = parsedTime.getTime();
-          return {
-            ...crossing,
-            time: parsedTime,
-          } as TimeRecord;
-        } catch (_error) {
-          return crossing;
-        }
-      } else {
-        return crossing;
-      }
-    });
-  });
+  return parseOutreachFile(filePath)
+    .then((unparsedData: ChipCrossingData[]) => parseUnparsedChipCrossings(fileEventDate, unparsedData));
 };

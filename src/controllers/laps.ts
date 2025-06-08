@@ -1,6 +1,5 @@
 import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.ts";
 import type { FlagRecord, GreenFlagRecord } from "../model/flag.ts";
-import { MINIMUM_LAP_TIME_SECONDS, warn } from "../printCrossings.ts";
 import type { ParticipantPassingRecord, TimeRecord } from "../model/timerecord.ts";
 import { ParticipantStartFlagError, StartFlagHasNoTimeError } from "../validators/errors.ts";
 import { calculateParticipantElapsedTimes, getParticipantNumber, getParticipantTransponders, getPassingsForParticipant } from "./participant.ts";
@@ -10,6 +9,9 @@ import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.ts";
 
 import type { EventCategoryId } from "../model/eventcategory.ts";
 import { setCategoryStartForPassings } from "./category.ts";
+import { warn } from "../printCrossings.ts";
+
+const MINIMUM_LAP_TIME_SECONDS = 300;
 
 export const validTimeAfterLastLap = (
   passing: ParticipantPassingRecord,

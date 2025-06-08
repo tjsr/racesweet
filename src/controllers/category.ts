@@ -1,4 +1,4 @@
-import type { EventCategory, EventCategoryId } from '../model/eventcategory.ts';
+import type { EventCategory, EventCategoryId, PlaceholderCategory } from '../model/eventcategory.ts';
 import type { ParticipantPassingRecord, PassingRecordId, TimeRecord } from '../model/timerecord.ts';
 import { elapsedTimeMilliseconds, getElapsedTimeStart, millisecondsToTime } from '../app/utils/timeutils.ts';
 import type { FlagRecord } from '../model/flag.ts';
@@ -95,6 +95,7 @@ export const calculateCategoryElapsedTime = (
   const elapsed: number = elapsedTimeMilliseconds(startTime, lap.time);
   return elapsed;
 };
+
 export const getElapsedTimeForCategory = (cat: EventCategory, time: Date): string | undefined => {
   if (cat.startTime === undefined) {
     return undefined;
@@ -103,6 +104,11 @@ export const getElapsedTimeForCategory = (cat: EventCategory, time: Date): strin
   const formattedTime = millisecondsToTime(duration);
   return formattedTime;
 };
+
+export const isPlaceholderCatgegory = (
+  category: EventCategory
+): category is PlaceholderCategory => (category as PlaceholderCategory).isPlaceholder === true;
+
 // const addParticipantCrossings = (
 //   allPassingRecords: ParticipantPassingRecord[],
 //   participantTimes: Map<EventParticipantId, ParticipantPassingRecord[]>

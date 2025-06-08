@@ -1,5 +1,6 @@
 import { OutreachTeamsRaceTestSession } from './testdata/outreach.ts';
 import type { ParticipantPassingRecord } from './model/timerecord.ts';
+import { RfidIndividualTestRace } from './testdata/rfid.ts';
 import type { TestSession } from './testdata/testsession.ts';
 import colors from 'colors';
 import { getCliTable } from "./controllers/clitable.ts";
@@ -19,7 +20,9 @@ export const warn = (message?: string, ...optionalParams: unknown[]): void => {
 
 // const categories = getCategoryList();
 
-const eventSession: TestSession = new OutreachTeamsRaceTestSession();
+const _outreachSession: TestSession = new OutreachTeamsRaceTestSession();
+const rfidSession: TestSession = new RfidIndividualTestRace();
+const eventSession: TestSession = rfidSession;
 await eventSession.loadTestData();
 
 // // If you want to get the rows with no valid time, assign the result to a variable:

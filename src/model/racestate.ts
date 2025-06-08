@@ -13,6 +13,7 @@ import { assignParticpantsToCrossings } from "../controllers/participant.ts";
 import { compareByTime } from "../controllers/timerecord.ts";
 import { crossingMatchesParticipantIdentifiers } from "../controllers/participantMatch.ts";
 import { isParsedChipCrossing } from "../controllers/chipCrossing.ts";
+import { isPlaceholderCatgegory } from "../controllers/category.ts";
 import { isValidId } from "../validators/isValidId.ts";
 import { listToMap } from "../utils.ts";
 
@@ -69,7 +70,6 @@ export class Session implements RaceState, RaceStateLookup {
     return [...this._teams.values()];
   };
 
-
   public async beginBulkProcess(): Promise<boolean> {
     this._bulkProcess = true;
     // this.__currentBulkProcess = this.__currentBulkProcess || Promise.resolve();
@@ -125,7 +125,7 @@ export class Session implements RaceState, RaceStateLookup {
   }
 
   public addRecords(records: TimeRecord[]) {
-    records.forEach((record) => {
+    records.forEach((record: TimeRecord) => {
       this._records.set(record.id, record);
       // addTimeRecord(targetArray, startFlagA);
     });
@@ -142,19 +142,46 @@ export class Session implements RaceState, RaceStateLookup {
     return this._cachedParticipantLaps.get(participantId) ?? null;
   }
 
-  public addCategories(categories: EventCategory[]): void {
-    categories.forEach((category) => {
-      if (!isValidId(category.id)) {
+  public async addCategories(categories: EventCategory[]): Promise<void> {
+    let addedIds: Set<EventCategoryId>|null = null;
+    // let placeholderCategoryParticipants: EventParticipant[]|null = null;
+
+    if (!this._bulkProcess) {
+      addedIds = new Set<EventCategoryId>();
+      // placeholderCategoryParticipants = this.__findParticipantsWithPlaceholderCategories();
+    }
+
+    categories.forEach((category: EventCategory) => {
+      if (!isValidId(category.id) && category.id) {
         throw new InvalidIdError(`Category ID ${category.id} is invalid while adding category to session.`);
       }
-      if (category.id) {
-        this._categories.set(category.id, category);
-      } else {
-        console.error(`Category has no ID:`, category);
+      this._categories.set(category.id, category);
+
+      if (addedIds) {
+        addedIds.add(category.id);
+        this.__getCategoryGreenFlag(category.id);
       }
     });
+    return Promise.resolve();
   }
 
+  private __findParticipantsWithPlaceholderCategories(): EventParticipant[] {
+    return this.participants.filter((participant: EventParticipant) => {
+      if (!participant.categoryId) {
+        return false;
+      }
+      if (!isValidId(participant.categoryId)) {
+        console.warn(`Participant ${participant.firstname} ${participant.surname} has invalid category ID: ${participant.categoryId}`);
+        return false;
+      }
+      const category = this.getCategoryById(participant.categoryId);
+      if (!category) {
+        console.warn(`CategoryID ${participant.categoryId} for participant ${participant.firstname} ${participant.surname} does not exist.`);
+        return false;
+      }
+      return isPlaceholderCatgegory(category);
+    });
+  };
   // private _reprocessBarrier: Promise<void>;
   // private _nextReprocessEvent: number | undefined = undefined;
 
@@ -163,7 +190,7 @@ export class Session implements RaceState, RaceStateLookup {
   //   this._reprocessWaits.push()
   // }
 
-  private getCategoryGreenFlag(categoryId: EventCategoryId): GreenFlagRecord | null {
+  private __getCategoryGreenFlag(categoryId: EventCategoryId): GreenFlagRecord | null {
     const flags = this.flags;
     if (this._categoryGreenFlags === undefined) {
       this._categoryGreenFlags = new Map<EventCategoryId, GreenFlagRecord>();
@@ -195,7 +222,7 @@ export class Session implements RaceState, RaceStateLookup {
       if (this._bulkProcess) {
         return; // If bulk processing, we will handle this later
       }
-      const participantCategoryStartFlag: GreenFlagRecord | null | undefined = this.getCategoryGreenFlag(participant.categoryId);
+      const participantCategoryStartFlag: GreenFlagRecord | null | undefined = this.__getCategoryGreenFlag(participant.categoryId);
       if (participantCategoryStartFlag) {
       // validateParticipantStartFlag(participantCategoryStartFlag, participant);
         processParticipantLaps(participant, [...affectedCrossings], participantCategoryStartFlag!, minimumLapTimeMilliseconds);

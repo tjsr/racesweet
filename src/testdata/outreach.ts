@@ -1,7 +1,7 @@
+import { GenericTestSession } from "./genericTestSession.js";
 import type { GreenFlagRecord } from "../model/flag.ts";
 import type { PathLike } from "fs";
 import type { RaceState } from "../model/racestate.ts";
-import { Session } from "../model/racestate.ts";
 import type { TestSession } from "./testsession.ts";
 import { createGreenFlagEvent } from "../controllers/flag.ts";
 import { getTestFilePath } from "../testing/testDataFiles.ts";
@@ -15,38 +15,9 @@ const ENTRIES_DATA_FILE = '2025-02-07-entries.xlsx';
 const TEST_EVENT_START_TIME = new Date('2025-02-07T19:02:43.867+10:00');
 const TEST_EVENT_DATE = new Date('2025-02-07T00:00:00Z');
 
-
-abstract class GenericTestSession extends Session implements TestSession {
-  public abstract loadCategories(): Promise<void>;
-  public abstract loadParticipants(): Promise<void>;
-  public abstract loadFlags(): Promise<void>;
-  public abstract loadCrossings(): Promise<void>;
-
-  public async loadTestData(): Promise<void> {
-    return this.beginBulkProcess()
-      .then(this.loadCategories)
-      .then(this.loadParticipants)
-      .then(this.loadFlags)
-      .then(this.loadCrossings)
-      .then(this.endBulkProcess)
-      .catch((error: unknown) => {
-        console.log('Error loading test data:', error);
-      });
-  }
-}
-
 export class OutreachTeamsRaceTestSession extends GenericTestSession implements TestSession, GenericTestSession {
   public static async create(): Promise<OutreachTeamsRaceTestSession> {
     return Promise.resolve(new OutreachTeamsRaceTestSession({} as RaceState));
-  };
-  
-  public constructor(raceState?: RaceState) {
-    super(raceState || {
-      categories: [],
-      participants: [],
-      records: [],
-      teams: [],
-    });
   };
 
   public async loadCategories(): Promise<void> {
