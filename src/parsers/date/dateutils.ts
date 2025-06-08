@@ -2,6 +2,8 @@ import { DateParseError, InvalidMonthError, InvalidYearError } from "./errors.ts
 
 import { TZDate } from "@date-fns/tz/date";
 import { expandTwoDigitYear } from "./datestring.js";
+import { formatRFC3339 } from "date-fns";
+import { parseRfidTimingDate } from "../rfidTimingDate.ts";
 import { toZonedTime } from "date-fns-tz";
 
 // import { toZonedTime } from "@date-fns/tz";
@@ -174,3 +176,22 @@ export const isBetween = (query: Date, start: Date | undefined, end: Date | unde
   }
   return true;
 };
+export const toYYYYMMDD = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};export const timeOrTimeToday = (today: Date, time: string): Date => {
+  const datePrefix = /[\sT]/.test(time) ? '' : (toYYYYMMDD(today) + 'T');
+  const toParse = datePrefix + time;
+
+  const parsedDate = parseRfidTimingDate(toParse);
+  try {
+    const _timeString = formatRFC3339(parsedDate, { fractionDigits: 3 });
+  } catch (_error) {
+    console.trace(`Error formatting time ${time}`);
+  }
+
+  return parsedDate;
+};
+
