@@ -1,4 +1,4 @@
-import { OutreachFileTestSession as OutreachTeamsRaceTestSession } from './testdata/outreach.ts';
+import { OutreachTeamsRaceTestSession } from './testdata/outreach.ts';
 import type { ParticipantPassingRecord } from './model/timerecord.ts';
 import type { TestSession } from './testdata/testsession.ts';
 import colors from 'colors';
@@ -10,8 +10,6 @@ colors.enable();
 export const warn = (message?: string, ...optionalParams: unknown[]): void => {
   console.warn(`Warning: ${message}`, optionalParams);
 };
-
-export const MINIMUM_LAP_TIME_SECONDS = 300; // 5 minutes in milliseconds
 
 // const filePath = path.format({
 //   base: '192.168.1.119 2025-03-03.txt',
