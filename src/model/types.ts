@@ -1,6 +1,6 @@
 export type uuidv5 = string;
 export type uuid = uuidv5;
-export type IdType = uuid | number;
+export type IdType = uuid;
 
 export interface WithId<Id extends IdType> {
   id: Id;
@@ -22,3 +22,6 @@ export type PhysicalLocation = [latitude, longitude] | [latitude, longitude, ele
 export type TimeRecordSourceId = uuid;export type MapOf<T extends WithId<IdType>> = Map<T['id'], T>;
 
 export type PlateNumberType = string | number;
+
+export type EventId = uuid;
+

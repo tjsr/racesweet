@@ -41,7 +41,7 @@ export class OutreachTeamsRaceTestSession extends GenericTestSession implements 
   public async loadCrossings(): Promise<void> {
     const filePath = getTestFilePath(TEST_CROSSINGS_DATA_FILE);
     return parseOutreachCrossingsFile(filePath, TEST_EVENT_DATE)
-      .then(this.addRecords);
+      .then((records) => this.addRecords(records, false));
   }
 
   public createGreenFlagTestRecords(): Promise<void> {

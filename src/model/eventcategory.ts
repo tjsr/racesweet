@@ -6,12 +6,18 @@ export type EventCategoryId = IdType;
 
 export interface EventCategory extends WithId<EventCategoryId> {
   name: string;
+  code?: string;
   description?: string;
   startTime?: ISO8601DateTime;
   distance?: number;
   duration?: ISO8601Duration;
   startRecordFlag?: TimeRecord['id'];
 }
+
+export interface PlaceholderCategory extends EventCategory {
+  isPlaceholder: true;
+}
+
 
 export class CategoryNotFoundError extends Error {
   constructor(message: string) {

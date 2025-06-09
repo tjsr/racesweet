@@ -47,3 +47,24 @@ export class InvalidIdError extends Error {
     this.name = 'InvalidIdError';
   }
 }
+
+export class CategoryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CategoryError';
+  }
+}
+
+export class DuplicateCategoryError extends CategoryError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DuplicateCategoryError';
+  }
+}
+
+export class InvalidCategoryIdError extends InvalidIdError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidCategoryIdError';
+  }
+}

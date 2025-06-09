@@ -19,8 +19,13 @@ export abstract class GenericTestSession extends Session implements TestSession 
 
   public async loadTestData(): Promise<void> {
     return this.beginBulkProcess()
-      .then(() => this.loadCategories())
-      .then(() => this.loadParticipants())
+      .then(() => this.loadCategories().then(() => {
+        console.log(`Loaded ${this.categories.length} categories successfully.`);
+        console.log(this.categories.map((c) => `${c.id}: ${c.name}`).join('\n'));
+      }))
+      .then(() => this.loadParticipants().then(() => {
+        console.log(`Loaded ${this.participants.length} participants successfully.`);
+      }))
       .then(() => this.loadFlags())
       .then(() => this.loadCrossings())
       .then(() => this.endBulkProcess())

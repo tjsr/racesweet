@@ -36,6 +36,11 @@ export const entrantHasTransponder = (
   lookupTime: Date = new Date()
 ): boolean => matchParticipantToIdentifier(entrant, transponder, 'txNo', lookupTime) != null;
 
+export const entrantHasAnyTx = (
+  participant: EventParticipant,
+  lookupTime: Date = new Date()
+): boolean => getParticipantIdentifiers(participant, 'txNo', lookupTime).length > 0;
+
 export const matchParticipantToIdentifier = (
   participant: EventParticipant,
   identifierValue: string | number,

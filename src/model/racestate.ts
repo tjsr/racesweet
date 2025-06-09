@@ -1,16 +1,17 @@
+import { DuplicateCategoryError, InvalidCategoryIdError, InvalidIdError } from "../validators/errors.ts";
 import type { EventCategory, EventCategoryId } from "./eventcategory.ts";
 import type { EventParticipant, EventParticipantId } from "./eventparticipant.ts";
 import type { FlagRecord, GreenFlagRecord } from "./flag.ts";
-import type { ParticipantPassingRecord, TimeRecord, TimeRecordId } from "./timerecord.ts";
-import { getOrCacheGreenFlagForCategory, isFlagRecord } from "../controllers/flag.ts";
+import { FlagReferencesUnknownCategoryError, InvalidFlagRecordError } from "./errors.ts";
+import type { ParticipantPassingRecord, TimeRecord, TimeRecordId, Validated } from "./timerecord.ts";
+import { addError, compareByTime } from "../controllers/timerecord.ts";
+import { getOrCacheGreenFlagForCategory, hasCategoryIds, isFlagRecord } from "../controllers/flag.ts";
 import { processAllParticipantLaps, processParticipantLaps } from "../controllers/laps.ts";
 
 import type { ChipCrossingData } from "./chipcrossing.ts";
 import type { EventTeam } from "./eventteam.ts";
-import { InvalidIdError } from "../validators/errors.ts";
 import type { MapOf } from "./types.ts";
 import { assignParticpantsToCrossings } from "../controllers/participant.ts";
-import { compareByTime } from "../controllers/timerecord.ts";
 import { crossingMatchesParticipantIdentifiers } from "../controllers/participantMatch.ts";
 import { isParsedChipCrossing } from "../controllers/chipCrossing.ts";
 import { isPlaceholderCatgegory } from "../controllers/category.ts";
@@ -124,10 +125,80 @@ export class Session implements RaceState, RaceStateLookup {
     // return this.__currentBulkProcess?.release() || Promise.resolve();
   }
 
-  public addRecords(records: TimeRecord[]) {
+
+  private _processRecord(_record: TimeRecord): void {
+    return;
+  }
+
+  public categoryExists(categoryId: EventCategoryId): boolean {
+    if (!isValidId(categoryId)) {
+      throw new InvalidIdError(`CategoryId ${categoryId} for category existence check is not a valid Id type.`);
+    }
+    return this._categories.has(categoryId.toString());
+  }
+
+  private _validateFlagRecord(record: FlagRecord): boolean {
+    if (!isFlagRecord(record)) {
+      throw new InvalidFlagRecordError(`Record ${record} is not a valid FlagRecord.`);
+    }
+
+    if (!hasCategoryIds(record)) {
+      return true;
+    }
+
+    record.categoryIds?.forEach((id: EventCategoryId) => {
+      if (!this.categoryExists(id)) {
+        throw new FlagReferencesUnknownCategoryError(`Flag record ${record.id} references non-existent category ID ${id}.`);
+      }
+    });
+    return true;
+  }
+
+  private _validateRecords(records: TimeRecord[]): void {
+    if (!Array.isArray(records)) {
+      throw new TypeError(`Expected records to be an array, but got ${typeof records}`);
+    }
+
+    const invalidRecords: Validated<TimeRecord>[] = [];
     records.forEach((record: TimeRecord) => {
-      this._records.set(record.id, record);
-      // addTimeRecord(targetArray, startFlagA);
+      if (isFlagRecord(record)) {
+        try {
+          this._validateFlagRecord(record);
+        } catch (error: unknown) {
+          if (error instanceof InvalidFlagRecordError) {
+            const validatedRecord = addError(record, error);
+            invalidRecords.push(validatedRecord);
+          }
+          throw error;
+        }
+      }
+    });
+
+    if (invalidRecords.length > 0) {
+      throw new InvalidFlagRecordError(
+        `Invalid records found: ${invalidRecords.map((r) => r.id).join(", ")}`,
+        invalidRecords);
+    }
+  }
+
+  public async addRecords(records: TimeRecord[], validate: boolean = true): Promise<void> {
+    try {
+      this._validateRecords(records);
+    } catch (error: unknown) {
+      if (validate) {
+        throw error;
+      }
+    }
+
+    records.forEach((record: TimeRecord) => {
+      if (!isValidId(record.id)) {
+        throw new InvalidIdError(`Record ID ${record.id} is not a valid Id type.`);
+      }
+      this._records.set(record.id.toString(), record);
+
+      if (!this._bulkProcess) {
+        this._processRecord(record);
+      }
     });
   }
 
@@ -153,9 +224,13 @@ export class Session implements RaceState, RaceStateLookup {
 
     categories.forEach((category: EventCategory) => {
       if (!isValidId(category.id) && category.id) {
-        throw new InvalidIdError(`Category ID ${category.id} is invalid while adding category to session.`);
+        throw new InvalidCategoryIdError(`Category ID ${category.id} is invalid while adding category to session.`);
       }
-      this._categories.set(category.id, category);
+      const existing = this._categories.get(category.id.toString());
+      if (existing) {
+        throw new DuplicateCategoryError(`Category with ID ${category.id} (${category.name}) already exists as ${existing.name}.`);
+      }
+      this._categories.set(category.id.toString(), category);
 
       if (addedIds) {
         addedIds.add(category.id);
@@ -211,7 +286,7 @@ export class Session implements RaceState, RaceStateLookup {
         return;
       }
       if (participant.id) {
-        this._participants.set(participant.id, participant);
+        this._participants.set(participant.id.toString(), participant);
       } else {
         console.error(`Participant has no ID:`, participant);
       }

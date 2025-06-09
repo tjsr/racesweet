@@ -1,6 +1,6 @@
 import type { ChipCodeType, EventParticipantId } from "../model/eventparticipant.ts";
 import { ColumnNotInSpreadsheetError, ParticipantSpreadsheetError } from "../model/errors.ts";
-import type { EventCategory, EventParticipant, ParticipantIdentifier, TimeRecord } from "../model/index.ts";
+import type { EventCategory, EventCategoryId, EventParticipant, ParticipantIdentifier, TimeRecord } from "../model/index.ts";
 import { compareByTime, getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.ts";
 import {
   findCategoryByName,
@@ -9,6 +9,7 @@ import {
 import { isFlagRecord, isStartRecord } from "./flag.ts";
 
 import { CategoryNotFoundError } from "../model/eventcategory.ts";
+import type { EventId } from "../model/types.ts";
 import type { GreenFlagRecord } from "../model/flag.ts";
 import type { ParticipantPassingRecord } from "../model/timerecord.ts";
 import type { PathLike } from "fs";
@@ -16,6 +17,7 @@ import type { WorkSheet } from 'xlsx';
 import { assignEntrantToTime } from "./crossing.ts";
 import { elapsedTimeMilliseconds } from "../app/utils/timeutils.ts";
 import { randomUUID } from "crypto";
+import { v5 as uuidv5 } from 'uuid';
 import { validateStartFlag } from "../validators/startflag.ts";
 import xlsx from 'xlsx';
 
@@ -48,7 +50,7 @@ console.debug = (message?: any, ...optionalParams: any[]): void => {
 };
 
 const addParticipantIdentifier = (
-  participant: EventParticipant,
+  participant: Partial<EventParticipant>,
   identifierType: string,
   value: unknown,
   fromTime?: Date | undefined,
@@ -79,7 +81,7 @@ const addParticipantIdentifier = (
 };
 
 export const assignParticipantNumber = (
-  participant: EventParticipant,
+  participant: Partial<EventParticipant>,
   plateNumber: string | number,
   fromTime?: Date | undefined,
   toTime?: Date | undefined
@@ -176,7 +178,7 @@ export const getParticipantNumber = (participant: EventParticipant, lookupTime?:
   getParticipantIdentifier(participant, 'racePlate', lookupTime);
 
 export const assignTransponder = (
-  participant: EventParticipant,
+  participant: Partial<EventParticipant>,
   txNo: string | number,
   fromTime?: Date | undefined,
   toTime?: Date | undefined
@@ -189,9 +191,10 @@ export const removeTransponder = (
   removeIdentifier(participant, 'txNo', txNo);
 
 export const getParticipantTransponders = (
-  participant: EventParticipant
+  participant: EventParticipant,
+  lookupTime?: Date | undefined
 ): (string|number)[] =>
-  getParticipantIdentifiers(participant, 'txNo');
+  getParticipantIdentifiers(participant, 'txNo', lookupTime);
 
 export const validateIdentifierType = (identifierType: string): void => {
   const validIdentifierTypes = ['txNo', 'racePlate'];
@@ -648,4 +651,9 @@ export const calculateParticipantElapsedTimes = (
     }
   });
 };
+export const createParticipantIdFromEventAndCategory = (
+  eventId: EventId,
+  categoryId: EventCategoryId,
+  raceNumber: string
+): EventParticipantId => uuidv5(`${eventId}-${categoryId}-${raceNumber}`, eventId);
 

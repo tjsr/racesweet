@@ -148,7 +148,7 @@ const mapCategoryToPMTKLookupEventCategory = (pmcat: tEventsCategories, start: D
   }
   const ec: PMTKLookupEventCategory = {
     CategoryCode: pmcat.CategoryCode,
-    id: pmcat.ID,
+    id: pmcat.ID.toString(),
     name: pmcat.CategoryDesc,
     startTime: formatRFC3339(start),
   };

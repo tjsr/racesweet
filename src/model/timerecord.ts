@@ -9,8 +9,9 @@ export const EVENT_SESSION_START = 1;
 export const EVENT_SESSION_END = 2;
 export const EVENT_FLAG_DISPLAYED = 4;
 export const EVENT_FLAG_RETRACTED = 8;
+export const RECORD_TX_CROSSING = 16; // Indicates a crossing record, used for passing records.
 
-export type TimeRecordId = uuid | number;
+export type TimeRecordId = uuid;
 export type PassingRecordId = TimeRecordId;
 
 export interface TimeRecord extends WithId<TimeRecordId> {
@@ -20,6 +21,11 @@ export interface TimeRecord extends WithId<TimeRecordId> {
   time?: Date;
   timeString?: string | null | undefined;
   dataLine?: string | null | undefined;
+}
+
+export type Validated<T> = T & {
+  isValid: boolean;
+  validationErrors?: (string|Error)[];
 }
 
 export const CROSSING_FLAG_SESSION_FASTEST = 0x01; // Indicates a crossing is the fastest of the session so far.

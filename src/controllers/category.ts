@@ -1,10 +1,11 @@
 import type { EventCategory, EventCategoryId, PlaceholderCategory } from '../model/eventcategory.ts';
+import type { EventId, IdType } from "../model/types.ts";
 import type { ParticipantPassingRecord, PassingRecordId, TimeRecord } from '../model/timerecord.ts';
 import { elapsedTimeMilliseconds, getElapsedTimeStart, millisecondsToTime } from '../app/utils/timeutils.ts';
 import type { FlagRecord } from '../model/flag.ts';
-import type { IdType } from "../model/types.ts";
 import { type PathLike } from "fs";
 import fs from 'fs/promises';
+import { v5 as uuidv5 } from 'uuid';
 
 type CategoryId = IdType;
 
@@ -146,16 +147,30 @@ export const setCategoryStartForPassings = (
   });
 };
 
-export const categoryTextString = (selectedCategories: EventCategoryId[], categories: EventCategory[]): string => {
+export const categoryTextString = (
+  selectedCategories: EventCategoryId[],
+  categories: EventCategory[]
+): string => {
   if ((selectedCategories?.length || 0) === 0) {
     return 'All categories';
   }
   return selectedCategories.map((catId: EventCategoryId) => {
-    const category = categories.find((search) => search.id?.toString() === catId);
+    const category = categories.find(
+      (search: EventCategory) => search.id?.toString() === catId.toString()
+    );
     if (category) {
       return category.name;
+    } else {
+      console.trace(`Category with ID ${catId} not found in categories list.`);
     }
     return `&${catId}`;
   }).join(', ');
+};
+
+export const createEventCategoryIdFromCategoryCode = (eventId: EventId, categoryCode: string): EventCategoryId => {
+  if (!categoryCode) {
+    throw new Error("Category code must not be empty.");
+  }
+  return uuidv5(categoryCode, eventId);
 };
 

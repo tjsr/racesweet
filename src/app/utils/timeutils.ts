@@ -52,6 +52,7 @@ export const getElapsedTimeStart = (
   }
   return startTime.time;
 };
+
 export const tableTimeString = (time: Date | undefined): string => {
   if (!time) {
     return 'Unknown time';
@@ -70,6 +71,7 @@ export const tableTimeString = (time: Date | undefined): string => {
   }
 };
 export const isAfter = (first: Date, second: Date): boolean => first && second && first.getTime() > second.getTime();
+
 export const lapTimeAfterStart = (lap: TimeRecord, participantStartTime: Date): number | undefined => {
   if (!lap?.time || !isAfter(lap.time, participantStartTime)) {
     return undefined;
@@ -79,3 +81,7 @@ export const lapTimeAfterStart = (lap: TimeRecord, participantStartTime: Date): 
   return lapTime;
 };
 
+export const addToTime = (time: Date, duration: number): Date => {
+  const newTime = new Date(time.getTime() + duration);
+  return newTime;
+};

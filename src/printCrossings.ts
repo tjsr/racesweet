@@ -1,3 +1,4 @@
+import { ApicalTestRace } from './testdata/apical.ts';
 import { OutreachTeamsRaceTestSession } from './testdata/outreach.ts';
 import type { ParticipantPassingRecord } from './model/timerecord.ts';
 import { RfidIndividualTestRace } from './testdata/rfid.ts';
@@ -21,8 +22,10 @@ export const warn = (message?: string, ...optionalParams: unknown[]): void => {
 // const categories = getCategoryList();
 
 const _outreachSession: TestSession = new OutreachTeamsRaceTestSession();
-const rfidSession: TestSession = new RfidIndividualTestRace();
-const eventSession: TestSession = rfidSession;
+const _rfidSession: TestSession = new RfidIndividualTestRace();
+const apicalSession: TestSession = new ApicalTestRace();
+
+const eventSession: TestSession = apicalSession; // rfidSession;
 await eventSession.loadTestData();
 
 // // If you want to get the rows with no valid time, assign the result to a variable:

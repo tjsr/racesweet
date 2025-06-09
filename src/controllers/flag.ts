@@ -100,6 +100,12 @@ export const isFlagRecord = (event: TimeRecord): event is FlagRecord => {
   return flag.flagType !== undefined;
 };
 
+export const hasCategoryIds = (
+  record: FlagRecord
+): boolean => record?.categoryIds !== undefined &&
+Array.isArray(record.categoryIds) &&
+record.categoryIds.length > 0;
+
 export const isStartRecord = (event: TimeRecord): boolean => 
   (event.recordType & EVENT_SESSION_START) > 0 ||
   (isFlagRecord(event) && (isNotRecordType(event, EVENT_SESSION_END | EVENT_FLAG_RETRACTED) && isGreenFlag(event as FlagRecord)));

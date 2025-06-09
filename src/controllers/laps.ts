@@ -8,6 +8,7 @@ import { getFlagEvents, getOrCacheGreenFlagForCategory } from "./flag.ts";
 import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.ts";
 
 import type { EventCategoryId } from "../model/eventcategory.ts";
+import { entrantHasAnyTx } from "./participantMatch.ts";
 import { setCategoryStartForPassings } from "./category.ts";
 import { warn } from "../printCrossings.ts";
 
@@ -74,7 +75,11 @@ export const processAllParticipantLaps = (
     }
     const participantPassings = getPassingsForParticipant(participantId, allTimeRecords);
     if (participantPassings.length === 0) {
-      console.warn(`Participant ${getParticipantNumber(participant)} has no passings.  Has assignParticpantsToCrossings() been called?`);
+      if (entrantHasAnyTx(participant)) {
+        console.warn(`Participant ${getParticipantNumber(participant)} with Tx${getParticipantTransponders(participant)} has no passings.  Has assignParticpantsToCrossings() been called?`);
+      } else {
+        console.warn(`Participant ${getParticipantNumber(participant)} with no assigned timing devices has no passings.  Has assignParticpantsToCrossings() been called?`);
+      }
       return; // Skip processing this participant if they have no passings
     }
     const participantCategoryStartFlag: GreenFlagRecord | null | undefined = eventFlags?.length > 0

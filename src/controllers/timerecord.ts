@@ -1,9 +1,9 @@
+import type { TimeRecord, Validated } from "../model/timerecord.ts";
 import { assertValidTimeRecord, moveForwardIfUndefined } from "./crossingList.ts";
 
 import type { ChipCrossingData } from "../model/chipcrossing.ts";
 import type { PlateCrossingData } from "../model/platecrossing.ts";
 import type { StartRecord } from "../model/flag.ts";
-import type { TimeRecord } from "../model/timerecord.ts";
 
 const formatTime = (time: Date | undefined): string => {
   if (!time) {
@@ -123,5 +123,15 @@ export const noTimeRecordFilter = (event: TimeRecord): boolean => !hasTime(event
 
 export const noTimeArrayRecordFilter = (event: TimeRecord, _idx: number, _arr: TimeRecord[]): boolean => {
   return !event || !hasTime(event);
+};
+
+export const addError = <TR extends TimeRecord>(record: TR, error: string|Error): Validated<TR> => {
+  const validated: Validated<TR> = record as Validated<TR>;
+  if (!validated.validationErrors) {
+    validated.validationErrors = [];
+  }
+  validated.isValid = false;
+  validated.validationErrors.push(error);
+  return validated;
 };
 

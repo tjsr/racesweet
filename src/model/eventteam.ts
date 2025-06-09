@@ -1,13 +1,11 @@
-import type { EventCategoryId } from "./eventcategory.ts";
+import type { EventEntrant, EventEntrantId } from "./entrant.ts";
+
 import type { EventParticipantId } from "./eventparticipant.ts";
-import type { IdType } from "./types.ts";
 
-export type EventTeamId = IdType;
+export type EventTeamId = EventEntrantId;
 
-export interface EventTeam {
-  id: EventTeamId;
+export interface EventTeam extends EventEntrant<EventTeamId> {
   name: string;
   description: string;
-  categoryId: EventCategoryId;
   members: EventParticipantId[];
 }

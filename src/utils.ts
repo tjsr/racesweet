@@ -53,3 +53,16 @@ export const listToMap = <T extends WithId<Id>, Id extends IdType>(list: T[]): M
   return map;
 };
 
+export const split = (str: string, sep: string, n: number): string[] => {
+  const out: string[] = [];
+
+  while (n--) {
+    const psn = str.indexOf(sep);
+    const first = str.substring(0, psn);
+    out.push(first);
+    str = str.substring(psn + sep.length);
+  }
+  out.push(str);
+
+  return out;
+};
