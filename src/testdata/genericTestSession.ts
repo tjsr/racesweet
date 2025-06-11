@@ -17,8 +17,13 @@ export abstract class GenericTestSession extends Session implements TestSession 
   public abstract loadFlags(): Promise<void>;
   public abstract loadCrossings(): Promise<void>;
 
-  public async loadTestData(): Promise<void> {
-    return this.beginBulkProcess()
+  public async loadTestData(noBulkProcess: boolean = false): Promise<void> {
+    const loadStartTime = new Date();
+    let initPromise: Promise<boolean> = Promise.resolve(true);
+    if (!noBulkProcess) {
+      initPromise = this.beginBulkProcess();
+    }
+    return initPromise
       .then(() => this.loadCategories().then(() => {
         console.log(`Loaded ${this.categories.length} categories successfully.`);
         console.log(this.categories.map((c) => `${c.id}: ${c.name}`).join('\n'));
@@ -28,7 +33,15 @@ export abstract class GenericTestSession extends Session implements TestSession 
       }))
       .then(() => this.loadFlags())
       .then(() => this.loadCrossings())
-      .then(() => this.endBulkProcess())
+      .then(() => {
+        const loadEndTime = new Date();
+        const loadDuration = (loadEndTime.getTime() - loadStartTime.getTime());
+        console.log(`Test data loaded in ${loadDuration} milliseconds.`);
+        if (noBulkProcess) {
+          return Promise.resolve();
+        }
+        return this.endBulkProcess();
+      })
       .catch((error: unknown) => {
         console.log('Error loading test data:', error);
       });

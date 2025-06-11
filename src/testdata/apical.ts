@@ -44,6 +44,7 @@ export class ApicalTestRace extends GenericTestSession implements TestSession {
     });
     // throw new Error("Method not implemented.");
   }
+
   public loadParticipants(): Promise<void> {
     if (this._data?.participants) {
       this.addParticipants(this._data.participants);
@@ -51,6 +52,7 @@ export class ApicalTestRace extends GenericTestSession implements TestSession {
     return Promise.resolve();
     // throw new Error("Method not implemented.");
   }
+
   public loadFlags(): Promise<void> {
     this.addRecords([
       createGreenFlagEvent({
@@ -73,6 +75,7 @@ export class ApicalTestRace extends GenericTestSession implements TestSession {
     return Promise.resolve();
     // throw new Error("Method not implemented.");
   }
+
   public async loadCrossings(): Promise<void> {
     const filePath = getTestFilePath(TEST_CROSSINGS_DATA_FILE);
     return parseFile(filePath, new Date('2025-06-06T19:00:00+10:00'))
@@ -81,6 +84,7 @@ export class ApicalTestRace extends GenericTestSession implements TestSession {
     return Promise.resolve();
     // throw new Error("Method not implemented.");
   }
+  
   public async read(): Promise<Partial<RaceState>> {
     const filePath: PathLike = 'src/testdata/2025-06-06-data.json';
     const data = fs.readFile(filePath, 'utf8').then(d => JSON.parse(d) as ApicalLapByCategory);

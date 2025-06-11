@@ -1,5 +1,6 @@
-import type { TimeRecord, Validated } from "../model/timerecord.ts";
+import type { ParticipantPassingRecord, TimeRecord, Validated } from "../model/timerecord.ts";
 import { assertValidTimeRecord, moveForwardIfUndefined } from "./crossingList.ts";
+import { isFlagRecord, isStartRecord } from "./flag.ts";
 
 import type { ChipCrossingData } from "../model/chipcrossing.ts";
 import type { PlateCrossingData } from "../model/platecrossing.ts";
@@ -81,6 +82,10 @@ export const isRecordAfterStart = (
 
 export const isNotRecordType = (event: TimeRecord, recordType: number): boolean => (event.recordType & recordType) === 0;
 
+export const isCrossingRecord = (crossing: TimeRecord): crossing is ParticipantPassingRecord => {
+  return !isStartRecord(crossing) && !isFlagRecord(crossing);
+};
+
 export const addTimeRecord = (crossings: TimeRecord[], record: TimeRecord): void => {
   assertValidTimeRecord(record);
 
@@ -134,4 +139,3 @@ export const addError = <TR extends TimeRecord>(record: TR, error: string|Error)
   validated.validationErrors.push(error);
   return validated;
 };
-

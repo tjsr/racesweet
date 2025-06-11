@@ -56,12 +56,13 @@ export const processParticipantLaps = (
 export const processAllParticipantLaps = (
   allTimeRecords: TimeRecord[],
   eventParticipants: Map<EventParticipantId, EventParticipant>,
-  minimumLapTimeMilliseconds: number = MINIMUM_LAP_TIME_SECONDS * 1000 // Default to 60 seconds if not provided
+  minimumLapTimeMilliseconds: number = MINIMUM_LAP_TIME_SECONDS * 1000, // Default to 60 seconds if not provided
+  silenceWarnings: boolean = false
 ): Map<EventParticipantId, ParticipantPassingRecord[]> => {
   const participantTimesMap = new Map<EventParticipantId, ParticipantPassingRecord[]>();
   const eventFlags: FlagRecord[] = getFlagEvents(allTimeRecords);
 
-  if (!eventFlags || eventFlags.length === 0) {
+  if (!silenceWarnings && (!eventFlags || eventFlags.length === 0)) {
     console.warn(processAllParticipantLaps.name,
       `No event flags defined in event with ${allTimeRecords.length} and ${eventParticipants.size} participants.`
     );
@@ -75,10 +76,10 @@ export const processAllParticipantLaps = (
     }
     const participantPassings = getPassingsForParticipant(participantId, allTimeRecords);
     if (participantPassings.length === 0) {
-      if (entrantHasAnyTx(participant)) {
-        console.warn(`Participant ${getParticipantNumber(participant)} with Tx${getParticipantTransponders(participant)} has no passings.  Has assignParticpantsToCrossings() been called?`);
-      } else {
-        console.warn(`Participant ${getParticipantNumber(participant)} with no assigned timing devices has no passings.  Has assignParticpantsToCrossings() been called?`);
+      const txpart = entrantHasAnyTx(participant) ? `Tx${getParticipantTransponders(participant)}` : 'no assigned timing devices';
+      const msg = `Participant ${getParticipantNumber(participant)} with ${txpart} has no passings.  Has assignParticpantsToCrossings() been called?`;
+      if (!silenceWarnings) {
+        console.warn(processAllParticipantLaps.name, msg);
       }
       return; // Skip processing this participant if they have no passings
     }

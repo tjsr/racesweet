@@ -1,17 +1,17 @@
-import { DuplicateCategoryError, InvalidCategoryIdError, InvalidIdError } from "../validators/errors.ts";
+import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError } from "../validators/errors.ts";
 import type { EventCategory, EventCategoryId } from "./eventcategory.ts";
 import type { EventParticipant, EventParticipantId } from "./eventparticipant.ts";
 import type { FlagRecord, GreenFlagRecord } from "./flag.ts";
 import { FlagReferencesUnknownCategoryError, InvalidFlagRecordError } from "./errors.ts";
+import { ParticipantNotFoundError, assignParticpantsToCrossings } from "../controllers/participant.ts";
 import type { ParticipantPassingRecord, TimeRecord, TimeRecordId, Validated } from "./timerecord.ts";
-import { addError, compareByTime } from "../controllers/timerecord.ts";
+import { addError, compareByTime, isCrossingRecord } from "../controllers/timerecord.ts";
 import { getOrCacheGreenFlagForCategory, hasCategoryIds, isFlagRecord } from "../controllers/flag.ts";
 import { processAllParticipantLaps, processParticipantLaps } from "../controllers/laps.ts";
 
 import type { ChipCrossingData } from "./chipcrossing.ts";
 import type { EventTeam } from "./eventteam.ts";
 import type { MapOf } from "./types.ts";
-import { assignParticpantsToCrossings } from "../controllers/participant.ts";
 import { crossingMatchesParticipantIdentifiers } from "../controllers/participantMatch.ts";
 import { isParsedChipCrossing } from "../controllers/chipCrossing.ts";
 import { isPlaceholderCatgegory } from "../controllers/category.ts";
@@ -125,8 +125,89 @@ export class Session implements RaceState, RaceStateLookup {
     // return this.__currentBulkProcess?.release() || Promise.resolve();
   }
 
+  private __cacheParticipantLap(participantId: EventParticipantId, lap: ParticipantPassingRecord): void {
+    if (!isValidId(participantId)) {
+      throw new InvalidIdError(`ParticipantId ${participantId} for adding cached lap is not a valid Id type.`);
+    }
+    if (!this._cachedParticipantLaps) {
+      this._cachedParticipantLaps = new Map<TimeRecordId, ParticipantPassingRecord[]>();
+    }
+    const laps = this._cachedParticipantLaps.get(participantId) || [];
+    if (!laps.includes(lap)) {
+      laps.push(lap);
+    }
+    this._cachedParticipantLaps.set(participantId.toString(), laps);
+  }
 
-  private _processRecord(_record: TimeRecord): void {
+  private __reprocessParticipantLaps(participantId: EventParticipantId): void {
+    if (!isValidId(participantId)) {
+      throw new InvalidIdError(`ParticipantId ${participantId} for reprocessing laps is not a valid Id type.`);
+    }
+    const participant = this.getParticipantById(participantId);
+    if (!participant) {
+      throw new ParticipantNotFoundError(`Participant with ID ${participantId} not found. Cannot reprocess laps.`);
+    }
+    const categoryStart = this.__getCategoryGreenFlag(participant.categoryId);
+    if (categoryStart) {
+      const participantLaps = this.getParticipantLaps(participantId);
+      if (participantLaps) {
+        processParticipantLaps(participant, participantLaps, categoryStart, this._minimumLapTimeMilliseconds);
+        this._cachedParticipantLaps?.set(participantId, participantLaps);
+      }
+    }
+  }
+
+  private __validateCategory(categoryId: EventCategoryId): void {
+    if (!isValidId(categoryId)) {
+      throw new InvalidCategoryIdError(`CategoryId ${categoryId} for validation is not a valid Id type.`);
+    }
+    if (!this.categoryExists(categoryId)) {
+      throw new InvalidCategoryIdError(`Category with ID ${categoryId} does not exist.`);
+    }
+  }
+
+  public getCategoryParticipants(categoryId: EventCategoryId): EventParticipant[] {
+    this.__validateCategory(categoryId);
+    const participants: EventParticipant[] = [];
+    this._participants.forEach((participant: EventParticipant) => {
+      if (participant.categoryId.toString() === categoryId.toString()) {
+        participants.push(participant);
+      }
+    });
+    return participants;
+  };
+
+  private __reprocessParticipantLapsForCategory(categoryId: EventCategoryId): void {
+    this.__validateCategory(categoryId);
+    this.getCategoryParticipants(categoryId).forEach((participant: EventParticipant) => {
+      this.__reprocessParticipantLaps(participant.id);
+    });
+  }
+
+  private _processRecord(record: TimeRecord): void {
+    if (isCrossingRecord(record)) {
+      if (isParsedChipCrossing(record as ChipCrossingData)) {
+        this.__cacheTransponderCrossing(record as ChipCrossingData);
+      }
+      assignParticpantsToCrossings(this._participants, [record]);
+      
+      if (record.participantId) {
+        this.__cacheParticipantLap(record.participantId, record as ParticipantPassingRecord);
+        this.__reprocessParticipantLaps(record.participantId);
+      } else {
+        console.warn(`Record ${record.id} has no participant ID. Skipping.`);
+      }
+    } else if (isFlagRecord(record)) {
+      this._validateFlagRecord(record);
+      if (record.categoryIds) {
+        record.categoryIds.forEach((categoryId: EventCategoryId) => {
+          this.__reprocessParticipantLapsForCategory(categoryId);
+        });
+      } else {
+        this.__reprocessAllParticipantLaps();
+      }
+    }
+    
     return;
   }
 
@@ -213,7 +294,7 @@ export class Session implements RaceState, RaceStateLookup {
     return this._cachedParticipantLaps.get(participantId) ?? null;
   }
 
-  public async addCategories(categories: EventCategory[]): Promise<void> {
+  public async addCategories(categories: EventCategory[]): Promise<Set<EventCategoryId>|null> {
     let addedIds: Set<EventCategoryId>|null = null;
     // let placeholderCategoryParticipants: EventParticipant[]|null = null;
 
@@ -234,10 +315,14 @@ export class Session implements RaceState, RaceStateLookup {
 
       if (addedIds) {
         addedIds.add(category.id);
-        this.__getCategoryGreenFlag(category.id);
+        try {
+          this.__getCategoryGreenFlag(category.id);
+        } catch (_error: unknown) {
+          // This is okay at this time - categories can be added without flags existing.
+        }
       }
     });
-    return Promise.resolve();
+    return Promise.resolve(addedIds || null);
   }
 
   private __findParticipantsWithPlaceholderCategories(): EventParticipant[] {
@@ -264,6 +349,14 @@ export class Session implements RaceState, RaceStateLookup {
   //   const promise = new Promise<number>();
   //   this._reprocessWaits.push()
   // }
+
+  private __reprocessAllParticipantLaps(): void {
+    const processedLaps: Map<EventParticipantId, ParticipantPassingRecord[]> = processAllParticipantLaps(
+      this.records, this._participants, this._minimumLapTimeMilliseconds, true // silence warnigns
+    );
+
+    this._cachedParticipantLaps = processedLaps;
+  }
 
   private __getCategoryGreenFlag(categoryId: EventCategoryId): GreenFlagRecord | null {
     const flags = this.flags;
@@ -297,9 +390,20 @@ export class Session implements RaceState, RaceStateLookup {
       if (this._bulkProcess) {
         return; // If bulk processing, we will handle this later
       }
-      const participantCategoryStartFlag: GreenFlagRecord | null | undefined = this.__getCategoryGreenFlag(participant.categoryId);
+
+      let participantCategoryStartFlag: GreenFlagRecord | null | undefined;
+      try {
+        participantCategoryStartFlag = this.__getCategoryGreenFlag(participant.categoryId);
+      } catch (error: unknown) {
+        if (error instanceof EventFlagsError) {
+          // do nothing - it's okay for participants to not have a start flag when adding.
+        } else {
+          console.error(`Error processing participant laps for ${participant.firstname} ${participant.surname}:`, error);
+          throw error;
+        }
+      }
+      
       if (participantCategoryStartFlag) {
-      // validateParticipantStartFlag(participantCategoryStartFlag, participant);
         processParticipantLaps(participant, [...affectedCrossings], participantCategoryStartFlag!, minimumLapTimeMilliseconds);
       }
       affectedCrossings.forEach((crossing: ParticipantPassingRecord) => {
@@ -342,11 +446,7 @@ export class Session implements RaceState, RaceStateLookup {
 
     // export const processedLaps: Map<EventParticipantId, ParticipantPassingRecord[]> = 
     if (!this._bulkProcess) {
-      const processedLaps: Map<EventParticipantId, ParticipantPassingRecord[]> = processAllParticipantLaps(
-        this.records, this._participants
-      );
-
-      this._cachedParticipantLaps = processedLaps;
+      this.__reprocessAllParticipantLaps();
     }
   }
 
@@ -360,8 +460,29 @@ export class Session implements RaceState, RaceStateLookup {
     return flags;
   }
 
+  private __cacheTransponderCrossing(dataRecord: ChipCrossingData): void {
+    if (!isParsedChipCrossing(dataRecord)) {
+      console.error(this.__cacheTransponderCrossing.name, `Data record ${dataRecord.id} is not a valid ChipCrossingData.`, dataRecord);
+      throw new Error(`Data record ${dataRecord.id} is not a valid ChipCrossingData.`);
+    }
+    if (!this._cachedTransponderCrossings) {
+      this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
+    }
+    let txCrossings = this._cachedTransponderCrossings.get(dataRecord.chipCode);
+    if (!txCrossings) {
+      txCrossings = [dataRecord];
+      this._cachedTransponderCrossings.set(dataRecord.chipCode, txCrossings);
+    } else if (!txCrossings.includes(dataRecord)) {
+      txCrossings.push(dataRecord);
+    }
+  }
+
   private cacheTransponderCrossings(txNo: ChipCrossingData["chipCode"]): void {
     const crossings: ChipCrossingData[] = [];
+    if (!this._cachedTransponderCrossings) {
+      this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
+    }
+
     this._records.values().forEach((record: TimeRecord) => {
       const chipCrossing: ChipCrossingData = record as ChipCrossingData;
       if (isParsedChipCrossing(chipCrossing)) {
@@ -370,9 +491,6 @@ export class Session implements RaceState, RaceStateLookup {
         }
       }
     });
-    if (!this._cachedTransponderCrossings) {
-      this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
-    }
     this._cachedTransponderCrossings.set(txNo, crossings);
   };
 

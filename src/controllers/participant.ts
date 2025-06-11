@@ -1,12 +1,11 @@
 import type { ChipCodeType, EventParticipantId } from "../model/eventparticipant.ts";
 import { ColumnNotInSpreadsheetError, ParticipantSpreadsheetError } from "../model/errors.ts";
 import type { EventCategory, EventCategoryId, EventParticipant, ParticipantIdentifier, TimeRecord } from "../model/index.ts";
-import { compareByTime, getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.ts";
+import { compareByTime, getTimeRecordIdentifier, isCrossingRecord, isRecordAfterStart } from "./timerecord.ts";
 import {
   findCategoryByName,
   findOrCreateCategory
 } from "./category.ts";
-import { isFlagRecord, isStartRecord } from "./flag.ts";
 
 import { CategoryNotFoundError } from "../model/eventcategory.ts";
 import type { EventId } from "../model/types.ts";
@@ -542,10 +541,6 @@ export class ParticipantNotFoundError extends Error {
   }
 }
 
-const isCrossingRecord = (crossing: TimeRecord): crossing is ParticipantPassingRecord => {
-  return !isStartRecord(crossing) && !isFlagRecord(crossing);
-};
-
 export const assignParticpantsToCrossings = (participants: Map<EventParticipantId, EventParticipant>, crossings: TimeRecord[]): void => {
   crossings.forEach((crossing: TimeRecord) => {
     if (isCrossingRecord(crossing)) {
@@ -651,6 +646,7 @@ export const calculateParticipantElapsedTimes = (
     }
   });
 };
+
 export const createParticipantIdFromEventAndCategory = (
   eventId: EventId,
   categoryId: EventCategoryId,
