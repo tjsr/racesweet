@@ -3,7 +3,8 @@ import type { FlagRecord } from "../../model/flag.ts";
 import type { TimeRecord } from "../../model/timerecord.ts";
 import { findSessionStart } from "../../controllers/session.ts";
 import { formatRFC3339 } from "date-fns";
-import { useRFCTime } from "../../printCrossings.ts";
+
+export const useRFCTime = false;
 
 export const millisecondsToTime = (milliseconds: number): string => {
   const seconds = Math.floor((milliseconds / 1000) % 60);

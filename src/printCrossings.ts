@@ -6,7 +6,6 @@ import type { TestSession } from './testdata/testsession.ts';
 import colors from 'colors';
 import { getCliTable } from "./controllers/clitable.ts";
 
-export const useRFCTime = false;
 colors.enable();
 
 export const warn = (message?: string, ...optionalParams: unknown[]): void => {
