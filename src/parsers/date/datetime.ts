@@ -1,13 +1,12 @@
-import { DateParseError, InvalidDateTimeStringError, TimeParseError } from "./errors.js";
+import { DateParseError, InvalidDateTimeStringError, TimeParseError } from "./errors.ts";
 import { TZDate, tz } from "@date-fns/tz";
 
-import type { RFC3339DateStamp } from "./dateutils.js";
-import adp from 'any-date-parser';
+import type { RFC3339DateStamp } from "./dateutils.ts";
 import { formatRFC3339 } from "date-fns";
-import { parseDateString } from "./datestring.js";
+import { parseDateString } from "./datestring.ts";
 import { parseISO } from "date-fns/parseISO";
-import { splitDateTime } from "./splitDateTime.js";
-import { validateTimeString } from "../../validators/time.js";
+import { splitDateTime } from "./splitDateTime.ts";
+import { validateTimeString } from "../../validators/time.ts";
 
 export const systemDateString = /^(?<year>\d{4})[-/](?<month>\d{1,2})[-/](?<day>\d{1,2})$/;
 // const reverseDateString = /^(?<day>\d{1,2})[-/](?<month>\d{1,2})[-/](?<year>\d{4})$/;
@@ -100,15 +99,6 @@ const assertValidTimeString = (input: string): void => {
   if (!hasValidTime) {
     throw new TimeParseError('Time value could not be parsed.', input);
   }
-};
-
-export const anyDateParseUnknownDateTimeString = (input: string): TZDate => {
-  const date = adp.fromString(input);
-  if (date !== null) {
-    return new TZDate(date);;
-  }
-
-  throw new DateParseError('Date value could not be parsed.', input);
 };
 
 export const parseUnknownDateTimeString = (input: string, eventDateHint: TZDate): TZDate => {
