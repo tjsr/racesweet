@@ -5,12 +5,9 @@ import { RfidIndividualTestRace } from './testdata/rfid.ts';
 import type { TestSession } from './testdata/testsession.ts';
 import colors from 'colors';
 import { getCliTable } from "./controllers/clitable.ts";
+import { warn } from './utils.ts';
 
 colors.enable();
-
-export const warn = (message?: string, ...optionalParams: unknown[]): void => {
-  console.warn(`Warning: ${message}`, optionalParams);
-};
 
 const _outreachSession: TestSession = new OutreachTeamsRaceTestSession();
 const _rfidSession: TestSession = new RfidIndividualTestRace();

@@ -66,3 +66,7 @@ export const split = (str: string, sep: string, n: number): string[] => {
 
   return out;
 };
+
+export const warn = (message?: string, ...optionalParams: unknown[]): void => {
+  console.warn(`Warning: ${message}`, optionalParams);
+};
