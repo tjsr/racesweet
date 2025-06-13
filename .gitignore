@@ -4,3 +4,6 @@ build
 upload.ps1
 src/testdata/2025-03-03-entries.xlsx
 src/testdata/~$*.xlsx
+.webpack/
+backup/
+
