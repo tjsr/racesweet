@@ -2,6 +2,7 @@ import type { EventCategory, EventCategoryId, PlaceholderCategory } from '../mod
 import type { EventId, IdType } from "../model/types.ts";
 import type { ParticipantPassingRecord, PassingRecordId, TimeRecord } from '../model/timerecord.ts';
 import { elapsedTimeMilliseconds, getElapsedTimeStart, millisecondsToTime } from '../app/utils/timeutils.ts';
+import { CategoryCreateError } from '../model/errors/category.ts';
 import type { FlagRecord } from '../model/flag.ts';
 import { type PathLike } from "fs";
 import fs from 'fs/promises';
@@ -13,20 +14,6 @@ const categories: Partial<EventCategory>[] = [
   { id: 'cat1', name: 'Test category' },
   { id: 'cat2', name: 'Another category' },
 ];
-
-class CategoryError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "CategoryError";
-  }
-}
-
-class CategoryCreateError extends CategoryError {
-  constructor(message: string) {
-    super(message);
-    this.name = "CategoryCreateError";
-  }
-}
 
 export const findCategoryById = (categories: EventCategory[], categoryId: CategoryId): EventCategory | null =>
   categories.find((cat) => cat.id === categoryId) || null;
