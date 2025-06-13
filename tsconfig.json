@@ -1,14 +1,23 @@
 {
   "extends": ["@tsconfig/node22/tsconfig.json", "@tsconfig/node-ts/tsconfig.json"],
   "compilerOptions": {
+    "allowJs": true,
+    "experimentalDecorators": true,
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
     "lib": ["ESNext", "dom"],
-    "types": ["vitest/globals"],
+    "module": "node16",
+    "moduleResolution": "node16",
+    "outDir": "./dist",
+    "resolveJsonModule": true,
     "rootDir": ".",
-    "outDir": "./build",
     "strict": true,
     "sourceMap": true,
-    "module": "Node18",
-    "target": "ES2024",
-    "moduleResolution": "nodenext",
+    "skipLibCheck": true,
+    "target": "ESNext",
+    "types": ["vitest/globals"],
+    "verbatimModuleSyntax": false
   },
+  "src": ["src", "test"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx"],
 }

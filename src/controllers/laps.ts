@@ -10,7 +10,7 @@ import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.ts";
 import type { EventCategoryId } from "../model/eventcategory.ts";
 import { entrantHasAnyTx } from "./participantMatch.ts";
 import { setCategoryStartForPassings } from "./category.ts";
-import { warn } from "../printCrossings.ts";
+import { warn } from "../utils.ts";
 
 const MINIMUM_LAP_TIME_SECONDS = 300;
 
