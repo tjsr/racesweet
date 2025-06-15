@@ -1,4 +1,4 @@
-import { ApicalTestRace } from './testdata/apical.ts';
+import { ApicalLocalFile } from './testdata/apicalLocalFile.ts';
 import { OutreachTeamsRaceTestSession } from './testdata/outreach.ts';
 import type { ParticipantPassingRecord } from './model/timerecord.ts';
 import { RfidIndividualTestRace } from './testdata/rfid.ts';
@@ -11,10 +11,9 @@ colors.enable();
 
 const _outreachSession: TestSession = new OutreachTeamsRaceTestSession();
 const _rfidSession: TestSession = new RfidIndividualTestRace();
-const apicalSession: TestSession = new ApicalTestRace();
+const apicalSession: TestSession = new ApicalLocalFile();
 
 const eventSession: TestSession = apicalSession; // rfidSession;
-await eventSession.loadTestData(false);
 
 const filter = (data: ParticipantPassingRecord): boolean => {
   if (!data.participantId) {
@@ -32,7 +31,7 @@ const filter = (data: ParticipantPassingRecord): boolean => {
   return true;
 };
 
-console.log(getCliTable(eventSession, filter).toString());
-
-
+eventSession.loadTestData(false).then(() => {
+  console.log(getCliTable(eventSession, filter).toString());
+});
 

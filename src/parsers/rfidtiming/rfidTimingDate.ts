@@ -1,6 +1,6 @@
-import { fixDateInDateTimeString, parseUnknownDateTimeString } from './date/datetime.ts';
+import { fixDateInDateTimeString, parseUnknownDateTimeString } from '../date/datetime.ts';
 
-import { DateParseError } from './date/errors.ts';
+import { DateParseError } from '../date/errors.ts';
 import type { TZDate } from '@date-fns/tz';
 import { parse } from 'date-fns';
 

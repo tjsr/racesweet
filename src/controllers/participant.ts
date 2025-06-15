@@ -6,6 +6,7 @@ import {
   findCategoryByName,
   findOrCreateCategory
 } from "./category.ts";
+import { v1 as randomUUID, v5 as uuidv5 } from 'uuid';
 
 import { CategoryNotFoundError } from "../model/eventcategory.ts";
 import type { EventId } from "../model/types.ts";
@@ -15,8 +16,6 @@ import type { PathLike } from "fs";
 import type { WorkSheet } from 'xlsx';
 import { assignEntrantToTime } from "./crossing.ts";
 import { elapsedTimeMilliseconds } from "../app/utils/timeutils.ts";
-import { randomUUID } from "crypto";
-import { v5 as uuidv5 } from 'uuid';
 import { validateStartFlag } from "../validators/startflag.ts";
 import xlsx from 'xlsx';
 

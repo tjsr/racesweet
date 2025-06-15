@@ -1,0 +1,1403 @@
+[
+  {
+    "CategoryName": "A",
+    "ParticipantViewModels": [
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1241,
+            "FullName": "Robert WOOD",
+            "RaceNumber": "306",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:09:20.2340000",
+            "CumulativeLapTimeSpan": "00:09:20.2340000"
+          },
+          {
+            "Id": 1268,
+            "FullName": "Robert WOOD",
+            "RaceNumber": "306",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:10:03.7130000",
+            "CumulativeLapTimeSpan": "00:19:23.9470000"
+          },
+          {
+            "Id": 1296,
+            "FullName": "Robert WOOD",
+            "RaceNumber": "306",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:09:56.3430000",
+            "CumulativeLapTimeSpan": "00:29:20.2900000"
+          },
+          {
+            "Id": 1319,
+            "FullName": "Robert WOOD",
+            "RaceNumber": "306",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:09:54.2870000",
+            "CumulativeLapTimeSpan": "00:39:14.5770000"
+          },
+          {
+            "Id": 1342,
+            "FullName": "Robert WOOD",
+            "RaceNumber": "306",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:09:55.2600000",
+            "CumulativeLapTimeSpan": "00:49:09.8370000"
+          },
+          {
+            "Id": 1368,
+            "FullName": "Robert WOOD",
+            "RaceNumber": "306",
+            "LapNumber": 6,
+            "LapTimeSpan": "00:10:03.3570000",
+            "CumulativeLapTimeSpan": "00:59:13.1940000"
+          }
+        ],
+        "TeamNameDisplay": "Robert WOOD",
+        "CategoryName": "A",
+        "RaceNumbers": "306",
+        "NumberOfLaps": 6,
+        "TotalTimeSpan": "00:59:13.1940000",
+        "Position": 1
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1239,
+            "FullName": "Stuart KENT",
+            "RaceNumber": "139",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:09:19.2270000",
+            "CumulativeLapTimeSpan": "00:09:19.2270000"
+          },
+          {
+            "Id": 1267,
+            "FullName": "Stuart KENT",
+            "RaceNumber": "139",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:09:56.1800000",
+            "CumulativeLapTimeSpan": "00:19:15.4070000"
+          },
+          {
+            "Id": 1295,
+            "FullName": "Stuart KENT",
+            "RaceNumber": "139",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:10:04.0770000",
+            "CumulativeLapTimeSpan": "00:29:19.4840000"
+          },
+          {
+            "Id": 1320,
+            "FullName": "Stuart KENT",
+            "RaceNumber": "139",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:10:00.0730000",
+            "CumulativeLapTimeSpan": "00:39:19.5570000"
+          },
+          {
+            "Id": 1343,
+            "FullName": "Stuart KENT",
+            "RaceNumber": "139",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:09:51.7970000",
+            "CumulativeLapTimeSpan": "00:49:11.3540000"
+          },
+          {
+            "Id": 1371,
+            "FullName": "Stuart KENT",
+            "RaceNumber": "139",
+            "LapNumber": 6,
+            "LapTimeSpan": "00:10:29.7760000",
+            "CumulativeLapTimeSpan": "00:59:41.1300000"
+          }
+        ],
+        "TeamNameDisplay": "Stuart KENT",
+        "CategoryName": "A",
+        "RaceNumbers": "139",
+        "NumberOfLaps": 6,
+        "TotalTimeSpan": "00:59:41.1300000",
+        "Position": 2
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1242,
+            "FullName": "Cameron SHAKESPEARE",
+            "RaceNumber": "442",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:09:25.9540000",
+            "CumulativeLapTimeSpan": "00:09:25.9540000"
+          },
+          {
+            "Id": 1269,
+            "FullName": "Cameron SHAKESPEARE",
+            "RaceNumber": "442",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:10:07.7200000",
+            "CumulativeLapTimeSpan": "00:19:33.6740000"
+          },
+          {
+            "Id": 1297,
+            "FullName": "Cameron SHAKESPEARE",
+            "RaceNumber": "442",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:09:58.1900000",
+            "CumulativeLapTimeSpan": "00:29:31.8640000"
+          },
+          {
+            "Id": 1321,
+            "FullName": "Cameron SHAKESPEARE",
+            "RaceNumber": "442",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:10:11.4260000",
+            "CumulativeLapTimeSpan": "00:39:43.2900000"
+          },
+          {
+            "Id": 1346,
+            "FullName": "Cameron SHAKESPEARE",
+            "RaceNumber": "442",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:10:10.2970000",
+            "CumulativeLapTimeSpan": "00:49:53.5870000"
+          }
+        ],
+        "TeamNameDisplay": "Cameron SHAKESPEARE",
+        "CategoryName": "A",
+        "RaceNumbers": "442",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:49:53.5870000",
+        "Position": 3
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1240,
+            "FullName": "Riley FLAHERTY",
+            "RaceNumber": "3",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:09:19.6300000",
+            "CumulativeLapTimeSpan": "00:09:19.6300000"
+          },
+          {
+            "Id": 1271,
+            "FullName": "Riley FLAHERTY",
+            "RaceNumber": "3",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:10:20.5200000",
+            "CumulativeLapTimeSpan": "00:19:40.1500000"
+          },
+          {
+            "Id": 1298,
+            "FullName": "Riley FLAHERTY",
+            "RaceNumber": "3",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:10:02.0700000",
+            "CumulativeLapTimeSpan": "00:29:42.2200000"
+          },
+          {
+            "Id": 1324,
+            "FullName": "Riley FLAHERTY",
+            "RaceNumber": "3",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:10:27.3540000",
+            "CumulativeLapTimeSpan": "00:40:09.5740000"
+          },
+          {
+            "Id": 1348,
+            "FullName": "Riley FLAHERTY",
+            "RaceNumber": "3",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:10:36.1700000",
+            "CumulativeLapTimeSpan": "00:50:45.7440000"
+          }
+        ],
+        "TeamNameDisplay": "Riley FLAHERTY",
+        "CategoryName": "A",
+        "RaceNumbers": "3",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:50:45.7440000",
+        "Position": 4
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1243,
+            "FullName": "Mark MATHEWS",
+            "RaceNumber": "484",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:09:26.4840000",
+            "CumulativeLapTimeSpan": "00:09:26.4840000"
+          },
+          {
+            "Id": 1270,
+            "FullName": "Mark MATHEWS",
+            "RaceNumber": "484",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:10:12.2660000",
+            "CumulativeLapTimeSpan": "00:19:38.7500000"
+          },
+          {
+            "Id": 1299,
+            "FullName": "Mark MATHEWS",
+            "RaceNumber": "484",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:10:27.5470000",
+            "CumulativeLapTimeSpan": "00:30:06.2970000"
+          },
+          {
+            "Id": 1325,
+            "FullName": "Mark MATHEWS",
+            "RaceNumber": "484",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:10:30.1330000",
+            "CumulativeLapTimeSpan": "00:40:36.4300000"
+          },
+          {
+            "Id": 1349,
+            "FullName": "Mark MATHEWS",
+            "RaceNumber": "484",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:10:21.3070000",
+            "CumulativeLapTimeSpan": "00:50:57.7370000"
+          }
+        ],
+        "TeamNameDisplay": "Mark MATHEWS",
+        "CategoryName": "A",
+        "RaceNumbers": "484",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:50:57.7370000",
+        "Position": 5
+      }
+    ]
+  },
+  {
+    "CategoryName": "B",
+    "ParticipantViewModels": [
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1247,
+            "FullName": "Adrian DILLON",
+            "RaceNumber": "10",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:10:19.9870000",
+            "CumulativeLapTimeSpan": "00:10:19.9870000"
+          },
+          {
+            "Id": 1274,
+            "FullName": "Adrian DILLON",
+            "RaceNumber": "10",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:10:42.5330000",
+            "CumulativeLapTimeSpan": "00:21:02.5200000"
+          },
+          {
+            "Id": 1302,
+            "FullName": "Adrian DILLON",
+            "RaceNumber": "10",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:10:58",
+            "CumulativeLapTimeSpan": "00:32:00.5200000"
+          },
+          {
+            "Id": 1328,
+            "FullName": "Adrian DILLON",
+            "RaceNumber": "10",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:10:35.0640000",
+            "CumulativeLapTimeSpan": "00:42:35.5840000"
+          },
+          {
+            "Id": 1354,
+            "FullName": "Adrian DILLON",
+            "RaceNumber": "10",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:10:41.7800000",
+            "CumulativeLapTimeSpan": "00:53:17.3640000"
+          }
+        ],
+        "TeamNameDisplay": "Adrian DILLON",
+        "CategoryName": "B",
+        "RaceNumbers": "10",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:53:17.3640000",
+        "Position": 1
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1245,
+            "FullName": "Phil O'NEIL",
+            "RaceNumber": "129",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:10:16.7370000",
+            "CumulativeLapTimeSpan": "00:10:16.7370000"
+          },
+          {
+            "Id": 1273,
+            "FullName": "Phil O'NEIL",
+            "RaceNumber": "129",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:10:45.2200000",
+            "CumulativeLapTimeSpan": "00:21:01.9570000"
+          },
+          {
+            "Id": 1301,
+            "FullName": "Phil O'NEIL",
+            "RaceNumber": "129",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:10:57.8470000",
+            "CumulativeLapTimeSpan": "00:31:59.8040000"
+          },
+          {
+            "Id": 1331,
+            "FullName": "Phil O'NEIL",
+            "RaceNumber": "129",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:11:06.8360000",
+            "CumulativeLapTimeSpan": "00:43:06.6400000"
+          },
+          {
+            "Id": 1358,
+            "FullName": "Phil O'NEIL",
+            "RaceNumber": "129",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:10:57.1100000",
+            "CumulativeLapTimeSpan": "00:54:03.7500000"
+          }
+        ],
+        "TeamNameDisplay": "Phil O'NEIL",
+        "CategoryName": "B",
+        "RaceNumbers": "129",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:54:03.7500000",
+        "Position": 2
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1248,
+            "FullName": "Tony FRENCH",
+            "RaceNumber": "368",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:10:22.8870000",
+            "CumulativeLapTimeSpan": "00:10:22.8870000"
+          },
+          {
+            "Id": 1276,
+            "FullName": "Tony FRENCH",
+            "RaceNumber": "368",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:10:56.8870000",
+            "CumulativeLapTimeSpan": "00:21:19.7740000"
+          },
+          {
+            "Id": 1304,
+            "FullName": "Tony FRENCH",
+            "RaceNumber": "368",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:10:53.5230000",
+            "CumulativeLapTimeSpan": "00:32:13.2970000"
+          },
+          {
+            "Id": 1332,
+            "FullName": "Tony FRENCH",
+            "RaceNumber": "368",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:11:04.9000000",
+            "CumulativeLapTimeSpan": "00:43:18.1970000"
+          },
+          {
+            "Id": 1359,
+            "FullName": "Tony FRENCH",
+            "RaceNumber": "368",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:10:56.0870000",
+            "CumulativeLapTimeSpan": "00:54:14.2840000"
+          }
+        ],
+        "TeamNameDisplay": "Tony FRENCH",
+        "CategoryName": "B",
+        "RaceNumbers": "368",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:54:14.2840000",
+        "Position": 3
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1246,
+            "FullName": "Tim ROWE",
+            "RaceNumber": "232",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:10:19.4200000",
+            "CumulativeLapTimeSpan": "00:10:19.4200000"
+          },
+          {
+            "Id": 1275,
+            "FullName": "Tim ROWE",
+            "RaceNumber": "232",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:10:58.9740000",
+            "CumulativeLapTimeSpan": "00:21:18.3940000"
+          },
+          {
+            "Id": 1306,
+            "FullName": "Tim ROWE",
+            "RaceNumber": "232",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:11:29.3760000",
+            "CumulativeLapTimeSpan": "00:32:47.7700000"
+          },
+          {
+            "Id": 1335,
+            "FullName": "Tim ROWE",
+            "RaceNumber": "232",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:11:25.1840000",
+            "CumulativeLapTimeSpan": "00:44:12.9540000"
+          },
+          {
+            "Id": 1362,
+            "FullName": "Tim ROWE",
+            "RaceNumber": "232",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:11:38.9160000",
+            "CumulativeLapTimeSpan": "00:55:51.8700000"
+          }
+        ],
+        "TeamNameDisplay": "Tim ROWE",
+        "CategoryName": "B",
+        "RaceNumbers": "232",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:55:51.8700000",
+        "Position": 4
+      }
+    ]
+  },
+  {
+    "CategoryName": "C",
+    "ParticipantViewModels": [
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1253,
+            "FullName": "Gavin ERICKSON",
+            "RaceNumber": "22",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:10:47.5800000",
+            "CumulativeLapTimeSpan": "00:10:47.5800000"
+          },
+          {
+            "Id": 1280,
+            "FullName": "Gavin ERICKSON",
+            "RaceNumber": "22",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:11:03.6900000",
+            "CumulativeLapTimeSpan": "00:21:51.2700000"
+          },
+          {
+            "Id": 1307,
+            "FullName": "Gavin ERICKSON",
+            "RaceNumber": "22",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:11:01.5340000",
+            "CumulativeLapTimeSpan": "00:32:52.8040000"
+          },
+          {
+            "Id": 1334,
+            "FullName": "Gavin ERICKSON",
+            "RaceNumber": "22",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:11:01.8300000",
+            "CumulativeLapTimeSpan": "00:43:54.6340000"
+          },
+          {
+            "Id": 1361,
+            "FullName": "Gavin ERICKSON",
+            "RaceNumber": "22",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:11:17.6660000",
+            "CumulativeLapTimeSpan": "00:55:12.3000000"
+          }
+        ],
+        "TeamNameDisplay": "Gavin ERICKSON",
+        "CategoryName": "C",
+        "RaceNumbers": "22",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:55:12.3000000",
+        "Position": 1
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1252,
+            "FullName": "Richard WILLIAMS",
+            "RaceNumber": "336",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:10:46.3600000",
+            "CumulativeLapTimeSpan": "00:10:46.3600000"
+          },
+          {
+            "Id": 1279,
+            "FullName": "Richard WILLIAMS",
+            "RaceNumber": "336",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:11:03.2170000",
+            "CumulativeLapTimeSpan": "00:21:49.5770000"
+          },
+          {
+            "Id": 1308,
+            "FullName": "Richard WILLIAMS",
+            "RaceNumber": "336",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:11:24.3230000",
+            "CumulativeLapTimeSpan": "00:33:13.9000000"
+          },
+          {
+            "Id": 1336,
+            "FullName": "Richard WILLIAMS",
+            "RaceNumber": "336",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:11:24.4370000",
+            "CumulativeLapTimeSpan": "00:44:38.3370000"
+          },
+          {
+            "Id": 1363,
+            "FullName": "Richard WILLIAMS",
+            "RaceNumber": "336",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:11:25.9570000",
+            "CumulativeLapTimeSpan": "00:56:04.2940000"
+          }
+        ],
+        "TeamNameDisplay": "Richard WILLIAMS",
+        "CategoryName": "C",
+        "RaceNumbers": "336",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:56:04.2940000",
+        "Position": 2
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1251,
+            "FullName": "Ben WILLIAMS",
+            "RaceNumber": "403",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:10:42.2370000",
+            "CumulativeLapTimeSpan": "00:10:42.2370000"
+          },
+          {
+            "Id": 1282,
+            "FullName": "Ben WILLIAMS",
+            "RaceNumber": "403",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:11:13.0500000",
+            "CumulativeLapTimeSpan": "00:21:55.2870000"
+          },
+          {
+            "Id": 1310,
+            "FullName": "Ben WILLIAMS",
+            "RaceNumber": "403",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:11:39.0200000",
+            "CumulativeLapTimeSpan": "00:33:34.3070000"
+          },
+          {
+            "Id": 1338,
+            "FullName": "Ben WILLIAMS",
+            "RaceNumber": "403",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:12:04.9800000",
+            "CumulativeLapTimeSpan": "00:45:39.2870000"
+          },
+          {
+            "Id": 1366,
+            "FullName": "Ben WILLIAMS",
+            "RaceNumber": "403",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:11:57.3330000",
+            "CumulativeLapTimeSpan": "00:57:36.6200000"
+          }
+        ],
+        "TeamNameDisplay": "Ben WILLIAMS",
+        "CategoryName": "C",
+        "RaceNumbers": "403",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:57:36.6200000",
+        "Position": 3
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1255,
+            "FullName": "Vince TROTTER",
+            "RaceNumber": "120",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:10:56.4900000",
+            "CumulativeLapTimeSpan": "00:10:56.4900000"
+          },
+          {
+            "Id": 1283,
+            "FullName": "Vince TROTTER",
+            "RaceNumber": "120",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:11:31.4270000",
+            "CumulativeLapTimeSpan": "00:22:27.9170000"
+          },
+          {
+            "Id": 1311,
+            "FullName": "Vince TROTTER",
+            "RaceNumber": "120",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:11:37.6430000",
+            "CumulativeLapTimeSpan": "00:34:05.5600000"
+          },
+          {
+            "Id": 1339,
+            "FullName": "Vince TROTTER",
+            "RaceNumber": "120",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:11:46.9570000",
+            "CumulativeLapTimeSpan": "00:45:52.5170000"
+          },
+          {
+            "Id": 1367,
+            "FullName": "Vince TROTTER",
+            "RaceNumber": "120",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:12:09.0570000",
+            "CumulativeLapTimeSpan": "00:58:01.5740000"
+          }
+        ],
+        "TeamNameDisplay": "Vince TROTTER",
+        "CategoryName": "C",
+        "RaceNumbers": "120",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:58:01.5740000",
+        "Position": 4
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1256,
+            "FullName": "Ben VAN DUIJNE",
+            "RaceNumber": "69",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:11:02.9900000",
+            "CumulativeLapTimeSpan": "00:11:02.9900000"
+          },
+          {
+            "Id": 1285,
+            "FullName": "Ben VAN DUIJNE",
+            "RaceNumber": "69",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:11:53.3440000",
+            "CumulativeLapTimeSpan": "00:22:56.3340000"
+          },
+          {
+            "Id": 1313,
+            "FullName": "Ben VAN DUIJNE",
+            "RaceNumber": "69",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:12:22.9060000",
+            "CumulativeLapTimeSpan": "00:35:19.2400000"
+          },
+          {
+            "Id": 1341,
+            "FullName": "Ben VAN DUIJNE",
+            "RaceNumber": "69",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:12:01.6070000",
+            "CumulativeLapTimeSpan": "00:47:20.8470000"
+          },
+          {
+            "Id": 1369,
+            "FullName": "Ben VAN DUIJNE",
+            "RaceNumber": "69",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:11:36.5330000",
+            "CumulativeLapTimeSpan": "00:58:57.3800000"
+          }
+        ],
+        "TeamNameDisplay": "Ben VAN DUIJNE",
+        "CategoryName": "C",
+        "RaceNumbers": "69",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:58:57.3800000",
+        "Position": 5
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1257,
+            "FullName": "Eric VAN DAM",
+            "RaceNumber": "339",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:11:14.8200000",
+            "CumulativeLapTimeSpan": "00:11:14.8200000"
+          },
+          {
+            "Id": 1284,
+            "FullName": "Eric VAN DAM",
+            "RaceNumber": "339",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:11:35.9540000",
+            "CumulativeLapTimeSpan": "00:22:50.7740000"
+          },
+          {
+            "Id": 1312,
+            "FullName": "Eric VAN DAM",
+            "RaceNumber": "339",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:12:05.5200000",
+            "CumulativeLapTimeSpan": "00:34:56.2940000"
+          },
+          {
+            "Id": 1340,
+            "FullName": "Eric VAN DAM",
+            "RaceNumber": "339",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:12:09.5960000",
+            "CumulativeLapTimeSpan": "00:47:05.8900000"
+          },
+          {
+            "Id": 1370,
+            "FullName": "Eric VAN DAM",
+            "RaceNumber": "339",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:12:02.4640000",
+            "CumulativeLapTimeSpan": "00:59:08.3540000"
+          }
+        ],
+        "TeamNameDisplay": "Eric VAN DAM",
+        "CategoryName": "C",
+        "RaceNumbers": "339",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:59:08.3540000",
+        "Position": 6
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1259,
+            "FullName": "Nick PILE",
+            "RaceNumber": "342",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:11:55.1900000",
+            "CumulativeLapTimeSpan": "00:11:55.1900000"
+          },
+          {
+            "Id": 1287,
+            "FullName": "Nick PILE",
+            "RaceNumber": "342",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:12:07.6970000",
+            "CumulativeLapTimeSpan": "00:24:02.8870000"
+          },
+          {
+            "Id": 1315,
+            "FullName": "Nick PILE",
+            "RaceNumber": "342",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:12:18.5870000",
+            "CumulativeLapTimeSpan": "00:36:21.4740000"
+          },
+          {
+            "Id": 1344,
+            "FullName": "Nick PILE",
+            "RaceNumber": "342",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:12:36.1300000",
+            "CumulativeLapTimeSpan": "00:48:57.6040000"
+          }
+        ],
+        "TeamNameDisplay": "Nick PILE",
+        "CategoryName": "C",
+        "RaceNumbers": "342",
+        "NumberOfLaps": 4,
+        "TotalTimeSpan": "00:48:57.6040000",
+        "Position": 7
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1258,
+            "FullName": "Kelly WESTON",
+            "RaceNumber": "127",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:11:35.9200000",
+            "CumulativeLapTimeSpan": "00:11:35.9200000"
+          },
+          {
+            "Id": 1286,
+            "FullName": "Kelly WESTON",
+            "RaceNumber": "127",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:12:12.1970000",
+            "CumulativeLapTimeSpan": "00:23:48.1170000"
+          },
+          {
+            "Id": 1314,
+            "FullName": "Kelly WESTON",
+            "RaceNumber": "127",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:12:33.1530000",
+            "CumulativeLapTimeSpan": "00:36:21.2700000"
+          },
+          {
+            "Id": 1345,
+            "FullName": "Kelly WESTON",
+            "RaceNumber": "127",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:12:59.8840000",
+            "CumulativeLapTimeSpan": "00:49:21.1540000"
+          }
+        ],
+        "TeamNameDisplay": "Kelly WESTON",
+        "CategoryName": "C",
+        "RaceNumbers": "127",
+        "NumberOfLaps": 4,
+        "TotalTimeSpan": "00:49:21.1540000",
+        "Position": 8
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1260,
+            "FullName": "Martz Keir",
+            "RaceNumber": "20",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:12:22.4940000",
+            "CumulativeLapTimeSpan": "00:12:22.4940000"
+          },
+          {
+            "Id": 1288,
+            "FullName": "Martz Keir",
+            "RaceNumber": "20",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:12:30.3500000",
+            "CumulativeLapTimeSpan": "00:24:52.8440000"
+          },
+          {
+            "Id": 1316,
+            "FullName": "Martz Keir",
+            "RaceNumber": "20",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:12:21.4730000",
+            "CumulativeLapTimeSpan": "00:37:14.3170000"
+          },
+          {
+            "Id": 1347,
+            "FullName": "Martz Keir",
+            "RaceNumber": "20",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:12:35.6400000",
+            "CumulativeLapTimeSpan": "00:49:49.9570000"
+          }
+        ],
+        "TeamNameDisplay": "Martz Keir",
+        "CategoryName": "C",
+        "RaceNumbers": "20",
+        "NumberOfLaps": 4,
+        "TotalTimeSpan": "00:49:49.9570000",
+        "Position": 9
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1265,
+            "FullName": "Luis GOLDSTRAW",
+            "RaceNumber": "315",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:13:10.6570000",
+            "CumulativeLapTimeSpan": "00:13:10.6570000"
+          },
+          {
+            "Id": 1290,
+            "FullName": "Luis GOLDSTRAW",
+            "RaceNumber": "315",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:12:24.5870000",
+            "CumulativeLapTimeSpan": "00:25:35.2440000"
+          },
+          {
+            "Id": 1317,
+            "FullName": "Luis GOLDSTRAW",
+            "RaceNumber": "315",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:12:22.7560000",
+            "CumulativeLapTimeSpan": "00:37:58"
+          },
+          {
+            "Id": 1350,
+            "FullName": "Luis GOLDSTRAW",
+            "RaceNumber": "315",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:12:35.8970000",
+            "CumulativeLapTimeSpan": "00:50:33.8970000"
+          }
+        ],
+        "TeamNameDisplay": "Luis GOLDSTRAW",
+        "CategoryName": "C",
+        "RaceNumbers": "315",
+        "NumberOfLaps": 4,
+        "TotalTimeSpan": "00:50:33.8970000",
+        "Position": 10
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1261,
+            "FullName": "Scott WILLIAMS",
+            "RaceNumber": "256",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:12:33.2570000",
+            "CumulativeLapTimeSpan": "00:12:33.2570000"
+          },
+          {
+            "Id": 1291,
+            "FullName": "Scott WILLIAMS",
+            "RaceNumber": "256",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:13:08.2830000",
+            "CumulativeLapTimeSpan": "00:25:41.5400000"
+          },
+          {
+            "Id": 1322,
+            "FullName": "Scott WILLIAMS",
+            "RaceNumber": "256",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:13:37.4100000",
+            "CumulativeLapTimeSpan": "00:39:18.9500000"
+          },
+          {
+            "Id": 1355,
+            "FullName": "Scott WILLIAMS",
+            "RaceNumber": "256",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:14:01.4140000",
+            "CumulativeLapTimeSpan": "00:53:20.3640000"
+          }
+        ],
+        "TeamNameDisplay": "Scott WILLIAMS",
+        "CategoryName": "C",
+        "RaceNumbers": "256",
+        "NumberOfLaps": 4,
+        "TotalTimeSpan": "00:53:20.3640000",
+        "Position": 11
+      },
+      {
+        "LapByCategoryViewModels": [],
+        "TeamNameDisplay": "Steve BARKER",
+        "CategoryName": "C",
+        "RaceNumbers": "",
+        "NumberOfLaps": 0,
+        "TotalTimeSpan": null,
+        "Position": 12
+      }
+    ]
+  },
+  {
+    "CategoryName": "D",
+    "ParticipantViewModels": [
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1264,
+            "FullName": "Oscar DURANTE",
+            "RaceNumber": "466",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:12:49.4970000",
+            "CumulativeLapTimeSpan": "00:12:49.4970000"
+          },
+          {
+            "Id": 1293,
+            "FullName": "Oscar DURANTE",
+            "RaceNumber": "466",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:13:39.7900000",
+            "CumulativeLapTimeSpan": "00:26:29.2870000"
+          },
+          {
+            "Id": 1326,
+            "FullName": "Oscar DURANTE",
+            "RaceNumber": "466",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:13:51.0400000",
+            "CumulativeLapTimeSpan": "00:40:20.3270000"
+          },
+          {
+            "Id": 1357,
+            "FullName": "Oscar DURANTE",
+            "RaceNumber": "466",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:13:12.5370000",
+            "CumulativeLapTimeSpan": "00:53:32.8640000"
+          }
+        ],
+        "TeamNameDisplay": "Oscar DURANTE",
+        "CategoryName": "D",
+        "RaceNumbers": "466",
+        "NumberOfLaps": 4,
+        "TotalTimeSpan": "00:53:32.8640000",
+        "Position": 1
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1266,
+            "FullName": "Colin LINAHAN",
+            "RaceNumber": "50",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:13:03.9040000",
+            "CumulativeLapTimeSpan": "00:13:03.9040000"
+          },
+          {
+            "Id": 1294,
+            "FullName": "Colin LINAHAN",
+            "RaceNumber": "50",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:14:27.3800000",
+            "CumulativeLapTimeSpan": "00:27:31.2840000"
+          },
+          {
+            "Id": 1329,
+            "FullName": "Colin LINAHAN",
+            "RaceNumber": "50",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:14:45.7300000",
+            "CumulativeLapTimeSpan": "00:42:17.0140000"
+          },
+          {
+            "Id": 1365,
+            "FullName": "Colin LINAHAN",
+            "RaceNumber": "50",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:14:27.1830000",
+            "CumulativeLapTimeSpan": "00:56:44.1970000"
+          }
+        ],
+        "TeamNameDisplay": "Colin LINAHAN",
+        "CategoryName": "D",
+        "RaceNumbers": "50",
+        "NumberOfLaps": 4,
+        "TotalTimeSpan": "00:56:44.1970000",
+        "Position": 2
+      },
+      {
+        "LapByCategoryViewModels": [],
+        "TeamNameDisplay": "Paul Fletcher",
+        "CategoryName": "D",
+        "RaceNumbers": "246",
+        "NumberOfLaps": 0,
+        "TotalTimeSpan": null,
+        "Position": 3
+      }
+    ]
+  },
+  {
+    "CategoryName": "EBIKE",
+    "ParticipantViewModels": [
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1244,
+            "FullName": "Paul DURANTE",
+            "RaceNumber": "374",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:10:12.1240000",
+            "CumulativeLapTimeSpan": "00:10:12.1240000"
+          },
+          {
+            "Id": 1272,
+            "FullName": "Paul DURANTE",
+            "RaceNumber": "374",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:10:10.8530000",
+            "CumulativeLapTimeSpan": "00:20:22.9770000"
+          },
+          {
+            "Id": 1300,
+            "FullName": "Paul DURANTE",
+            "RaceNumber": "374",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:10:13.8830000",
+            "CumulativeLapTimeSpan": "00:30:36.8600000"
+          },
+          {
+            "Id": 1327,
+            "FullName": "Paul DURANTE",
+            "RaceNumber": "374",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:10:14.2870000",
+            "CumulativeLapTimeSpan": "00:40:51.1470000"
+          },
+          {
+            "Id": 1351,
+            "FullName": "Paul DURANTE",
+            "RaceNumber": "374",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:10:05.6500000",
+            "CumulativeLapTimeSpan": "00:50:56.7970000"
+          }
+        ],
+        "TeamNameDisplay": "Paul DURANTE",
+        "CategoryName": "EBIKE",
+        "RaceNumbers": "374",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:50:56.7970000",
+        "Position": 1
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1249,
+            "FullName": "Peter HENKEL",
+            "RaceNumber": "62",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:10:45.7370000",
+            "CumulativeLapTimeSpan": "00:10:45.7370000"
+          },
+          {
+            "Id": 1277,
+            "FullName": "Peter HENKEL",
+            "RaceNumber": "62",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:10:39.5800000",
+            "CumulativeLapTimeSpan": "00:21:25.3170000"
+          },
+          {
+            "Id": 1303,
+            "FullName": "Peter HENKEL",
+            "RaceNumber": "62",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:10:38.9830000",
+            "CumulativeLapTimeSpan": "00:32:04.3000000"
+          },
+          {
+            "Id": 1330,
+            "FullName": "Peter HENKEL",
+            "RaceNumber": "62",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:10:45.4970000",
+            "CumulativeLapTimeSpan": "00:42:49.7970000"
+          },
+          {
+            "Id": 1356,
+            "FullName": "Peter HENKEL",
+            "RaceNumber": "62",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:10:52.8530000",
+            "CumulativeLapTimeSpan": "00:53:42.6500000"
+          }
+        ],
+        "TeamNameDisplay": "Peter HENKEL",
+        "CategoryName": "EBIKE",
+        "RaceNumbers": "62",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:53:42.6500000",
+        "Position": 2
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1254,
+            "FullName": "Anthony SPEECHLEY",
+            "RaceNumber": "445",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:10:58.4070000",
+            "CumulativeLapTimeSpan": "00:10:58.4070000"
+          },
+          {
+            "Id": 1278,
+            "FullName": "Anthony SPEECHLEY",
+            "RaceNumber": "445",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:10:46.5570000",
+            "CumulativeLapTimeSpan": "00:21:44.9640000"
+          },
+          {
+            "Id": 1305,
+            "FullName": "Anthony SPEECHLEY",
+            "RaceNumber": "445",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:11:02.4000000",
+            "CumulativeLapTimeSpan": "00:32:47.3640000"
+          },
+          {
+            "Id": 1333,
+            "FullName": "Anthony SPEECHLEY",
+            "RaceNumber": "445",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:10:45.2200000",
+            "CumulativeLapTimeSpan": "00:43:32.5840000"
+          },
+          {
+            "Id": 1360,
+            "FullName": "Anthony SPEECHLEY",
+            "RaceNumber": "445",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:11:01.2060000",
+            "CumulativeLapTimeSpan": "00:54:33.7900000"
+          }
+        ],
+        "TeamNameDisplay": "Anthony SPEECHLEY",
+        "CategoryName": "EBIKE",
+        "RaceNumbers": "445",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:54:33.7900000",
+        "Position": 3
+      }
+    ]
+  },
+  {
+    "CategoryName": "Timing Error List",
+    "ParticipantViewModels": []
+  },
+  {
+    "CategoryName": "WA",
+    "ParticipantViewModels": [
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1250,
+            "FullName": "Christy HARRIS",
+            "RaceNumber": "130",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:10:50.7000000",
+            "CumulativeLapTimeSpan": "00:10:50.7000000"
+          },
+          {
+            "Id": 1281,
+            "FullName": "Christy HARRIS",
+            "RaceNumber": "130",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:11:11.5170000",
+            "CumulativeLapTimeSpan": "00:22:02.2170000"
+          },
+          {
+            "Id": 1309,
+            "FullName": "Christy HARRIS",
+            "RaceNumber": "130",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:11:22.6770000",
+            "CumulativeLapTimeSpan": "00:33:24.8940000"
+          },
+          {
+            "Id": 1337,
+            "FullName": "Christy HARRIS",
+            "RaceNumber": "130",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:11:35.6930000",
+            "CumulativeLapTimeSpan": "00:45:00.5870000"
+          },
+          {
+            "Id": 1364,
+            "FullName": "Christy HARRIS",
+            "RaceNumber": "130",
+            "LapNumber": 5,
+            "LapTimeSpan": "00:11:55.0370000",
+            "CumulativeLapTimeSpan": "00:56:55.6240000"
+          }
+        ],
+        "TeamNameDisplay": "Christy HARRIS",
+        "CategoryName": "WA",
+        "RaceNumbers": "130",
+        "NumberOfLaps": 5,
+        "TotalTimeSpan": "00:56:55.6240000",
+        "Position": 1
+      }
+    ]
+  },
+  {
+    "CategoryName": "WB",
+    "ParticipantViewModels": [
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1262,
+            "FullName": "Amy Trotter",
+            "RaceNumber": "91",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:12:26.9800000",
+            "CumulativeLapTimeSpan": "00:12:26.9800000"
+          },
+          {
+            "Id": 1289,
+            "FullName": "Amy Trotter",
+            "RaceNumber": "91",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:12:47.1970000",
+            "CumulativeLapTimeSpan": "00:25:14.1770000"
+          },
+          {
+            "Id": 1318,
+            "FullName": "Amy Trotter",
+            "RaceNumber": "91",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:13:08.1070000",
+            "CumulativeLapTimeSpan": "00:38:22.2840000"
+          },
+          {
+            "Id": 1352,
+            "FullName": "Amy Trotter",
+            "RaceNumber": "91",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:13:25.0760000",
+            "CumulativeLapTimeSpan": "00:51:47.3600000"
+          }
+        ],
+        "TeamNameDisplay": "Amy Trotter",
+        "CategoryName": "WB",
+        "RaceNumbers": "91",
+        "NumberOfLaps": 4,
+        "TotalTimeSpan": "00:51:47.3600000",
+        "Position": 1
+      },
+      {
+        "LapByCategoryViewModels": [
+          {
+            "Id": 1263,
+            "FullName": "Kimberly DOUGLASS",
+            "RaceNumber": "133",
+            "LapNumber": 1,
+            "LapTimeSpan": "00:12:43.6040000",
+            "CumulativeLapTimeSpan": "00:12:43.6040000"
+          },
+          {
+            "Id": 1292,
+            "FullName": "Kimberly DOUGLASS",
+            "RaceNumber": "133",
+            "LapNumber": 2,
+            "LapTimeSpan": "00:13:11.2460000",
+            "CumulativeLapTimeSpan": "00:25:54.8500000"
+          },
+          {
+            "Id": 1323,
+            "FullName": "Kimberly DOUGLASS",
+            "RaceNumber": "133",
+            "LapNumber": 3,
+            "LapTimeSpan": "00:13:30.7240000",
+            "CumulativeLapTimeSpan": "00:39:25.5740000"
+          },
+          {
+            "Id": 1353,
+            "FullName": "Kimberly DOUGLASS",
+            "RaceNumber": "133",
+            "LapNumber": 4,
+            "LapTimeSpan": "00:13:31.7900000",
+            "CumulativeLapTimeSpan": "00:52:57.3640000"
+          }
+        ],
+        "TeamNameDisplay": "Kimberly DOUGLASS",
+        "CategoryName": "WB",
+        "RaceNumbers": "133",
+        "NumberOfLaps": 4,
+        "TotalTimeSpan": "00:52:57.3640000",
+        "Position": 2
+      }
+    ]
+  }
+]

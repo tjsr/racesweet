@@ -2,7 +2,7 @@ import type { ChipCrossingData } from "../model/chipcrossing.ts";
 import type { PathLike } from "node:fs";
 import type { TimeRecord } from "../model/timerecord.ts";
 import { createIdHash } from "../utils.ts";
-import { fromRfidTimingLine } from "./rfidtiming.js";
+import { fromRfidTimingLine } from "./rfidtiming/rfidtiming.js";
 import { getSequenceNumber } from "../app/utils/sequence.ts";
 import { open } from 'node:fs/promises';
 import { parseLineMatching } from "./genericLineMatcher.js";

@@ -8,7 +8,7 @@ export default defineConfig({
 		include: ['src/**/*.test.ts'],
 		exclude: [ 'node_modules', '.git', '**/*.git' ],
 		environment: 'node', // Use 'jsdom' if you're testing browser-based code,
-		threads: false, // Disable threads for debugging
+		// threads: false, // Disable threads for debugging
   }
 }
 );

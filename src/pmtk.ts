@@ -15,7 +15,7 @@ export const eventId = process.env.GMBC_MDB_EVENT_ID ? parseInt(process.env.GMBC
 
 const sourceUuid = uuidv5(dbFile, uuidv5.URL);
 
-const data = await getEvent(conn, eventId, sourceUuid);
-
-console.log(data);
+getEvent(conn, eventId, sourceUuid).then((data) => {
+  console.log(data);
+});
 

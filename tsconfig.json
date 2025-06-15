@@ -2,6 +2,7 @@
   "extends": ["@tsconfig/node22/tsconfig.json", "@tsconfig/node-ts/tsconfig.json"],
   "compilerOptions": {
     "allowJs": true,
+    "baseUrl": ".",
     "experimentalDecorators": true,
     "esModuleInterop": true,
     "jsx": "react-jsx",
@@ -16,7 +17,11 @@
     "skipLibCheck": true,
     "target": "ESNext",
     "types": ["vitest/globals"],
-    "verbatimModuleSyntax": false
+    "verbatimModuleSyntax": false,
+    "paths": {
+      "@model/*": ["src/model/*"],
+      "@parsers/*": ["src/parsers/*"],
+    }
   },
   "src": ["src", "test"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx"],

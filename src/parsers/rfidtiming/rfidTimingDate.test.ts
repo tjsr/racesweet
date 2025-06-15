@@ -2,7 +2,7 @@
 
 import { parseRfidTimingDate, tryParseDateTime } from './rfidTimingDate.ts';
 
-import { DateParseError } from './date/errors.ts';
+import { DateParseError } from '../date/errors.ts';
 import { TZDate } from '@date-fns/tz';
 
 describe('tryParseDateTime', () => {

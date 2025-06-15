@@ -1,11 +1,13 @@
+import type { PathLike, ReadStream } from "fs";
+
 import { GenericTestSession } from "./genericTestSession.js";
 import type { GreenFlagRecord } from "../model/flag.ts";
-import type { PathLike } from "fs";
+import LocalFileResourceProvider from "../controllers/resource/local.ts";
 import type { RaceState } from "../model/racestate.ts";
 import type { TestSession } from "./testsession.ts";
 import { createGreenFlagEvent } from "../controllers/flag.ts";
 import { getTestFilePath } from "../testing/testDataFiles.ts";
-import { loadCategoriesFromJsonFile } from "../controllers/category.ts";
+import { loadCategoriesFromJsonFile } from '../controllers/import.ts';
 import { parseFile as parseOutreachCrossingsFile } from "../parsers/outreach.ts";
 import { readParticipantsXlsx } from "../controllers/participant.ts";
 
@@ -15,7 +17,9 @@ const ENTRIES_DATA_FILE = '2025-02-07-entries.xlsx';
 const TEST_EVENT_START_TIME = new Date('2025-02-07T19:02:43.867+10:00');
 const TEST_EVENT_DATE = new Date('2025-02-07T00:00:00Z');
 
-export class OutreachTeamsRaceTestSession extends GenericTestSession implements TestSession, GenericTestSession {
+export class OutreachTeamsRaceTestSession
+  extends GenericTestSession<ReadStream, LocalFileResourceProvider>
+  implements TestSession {
   public static async create(): Promise<OutreachTeamsRaceTestSession> {
     return Promise.resolve(new OutreachTeamsRaceTestSession({} as RaceState));
   };

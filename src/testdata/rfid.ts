@@ -1,19 +1,25 @@
+import { iterateRfidData, nonEmptyLinesFilter } from "../parsers/rfidtiming/fromIterator.ts";
+
+import { ChipCrossingData } from "../model/chipcrossing.ts";
 import { GenericTestSession } from "./genericTestSession.ts";
+import LocalFileResourceProvider from "../controllers/resource/local.ts";
 import type { PathLike } from "fs";
 import type { RaceState } from "../model/racestate.ts";
 import type { TestSession } from "./testsession.ts";
-import type { TimeRecord } from "../model/timerecord.ts";
 import { createGreenFlagEvent } from "../controllers/flag.ts";
 import { getTestFilePath } from "../testing/testDataFiles.ts";
-import { loadCategoriesFromJsonFile } from "../controllers/category.ts";
-import { parseFile } from "../parsers/rfidtiming.ts";
+import { loadCategoriesFromJsonFile } from '../controllers/import.ts';
+import { parseUnparsedChipCrossings } from "../parsers/genericTimeParser.ts";
+import { v5 as uuidv5 } from 'uuid';
 
 const TEST_CROSSINGS_DATA_FILE = 'rfid-2025-06-06.txt';
 const CATEGORIES_TEST_FILE = '2025-06-06-categories.json';
 
 export class RfidIndividualTestRace extends GenericTestSession implements TestSession {
+  private _crossingResourceProvider: LocalFileResourceProvider<string[]>;
   constructor(raceState?: RaceState) {
     super(raceState);
+    this._crossingResourceProvider = new LocalFileResourceProvider<string[]>('src/testdata');
   }
   
   createGreenFlagTestRecords(): Promise<void> {
@@ -62,8 +68,23 @@ export class RfidIndividualTestRace extends GenericTestSession implements TestSe
   }
 
   public async loadCrossings(): Promise<void> {
-    const filePath = getTestFilePath(TEST_CROSSINGS_DATA_FILE);
-    return parseFile(filePath, new Date('2025-06-06T19:00:00+10:00'))
-      .then((records: TimeRecord[]) => super.addRecords(records));
+    const source = uuidv5(TEST_CROSSINGS_DATA_FILE, uuidv5.URL);
+    const errors: unknown[] = [];
+    const fileEventDate = new Date('2025-06-06T19:00:00+10:00');
+    return this._crossingResourceProvider.getResource(TEST_CROSSINGS_DATA_FILE)
+      .then((crossingLines: string[]) => {
+        const lines = crossingLines.filter(nonEmptyLinesFilter);
+        const crossingsIter = lines[Symbol.iterator]();
+        const crossings: ChipCrossingData[] = [];
+        const iCrossings = iterateRfidData(crossingsIter, errors, source);
+
+        for (const parsedLine of iCrossings) {
+          if (parsedLine) {
+            crossings.push(parsedLine);
+          }
+        }
+        const records = parseUnparsedChipCrossings(fileEventDate, crossings);
+        return super.addRecords(records);
+      });
   }
 }

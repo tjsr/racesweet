@@ -2,10 +2,9 @@ import type { EventCategory, EventCategoryId, PlaceholderCategory } from '../mod
 import type { EventId, IdType } from "../model/types.ts";
 import type { ParticipantPassingRecord, PassingRecordId, TimeRecord } from '../model/timerecord.ts';
 import { elapsedTimeMilliseconds, getElapsedTimeStart, millisecondsToTime } from '../app/utils/timeutils.ts';
+
 import { CategoryCreateError } from '../model/errors/category.ts';
 import type { FlagRecord } from '../model/flag.ts';
-import { type PathLike } from "fs";
-import fs from 'fs/promises';
 import { v5 as uuidv5 } from 'uuid';
 
 type CategoryId = IdType;
@@ -60,9 +59,6 @@ export const findOrCreateCategory  = (
 export const getCategoryList = (): EventCategory[] => {
   return categories as EventCategory[];
 };
-
-export const loadCategoriesFromJsonFile = async (path: PathLike): Promise<EventCategory[]> =>
-  fs.readFile(path, 'utf8').then(cats => JSON.parse(cats) as EventCategory[]);
 
 export const calculateCategoryElapsedTime = (
   lap: TimeRecord,
