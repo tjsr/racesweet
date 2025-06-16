@@ -296,7 +296,7 @@ interface SheetData {
   data: Record<string, unknown>[];
 }
 
-export const readXlsxToJson = (filePath: PathLike): Promise<SheetData> => {
+export const readXlsxFileToJson = (filePath: PathLike): Promise<SheetData> => {
   let path = filePath.toString();
   let sheetName = undefined;
   if (filePath.toString().includes('')) {
@@ -305,43 +305,14 @@ export const readXlsxToJson = (filePath: PathLike): Promise<SheetData> => {
     path = workbookLocationParts[0];
   }
   const workbook = xlsx.readFile(path);
-  const workingSheet: WorkSheet = workbook.Sheets[sheetName || 'Sheet1'] || workbook.Sheets[workbook.SheetNames[0]] || workbook.Sheets[0];
-  const sheetJson: Record<string, unknown>[] = xlsx.utils.sheet_to_json(workingSheet, { header: "A" });
-  const headers = sheetJson.shift() as Record<string, unknown>;
-
-  sheetJson.forEach((row: unknown) => {
-    Object.keys(headers).forEach((key) => {
-      try {
-        const mappedKey: unknown = headers[key];
-        if (!mappedKey) {
-          return;
-        }
-        const rowRecord = row as unknown as Record<string, unknown>;
-        const mappedValue = rowRecord[key];
-        if (mappedValue) {
-          rowRecord[mappedKey as string] = mappedValue;
-        }
-      } catch (error) {
-        const hk = headers ? headers[key] : 'Unknown header mapping';
-        console.error(`Error mapping key ${key} to ${hk}:`, error);
-      }
-    });
-
-    
-    // const rowDataKeys = Object.keys(rowData);
-    // const rowDataValues = Object.values(rowData);
-    // console.log('Row', '>>>>', row);
-
-    // console.debug('Row', '>>>>', row);
-  });
-
-  const result: SheetData = {
-    data: sheetJson,
-    headers: headers,
-  };
-
-  return Promise.resolve(result);
+  return readJsonFromSheet(workbook, sheetName);
 };
+
+export const readXlsxBufferToJson = (buffer: Buffer, sheetName?: string): Promise<SheetData> => {
+  const workbook = xlsx.read(buffer);
+  return readJsonFromSheet(workbook, sheetName);
+};
+
 
 interface ImportMappings {
   [key: string]: string|number;
@@ -463,25 +434,49 @@ const processParticipantRow = (
   return participant as EventParticipant;
 };
 
-export const readParticipantsXlsx = async (filePath: PathLike, mappings: ImportMappings, categoryList: EventCategory[]): Promise<EventParticipant[]> => {
-  return readXlsxToJson(filePath).then((sheetData: SheetData) => {
-    const participants: EventParticipant[] = [];
-    const headers = sheetData.headers as Record<string, string|undefined>;
-    const data: Record<string, unknown>[] = sheetData.data;
-
-    const categorySheetHeader: string = findColumnNameForSheetColumn(headers, ['Category', 'Class', 'Category Name', 'Grade'])!;
-    if (!categorySheetHeader) {
-      throw new Error('Entrant sheet to import does not have a category header.');
-    }
-
-    data.forEach((row: Record<string, unknown>) => {
-      const participant = processParticipantRow(headers, mappings, row, categorySheetHeader, categoryList);
-      participants.push(participant as EventParticipant);
-    });
-    console.log(readParticipantsXlsx.name, `Finished reading ${participants.length} participants from input file ${filePath}.`);
+export const readParticipantsXlsxFromBuffer = async (
+  buffer: Buffer,
+  mappings: ImportMappings,
+  categoryList: EventCategory[]
+): Promise<EventParticipant[]> => readXlsxFileToJson(buffer)
+  .then((sheetData: SheetData) => readParticipantsXlsx(sheetData, mappings, categoryList))
+  .then((participants: EventParticipant[]) => {
+    console.log(readParticipantsXlsxFromBuffer.name, `Finished reading ${participants.length} participants from stream.`);
     return participants;
   });
+
+export const readParticipantsXlsxFromFile = async (
+  filePath: PathLike,
+  mappings: ImportMappings,
+  categoryList: EventCategory[]
+): Promise<EventParticipant[]> => readXlsxFileToJson(filePath)
+  .then((sheetData: SheetData) => readParticipantsXlsx(sheetData, mappings, categoryList))
+  .then((participants: EventParticipant[]) => {
+    console.log(readParticipantsXlsxFromFile.name, `Finished reading ${participants.length} participants from input file ${filePath}.`);
+    return participants;
+  });
+
+export const readParticipantsXlsx = async (
+  sheetData: SheetData,
+  mappings: ImportMappings,
+  categoryList: EventCategory[]
+): Promise<EventParticipant[]> => {
+  const participants: EventParticipant[] = [];
+  const headers = sheetData.headers as Record<string, string|undefined>;
+  const data: Record<string, unknown>[] = sheetData.data;
+
+  const categorySheetHeader: string = findColumnNameForSheetColumn(headers, ['Category', 'Class', 'Category Name', 'Grade'])!;
+  if (!categorySheetHeader) {
+    throw new Error('Entrant sheet to import does not have a category header.');
+  }
+
+  data.forEach((row: Record<string, unknown>) => {
+    const participant = processParticipantRow(headers, mappings, row, categorySheetHeader, categoryList);
+    participants.push(participant as EventParticipant);
+  });
+  return participants;
 };
+
 // const calculateLapForTimeRecord = (
 //   passingRecord: ParticipantPassingRecord,
 //   prevLap: EntrantLap|undefined,
@@ -651,4 +646,43 @@ export const createParticipantIdFromEventAndCategory = (
   categoryId: EventCategoryId,
   raceNumber: string
 ): EventParticipantId => uuidv5(`${eventId}-${categoryId}-${raceNumber}`, eventId);
+
+const readJsonFromSheet = (workbook: xlsx.WorkBook, sheetName: string = 'Sheet1') => {
+  const workingSheet: WorkSheet = workbook.Sheets[sheetName] || workbook.Sheets[workbook.SheetNames[0]] || workbook.Sheets[0];
+  const sheetJson: Record<string, unknown>[] = xlsx.utils.sheet_to_json(workingSheet, { header: "A" });
+  const headers = sheetJson.shift() as Record<string, unknown>;
+
+  sheetJson.forEach((row: unknown) => {
+    Object.keys(headers).forEach((key) => {
+      try {
+        const mappedKey: unknown = headers[key];
+        if (!mappedKey) {
+          return;
+        }
+        const rowRecord = row as unknown as Record<string, unknown>;
+        const mappedValue = rowRecord[key];
+        if (mappedValue) {
+          rowRecord[mappedKey as string] = mappedValue;
+        }
+      } catch (error) {
+        const hk = headers ? headers[key] : 'Unknown header mapping';
+        console.error(`Error mapping key ${key} to ${hk}:`, error);
+      }
+    });
+
+
+    // const rowDataKeys = Object.keys(rowData);
+    // const rowDataValues = Object.values(rowData);
+    // console.log('Row', '>>>>', row);
+    // console.debug('Row', '>>>>', row);
+  });
+
+  const result: SheetData = {
+    data: sheetJson,
+    headers: headers,
+  };
+
+  return Promise.resolve(result);
+};
+
 

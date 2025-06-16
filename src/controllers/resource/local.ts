@@ -30,6 +30,11 @@ export class LocalFileResourceProvider<ResourceType> extends ResourceProvider<Re
     return path.join(this._basePath as string, name);
   }
 
+  protected getResourceBuf(name: string): Promise<Buffer> {
+    const filePath = this.getResourcePath(name);
+    return readFile(filePath);
+  }
+
   public async getFile(name: string): Promise<string> {
     const filePath = this.getResourcePath(name);
 

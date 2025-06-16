@@ -4,5 +4,7 @@ export abstract class ResourceProvider<ResourceType> {
   }
 
   public abstract getResource(name: string): Promise<ResourceType>;
+  public abstract getResourceBuf(name: string): Promise<Buffer>;
+  
 }
 
