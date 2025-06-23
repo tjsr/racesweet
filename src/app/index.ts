@@ -73,7 +73,7 @@ ipcMain.on(RequestReadIpcSendChannel, (event: Electron.IpcMainEvent, filename: s
   // const path = require('path');
   const filePath = path.join(__dirname, filename);
   
-  readFile(filePath, 'utf8').then((data: string) => {
+  readFile(filePath).then((data: Buffer) => {
     event.reply(ReadContentIpcReceiveChannel, eventId, data);
   }).catch((error: Error) => {
     // Handle the error, e.g., file not found or read error

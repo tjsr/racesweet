@@ -1,9 +1,10 @@
 import { createIdHash, safeIntOption } from "../../utils.ts";
+import type { uuid, uuidv5 } from "../../model/types.ts";
 
 import { InvalidRfidTimingFormatError } from "./errors.ts";
 import { RFIDTimingChipCrossingData } from "./model.ts";
 import type { UnparsedTimeStringEvent } from "../../model/timerecord.ts";
-import type { uuid } from "../../model/types.ts";
+import { v5 } from 'uuid';
 
 const outreachRfidTimingFormatPattern: RegExp = /(?<antenna>\d+),(?<chipCode>\d+),(?<hexChipCode>[0-f]+),"?(?<timeString>[\d\-/\s:.]+)"?(,(?<reader>\d+),(?<antenna2>\d+))?/;
 
@@ -60,4 +61,9 @@ export const parseRfidLine = (line: string, source: uuid): RFIDTimingChipCrossin
     throw new InvalidRfidTimingFormatError('No time string found in line', line);
   }
   return parsedLine;
+};
+
+export const getRfidSourceUuid = (filePath: string): uuidv5 => {
+  const fileName = filePath.toString();
+  return v5(fileName, v5.URL);
 };

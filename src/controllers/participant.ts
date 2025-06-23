@@ -1,6 +1,7 @@
 import type { ChipCodeType, EventParticipantId } from "../model/eventparticipant.ts";
-import { ColumnNotInSpreadsheetError, ParticipantSpreadsheetError } from "../model/errors.ts";
 import type { EventCategory, EventCategoryId, EventParticipant, ParticipantIdentifier, TimeRecord } from "../model/index.ts";
+import { ImportMappings, SheetData, findColumnNameForSheetColumn, readXlsxFileToJson, readXlsxWorkbookToJson } from "./resource/excel.ts";
+import type { WorkBook, WorkSheet } from 'xlsx';
 import { compareByTime, getTimeRecordIdentifier, isCrossingRecord, isRecordAfterStart } from "./timerecord.ts";
 import {
   findCategoryByName,
@@ -12,8 +13,8 @@ import { CategoryNotFoundError } from "../model/eventcategory.ts";
 import type { EventId } from "../model/types.ts";
 import type { GreenFlagRecord } from "../model/flag.ts";
 import type { ParticipantPassingRecord } from "../model/timerecord.ts";
+import { ParticipantSpreadsheetError } from "../model/errors.ts";
 import type { PathLike } from "fs";
-import type { WorkSheet } from 'xlsx';
 import { assignEntrantToTime } from "./crossing.ts";
 import { elapsedTimeMilliseconds } from "../app/utils/timeutils.ts";
 import { validateStartFlag } from "../validators/startflag.ts";
@@ -291,54 +292,6 @@ export const createEntrantForUnmatchedChipCode = (
   return createdEntrant;
 };
 
-interface SheetData {
-  headers: Record<string, unknown>;
-  data: Record<string, unknown>[];
-}
-
-export const readXlsxFileToJson = (filePath: PathLike): Promise<SheetData> => {
-  let path = filePath.toString();
-  let sheetName = undefined;
-  if (filePath.toString().includes('')) {
-    const workbookLocationParts = filePath.toString().split('!');
-    sheetName = workbookLocationParts[workbookLocationParts.length - 1];
-    path = workbookLocationParts[0];
-  }
-  const workbook = xlsx.readFile(path);
-  return readJsonFromSheet(workbook, sheetName);
-};
-
-export const readXlsxBufferToJson = (buffer: Buffer, sheetName?: string): Promise<SheetData> => {
-  const workbook = xlsx.read(buffer);
-  return readJsonFromSheet(workbook, sheetName);
-};
-
-
-interface ImportMappings {
-  [key: string]: string|number;
-}
-
-const findColumnNameForSheetColumn = (headers: Record<string, string|undefined>, possibleNames: string[]): string|undefined => {
-  const checkNames = [...possibleNames];
-  
-  // , ...possibleNames.map((name) => name.toLowerCase())];
-  for (const name of checkNames) {
-    const foundName = Object.keys(headers).find((header) => {
-      const headerValue = headers[header];
-      if (headerValue && headerValue.toString().replaceAll(' ', '').toLowerCase() === name.replaceAll(' ', '').toLowerCase()) {
-        return true;
-      }
-    });
-    if (foundName) {
-      return foundName;
-    }
-  }
-
-  const possibleNamesString = possibleNames.map((name) => `"${name}"`).join(', ');
-  const errMsg = `Entrant sheet to import does not have a searched for header, looked for columns named ${possibleNamesString}`;
-  throw new ColumnNotInSpreadsheetError(errMsg);
-};
-
 class NoTransponderError extends ParticipantSpreadsheetError {
   constructor(message: string) {
     super(message);
@@ -433,6 +386,18 @@ const processParticipantRow = (
 
   return participant as EventParticipant;
 };
+
+export const readParticipantsFromWorkbook = async (
+  workbook: WorkBook,
+  mappings: ImportMappings,
+  categoryList: EventCategory[]
+): Promise<EventParticipant[]> => readXlsxWorkbookToJson(workbook)
+  .then((sheetData: SheetData) => readParticipantsXlsx(sheetData, mappings, categoryList))
+  .then((participants: EventParticipant[]) => {
+    console.log(readParticipantsXlsxFromBuffer.name, `Finished reading ${participants.length} participants from stream.`);
+    return participants;
+  });
+
 
 export const readParticipantsXlsxFromBuffer = async (
   buffer: Buffer,
@@ -647,7 +612,7 @@ export const createParticipantIdFromEventAndCategory = (
   raceNumber: string
 ): EventParticipantId => uuidv5(`${eventId}-${categoryId}-${raceNumber}`, eventId);
 
-const readJsonFromSheet = (workbook: xlsx.WorkBook, sheetName: string = 'Sheet1') => {
+export const readJsonFromSheet = (workbook: xlsx.WorkBook, sheetName: string = 'Sheet1') => {
   const workingSheet: WorkSheet = workbook.Sheets[sheetName] || workbook.Sheets[workbook.SheetNames[0]] || workbook.Sheets[0];
   const sheetJson: Record<string, unknown>[] = xlsx.utils.sheet_to_json(workingSheet, { header: "A" });
   const headers = sheetJson.shift() as Record<string, unknown>;

@@ -1,10 +1,8 @@
-export abstract class ResourceProvider<ResourceType> {
-  constructor() {
+export interface ResourceProvider<ResourceType> {
+  getResource(name: string, ...opts: unknown[]): Promise<ResourceType>;
+}
 
-  }
-
-  public abstract getResource(name: string): Promise<ResourceType>;
-  public abstract getResourceBuf(name: string): Promise<Buffer>;
-  
+export interface ResourceStreamProvider {
+  getResourceBuf(name: string, ...opts: unknown[]): Promise<Buffer>;
 }
 

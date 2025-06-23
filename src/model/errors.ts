@@ -13,13 +13,6 @@ export class ParticipantSpreadsheetError extends DataImportError {
   }
 }
 
-export class ColumnNotInSpreadsheetError extends ParticipantSpreadsheetError {
-  constructor(message: string) {
-    super(message);
-    this.name = "ColumnNotInSpreadsheetError";
-  }
-}
-
 class SexOrGenderDataWarning extends DataImportError {
   constructor(message: string) {
     super(message);

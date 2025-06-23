@@ -1,15 +1,20 @@
 import { ResourceProvider } from "./provider.ts";
 
-export abstract class ElectronResourceProvider<ResourceType> extends ResourceProvider<ResourceType> {
-  constructor() {
-    super();
+export class ElectronResourceProvider<ResourceType> implements ResourceProvider<ResourceType> {
+  _path: string | undefined;
+  constructor(defaultDir: string = 'src/testdata') {
+    if (!defaultDir) {
+      this._path = 'H:/dev/racesweet/src/testdata/';
+    }
     // Initialization code for Electron resource provider
   }
 
-  protected getElectronResource(name: string): Promise<string> {
-    const path = 'H:/dev/racesweet/src/testdata/' + name;
-    return window.api.requestFileContent<string>(path);
+  protected getElectronResource(name: string): Promise<ResourceType> {
+    const path = this._path + name;
+    return window.api.requestFileContent<ResourceType>(path);
   }
 
-  public abstract getResource(name: string): Promise<ResourceType>;
+  public getResource(name: string): Promise<ResourceType> {
+    return this.getElectronResource(name);
+  }
 }

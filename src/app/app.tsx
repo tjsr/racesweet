@@ -1,26 +1,15 @@
 import { RaceState, Session } from '../model/racestate.ts';
 import React, { useState } from 'react';
 
+import { ApicalLapByCategory } from '../model/apical.ts';
 import { ApicalTestRace } from '../testdata/apical';
+import { ElectronResourceProvider } from '../controllers/resource/electron.ts';
 import { RecentRecords } from '../views/display/recent';
+import { ResourceProvider } from '../controllers/resource/provider.ts';
 import { TestSession } from '../testdata/testsession';
 import { createRoot } from 'react-dom/client';
 
 const root = createRoot(document.getElementById('app') as HTMLElement);
-
-class ApicalElectronFile extends ApicalTestRace {
-  constructor() {
-    super();
-    // Set a unique event ID for the session.
-    super.eventId = 'apical-electron-file-session';
-  }
-
-  public async read(): Promise<Partial<RaceState>> {
-    // This method should read data from a file or other source.
-    // For now, we return an empty object as a placeholder.
-    return {};
-  }
-}
 
 const loadRecords = () => {
   const apicalSession: TestSession = new ApicalElectronFile();

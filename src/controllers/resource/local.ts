@@ -4,11 +4,10 @@ import { PathLike } from "node:fs";
 import { ResourceProvider } from "./provider.ts";
 import path from "node:path";
 
-export class LocalFileResourceProvider<ResourceType> extends ResourceProvider<ResourceType> {
+export class LocalFileResourceProvider<ResourceType> implements ResourceProvider<ResourceType> {
   private _basePath: PathLike | undefined;
 
   constructor(basePath?: string) {
-    super();
     if (basePath) {
       this._basePath = basePath;
     } else if (process.env.DEVELOPMENT) {
@@ -30,7 +29,7 @@ export class LocalFileResourceProvider<ResourceType> extends ResourceProvider<Re
     return path.join(this._basePath as string, name);
   }
 
-  protected getResourceBuf(name: string): Promise<Buffer> {
+  public getResourceBuf(name: string): Promise<Buffer> {
     const filePath = this.getResourcePath(name);
     return readFile(filePath);
   }

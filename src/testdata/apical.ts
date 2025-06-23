@@ -1,25 +1,37 @@
 import { CategoryNotFoundError, type EventCategoryId } from "../model/eventcategory.ts";
+import { v1 as randomUUID, v5 as uuidv5 } from "uuid";
 import type {
   ApicalLapByCategory,
 } from "../model/apical.ts";
 import type { EventId } from "../model/types.ts";
 import { GenericTestSession } from "./genericTestSession.ts";
+import { MAX_ERRORS } from "../parsers/rfidtiming/settings.ts";
 import type { RaceState } from "../model/racestate.ts";
 import { ResourceProvider } from "../controllers/resource/provider.ts";
+import { RfidResourceProvider } from "../controllers/resource/rfid.ts";
 import type { TestSession } from "./testsession.ts";
 // import type { TimeRecord } from "../model/timerecord.ts";
-import { convertDataToEntrantsMap } from "../parsers/apical.ts";
+import { TimeRecord } from "../model/timerecord.ts";
+import { convertDataToRaceState } from "../parsers/apical.ts";
 import { createEventCategoryIdFromCategoryCode } from "../controllers/category.ts";
 import { createGreenFlagEvent } from "../controllers/flag.ts";
+import { getRfidSourceUuid } from "@parsers/rfidtiming/rfidtiming";
 // import { parseFile } from "../parsers/rfidtiming/file.ts";
 // import LocalFileResourceProvider from "../controllers/resource/local.ts";
 
+const TEST_EVENT_DATE = new Date('2025-06-06T10:00:00+10:00');
 const TEST_CROSSINGS_DATA_FILE = 'rfid-2025-06-06.txt';
-
+const TEST_APICAL_DATA_FILE = '2025-06-06-data.json';
+type JsonFilename = `${string}.json`;
+type TextFilename = `${string}.txt`;
+// const CATEGORIES_TEST_FILE: JsonFilename = '2025-06-06-categories.json';
 export abstract class ApicalTestRace extends GenericTestSession implements TestSession {
   private _data: Partial<RaceState> | undefined;
+  private _dataPromise: Promise<Partial<RaceState>> | undefined;
   private _eventId!: EventId;
-  private _resourceProvider: ResourceProvider<ApicalLapByCategory>;
+  private _provider: ResourceProvider<Buffer>;
+  private _rfidProvider: RfidResourceProvider;
+  // private _apicalResourceProvider: ResourceProvider<ApicalLapByCategory>;
 
   public get eventId(): EventId {
     return this._eventId;
@@ -28,13 +40,31 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
     this._eventId = value;
   }
 
-  constructor(resourceProvider: ResourceProvider<ApicalLapByCategory>) {
+  constructor(baseProvider: ResourceProvider<Buffer>) {
     super();
-    this._resourceProvider = resourceProvider;
+    this._provider = baseProvider;
+    this._rfidProvider = new RfidResourceProvider(baseProvider);
+    // this._apicalResourceProvider = new ApicalResourceProvider(baseProvider);
   }
 
-  protected getResource(name: string): Promise<ApicalLapByCategory> {
-    return this._resourceProvider.getResource(name);
+  protected getApicalJsonResource(name: JsonFilename): Promise<ApicalLapByCategory> {
+    return this._provider.getResource(name).then((data: Buffer) => {
+      const jsonData = JSON.parse(data.toString());
+      return jsonData as ApicalLapByCategory;
+    });
+  }
+
+  protected getRfidResource(filename: TextFilename, eventDate: Date): Promise<TimeRecord[]> {
+    return this._provider.getResource(filename).then((data: Buffer) => {
+      const source = getRfidSourceUuid(filename);
+      const errors: unknown[] = [];
+      return this._rfidProvider.getRecordsFromRfidData(data, eventDate, errors, source).then((records: TimeRecord[]) => {
+        if (errors.length > MAX_ERRORS) {
+          throw new Error(`Too many errors (${errors.length}) while parsing RFID data from ${filename}.`);
+        }
+        return records;
+      });
+    });
   }
 
   private categoryCodes(codes: string[]): EventCategoryId[] {
@@ -49,10 +79,9 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
   }
 
   public async loadCategories(): Promise<void> {
-    return this.read().then((data: Partial<RaceState>) => {
-      this._data = data;
-      if (this._data.categories) {
-        this.addCategories(this._data.categories);
+    return this.retrieveApicalDataAsRaceState().then((data: Partial<RaceState>) => {
+      if (data.categories) {
+        this.addCategories(data.categories);
       }
       return Promise.resolve();
     });
@@ -136,12 +165,45 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
   }
 
   protected convert(eventId: EventId, data: ApicalLapByCategory): Partial<RaceState> {
-    return convertDataToEntrantsMap(this.eventId, new Date(), data, 200000);
+    return convertDataToRaceState(this.eventId, new Date(), data, 200000);
   }
 
-  protected async read(): Promise<Partial<RaceState>> {
-    return this.getResource(TEST_CROSSINGS_DATA_FILE).then((data: ApicalLapByCategory) => {
-      return this.convert(this.eventId, data);
+  private async loadApicalRaceState(): Promise<Partial<RaceState>> {
+    return this.retrieveApicalDataAsRaceState().then ((raceState: Partial<RaceState>) => {
+      this._data = raceState;
+      return raceState;
     });
+  }
+
+  protected async retrieveApicalDataAsRaceState(): Promise<Partial<RaceState>> {
+    return this.getApicalJsonResource(TEST_APICAL_DATA_FILE)
+      .then((data: ApicalLapByCategory) => {
+        return this.convert(this.eventId, data);
+      });
+  }
+
+  private loadData(): Promise<Partial<RaceState>> {
+    if (this._dataPromise) {
+      return this._dataPromise;
+    }
+
+    this._dataPromise = this.getRfidResource(TEST_CROSSINGS_DATA_FILE, TEST_EVENT_DATE)
+      .then((records: TimeRecord[]) => {
+        this.addRecords(records, false);
+      }).then(() => this.loadApicalRaceState());
+    return this._dataPromise;
+  }
+}
+
+
+export class ApicalFile extends ApicalTestRace {
+  constructor(resourceProvider: ResourceProvider<Buffer>) {
+    super(resourceProvider);
+    super.eventId = uuidv5('1', randomUUID());
+  }
+
+  public async retrieveApicalDataAsRaceState(): Promise<Partial<RaceState>> {
+    return super.getApicalJsonResource('2025-06-06-data.json')
+      .then((apicalData) => super.convert(this.eventId, apicalData));
   }
 }

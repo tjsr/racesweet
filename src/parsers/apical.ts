@@ -207,7 +207,7 @@ export const apiParticipantEntrantToEntrantData = (
   };
 };
 
-export const convertDataToEntrantsMap = (
+export const convertDataToRaceState = (
   eventId: EventId,
   eventStartTime: Date | undefined,
   data: ApicalLapByCategory,

@@ -1,23 +1,31 @@
 import { v1 as randomUUID, v5 as uuidv5 } from "uuid";
 
-import { ApicalLapByCategory } from "../model/apical.ts";
 import { ApicalTestRace } from "./apical.ts";
-import type { PathLike } from "fs";
-import { RaceState } from "../model";
-import { ResourceProvider } from "../controllers/resource/provider.ts";
-import fs from 'fs/promises';
+import LocalFileResourceProvider from "../controllers/resource/local.ts";
+
+// class ApicalElectronFile extends ApicalTestRace {
+//   constructor() {
+//     const bufferProvider: ElectronResourceProvider<Buffer> = new ElectronResourceProvider<Buffer>();
+//     const apicalResourceProvider:  ResourceProvider<ApicalLapByCategory> = new ElectronResourceProvider<ApicalLapByCategory>();
+//     electronFileResourceProvider: ResourceProvider<ApicalLapByCategory> = new ElectronResourceProvider<ApicalLapByCategory>('src/testdata');
+//     super(electronFileResourceProvider);
+//     // Set a unique event ID for the session.
+//     super.eventId = 'apical-electron-file-session';
+//   }
+
+//   public async retrieveApicalDataAsRaceState(): Promise<Partial<RaceState>> {
+//     // This method should read data from a file or other source.
+//     // For now, we return an empty object as a placeholder.
+//     return {};
+//   }
+// }
+
 
 export class ApicalLocalFile extends ApicalTestRace {
-  constructor(resourceProvider: ResourceProvider<ApicalLapByCategory>) {
-    super(resourceProvider);
+  constructor() {
+    const localProvider: LocalFileResourceProvider<Buffer> = new LocalFileResourceProvider<Buffer>('src/testdata');
+    super(localProvider);
+    // Set a unique event ID for the session.
     super.eventId = uuidv5('1', randomUUID());
-  }
-
-  public async read(): Promise<Partial<RaceState>> {
-    const filePath: PathLike = 'src/testdata/2025-06-06-data.json';
-    super.getResource('2025-06-06-data.json');
-    return fs.readFile(filePath, 'utf8')
-      .then(d => JSON.parse(d) as ApicalLapByCategory)
-      .then(apicalData => super.convert(this.eventId, apicalData));
   }
 }
