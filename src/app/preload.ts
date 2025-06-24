@@ -1,10 +1,13 @@
 import './state.ts';
 
-// See the Electron documentation for details on how to use preload scripts:
-// https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
 import { InvalidIpcChannelError, SendChannels } from '../model/electronIpcTypes.ts';
 import { IpcRendererEvent, contextBridge, ipcRenderer } from 'electron';
 import { ReadContentErrorIpcReceiveChannel, ReadContentIpcReceiveChannel, RequestReadIpcSendChannel, VALID_RECEIVE_CHANNELS, VALID_SEND_CHANNELS } from '../model/electronIpc.ts';
+
+import { FileReadDataType } from './window.ts';
+
+// See the Electron documentation for details on how to use preload scripts:
+// https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
 
 type dependencies = 'chrome'| 'node'| 'electron';
 
@@ -60,7 +63,7 @@ contextBridge.exposeInMainWorld(
         throw new InvalidIpcChannelError(channel);
       }
     },
-    requestFileContent: <DataType>(filePath: string): Promise<DataType> => {
+    requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType = 'utf8'): Promise<DataType> => {
       return new Promise<DataType>(
         (
           resolve: (value: DataType | PromiseLike<DataType>) => void,
@@ -68,7 +71,7 @@ contextBridge.exposeInMainWorld(
         ) => {
           const outgoingEventId = crypto.randomUUID(); // Generate a unique event ID for this request
           eventCalls[outgoingEventId] = [resolve, reject];
-          ipcRenderer.send(RequestReadIpcSendChannel, filePath, outgoingEventId);
+          ipcRenderer.send(RequestReadIpcSendChannel, filePath, outgoingEventId, dataType);
         });
     },
     send: (channel: SendChannels, ...args: unknown[]): void => {

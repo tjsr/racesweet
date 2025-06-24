@@ -1,12 +1,12 @@
-import { iterateRfidData, nonEmptyLinesFilter } from "@parsers/rfidtiming/fromIterator";
+import { iterateRfidData, nonEmptyLinesFilter } from "../../parsers/rfidtiming/fromIterator.ts";
 
-import { ChipCrossingData } from "@model/chipcrossing";
-import { MAX_ERRORS } from "@parsers/rfidtiming/settings";
-import { ResourceProvider } from "./provider";
-import { TimeRecord } from "@model/timerecord";
-import { getRfidSourceUuid } from "@parsers/rfidtiming/rfidtiming";
-import { parseUnparsedChipCrossings } from "@parsers/genericTimeParser";
-import type { uuidv5 } from "@model/types";
+import { ChipCrossingData } from "../../model/chipcrossing.ts";
+import { MAX_ERRORS } from "../../parsers/rfidtiming/settings.ts";
+import { ResourceProvider } from "./provider.ts";
+import { TimeRecord } from "../../model/timerecord.ts";
+import { getRfidSourceUuid } from "../../parsers/rfidtiming/rfidtiming.ts";
+import { parseUnparsedChipCrossings } from "../../parsers/genericTimeParser.ts";
+import type { uuidv5 } from "../../model/types.ts";
 
 export class RfidResourceProvider implements ResourceProvider<TimeRecord[]> {
   _baseProvider: ResourceProvider<Buffer>;

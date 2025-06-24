@@ -15,7 +15,7 @@ import { TimeRecord } from "../model/timerecord.ts";
 import { convertDataToRaceState } from "../parsers/apical.ts";
 import { createEventCategoryIdFromCategoryCode } from "../controllers/category.ts";
 import { createGreenFlagEvent } from "../controllers/flag.ts";
-import { getRfidSourceUuid } from "@parsers/rfidtiming/rfidtiming";
+import { getRfidSourceUuid } from "../parsers/rfidtiming/rfidtiming.ts";
 // import { parseFile } from "../parsers/rfidtiming/file.ts";
 // import LocalFileResourceProvider from "../controllers/resource/local.ts";
 
@@ -49,8 +49,18 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
 
   protected getApicalJsonResource(name: JsonFilename): Promise<ApicalLapByCategory> {
     return this._provider.getResource(name).then((data: Buffer) => {
-      const jsonData = JSON.parse(data.toString());
-      return jsonData as ApicalLapByCategory;
+      if (!Buffer.isBuffer(data)) {
+        throw new Error('Input data is not a Buffer');
+      }
+      const dataString: string = data.toString('utf8');
+      try {
+        const jsonData = JSON.parse(dataString);
+        return jsonData as ApicalLapByCategory;
+      } catch (error) {
+        console.error(`Failed while parsing JSON in file ${name}`, error);
+        console.debug('Data begins with :', dataString.slice(0, 100));
+        throw error;
+      }
     });
   }
 

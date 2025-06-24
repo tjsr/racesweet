@@ -3,6 +3,7 @@
 
 export type AvailableSendChannels = 'askToRead' | 'askToWrite';
 export type AvailableReceiveChannels = 'sendReadContent' | 'sendReadError' | 'sendWriteContent' | 'sendWriteError';
+export type FileReadDataType = 'utf8' | 'buffer' | 'bytearray';
 
 declare global {
   interface Window {
@@ -16,7 +17,7 @@ declare global {
       //   ((channel: 'sendWriteError', func: (eventId: string, error: string) => void) => void) |
       //   ((channel: string, func: (...data: unknown[]) => void) => void);
       // send: (channel: AvailableSendChannels, ...args: unknown[]) => void;
-      requestFileContent: <DataType>(filePath: string) => Promise<DataType>;
+      requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType) => Promise<DataType>;
     },
     versions: {
       node: () => string;

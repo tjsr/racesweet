@@ -9,6 +9,7 @@ import {
 } from '../model/electronIpc';
 import { readFile, writeFile } from 'node:fs/promises';
 
+import { FileReadDataType } from './window.ts';
 import path from 'node:path';
 
 // import ('electron-squirrel-startup').catch(() => {
@@ -68,12 +69,18 @@ app.on('activate', (): void => {
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
 
-ipcMain.on(RequestReadIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: string): void => {
+ipcMain.on(RequestReadIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: string, dataType: FileReadDataType): void => {
   // const fs = require('fs');
   // const path = require('path');
   const filePath = path.join(__dirname, filename);
-  
-  readFile(filePath).then((data: Buffer) => {
+
+  // Handle "buffer" encoding separately, as it's not a valid BufferEncoding
+  const readPromise =
+    dataType === 'buffer'
+      ? readFile(filePath)
+      : readFile(filePath, { encoding: dataType as BufferEncoding });
+
+  readPromise.then((data: Buffer | string) => {
     event.reply(ReadContentIpcReceiveChannel, eventId, data);
   }).catch((error: Error) => {
     // Handle the error, e.g., file not found or read error

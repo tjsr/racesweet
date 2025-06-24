@@ -67,7 +67,7 @@ export abstract class GenericTestSession extends Session implements TestSession 
         return this.endBulkProcess();
       })
       .catch((error: unknown) => {
-        console.log('Error loading test data:', error);
+        console.error('Error loading test data:', error);
       });
   }
 }
