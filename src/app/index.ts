@@ -9,6 +9,7 @@ import {
 } from '../model/electronIpc';
 import { readFile, writeFile } from 'node:fs/promises';
 
+import { FileReadDataType } from './window.ts';
 import path from 'node:path';
 
 // import ('electron-squirrel-startup').catch(() => {

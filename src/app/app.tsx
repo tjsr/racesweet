@@ -22,16 +22,6 @@ const loadRecords = async (
     // setSessionState(eventSession);
     // setErrorState(undefined);
   });
-  // .catch((error) => {
-  //   console.error("Error loading test data:", error);
-  //   // setSessionState(undefined);
-  //   setErrorState(error);
-  //   throw error;
-  // });
-  
-  // This function should load records from a data source.
-  // For now, we return an empty array as a placeholder.
-  // return [];
 };
 
 const RaceSweetMainApp = () => {

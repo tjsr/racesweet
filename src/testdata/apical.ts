@@ -51,12 +51,16 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
     console.debug(`Retrieving Apical data for event ${this.eventId} from ${name}...`);
 
     return this._provider.getResource(name).then((data: Buffer) => {
-      const dataStr = new TextDecoder('utf-8').decode(data);
+      if (!Buffer.isBuffer(data)) {
+        throw new Error('Input data is not a Buffer');
+      }
+      const dataString: string = data.toString('utf8');
       try {
-        const jsonData = JSON.parse(dataStr);
+        const jsonData = JSON.parse(dataString);
         return jsonData as ApicalLapByCategory;
       } catch (error) {
-        console.error(`Error parsing JSON data from ${name}:`, error, dataStr.substring(0, 100));
+        console.error(`Failed while parsing JSON in file ${name}`, error);
+        console.debug('Data begins with :', dataString.slice(0, 100));
         throw error;
       }
     });
