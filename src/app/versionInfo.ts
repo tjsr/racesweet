@@ -4,6 +4,7 @@ const information = document.getElementById('info');
 const LEGACY_CODE = true; // Don't use this code, legacy for reference only
 
 if (information && !LEGACY_CODE) {
+  console.log('Executing old legacy code block to replace version info.');
   if (window.versions) {
     console.debug(window.versions, window.versions.chrome);
     const chromeVersion = typeof window.versions.chrome === 'function' ? window.versions.chrome() : undefined;
@@ -27,5 +28,7 @@ if (information && !LEGACY_CODE) {
   }
 } else if (!LEGACY_CODE) {
   throw new Error("Element with id 'info' not found");
+} else if (information) {
+  information.style.display = 'none'; // Hide the info element
 }
 

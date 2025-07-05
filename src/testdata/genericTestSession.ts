@@ -47,6 +47,7 @@ export abstract class GenericTestSession extends Session implements TestSession 
     if (!noBulkProcess) {
       initPromise = this.beginBulkProcess();
     }
+    console.debug('Loading test data...');
     return initPromise
       .then(() => this.loadCategories().then(() => {
         console.log(`Loaded ${this.categories.length} categories successfully.`);
@@ -68,6 +69,7 @@ export abstract class GenericTestSession extends Session implements TestSession 
       })
       .catch((error: unknown) => {
         console.log('Error loading test data:', error);
+        throw error;
       });
   }
 }

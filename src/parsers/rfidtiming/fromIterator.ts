@@ -1,7 +1,7 @@
 import { MAX_ERRORS } from "./settings";
 import { RFIDTimingChipCrossingData } from "./model";
 import { parseRfidLine } from "./rfidtiming";
-import { uuid } from "@model/types";
+import { uuid } from "../../model/types";
 
 const isEmpty = (line: string): boolean => 
   !line || line.trim() === '';

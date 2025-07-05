@@ -1,3 +1,4 @@
+import { EventParticipantId } from "src/model";
 
 class TimeRecordError extends Error {
   constructor(message: string) {
@@ -80,5 +81,47 @@ export class InvalidCategoryIdError extends InvalidIdError {
   constructor(message: string) {
     super(message);
     this.name = 'InvalidCategoryIdError';
+  }
+}
+
+export class ParticipantError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ParticipantError';
+  }
+}
+
+export class NoParticipantError extends ParticipantError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NoParticipantError';
+  }
+}
+
+export class ParticipantNotFoundError extends ParticipantError {
+  constructor(participantId: EventParticipantId, message: string = `Participant with ID ${participantId} not found`) {
+    super(message);
+    this.name = 'ParticipantNotFoundError';
+  }
+}
+
+export class InvalidCrossingError extends TimeRecordError {
+  constructor(message: string = 'Invalid crossing record') {
+    super(message);
+    this.name = 'InvalidCrossingError';
+  }
+}
+
+export class NoCrossingError extends InvalidCrossingError {
+  constructor(message: string = 'No crossing record provided') {
+    super(message);
+    this.name = 'NoCrossingError';
+  }
+}
+
+export class SessionStateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SessionStateError';
   }
 }

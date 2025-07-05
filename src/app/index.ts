@@ -22,6 +22,7 @@ declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 if (require('electron-squirrel-startup')) {
   app.quit();
 }
@@ -68,20 +69,27 @@ app.on('activate', (): void => {
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
 
-ipcMain.on(RequestReadIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: string): void => {
+ipcMain.on(RequestReadIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: string, dataType?: string): void => {
   // const fs = require('fs');
   // const path = require('path');
   const filePath = path.join(__dirname, filename);
   
   readFile(filePath).then((data: Buffer) => {
-    event.reply(ReadContentIpcReceiveChannel, eventId, data);
+    if (dataType === 'utf-8' || dataType === 'utf8') {
+      const utf8Data = new TextDecoder('utf-8').decode(data);
+      event.reply(ReadContentIpcReceiveChannel, eventId, utf8Data, 'utf-8');
+    } else {
+      event.reply(ReadContentIpcReceiveChannel, eventId, data);
+    }
   }).catch((error: Error) => {
     // Handle the error, e.g., file not found or read error
-    console.error(`Error reading file ${filename}:`, error);
+    const errMsg = `Error reading file ${filename} within dir ${__dirname}`;
+    console.error(errMsg, error);
     // Send a reply back to the renderer process with the error.
     // It might be safer for some events to not send details of the exception.
     // You need to implement sendReadError in preload.ts if you're going to handle
     // errors differently from the 'sendReadContent' event.
+    error.message = errMsg + ': ' + error.message;
     event.reply(ReadContentErrorIpcReceiveChannel, eventId, error.message);
   });
   // event.reply('sendReadContent', filename, data);

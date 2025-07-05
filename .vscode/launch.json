@@ -27,9 +27,9 @@
   },
   {
     "name": "Electron Main",
-    "program": "${workspaceFolder}/index.mjs",
     "request": "launch",
-    "runtimeExecutable": "electron",
+    "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron-forge",
+    "args": ["start"],
     "skipFiles": [
       "<node_internals>/**"
     ],

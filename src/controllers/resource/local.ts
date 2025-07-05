@@ -23,9 +23,10 @@ export class LocalFileResourceProvider<ResourceType> implements ResourceProvider
     if (!this._basePath) {
       throw new Error("Base path is not set.");
     }
-    if (!name.endsWith('.json')) {
+    if (!name.endsWith('.json') && !name.endsWith('.txt')) {
       name += '.json'; // Ensure the file has a .json extension
     }
+    console.log(`Getting resource path for ${name} in base path ${this._basePath}`);
     return path.join(this._basePath as string, name);
   }
 
@@ -34,12 +35,12 @@ export class LocalFileResourceProvider<ResourceType> implements ResourceProvider
     return readFile(filePath);
   }
 
-  public async getFile(name: string): Promise<string> {
+  public async getFile(name: string): Promise<Buffer> {
     const filePath = this.getResourcePath(name);
 
     try {
       await access(filePath);
-      const data = await readFile(filePath, 'utf8');
+      const data = await readFile(filePath);
       return data;
     } catch (err) {
       throw new Error(`File not found or permissions denied: ${filePath}`, { cause: err });
@@ -47,11 +48,12 @@ export class LocalFileResourceProvider<ResourceType> implements ResourceProvider
   }
 
   public async getResource(name: string): Promise<ResourceType> {
+    console.debug(`Getting local resource of ${name} from ${this.basePath}`);
     const contents = await this.getFile(name);
     if (!contents) {
       throw new Error(`Resource not found: ${name}`);
     }
-    return JSON.parse(contents) as ResourceType;
+    return contents as ResourceType;
   }
 }
 

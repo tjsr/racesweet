@@ -15,7 +15,7 @@ import { TimeRecord } from "../model/timerecord.ts";
 import { convertDataToRaceState } from "../parsers/apical.ts";
 import { createEventCategoryIdFromCategoryCode } from "../controllers/category.ts";
 import { createGreenFlagEvent } from "../controllers/flag.ts";
-import { getRfidSourceUuid } from "@parsers/rfidtiming/rfidtiming";
+import { getRfidSourceUuid } from "../parsers/rfidtiming/rfidtiming";
 // import { parseFile } from "../parsers/rfidtiming/file.ts";
 // import LocalFileResourceProvider from "../controllers/resource/local.ts";
 
@@ -48,9 +48,17 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
   }
 
   protected getApicalJsonResource(name: JsonFilename): Promise<ApicalLapByCategory> {
+    console.debug(`Retrieving Apical data for event ${this.eventId} from ${name}...`);
+
     return this._provider.getResource(name).then((data: Buffer) => {
-      const jsonData = JSON.parse(data.toString());
-      return jsonData as ApicalLapByCategory;
+      const dataStr = new TextDecoder('utf-8').decode(data);
+      try {
+        const jsonData = JSON.parse(dataStr);
+        return jsonData as ApicalLapByCategory;
+      } catch (error) {
+        console.error(`Error parsing JSON data from ${name}:`, error, dataStr.substring(0, 100));
+        throw error;
+      }
     });
   }
 
@@ -79,7 +87,7 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
   }
 
   public async loadCategories(): Promise<void> {
-    return this.retrieveApicalDataAsRaceState().then((data: Partial<RaceState>) => {
+    return this.loadData().then((data: Partial<RaceState>) => {
       if (data.categories) {
         this.addCategories(data.categories);
       }
@@ -88,42 +96,50 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
     // throw new Error("Method not implemented.");
   }
 
-  public loadParticipants(): Promise<void> {
-    if (this._data?.participants) {
-      this.addParticipants(this._data.participants);
-    }
-    return Promise.resolve();
-    // throw new Error("Method not implemented.");
+  public async loadParticipants(): Promise<void> {
+    return this.loadData().then((_data: Partial<RaceState>) => {
+      if (!this._data?.participants) {
+        throw new Error('No participants in data.');
+      }
+      if (this._data?.participants) {
+        this.addParticipants(this._data.participants);
+      }
+      return Promise.resolve();;
+    });
   }
 
-  public loadFlags(): Promise<void> {
-    this.addRecords([
-      createGreenFlagEvent({
-        categoryIds: this.categoryCodes(['A']),
-        time: new Date('2025-06-06T19:02:06+10:00'),
-      }),
-      createGreenFlagEvent({
-        categoryIds: this.categoryCodes(['B', 'WA', 'EBIKE']),
-        time: new Date('2025-06-06T19:02:23+10:00'),
-      }),
-      createGreenFlagEvent({
-        categoryIds: this.categoryCodes(['C', 'WB']),
-        time: new Date('2025-06-06T19:02:39+10:00'),
-      }),
-      createGreenFlagEvent({
-        categoryIds: this.categoryCodes(['D']),
-        time: new Date('2025-06-06T19:03:03.14+10:00'),
-      }),
-    ]);
-    return Promise.resolve();
+  public async loadFlags(): Promise<void> {
+    return this.loadData().then((_data: Partial<RaceState>) => {
+      this.addRecords([
+        createGreenFlagEvent({
+          categoryIds: this.categoryCodes(['A']),
+          time: new Date('2025-06-06T19:02:06+10:00'),
+        }),
+        createGreenFlagEvent({
+          categoryIds: this.categoryCodes(['B', 'WA', 'EBIKE']),
+          time: new Date('2025-06-06T19:02:23+10:00'),
+        }),
+        createGreenFlagEvent({
+          categoryIds: this.categoryCodes(['C', 'WB']),
+          time: new Date('2025-06-06T19:02:39+10:00'),
+        }),
+        createGreenFlagEvent({
+          categoryIds: this.categoryCodes(['D']),
+          time: new Date('2025-06-06T19:03:03.14+10:00'),
+        }),
+      ]);
+      return Promise.resolve();
+    });
     // throw new Error("Method not implemented.");
   }
 
   public async loadCrossings(): Promise<void> {
-    if (!this._data?.records) {
-      throw new Error("No records found in data.");
-    }
-    return super.addRecords(this._data?.records);
+    return this.loadData().then((_data: Partial<RaceState>) => {
+      if (!this._data?.records) {
+        throw new Error("No records found in data.");
+      }
+      return super.addRecords(this._data?.records);
+    });
     //   if (record.categoryId) {
     //     if (!this.categoryExists(record.categoryId)) {
     // // const filePath = getTestFilePath(TEST_CROSSINGS_DATA_FILE);
@@ -182,6 +198,7 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
       });
   }
 
+  /** This method must gaurantee this._data is populated when resolved. */
   private loadData(): Promise<Partial<RaceState>> {
     if (this._dataPromise) {
       return this._dataPromise;

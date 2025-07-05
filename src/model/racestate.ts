@@ -1,4 +1,4 @@
-import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError } from "../validators/errors.ts";
+import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError, SessionStateError } from "../validators/errors.ts";
 import type { EventCategory, EventCategoryId } from "./eventcategory.ts";
 import type { EventParticipant, EventParticipantId } from "./eventparticipant.ts";
 import type { FlagRecord, GreenFlagRecord } from "./flag.ts";
@@ -99,6 +99,9 @@ export class Session implements RaceState, RaceStateLookup {
   };
 
   public getCategoryById(categoryId: EventCategoryId): EventCategory | undefined {
+    if (!this._categories) {
+      throw new SessionStateError('Categories have not been initialized yet.');
+    }
     if (!isValidId(categoryId)) {
       throw new InvalidIdError(`ParticipantId ${categoryId} for category lookup by Id is not a valid Id type.`);
     }
@@ -106,6 +109,9 @@ export class Session implements RaceState, RaceStateLookup {
   }
 
   public getParticipantById(participantId: EventParticipantId): EventParticipant | undefined {
+    if (!this._participants) {
+      throw new SessionStateError('Participants have not been initialized yet.');
+    }
     if (!isValidId(participantId)) {
       throw new InvalidIdError(`ParticipantId ${participantId} for participant lookup by Id is not a valid Id type.`);
     }

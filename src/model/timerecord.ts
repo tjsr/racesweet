@@ -21,6 +21,7 @@ export interface TimeRecord extends WithId<TimeRecordId> {
   time?: Date;
   timeString?: string | null | undefined;
   dataLine?: string | null | undefined;
+  originRecordNumber?: number;
 }
 
 export type Validated<T> = T & {

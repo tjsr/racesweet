@@ -7,26 +7,42 @@ import { timeOrTimeToday } from "./date/dateutils.ts";
 export const parseUnparsedChipCrossings = (
   eventDate: Date,
   unparsedCrossings: ChipCrossingData[]
-): TimeRecord[] => unparsedCrossings.map((crossing: ChipCrossingData) => {
-  if (asUnparsedChipCrossing(crossing)) {
-    if (!crossing.timeString) {
-      throw new Error(`Crossing ${crossing.chipCode} has no timeString`);
-    }
-    const parsedTime = timeOrTimeToday(eventDate, crossing.timeString!);
+): TimeRecord[] => {
+  if (!unparsedCrossings) {
+    throw new Error("No unparsed crossings provided");
+  }
+  return unparsedCrossings.map((crossing: ChipCrossingData, index: number) => {
+    let unparsed;
     try {
-      const _checkFormattable = formatRFC3339(parsedTime, { fractionDigits: 3 });
-      const _t = parsedTime.getTime();
-      return {
-        ...crossing,
-        time: parsedTime,
-      } as TimeRecord;
-    } catch (_error) {
+      unparsed = asUnparsedChipCrossing(crossing);
+    } catch (error: unknown) {
+      console.error(`Failed parsing crossing from ${crossing.dataLine}:`, error);
+      if ((error as Error)?.message) {
+        throw new Error('Failed parsing crossing data: ' + (error as Error).message);
+      }
+    }
+    if (unparsed) {
+      if (!crossing.timeString) {
+        throw new Error(`Crossing ${crossing.chipCode} has no timeString`);
+      }
+      try {
+        const parsedTime = timeOrTimeToday(eventDate, crossing.timeString!);
+        const _checkFormattable = formatRFC3339(parsedTime, { fractionDigits: 3 });
+        const _t = parsedTime.getTime();
+        return {
+          ...crossing,
+          time: parsedTime,
+        } as TimeRecord;
+      } catch (error) {
+        console.error(`Failed parsing timeString ${index}="${crossing.timeString}" for crossing ${crossing.dataLine}:`, error);
+        throw error;
+        // return crossing;
+      }
+    } else {
       return crossing;
     }
-  } else {
-    return crossing;
-  }
-});
+  });
+};
 
 export const durationStringToMilliseconds = (duration: string): number => {
   const parts = duration.split(':');

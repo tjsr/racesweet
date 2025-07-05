@@ -6,16 +6,24 @@ import { formatRFC3339 } from "date-fns";
 
 export const useRFCTime = false;
 
-export const millisecondsToTime = (milliseconds: number): string => {
+export type MillisecondsDuration = number;
+
+export type UnknownDurationString = '--:--:--.---';
+
+export type DurationString = `${string}:${string}:${string}.${string}` | UnknownDurationString;
+
+export type TimeStringOrError = DurationString | 'Unknown time' | 'Invalid time' | 'Undefined time';
+
+export const millisecondsToTime = (milliseconds: MillisecondsDuration): DurationString => {
   const seconds = Math.floor((milliseconds / 1000) % 60);
   const minutes = Math.floor((milliseconds / (1000 * 60)) % 60);
   const hours = Math.floor((milliseconds / (1000 * 60 * 60)) % 24);
   milliseconds = Math.floor(milliseconds % 1000);
-  const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
+  const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}` as DurationString;
   return formattedTime;
 };
 
-export const elapsedTimeMilliseconds = (start: Date, end: Date): number => {
+export const elapsedTimeMilliseconds = (start: Date, end: Date): MillisecondsDuration => {
   const startTime = start.getTime();
   const endTime = end.getTime();
   return endTime - startTime;
@@ -58,12 +66,12 @@ export const tableTimeString = (time: Date | undefined): string => {
   if (!time) {
     return 'Unknown time';
   }
-  let timeString = !time ? 'Undefined time' : 'Invalid time';
+  let timeString: TimeStringOrError = !time ? 'Undefined time' : 'Invalid time';
   try {
-    timeString = formatRFC3339(time!, { fractionDigits: 3 });
+    const tmpTimeString = formatRFC3339(time!, { fractionDigits: 3 });
     if (!useRFCTime) {
       // Now re-format in a shorter format.
-      timeString = timeString.replace(/(.*T)/, '').replace(/([Z+].*)$/, '');
+      timeString = tmpTimeString.replace(/(.*T)/, '').replace(/([Z+].*)$/, '') as DurationString;
     }
     return timeString;
   } catch (error) {
@@ -73,7 +81,7 @@ export const tableTimeString = (time: Date | undefined): string => {
 };
 export const isAfter = (first: Date, second: Date): boolean => first && second && first.getTime() > second.getTime();
 
-export const lapTimeAfterStart = (lap: TimeRecord, participantStartTime: Date): number | undefined => {
+export const lapTimeAfterStart = (lap: TimeRecord, participantStartTime: Date): MillisecondsDuration | undefined => {
   if (!lap?.time || !isAfter(lap.time, participantStartTime)) {
     return undefined;
   }
@@ -82,7 +90,7 @@ export const lapTimeAfterStart = (lap: TimeRecord, participantStartTime: Date): 
   return lapTime;
 };
 
-export const addToTime = (time: Date, duration: number): Date => {
+export const addToTime = (time: Date, duration: MillisecondsDuration): Date => {
   const newTime = new Date(time.getTime() + duration);
   return newTime;
 };
