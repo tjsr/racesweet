@@ -1,7 +1,7 @@
 import { FileReadDataType } from "../../app/window.ts";
 import { ResourceProvider } from "./provider.ts";
 
-export class ElectronResourceProvider<ResourceType> implements ResourceProvider<ResourceType> {
+export abstract class  ElectronResourceProvider<ResourceType> implements ResourceProvider<ResourceType> {
   _path: string | undefined;
   constructor(defaultDir: string = '../../src/testdata') {
     if (!defaultDir) {
@@ -20,7 +20,17 @@ export class ElectronResourceProvider<ResourceType> implements ResourceProvider<
     return window.api.requestFileContent<ResourceType>(path, dataType);
   }
 
-  public getResource(name: string, dataType: FileReadDataType = 'utf8'): Promise<ResourceType> {
-    return this.getElectronResource(name, dataType);
+  public abstract getResource(name: string, dataType: FileReadDataType): Promise<ResourceType>;
+}
+
+export class ElectronBufferResourceProvider extends ElectronResourceProvider<Buffer> implements ResourceProvider<Buffer> {
+  public getResource(name: string): Promise<Buffer> {
+    return this.getElectronResource(name);
+  }
+}
+
+export class ElectronStringResourceProvider extends ElectronResourceProvider<string> implements ResourceProvider<string> {
+  public getResource(name: string): Promise<string> {
+    return this.getElectronResource(name, 'utf8');
   }
 }

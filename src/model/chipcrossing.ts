@@ -1,6 +1,5 @@
-import type { ParticipantPassingRecord, TimeRecord } from "./timerecord.ts";
+import { AutomaticTimingIdentifiactionCrossing } from "./tx.ts";
 
-export interface ChipCrossingData extends TimeRecord, ParticipantPassingRecord {
-  chipCode: number;
-}
+export type node = 'chipCode';
 
+export type ChipCrossingData = AutomaticTimingIdentifiactionCrossing<node>;

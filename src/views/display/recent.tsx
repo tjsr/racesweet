@@ -8,7 +8,7 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { MillisecondsDuration, millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.ts';
 import { categoriesTextFromLookupFn, categoryTextString, getElapsedTimeForCategory, setCategoryStartForPassings } from '../../controllers/category.ts';
 import "./recent.css"
-import { getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
+import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
 import { ParticipantPassingRecord } from '../../model/timerecord.ts';
 import { InvalidCategoryIdError, NoCrossingError, NoParticipantError, ParticipantNotFoundError } from '../../validators/errors.ts';
 import { RaceStateLookup } from '../../model/racestate.ts';
@@ -155,7 +155,7 @@ export const PassingRecordRow = (
   props: PassingRecordRowProps
 ): JSX.Element => {
   const passing: ParticipantPassingRecord = props.passing;
-  
+  const rs: RaceStateLookup = props.raceStateLookup;
   let categoryStr = undefined;
   const timeString = tableTimeString(passing.time);
   const identifier: string = getTimeRecordIdentifier(passing, true);
@@ -166,24 +166,24 @@ export const PassingRecordRow = (
   let elapsedTime = '--:--:--.---';
   let lapTime = '';
 
-    if (passing.participantId) {
-      let participant = props.raceStateLookup.getParticipantById(passing.participantId);
-      const categoryLookup = props.raceStateLookup.getCategoryById.bind(props.raceStateLookup);
-      categoryStr = participant ? categoryStringFromParticipant(participant, categoryLookup) : undefined;
+  if (passing.participantId) {
+    let participant = props.raceStateLookup.getParticipantById(passing.participantId);
+    const categoryLookup = props.raceStateLookup.getCategoryById.bind(props.raceStateLookup);
+    categoryStr = participant ? categoryStringFromParticipant(participant, categoryLookup) : undefined;
+  }
+  
+  if (entrant) {
+    plateNumber = getParticipantNumber(entrant);
+    entrantName = `${entrant.firstname} ${entrant.surname}`;
+    const entrantLaps: ParticipantPassingRecord[] | undefined |null = rs.getParticipantLaps(entrant.id);
+    if (entrantLaps) {
+      // const lap = entrantLaps.find((l) => l.timeRecordId === evt.id);
+      lapNo = passing.isValid ? passing?.lapNo?.toString() || '' : '';
+      elapsedTime = passing?.elapsedTime ? millisecondsToTime(passing.elapsedTime) : '--:--:--.---';
+      lapTime = getLapTimeCell(passing);
     }
-    
-    if (entrant) {
-      plateNumber = getParticipantNumber(entrant);
-      entrantName = `${entrant.firstname} ${entrant.surname}`;
-      const entrantLaps: ParticipantPassingRecord[] | undefined |null = rs.getParticipantLaps(entrant.id);
-      if (entrantLaps) {
-        // const lap = entrantLaps.find((l) => l.timeRecordId === evt.id);
-        lapNo = passing.isValid ? passing?.lapNo?.toString() || '' : '';
-        elapsedTime = passing?.elapsedTime ? millisecondsToTime(passing.elapsedTime) : '--:--:--.---';
-        lapTime = getLapTimeCell(passing);
-      }
 
-          if (entrant?.categoryId) {
+    if (entrant?.categoryId) {
       const cat = rs.getCategoryById(entrant?.categoryId);
       if (cat) {
         elapsedTime = getElapsedTimeForCategory(cat, passing.time!) || elapsedTime || '00:00:00.000';
@@ -192,6 +192,25 @@ export const PassingRecordRow = (
         }
       }
     }
+  }
+
+  let categoryName = 'No category';
+
+  return (<>
+    <TableRow key={passing.id} data-record-id={passing.id}>
+      <TableCell>{passing.sequence}</TableCell>
+      <TableCell>Ant</TableCell>
+      <TableCell>Tx</TableCell>
+      <TableCell>{timeString}</TableCell>
+      <TableCell>No</TableCell>
+      <TableCell>Entrant</TableCell>
+      <TableCell>{categoryStr || ''}</TableCell>
+      <TableCell>Category</TableCell>
+      <TableCell>Lap#</TableCell>
+      <TableCell>Elapsed</TableCell>
+      <TableCell>Lap time</TableCell>
+    </TableRow>
+  </>);
 };
 
 
@@ -210,53 +229,50 @@ export const RecordRow = (props: RecentRecordRowProps) => {
   let ant = '';
   let passing: ParticipantPassingRecord;
   if (isCrossingRecord(record)) {
-    return <PassingRecordRow passing={record as ParticipantPassingRecord} />;
     passing = record as ParticipantPassingRecord;
-
-
-
-    }
-    if (!plateNumber) {
-      return <UnknownChipRow
-        sequenceNumber={passing.sequence}
-        timeRecordId={passing.id}
-        ant='0'
-        passingTime={passing.time!}
-        txNo={0}
-        identifier=''
-        rs={props.raceStateLookup} />;
-      //(passing, rs, identifier, ant, timeString);
-    }
-    const plateNumberString: string = plateNumber?.toString() || '';
-  
-    if (!entrantName) {
-      entrantName = '';
-    }
-
+    return <PassingRecordRow
+      raceStateLookup={props.raceStateLookup}
+      passing={passing}
+    />;
   }
 
+  const identifier = getTimeRecordIdentifier(record, true);
+  const txNo = getAutomaticIdentifier(record);
+  // if (!plateNumber) {
+    return <UnknownChipRow
+      sequenceNumber={record.sequence}
+      timeRecordId={record.id}
+      ant='?'
+      passingTime={record.time!}
+      txNo={0}
+      identifier={identifier}
+      rs={props.raceStateLookup} />;
+    //(passing, rs, identifier, ant, timeString);
+  // }
+  // const plateNumberString: string = plateNumber?.toString() || '';
 
-  
-  let categoryName = 'No category';
+  // if (!entrantName) {
+  //   entrantName = '';
+  // } 
 
-  const timeString = tableTimeString(record.time);
+  // let categoryName = 'No category';
+  // const timeString = tableTimeString(record.time);
 
-
-  return (<>
-    <TableRow key={record.id} data-record-id={record.id}>
-      <TableCell>{record.sequence}</TableCell>
-      <TableCell>Ant</TableCell>
-      <TableCell>Tx</TableCell>
-      <TableCell>{timeString}</TableCell>
-      <TableCell>No</TableCell>
-      <TableCell>Entrant</TableCell>
-      <TableCell>{categoryStr || ''}</TableCell>
-      <TableCell>Category</TableCell>
-      <TableCell>Lap#</TableCell>
-      <TableCell>Elapsed</TableCell>
-      <TableCell>Lap time</TableCell>
-    </TableRow>
-  </>);
+  // return (<>
+  //   <TableRow key={record.id} data-record-id={record.id}>
+  //     <TableCell>{record.sequence}</TableCell>
+  //     <TableCell>Ant</TableCell>
+  //     <TableCell>Tx</TableCell>
+  //     <TableCell>{timeString}</TableCell>
+  //     <TableCell>No</TableCell>
+  //     <TableCell>Entrant</TableCell>
+  //     <TableCell>{categoryStr || ''}</TableCell>
+  //     <TableCell>Category</TableCell>
+  //     <TableCell>Lap#</TableCell>
+  //     <TableCell>Elapsed</TableCell>
+  //     <TableCell>Lap time</TableCell>
+  //   </TableRow>
+  // </>);
 };
 
 const warnings: string[] = [];
@@ -287,15 +303,24 @@ export const Warnings = ({ warnings }: { warnings: string[] }): JSX.Element => {
   );
 }
 
-export const RecentRecords = (props: RecordsProps) => {
-  const gridColumns: GridColDef<(typeof props.records)[number]>[] = [
-    { field: 'time', headerName: 'Time', width: 180, valueFormatter: (params) => formatGridTime(params) },
-    { field: 'source', headerName: 'Source', width: 150 },
-    { field: 'sequence', headerName: 'Details', flex: 1 },
-    { field: 'flagType', headerName: 'Flag Type', width: 150 },
-    { field: 'category', headerName: 'Category', width: 150 },
-  ];
+const headings: string[] = [
+  "Seq",
+  "Antenna",
+  "TxNo",
+  "Time",
+  "Number",
+  "Entrant",
+  "Category",
+  "Lap#",
+  "Elapsed Time",
+  "Lap Time"
+];
 
+// const RecordTable = (props: RecordTableProps) => {
+
+// };
+
+export const RecentRecords = (props: RecordsProps) => {
   return <>
     <h2>Recent Records</h2>
     { warnings?.length > 0 && <Warnings warnings={warnings} />}
@@ -305,16 +330,7 @@ export const RecentRecords = (props: RecordsProps) => {
           <TableContainer component={Paper}>
             <Table component={Paper} stickyHeader sx={{ minWidth: 650 }} size="small">
               <TableHead>
-                <TableCell>Seq</TableCell>
-                <TableCell>Antenna</TableCell>
-                <TableCell>TxNo</TableCell>
-                <TableCell>Time</TableCell>
-                <TableCell>Number</TableCell>
-                <TableCell>Entrant</TableCell>
-                <TableCell>Category</TableCell>
-                <TableCell>Lap#</TableCell>
-                <TableCell>Elapsed Time</TableCell>
-                <TableCell>Lap Time</TableCell>
+                {headings.map((h) => <TableCell>{h}</TableCell>)}
               </TableHead>
               <TableBody>
                 {props.records.map((record, index) => (

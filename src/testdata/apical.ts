@@ -67,16 +67,21 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
   }
 
   protected getRfidResource(filename: TextFilename, eventDate: Date): Promise<TimeRecord[]> {
-    return this._provider.getResource(filename).then((data: Buffer) => {
-      const source = getRfidSourceUuid(filename);
-      const errors: unknown[] = [];
-      return this._rfidProvider.getRecordsFromRfidData(data, eventDate, errors, source).then((records: TimeRecord[]) => {
-        if (errors.length > MAX_ERRORS) {
-          throw new Error(`Too many errors (${errors.length}) while parsing RFID data from ${filename}.`);
+    return this._provider.getResource(filename)
+      .then((data: Buffer) => {
+        if (!Buffer.isBuffer(data)) {
+          throw new Error('Input data is not a Buffer');
         }
-        return records;
+
+        const source = getRfidSourceUuid(filename);
+        const errors: unknown[] = [];
+        return this._rfidProvider.getRecordsFromRfidData(data, eventDate, errors, source).then((records: TimeRecord[]) => {
+          if (errors.length > MAX_ERRORS) {
+            throw new Error(`Too many errors (${errors.length}) while parsing RFID data from ${filename}.`);
+          }
+          return records;
+        });
       });
-    });
   }
 
   private categoryCodes(codes: string[]): EventCategoryId[] {

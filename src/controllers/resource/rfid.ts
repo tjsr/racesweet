@@ -24,15 +24,21 @@ export class RfidResourceProvider implements ResourceProvider<TimeRecord[]> {
     return RfidResourceProvider.convertRecordsFromRfidData(data, eventDate, errors, source);
   }
 
-  public static getCrossingLinesFromData(
-    data: Buffer
+  public static getCrossingLinesFromString(
+    data: string
   ): string[] {
-    const fileContent = new TextDecoder('utf-8').decode(data);
-    const crossingLines = fileContent.split('\n')
+    const crossingLines = data.split('\n')
       .map((line) => line.trim()
         .replace(/[\r\n]+/g, '')) // Normalize line endings
       .filter(nonEmptyLinesFilter);
     return crossingLines;
+  }
+
+  public static getCrossingLinesFromBuffer(
+    data: Buffer
+  ): string[] {
+    const fileContent = new TextDecoder('utf-8').decode(data);
+    return RfidResourceProvider.getCrossingLinesFromString(fileContent);
   }
   
   public static async convertRecordsFromRfidData(
@@ -41,7 +47,7 @@ export class RfidResourceProvider implements ResourceProvider<TimeRecord[]> {
     errors: unknown[],
     source: uuidv5
   ): Promise<TimeRecord[]> {
-    const crossingLines = this.getCrossingLinesFromData(data);
+    const crossingLines = this.getCrossingLinesFromBuffer(data);
     const lines = crossingLines.filter(nonEmptyLinesFilter);
     const crossingsIter = lines[Symbol.iterator]();
     const crossings: ChipCrossingData[] = [];
@@ -56,7 +62,11 @@ export class RfidResourceProvider implements ResourceProvider<TimeRecord[]> {
     return records;
   };
 
-  public static getRecords(rp: ResourceProvider<Buffer>, filename: string, fileEventDate: Date): Promise<TimeRecord[]> {
+  public static async getRecords(
+    rp: ResourceProvider<Buffer>,
+    filename: string,
+    fileEventDate: Date
+  ): Promise<TimeRecord[]> {
     const source = getRfidSourceUuid(filename);
     const errors: unknown[] = [];
     return rp.getResource(filename)

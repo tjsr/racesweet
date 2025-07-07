@@ -1,10 +1,15 @@
 import type { ParticipantPassingRecord, TimeRecord, Validated } from "../model/timerecord.ts";
 import { assertValidTimeRecord, moveForwardIfUndefined } from "./crossingList.ts";
+import { getChipIdentifier, isChipCrossing } from './chipCrossing.ts';
+import { getTransmitterIdentifier, isTransmitterCrossing } from './transmitter.ts';
+import { getTransponderIdentifier, isTransponderCrossing } from './transponder.ts';
 import { isFlagRecord, isStartRecord } from "./flag.ts";
 
 import type { ChipCrossingData } from "../model/chipcrossing.ts";
 import type { PlateCrossingData } from "../model/platecrossing.ts";
 import type { StartRecord } from "../model/flag.ts";
+import { TransmitterCrossingData } from "../model/transmitter.ts";
+import { TransponderCrossingData } from "../model/transponder.ts";
 
 const formatTime = (time: Date | undefined): string => {
   if (!time) {
@@ -18,12 +23,38 @@ const formatTime = (time: Date | undefined): string => {
   }
 };
 
+export const getAutomaticIdentifier = (record: TimeRecord): number | undefined => {
+  if (isChipCrossing(record)) {
+    const crossing = record as ChipCrossingData;
+    const chip = getChipIdentifier(crossing);
+    return chip;
+  } else if (isTransmitterCrossing(record)) {
+    const crossing = record as TransmitterCrossingData;
+    const tx = getTransmitterIdentifier(crossing);
+    return tx;
+  } else if (isTransponderCrossing(record)) {
+    const crossing = record as TransponderCrossingData;
+    const tx = getTransponderIdentifier(crossing);
+    return tx;
+  }
+  return undefined;
+};
+
 export const getTimeRecordIdentifier = (record: TimeRecord, excludeTime: boolean = false): string => {
   const timeString = formatTime(record.time);
   let id = `&${record.id}`;
-  if (Object.prototype.hasOwnProperty.call(record, 'chipCode')) {
+  if (isChipCrossing(record)) {
     const crossing = record as ChipCrossingData;
-    id = `Tx${crossing.chipCode}`;
+    const chip = getChipIdentifier(crossing);
+    id = `Tx${chip}`;
+  } else if (isTransmitterCrossing(record)) {
+    const crossing = record as TransmitterCrossingData;
+    const tx = getTransmitterIdentifier(crossing);
+    id = `Tx${tx}`;
+  } else if (isTransponderCrossing(record)) {
+    const crossing = record as TransponderCrossingData;
+    const tx = getTransponderIdentifier(crossing);
+    id = `Tx${tx}`;
   } else if (Object.prototype.hasOwnProperty.call(record, 'plateNumber')) {
     const crossing = record as PlateCrossingData;
     id = `#${crossing.plateNumber}`;
@@ -85,6 +116,10 @@ export const isNotRecordType = (event: TimeRecord, recordType: number): boolean 
 export const isCrossingRecord = (crossing: TimeRecord): crossing is ParticipantPassingRecord => {
   return !isStartRecord(crossing) && !isFlagRecord(crossing);
 };
+
+export const isDeviceCrossing = (crossing: TimeRecord): crossing is ChipCrossingData =>
+  isTransmitterCrossing(crossing) || isTransponderCrossing(crossing) || isChipCrossing(crossing);
+
 
 export const addTimeRecord = (crossings: TimeRecord[], record: TimeRecord): void => {
   assertValidTimeRecord(record);
