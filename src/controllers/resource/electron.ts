@@ -13,11 +13,9 @@ export abstract class  ElectronResourceProvider<ResourceType> implements Resourc
     }
   }
 
-  protected getElectronResource(name: string, dataType: FileReadDataType = 'utf8'): Promise<ResourceType> {
+  protected getResourcePath(name: string): string {
     const path = this._path + name;
-    console.log(`Requesting resource from path: ${path}`);
-    // const dataType = options.length > 0 && typeof options[0] === 'string' ? options[0] as FileReadDataType : 'utf8';
-    return window.api.requestFileContent<ResourceType>(path, dataType);
+    return path;
   }
 
   public abstract getResource(name: string, dataType: FileReadDataType): Promise<ResourceType>;
@@ -25,12 +23,20 @@ export abstract class  ElectronResourceProvider<ResourceType> implements Resourc
 
 export class ElectronBufferResourceProvider extends ElectronResourceProvider<Buffer> implements ResourceProvider<Buffer> {
   public getResource(name: string): Promise<Buffer> {
-    return this.getElectronResource(name);
+    const path = this.getResourcePath(name);
+    return window.api.requestBuffer(path);
   }
 }
 
 export class ElectronStringResourceProvider extends ElectronResourceProvider<string> implements ResourceProvider<string> {
   public getResource(name: string): Promise<string> {
     return this.getElectronResource(name, 'utf8');
+  }
+
+  protected getElectronResource(name: string, dataType: FileReadDataType = 'utf8'): Promise<string> {
+    const path = this.getResourcePath(name);
+    console.log(`Requesting resource from path: ${path}`);
+    // const dataType = options.length > 0 && typeof options[0] === 'string' ? options[0] as FileReadDataType : 'utf8';
+    return window.api.requestFileContent<string>(path, dataType);
   }
 }

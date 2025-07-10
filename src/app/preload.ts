@@ -63,6 +63,17 @@ contextBridge.exposeInMainWorld(
         throw new InvalidIpcChannelError(channel);
       }
     },
+    requestBuffer: (filePath: string): Promise<Buffer> => {
+      return new Promise<Buffer>(
+        (
+          resolve: (value: Buffer | PromiseLike<Buffer>) => void,
+          reject: (reason?: string | Error) => void
+        ) => {
+          const outgoingEventId = crypto.randomUUID(); // Generate a unique event ID for this request
+          eventCalls[outgoingEventId] = [resolve, reject];
+          ipcRenderer.send(RequestReadIpcSendChannel, filePath, outgoingEventId, 'buffer');
+        });
+    },
     requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType = 'utf8'): Promise<DataType> => {
       return new Promise<DataType>(
         (
@@ -84,3 +95,7 @@ contextBridge.exposeInMainWorld(
     },
   }
 );
+
+contextBridge.exposeInMainWorld("nodeAPI", {
+  createBuffer: (data: any) => Buffer.from(data),
+});

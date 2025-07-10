@@ -51,10 +51,10 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
     console.debug(`Retrieving Apical data for event ${this.eventId} from ${name}...`);
 
     return this._provider.getResource(name).then((data: Buffer) => {
-      if (!Buffer.isBuffer(data)) {
-        throw new Error('Input data is not a Buffer');
-      }
-      const dataString: string = data.toString('utf8');
+      const td: TextDecoder = new TextDecoder('utf8');
+      const dataString: string = td.decode(data);
+      
+      // data.toString('utf8');
       try {
         const jsonData = JSON.parse(dataString);
         return jsonData as ApicalLapByCategory;
@@ -69,10 +69,6 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
   protected getRfidResource(filename: TextFilename, eventDate: Date): Promise<TimeRecord[]> {
     return this._provider.getResource(filename)
       .then((data: Buffer) => {
-        if (!Buffer.isBuffer(data)) {
-          throw new Error('Input data is not a Buffer');
-        }
-
         const source = getRfidSourceUuid(filename);
         const errors: unknown[] = [];
         return this._rfidProvider.getRecordsFromRfidData(data, eventDate, errors, source).then((records: TimeRecord[]) => {

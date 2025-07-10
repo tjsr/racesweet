@@ -18,7 +18,11 @@ declare global {
       //   ((channel: string, func: (...data: unknown[]) => void) => void);
       // send: (channel: AvailableSendChannels, ...args: unknown[]) => void;
       requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType) => Promise<DataType>;
+      requestBuffer: (filePath: string) => Promise<Buffer>;
     },
+    nodeapi: {
+      createBuffer: (data: any) => Buffer;
+    }
     versions: {
       node: () => string;
       chrome: () => string;
