@@ -1,12 +1,11 @@
 import React, { type JSX, type ReactNode } from 'react';
-import { ChipCrossingData, EventParticipant, EventParticipantId, TimeRecord } from '../../model';
+import { EventParticipant, EventParticipantId, TimeRecord } from '../../model';
 import { FlagRecord, GreenFlagRecord } from '../../model/flag';
 import { EventCategory, EventCategoryId } from '../../model/eventcategory';
 import { isFlagRecord, isGreenFlag } from '../../controllers/flag';
-import { Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { Box, FormControl, InputLabel, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { MillisecondsDuration, millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.ts';
-import { categoriesTextFromLookupFn, categoryTextString, getElapsedTimeForCategory, setCategoryStartForPassings } from '../../controllers/category.ts';
+import { categoriesTextFromLookupFn, getElapsedTimeForCategory } from '../../controllers/category.ts';
 import "./recent.css"
 import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
 import { ParticipantPassingRecord } from '../../model/timerecord.ts';
@@ -19,12 +18,14 @@ interface RecordsProps {
   records: TimeRecord[];
   raceStateLookup: RaceStateLookup;
   warnings?: string[];
+  selectedCategories: Set<EventCategoryId>;
 }
 
 interface RecentRecordRowProps<RecordType extends TimeRecord = TimeRecord> {
   record: RecordType;
   index: number;
   raceStateLookup: RaceStateLookup;
+  selectedCategories?: Set<EventCategoryId>;
 }
 
 interface FlagRecordRowProps<FlagType extends FlagRecord> extends RecentRecordRowProps<FlagType> {
@@ -47,15 +48,20 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
   let flagClass = 'flag green';
   let flagText = 'Green flag'
   
+  if (record.categoryIds?.some((id: EventCategoryId) => props.selectedCategories?.has(id))) {
+    flagClass += ' selected-category';
+  }
+
   const categoryList: EventCategory[] = props.categoryList || [];
   const categoryLookup = props.raceStateLookup.getCategoryById.bind(props.raceStateLookup);
+  const elapsedTime = '--:--:--.---';
 
   return (<>
     <TableRow className={flagClass} key={props.index}>
-      <TableCell>{record.sequence}</TableCell>
-      <TableCell>{flagText}</TableCell>
-      <TableCell colSpan={3}>{tableTimeString(record.time)}</TableCell>
-      <TableCell colSpan={5}>{categoriesTextFromLookupFn(record.categoryIds || [], categoryLookup)}</TableCell>
+      <TableCell colSpan={3}>{record.sequence}{flagText}</TableCell>
+      <TableCell colSpan={1}>{tableTimeString(record.time)}</TableCell>
+      <TableCell colSpan={4}>{categoriesTextFromLookupFn(record.categoryIds || [], categoryLookup)}</TableCell>
+      <TableCell colSpan={2}>{elapsedTime}</TableCell>
     </TableRow>
   </>);
 };
@@ -149,6 +155,7 @@ const UnknownChipRow = (
 interface PassingRecordRowProps {
   passing: ParticipantPassingRecord;
   raceStateLookup: RaceStateLookup;
+  selectedCategories: Set<EventCategoryId> | undefined;
 }
 
 export const PassingRecordRow = (
@@ -171,6 +178,8 @@ export const PassingRecordRow = (
     const categoryLookup = props.raceStateLookup.getCategoryById.bind(props.raceStateLookup);
     categoryStr = participant ? categoryStringFromParticipant(participant, categoryLookup) : undefined;
   }
+
+  let className = passing.isValid ? 'passing' : 'invalid-passing';
   
   if (entrant) {
     plateNumber = getParticipantNumber(entrant);
@@ -191,12 +200,15 @@ export const PassingRecordRow = (
           categoryStr = cat?.name;
         }
       }
+
+      if (props.selectedCategories?.has(entrant?.categoryId)) {
+        className += ' selected-category';
+      }
     }
   }
 
   let categoryName = 'No category';
 
-  let className = passing.isValid ? 'passing' : 'invalid-passing';
   if (passing.isExcluded) {
     className += ' excluded';
   }
@@ -227,6 +239,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       record={record}
       index={props.index}
       raceStateLookup={props.raceStateLookup}
+      selectedCategories={props.selectedCategories}
     />;
   }
 
@@ -236,9 +249,11 @@ export const RecordRow = (props: RecentRecordRowProps) => {
   let passing: ParticipantPassingRecord;
   if (isCrossingRecord(record)) {
     passing = record as ParticipantPassingRecord;
+
     return <PassingRecordRow
       raceStateLookup={props.raceStateLookup}
       passing={passing}
+      selectedCategories={props.selectedCategories}
     />;
   }
 
@@ -252,7 +267,8 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       passingTime={record.time!}
       txNo={0}
       identifier={identifier}
-      rs={props.raceStateLookup} />;
+      rs={props.raceStateLookup}
+   />
     //(passing, rs, identifier, ant, timeString);
   // }
   // const plateNumberString: string = plateNumber?.toString() || '';
@@ -327,11 +343,61 @@ const headings: string[] = [
 // };
 
 export const RecentRecords = (props: RecordsProps) => {
+  const [recentFirst, setRecentFirst] = React.useState<boolean>(false);
+  const sortedRecords = (props.records || []).sort((a, b) => {
+    if (recentFirst) {
+      return b.time!.getTime() - a.time!.getTime();
+    } else {
+      return a.time!.getTime() - b.time!.getTime();
+    }
+  });
+
   return <>
-    <h2>Recent Records</h2>
+    <h2 className="recent-records">Recent Records</h2>
+    <FormControl
+      fullWidth={false}
+      id="recent-records-type-dropdown"
+      sx={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: 2 }}
+    >
+      <InputLabel id="show-recent-type-label">Show</InputLabel>
+      <Select
+        id="show-recent-type"
+        defaultValue="all"
+        onChange={(e) => {
+          console.log('Selected type:', e.target.value);
+        }}
+        label="Record types">
+        <MenuItem value="all">All records</MenuItem>
+        <MenuItem value="category">Only selected category</MenuItem>
+        <MenuItem value="team">Only selected team</MenuItem>
+        <MenuItem value="participant">Only selected participant</MenuItem>
+        </Select>
+    </FormControl>
+    <FormControl
+      fullWidth={false}
+      id="recent-records-order-dropdown"
+      sx={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: 2 }}
+    >
+      <InputLabel id="show-recent-order-label">Order</InputLabel>
+      <Select
+        id="show-recent-order"
+        defaultValue="oldest"
+        onChange={(e) => {
+          console.log('Selected type:', e.target.value);
+          if (e.target.value === 'recent') {
+            setRecentFirst(true);
+          } else {
+            setRecentFirst(false);
+          }
+        }}
+        label="Sort records">
+        <MenuItem value="oldest">Oldest fist</MenuItem>
+        <MenuItem value="recent">Recent first</MenuItem>
+      </Select>
+    </FormControl>
     { warnings?.length > 0 && <Warnings warnings={warnings} />}
     {
-      !(props.records?.length > 0) ? <p>No records available.</p> :
+      !(sortedRecords.length > 0) ? <p>No records available.</p> :
         <Box sx={{ flexGrow: 1, width: '100%' }}>
           <TableContainer component={Paper}>
             <Table component={Paper} stickyHeader sx={{ minWidth: 650 }} size="small">
@@ -339,12 +405,13 @@ export const RecentRecords = (props: RecordsProps) => {
                 {headings.map((h) => <TableCell>{h}</TableCell>)}
               </TableHead>
               <TableBody>
-                {props.records.map((record, index) => (
+                {sortedRecords.map((record, index) => (
                   <RecordRow
                     key={record.id}
                     record={record}
                     index={index}
                     raceStateLookup={props.raceStateLookup}
+                    selectedCategories={props.selectedCategories}
                   />
                 ))}
               </TableBody>

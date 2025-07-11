@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
 import { CategoryList } from '../views/display/categories';
+import { EventCategoryId } from '../model/eventcategory';
 import { RecentRecords } from '../views/display/recent';
 import { TestSession } from '../testdata/testsession';
 import { createRoot } from 'react-dom/client';
@@ -27,6 +28,7 @@ const loadRecords = async (
 const RaceSweetMainApp = () => {
   const [sessionState, setSessionState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [errorState, setErrorState] = useState<Error|undefined>(undefined);
+  const [selectedCategories, setCategorySelected] = useState<Set<EventCategoryId>>(new Set<EventCategoryId>());
   useEffect(() => {
     if (!sessionState && !errorState) {
       loadRecords().then((session: Session) => {
@@ -53,10 +55,11 @@ const RaceSweetMainApp = () => {
 
   return <>
     <h1>Main content.</h1>
-    <CategoryList categories={sessionState.categories || []} />
+    <CategoryList categories={sessionState.categories || []} categorySelected={setCategorySelected} />
     <RecentRecords
       records={sessionState.records || []}
       raceStateLookup={sessionState}
+      selectedCategories={selectedCategories || new Set<EventCategoryId>()}
     />
   </>
 };

@@ -12,3 +12,34 @@
   background-color: #ffcccc;
   color: #a00;
 }
+
+.selected-category {
+  background-color: #ebffd0;
+  color: #004080;
+  font-style: italic;
+}
+
+.lap-time-session-fastest {
+  color: #a0f;
+  font-weight: bold;
+}
+
+.lap-time-too-fast {
+  color: #a00;
+}
+
+.lap-time-imroved {
+  color: #0a0;
+}
+
+.lap-time-personal-best {
+  color: #ff0;
+}
+
+#recent-records-order-dropdown, #recent-records-type-dropdown {
+  float: right;
+}
+
+h2.recent-records {
+  display: inline-block;
+}
