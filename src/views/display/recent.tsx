@@ -196,21 +196,27 @@ export const PassingRecordRow = (
 
   let categoryName = 'No category';
 
-  return (<>
-    <TableRow key={passing.id} data-record-id={passing.id}>
-      <TableCell>{passing.sequence}</TableCell>
-      <TableCell>Ant</TableCell>
-      <TableCell>Tx</TableCell>
-      <TableCell>{timeString}</TableCell>
-      <TableCell>No</TableCell>
-      <TableCell>Entrant</TableCell>
-      <TableCell>{categoryStr || ''}</TableCell>
-      <TableCell>Category</TableCell>
-      <TableCell>Lap#</TableCell>
-      <TableCell>Elapsed</TableCell>
-      <TableCell>Lap time</TableCell>
-    </TableRow>
-  </>);
+  let className = passing.isValid ? 'passing' : 'invalid-passing';
+  if (passing.isExcluded) {
+    className += ' excluded';
+  }
+
+  return (
+    <>
+      <TableRow key={passing.id} data-record-id={passing.id} className={className}>
+        <TableCell>{passing.sequence}</TableCell>
+        <TableCell>Ant</TableCell>
+        <TableCell>{identifier}</TableCell>
+        <TableCell>{timeString}</TableCell>
+        <TableCell>{plateNumber || '?'}</TableCell>
+        <TableCell>{entrantName}</TableCell>
+        <TableCell>{categoryStr || ''}</TableCell>
+        <TableCell>{lapNo}</TableCell>
+        <TableCell>{elapsedTime}</TableCell>
+        <TableCell>{lapTime}</TableCell>
+      </TableRow>
+    </>
+  );
 };
 
 

@@ -2,3 +2,13 @@
   background-color: #27a845;
   color: #e1e1e1; 
 }
+
+.excluded {
+  opacity: 0.5;
+  background-color: #a0a0a0;
+}
+
+.invalid-passing {
+  background-color: #ffcccc;
+  color: #a00;
+}
