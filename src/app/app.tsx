@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
 import { CategoryList } from '../views/display/categories';
 import { EventCategoryId } from '../model/eventcategory';
+import { EventParticipantId } from '../model/eventparticipant';
 import { RecentRecords } from '../views/display/recent';
 import { TestSession } from '../testdata/testsession';
 import { createRoot } from 'react-dom/client';
@@ -29,6 +30,9 @@ const RaceSweetMainApp = () => {
   const [sessionState, setSessionState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [errorState, setErrorState] = useState<Error|undefined>(undefined);
   const [selectedCategories, setCategorySelected] = useState<Set<EventCategoryId>>(new Set<EventCategoryId>());
+  const [recordSelectedCategories, setRecordSelectedCategories] = useState<Set<EventCategoryId>>(new Set<EventCategoryId>());
+  const [recordSelectedParticipants, setRecordSelectedParticipants] = useState<Set<string>>(new Set<EventParticipantId>());
+
   useEffect(() => {
     if (!sessionState && !errorState) {
       loadRecords().then((session: Session) => {
@@ -53,13 +57,28 @@ const RaceSweetMainApp = () => {
     return <>Loading...</>
   }
 
+  const hilightCategories = new Set<EventCategoryId>();
+  if (recordSelectedCategories && recordSelectedCategories.size > 0) {
+    recordSelectedCategories.forEach((categoryId: EventCategoryId) => {
+      hilightCategories.add(categoryId);
+    });
+  }
+  if (selectedCategories && selectedCategories.size > 0) {
+    selectedCategories.forEach((categoryId: EventCategoryId) => {
+      hilightCategories.add(categoryId);
+    });
+  }
+
   return <>
     <h1>Main content.</h1>
     <CategoryList categories={sessionState.categories || []} categorySelected={setCategorySelected} />
     <RecentRecords
       records={sessionState.records || []}
       raceStateLookup={sessionState}
-      selectedCategories={selectedCategories || new Set<EventCategoryId>()}
+      selectedCategories={hilightCategories}
+      selectedParticipants={recordSelectedParticipants}
+      categorySelected={setRecordSelectedCategories}
+      participantSelected={setRecordSelectedParticipants}
     />
   </>
 };
