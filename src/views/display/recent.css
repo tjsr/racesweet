@@ -15,8 +15,14 @@
 
 .selected-category {
   background-color: #ebffd0;
-  color: #004080;
   font-style: italic;
+}
+
+.selected-participant {
+  background-color: #d0f4ff;
+  font-style: unset;
+  font-weight: unset;
+  font-weight: bold;
 }
 
 .lap-time-session-fastest {

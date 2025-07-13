@@ -3,7 +3,7 @@ import { EventParticipant, EventParticipantId, TimeRecord } from '../../model';
 import { FlagRecord, GreenFlagRecord } from '../../model/flag';
 import { EventCategory, EventCategoryId } from '../../model/eventcategory';
 import { isFlagRecord, isGreenFlag } from '../../controllers/flag';
-import { Box, FormControl, InputLabel, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import { Box, createTheme, FormControl, InputLabel, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { MillisecondsDuration, millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.ts';
 import { categoriesTextFromLookupFn, getElapsedTimeForCategory } from '../../controllers/category.ts';
 import "./recent.css"
@@ -19,6 +19,9 @@ interface RecordsProps {
   raceStateLookup: RaceStateLookup;
   warnings?: string[];
   selectedCategories: Set<EventCategoryId>;
+  selectedParticipants: Set<EventParticipantId>;
+  categorySelected?: ((ids: Set<EventCategoryId>) => void) | undefined;
+  participantSelected?: ((participantId: Set<EventParticipantId>) => void) | undefined;
 }
 
 interface RecentRecordRowProps<RecordType extends TimeRecord = TimeRecord> {
@@ -26,10 +29,14 @@ interface RecentRecordRowProps<RecordType extends TimeRecord = TimeRecord> {
   index: number;
   raceStateLookup: RaceStateLookup;
   selectedCategories?: Set<EventCategoryId>;
+  selectedParticipants?: Set<EventParticipantId>;
+  categorySelected?: ((ids: Set<EventCategoryId>) => void) | undefined;
+  participantSelected?: ((participantId: Set<EventParticipantId>) => void) | undefined;
 }
 
 interface FlagRecordRowProps<FlagType extends FlagRecord> extends RecentRecordRowProps<FlagType> {
   categoryList?: EventCategory[];
+  onSelect: (record: FlagType) => void;
 }
 
 interface GreenFlagEventRowProps extends FlagRecordRowProps<GreenFlagRecord> {
@@ -57,7 +64,12 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
   const elapsedTime = '--:--:--.---';
 
   return (<>
-    <TableRow className={flagClass} key={props.index}>
+    <TableRow className={flagClass} key={props.index}
+      onClick={(event: React.MouseEvent<HTMLTableRowElement, MouseEvent>) => {
+        if (props.onSelect) {
+          props.onSelect(record);
+        }
+      }}>
       <TableCell colSpan={3}>{record.sequence}{flagText}</TableCell>
       <TableCell colSpan={1}>{tableTimeString(record.time)}</TableCell>
       <TableCell colSpan={4}>{categoriesTextFromLookupFn(record.categoryIds || [], categoryLookup)}</TableCell>
@@ -156,6 +168,8 @@ interface PassingRecordRowProps {
   passing: ParticipantPassingRecord;
   raceStateLookup: RaceStateLookup;
   selectedCategories: Set<EventCategoryId> | undefined;
+  selectedParticipants: Set<EventParticipantId> | undefined;
+  onSelect?: (passingRecord: ParticipantPassingRecord) => void;
 }
 
 export const PassingRecordRow = (
@@ -180,7 +194,8 @@ export const PassingRecordRow = (
   }
 
   let className = passing.isValid ? 'passing' : 'invalid-passing';
-  
+  let cellClasses = '';
+
   if (entrant) {
     plateNumber = getParticipantNumber(entrant);
     entrantName = `${entrant.firstname} ${entrant.surname}`;
@@ -190,6 +205,11 @@ export const PassingRecordRow = (
       lapNo = passing.isValid ? passing?.lapNo?.toString() || '' : '';
       elapsedTime = passing?.elapsedTime ? millisecondsToTime(passing.elapsedTime) : '--:--:--.---';
       lapTime = getLapTimeCell(passing);
+    }
+
+    if (props.selectedParticipants?.has(entrant.id)) {
+      className += ' selected-participant';
+      cellClasses = 'selected-participant';
     }
 
     if (entrant?.categoryId) {
@@ -215,17 +235,25 @@ export const PassingRecordRow = (
 
   return (
     <>
-      <TableRow key={passing.id} data-record-id={passing.id} className={className}>
-        <TableCell>{passing.sequence}</TableCell>
-        <TableCell>Ant</TableCell>
-        <TableCell>{identifier}</TableCell>
-        <TableCell>{timeString}</TableCell>
-        <TableCell>{plateNumber || '?'}</TableCell>
-        <TableCell>{entrantName}</TableCell>
-        <TableCell>{categoryStr || ''}</TableCell>
-        <TableCell>{lapNo}</TableCell>
-        <TableCell>{elapsedTime}</TableCell>
-        <TableCell>{lapTime}</TableCell>
+      <TableRow
+        key={passing.id}
+        data-record-id={passing.id}
+        className={className}
+        onClick={(event: React.MouseEvent<HTMLTableRowElement, MouseEvent>) => {
+          if (props.onSelect) {
+            props.onSelect(passing);
+          }
+        }}>
+        <TableCell className={cellClasses}>{passing.sequence}</TableCell>
+        <TableCell className={cellClasses}></TableCell>
+        <TableCell className={cellClasses}>{identifier}</TableCell>
+        <TableCell className={cellClasses}>{timeString}</TableCell>
+        <TableCell className={cellClasses}>{plateNumber || '?'}</TableCell>
+        <TableCell className={cellClasses}>{entrantName}</TableCell>
+        <TableCell className={cellClasses}>{categoryStr || ''}</TableCell>
+        <TableCell className={cellClasses}>{lapNo}</TableCell>
+        <TableCell className={cellClasses}>{elapsedTime}</TableCell>
+        <TableCell className={cellClasses}>{lapTime}</TableCell>
       </TableRow>
     </>
   );
@@ -233,6 +261,13 @@ export const PassingRecordRow = (
 
 
 export const RecordRow = (props: RecentRecordRowProps) => {
+  const flagRecordSelected = (record: FlagRecord): void => {
+    console.log('Flag record selected: ', record);
+
+    if (props.categorySelected) {
+      props.categorySelected(new Set<EventCategoryId>(record.categoryIds));
+    }
+  }
   const record = props.record;
   if (isFlagRecord(record)) {
     return <FlagRecordRow
@@ -240,6 +275,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       index={props.index}
       raceStateLookup={props.raceStateLookup}
       selectedCategories={props.selectedCategories}
+      onSelect={flagRecordSelected}
     />;
   }
 
@@ -250,10 +286,32 @@ export const RecordRow = (props: RecentRecordRowProps) => {
   if (isCrossingRecord(record)) {
     passing = record as ParticipantPassingRecord;
 
+    const passingRecordSelected = (passingRecord: ParticipantPassingRecord): void => {
+      console.log('Passing record selected: ', passingRecord);
+      if (!passingRecord.participantId) {
+        return;
+      }
+
+      const selectionParticipant: EventParticipant|undefined = props.raceStateLookup.getParticipantById(passingRecord.participantId);
+      if (props.participantSelected !== undefined && selectionParticipant) {
+        const selectedEntrants: Set<EventParticipantId> = new Set<EventParticipantId>();
+        selectedEntrants.add(selectionParticipant.id);
+        props.participantSelected(selectedEntrants);
+      }
+
+      if (props.categorySelected && selectionParticipant?.categoryId) {
+        const categorySet = new Set<EventCategoryId>()
+        categorySet.add(selectionParticipant.categoryId);
+        props.categorySelected(categorySet);
+      }
+    }
+
     return <PassingRecordRow
       raceStateLookup={props.raceStateLookup}
       passing={passing}
       selectedCategories={props.selectedCategories}
+      selectedParticipants={props.selectedParticipants}
+      onSelect={passingRecordSelected}
     />;
   }
 
@@ -343,6 +401,16 @@ const headings: string[] = [
 // };
 
 export const RecentRecords = (props: RecordsProps) => {
+  const rowSelected = (record: TimeRecord): void => {
+    console.log('Row selected:', record);
+  }
+
+  const rowSelectedEvent = (event: React.MouseEvent<HTMLTableRowElement, MouseEvent>, record: TimeRecord) => {
+    console.log('Event: Row selected:', record);
+    // Handle row selection logic here, e.g., update state or call a callback
+    rowSelected(record);
+  }
+
   const [recentFirst, setRecentFirst] = React.useState<boolean>(false);
   const sortedRecords = (props.records || []).sort((a, b) => {
     if (recentFirst) {
@@ -412,6 +480,9 @@ export const RecentRecords = (props: RecordsProps) => {
                     index={index}
                     raceStateLookup={props.raceStateLookup}
                     selectedCategories={props.selectedCategories}
+                    selectedParticipants={props.selectedParticipants}
+                    categorySelected={props.categorySelected}
+                    participantSelected={props.participantSelected}
                   />
                 ))}
               </TableBody>
