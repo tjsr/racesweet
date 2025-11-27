@@ -22,6 +22,6 @@ export type { EventParticipant,
 export type { EventTeam } from './eventteam.ts';
 export type { TimingDevice } from './timingdevice.ts';
 export type { TimingPoint } from './timingpoint.ts';
-export type { TimeRecord, TimeRecordSource } from './timerecord.ts';
+export type { EventTimeRecord, TimeRecord, TimeRecordSource } from './timerecord.ts';
 export type { TimingPointId } from './timingpoint.ts';
 export type { ChipCrossingData } from './chipcrossing.ts';

@@ -1,15 +1,17 @@
-import type { ParticipantPassingRecord, TimeRecord, Validated } from "../model/timerecord.ts";
+import type { EventTimeRecord, ParticipantPassingRecord, TimeRecord, Validated } from "../model/timerecord.ts";
 import { assertValidTimeRecord, moveForwardIfUndefined } from "./crossingList.ts";
 import { getChipIdentifier, isChipCrossing } from './chipCrossing.ts';
 import { getTransmitterIdentifier, isTransmitterCrossing } from './transmitter.ts';
 import { getTransponderIdentifier, isTransponderCrossing } from './transponder.ts';
 import { isFlagRecord, isStartRecord } from "./flag.ts";
 
+import { AutomaticTimingIdentifiactionCrossing } from "../model/timingdevice.ts";
 import type { ChipCrossingData } from "../model/chipcrossing.ts";
 import type { PlateCrossingData } from "../model/platecrossing.ts";
 import type { StartRecord } from "../model/flag.ts";
 import { TransmitterCrossingData } from "../model/transmitter.ts";
 import { TransponderCrossingData } from "../model/transponder.ts";
+import { isPlateCrossing } from "./plateCrossing.ts";
 
 const formatTime = (time: Date | undefined): string => {
   if (!time) {
@@ -23,7 +25,7 @@ const formatTime = (time: Date | undefined): string => {
   }
 };
 
-export const getAutomaticIdentifier = (record: TimeRecord): number | undefined => {
+export const getAutomaticIdentifier = (record: EventTimeRecord): number | undefined => {
   if (isChipCrossing(record)) {
     const crossing = record as ChipCrossingData;
     const chip = getChipIdentifier(crossing);
@@ -40,7 +42,7 @@ export const getAutomaticIdentifier = (record: TimeRecord): number | undefined =
   return undefined;
 };
 
-export const getTimeRecordIdentifier = (record: TimeRecord, excludeTime: boolean = false): string => {
+export const getTimeRecordIdentifier = (record: EventTimeRecord, excludeTime: boolean = false): string => {
   const timeString = formatTime(record.time);
   let id = `&${record.id}`;
   if (isChipCrossing(record)) {
@@ -113,13 +115,22 @@ export const isRecordAfterStart = (
 
 export const isNotRecordType = (event: TimeRecord, recordType: number): boolean => (event.recordType & recordType) === 0;
 
-export const isCrossingRecord = (crossing: TimeRecord): crossing is ParticipantPassingRecord => {
-  return !isStartRecord(crossing) && !isFlagRecord(crossing);
-};
-
-export const isDeviceCrossing = (crossing: TimeRecord): crossing is ChipCrossingData =>
+export const isDeviceCrossing = (crossing: TimeRecord): crossing is (ChipCrossingData|TransponderCrossingData|TransmitterCrossingData) =>
   isTransmitterCrossing(crossing) || isTransponderCrossing(crossing) || isChipCrossing(crossing);
 
+export const isCrossingRecord = (crossing: TimeRecord): crossing is (AutomaticTimingIdentifiactionCrossing|PlateCrossingData) => {
+  if (isFlagRecord(crossing)) {
+    return false;
+  }
+  if (isStartRecord(crossing)) {
+    return false;
+  }
+  return isDeviceCrossing(crossing) || isPlateCrossing(crossing);
+};
+
+export const isIdentifiedCrossing = (crossing: TimeRecord): crossing is ParticipantPassingRecord => {
+  return isCrossingRecord(crossing) && !!crossing.participantId;
+};
 
 export const addTimeRecord = (crossings: TimeRecord[], record: TimeRecord): void => {
   assertValidTimeRecord(record);
@@ -173,4 +184,14 @@ export const addError = <TR extends TimeRecord>(record: TR, error: string|Error)
   validated.isValid = false;
   validated.validationErrors.push(error);
   return validated;
+};
+
+export const elapsedTimeSort = (a: ParticipantPassingRecord, b: ParticipantPassingRecord): number => {
+  if (a.elapsedTime === undefined || a.elapsedTime === null) {
+    return 1; // Treat undefined or null as greater than any valid elapsed time
+  }
+  if (b.elapsedTime === undefined || b.elapsedTime === null) {
+    return -1; // Treat undefined or null as less than any valid elapsed time
+  }
+  return a.elapsedTime - b.elapsedTime;
 };

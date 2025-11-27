@@ -1,14 +1,5 @@
-import { ParticipantPassingRecord } from "../model/timerecord";
-
-const elapsedTimeSort = (a: ParticipantPassingRecord, b: ParticipantPassingRecord): number => {
-  if (a.elapsedTime === undefined || a.elapsedTime === null) {
-    return 1; // Treat undefined or null as greater than any valid elapsed time
-  }
-  if (b.elapsedTime === undefined || b.elapsedTime === null) {
-    return -1; // Treat undefined or null as less than any valid elapsed time
-  }
-  return a.elapsedTime - b.elapsedTime;
-};
+import { ParticipantPassingRecord } from "../model/timerecord.ts";
+import { elapsedTimeSort } from "./timerecord.ts";
 
 export const generateLapChart = (passing: ParticipantPassingRecord[]): ParticipantPassingRecord[][] => {
   const laps: ParticipantPassingRecord[][] = [];

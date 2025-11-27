@@ -1,7 +1,7 @@
-import { ParticipantPassingRecord, TimeRecord } from "./timerecord.ts";
+import { EventTimeRecord, ParticipantPassingRecord } from "./timerecord.ts";
 
 export type AutomaticTimingIdentifiactionCrossing<Node extends string> =
-  TimeRecord & ParticipantPassingRecord & {
+  EventTimeRecord & ParticipantPassingRecord & {
     [K in Node]: number;
   };
 

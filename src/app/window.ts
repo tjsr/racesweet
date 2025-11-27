@@ -5,6 +5,18 @@ export type AvailableSendChannels = 'askToRead' | 'askToWrite';
 export type AvailableReceiveChannels = 'sendReadContent' | 'sendReadError' | 'sendWriteContent' | 'sendWriteError';
 export type FileReadDataType = 'utf8' | 'buffer' | 'bytearray';
 
+// import { BrowserWindow, app } from 'electron';
+
+// import contextMenu from 'electron-context-menu';
+
+// import remote, { Menu, MenuItem } from '@electron/remote';
+
+
+
+// import remote from '@electron/remote';
+
+// const Menu = remote.require('menu');
+// const MenuItem = remote.require('menu-item');
 declare global {
   interface Window {
     api: {

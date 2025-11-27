@@ -32,6 +32,8 @@ export const parseSimpleOutreachChipLine = (
   return {
     ...crossingLine,
     chipCode: crossingLine.chipCode!,
+    eventId: undefined,
+    participantId: undefined,
     recordType: 0,
     sequence: getSequenceNumber(),
     timeString: crossingLine.timeString!,

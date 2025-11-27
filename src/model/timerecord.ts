@@ -1,5 +1,6 @@
-import type { TimeRecordSourceId, WithId, uuid } from "./types.ts";
+import type { EventId, TimeRecordSourceId, WithId, uuid } from "./types.ts";
 
+import { EventEntrantId } from "./entrant.ts";
 import type { EventParticipantId } from "./eventparticipant.ts";
 import { v5 as uuidv5 } from "uuid";
 
@@ -14,9 +15,14 @@ export const RECORD_TX_CROSSING = 16; // Indicates a crossing record, used for p
 export type TimeRecordId = uuid;
 export type PassingRecordId = TimeRecordId;
 
+export interface EventTimeRecord extends TimeRecord {
+  eventId?: EventId;
+  sessionId?: uuid;
+  sequence: number;
+}
+
 export interface TimeRecord extends WithId<TimeRecordId> {
   recordType: number;
-  sequence: number;
   source: TimeRecordSourceId;
   time?: Date;
   timeString?: string | null | undefined;
@@ -34,7 +40,7 @@ export const CROSSING_FLAG_PARTICIPANT_FASTEST = 0x02; // Indicates a crossing i
 export const CROSSING_FLAG_PARTICIPANT_IMPROVED = 0x04; // Indicates a crossing is quicker than previous lap.
 export const CROSSING_FLAG_LAP_UNDER_MINIMUM = 0x08; // Indicates a crossing is under the minimum lap time.
 
-export interface ParticipantPassingRecord extends TimeRecord {
+export interface ParticipantPassingRecord extends EventTimeRecord {
   id: PassingRecordId;
   participantId?: EventParticipantId | null | undefined;
   participantStartRecordId?: TimeRecordId | null | undefined;
@@ -48,6 +54,10 @@ export interface ParticipantPassingRecord extends TimeRecord {
   positionInClass?: number | null | undefined;
   isValid?: boolean | null | undefined; // Indicates if the record is valid
   infoFlags?: number;
+}
+
+export interface EntrantPassingRecord extends ParticipantPassingRecord {
+  entrantId?: EventEntrantId | null | undefined;
 }
 
 // export type UnparsedTimeRecord<TE extends TimeRecord> = Omit<TE, 'time'> & {

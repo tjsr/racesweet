@@ -6,6 +6,7 @@ import { v5 as uuidv5 } from "uuid";
 export const isEntrantTeam = (entrant: ApicalParticipantViewModel): boolean => {
   return entrant.RaceNumbers.split(',').length > 1;
 };
+
 export const generateTeamId = (eventId: EventId, teamName: string): EventTeamId => {
   if (!teamName) {
     throw new Error("Team name must not be empty.");

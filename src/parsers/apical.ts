@@ -23,8 +23,9 @@ import { v5 as uuidv5 } from 'uuid';
 export const createChipCrossingRecord = (
   lap: ApicalLapByCategoryViewModel,
   eventStartTime: Date,
-  txNo: number
-): Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time'> => {
+  txNo: number,
+  eventId: EventId
+): Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time' | 'eventId'> => {
   if (!txNo) {
     throw new Error('Cannot create chip crossing record without transponder number');
   }
@@ -34,8 +35,9 @@ export const createChipCrossingRecord = (
   const lapMs = durationStringToMilliseconds(lap.LapTimeSpan);
   const calculatedRecordTime = addToTime(eventStartTime, lapMs);
 
-  const timeRecord: Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time'> = {
+  const timeRecord: Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time' | 'eventId'> = {
     chipCode: txNo,
+    eventId: eventId,
     id: lap.Id.toString(),
     recordType: RECORD_TX_CROSSING,
     time: calculatedRecordTime,
@@ -110,10 +112,10 @@ export const convertLapCategoryViewModelToChipCrossing = (
   categoryId: EventCategoryId,
   eventStartTime: Date,
   inferTransponderNumberRange: number
-): Pick<ChipCrossingData, 'participantId'> & ReturnType<typeof createChipCrossingRecord> => {
+): Pick<ChipCrossingData, 'participantId' | 'eventId'> & ReturnType<typeof createChipCrossingRecord> => {
   const epId: EventParticipantId = createParticipantIdFromEventAndCategory(eventId, categoryId, lap.RaceNumber);
   const txNo = inferTransponderFromRaceNumber(lap.RaceNumber, inferTransponderNumberRange);
-  const crossing: Pick<ChipCrossingData, 'participantId'> & ReturnType<typeof createChipCrossingRecord> = createChipCrossingRecord(lap, eventStartTime, txNo);
+  const crossing: Pick<ChipCrossingData, 'participantId' | 'eventId'> & ReturnType<typeof createChipCrossingRecord> = createChipCrossingRecord(lap, eventStartTime, txNo, eventId);
   crossing.participantId = epId;
 
   return crossing;

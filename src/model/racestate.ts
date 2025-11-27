@@ -392,7 +392,7 @@ export class Session implements RaceState, RaceStateLookup {
 
       const minimumLapTimeMilliseconds = this._minimumLapTimeMilliseconds || 60000; // Default to 60 seconds if not set
 
-      const affectedCrossings = this._records.values().filter((record) => crossingMatchesParticipantIdentifiers(participant, record)).map((record) => record as ParticipantPassingRecord);
+      const affectedCrossings = this._records.values().filter((record) => isCrossingRecord(record) && crossingMatchesParticipantIdentifiers(participant, record)).map((record) => record as ParticipantPassingRecord);
       if (this._bulkProcess) {
         return; // If bulk processing, we will handle this later
       }

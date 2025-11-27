@@ -1,11 +1,11 @@
 import type { EventCategoryId } from "./eventcategory.ts";
 import type { EventParticipantId } from "./eventparticipant.ts";
-import type { TimeRecord } from "./timerecord.ts";
+import type { EventTimeRecord } from "./timerecord.ts";
 import type { uuid } from "./types.ts";
 
 type CheckpointId = uuid | number;
 
-export interface FlagRecord extends TimeRecord {
+export interface FlagRecord extends EventTimeRecord {
   flagType: string;
   flagValue: string;
   categoryIds?: EventCategoryId[];

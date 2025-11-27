@@ -1,5 +1,5 @@
 import React, { type JSX, type ReactNode } from 'react';
-import { EventParticipant, EventParticipantId, TimeRecord } from '../../model';
+import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../model';
 import { FlagRecord, GreenFlagRecord } from '../../model/flag';
 import { EventCategory, EventCategoryId } from '../../model/eventcategory';
 import { isFlagRecord, isGreenFlag } from '../../controllers/flag';
@@ -15,7 +15,7 @@ import { getParticipantNumber } from '../../controllers/participant.ts';
 import { getLapTimeCell } from '../../controllers/laps.ts';
 
 interface RecordsProps {
-  records: TimeRecord[];
+  records: EventTimeRecord[];
   raceStateLookup: RaceStateLookup;
   warnings?: string[];
   selectedCategories: Set<EventCategoryId>;
@@ -24,7 +24,7 @@ interface RecordsProps {
   participantSelected?: ((participantId: Set<EventParticipantId>) => void) | undefined;
 }
 
-interface RecentRecordRowProps<RecordType extends TimeRecord = TimeRecord> {
+interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRecord> {
   record: RecordType;
   index: number;
   raceStateLookup: RaceStateLookup;
@@ -401,11 +401,11 @@ const headings: string[] = [
 // };
 
 export const RecentRecords = (props: RecordsProps) => {
-  const rowSelected = (record: TimeRecord): void => {
+  const rowSelected = (record: EventTimeRecord): void => {
     console.log('Row selected:', record);
   }
 
-  const rowSelectedEvent = (event: React.MouseEvent<HTMLTableRowElement, MouseEvent>, record: TimeRecord) => {
+  const rowSelectedEvent = (event: React.MouseEvent<HTMLTableRowElement, MouseEvent>, record: EventTimeRecord) => {
     console.log('Event: Row selected:', record);
     // Handle row selection logic here, e.g., update state or call a callback
     rowSelected(record);
