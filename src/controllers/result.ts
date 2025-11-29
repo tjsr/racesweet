@@ -3,7 +3,7 @@ import { EntrantPassingRecord, ParticipantPassingRecord } from "../model/timerec
 import { EventEntrantId } from "../model/entrant.ts";
 import { elapsedTimeSort } from "./timerecord.ts";
 
-interface EntrantResult {
+export interface EntrantResult {
   entrantId: EventEntrantId;
   lapCount: number;
   totalTime: number; // Total time in milliseconds
@@ -19,20 +19,10 @@ export const filterPassingsByTime = (passings: EntrantPassingRecord[], upToTime:
     return record.time <= upToTime && record.isExcluded !== true;
   });
 
-export const generateResult = (passings: Map<EventEntrantId, EntrantPassingRecord[]>, upToEventTime?: Date): EntrantResult[] => {
-  const laps: ParticipantPassingRecord[][] = [];
-  const filteredPassings = new Map<EventEntrantId, EntrantPassingRecord[]>();
-  // const entrantPassings: Map<EntrantId, EntrantResult[] = [];
+const isValidLapPassing = (record: PassingRecord): boolean => !(record.lapNo === undefined || record.lapNo === null || record.lapNo < 1);
 
-  passings.keys().forEach((entrantId) => {
-    let entrantPassings = passings.get(entrantId) || [];
-    entrantPassings = entrantPassings.filter((record) => record.isExcluded !== true);
-    if (upToEventTime) {
-      entrantPassings = filterPassingsByTime(entrantPassings, upToEventTime);
-    }
-    entrantPassings.sort(elapsedTimeSort);
-    filteredPassings.set(entrantId, entrantPassings);
-  });
+export const getLapsOnly = (sortedRecords: EntrantPassingRecord[]): ParticipantPassingRecord[] => {
+  const laps: ParticipantPassingRecord[][] = [];
 
   sortedRecords.forEach((record) => {
     const entrantId = record.entrantId;
@@ -46,6 +36,52 @@ export const generateResult = (passings: Map<EventEntrantId, EntrantPassingRecor
     }
     laps[record.lapNo - 1].push(record);
   });
-
-  return laps;
+  
 };
+
+const getIncludedLapsOnly = (
+  entrantPassings: EntrantPassingRecord[]
+): EntrantPassingRecord[] => entrantPassings
+  .filter((record) => record.isExcluded !== true)
+  .filter(isValidLapPassing);
+
+const getFastestLap = (passings: ParticipantPassingRecord[]): ParticipantPassingRecord | undefined => 
+  passings.reduce((acc: ParticipantPassingRecord | undefined, record: ParticipantPassingRecord) => {
+    if (acc === undefined || !acc.lapTime) {
+      return record;
+    }
+    if (!record || !record.lapTime || !isValidLapPassing(record)) {
+      return acc; // Skip invalid lap passings
+    }
+    if (record.lapTime < acc.lapTime) {
+      return record;
+    }
+    return acc;
+  }, undefined);
+
+export const generateResult = (passings: Map<EventEntrantId, EntrantPassingRecord[]>, upToEventTime?: Date): EntrantResult[] => {
+  const filteredPassings = new Map<EventEntrantId, EntrantPassingRecord[]>();
+  const results: EntrantResult[] = [];
+
+  passings.keys().forEach((entrantId) => {
+    let entrantPassings = passings.get(entrantId) || [];
+    entrantPassings = getIncludedLapsOnly(entrantPassings);
+
+    if (upToEventTime) {
+      entrantPassings = filterPassingsByTime(entrantPassings, upToEventTime);
+    }
+    entrantPassings.sort(elapsedTimeSort);
+    filteredPassings.set(entrantId, entrantPassings);
+    const result: Partial<EntrantResult> = {
+      entrantId: entrantId,
+      fastestLap: getFastestLap(entrantPassings),
+      lapCount: entrantPassings.length,
+      laps: entrantPassings,
+      totalTime: entrantPassings.length > 0 ? (entrantPassings[entrantPassings.length - 1].elapsedTime || 0) : 0,
+    };
+    results.push(result as EntrantResult);
+  });
+
+  return results;
+};
+
