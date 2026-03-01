@@ -1,5 +1,6 @@
 {
   "configurations": [
+
   {
     "name": "Launch via NPM",
     "request": "launch",
@@ -97,6 +98,18 @@
     ],
     "console": "integratedTerminal",
     "preLaunchTask": "clear-terminal"
-  }
+  },
+  {
+    "type": "node",
+    "request": "launch",
+    "name": "Debug apicalTest",
+    "runtimeExecutable": "tsx",
+    "program": "${workspaceFolder}/src/utils/apical/apicalTest.mts",
+    "skipFiles": [
+      "<node_internals>/**"
+    ],
+    "console": "integratedTerminal",
+    "preLaunchTask": "clear-terminal"
+  } 
   ]
 }

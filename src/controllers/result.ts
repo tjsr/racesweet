@@ -27,7 +27,6 @@ export const getLapsOnly = (sortedRecords: EntrantPassingRecord[]): ParticipantP
   sortedRecords.forEach((record) => {
     const entrantId = record.entrantId;
 
-
     if (record.lapNo === undefined || record.lapNo === null || record.lapNo < 1) {
       return; // Skip records without a valid lap number
     }
