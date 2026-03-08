@@ -1,3 +1,6 @@
+import { EventHandicapData } from './apicalData.ts';
+import fs from 'fs/promises';
+
 export const COMPANY_GMBC = 2;
 
 const getApicalEventListUrl = (companyId: number = COMPANY_GMBC, timestamp: number = Date.now()): string => `https://apicalracetiming.com.au/raceresult/event/getall?companyId=${companyId}&_=${timestamp}`;
@@ -8,6 +11,11 @@ export interface ApicalEventResponseEventData {
   EventDate: string;
   CompanyName: string;
   ThumbPathAndFileName: string;
+}
+
+export interface ExtendedApicalEventListData extends ApicalEventResponseEventData {
+  ExcelDataPath: string;
+  EventHandicapData?: EventHandicapData;
 }
 
 export type  ApicalEventListResponse = ApicalEventResponseEventData[];
@@ -29,3 +37,7 @@ export const getApicalEventList = (companyId: number = COMPANY_GMBC, timestamp: 
     });
 };
 
+export const writeJsonEventCache = async (events: ExtendedApicalEventListData[], outputFile: string): Promise<void> => {
+  const jsonData = JSON.stringify(events, null, 2);
+  return fs.writeFile(outputFile, jsonData, 'utf-8');
+};
