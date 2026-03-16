@@ -1,12 +1,14 @@
-import { ApicalSpreadsheetLapsRow } from "./apicalEventSpreadsheet.ts";
+import { ApicalSpreadsheetLapsRow } from "./apicalEventSpreadsheet.js";
 
 const MIN_LAPS_FOR_MEDIAN_RESULT = 3;
 
 export const getEntrantLapTimeMap = (lapsData: ApicalSpreadsheetLapsRow[]): Map<string, number[]> => {
   const entrantLapTimes: Map<string, number[]> = new Map();
   
-  lapsData.forEach((lap) => {
-    const entrantName = lap.FullName;
+  lapsData
+    .filter((lap) => !(lap.FullName.toLowerCase().includes("unknown")))
+    .forEach((lap) => {
+    const entrantName = lap.FullName.toLowerCase();
     const lapTime = lap.LapSeconds;
     if (!entrantLapTimes.has(entrantName)) {
       entrantLapTimes.set(entrantName, []);
@@ -17,7 +19,7 @@ export const getEntrantLapTimeMap = (lapsData: ApicalSpreadsheetLapsRow[]): Map<
   return entrantLapTimes;
 };
 
-export const calcualteAverageLapTime = (lapTimes: number[]): number => {
+export const calculateAverageLapTime = (lapTimes: number[]): number => {
   if (lapTimes.length === 0) return 0;
   const total = lapTimes.reduce((sum, time) => sum + time, 0);
   return total / lapTimes.length;
@@ -34,7 +36,7 @@ export const calculateBestLapTime = (lapTimes: number[]): number => {
 
 export const calculateLapTimeConsistency = (lapTimes: number[]): number => {
   if (lapTimes.length === 0) return 0;
-  const average = calcualteAverageLapTime(lapTimes);
+  const average = calculateAverageLapTime(lapTimes);
   const variance = lapTimes.reduce((sum, time) => sum + Math.pow(time - average, 2), 0) / lapTimes.length;
   return Math.sqrt(variance);
 };

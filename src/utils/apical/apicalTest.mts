@@ -1,10 +1,12 @@
 #!tsx
 
-import { calculateEventHandicapData, EventHandicapData, getAllMedianLapTimes, getEntrantLapTimeMap, outputHandicapsInOrder } from './apicalData.ts';
-import { ApicalEventListResponse, ApicalEventResponseEventData, ExtendedApicalEventListData, getApicalEventList, writeJsonEventCache } from './apicalEventList.ts';
-import { ApicalSpreadsheetLapsRow, readTempApicalExcelFile } from './apicalEventSpreadsheet.ts';
-import { apicalDataFileExists, generateOrGetCachedEventPath } from './excelGenerate.ts';
-import { readFile, readFileSync } from 'fs';
+import { calculateEventHandicapData, EventHandicapData, getAllMedianLapTimes, getEntrantLapTimeMap, outputHandicapsInOrder } from './apicalData.js';
+import { ApicalEventListResponse, ApicalEventResponseEventData, ExtendedApicalEventListData, getApicalEventList, loadCachedOrUpdatedEventList, writeJsonEventCache } from './apicalEventList.js';
+import { ApicalSpreadsheetLapsRow, readTempApicalExcelFile } from './apicalEventSpreadsheet.js';
+import { apicalDataFileExists, generateOrGetCachedEventPath } from './excelGenerate.js';
+import { readFileSync } from 'fs';
+import { outputProcessedHandicaps, processHandicaps } from '../handicapData.js';
+import { count } from 'console';
 
 console.log('Starting apicalTest...');
 const CACHED_EVENTS_FILE = 'cachedEvents.json';
@@ -12,7 +14,8 @@ const CACHED_EVENTS_FILE = 'cachedEvents.json';
 (async () => {
   try {
     console.log('Calling getApicalEventList...');
-    const events: ApicalEventListResponse = (await getApicalEventList()).filter((e) => e.Name.includes("NF"));
+
+    const events: ApicalEventListResponse = await loadCachedOrUpdatedEventList();
 
     let file;
     try {
@@ -53,22 +56,45 @@ const CACHED_EVENTS_FILE = 'cachedEvents.json';
           .catch((error) => {
             console.error(`Error fetching laps data for event ID ${event.Id}/${event.Name}:`, error);
           });
-    }));
+      }));
+    
+    const countOccurrences = (str: string, char: string): number => (str.match(new RegExp(char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+    const generateEventHandicapList = (data: ExtendedApicalEventListData[]): Map<string, string> => {
+      const output: Map<string, string> = new Map<string, string>();
+      data.forEach((d: ExtendedApicalEventListData, idx: number) => {
+        d.EventHandicapData?.entrantData.forEach((entrant) => {
+          // const existingEntrant: string = output.get(entrant.name)!;
+          let existingVal: string | undefined = output.get(entrant.name) || '';
+          while (countOccurrences(existingVal, ",") < idx) {
+            existingVal = existingVal + ",";
+          }
+          existingVal = existingVal + entrant.ratioScore.toFixed(4);
+          output.set(entrant.name, existingVal);
+        });
+        output.forEach((val: string, key: string) => {
+          while (countOccurrences(val, ",") < idx) {
+            val = val + ",";
+          }
+          output.set(key, val);
+        });
+      });
+      return output;
+    };
 
     Promise.all(eventPromises).then((data: ExtendedApicalEventListData[]) => {
       const outputHandicapData: Map<string, number> = new Map<string, number>();
       const sortedEvents: ExtendedApicalEventListData[] = data.sort((eventDataA, eventDataB) => new Date(eventDataB.EventDate).getTime() - new Date(eventDataA.EventDate).getTime());
+      const riderEventHandicapList: Map<string, string> = generateEventHandicapList(data);
       sortedEvents.forEach((event: ExtendedApicalEventListData) => {
-        console.log(`Event handicap data for event ID ${event.Id}/${event.Name}:`);
         if (event.EventHandicapData) {
-          outputHandicapsInOrder(event.EventHandicapData);
+          // console.log(`Event handicap data for event ID ${event.Id}/${event.Name}:`);
+          // outputHandicapsInOrder(event.EventHandicapData);
           processHandicaps(outputHandicapData, event.EventHandicapData);
         }
       });
 
-
-
       console.log(`Total events: ${events.length}`);
+      outputProcessedHandicaps(outputHandicapData, riderEventHandicapList);
       return writeJsonEventCache(sortedEvents, CACHED_EVENTS_FILE);
     }).then(() => { 
       console.log(`Event cache written to ${CACHED_EVENTS_FILE}`);

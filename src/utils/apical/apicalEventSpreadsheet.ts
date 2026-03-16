@@ -1,6 +1,6 @@
 import XLSX from 'xlsx';
 import { promises as fs } from 'fs';
-import { getApicalEventExcelFilePath } from './excelGenerate';
+import { getApicalEventExcelFilePath } from './excelGenerate.js';
 
 export interface ApicalSpreadsheetLapsRow {
   EventName: string;

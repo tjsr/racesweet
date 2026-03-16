@@ -1,4 +1,4 @@
-import { ApicalSpreadsheetLapsRow, retrieveExcelData } from './apicalEventSpreadsheet';
+import { ApicalSpreadsheetLapsRow, retrieveExcelData } from './apicalEventSpreadsheet.js';
 
 import { promises as fs } from 'fs';
 import path from 'path';

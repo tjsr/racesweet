@@ -2,6 +2,7 @@
   "extends": ["@tsconfig/node22/tsconfig.json", "@tsconfig/node-ts/tsconfig.json"],
   "compilerOptions": {
     "allowJs": true,
+    "allowImportingTsExtensions": true,
     "baseUrl": ".",
     "experimentalDecorators": true,
     "esModuleInterop": true,
