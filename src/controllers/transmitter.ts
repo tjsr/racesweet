@@ -1,6 +1,6 @@
-import { TimeRecord } from "../model/timerecord.ts";
-import { TransmitterCrossingData } from "../model/transmitter.ts";
-import { getIdentifier as getGenericIdentifier } from "./tx.ts";
+import { TimeRecord } from "../model/timerecord.js";
+import { TransmitterCrossingData } from "../model/transmitter.js";
+import { getIdentifier as getGenericIdentifier } from "./tx.js";
 
 export const getTransmitterIdentifier = (
   crossing: TransmitterCrossingData

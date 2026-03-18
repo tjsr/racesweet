@@ -1,7 +1,7 @@
 import { access, readFile } from "node:fs/promises";
 
 import { PathLike } from "node:fs";
-import { ResourceProvider } from "./provider.ts";
+import { ResourceProvider } from "./provider.js";
 import path from "node:path";
 
 export class LocalFileResourceProvider<ResourceType> implements ResourceProvider<ResourceType> {

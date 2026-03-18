@@ -1,5 +1,5 @@
-import { ParticipantPassingRecord } from "../model/timerecord.ts";
-import { elapsedTimeSort } from "./timerecord.ts";
+import { ParticipantPassingRecord } from "../model/timerecord.js";
+import { elapsedTimeSort } from "./timerecord.js";
 
 export const generateLapChart = (passing: ParticipantPassingRecord[]): ParticipantPassingRecord[][] => {
   const laps: ParticipantPassingRecord[][] = [];

@@ -1,6 +1,6 @@
-import type { RaceState } from "../model/racestate.ts";
-import { Session } from "../model/racestate.ts";
-import type { TestSession } from "./testsession.ts";
+import type { RaceState } from "../model/racestate.js";
+import { Session } from "../model/racestate.js";
+import type { TestSession } from "./testsession.js";
 
 export abstract class GenericTestSession extends Session implements TestSession {
   // private _resourceProvider: RP | undefined;

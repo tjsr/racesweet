@@ -1,6 +1,6 @@
-import type { ParsedTimeRecord, TimeRecord, UnparsedTimeStringEvent } from "../model/timerecord.ts";
+import type { ParsedTimeRecord, TimeRecord, UnparsedTimeStringEvent } from "../model/timerecord.js";
 
-import type { PlateCrossingData } from "../model/platecrossing.ts";
+import type { PlateCrossingData } from "../model/platecrossing.js";
 
 export const asUnparsedPlateCrossing = (crossing: PlateCrossingData): (PlateCrossingData & UnparsedTimeStringEvent) | undefined => {
   if (crossing.plateNumber && crossing.time === undefined) {

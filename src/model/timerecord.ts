@@ -1,7 +1,7 @@
-import type { EventId, TimeRecordSourceId, WithId, uuid } from "./types.ts";
+import type { EventId, TimeRecordSourceId, WithId, uuid } from "./types.js";
 
-import { EventEntrantId } from "./entrant.ts";
-import type { EventParticipantId } from "./eventparticipant.ts";
+import { EventEntrantId } from "./entrant.js";
+import type { EventParticipantId } from "./eventparticipant.js";
 import { v5 as uuidv5 } from "uuid";
 
 export const FILE_PATH_NAMESPACE = uuidv5('fs', '00000000-0000-0000-0000-000000000000');

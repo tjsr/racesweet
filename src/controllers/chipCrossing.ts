@@ -1,7 +1,7 @@
-import type { ParsedTimeRecord, TimeRecord, UnparsedTimeStringEvent } from "../model/timerecord.ts";
+import type { ParsedTimeRecord, TimeRecord, UnparsedTimeStringEvent } from "../model/timerecord.js";
 
-import type { ChipCrossingData } from "../model/chipcrossing.ts";
-import { getIdentifier as getGenericIdentifier } from "./tx.ts";
+import type { ChipCrossingData } from "../model/chipcrossing.js";
+import { getIdentifier as getGenericIdentifier } from "./tx.js";
 
 export const asUnparsedChipCrossing = (crossing: ChipCrossingData): (ChipCrossingData & UnparsedTimeStringEvent) | undefined => {
   if (crossing.chipCode && crossing.time === undefined) {

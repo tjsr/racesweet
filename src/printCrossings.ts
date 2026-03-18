@@ -6,7 +6,7 @@ import { ResourceProvider } from './controllers/resource/provider.ts';
 import { RfidIndividualTestRace } from './testdata/rfid.ts';
 import type { TestSession } from './testdata/testsession.ts';
 import colors from 'colors';
-import { getCliTable } from "./controllers/clitable.ts";
+import { getCliTable } from "./controllers/clitable.js";
 import { warn } from './utils.ts';
 
 colors.enable();

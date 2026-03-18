@@ -1,18 +1,18 @@
-import type { ParticipantPassingRecord, TimeRecord } from "../model/timerecord.ts";
-import type { RaceStateLookup, Session } from "../model/racestate.ts";
-import { categoryTextString, findCategoryById, getElapsedTimeForCategory } from "./category.ts";
-import { isFlagRecord, isGreenFlag } from "./flag.ts";
+import type { ParticipantPassingRecord, TimeRecord } from "../model/timerecord.js";
+import type { RaceStateLookup, Session } from "../model/racestate.js";
+import { categoryTextString, findCategoryById, getElapsedTimeForCategory } from "./category.js";
+import { isFlagRecord, isGreenFlag } from "./flag.js";
 
 import type { Cell } from "cli-table3";
-import type { ChipCrossingData } from "../model/chipcrossing.ts";
-import type { EventCategory } from "../model/eventcategory.ts";
-import type { FlagRecord } from "../model/flag.ts";
+import type { ChipCrossingData } from "../model/chipcrossing.js";
+import type { EventCategory } from "../model/eventcategory.js";
+import type { FlagRecord } from "../model/flag.js";
 import Table from "cli-table3";
-import { getLapTimeCell } from "./laps.ts";
-import { getParticipantNumber } from "./participant.ts";
-import { getTimeRecordIdentifier } from "./timerecord.ts";
-import { millisecondsToTime } from "../app/utils/timeutils.ts";
-import { tableTimeString } from "../app/utils/timeutils.ts";
+import { getLapTimeCell } from "./laps.js";
+import { getParticipantNumber } from "./participant.js";
+import { getTimeRecordIdentifier } from "./timerecord.js";
+import { millisecondsToTime } from "../app/utils/timeutils.js";
+import { tableTimeString } from "../app/utils/timeutils.js";
 
 export const columns = ['Antenna', 'Chip Code', 'Time', 'Number', 'Entrant', 'Category', 'LapNo', 'Elapsed Time', 'Lap Time'];
 let table: Table.Table;

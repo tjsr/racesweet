@@ -1,4 +1,4 @@
-import type { PMTKEventData, PMTKLookupEventCategory, PMTKParticipantsQueryResult, PMTKProcessedEventData } from "../model/PMTKConversionTypes.ts";
+import type { PMTKEventData, PMTKLookupEventCategory, PMTKParticipantsQueryResult, PMTKProcessedEventData } from "../model/PMTKConversionTypes.js";
 import { assignParticipantNumber, assignTransponder } from './participant.ts';
 import { createIdHash, humanDate } from '../utils.ts';
 import type {
@@ -14,7 +14,7 @@ import type { EventCategory } from '../model/eventcategory.ts';
 import type { EventParticipant } from '../model/eventparticipant.ts';
 import type { GreenFlagRecord } from '../model/flag.ts';
 import type { OutreachChipCrossingData } from '../parsers/outreach.ts';
-import type { PMTKRiderResultTypes } from "../model/PMTKConversionTypes.ts";
+import type { PMTKRiderResultTypes } from "../model/PMTKConversionTypes.js";
 import type { PlateCrossingData } from '../model/platecrossing.ts';
 import { accessQueryUsingConnection } from './access.ts';
 import type adodb from 'node-adodb';

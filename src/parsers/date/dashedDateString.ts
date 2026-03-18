@@ -1,6 +1,6 @@
-import { DateParseError } from "./errors.ts";
+import { DateParseError } from "./errors.js";
 import { TZDate } from "@date-fns/tz";
-import { parseSplitDateStringToDate } from "./splitStringToDate.ts";
+import { parseSplitDateStringToDate } from "./splitStringToDate.js";
 
 export const validateDashedDateFormat = (input: string): boolean => {
   const dashedDateRegex = /\b\d{2}-\d{2}-\d{2}\b(?!\d)/;

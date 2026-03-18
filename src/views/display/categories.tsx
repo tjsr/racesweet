@@ -1,8 +1,8 @@
-import { EventCategory, EventCategoryId } from "../../model/eventcategory.ts";
-import { GridEventListener, GridRowId } from "@mui/x-data-grid";
+import { EventCategory, EventCategoryId } from '../../model/eventcategory.js';
+import { GridEventListener, GridRowId } from '@mui/x-data-grid';
 
-import Box from "@mui/material/Box";
-import { DataGrid } from "@mui/x-data-grid/DataGrid";
+import Box from '@mui/material/Box';
+import { DataGrid } from '@mui/x-data-grid/DataGrid';
 
 interface CategoryListProps {
   categories: EventCategory[];

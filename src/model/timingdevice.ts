@@ -1,7 +1,7 @@
-import { ChipCrossingData } from "./chipcrossing.ts";
-import type { IdType } from "./types.ts";
-import { TransmitterCrossingData } from "./transmitter.ts";
-import { TransponderCrossingData } from "./transponder.ts";
+import { ChipCrossingData } from "./chipcrossing.js";
+import type { IdType } from "./types.js";
+import { TransmitterCrossingData } from "./transmitter.js";
+import { TransponderCrossingData } from "./transponder.js";
 
 export type TimingDeviceId = IdType;
 

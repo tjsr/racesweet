@@ -1,4 +1,4 @@
-import { fromRfidTimingLine, matchRfidLine } from "./rfidtiming.ts";
+import { fromRfidTimingLine, matchRfidLine } from "./rfidtiming.js";
 
 describe('matchRfidLine', () => {
   it('Should allow various formats', () => {

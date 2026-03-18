@@ -1,6 +1,6 @@
-import type { ApicalParticipantViewModel } from "../model/apical.ts";
-import type { EventId } from "../model/types.ts";
-import type { EventTeamId } from "../model/eventteam.ts";
+import type { ApicalParticipantViewModel } from "../model/apical.js";
+import type { EventId } from "../model/types.js";
+import type { EventTeamId } from "../model/eventteam.js";
 import { v5 as uuidv5 } from "uuid";
 
 export const isEntrantTeam = (entrant: ApicalParticipantViewModel): boolean => {

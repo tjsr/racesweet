@@ -1,4 +1,4 @@
-import { chipNumberInSeries, getPlateNumberFromChipCode } from "./participant.ts";
+import { chipNumberInSeries, getPlateNumberFromChipCode } from "./participant.js";
 
 describe('getPlateNumberFromChipCode', () => {
   it('Should return the correct plate number for a given chip code', () => {

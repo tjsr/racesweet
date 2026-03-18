@@ -4,20 +4,20 @@ import {
   type ApicalLapByCategoryViewModel,
   type ApicalParticipantViewModel
 } from "../model/apical.ts";
-import type { EventCategory, EventCategoryId } from "../model/eventcategory.ts";
-import type { EventId, uuid } from "../model/types.ts";
-import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.ts";
-import { RECORD_TX_CROSSING, type TimeRecord } from "../model/timerecord.ts";
-import { assignParticipantNumber, assignTransponder, createParticipantIdFromEventAndCategory } from "../controllers/participant.ts";
-import { generateTeamId, isEntrantTeam } from "../controllers/eventteam.ts";
-import type { ChipCrossingData } from "../model/chipcrossing.ts";
-import type { EventTeam } from "../model/eventteam.ts";
-import type { RaceState } from "../model/racestate.ts";
-import { addToTime } from "../app/utils/timeutils.ts";
-import { createEventCategoryIdFromCategoryCode } from "../controllers/category.ts";
-import { durationStringToMilliseconds } from "./genericTimeParser.ts";
-import { inferTransponderFromRaceNumber } from "../controllers/transponder.ts";
-import { split } from "../utils.ts";
+import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
+import type { EventId, uuid } from "../model/types.js";
+import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
+import { RECORD_TX_CROSSING, type TimeRecord } from "../model/timerecord.js";
+import { assignParticipantNumber, assignTransponder, createParticipantIdFromEventAndCategory } from "../controllers/participant.js";
+import { generateTeamId, isEntrantTeam } from "../controllers/eventteam.js";
+import type { ChipCrossingData } from "../model/chipcrossing.js";
+import type { EventTeam } from "../model/eventteam.js";
+import type { RaceState } from "../model/racestate.js";
+import { addToTime } from "../app/utils/timeutils.js";
+import { createEventCategoryIdFromCategoryCode } from "../controllers/category.js";
+import { durationStringToMilliseconds } from "./genericTimeParser.js";
+import { inferTransponderFromRaceNumber } from "../controllers/transponder.js";
+import { split } from "../utils.js";
 import { v5 as uuidv5 } from 'uuid';
 
 export const createChipCrossingRecord = (

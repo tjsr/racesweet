@@ -1,7 +1,7 @@
-import type { EventCategoryId } from "./eventcategory.ts";
-import type { EventParticipantId } from "./eventparticipant.ts";
-import type { EventTimeRecord } from "./timerecord.ts";
-import type { uuid } from "./types.ts";
+import type { EventCategoryId } from "./eventcategory.js";
+import type { EventParticipantId } from "./eventparticipant.js";
+import type { EventTimeRecord } from "./timerecord.js";
+import type { uuid } from "./types.js";
 
 type CheckpointId = uuid | number;
 

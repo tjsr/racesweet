@@ -5,12 +5,12 @@ import {
   EVENT_SESSION_START
 } from "../model/timerecord.ts";
 import type { FlagRecord, GreenFlagRecord } from '../model/flag.ts';
-import { NoEventFlagsError, NoStartFlagError } from "../validators/errors.ts";
-import type { TimeRecord, TimeRecordId } from "../model/timerecord.ts";
+import { NoEventFlagsError, NoStartFlagError } from "../validators/errors.js";
+import type { TimeRecord, TimeRecordId } from "../model/timerecord.js";
 import { getTimeRecordIdentifier, isNotRecordType } from './timerecord.ts';
 import { v1 as uuid1, v5 as uuid5 } from 'uuid';
 
-import type { EventCategoryId } from "../model/eventcategory.ts";
+import type { EventCategoryId } from "../model/eventcategory.js";
 import type { EventParticipantId } from '../model/eventparticipant.ts';
 
 const FLAG_NAMESPACE = uuid5('flag', '00000000-0000-0000-0000-000000000000');

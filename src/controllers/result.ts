@@ -1,7 +1,7 @@
-import { EntrantPassingRecord, ParticipantPassingRecord } from "../model/timerecord.ts";
+import { EntrantPassingRecord, ParticipantPassingRecord } from "../model/timerecord.js";
 
-import { EventEntrantId } from "../model/entrant.ts";
-import { elapsedTimeSort } from "./timerecord.ts";
+import { EventEntrantId } from "../model/entrant.js";
+import { elapsedTimeSort } from "./timerecord.js";
 
 export interface EntrantResult {
   entrantId: EventEntrantId;

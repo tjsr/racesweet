@@ -1,8 +1,8 @@
 // const dbFile = process.argv[2];
 // const password = process.argv[3];
 
-import { getConnection } from "./controllers/access.ts";
-import { getEvent } from "./controllers/pmtk.ts";
+import { getConnection } from "./controllers/access.js";
+import { getEvent } from "./controllers/pmtk.js";
 import { v5 as uuidv5 } from "uuid";
 
 process.loadEnvFile('.env.tjsr-yoga');

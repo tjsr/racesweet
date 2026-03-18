@@ -1,7 +1,7 @@
-import type { EventCategoryId } from "../../model/eventcategory.ts";
-import type { FlagRecord } from "../../model/flag.ts";
-import type { TimeRecord } from "../../model/timerecord.ts";
-import { findSessionStart } from "../../controllers/session.ts";
+import type { EventCategoryId } from "../../model/eventcategory.js";
+import type { FlagRecord } from "../../model/flag.js";
+import type { TimeRecord } from "../../model/timerecord.js";
+import { findSessionStart } from "../../controllers/session.js";
 import { formatRFC3339 } from "date-fns";
 
 export const useRFCTime = false;

@@ -1,6 +1,6 @@
-import { TimeRecord } from "../model/timerecord.ts";
-import { TransponderCrossingData } from "../model/transponder.ts";
-import { getIdentifier as getGenericIdentifier } from "./tx.ts";
+import { TimeRecord } from "../model/timerecord.js";
+import { TransponderCrossingData } from "../model/transponder.js";
+import { getIdentifier as getGenericIdentifier } from "./tx.js";
 
 export const inferTransponderFromRaceNumber = (raceNumber: string, txRange: number): number => {
   const raceNoInt = parseInt(raceNumber, 10);

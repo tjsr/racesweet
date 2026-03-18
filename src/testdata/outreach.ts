@@ -1,14 +1,14 @@
-import { ExcelResourceProvider } from "../controllers/resource/excel.ts";
+import { ExcelResourceProvider } from "../controllers/resource/excel.js";
 import { GenericTestSession } from "./genericTestSession.js";
-import type { GreenFlagRecord } from "../model/flag.ts";
-import type { RaceState } from "../model/racestate.ts";
-import { ResourceProvider } from "../controllers/resource/provider.ts";
-import type { TestSession } from "./testsession.ts";
+import type { GreenFlagRecord } from "../model/flag.js";
+import type { RaceState } from "../model/racestate.js";
+import { ResourceProvider } from "../controllers/resource/provider.js";
+import type { TestSession } from "./testsession.js";
 import { WorkBook } from "xlsx";
-import { createGreenFlagEvent } from "../controllers/flag.ts";
-import { getTestFilePath } from "../testing/testDataFiles.ts";
-import { parseFile as parseOutreachCrossingsFile } from "../parsers/outreach.ts";
-import { readParticipantsFromWorkbook } from "../controllers/participant.ts";
+import { createGreenFlagEvent } from "../controllers/flag.js";
+import { getTestFilePath } from "../testing/testDataFiles.js";
+import { parseFile as parseOutreachCrossingsFile } from "../parsers/outreach.js";
+import { readParticipantsFromWorkbook } from "../controllers/participant.js";
 
 const CATEGORIES_TEST_FILE = '2025-02-07-categories.json';
 const TEST_CROSSINGS_DATA_FILE = '192.168.1.119 2025-02-07.txt';

@@ -1,16 +1,16 @@
-import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.ts";
-import type { FlagRecord, GreenFlagRecord } from "../model/flag.ts";
-import type { ParticipantPassingRecord, TimeRecord } from "../model/timerecord.ts";
-import { ParticipantStartFlagError, StartFlagHasNoTimeError } from "../validators/errors.ts";
-import { calculateParticipantElapsedTimes, getParticipantNumber, getParticipantTransponders, getPassingsForParticipant } from "./participant.ts";
-import { elapsedTimeMilliseconds, millisecondsToTime } from "../app/utils/timeutils.ts";
-import { getFlagEvents, getOrCacheGreenFlagForCategory } from "./flag.ts";
-import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.ts";
+import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
+import type { FlagRecord, GreenFlagRecord } from "../model/flag.js";
+import type { ParticipantPassingRecord, TimeRecord } from "../model/timerecord.js";
+import { ParticipantStartFlagError, StartFlagHasNoTimeError } from "../validators/errors.js";
+import { calculateParticipantElapsedTimes, getParticipantNumber, getParticipantTransponders, getPassingsForParticipant } from "./participant.js";
+import { elapsedTimeMilliseconds, millisecondsToTime } from "../app/utils/timeutils.js";
+import { getFlagEvents, getOrCacheGreenFlagForCategory } from "./flag.js";
+import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.js";
 
-import type { EventCategoryId } from "../model/eventcategory.ts";
-import { entrantHasAnyTx } from "./participantMatch.ts";
-import { setCategoryStartForPassings } from "./category.ts";
-import { warn } from "../utils.ts";
+import type { EventCategoryId } from "../model/eventcategory.js";
+import { entrantHasAnyTx } from "./participantMatch.js";
+import { setCategoryStartForPassings } from "./category.js";
+import { warn } from "../utils.js";
 
 const MINIMUM_LAP_TIME_SECONDS = 300;
 

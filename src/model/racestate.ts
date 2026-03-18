@@ -1,22 +1,22 @@
-import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError, SessionStateError } from "../validators/errors.ts";
-import type { EventCategory, EventCategoryId } from "./eventcategory.ts";
-import type { EventParticipant, EventParticipantId } from "./eventparticipant.ts";
-import type { FlagRecord, GreenFlagRecord } from "./flag.ts";
-import { FlagReferencesUnknownCategoryError, InvalidFlagRecordError } from "./errors.ts";
-import { ParticipantNotFoundError, assignParticpantsToCrossings } from "../controllers/participant.ts";
-import type { ParticipantPassingRecord, TimeRecord, TimeRecordId, Validated } from "./timerecord.ts";
-import { addError, compareByTime, isCrossingRecord } from "../controllers/timerecord.ts";
-import { getOrCacheGreenFlagForCategory, hasCategoryIds, isFlagRecord } from "../controllers/flag.ts";
-import { processAllParticipantLaps, processParticipantLaps } from "../controllers/laps.ts";
+import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError, SessionStateError } from "../validators/errors.js";
+import type { EventCategory, EventCategoryId } from "./eventcategory.js";
+import type { EventParticipant, EventParticipantId } from "./eventparticipant.js";
+import type { FlagRecord, GreenFlagRecord } from "./flag.js";
+import { FlagReferencesUnknownCategoryError, InvalidFlagRecordError } from "./errors.js";
+import { ParticipantNotFoundError, assignParticpantsToCrossings } from "../controllers/participant.js";
+import type { ParticipantPassingRecord, TimeRecord, TimeRecordId, Validated } from "./timerecord.js";
+import { addError, compareByTime, isCrossingRecord } from "../controllers/timerecord.js";
+import { getOrCacheGreenFlagForCategory, hasCategoryIds, isFlagRecord } from "../controllers/flag.js";
+import { processAllParticipantLaps, processParticipantLaps } from "../controllers/laps.js";
 
-import type { ChipCrossingData } from "./chipcrossing.ts";
-import type { EventTeam } from "./eventteam.ts";
-import type { MapOf } from "./types.ts";
-import { crossingMatchesParticipantIdentifiers } from "../controllers/participantMatch.ts";
-import { isParsedChipCrossing } from "../controllers/chipCrossing.ts";
-import { isPlaceholderCatgegory } from "../controllers/category.ts";
-import { isValidId } from "../validators/isValidId.ts";
-import { listToMap } from "../utils.ts";
+import type { ChipCrossingData } from "./chipcrossing.js";
+import type { EventTeam } from "./eventteam.js";
+import type { MapOf } from "./types.js";
+import { crossingMatchesParticipantIdentifiers } from "../controllers/participantMatch.js";
+import { isParsedChipCrossing } from "../controllers/chipCrossing.js";
+import { isPlaceholderCatgegory } from "../controllers/category.js";
+import { isValidId } from "../validators/isValidId.js";
+import { listToMap } from "../utils.js";
 
 export interface RaceStateLookup {
   getParticipantById(participantId: EventParticipantId): EventParticipant | undefined;

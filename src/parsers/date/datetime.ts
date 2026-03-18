@@ -1,12 +1,12 @@
-import { DateParseError, InvalidDateTimeStringError, TimeParseError } from "./errors.ts";
+import { DateParseError, InvalidDateTimeStringError, TimeParseError } from "./errors.js";
 import { TZDate, tz } from "@date-fns/tz";
 
-import type { RFC3339DateStamp } from "./dateutils.ts";
+import type { RFC3339DateStamp } from "./dateutils.js";
 import { formatRFC3339 } from "date-fns";
-import { parseDateString } from "./datestring.ts";
+import { parseDateString } from "./datestring.js";
 import { parseISO } from "date-fns/parseISO";
-import { splitDateTime } from "./splitDateTime.ts";
-import { validateTimeString } from "../../validators/time.ts";
+import { splitDateTime } from "./splitDateTime.js";
+import { validateTimeString } from "../../validators/time.js";
 
 export const systemDateString = /^(?<year>\d{4})[-/](?<month>\d{1,2})[-/](?<day>\d{1,2})$/;
 // const reverseDateString = /^(?<day>\d{1,2})[-/](?<month>\d{1,2})[-/](?<year>\d{4})$/;

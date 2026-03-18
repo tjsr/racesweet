@@ -1,11 +1,11 @@
-import { GenericTestSession } from "./genericTestSession.ts";
+import { GenericTestSession } from "./genericTestSession.js";
 import type { PathLike } from "fs";
-import type { RaceState } from "../model/racestate.ts";
-import { ResourceProvider } from "../controllers/resource/provider.ts";
-import { RfidResourceProvider } from "../controllers/resource/rfid.ts";
-import type { TestSession } from "./testsession.ts";
-import { createGreenFlagEvent } from "../controllers/flag.ts";
-import { getTestFilePath } from "../testing/testDataFiles.ts";
+import type { RaceState } from "../model/racestate.js";
+import { ResourceProvider } from "../controllers/resource/provider.js";
+import { RfidResourceProvider } from "../controllers/resource/rfid.js";
+import type { TestSession } from "./testsession.js";
+import { createGreenFlagEvent } from "../controllers/flag.js";
+import { getTestFilePath } from "../testing/testDataFiles.js";
 import { loadCategoriesFromJsonFile } from '../controllers/import.ts';
 
 const TEST_CROSSINGS_DATA_FILE = 'rfid-2025-06-06.txt';

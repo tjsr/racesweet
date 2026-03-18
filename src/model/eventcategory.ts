@@ -1,6 +1,6 @@
-import type { ISO8601DateTime, ISO8601Duration, IdType, WithId } from "./types.ts";
+import type { ISO8601DateTime, ISO8601Duration, IdType, WithId } from "./types.js";
 
-import type { TimeRecord } from "./timerecord.ts";
+import type { TimeRecord } from "./timerecord.js";
 
 export type EventCategoryId = IdType;
 

@@ -1,9 +1,9 @@
-import { createIdHash, safeIntOption } from "../../utils.ts";
-import type { uuid, uuidv5 } from "../../model/types.ts";
+import { createIdHash, safeIntOption } from "../../utils.js";
+import type { uuid, uuidv5 } from "../../model/types.js";
 
-import { InvalidRfidTimingFormatError } from "./errors.ts";
-import { RFIDTimingChipCrossingData } from "./model.ts";
-import type { UnparsedTimeStringEvent } from "../../model/timerecord.ts";
+import { InvalidRfidTimingFormatError } from "./errors.js";
+import { RFIDTimingChipCrossingData } from "./model.js";
+import type { UnparsedTimeStringEvent } from "../../model/timerecord.js";
 import { v5 } from 'uuid';
 
 const outreachRfidTimingFormatPattern: RegExp = /(?<antenna>\d+),(?<chipCode>\d+),(?<hexChipCode>[0-f]+),"?(?<timeString>[\d\-/\s:.]+)"?(,(?<reader>\d+),(?<antenna2>\d+))?/;

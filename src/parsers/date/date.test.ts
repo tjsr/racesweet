@@ -1,4 +1,4 @@
-import { fixDateInDateTimeString } from "./datetime.ts";
+import { fixDateInDateTimeString } from "./datetime.js";
 
 describe('Date', () => {
   it('Should parse a basic date format as a valid date.', () => {

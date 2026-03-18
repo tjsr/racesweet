@@ -1,20 +1,20 @@
-import { CategoryNotFoundError, type EventCategoryId } from "../model/eventcategory.ts";
+import { CategoryNotFoundError, type EventCategoryId } from "../model/eventcategory.js";
 import { v1 as randomUUID, v5 as uuidv5 } from "uuid";
 import type {
   ApicalLapByCategory,
 } from "../model/apical.ts";
-import type { EventId } from "../model/types.ts";
-import { GenericTestSession } from "./genericTestSession.ts";
-import { MAX_ERRORS } from "../parsers/rfidtiming/settings.ts";
-import type { RaceState } from "../model/racestate.ts";
-import { ResourceProvider } from "../controllers/resource/provider.ts";
-import { RfidResourceProvider } from "../controllers/resource/rfid.ts";
-import type { TestSession } from "./testsession.ts";
+import type { EventId } from "../model/types.js";
+import { GenericTestSession } from "./genericTestSession.js";
+import { MAX_ERRORS } from "../parsers/rfidtiming/settings.js";
+import type { RaceState } from "../model/racestate.js";
+import { ResourceProvider } from "../controllers/resource/provider.js";
+import { RfidResourceProvider } from "../controllers/resource/rfid.js";
+import type { TestSession } from "./testsession.js";
 // import type { TimeRecord } from "../model/timerecord.ts";
-import { TimeRecord } from "../model/timerecord.ts";
-import { convertDataToRaceState } from "../parsers/apical.ts";
-import { createEventCategoryIdFromCategoryCode } from "../controllers/category.ts";
-import { createGreenFlagEvent } from "../controllers/flag.ts";
+import { TimeRecord } from "../model/timerecord.js";
+import { convertDataToRaceState } from "../parsers/apical.js";
+import { createEventCategoryIdFromCategoryCode } from "../controllers/category.js";
+import { createGreenFlagEvent } from "../controllers/flag.js";
 import { getRfidSourceUuid } from "../parsers/rfidtiming/rfidtiming";
 // import { parseFile } from "../parsers/rfidtiming/file.ts";
 // import LocalFileResourceProvider from "../controllers/resource/local.ts";

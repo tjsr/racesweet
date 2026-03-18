@@ -1,23 +1,23 @@
-import type { ChipCodeType, EventParticipantId } from "../model/eventparticipant.ts";
-import type { EventCategory, EventCategoryId, EventParticipant, ParticipantIdentifier, TimeRecord } from "../model/index.ts";
-import { ImportMappings, SheetData, findColumnNameForSheetColumn, readXlsxFileToJson, readXlsxWorkbookToJson } from "./resource/excel.ts";
+import type { ChipCodeType, EventParticipantId } from "../model/eventparticipant.js";
+import type { EventCategory, EventCategoryId, EventParticipant, ParticipantIdentifier, TimeRecord } from "../model/index.js";
+import { ImportMappings, SheetData, findColumnNameForSheetColumn, readXlsxFileToJson, readXlsxWorkbookToJson } from "./resource/excel.js";
 import type { WorkBook, WorkSheet } from 'xlsx';
-import { compareByTime, getTimeRecordIdentifier, isCrossingRecord, isRecordAfterStart } from "./timerecord.ts";
+import { compareByTime, getTimeRecordIdentifier, isCrossingRecord, isRecordAfterStart } from "./timerecord.js";
 import {
   findCategoryByName,
   findOrCreateCategory
 } from "./category.ts";
 import { v1 as randomUUID, v5 as uuidv5 } from 'uuid';
 
-import { CategoryNotFoundError } from "../model/eventcategory.ts";
-import type { EventId } from "../model/types.ts";
-import type { GreenFlagRecord } from "../model/flag.ts";
-import type { ParticipantPassingRecord } from "../model/timerecord.ts";
-import { ParticipantSpreadsheetError } from "../model/errors.ts";
+import { CategoryNotFoundError } from "../model/eventcategory.js";
+import type { EventId } from "../model/types.js";
+import type { GreenFlagRecord } from "../model/flag.js";
+import type { ParticipantPassingRecord } from "../model/timerecord.js";
+import { ParticipantSpreadsheetError } from "../model/errors.js";
 import type { PathLike } from "fs";
-import { assignEntrantToTime } from "./crossing.ts";
-import { elapsedTimeMilliseconds } from "../app/utils/timeutils.ts";
-import { validateStartFlag } from "../validators/startflag.ts";
+import { assignEntrantToTime } from "./crossing.js";
+import { elapsedTimeMilliseconds } from "../app/utils/timeutils.js";
+import { validateStartFlag } from "../validators/startflag.js";
 import xlsx from 'xlsx';
 
 const silent: string[] = ['addParticipantIdentifier'];

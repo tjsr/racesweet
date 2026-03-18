@@ -1,10 +1,10 @@
 import type { ChipCrossingData, TimeRecord } from "../../model";
 import type { PathLike, ReadStream } from "fs";
 
-import { closeStream } from "../../utils/stream.ts";
+import { closeStream } from "../../utils/stream.js";
 import { getFileStream } from '../../utils/file.ts';
-import { parseRfidDataStream } from "./stream.ts";
-import { parseUnparsedChipCrossings } from "../genericTimeParser.ts";
+import { parseRfidDataStream } from "./stream.js";
+import { parseUnparsedChipCrossings } from "../genericTimeParser.js";
 import { v5 as uuidv5 } from 'uuid';
 
 export const parseFile = async (filePath: PathLike, fileEventDate: Date): Promise<TimeRecord[]> => {

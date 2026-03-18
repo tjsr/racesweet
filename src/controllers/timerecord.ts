@@ -1,17 +1,17 @@
-import type { EventTimeRecord, ParticipantPassingRecord, TimeRecord, Validated } from "../model/timerecord.ts";
-import { assertValidTimeRecord, moveForwardIfUndefined } from "./crossingList.ts";
+import type { EventTimeRecord, ParticipantPassingRecord, TimeRecord, Validated } from "../model/timerecord.js";
+import { assertValidTimeRecord, moveForwardIfUndefined } from "./crossingList.js";
 import { getChipIdentifier, isChipCrossing } from './chipCrossing.ts';
 import { getTransmitterIdentifier, isTransmitterCrossing } from './transmitter.ts';
 import { getTransponderIdentifier, isTransponderCrossing } from './transponder.ts';
-import { isFlagRecord, isStartRecord } from "./flag.ts";
+import { isFlagRecord, isStartRecord } from "./flag.js";
 
-import { AutomaticTimingIdentifiactionCrossing } from "../model/timingdevice.ts";
-import type { ChipCrossingData } from "../model/chipcrossing.ts";
-import type { PlateCrossingData } from "../model/platecrossing.ts";
-import type { StartRecord } from "../model/flag.ts";
-import { TransmitterCrossingData } from "../model/transmitter.ts";
-import { TransponderCrossingData } from "../model/transponder.ts";
-import { isPlateCrossing } from "./plateCrossing.ts";
+import { AutomaticTimingIdentifiactionCrossing } from "../model/timingdevice.js";
+import type { ChipCrossingData } from "../model/chipcrossing.js";
+import type { PlateCrossingData } from "../model/platecrossing.js";
+import type { StartRecord } from "../model/flag.js";
+import { TransmitterCrossingData } from "../model/transmitter.js";
+import { TransponderCrossingData } from "../model/transponder.js";
+import { isPlateCrossing } from "./plateCrossing.js";
 
 const formatTime = (time: Date | undefined): string => {
   if (!time) {

@@ -1,12 +1,12 @@
-import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.ts";
-import { getParticipantIdentifiers, validateIdentifierType } from "./participant.ts";
+import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
+import { getParticipantIdentifiers, validateIdentifierType } from "./participant.js";
 
-import { type ChipCrossingData } from "../model/chipcrossing.ts";
-import type { ParticipantPassingRecord } from "../model/timerecord.ts";
-import type { PlateCrossingData } from "../model/platecrossing.ts";
-import type { PlateNumberType } from "../model/types.ts";
-import { asParsedChipCrossing } from "./chipCrossing.ts";
-import { asUnparsedPlateCrossing } from "./plateCrossing.ts";
+import { type ChipCrossingData } from "../model/chipcrossing.js";
+import type { ParticipantPassingRecord } from "../model/timerecord.js";
+import type { PlateCrossingData } from "../model/platecrossing.js";
+import type { PlateNumberType } from "../model/types.js";
+import { asParsedChipCrossing } from "./chipCrossing.js";
+import { asUnparsedPlateCrossing } from "./plateCrossing.js";
 
 export const entrantHasIdentifier = (
   idenfitier: string | number | undefined,

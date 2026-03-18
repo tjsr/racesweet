@@ -1,4 +1,4 @@
-import { AutomaticTimingIdentifiactionCrossing } from "./tx.ts";
+import { AutomaticTimingIdentifiactionCrossing } from "./tx.js";
 
 export type node = 'transponderId';
 

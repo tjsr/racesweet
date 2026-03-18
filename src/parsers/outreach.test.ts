@@ -1,6 +1,6 @@
 import { parseFile, parseOutreachLine, parseSimpleOutreachChipLine } from "./outreach.js";
 
-import type { UnsourcedOutreachChipCrossingData } from "./outreach.ts";
+import type { UnsourcedOutreachChipCrossingData } from "./outreach.js";
 import path from 'node:path';
 
 const testdata_dir = path.resolve(path.join('.', 'src', 'testdata'));

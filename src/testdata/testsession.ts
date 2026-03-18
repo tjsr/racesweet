@@ -1,4 +1,4 @@
-import type { Session } from "../model/racestate.ts";
+import type { Session } from "../model/racestate.js";
 
 export interface TestSession extends Session {
   loadTestData(noBulkProcess: boolean): Promise<void>;

@@ -1,7 +1,7 @@
 import { v1 as randomUUID, v5 as uuidv5 } from "uuid";
 
-import { ApicalTestRace } from "./apical.ts";
-import LocalFileResourceProvider from "../controllers/resource/local.ts";
+import { ApicalTestRace } from "./apical.js";
+import LocalFileResourceProvider from "../controllers/resource/local.js";
 
 // class ApicalElectronFile extends ApicalTestRace {
 //   constructor() {

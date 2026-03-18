@@ -1,8 +1,8 @@
-import { ParticipantSpreadsheetError } from "../../model/errors.ts";
+import { ParticipantSpreadsheetError } from "../../model/errors.js";
 import type { PathLike } from "fs";
-import { ResourceProvider } from "./provider.ts";
+import { ResourceProvider } from "./provider.js";
 import type { WorkBook } from "xlsx";
-import { readJsonFromSheet } from "../participant.ts";
+import { readJsonFromSheet } from "../participant.js";
 import xlsx from "xlsx";
 
 export class ColumnNotInSpreadsheetError extends ParticipantSpreadsheetError {

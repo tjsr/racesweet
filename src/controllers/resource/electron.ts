@@ -1,5 +1,5 @@
-import { FileReadDataType } from "../../app/window.ts";
-import { ResourceProvider } from "./provider.ts";
+import { FileReadDataType } from "../../app/window.js";
+import { ResourceProvider } from "./provider.js";
 
 export abstract class  ElectronResourceProvider<ResourceType> implements ResourceProvider<ResourceType> {
   _path: string | undefined;

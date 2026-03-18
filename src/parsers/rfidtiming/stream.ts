@@ -1,11 +1,13 @@
-import { handleIteration, iterateRfidData } from "./fromIterator.ts";
+import { handleIteration, iterateRfidData } from "./fromIterator.js";
 
-import { ChipCrossingData } from "../../model/chipcrossing.ts";
-import { MAX_ERRORS } from "./settings.ts";
-import { RFIDTimingChipCrossingData } from "./model.ts";
+import { ChipCrossingData } from "../../model/chipcrossing.js";
+import { MAX_ERRORS } from "./settings.js";
+import { RFIDTimingChipCrossingData } from "./model.js";
 import { ReadStream } from "fs";
+import { uuid } from "../../model/types.js";
+
 // import { parseRfidLine } from "./rfidtiming.ts";
-import { uuid } from "../../model/types.ts";
+
 
 export async function* iterateRfidStream(
   iterator: AsyncIterable<string>,

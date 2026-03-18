@@ -1,5 +1,5 @@
 import type { EventCategory, EventCategoryId, PlaceholderCategory } from '../model/eventcategory.ts';
-import type { EventId, IdType } from "../model/types.ts";
+import type { EventId, IdType } from "../model/types.js";
 import type { ParticipantPassingRecord, PassingRecordId, TimeRecord } from '../model/timerecord.ts';
 import { elapsedTimeMilliseconds, getElapsedTimeStart, millisecondsToTime } from '../app/utils/timeutils.ts';
 

@@ -1,9 +1,9 @@
-import { InvalidDateTimeStringError } from "./errors.ts";
+import { InvalidDateTimeStringError } from "./errors.js";
 import { TZDate } from "@date-fns/tz";
 import { formatRFC3339 } from "date-fns";
-import { hasDateComponent } from "./datetime.ts";
-import { parseDateString } from "./datestring.ts";
-import { timeToLocal } from "./dateutils.ts";
+import { hasDateComponent } from "./datetime.js";
+import { parseDateString } from "./datestring.js";
+import { timeToLocal } from "./dateutils.js";
 
 const timeStringHasTimezone = (time: string): boolean => time?.includes('Z') || time?.includes('+');
 

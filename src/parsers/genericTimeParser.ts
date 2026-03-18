@@ -1,8 +1,8 @@
-import type { ChipCrossingData } from "../model/chipcrossing.ts";
-import type { TimeRecord } from "../model/timerecord.ts";
-import { asUnparsedChipCrossing } from "../controllers/chipCrossing.ts";
+import type { ChipCrossingData } from "../model/chipcrossing.js";
+import type { TimeRecord } from "../model/timerecord.js";
+import { asUnparsedChipCrossing } from "../controllers/chipCrossing.js";
 import { formatRFC3339 } from "date-fns";
-import { timeOrTimeToday } from "./date/dateutils.ts";
+import { timeOrTimeToday } from "./date/dateutils.js";
 
 export const parseUnparsedChipCrossings = (
   eventDate: Date,

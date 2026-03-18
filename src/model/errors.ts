@@ -1,4 +1,4 @@
-import type { TimeRecord } from "./timerecord.ts";
+import type { TimeRecord } from "./timerecord.js";
 
 class DataImportError extends Error {
   constructor(message: string) {
