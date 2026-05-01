@@ -42,23 +42,25 @@ export const writeJsonEventCache = async (events: ApicalEventListResponse, outpu
   return fs.writeFile(outputFile, jsonData, 'utf-8');
 };
 
-export const loadCachedOrUpdatedEventList = async (): Promise<ApicalEventListResponse> => {
-  return fs.stat('cachedEvents.json').then(async (stats) => {
-    const existingData = await fs.readFile('cachedEvents.json', 'utf-8');
+export const loadCachedOrUpdatedEventList = async (cacheFileName: string, excludedEventIds: number[] = []): Promise<ApicalEventListResponse> => {
+  return fs.stat(cacheFileName).then(async (stats) => {
+    const existingData = await fs.readFile(cacheFileName, 'utf-8');
     if (existingData) {
-      console.log('Loaded event list from cache');
+      console.log(`Loaded event list from cache at ${cacheFileName}`);
       return JSON.parse(existingData);
-    } throw new Error('Cached event list file is empty');
+    } throw new Error(`Cached event list file ${cacheFileName} is empty`);
   }).catch((err) => {
-    console.log('No cached event list found, fetching new data...');
+    console.log(`No cached event list found at ${cacheFileName}, fetching new data...`);
     return getApicalEventList().then((data: ApicalEventListResponse) => {
       console.log('Fetched event list from API, caching to file...');
           
-      const returnData = data.filter((e) => e.Name.includes("NF"));
-      return writeJsonEventCache(data, 'cachedEvents.json').then(() => {
-        console.log('Event list cached successfully');
-        return returnData;
+      return writeJsonEventCache(data, cacheFileName).then(() => {
+        console.log(`Event list cached successfully to ${cacheFileName}`);
+        return data;
       });
     });
+  }).then((events: ApicalEventListResponse) => {
+    const filteredEvents = events.filter((e) => e.Name.includes("NF") && !excludedEventIds.includes(e.Id));
+    return filteredEvents;
   });
 };

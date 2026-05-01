@@ -8,12 +8,14 @@ export const getEntrantLapTimeMap = (lapsData: ApicalSpreadsheetLapsRow[]): Map<
   lapsData
     .filter((lap) => !(lap.FullName.toLowerCase().includes("unknown")))
     .forEach((lap) => {
-    const entrantName = lap.FullName.toLowerCase();
-    const lapTime = lap.LapSeconds;
-    if (!entrantLapTimes.has(entrantName)) {
-      entrantLapTimes.set(entrantName, []);
+      const entrantName = lap.FullName.toLowerCase();
+      const entrantCategory = lap.CategoryName.toLowerCase();
+      const lapTime = lap.LapSeconds;
+      const entrantKey: string = `${entrantCategory}-${entrantName}`;
+    if (!entrantLapTimes.has(entrantKey)) {
+      entrantLapTimes.set(entrantKey, []);
     }
-    entrantLapTimes.get(entrantName)?.push(lapTime);
+    entrantLapTimes.get(entrantKey)?.push(lapTime);
   });
   
   return entrantLapTimes;
@@ -64,6 +66,7 @@ export interface EventHandicapData {
 
 export interface EventEntrantHandicapData {
   name: string;
+  category: string;
   medianLapTime: number;
   ratioScore: number;
 }
@@ -77,10 +80,17 @@ export const calculateEventHandicapData = (event: { Id: number; Name: string }, 
 
   const result: EventHandicapData = {
     entrantData: Array.from(medianLaps.entries()).map(([entrant, median]) => {
+      const entrantCategory: string = lapsData.find(
+        (lap: ApicalSpreadsheetLapsRow) => {
+          console.log(lap.FullName + '=>' + lap.CategoryName);
+          return lap.FullName.toLowerCase() === entrant;
+        }
+      )?.CategoryName || 'Unknown';
       const ratioScore = (median - lowMedian) / (highMedian - lowMedian);
       return {
         medianLapTime: median,
         name: entrant,
+        category: entrantCategory,
         ratioScore,
       };
     }),

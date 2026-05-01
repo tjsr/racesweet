@@ -65,14 +65,14 @@ export const generateOrGetCachedEventPath = async (eventId: number): Promise<str
   let dataPath: string;
 
   if (!await apicalDataFileExists(eventId)) {
-    console.log(`No data file exists for eventId ${eventId}. Generating new Excel data...`);
+    // console.log(`No data file exists for eventId ${eventId}. Generating new Excel data...`);
     dataPath = await generateExcelData(eventId).then((response: ApicalExportToExcelResponse) => {
       const { FileGuid, FileName, Cookie } = response;
-      console.log(`Generated Excel data for event ID ${eventId}: FileGuid=${FileGuid}, FileName=${FileName}`);
+      // console.log(`Generated Excel data for event ID ${eventId}: FileGuid=${FileGuid}, FileName=${FileName}`);
       return retrieveExcelData(FileGuid, FileName, eventId, Cookie);
     });
   } else {
-    console.log(`Data file already exists for eventId ${eventId}. Using cached data...`);
+    // console.log(`Data file already exists for eventId ${eventId}. Using cached data...`);
     dataPath = getApicalEventExcelFilePath(eventId);
   }
   return dataPath;

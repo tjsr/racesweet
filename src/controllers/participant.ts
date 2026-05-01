@@ -339,7 +339,7 @@ const processParticipantRow = (
   }
   const createUnknownCategories: boolean = true;
 
-  const categoryName = row[categorySheetHeader] as string;
+  const categoryName: string = row[categorySheetHeader] as string;
 
   const category: EventCategory | null = createUnknownCategories ? findOrCreateCategory(categoryList, { name: categoryName }) : findCategoryByName(categoryList, categoryName);
   if (!category) {

@@ -43,7 +43,7 @@ export const scaleEventScore = (score: number, highestEventRatio: number, lowest
 };
 
 const isDebugRider = (entrantName: string): boolean => {
-  const debugRiders = ['gavin erickson', 'adrian dillon', 'nick pile'];
+  const debugRiders: string[] = [];  // 'gavin erickson', 'adrian dillon', 'nick pile'];
   return debugRiders.includes(entrantName);
 }
 
@@ -53,7 +53,7 @@ const scaleHandicapData = (progressiveHandicapData: Map<string, number>, eventHa
   const lowestRanked = findLowestRankedEntrant(progressiveHandicapData, eventHandicapData);
   const lowestEventRatio: number | undefined = lowestRanked ? eventHandicapData.entrantData.find((entrant) => entrant.name === lowestRanked)?.ratioScore || 1.0 : 1.0;
 
-  console.log(`Fastest rider for this event was ${highestRanked}=${highestEventRatio.toFixed(4)}, lowest was ${lowestRanked}=${lowestEventRatio.toFixed(4)}`);
+  // console.log(`Fastest rider for this event was ${highestRanked}=${highestEventRatio.toFixed(4)}, lowest was ${lowestRanked}=${lowestEventRatio.toFixed(4)}`);
   const correctedHandicaps = eventHandicapData.entrantData.map(
     (value: EventEntrantHandicapData) => {
       try {
@@ -95,7 +95,7 @@ const getEntrantRoundData = (entrantName: string, roundHandicapData: Map<string,
 };
 
 export const outputProcessedHandicaps = (progressiveHandicapData: Map<string, number>, roundHandicapData: Map<string, string>): void => {
-  console.log('Processed Handicap Data:');
+  // console.log('Processed Handicap Data:');
   let handicaps:ProcessedHandicapData[] = [];
   progressiveHandicapData.forEach((handicapTime, entrant) => {
     handicaps.push({ name: entrant, handicapRatio: handicapTime });

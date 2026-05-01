@@ -1,7 +1,7 @@
 #!tsx
 
-import { calculateEventHandicapData, EventHandicapData, getAllMedianLapTimes, getEntrantLapTimeMap, outputHandicapsInOrder } from './apicalData.js';
-import { ApicalEventListResponse, ApicalEventResponseEventData, ExtendedApicalEventListData, getApicalEventList, loadCachedOrUpdatedEventList, writeJsonEventCache } from './apicalEventList.js';
+import { calculateEventHandicapData, EventEntrantHandicapData, EventHandicapData } from './apicalData.js';
+import { ApicalEventListResponse, ApicalEventResponseEventData, ExtendedApicalEventListData, loadCachedOrUpdatedEventList, writeJsonEventCache } from './apicalEventList.js';
 import { ApicalSpreadsheetLapsRow, readTempApicalExcelFile } from './apicalEventSpreadsheet.js';
 import { apicalDataFileExists, generateOrGetCachedEventPath } from './excelGenerate.js';
 import { readFileSync } from 'fs';
@@ -10,12 +10,15 @@ import { count } from 'console';
 
 console.log('Starting apicalTest...');
 const CACHED_EVENTS_FILE = 'cachedEvents.json';
+const EXCLUDE_EVENTS = [
+  46, // Summer NFF 2 - didn't run
+  48, // Multi-part race - race 1
+  49, // Multipart race - race 2
+];
 
 (async () => {
   try {
-    console.log('Calling getApicalEventList...');
-
-    const events: ApicalEventListResponse = await loadCachedOrUpdatedEventList();
+    const events: ApicalEventListResponse = await loadCachedOrUpdatedEventList(CACHED_EVENTS_FILE, EXCLUDE_EVENTS);
 
     let file;
     try {
@@ -28,11 +31,11 @@ const CACHED_EVENTS_FILE = 'cachedEvents.json';
     const eventPromises: Promise<ExtendedApicalEventListData>[] = events.map(
       (event: ApicalEventResponseEventData) => new Promise<ExtendedApicalEventListData>(async (resolve, reject) => {
 
-        console.log(`Event ID: ${event.Id}, Name: ${event.Name}, Date: ${event.EventDate}`);
+        // console.log(`Event ID: ${event.Id}, Name: ${event.Name}, Date: ${event.EventDate}`);
         if (await apicalDataFileExists(event.Id)) {
-          console.log(`Data file exists for event ID: ${event.Id}`);
+          // console.log(`Data file exists for event ID: ${event.Id}`);
         } else {
-          console.log(`Data file does not exist for event ID: ${event.Id}`);
+          // console.log(`Data file does not exist for event ID: ${event.Id}`);
         }
         const cachedEvent: ExtendedApicalEventListData | undefined = cachedEvents.find((ce) => ce.Id === event.Id);
 
@@ -59,24 +62,39 @@ const CACHED_EVENTS_FILE = 'cachedEvents.json';
       }));
     
     const countOccurrences = (str: string, char: string): number => (str.match(new RegExp(char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
-    const generateEventHandicapList = (data: ExtendedApicalEventListData[]): Map<string, string> => {
+    const generateEventHandicapList = (events: ExtendedApicalEventListData[]): Map<string, string> => {
       const output: Map<string, string> = new Map<string, string>();
-      data.forEach((d: ExtendedApicalEventListData, idx: number) => {
-        d.EventHandicapData?.entrantData.forEach((entrant) => {
+      events.forEach((d: ExtendedApicalEventListData, eventIndex: number) => {
+        const eventNumber = eventIndex + 1;
+
+        d.EventHandicapData?.entrantData.forEach((entrant: EventEntrantHandicapData) => {
           // const existingEntrant: string = output.get(entrant.name)!;
           let existingVal: string | undefined = output.get(entrant.name) || '';
-          while (countOccurrences(existingVal, ",") < idx) {
-            existingVal = existingVal + ",";
+          const entrantEventNumber = countOccurrences(existingVal, ",");
+          let roundsMissing = eventNumber - entrantEventNumber;
+          let outputRound = countOccurrences(existingVal, ",") + 1;
+          while (outputRound < eventNumber) {
+            const crstr = outputRound + "=";
+            existingVal = existingVal + "," + crstr + ":";
+            outputRound = countOccurrences(existingVal, ",") + 1;
           }
-          existingVal = existingVal + entrant.ratioScore.toFixed(4);
+          existingVal = existingVal + "," + outputRound + "=" + entrant.ratioScore.toFixed(4) +":" + entrant.medianLapTime.toFixed(0);
           output.set(entrant.name, existingVal);
         });
+
+        // Append commas to entrants who did not participate in this event to maintain alignment
         output.forEach((val: string, key: string) => {
-          while (countOccurrences(val, ",") < idx) {
-            val = val + ",";
+          let currentRound = countOccurrences(val, ",") + 1;
+          while (currentRound <= eventNumber) {
+            const crstr = currentRound + "=";
+            val = val + "," + crstr + ":";
+            currentRound = countOccurrences(val, ",") + 1;
           }
           output.set(key, val);
         });
+      });
+      output.forEach((val: string, key: string) => {
+        output.set(key, val.replaceAll(/[:=]/g, ","));
       });
       return output;
     };
@@ -90,14 +108,15 @@ const CACHED_EVENTS_FILE = 'cachedEvents.json';
           // console.log(`Event handicap data for event ID ${event.Id}/${event.Name}:`);
           // outputHandicapsInOrder(event.EventHandicapData);
           processHandicaps(outputHandicapData, event.EventHandicapData);
+          // processMediaLaps(event.EventHandicapData);
         }
       });
 
-      console.log(`Total events: ${events.length}`);
+      // console.log(`Total events: ${events.length}`);
       outputProcessedHandicaps(outputHandicapData, riderEventHandicapList);
       return writeJsonEventCache(sortedEvents, CACHED_EVENTS_FILE);
     }).then(() => { 
-      console.log(`Event cache written to ${CACHED_EVENTS_FILE}`);
+      // console.log(`Event cache written to ${CACHED_EVENTS_FILE}`);
     });
 
   } catch (error) {
@@ -105,5 +124,3 @@ const CACHED_EVENTS_FILE = 'cachedEvents.json';
     process.exit(1);
   }
 })();
-
-console.log('Test');

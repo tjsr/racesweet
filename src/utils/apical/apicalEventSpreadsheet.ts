@@ -46,17 +46,17 @@ export const retrieveExcelData = async (fileGuid: string, fileName: string, even
 
       console.debug(`[${response.status}] Queried URL ${url}`);
       
-      console.log('Response headers:', response.headers.get('content-type'));
-      console.log('Response status:', response.status);
+      // console.log('Response headers:', response.headers.get('content-type'));
+      // console.log('Response status:', response.status);
       
       const blob = await response.blob();
-      console.log('Blob size:', blob.size);
+      // console.log('Blob size:', blob.size);
       
       const buffer = await blob.arrayBuffer();
-      console.log('ArrayBuffer size:', buffer.byteLength);
+      // console.log('ArrayBuffer size:', buffer.byteLength);
       
       const nodeBuffer = Buffer.from(buffer);
-      console.log('Buffer size:', nodeBuffer.length);
+      // console.log('Buffer size:', nodeBuffer.length);
 
       const eventFileOutputPath = getApicalEventExcelFilePath(eventId);
       await fs.writeFile(eventFileOutputPath, nodeBuffer);
