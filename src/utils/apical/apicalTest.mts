@@ -1,15 +1,25 @@
 #!tsx
 
-import { calculateEventHandicapData, EventEntrantHandicapData, EventHandicapData } from './apicalData.js';
+import { readFileSync } from 'fs';
+
+import { calculateEventHandicapData, EventHandicapData } from './apicalData.js';
 import { ApicalEventListResponse, ApicalEventResponseEventData, ExtendedApicalEventListData, loadCachedOrUpdatedEventList, writeJsonEventCache } from './apicalEventList.js';
 import { ApicalSpreadsheetLapsRow, readTempApicalExcelFile } from './apicalEventSpreadsheet.js';
-import { apicalDataFileExists, generateOrGetCachedEventPath } from './excelGenerate.js';
-import { readFileSync } from 'fs';
-import { outputProcessedHandicaps, processHandicaps } from '../handicapData.js';
-import { count } from 'console';
+import { generateOrGetCachedEventPath } from './excelGenerate.js';
+import { generateEventHandicapList } from './handicapRoundData.js';
+import { mapSnapshotEvents, writeHandicapSnapshot } from './handicapSnapshotOutput.js';
+import { buildHandicapSnapshot, outputProcessedHandicaps, processHandicaps } from '../handicapData.js';
+
+const args = process.argv.slice(2);
+const forceRefreshEvents = args.includes('--refresh-events') || args.includes('--force-refresh');
+const forceRefreshExcel = args.includes('--refresh-excel') || args.includes('--force-refresh');
+
+if (forceRefreshEvents) console.log('Cache mode: forcing event list refresh');
+if (forceRefreshExcel) console.log('Cache mode: forcing Excel file refresh');
 
 console.log('Starting apicalTest...');
 const CACHED_EVENTS_FILE = 'cachedEvents.json';
+const HANDICAP_SNAPSHOT_FILE = 'src/generated/handicapSnapshot.json';
 const EXCLUDE_EVENTS = [
   46, // Summer NFF 2 - didn't run
   48, // Multi-part race - race 1
@@ -18,7 +28,11 @@ const EXCLUDE_EVENTS = [
 
 (async () => {
   try {
-    const events: ApicalEventListResponse = await loadCachedOrUpdatedEventList(CACHED_EVENTS_FILE, EXCLUDE_EVENTS);
+    const events: ApicalEventListResponse = await loadCachedOrUpdatedEventList(
+      CACHED_EVENTS_FILE,
+      EXCLUDE_EVENTS,
+      forceRefreshEvents
+    );
 
     let file;
     try {
@@ -27,97 +41,56 @@ const EXCLUDE_EVENTS = [
       console.error('Error reading cached events file:', error instanceof Error ? error.message : String(error));
     }
     const cachedEvents: ExtendedApicalEventListData[] = file ? JSON.parse(file) : [];
-    const modifiedEvents: ExtendedApicalEventListData[] = [];
-    const eventPromises: Promise<ExtendedApicalEventListData>[] = events.map(
-      (event: ApicalEventResponseEventData) => new Promise<ExtendedApicalEventListData>(async (resolve, reject) => {
 
-        // console.log(`Event ID: ${event.Id}, Name: ${event.Name}, Date: ${event.EventDate}`);
-        if (await apicalDataFileExists(event.Id)) {
-          // console.log(`Data file exists for event ID: ${event.Id}`);
-        } else {
-          // console.log(`Data file does not exist for event ID: ${event.Id}`);
-        }
-        const cachedEvent: ExtendedApicalEventListData | undefined = cachedEvents.find((ce) => ce.Id === event.Id);
+    const eventDataResults: Array<ExtendedApicalEventListData | undefined> = await Promise.all(
+      events.map(async (event: ApicalEventResponseEventData): Promise<ExtendedApicalEventListData | undefined> => {
+        try {
+          const cachedEvent: ExtendedApicalEventListData | undefined = cachedEvents.find((ce) => ce.Id === event.Id);
+          const dataPath = await generateOrGetCachedEventPath(event.Id, forceRefreshExcel);
+          const lapsData: ApicalSpreadsheetLapsRow[] = await readTempApicalExcelFile(dataPath);
+          const handicapData: EventHandicapData = calculateEventHandicapData(event, lapsData);
 
-        const extendedEvent: Partial<ExtendedApicalEventListData> = {
+          return {
             ...event,
-            ExcelDataPath: cachedEvent ? cachedEvent.ExcelDataPath : undefined,
+            EventHandicapData: handicapData,
+            ExcelDataPath: cachedEvent?.ExcelDataPath || dataPath,
           };
-
-        generateOrGetCachedEventPath(event.Id)
-          .then((dataPath) => {
-            extendedEvent.ExcelDataPath = dataPath;
-            modifiedEvents.push(extendedEvent as ExtendedApicalEventListData);
-            return readTempApicalExcelFile(dataPath);
-            // resolve(extendedEvent as ExtendedApicalEventListData);
-          })
-          .then((lapsData: ApicalSpreadsheetLapsRow[]) => {
-            const handicapData: EventHandicapData = calculateEventHandicapData(event, lapsData);
-            extendedEvent.EventHandicapData = handicapData;
-            resolve(extendedEvent as ExtendedApicalEventListData);
-          })
-          .catch((error) => {
-            console.error(`Error fetching laps data for event ID ${event.Id}/${event.Name}:`, error);
-          });
-      }));
-    
-    const countOccurrences = (str: string, char: string): number => (str.match(new RegExp(char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
-    const generateEventHandicapList = (events: ExtendedApicalEventListData[]): Map<string, string> => {
-      const output: Map<string, string> = new Map<string, string>();
-      events.forEach((d: ExtendedApicalEventListData, eventIndex: number) => {
-        const eventNumber = eventIndex + 1;
-
-        d.EventHandicapData?.entrantData.forEach((entrant: EventEntrantHandicapData) => {
-          // const existingEntrant: string = output.get(entrant.name)!;
-          let existingVal: string | undefined = output.get(entrant.name) || '';
-          const entrantEventNumber = countOccurrences(existingVal, ",");
-          let roundsMissing = eventNumber - entrantEventNumber;
-          let outputRound = countOccurrences(existingVal, ",") + 1;
-          while (outputRound < eventNumber) {
-            const crstr = outputRound + "=";
-            existingVal = existingVal + "," + crstr + ":";
-            outputRound = countOccurrences(existingVal, ",") + 1;
-          }
-          existingVal = existingVal + "," + outputRound + "=" + entrant.ratioScore.toFixed(4) +":" + entrant.medianLapTime.toFixed(0);
-          output.set(entrant.name, existingVal);
-        });
-
-        // Append commas to entrants who did not participate in this event to maintain alignment
-        output.forEach((val: string, key: string) => {
-          let currentRound = countOccurrences(val, ",") + 1;
-          while (currentRound <= eventNumber) {
-            const crstr = currentRound + "=";
-            val = val + "," + crstr + ":";
-            currentRound = countOccurrences(val, ",") + 1;
-          }
-          output.set(key, val);
-        });
-      });
-      output.forEach((val: string, key: string) => {
-        output.set(key, val.replaceAll(/[:=]/g, ","));
-      });
-      return output;
-    };
-
-    Promise.all(eventPromises).then((data: ExtendedApicalEventListData[]) => {
-      const outputHandicapData: Map<string, number> = new Map<string, number>();
-      const sortedEvents: ExtendedApicalEventListData[] = data.sort((eventDataA, eventDataB) => new Date(eventDataB.EventDate).getTime() - new Date(eventDataA.EventDate).getTime());
-      const riderEventHandicapList: Map<string, string> = generateEventHandicapList(data);
-      sortedEvents.forEach((event: ExtendedApicalEventListData) => {
-        if (event.EventHandicapData) {
-          // console.log(`Event handicap data for event ID ${event.Id}/${event.Name}:`);
-          // outputHandicapsInOrder(event.EventHandicapData);
-          processHandicaps(outputHandicapData, event.EventHandicapData);
-          // processMediaLaps(event.EventHandicapData);
+        } catch (error) {
+          console.error(`Error fetching laps data for event ID ${event.Id}/${event.Name}:`, error);
+          return undefined;
         }
-      });
+      })
+    );
 
-      // console.log(`Total events: ${events.length}`);
-      outputProcessedHandicaps(outputHandicapData, riderEventHandicapList);
-      return writeJsonEventCache(sortedEvents, CACHED_EVENTS_FILE);
-    }).then(() => { 
-      // console.log(`Event cache written to ${CACHED_EVENTS_FILE}`);
+    const validEventData: ExtendedApicalEventListData[] = eventDataResults.filter(
+      (event): event is ExtendedApicalEventListData => event !== undefined
+    );
+
+    if (validEventData.length === 0) {
+      throw new Error('No event handicap data could be generated.');
+    }
+
+    const outputHandicapData: Map<string, number> = new Map<string, number>();
+    const sortedEvents: ExtendedApicalEventListData[] = validEventData.sort(
+      (eventDataA, eventDataB) => new Date(eventDataB.EventDate).getTime() - new Date(eventDataA.EventDate).getTime()
+    );
+    const riderEventHandicapList: Map<string, string> = generateEventHandicapList(sortedEvents);
+    const eventIds: number[] = sortedEvents.map((event: ExtendedApicalEventListData) => event.Id);
+    const snapshotEvents = mapSnapshotEvents(sortedEvents);
+
+    sortedEvents.forEach((event: ExtendedApicalEventListData) => {
+      if (event.EventHandicapData) {
+        processHandicaps(outputHandicapData, event.EventHandicapData);
+      }
     });
+
+    outputProcessedHandicaps(outputHandicapData, riderEventHandicapList);
+    const handicapSnapshot = buildHandicapSnapshot(outputHandicapData, riderEventHandicapList, eventIds, snapshotEvents);
+    const handicapSnapshotJson = JSON.stringify(handicapSnapshot, null, 2);
+    console.log(`Writing handicap snapshot to ${HANDICAP_SNAPSHOT_FILE}...`);
+
+    await writeHandicapSnapshot(HANDICAP_SNAPSHOT_FILE, handicapSnapshotJson);
+    await writeJsonEventCache(sortedEvents, CACHED_EVENTS_FILE);
 
   } catch (error) {
     console.error('Error fetching events:', error);

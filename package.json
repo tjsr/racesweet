@@ -16,6 +16,10 @@
   "scripts": {
     "build": "babel index.mjs -d build",
     "clean": "rimraf src/generated build dist",
+    "generate:handicaps": "tsx ./src/utils/apical/apicalTest.mts",
+    "generate:handicaps:force-refresh": "tsx ./src/utils/apical/apicalTest.mts --force-refresh",
+    "generate:handicaps:refresh-events": "tsx ./src/utils/apical/apicalTest.mts --refresh-events",
+    "generate:handicaps:refresh-excel": "tsx ./src/utils/apical/apicalTest.mts --refresh-excel",
     "lint": "npm run lint:ts && npm run lint:json",
     "lint:json": "jsonlint src/**/*.json",
     "lint:ts": "eslint",

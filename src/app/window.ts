@@ -33,7 +33,7 @@ declare global {
       requestBuffer: (filePath: string) => Promise<Buffer>;
     },
     nodeapi: {
-      createBuffer: (data: any) => Buffer;
+      createBuffer: (data: string | Uint8Array | ArrayBuffer) => Buffer;
     }
     versions: {
       node: () => string;

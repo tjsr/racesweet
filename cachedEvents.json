@@ -6,7 +6,270 @@
     "EntryBossEventNumber": 28781,
     "CompanyName": "Geelong Mountain Bike Club",
     "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_59.xlsx"
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_59.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "a",
+          "confidenceFactor": 98.128,
+          "medianLapTime": 512.183,
+          "name": "a-dean madden",
+          "ratioScore": 0
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.995,
+          "medianLapTime": 536.07,
+          "name": "a-jack lamshed",
+          "ratioScore": 0.04126213382598469
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.674,
+          "medianLapTime": 545.267,
+          "name": "a-jeffrey hunt",
+          "ratioScore": 0.05714892768028118
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 95.42,
+          "medianLapTime": 548.747,
+          "name": "a-stuart brown",
+          "ratioScore": 0.06316024034886336
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.189,
+          "medianLapTime": 567.066,
+          "name": "a-cameron shakespeare",
+          "ratioScore": 0.09480427390511634
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 93.338,
+          "medianLapTime": 534.9345,
+          "name": "a-russell nankervis",
+          "ratioScore": 0.03930068395955486
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 99.294,
+          "medianLapTime": 555.087,
+          "name": "a-robert wood",
+          "ratioScore": 0.07411188469334963
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.805,
+          "medianLapTime": 591.28,
+          "name": "b-adam ryan",
+          "ratioScore": 0.13663126383530383
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.817,
+          "medianLapTime": 597.2,
+          "name": "b-benjamin williams",
+          "ratioScore": 0.1468574049266854
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.227,
+          "medianLapTime": 607.028,
+          "name": "b-phil o'neil",
+          "ratioScore": 0.16383418104933686
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.49,
+          "medianLapTime": 606.383,
+          "name": "b-ben lord",
+          "ratioScore": 0.1627200153392117
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.709,
+          "medianLapTime": 617.0165,
+          "name": "b-nick carter",
+          "ratioScore": 0.18108820305799614
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 94.207,
+          "medianLapTime": 620.1479999999999,
+          "name": "b-matt seehusen",
+          "ratioScore": 0.18649752076537124
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.079,
+          "medianLapTime": 630.9105,
+          "name": "b-chris fice",
+          "ratioScore": 0.20508854162618093
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 94.306,
+          "medianLapTime": 637.26,
+          "name": "b-sam furphy",
+          "ratioScore": 0.21605659616329695
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.917,
+          "medianLapTime": 658.99,
+          "name": "b-anthony natoli",
+          "ratioScore": 0.25359275256797925
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 93.911,
+          "medianLapTime": 611.51,
+          "name": "b-anders stenhouse",
+          "ratioScore": 0.17157633719318338
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.166,
+          "medianLapTime": 647.444,
+          "name": "c-vince trotter",
+          "ratioScore": 0.2336483226623896
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.369,
+          "medianLapTime": 664.503,
+          "name": "c-oscar durante",
+          "ratioScore": 0.2631158464593283
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.732,
+          "medianLapTime": 666.517,
+          "name": "c-richard williams",
+          "ratioScore": 0.26659480729683543
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.119,
+          "medianLapTime": 734.817,
+          "name": "c-eric van dam",
+          "ratioScore": 0.38457545536125315
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.245,
+          "medianLapTime": 736.017,
+          "name": "c-gavin erickson",
+          "ratioScore": 0.3866483217986954
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.884,
+          "medianLapTime": 759.824,
+          "name": "c-ben van duijne",
+          "ratioScore": 0.42777226452885037
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.349,
+          "medianLapTime": 763.4435000000001,
+          "name": "c-caleb fleet",
+          "ratioScore": 0.43402454792078554
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.628,
+          "medianLapTime": 803.5165,
+          "name": "c-nick pile",
+          "ratioScore": 0.5032461952104693
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.751,
+          "medianLapTime": 833.575,
+          "name": "d-paul fletcher",
+          "ratioScore": 0.5551689083853494
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.305,
+          "medianLapTime": 843.242,
+          "name": "d-paul durante",
+          "ratioScore": 0.571867574927644
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 90.29,
+          "medianLapTime": 1091.0915,
+          "name": "d-chris hird",
+          "ratioScore": 1
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 96.87,
+          "medianLapTime": 975.943,
+          "name": "d-theo bekema",
+          "ratioScore": 0.8010937825234903
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 96.4,
+          "medianLapTime": 559.71,
+          "name": "ebike-david goodall",
+          "ratioScore": 0.08209760264359574
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 96.917,
+          "medianLapTime": 588.0935,
+          "name": "ebike-george couyant",
+          "ratioScore": 0.13112693974954584
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 97.798,
+          "medianLapTime": 618.6695,
+          "name": "ebike-anthony speechley",
+          "ratioScore": 0.18394357657557278
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 96.809,
+          "medianLapTime": 849.835,
+          "name": "ebike-peter henkel",
+          "ratioScore": 0.583256248612691
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 99.022,
+          "medianLapTime": 666.56,
+          "name": "wa-melissa mackenzie",
+          "ratioScore": 0.2666690850108436
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 91.809,
+          "medianLapTime": 808.1534999999999,
+          "name": "wb-dimity gannon",
+          "ratioScore": 0.5112560966024854
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 98.345,
+          "medianLapTime": 905.537,
+          "name": "wb-kimberly douglass",
+          "ratioScore": 0.6794752538613615
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 94.773,
+          "medianLapTime": 946.55,
+          "name": "wb-sharrene joy",
+          "ratioScore": 0.7503206465270418
+        }
+      ]
+    }
   },
   {
     "Id": 57,
@@ -15,7 +278,333 @@
     "EntryBossEventNumber": 28780,
     "CompanyName": "Geelong Mountain Bike Club",
     "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_57.xlsx"
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_57.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "a",
+          "confidenceFactor": 94.124,
+          "medianLapTime": 924.605,
+          "name": "a-jeffrey hunt",
+          "ratioScore": 0
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 95.821,
+          "medianLapTime": 962.6320000000001,
+          "name": "a-stuart kent",
+          "ratioScore": 0.07621328576725366
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.969,
+          "medianLapTime": 979.873,
+          "name": "a-ashley goldstraw",
+          "ratioScore": 0.11076750408353467
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.962,
+          "medianLapTime": 983.5915,
+          "name": "a-tristano cristofoli",
+          "ratioScore": 0.11822007996713128
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.553,
+          "medianLapTime": 998.737,
+          "name": "b-jason luhm",
+          "ratioScore": 0.148574520748364
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.751,
+          "medianLapTime": 1003.92,
+          "name": "b-adam ryan",
+          "ratioScore": 0.1589622310629214
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.503,
+          "medianLapTime": 1015.29,
+          "name": "b-matt seehusen",
+          "ratioScore": 0.18174985720155115
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.115,
+          "medianLapTime": 1025.11,
+          "name": "b-benjamin williams",
+          "ratioScore": 0.20143099077071058
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 98.042,
+          "medianLapTime": 1034.49,
+          "name": "b-rodney sullivan",
+          "ratioScore": 0.2202302812878917
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.397,
+          "medianLapTime": 1037.64,
+          "name": "b-anders stenhouse",
+          "ratioScore": 0.22654347586455711
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.062,
+          "medianLapTime": 1038.296,
+          "name": "b-ben lord",
+          "ratioScore": 0.227858223687507
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.807,
+          "medianLapTime": 1083.387,
+          "name": "b-martz keir",
+          "ratioScore": 0.31822909881652645
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 98.324,
+          "medianLapTime": 1130.077,
+          "name": "b-lucas sproson",
+          "ratioScore": 0.4118046717639868
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.014,
+          "medianLapTime": 1037.38,
+          "name": "c-paul sheean",
+          "ratioScore": 0.22602238678838796
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.536,
+          "medianLapTime": 1072.58,
+          "name": "c-vince trotter",
+          "ratioScore": 0.29656983094667844
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.348,
+          "medianLapTime": 1050.537,
+          "name": "c-gavin erickson",
+          "ratioScore": 0.25239149823130347
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.413,
+          "medianLapTime": 1098.567,
+          "name": "c-ewan sullivan",
+          "ratioScore": 0.3486526841097895
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.58,
+          "medianLapTime": 1079.04,
+          "name": "c-richard williams",
+          "ratioScore": 0.30951689030072843
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.507,
+          "medianLapTime": 1101.73,
+          "name": "c-eric van dam",
+          "ratioScore": 0.3549919331402632
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.592,
+          "medianLapTime": 1103.977,
+          "name": "c-caleb fleet",
+          "ratioScore": 0.35949534527161786
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 99.487,
+          "medianLapTime": 1124.716,
+          "name": "c-jordan wright",
+          "ratioScore": 0.40106021585112867
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.005,
+          "medianLapTime": 1129.673,
+          "name": "c-ben van duijne",
+          "ratioScore": 0.41099497950717
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.726,
+          "medianLapTime": 1152.993,
+          "name": "c-allen pollock",
+          "ratioScore": 0.45773266126203754
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.377,
+          "medianLapTime": 1145.03,
+          "name": "c-david allen",
+          "ratioScore": 0.44177330620997884
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.476,
+          "medianLapTime": 1187.114,
+          "name": "c-oscar durante",
+          "ratioScore": 0.5261175857542264
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.113,
+          "medianLapTime": 1185.013,
+          "name": "c-scott williams",
+          "ratioScore": 0.5219067851810282
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.721,
+          "medianLapTime": 1217.15,
+          "name": "c-max whyte",
+          "ratioScore": 0.5863153991842954
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.444,
+          "medianLapTime": 1227.406,
+          "name": "c-nick pile",
+          "ratioScore": 0.6068703590504153
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.894,
+          "medianLapTime": 1227.004,
+          "name": "c-kelly weston",
+          "ratioScore": 0.6060646751711075
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.125,
+          "medianLapTime": 1220.616,
+          "name": "d-oliver kent",
+          "ratioScore": 0.5932619174073814
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.586,
+          "medianLapTime": 1233.953,
+          "name": "d-paul durante",
+          "ratioScore": 0.6199917828261066
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.96,
+          "medianLapTime": 1250.94,
+          "name": "d-theo bekema",
+          "ratioScore": 0.6540369371987456
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.906,
+          "medianLapTime": 1281.467,
+          "name": "d-brian maloney",
+          "ratioScore": 0.7152188073072725
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 98.945,
+          "medianLapTime": 1347.807,
+          "name": "d-colin linahan",
+          "ratioScore": 0.8481766892805965
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 91.115,
+          "medianLapTime": 1302.304,
+          "name": "d-wayne cossell",
+          "ratioScore": 0.7569800883847243
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 96.268,
+          "medianLapTime": 1423.56,
+          "name": "d-adam hargreaves",
+          "ratioScore": 1
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 91.8,
+          "medianLapTime": 930.3235,
+          "name": "ebike-robert miller",
+          "ratioScore": 0.011460953392590414
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 93.955,
+          "medianLapTime": 1037.13,
+          "name": "ebike-michael hartman",
+          "ratioScore": 0.22552133959976373
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 94.223,
+          "medianLapTime": 1050.176,
+          "name": "ebike-george couyant",
+          "ratioScore": 0.2516679860909299
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 94.345,
+          "medianLapTime": 1065.743,
+          "name": "ebike-peter henkel",
+          "ratioScore": 0.28286719243218317
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 97.274,
+          "medianLapTime": 1089.087,
+          "name": "wa-christy harris",
+          "ratioScore": 0.3296529747171589
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 96.954,
+          "medianLapTime": 1138.824,
+          "name": "wa-fiona mathews",
+          "ratioScore": 0.42933531079957127
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 92.983,
+          "medianLapTime": 1177.827,
+          "name": "wb-kimberly douglass",
+          "ratioScore": 0.5075046847912137
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 96.002,
+          "medianLapTime": 1211.007,
+          "name": "wb-amy trotter",
+          "ratioScore": 0.5740036676654209
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 97.622,
+          "medianLapTime": 1251.34,
+          "name": "wb-dimity gannon",
+          "ratioScore": 0.654838612700544
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 98.307,
+          "medianLapTime": 1358.94,
+          "name": "wb-jill stevenson",
+          "ratioScore": 0.8704893226844106
+        }
+      ]
+    }
   },
   {
     "Id": 54,
@@ -24,7 +613,298 @@
     "EntryBossEventNumber": 28778,
     "CompanyName": "Geelong Mountain Bike Club",
     "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_54.xlsx"
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_54.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "a",
+          "confidenceFactor": 99.22,
+          "medianLapTime": 828.595,
+          "name": "a-robert wood",
+          "ratioScore": 0.3399633244183736
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 99.208,
+          "medianLapTime": 828.983,
+          "name": "a-ryan holmberg",
+          "ratioScore": 0.3404911480708588
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.948,
+          "medianLapTime": 867.6935000000001,
+          "name": "a-stuart kent",
+          "ratioScore": 0.3931517601830514
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.952,
+          "medianLapTime": 874.7049999999999,
+          "name": "a-ian kelly",
+          "ratioScore": 0.4026899961093409
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 99.383,
+          "medianLapTime": 879.2685,
+          "name": "a-mark mathews",
+          "ratioScore": 0.40889804569211546
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.164,
+          "medianLapTime": 903.9380000000001,
+          "name": "a-ashley goldstraw",
+          "ratioScore": 0.4424576992874381
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.831,
+          "medianLapTime": 900.8199999999999,
+          "name": "a-scott gavens",
+          "ratioScore": 0.4382160648842187
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 94.746,
+          "medianLapTime": 911.0535,
+          "name": "a-tristano cristofoli",
+          "ratioScore": 0.4521374137185175
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 99.389,
+          "medianLapTime": 871.187,
+          "name": "b-max anthony mc peake",
+          "ratioScore": 0.3979042136107762
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 98.904,
+          "medianLapTime": 900.6034999999999,
+          "name": "b-adrian dillon",
+          "ratioScore": 0.43792154472761285
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.062,
+          "medianLapTime": 918.9014999999999,
+          "name": "b-adam ryan",
+          "ratioScore": 0.4628135993491987
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.754,
+          "medianLapTime": 932.987,
+          "name": "b-jason luhm",
+          "ratioScore": 0.4819750943416759
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.979,
+          "medianLapTime": 936.8444999999999,
+          "name": "b-phil o'neil",
+          "ratioScore": 0.4872227225361652
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 98.152,
+          "medianLapTime": 933.362,
+          "name": "b-nick carter",
+          "ratioScore": 0.4824852331810624
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.6,
+          "medianLapTime": 949.573,
+          "name": "b-benjamin williams",
+          "ratioScore": 0.5045381951151824
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.437,
+          "medianLapTime": 961.5345,
+          "name": "b-scott farrar",
+          "ratioScore": 0.5208102637213743
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.18,
+          "medianLapTime": 971.5250000000001,
+          "name": "b-ben lord",
+          "ratioScore": 0.5344010425877507
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 95.698,
+          "medianLapTime": 1007.164,
+          "name": "b-mark terrill",
+          "ratioScore": 0.5828832775128078
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 99.013,
+          "medianLapTime": 999.596,
+          "name": "b-martz keir",
+          "ratioScore": 0.5725879955488685
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 94.22,
+          "medianLapTime": 1031.177,
+          "name": "b-matt seehusen",
+          "ratioScore": 0.6155498480466441
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.762,
+          "medianLapTime": 972.117,
+          "name": "c-luis goldstraw",
+          "ratioScore": 0.535206381768862
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.099,
+          "medianLapTime": 979.9835,
+          "name": "c-jason rooney",
+          "ratioScore": 0.5459077342489531
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.999,
+          "medianLapTime": 1027.153,
+          "name": "c-richard williams",
+          "ratioScore": 0.6100757182074673
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.282,
+          "medianLapTime": 1055.37,
+          "name": "c-jordan wright",
+          "ratioScore": 0.6484612852233861
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.556,
+          "medianLapTime": 1061.507,
+          "name": "c-eric van dam",
+          "ratioScore": 0.6568098773762266
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.818,
+          "medianLapTime": 1074.813,
+          "name": "c-ben van duijne",
+          "ratioScore": 0.674910963767899
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.124,
+          "medianLapTime": 1153.59,
+          "name": "c-scott williams",
+          "ratioScore": 0.7820768500355054
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.312,
+          "medianLapTime": 1184.394,
+          "name": "c-alan riedel",
+          "ratioScore": 0.8239816948580725
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 93.412,
+          "medianLapTime": 1202.72,
+          "name": "c-tom maloney",
+          "ratioScore": 0.8489118398463324
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.879,
+          "medianLapTime": 1174.184,
+          "name": "c-nick pile",
+          "ratioScore": 0.8100923147243753
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 98.482,
+          "medianLapTime": 993.887,
+          "name": "d-jarrod james",
+          "ratioScore": 0.564821641858048
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.674,
+          "medianLapTime": 1047.053,
+          "name": "d-anthony vaughan",
+          "ratioScore": 0.6371470859509124
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 0,
+          "medianLapTime": 578.69,
+          "name": "d-oliver kent",
+          "ratioScore": 0
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 98.023,
+          "medianLapTime": 1174.947,
+          "name": "d-paul durante",
+          "ratioScore": 0.8111302772162469
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.553,
+          "medianLapTime": 1191.777,
+          "name": "d-paul fletcher",
+          "ratioScore": 0.8340253083279144
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 98.22,
+          "medianLapTime": 807.5,
+          "name": "ebike-robert miller",
+          "ratioScore": 0.3112663142400835
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 97.896,
+          "medianLapTime": 877.758,
+          "name": "ebike-david goodall",
+          "ratioScore": 0.40684320644706656
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 99.157,
+          "medianLapTime": 879.23,
+          "name": "wa-katriina dower",
+          "ratioScore": 0.4088456714379385
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 98.143,
+          "medianLapTime": 963.88,
+          "name": "wa-kate kellett",
+          "ratioScore": 0.5240010121154572
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 98.541,
+          "medianLapTime": 1010.003,
+          "name": "wa-christy harris",
+          "ratioScore": 0.5867453686195234
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 89.561,
+          "medianLapTime": 1313.784,
+          "name": "wb-dimity gannon",
+          "ratioScore": 1
+        }
+      ]
+    }
   },
   {
     "Id": 52,
@@ -33,43 +913,102 @@
     "EntryBossEventNumber": 28172,
     "CompanyName": "Geelong Mountain Bike Club",
     "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_52.xlsx"
-  },
-  {
-    "Id": 51,
-    "Name": "Spring NF Round 5",
-    "EventDate": "2025-11-28T00:00:00",
-    "EntryBossEventNumber": 27110,
-    "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_51.xlsx"
-  },
-  {
-    "Id": 48,
-    "Name": "Summer NF Rd3 - Race 1",
-    "EventDate": "2025-11-14T00:00:00",
-    "EntryBossEventNumber": 27035,
-    "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_48.xlsx"
-  },
-  {
-    "Id": 49,
-    "Name": "Summer NF Rd 3 - Race 2",
-    "EventDate": "2025-11-14T00:00:00",
-    "EntryBossEventNumber": 27035,
-    "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_49.xlsx"
-  },
-  {
-    "Id": 46,
-    "Name": "Summer NFF Round 2",
-    "EventDate": "2025-10-31T00:00:00",
-    "EntryBossEventNumber": 27109,
-    "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_46.xlsx"
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_52.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "wa",
+          "confidenceFactor": 97.033,
+          "medianLapTime": 935.5450000000001,
+          "name": "wa-kate kellett",
+          "ratioScore": 0
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 97.25,
+          "medianLapTime": 943.8534999999999,
+          "name": "wa-melissa mackenzie",
+          "ratioScore": 0.012755384020191026
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 97.241,
+          "medianLapTime": 1004.258,
+          "name": "wa-fiona mathews",
+          "ratioScore": 0.10548964339885654
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 97.781,
+          "medianLapTime": 1022.0150000000001,
+          "name": "wa-heidi hunt",
+          "ratioScore": 0.13275056342612215
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 99.635,
+          "medianLapTime": 1113.2465,
+          "name": "wb-stella goldstraw",
+          "ratioScore": 0.27281108183956315
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 97.954,
+          "medianLapTime": 1145.941,
+          "name": "wb-kari lankford",
+          "ratioScore": 0.323004366168641
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 97.996,
+          "medianLapTime": 1138.2935,
+          "name": "wb-sally brown",
+          "ratioScore": 0.31126376325663363
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 96,
+          "medianLapTime": 1235.053,
+          "name": "wb-marie-louise fitzgerald",
+          "ratioScore": 0.4598109835854168
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 95.764,
+          "medianLapTime": 1412.307,
+          "name": "wb-miranda coombs",
+          "ratioScore": 0.7319350540090763
+        },
+        {
+          "category": "wc",
+          "confidenceFactor": 97.082,
+          "medianLapTime": 1239.026,
+          "name": "wc-taylor ly",
+          "ratioScore": 0.46591041678180833
+        },
+        {
+          "category": "wc",
+          "confidenceFactor": 96.929,
+          "medianLapTime": 1401.73,
+          "name": "wc-marcel shields",
+          "ratioScore": 0.7156970210570919
+        },
+        {
+          "category": "wc",
+          "confidenceFactor": 97.486,
+          "medianLapTime": 1386.417,
+          "name": "wc-kirstie fraser",
+          "ratioScore": 0.6921881812543369
+        },
+        {
+          "category": "wc",
+          "confidenceFactor": 98.508,
+          "medianLapTime": 1586.917,
+          "name": "wc-erin heer",
+          "ratioScore": 1
+        }
+      ]
+    }
   },
   {
     "Id": 53,
@@ -78,25 +1017,437 @@
     "EntryBossEventNumber": 27111,
     "CompanyName": "Geelong Mountain Bike Club",
     "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_53.xlsx"
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_53.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "a",
+          "confidenceFactor": 97.108,
+          "medianLapTime": 795.58,
+          "name": "a-dominik dudkiewicz",
+          "ratioScore": 0
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.897,
+          "medianLapTime": 801.967,
+          "name": "a-jack lamshed",
+          "ratioScore": 0.01068113784972481
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.974,
+          "medianLapTime": 801.477,
+          "name": "a-jeffrey hunt",
+          "ratioScore": 0.009861698747428692
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.651,
+          "medianLapTime": 822.27,
+          "name": "a-stuart kent",
+          "ratioScore": 0.044634346204659
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.965,
+          "medianLapTime": 844.243,
+          "name": "a-cameron shakespeare",
+          "ratioScore": 0.08138033680619432
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.429,
+          "medianLapTime": 865.6,
+          "name": "a-sean milligan",
+          "ratioScore": 0.11709617539341437
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.273,
+          "medianLapTime": 870.947,
+          "name": "a-brett kellett",
+          "ratioScore": 0.12603809555663323
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.301,
+          "medianLapTime": 888.4815000000001,
+          "name": "b-chris fice",
+          "ratioScore": 0.15536147298359462
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.834,
+          "medianLapTime": 897.8135,
+          "name": "b-phil o'neil",
+          "ratioScore": 0.17096760707058875
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.547,
+          "medianLapTime": 889.2815,
+          "name": "b-matt seehusen",
+          "ratioScore": 0.15669933274244532
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.571,
+          "medianLapTime": 912.2435,
+          "name": "b-jarratt morgan",
+          "ratioScore": 0.19509925247085977
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.321,
+          "medianLapTime": 937.3820000000001,
+          "name": "b-adam ryan",
+          "ratioScore": 0.23713898690569768
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.404,
+          "medianLapTime": 961.4515,
+          "name": "b-anthony natoli",
+          "ratioScore": 0.27739100623777113
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.161,
+          "medianLapTime": 912.973,
+          "name": "c-ben williams",
+          "ratioScore": 0.1963192133384617
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.344,
+          "medianLapTime": 942.335,
+          "name": "c-martz keir",
+          "ratioScore": 0.24542201113768253
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.993,
+          "medianLapTime": 950.0115000000001,
+          "name": "c-vince trotter",
+          "ratioScore": 0.2582596116862051
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.821,
+          "medianLapTime": 975.435,
+          "name": "c-glenn withers",
+          "ratioScore": 0.30077595866013335
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.848,
+          "medianLapTime": 972.3715,
+          "name": "c-anders stenhouse",
+          "ratioScore": 0.2956527919460842
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.697,
+          "medianLapTime": 981.672,
+          "name": "c-benjamin stengel",
+          "ratioScore": 0.31120624780507383
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.724,
+          "medianLapTime": 1020.48,
+          "name": "c-david allen",
+          "ratioScore": 0.3761058247069251
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.85,
+          "medianLapTime": 1015.9354999999999,
+          "name": "c-richard williams",
+          "ratioScore": 0.3685059451143033
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.671,
+          "medianLapTime": 1061.027,
+          "name": "c-nick pile",
+          "ratioScore": 0.4439135742595783
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.036,
+          "medianLapTime": 1090.0735,
+          "name": "c-tom maloney",
+          "ratioScore": 0.4924887536164021
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.156,
+          "medianLapTime": 1072.8285,
+          "name": "c-stephen wilkin",
+          "ratioScore": 0.4636495141896752
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 93.681,
+          "medianLapTime": 1138.053,
+          "name": "c-ben van duijne",
+          "ratioScore": 0.5727260564911285
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 96.138,
+          "medianLapTime": 1013.4065,
+          "name": "d-jordan wright",
+          "ratioScore": 0.36427663595163645
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 95.86,
+          "medianLapTime": 1294.7,
+          "name": "d-colin linahan",
+          "ratioScore": 0.8346907035470008
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 92.617,
+          "medianLapTime": 1393.55,
+          "name": "d-theo bekema",
+          "ratioScore": 1
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 97.338,
+          "medianLapTime": 816.513,
+          "name": "ebike-robert miller",
+          "ratioScore": 0.035006772915029176
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 99.032,
+          "medianLapTime": 873.068,
+          "name": "ebike-david goodall",
+          "ratioScore": 0.1295850962422863
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 98.523,
+          "medianLapTime": 931.2719999999999,
+          "name": "ebike-anthony speechley",
+          "ratioScore": 0.22692108299747465
+        }
+      ]
+    }
   },
   {
-    "Id": 38,
-    "Name": "Winter NF Round 4",
-    "EventDate": "2025-08-22T00:00:00",
-    "EntryBossEventNumber": 26137,
+    "Id": 51,
+    "Name": "Spring NF Round 5",
+    "EventDate": "2025-11-28T00:00:00",
+    "EntryBossEventNumber": 27110,
     "CompanyName": "Geelong Mountain Bike Club",
     "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_38.xlsx"
-  },
-  {
-    "Id": 30,
-    "Name": "Autumn NF Round 4",
-    "EventDate": "2025-06-06T00:00:00",
-    "EntryBossEventNumber": 25180,
-    "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_30.xlsx"
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_51.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "a",
+          "confidenceFactor": 98.249,
+          "medianLapTime": 944.405,
+          "name": "a-tom ovens",
+          "ratioScore": 0
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.788,
+          "medianLapTime": 965.0515,
+          "name": "a-jeffrey hunt",
+          "ratioScore": 0.04855201119354738
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 99.368,
+          "medianLapTime": 958.4449999999999,
+          "name": "a-ashley goldstraw",
+          "ratioScore": 0.03301626121412353
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.86,
+          "medianLapTime": 959.5535,
+          "name": "a-stuart kent",
+          "ratioScore": 0.035622993803572076
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 99.481,
+          "medianLapTime": 961.965,
+          "name": "a-duncan murray",
+          "ratioScore": 0.04129384237322027
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 99.19,
+          "medianLapTime": 1013.673,
+          "name": "a-riley flaherty",
+          "ratioScore": 0.16288962833190282
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 98.326,
+          "medianLapTime": 1007.867,
+          "name": "b-phil o'neil",
+          "ratioScore": 0.1492363225905066
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.805,
+          "medianLapTime": 1029.48,
+          "name": "b-chris fice",
+          "ratioScore": 0.20006114122447066
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.667,
+          "medianLapTime": 1045.483,
+          "name": "b-adam ryan",
+          "ratioScore": 0.23769356488612434
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 93.62,
+          "medianLapTime": 1074.037,
+          "name": "b-james fitzgerald",
+          "ratioScore": 0.3048407388681819
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.035,
+          "medianLapTime": 1040.996,
+          "name": "c-ben williams",
+          "ratioScore": 0.22714200049383318
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.954,
+          "medianLapTime": 1047.8,
+          "name": "c-tom maloney",
+          "ratioScore": 0.24314218862067738
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.841,
+          "medianLapTime": 1052.29,
+          "name": "c-vince trotter",
+          "ratioScore": 0.2537008077696386
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.014,
+          "medianLapTime": 1085.536,
+          "name": "c-richard williams",
+          "ratioScore": 0.3318816211830828
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.434,
+          "medianLapTime": 1085.214,
+          "name": "c-ewan sullivan",
+          "ratioScore": 0.3311244106338697
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 93.598,
+          "medianLapTime": 1086.833,
+          "name": "c-glenn withers",
+          "ratioScore": 0.33493162764994316
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.314,
+          "medianLapTime": 1133.646,
+          "name": "c-david allen",
+          "ratioScore": 0.4450164023092569
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.313,
+          "medianLapTime": 1156.146,
+          "name": "c-luis goldstraw",
+          "ratioScore": 0.49792707733189084
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.428,
+          "medianLapTime": 1147.8,
+          "name": "c-nick pile",
+          "ratioScore": 0.47830074427682845
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 93.687,
+          "medianLapTime": 1211.97,
+          "name": "c-ben van duijne",
+          "ratioScore": 0.6292019894413808
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.528,
+          "medianLapTime": 1246.696,
+          "name": "c-kelly weston",
+          "ratioScore": 0.7108631494785356
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 94.546,
+          "medianLapTime": 1121.83,
+          "name": "d-jordan wright",
+          "ratioScore": 0.41723006737292595
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 94.561,
+          "medianLapTime": 1160.637,
+          "name": "d-oscar durante",
+          "ratioScore": 0.5084880480664086
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 96.757,
+          "medianLapTime": 1253.707,
+          "name": "d-paul durante",
+          "ratioScore": 0.7273501158155887
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 95.866,
+          "medianLapTime": 1279.046,
+          "name": "d-theo bekema",
+          "ratioScore": 0.7869369422333008
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 96.43,
+          "medianLapTime": 1369.65,
+          "name": "d-brian maloney",
+          "ratioScore": 1
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 96.996,
+          "medianLapTime": 1053.11,
+          "name": "wa-christy harris",
+          "ratioScore": 0.2556291079260189
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 97.634,
+          "medianLapTime": 1163.657,
+          "name": "wa-heidi hunt",
+          "ratioScore": 0.5155898364472243
+        }
+      ]
+    }
   },
   {
     "Id": 41,
@@ -105,25 +1456,242 @@
     "EntryBossEventNumber": 26138,
     "CompanyName": "Geelong Mountain Bike Club",
     "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_41.xlsx"
-  },
-  {
-    "Id": 35,
-    "Name": "Winter NF Round 3",
-    "EventDate": "2025-08-09T00:00:00",
-    "EntryBossEventNumber": 26136,
-    "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_35.xlsx"
-  },
-  {
-    "Id": 33,
-    "Name": "Winter NF Round 1",
-    "EventDate": "2025-07-26T00:00:00",
-    "EntryBossEventNumber": 26133,
-    "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_33.xlsx"
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_41.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "a",
+          "confidenceFactor": 96.182,
+          "medianLapTime": 607.4069999999999,
+          "name": "a-ashley goldstraw",
+          "ratioScore": 0.002421248080228577
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.512,
+          "medianLapTime": 606.1245,
+          "name": "a-cameron shakespeare",
+          "ratioScore": 0
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.406,
+          "medianLapTime": 607.5035,
+          "name": "a-stuart brown",
+          "ratioScore": 0.002603431658975032
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.364,
+          "medianLapTime": 608.797,
+          "name": "a-tristano cristofoli",
+          "ratioScore": 0.005045446779268102
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 78.104,
+          "medianLapTime": 709.38,
+          "name": "a-riley flaherty",
+          "ratioScore": 0.19493737321486052
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.793,
+          "medianLapTime": 632.526,
+          "name": "b-brett wiltshire",
+          "ratioScore": 0.049843728023515735
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 98.136,
+          "medianLapTime": 639.884,
+          "name": "b-chris fice",
+          "ratioScore": 0.06373498991382624
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 98.698,
+          "medianLapTime": 656.893,
+          "name": "b-phil o'neil",
+          "ratioScore": 0.09584649759149537
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 98.142,
+          "medianLapTime": 662.137,
+          "name": "b-stephen freer",
+          "ratioScore": 0.10574671196398606
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.338,
+          "medianLapTime": 657.51,
+          "name": "b-nathan clarke",
+          "ratioScore": 0.09701133974783147
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.859,
+          "medianLapTime": 664.806,
+          "name": "c-glenn withers",
+          "ratioScore": 0.1107855510486884
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.1,
+          "medianLapTime": 664.26,
+          "name": "c-martz keir",
+          "ratioScore": 0.10975475069640378
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.501,
+          "medianLapTime": 668.153,
+          "name": "c-benjamin stengel",
+          "ratioScore": 0.1171043949664471
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.821,
+          "medianLapTime": 686.53,
+          "name": "c-ben williams",
+          "ratioScore": 0.1517985672630268
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.746,
+          "medianLapTime": 694.127,
+          "name": "c-vince trotter",
+          "ratioScore": 0.16614104029655324
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.139,
+          "medianLapTime": 680.757,
+          "name": "c-greg matheson",
+          "ratioScore": 0.14089964705471444
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.636,
+          "medianLapTime": 701.383,
+          "name": "c-david allen",
+          "ratioScore": 0.17983973508808537
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.955,
+          "medianLapTime": 701.98,
+          "name": "c-ben van duijne",
+          "ratioScore": 0.18096681898975905
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.015,
+          "medianLapTime": 699.947,
+          "name": "c-nick pile",
+          "ratioScore": 0.17712869240332235
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.894,
+          "medianLapTime": 699.113,
+          "name": "c-eric van dam",
+          "ratioScore": 0.17555417318389885
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 99.045,
+          "medianLapTime": 751.506,
+          "name": "c-kelly weston",
+          "ratioScore": 0.27446758501035046
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.478,
+          "medianLapTime": 783.4835,
+          "name": "c-scott williams",
+          "ratioScore": 0.3348383144337537
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 98.991,
+          "medianLapTime": 788.6885,
+          "name": "d-colin linahan",
+          "ratioScore": 0.3446649002096527
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 98.117,
+          "medianLapTime": 793.03,
+          "name": "d-paul fletcher",
+          "ratioScore": 0.3528612733405011
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.36,
+          "medianLapTime": 853.618,
+          "name": "d-tom i’anson",
+          "ratioScore": 0.46724613001488635
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 96.178,
+          "medianLapTime": 1135.81,
+          "name": "d-amon charles",
+          "ratioScore": 1
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 96.887,
+          "medianLapTime": 637,
+          "name": "ebike-david goodall",
+          "ratioScore": 0.05829024959150287
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 97.021,
+          "medianLapTime": 637.456,
+          "name": "ebike-peter henkel",
+          "ratioScore": 0.05915113779780645
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 98.255,
+          "medianLapTime": 669.277,
+          "name": "wa-christy harris",
+          "ratioScore": 0.11922640887847608
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 97.724,
+          "medianLapTime": 735.88,
+          "name": "wa-fiona mathews",
+          "ratioScore": 0.24496706064258886
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 97.775,
+          "medianLapTime": 749.634,
+          "name": "wb-amy trotter",
+          "ratioScore": 0.27093341237394647
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 97.996,
+          "medianLapTime": 759.7615,
+          "name": "wb-stella goldstraw",
+          "ratioScore": 0.2900532485786376
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 99.388,
+          "medianLapTime": 840.6044999999999,
+          "name": "wb-kari lankford",
+          "ratioScore": 0.4426777776624052
+        }
+      ]
+    }
   },
   {
     "Id": 39,
@@ -132,7 +1700,856 @@
     "EntryBossEventNumber": 26139,
     "CompanyName": "Geelong Mountain Bike Club",
     "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_39.xlsx"
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_39.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "a",
+          "confidenceFactor": 97.471,
+          "medianLapTime": 1294.287,
+          "name": "a-joel green",
+          "ratioScore": 0
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 99.024,
+          "medianLapTime": 1362.7469999999998,
+          "name": "a-tom ovens",
+          "ratioScore": 0.06320185820479378
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 95.846,
+          "medianLapTime": 1395.795,
+          "name": "a-matt palmer",
+          "ratioScore": 0.09371157205159548
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.652,
+          "medianLapTime": 1475.2185,
+          "name": "a-cameron shakespeare",
+          "ratioScore": 0.16703486718931743
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.011,
+          "medianLapTime": 1495.9035,
+          "name": "a-stuart kent",
+          "ratioScore": 0.18613113416223825
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 93.424,
+          "medianLapTime": 1487.5585,
+          "name": "a-jordan enright",
+          "ratioScore": 0.1784270806022179
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.325,
+          "medianLapTime": 1495.5715,
+          "name": "a-rhys warrillow",
+          "ratioScore": 0.18582463376895775
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.371,
+          "medianLapTime": 1563.877,
+          "name": "a-dyon balding",
+          "ratioScore": 0.24888385850760147
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 94.791,
+          "medianLapTime": 1563.57,
+          "name": "a-sean milligan",
+          "ratioScore": 0.24860043796321243
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 94.844,
+          "medianLapTime": 1518.0884999999998,
+          "name": "a-stuart brown",
+          "ratioScore": 0.2066121920686559
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.314,
+          "medianLapTime": 1393.96,
+          "name": "a-hayden vimpani",
+          "ratioScore": 0.09201751114295104
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.556,
+          "medianLapTime": 1642.294,
+          "name": "b-neil dixon",
+          "ratioScore": 0.32127795892894734
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.328,
+          "medianLapTime": 1683.436,
+          "name": "b-phil o'neil",
+          "ratioScore": 0.35926000465289737
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 94.982,
+          "medianLapTime": 1683.573,
+          "name": "b-tony french",
+          "ratioScore": 0.3593864822248236
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 94.145,
+          "medianLapTime": 1684.835,
+          "name": "b-nathan clarke",
+          "ratioScore": 0.3605515529968722
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 91.714,
+          "medianLapTime": 1801.5749999999998,
+          "name": "b-martin byrne",
+          "ratioScore": 0.4683252153811496
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.012,
+          "medianLapTime": 1803.367,
+          "name": "c-martz keir",
+          "ratioScore": 0.46997957894970055
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.638,
+          "medianLapTime": 1793.284,
+          "name": "c-david allen",
+          "ratioScore": 0.4606710142947352
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 93.242,
+          "medianLapTime": 1734.8200000000002,
+          "name": "c-john heer",
+          "ratioScore": 0.406697402870764
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.865,
+          "medianLapTime": 1833.962,
+          "name": "c-vince trotter",
+          "ratioScore": 0.498224698023257
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.122,
+          "medianLapTime": 1890.563,
+          "name": "c-michael slater",
+          "ratioScore": 0.5504783991078254
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.48,
+          "medianLapTime": 1863.107,
+          "name": "c-richard williams",
+          "ratioScore": 0.5251311858610999
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.235,
+          "medianLapTime": 1915.675,
+          "name": "c-eric van dam",
+          "ratioScore": 0.573661645722473
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.455,
+          "medianLapTime": 1929.2530000000002,
+          "name": "c-benjamin stengel",
+          "ratioScore": 0.5861967732524862
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 93.874,
+          "medianLapTime": 2003.034,
+          "name": "c-ben van duijne",
+          "ratioScore": 0.6543109464953711
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.957,
+          "medianLapTime": 2013.09,
+          "name": "c-nick pile",
+          "ratioScore": 0.6635945849135335
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 93.215,
+          "medianLapTime": 2235.65,
+          "name": "c-barry lowe",
+          "ratioScore": 0.8690606316862322
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 85.673,
+          "medianLapTime": 2153.543,
+          "name": "c-kelly weston",
+          "ratioScore": 0.7932599455684843
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.406,
+          "medianLapTime": 1757.283,
+          "name": "c-rodney sullivan",
+          "ratioScore": 0.42743510869685614
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 95.401,
+          "medianLapTime": 1856.9364999999998,
+          "name": "d-adam newton",
+          "ratioScore": 0.5194346175576716
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 98.219,
+          "medianLapTime": 1935.6065,
+          "name": "d-craig lawn",
+          "ratioScore": 0.5920622860498007
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 94.45,
+          "medianLapTime": 2296.1,
+          "name": "d-colin linahan",
+          "ratioScore": 0.924867706306153
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.114,
+          "medianLapTime": 2377.483,
+          "name": "d-rory costelloe",
+          "ratioScore": 1
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.306,
+          "medianLapTime": 2152.58,
+          "name": "d-jordan wright",
+          "ratioScore": 0.7923709097891792
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 96.012,
+          "medianLapTime": 2314.6099999999997,
+          "name": "d-paul fletcher",
+          "ratioScore": 0.9419560264255034
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 96.326,
+          "medianLapTime": 2360.3585000000003,
+          "name": "d-paul durante",
+          "ratioScore": 0.9841907651062228
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 92.023,
+          "medianLapTime": 1527.19,
+          "name": "ebike-david goodall",
+          "ratioScore": 0.21501464185613683
+        },
+        {
+          "category": "u17",
+          "confidenceFactor": 97.667,
+          "medianLapTime": 1645.304,
+          "name": "u17-ben williams",
+          "ratioScore": 0.32405677273549754
+        },
+        {
+          "category": "u17",
+          "confidenceFactor": 94.51,
+          "medianLapTime": 1780.0165000000002,
+          "name": "u17-ewan sullivan",
+          "ratioScore": 0.4484225384879561
+        },
+        {
+          "category": "u17",
+          "confidenceFactor": 96.516,
+          "medianLapTime": 2047.245,
+          "name": "u17-alexandra heer",
+          "ratioScore": 0.6951262744692556
+        },
+        {
+          "category": "u17",
+          "confidenceFactor": 96.105,
+          "medianLapTime": 2080.7380000000003,
+          "name": "u17-oscar durante",
+          "ratioScore": 0.7260468096263282
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 97.803,
+          "medianLapTime": 1674.52,
+          "name": "wa-christy harris",
+          "ratioScore": 0.35102880734419245
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 96.45,
+          "medianLapTime": 1709.563,
+          "name": "wa-ruby dobson",
+          "ratioScore": 0.3833802931325448
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 98.203,
+          "medianLapTime": 1959.4135,
+          "name": "wa-fiona mathews",
+          "ratioScore": 0.6140407645523063
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 99.052,
+          "medianLapTime": 1978.3815,
+          "name": "wb-monika heer-reichler",
+          "ratioScore": 0.631551907503351
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 98.248,
+          "medianLapTime": 2215.26,
+          "name": "wb-kari lankford",
+          "ratioScore": 0.8502367069302325
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 90.565,
+          "medianLapTime": 2325.453,
+          "name": "wb-isobel heer",
+          "ratioScore": 0.9519662184867741
+        }
+      ]
+    }
+  },
+  {
+    "Id": 38,
+    "Name": "Winter NF Round 4",
+    "EventDate": "2025-08-22T00:00:00",
+    "EntryBossEventNumber": 26137,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_38.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "a",
+          "confidenceFactor": 98.08,
+          "medianLapTime": 589.5535,
+          "name": "a-robert wood",
+          "ratioScore": 0
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.627,
+          "medianLapTime": 599.1914999999999,
+          "name": "a-ryan holmberg",
+          "ratioScore": 0.024050416540338144
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.33,
+          "medianLapTime": 609.703,
+          "name": "a-stuart brown",
+          "ratioScore": 0.05028054244444358
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.035,
+          "medianLapTime": 614.568,
+          "name": "a-cameron shakespeare",
+          "ratioScore": 0.062420537927816294
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.286,
+          "medianLapTime": 620.03,
+          "name": "a-ashley sek",
+          "ratioScore": 0.07605027180863469
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.529,
+          "medianLapTime": 639.52,
+          "name": "a-tristano cristofoli",
+          "ratioScore": 0.1246851149681278
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 86.954,
+          "medianLapTime": 656.215,
+          "name": "a-ashley goldstraw",
+          "ratioScore": 0.1663453872384069
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.943,
+          "medianLapTime": 633.073,
+          "name": "b-chris fice",
+          "ratioScore": 0.1085974375002339
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.325,
+          "medianLapTime": 631.646,
+          "name": "b-adrian dillon",
+          "ratioScore": 0.10503653851672454
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.992,
+          "medianLapTime": 650.354,
+          "name": "b-phil o'neil",
+          "ratioScore": 0.1517199990517579
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.258,
+          "medianLapTime": 653.287,
+          "name": "b-matt seehusen",
+          "ratioScore": 0.15903893158058258
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.712,
+          "medianLapTime": 668.003,
+          "name": "b-brett wiltshire",
+          "ratioScore": 0.19576085830890996
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 95.924,
+          "medianLapTime": 688.687,
+          "name": "b-martin byrne",
+          "ratioScore": 0.24737517826329444
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 95.174,
+          "medianLapTime": 698.35,
+          "name": "b-nathan clarke",
+          "ratioScore": 0.2714879791586347
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.33,
+          "medianLapTime": 681.08,
+          "name": "c-john heer",
+          "ratioScore": 0.22839286672331174
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.531,
+          "medianLapTime": 716.894,
+          "name": "c-adam kelsall",
+          "ratioScore": 0.3177621983248553
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.508,
+          "medianLapTime": 713.947,
+          "name": "c-richard williams",
+          "ratioScore": 0.3104083305572295
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.93,
+          "medianLapTime": 721.18,
+          "name": "c-andrew noye",
+          "ratioScore": 0.3284573721463835
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.901,
+          "medianLapTime": 784.2950000000001,
+          "name": "c-ben van duijne",
+          "ratioScore": 0.48595291478421887
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.683,
+          "medianLapTime": 799.0955,
+          "name": "c-nick pile",
+          "ratioScore": 0.5228857006324525
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.743,
+          "medianLapTime": 857.3685,
+          "name": "c-kelly weston",
+          "ratioScore": 0.6682986413935168
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 96.562,
+          "medianLapTime": 827.818,
+          "name": "d-jordan wright",
+          "ratioScore": 0.5945590860941529
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 98.536,
+          "medianLapTime": 935.5055,
+          "name": "d-paul fletcher",
+          "ratioScore": 0.8632796952649024
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 98.577,
+          "medianLapTime": 951.582,
+          "name": "d-paul durante",
+          "ratioScore": 0.903396578592434
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.925,
+          "medianLapTime": 990.2950000000001,
+          "name": "d-colin linahan",
+          "ratioScore": 1
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 97.924,
+          "medianLapTime": 684.343,
+          "name": "wa-christy harris",
+          "ratioScore": 0.23653527273816152
+        }
+      ]
+    }
+  },
+  {
+    "Id": 35,
+    "Name": "Winter NF Round 3",
+    "EventDate": "2025-08-09T00:00:00",
+    "EntryBossEventNumber": 26136,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_35.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "a",
+          "confidenceFactor": 96.872,
+          "medianLapTime": 740.467,
+          "name": "a-matt palmer",
+          "ratioScore": 0
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.186,
+          "medianLapTime": 752.01,
+          "name": "a-stuart kent",
+          "ratioScore": 0.04177266953522795
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.894,
+          "medianLapTime": 751.477,
+          "name": "a-ashley goldstraw",
+          "ratioScore": 0.0398438093721614
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.891,
+          "medianLapTime": 751.61,
+          "name": "a-mark mathews",
+          "ratioScore": 0.04032511969427757
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.189,
+          "medianLapTime": 753.103,
+          "name": "a-riley flaherty",
+          "ratioScore": 0.04572809947562494
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 94.059,
+          "medianLapTime": 747.392,
+          "name": "a-cameron shakespeare",
+          "ratioScore": 0.0250607066214551
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.904,
+          "medianLapTime": 753.9365,
+          "name": "b-scott farrar",
+          "ratioScore": 0.04874443145670573
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.061,
+          "medianLapTime": 755.7935,
+          "name": "b-stephen freer",
+          "ratioScore": 0.05546468159331813
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.946,
+          "medianLapTime": 757.358,
+          "name": "b-tristano cristofoli",
+          "ratioScore": 0.061126410908735454
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 95.897,
+          "medianLapTime": 780.9535000000001,
+          "name": "b-chris fice",
+          "ratioScore": 0.14651556658910242
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.149,
+          "medianLapTime": 786.96,
+          "name": "b-david higgins",
+          "ratioScore": 0.16825233688827462
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.078,
+          "medianLapTime": 785.9385,
+          "name": "b-martin byrne",
+          "ratioScore": 0.16455565648194717
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.691,
+          "medianLapTime": 783.2584999999999,
+          "name": "b-tony french",
+          "ratioScore": 0.15485707254757886
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 93.244,
+          "medianLapTime": 799.0615,
+          "name": "b-rodney sullivan",
+          "ratioScore": 0.2120461478889296
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 95.415,
+          "medianLapTime": 800.8520000000001,
+          "name": "b-phil o'neil",
+          "ratioScore": 0.21852574286448434
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.417,
+          "medianLapTime": 895.85,
+          "name": "b-tim rowe",
+          "ratioScore": 0.5623115923410138
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.697,
+          "medianLapTime": 798.0865,
+          "name": "c-martz keir",
+          "ratioScore": 0.20851774515161275
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.548,
+          "medianLapTime": 800.442,
+          "name": "c-john heer",
+          "ratioScore": 0.2170420042775098
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 99.144,
+          "medianLapTime": 798.867,
+          "name": "c-gavin erickson",
+          "ratioScore": 0.2113422767787672
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.412,
+          "medianLapTime": 805.52,
+          "name": "c-vince trotter",
+          "ratioScore": 0.23541864950837582
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.628,
+          "medianLapTime": 804.4965,
+          "name": "c-luis goldstraw",
+          "ratioScore": 0.2317147313528438
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.756,
+          "medianLapTime": 806.033,
+          "name": "c-ewan sullivan",
+          "ratioScore": 0.23727513217939492
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.752,
+          "medianLapTime": 815.1715,
+          "name": "c-ben williams",
+          "ratioScore": 0.27034621773320944
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.936,
+          "medianLapTime": 820.923,
+          "name": "c-richard williams",
+          "ratioScore": 0.2911601750087758
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.201,
+          "medianLapTime": 854.3485000000001,
+          "name": "c-eric van dam",
+          "ratioScore": 0.4121228680305
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.076,
+          "medianLapTime": 856.15,
+          "name": "c-nick pile",
+          "ratioScore": 0.4186422706266804
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.73,
+          "medianLapTime": 857.472,
+          "name": "c-ben van duijne",
+          "ratioScore": 0.42342642285102167
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.56,
+          "medianLapTime": 870.335,
+          "name": "c-malcolm plant",
+          "ratioScore": 0.4699760068613863
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.216,
+          "medianLapTime": 957.7215,
+          "name": "c-andrew noye",
+          "ratioScore": 0.7862167923019298
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 92.499,
+          "medianLapTime": 1003.103,
+          "name": "c-kelly weston",
+          "ratioScore": 0.950446750069663
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 95.461,
+          "medianLapTime": 913.4435,
+          "name": "d-jordan wright",
+          "ratioScore": 0.6259802626579184
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.374,
+          "medianLapTime": 944.1205,
+          "name": "d-paul fletcher",
+          "ratioScore": 0.7369964788350117
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 96.582,
+          "medianLapTime": 958.338,
+          "name": "d-colin linahan",
+          "ratioScore": 0.7884478284942946
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 95.463,
+          "medianLapTime": 995.2864999999999,
+          "name": "d-paul durante",
+          "ratioScore": 0.9221598167401898
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 99.054,
+          "medianLapTime": 819.648,
+          "name": "ebike-david goodall",
+          "ratioScore": 0.28654610989074625
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 96.507,
+          "medianLapTime": 801.3430000000001,
+          "name": "wa-kate kellett",
+          "ratioScore": 0.22030261029425097
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 97.072,
+          "medianLapTime": 817.2484999999999,
+          "name": "wa-christy harris",
+          "ratioScore": 0.2778626202823443
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 97.718,
+          "medianLapTime": 888.1185,
+          "name": "wa-fiona mathews",
+          "ratioScore": 0.5343322633527426
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 96.898,
+          "medianLapTime": 924.605,
+          "name": "wb-amy trotter",
+          "ratioScore": 0.66637233153234
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 97.153,
+          "medianLapTime": 932.8365,
+          "name": "wb-alexandra heer",
+          "ratioScore": 0.6961610978217992
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 97.266,
+          "medianLapTime": 932.6714999999999,
+          "name": "wb-monika heer-reichler",
+          "ratioScore": 0.6955639835124069
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 96.938,
+          "medianLapTime": 961.977,
+          "name": "wb-kari lankford",
+          "ratioScore": 0.8016169131723414
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 98.149,
+          "medianLapTime": 980.7,
+          "name": "wb-sally brown",
+          "ratioScore": 0.8693731023526304
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 93.629,
+          "medianLapTime": 1016.796,
+          "name": "wb-isobel heer",
+          "ratioScore": 1
+        }
+      ]
+    }
   },
   {
     "Id": 34,
@@ -141,7 +2558,556 @@
     "EntryBossEventNumber": 26134,
     "CompanyName": "Geelong Mountain Bike Club",
     "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_34.xlsx"
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_34.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "a",
+          "confidenceFactor": 95.665,
+          "medianLapTime": 961.733,
+          "name": "a-dominik dudkiewicz",
+          "ratioScore": 0
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 95.765,
+          "medianLapTime": 968.7,
+          "name": "a-dean madden",
+          "ratioScore": 0.014954270026852217
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 95.868,
+          "medianLapTime": 981.16,
+          "name": "a-jeffrey hunt",
+          "ratioScore": 0.04169895275034509
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 94.806,
+          "medianLapTime": 1025.727,
+          "name": "a-stuart kent",
+          "ratioScore": 0.13735948845964827
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 95.14,
+          "medianLapTime": 1025.03,
+          "name": "a-mark mathews",
+          "ratioScore": 0.13586341752399195
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 95.175,
+          "medianLapTime": 1024.41,
+          "name": "a-cameron shakespeare",
+          "ratioScore": 0.13453262271752622
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 95.334,
+          "medianLapTime": 1026.527,
+          "name": "a-riley flaherty",
+          "ratioScore": 0.13907664304863648
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 95.265,
+          "medianLapTime": 1026.247,
+          "name": "a-lucas spargo",
+          "ratioScore": 0.13847563894249063
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 94.861,
+          "medianLapTime": 1025.917,
+          "name": "a-neil dixon",
+          "ratioScore": 0.13776731267453263
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 93.164,
+          "medianLapTime": 997.19,
+          "name": "b-todd lewis",
+          "ratioScore": 0.07610643782719868
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 94.492,
+          "medianLapTime": 1032.09,
+          "name": "b-cameron hudson",
+          "ratioScore": 0.15101730677181371
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 95.278,
+          "medianLapTime": 1095.167,
+          "name": "b-adrian dillon",
+          "ratioScore": 0.28640850678383384
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 95.61,
+          "medianLapTime": 1074.907,
+          "name": "b-tom pickles",
+          "ratioScore": 0.24292156681770471
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.147,
+          "medianLapTime": 1096.61,
+          "name": "b-stephen freer",
+          "ratioScore": 0.28950582437372147
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 94.81,
+          "medianLapTime": 1075.354,
+          "name": "b-ben lord",
+          "ratioScore": 0.24388102694430216
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.063,
+          "medianLapTime": 1109.466,
+          "name": "b-anthony natoli",
+          "ratioScore": 0.3171004986187637
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.289,
+          "medianLapTime": 1107.67,
+          "name": "b-chris fice",
+          "ratioScore": 0.3132454865664853
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.681,
+          "medianLapTime": 1111.273,
+          "name": "b-martin byrne",
+          "ratioScore": 0.3209791215466411
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.462,
+          "medianLapTime": 1314.955,
+          "name": "b-tim rowe",
+          "ratioScore": 0.7581709727895392
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.273,
+          "medianLapTime": 1094.41,
+          "name": "c-gavin erickson",
+          "ratioScore": 0.28478364925400396
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 93.943,
+          "medianLapTime": 1085.174,
+          "name": "c-tony pickles",
+          "ratioScore": 0.26495909952413366
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.579,
+          "medianLapTime": 1092.437,
+          "name": "c-martz keir",
+          "ratioScore": 0.28054871674891113
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.815,
+          "medianLapTime": 1159.645,
+          "name": "c-john heer",
+          "ratioScore": 0.42480687376981985
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.262,
+          "medianLapTime": 1141.9565,
+          "name": "c-ben williams",
+          "ratioScore": 0.38683951258567006
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.371,
+          "medianLapTime": 1147.8435,
+          "name": "c-malcolm plant",
+          "ratioScore": 0.3994756239173877
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.119,
+          "medianLapTime": 1149.9850000000001,
+          "name": "c-richard williams",
+          "ratioScore": 0.40407223210778626
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.609,
+          "medianLapTime": 1162.6599999999999,
+          "name": "c-ben van duijne",
+          "ratioScore": 0.4312784001270693
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.863,
+          "medianLapTime": 1170.295,
+          "name": "c-andrew noye",
+          "ratioScore": 0.447666494235727
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.364,
+          "medianLapTime": 1194.772,
+          "name": "c-nick pile",
+          "ratioScore": 0.5002049853290605
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 93.775,
+          "medianLapTime": 1207.3899999999999,
+          "name": "c-luke neale",
+          "ratioScore": 0.5272888060838786
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.987,
+          "medianLapTime": 1208.5520000000001,
+          "name": "c-shane jenkin",
+          "ratioScore": 0.5297829731243847
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.815,
+          "medianLapTime": 1230.023,
+          "name": "c-eric van dam",
+          "ratioScore": 0.5758692558495945
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 93.646,
+          "medianLapTime": 1251.4,
+          "name": "c-vince trotter",
+          "ratioScore": 0.6217537729105989
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.295,
+          "medianLapTime": 1401.5484999999999,
+          "name": "d-colin linahan",
+          "ratioScore": 0.9440390051664889
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 96.587,
+          "medianLapTime": 1427.62,
+          "name": "d-paul durante",
+          "ratioScore": 1
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 94.962,
+          "medianLapTime": 1121.9099999999999,
+          "name": "ebike-david goodall",
+          "ratioScore": 0.34381083825047687
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 96.539,
+          "medianLapTime": 1184.1615000000002,
+          "name": "wa-christy harris",
+          "ratioScore": 0.4774301493709853
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 94.923,
+          "medianLapTime": 1256.2649999999999,
+          "name": "wb-gemma berry",
+          "ratioScore": 0.6321962192548836
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 95.003,
+          "medianLapTime": 1297.7984999999999,
+          "name": "wb-amy trotter",
+          "ratioScore": 0.7213455194070665
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 96.108,
+          "medianLapTime": 1302.6,
+          "name": "wb-sally brown",
+          "ratioScore": 0.7316516666058508
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 97.991,
+          "medianLapTime": 1397.1315,
+          "name": "wb-isobel heer",
+          "ratioScore": 0.9345581653920373
+        }
+      ]
+    }
+  },
+  {
+    "Id": 33,
+    "Name": "Winter NF Round 1",
+    "EventDate": "2025-07-26T00:00:00",
+    "EntryBossEventNumber": 26133,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_33.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "a",
+          "confidenceFactor": 94.37,
+          "medianLapTime": 510.25,
+          "name": "a-james clay",
+          "ratioScore": 0
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 94.031,
+          "medianLapTime": 513.774,
+          "name": "a-dean madden",
+          "ratioScore": 0.01077901639945983
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 94.637,
+          "medianLapTime": 529.42,
+          "name": "a-dominik dudkiewicz",
+          "ratioScore": 0.05863613631601716
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 95.998,
+          "medianLapTime": 544.584,
+          "name": "a-scott chancellor",
+          "ratioScore": 0.10501894127668933
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 94.727,
+          "medianLapTime": 541.6,
+          "name": "a-sam chancellor",
+          "ratioScore": 0.0958916470269767
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 94.78,
+          "medianLapTime": 562.9380000000001,
+          "name": "a-robert wood",
+          "ratioScore": 0.1611591418997561
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 95.236,
+          "medianLapTime": 577.2805,
+          "name": "a-stuart kent",
+          "ratioScore": 0.20502918807150727
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 94.988,
+          "medianLapTime": 590.877,
+          "name": "a-cameron shakespeare",
+          "ratioScore": 0.24661741068083062
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.29,
+          "medianLapTime": 603.155,
+          "name": "a-lucas spargo",
+          "ratioScore": 0.28417267837452187
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.635,
+          "medianLapTime": 645.17,
+          "name": "a-neil dixon",
+          "ratioScore": 0.41268583785900104
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 73.899,
+          "medianLapTime": 592.63,
+          "name": "a-mark mathews",
+          "ratioScore": 0.25197939017806487
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 95.995,
+          "medianLapTime": 612.24,
+          "name": "b-scott farrar",
+          "ratioScore": 0.3119613741716538
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 95.918,
+          "medianLapTime": 630.11,
+          "name": "b-ben lord",
+          "ratioScore": 0.36662114234939136
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.392,
+          "medianLapTime": 654.267,
+          "name": "b-ray hart",
+          "ratioScore": 0.4405112385927942
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 94.433,
+          "medianLapTime": 654.29,
+          "name": "b-tim rowe",
+          "ratioScore": 0.4405815897213942
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 95.237,
+          "medianLapTime": 684.097,
+          "name": "b-tony french",
+          "ratioScore": 0.531753593642705
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 95.504,
+          "medianLapTime": 679.9549999999999,
+          "name": "b-anthony natoli",
+          "ratioScore": 0.5190842730052013
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 92.981,
+          "medianLapTime": 594.85,
+          "name": "b-stephen freer",
+          "ratioScore": 0.25876980346035805
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 93.464,
+          "medianLapTime": 623.1255,
+          "name": "c-james taylor",
+          "ratioScore": 0.345257339840303
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.065,
+          "medianLapTime": 638.936,
+          "name": "c-martin byrne",
+          "ratioScore": 0.39361762326358907
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 93.929,
+          "medianLapTime": 658.033,
+          "name": "c-martz keir",
+          "ratioScore": 0.4520304712149183
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.281,
+          "medianLapTime": 651.937,
+          "name": "c-ben williams",
+          "ratioScore": 0.4333843633911081
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.1,
+          "medianLapTime": 681.917,
+          "name": "c-david allen",
+          "ratioScore": 0.5250855301492823
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.335,
+          "medianLapTime": 724.77,
+          "name": "c-benjamin stengel",
+          "ratioScore": 0.6561619177105908
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.806,
+          "medianLapTime": 685.02,
+          "name": "c-andrew noye",
+          "ratioScore": 0.5345768150208836
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.353,
+          "medianLapTime": 750.6804999999999,
+          "name": "c-richard williams",
+          "ratioScore": 0.7354155228235885
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.804,
+          "medianLapTime": 776.0930000000001,
+          "name": "c-nick pile",
+          "ratioScore": 0.8131458730651532
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.227,
+          "medianLapTime": 788.5664999999999,
+          "name": "c-ben van duijne",
+          "ratioScore": 0.8512991253519467
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 91.045,
+          "medianLapTime": 580.53,
+          "name": "ebike-michael scragg",
+          "ratioScore": 0.21496857904484576
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 94.047,
+          "medianLapTime": 564.775,
+          "name": "wa-ruby taylor",
+          "ratioScore": 0.16677805595361717
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 95.913,
+          "medianLapTime": 616.655,
+          "name": "wa-kate kellett",
+          "ratioScore": 0.325465732118196
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 95.726,
+          "medianLapTime": 680.08,
+          "name": "wa-christy harris",
+          "ratioScore": 0.5194666160954209
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 94.975,
+          "medianLapTime": 809.817,
+          "name": "wb-gemma berry",
+          "ratioScore": 0.9162989800615728
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 96.063,
+          "medianLapTime": 832.6415,
+          "name": "wb-fiona mathews",
+          "ratioScore": 0.9861132989632386
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 95.073,
+          "medianLapTime": 837.1814999999999,
+          "name": "wb-kari lankford",
+          "ratioScore": 1
+        }
+      ]
+    }
   },
   {
     "Id": 32,
@@ -150,7 +3116,298 @@
     "EntryBossEventNumber": 25179,
     "CompanyName": "Geelong Mountain Bike Club",
     "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_32.xlsx"
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_32.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "a",
+          "confidenceFactor": 98.696,
+          "medianLapTime": 805.1115,
+          "name": "a-dean madden",
+          "ratioScore": 0.08275289739528023
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.892,
+          "medianLapTime": 802.918,
+          "name": "a-dominik dudkiewicz",
+          "ratioScore": 0.07893667789698222
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.499,
+          "medianLapTime": 816.0415,
+          "name": "a-bert henkel",
+          "ratioScore": 0.10176875293045141
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.13,
+          "medianLapTime": 819.8285,
+          "name": "a-nathan murphy",
+          "ratioScore": 0.1083573206259401
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.765,
+          "medianLapTime": 822.9685,
+          "name": "a-jack lamshed",
+          "ratioScore": 0.11382024710173487
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.37,
+          "medianLapTime": 834.825,
+          "name": "a-matt palmer",
+          "ratioScore": 0.13444801390436595
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.734,
+          "medianLapTime": 842.9865,
+          "name": "a-paul gerloff",
+          "ratioScore": 0.14864727327767768
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.056,
+          "medianLapTime": 842.4485,
+          "name": "a-stuart kent",
+          "ratioScore": 0.1477112686776848
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.483,
+          "medianLapTime": 866.373,
+          "name": "a-duncan murray",
+          "ratioScore": 0.18933476691658707
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.952,
+          "medianLapTime": 864.9214999999999,
+          "name": "a-sean milligan",
+          "ratioScore": 0.18680946826065814
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.26,
+          "medianLapTime": 880.74,
+          "name": "a-ryan holmberg",
+          "ratioScore": 0.21433026522160098
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.503,
+          "medianLapTime": 881.293,
+          "name": "a-christopher dick",
+          "ratioScore": 0.21529236660412152
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.892,
+          "medianLapTime": 871.53,
+          "name": "a-mark mathews",
+          "ratioScore": 0.19830684074960406
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.547,
+          "medianLapTime": 874.8465,
+          "name": "a-ashley goldstraw",
+          "ratioScore": 0.20407683936647464
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.324,
+          "medianLapTime": 892.717,
+          "name": "a-jonathan shue",
+          "ratioScore": 0.23516767617720422
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.89,
+          "medianLapTime": 874.527,
+          "name": "b-scott farrar",
+          "ratioScore": 0.20352097789863507
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.129,
+          "medianLapTime": 900.833,
+          "name": "b-stephen freer",
+          "ratioScore": 0.2492877753101821
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.344,
+          "medianLapTime": 909.36,
+          "name": "b-lachlan beckingsale",
+          "ratioScore": 0.2641229262844185
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 99.719,
+          "medianLapTime": 936.137,
+          "name": "b-ben lord",
+          "ratioScore": 0.3107091626673348
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.34,
+          "medianLapTime": 966.043,
+          "name": "b-chris fice",
+          "ratioScore": 0.3627391878855257
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 99.089,
+          "medianLapTime": 1038.19,
+          "name": "b-tim rowe",
+          "ratioScore": 0.4882594924871715
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.861,
+          "medianLapTime": 983.61,
+          "name": "c-ben williams",
+          "ratioScore": 0.39330199979644526
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 99.85,
+          "medianLapTime": 1022.25,
+          "name": "c-andrew noye",
+          "ratioScore": 0.46052731158775445
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.595,
+          "medianLapTime": 1038.69,
+          "name": "c-richard williams",
+          "ratioScore": 0.48912938523809424
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.453,
+          "medianLapTime": 1038.953,
+          "name": "c-eric van dam",
+          "ratioScore": 0.4895869488250794
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.165,
+          "medianLapTime": 1088.067,
+          "name": "c-benjamin stengel",
+          "ratioScore": 0.5750347739627183
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.633,
+          "medianLapTime": 1119.8235,
+          "name": "c-nick pile",
+          "ratioScore": 0.6302842722520741
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.096,
+          "medianLapTime": 1134.367,
+          "name": "c-kelly weston",
+          "ratioScore": 0.6555868426981638
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.708,
+          "medianLapTime": 1161.4035,
+          "name": "c-ben van duijne",
+          "ratioScore": 0.7026245534188089
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 94.96,
+          "medianLapTime": 1286,
+          "name": "c-james dempster",
+          "ratioScore": 0.9193957376994991
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 92.784,
+          "medianLapTime": 1100.1415000000002,
+          "name": "d-max sutton",
+          "ratioScore": 0.5960418140047518
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 94.44,
+          "medianLapTime": 1321.4029999999998,
+          "name": "d-oscar durante",
+          "ratioScore": 0.9809893638213343
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 98.186,
+          "medianLapTime": 1298.6599999999999,
+          "name": "d-colin linahan",
+          "ratioScore": 0.9414214221528626
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 96.713,
+          "medianLapTime": 757.5464999999999,
+          "name": "ebike-danny taugge",
+          "ratioScore": 0
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 96.357,
+          "medianLapTime": 794.5635,
+          "name": "ebike-stuart clark",
+          "ratioScore": 0.06440163992181414
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 97.963,
+          "medianLapTime": 983.483,
+          "name": "ebike-anthony speechley",
+          "ratioScore": 0.39308104703771074
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 97.584,
+          "medianLapTime": 1000.704,
+          "name": "wa-melissa mackenzie",
+          "ratioScore": 0.42304189316499174
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 94.273,
+          "medianLapTime": 1069.6535,
+          "name": "wa-christy harris",
+          "ratioScore": 0.5429992336244864
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 99.512,
+          "medianLapTime": 1196.5185000000001,
+          "name": "wb-anna sutton",
+          "ratioScore": 0.7637171213161132
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 98.762,
+          "medianLapTime": 1213.1835,
+          "name": "wb-sally brown",
+          "ratioScore": 0.7927106467043681
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 96.26,
+          "medianLapTime": 1332.33,
+          "name": "wb-sharrene dongiovanni",
+          "ratioScore": 1
+        }
+      ]
+    }
   },
   {
     "Id": 31,
@@ -159,6 +3416,506 @@
     "EntryBossEventNumber": 25181,
     "CompanyName": "Geelong Mountain Bike Club",
     "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_31.xlsx"
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_31.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "a",
+          "confidenceFactor": 99.103,
+          "medianLapTime": 511.2365,
+          "name": "a-matt palmer",
+          "ratioScore": 0
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 99.097,
+          "medianLapTime": 511.85,
+          "name": "a-robert wood",
+          "ratioScore": 0.0018537739483573464
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.061,
+          "medianLapTime": 533.8185,
+          "name": "a-stuart kent",
+          "ratioScore": 0.0682345938089691
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.089,
+          "medianLapTime": 534.2635,
+          "name": "a-sam chancellor",
+          "ratioScore": 0.06957922201926911
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.813,
+          "medianLapTime": 548.8834999999999,
+          "name": "a-mark mathews",
+          "ratioScore": 0.11375554659136729
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.539,
+          "medianLapTime": 547.3,
+          "name": "a-cameron shakespeare",
+          "ratioScore": 0.10897078530819929
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 98.942,
+          "medianLapTime": 549.0885000000001,
+          "name": "a-ashley goldstraw",
+          "ratioScore": 0.11437498205903397
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 98.535,
+          "medianLapTime": 558.1614999999999,
+          "name": "b-duncan murray",
+          "ratioScore": 0.14179028936701235
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 99.37,
+          "medianLapTime": 561.218,
+          "name": "b-scott farrar",
+          "ratioScore": 0.15102592110809446
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 98.822,
+          "medianLapTime": 563.277,
+          "name": "b-rodney sullivan",
+          "ratioScore": 0.1572474705126057
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.412,
+          "medianLapTime": 600.815,
+          "name": "b-phil o'neil",
+          "ratioScore": 0.27067365873336047
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 96.608,
+          "medianLapTime": 593.4635000000001,
+          "name": "b-tim rowe",
+          "ratioScore": 0.24846009853556417
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.62,
+          "medianLapTime": 586.3865000000001,
+          "name": "c-gavin erickson",
+          "ratioScore": 0.22707597753715505
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.971,
+          "medianLapTime": 599.233,
+          "name": "c-vince trotter",
+          "ratioScore": 0.26589342990483344
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.8,
+          "medianLapTime": 590.323,
+          "name": "c-richard williams",
+          "ratioScore": 0.2389706493345601
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 99.263,
+          "medianLapTime": 592.893,
+          "name": "c-benjamin stengel",
+          "ratioScore": 0.24673625495359536
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 99.242,
+          "medianLapTime": 595.29,
+          "name": "c-luis goldstraw",
+          "ratioScore": 0.2539791174706485
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.574,
+          "medianLapTime": 612.56,
+          "name": "c-martz keir",
+          "ratioScore": 0.3061627785759933
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.501,
+          "medianLapTime": 606.92,
+          "name": "c-steve barker",
+          "ratioScore": 0.28912074912410307
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.701,
+          "medianLapTime": 617.767,
+          "name": "c-andrew noye",
+          "ratioScore": 0.3218964394547157
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.939,
+          "medianLapTime": 608.95,
+          "name": "c-nick pile",
+          "ratioScore": 0.29525467107221276
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.113,
+          "medianLapTime": 610.867,
+          "name": "c-ewan sullivan",
+          "ratioScore": 0.30104714810399863
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.024,
+          "medianLapTime": 616.12,
+          "name": "c-ben van duijne",
+          "ratioScore": 0.3169198042583923
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.321,
+          "medianLapTime": 649.844,
+          "name": "c-ben williams",
+          "ratioScore": 0.4188214711441277
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.895,
+          "medianLapTime": 652.437,
+          "name": "c-kelly weston",
+          "ratioScore": 0.4266565744009984
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.368,
+          "medianLapTime": 672.237,
+          "name": "c-scott williams",
+          "ratioScore": 0.4864849756682726
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.109,
+          "medianLapTime": 689.567,
+          "name": "c-david allen",
+          "ratioScore": 0.5388499349592759
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.934,
+          "medianLapTime": 711.543,
+          "name": "c-tom maloney",
+          "ratioScore": 0.6052534170930952
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 98.078,
+          "medianLapTime": 699.783,
+          "name": "d-oscar durante",
+          "ratioScore": 0.5697189727040474
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 95.785,
+          "medianLapTime": 734.226,
+          "name": "d-colin linahan",
+          "ratioScore": 0.6737931961812559
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.983,
+          "medianLapTime": 842.183,
+          "name": "d-nicholas hughes",
+          "ratioScore": 1
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 97.593,
+          "medianLapTime": 630.026,
+          "name": "ebike-peter henkel",
+          "ratioScore": 0.3589386804211556
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 98.427,
+          "medianLapTime": 635.013,
+          "name": "ebike-rory costelloe",
+          "ratioScore": 0.3740075812857971
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 99.032,
+          "medianLapTime": 592.2535,
+          "name": "wa-kate kellett",
+          "ratioScore": 0.24480391845811952
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 95.945,
+          "medianLapTime": 635.14,
+          "name": "wa-christy harris",
+          "ratioScore": 0.37439132911210726
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 97.601,
+          "medianLapTime": 645.42,
+          "name": "wa-karen brookes",
+          "ratioScore": 0.4054537515882476
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 98.669,
+          "medianLapTime": 683.653,
+          "name": "wb-amy trotter",
+          "ratioScore": 0.5209799771262124
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 97.703,
+          "medianLapTime": 704.923,
+          "name": "wb-kimberly douglass",
+          "ratioScore": 0.5852501839421176
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 97.97,
+          "medianLapTime": 702.034,
+          "name": "wb-sally brown",
+          "ratioScore": 0.5765206763026652
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 87.746,
+          "medianLapTime": 781.14,
+          "name": "wb-anna sutton",
+          "ratioScore": 0.8155502475475643
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 96.39,
+          "medianLapTime": 740.5450000000001,
+          "name": "wb-amanda coombs",
+          "ratioScore": 0.692886916767514
+        }
+      ]
+    }
+  },
+  {
+    "Id": 30,
+    "Name": "Autumn NF Round 4",
+    "EventDate": "2025-06-06T00:00:00",
+    "EntryBossEventNumber": 25180,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
+    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_30.xlsx",
+    "EventHandicapData": {
+      "entrantData": [
+        {
+          "category": "a",
+          "confidenceFactor": 97.52,
+          "medianLapTime": 595.8015,
+          "name": "a-robert wood",
+          "ratioScore": 0
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.528,
+          "medianLapTime": 598.1265,
+          "name": "a-stuart kent",
+          "ratioScore": 0.008564166789450168
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 97.197,
+          "medianLapTime": 607.72,
+          "name": "a-cameron shakespeare",
+          "ratioScore": 0.04390194489465152
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 95.62,
+          "medianLapTime": 620.52,
+          "name": "a-riley flaherty",
+          "ratioScore": 0.09105090614409882
+        },
+        {
+          "category": "a",
+          "confidenceFactor": 96.241,
+          "medianLapTime": 621.307,
+          "name": "a-mark mathews",
+          "ratioScore": 0.09394983055842045
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 98.083,
+          "medianLapTime": 641.78,
+          "name": "b-adrian dillon",
+          "ratioScore": 0.16936238396935294
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.349,
+          "medianLapTime": 657.11,
+          "name": "b-phil o'neil",
+          "ratioScore": 0.22583063209076165
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 97.791,
+          "medianLapTime": 656.087,
+          "name": "b-tony french",
+          "ratioScore": 0.22206239870340339
+        },
+        {
+          "category": "b",
+          "confidenceFactor": 95.81,
+          "medianLapTime": 685.184,
+          "name": "b-tim rowe",
+          "ratioScore": 0.3292415647561512
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 98.558,
+          "medianLapTime": 661.83,
+          "name": "c-gavin erickson",
+          "ratioScore": 0.24321681155149552
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.706,
+          "medianLapTime": 684.323,
+          "name": "c-richard williams",
+          "ratioScore": 0.3260700604096064
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.655,
+          "medianLapTime": 699.02,
+          "name": "c-ben williams",
+          "ratioScore": 0.38020664505672586
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.61,
+          "medianLapTime": 697.643,
+          "name": "c-vince trotter",
+          "ratioScore": 0.37513444820981284
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 96.245,
+          "medianLapTime": 713.344,
+          "name": "c-ben van duijne",
+          "ratioScore": 0.43296927950493597
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.087,
+          "medianLapTime": 722.464,
+          "name": "c-eric van dam",
+          "ratioScore": 0.4665629143951673
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.95,
+          "medianLapTime": 733.142,
+          "name": "c-nick pile",
+          "ratioScore": 0.5058954619124798
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.868,
+          "medianLapTime": 742.675,
+          "name": "c-kelly weston",
+          "ratioScore": 0.541010387505525
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 99.219,
+          "medianLapTime": 746.422,
+          "name": "c-martz keir",
+          "ratioScore": 0.5548125092087814
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 97.434,
+          "medianLapTime": 750.242,
+          "name": "c-luis goldstraw",
+          "ratioScore": 0.5688835273316631
+        },
+        {
+          "category": "c",
+          "confidenceFactor": 95.897,
+          "medianLapTime": 802.8465,
+          "name": "c-scott williams",
+          "ratioScore": 0.7626528657728008
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 97.026,
+          "medianLapTime": 806.1635,
+          "name": "d-oscar durante",
+          "ratioScore": 0.7748710770590833
+        },
+        {
+          "category": "d",
+          "confidenceFactor": 95.447,
+          "medianLapTime": 867.2815,
+          "name": "d-colin linahan",
+          "ratioScore": 1
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 99.492,
+          "medianLapTime": 612.124,
+          "name": "ebike-paul durante",
+          "ratioScore": 0.06012413437453952
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 99.219,
+          "medianLapTime": 645.497,
+          "name": "ebike-peter henkel",
+          "ratioScore": 0.18305400029468072
+        },
+        {
+          "category": "ebike",
+          "confidenceFactor": 98.881,
+          "medianLapTime": 658.407,
+          "name": "ebike-anthony speechley",
+          "ratioScore": 0.23060814792986592
+        },
+        {
+          "category": "wa",
+          "confidenceFactor": 96.816,
+          "medianLapTime": 682.677,
+          "name": "wa-christy harris",
+          "ratioScore": 0.3200069986739354
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 97.191,
+          "medianLapTime": 777.652,
+          "name": "wb-amy trotter",
+          "ratioScore": 0.6698486076322381
+        },
+        {
+          "category": "wb",
+          "confidenceFactor": 97.561,
+          "medianLapTime": 800.985,
+          "name": "wb-kimberly douglass",
+          "ratioScore": 0.7557960070723441
+        }
+      ]
+    }
   }
 ]

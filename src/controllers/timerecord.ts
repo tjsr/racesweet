@@ -1,4 +1,4 @@
-import type { EventTimeRecord, ParticipantPassingRecord, TimeRecord, Validated } from "../model/timerecord.js";
+import type { ParticipantPassingRecord, TimeRecord, Validated } from "../model/timerecord.js";
 import { assertValidTimeRecord, moveForwardIfUndefined } from "./crossingList.js";
 import { getChipIdentifier, isChipCrossing } from './chipCrossing.ts';
 import { getTransmitterIdentifier, isTransmitterCrossing } from './transmitter.ts';
@@ -25,7 +25,7 @@ const formatTime = (time: Date | undefined): string => {
   }
 };
 
-export const getAutomaticIdentifier = (record: EventTimeRecord): number | undefined => {
+export const getAutomaticIdentifier = (record: TimeRecord): number | undefined => {
   if (isChipCrossing(record)) {
     const crossing = record as ChipCrossingData;
     const chip = getChipIdentifier(crossing);
@@ -42,7 +42,7 @@ export const getAutomaticIdentifier = (record: EventTimeRecord): number | undefi
   return undefined;
 };
 
-export const getTimeRecordIdentifier = (record: EventTimeRecord, excludeTime: boolean = false): string => {
+export const getTimeRecordIdentifier = (record: TimeRecord, excludeTime: boolean = false): string => {
   const timeString = formatTime(record.time);
   let id = `&${record.id}`;
   if (isChipCrossing(record)) {

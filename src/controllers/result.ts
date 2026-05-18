@@ -19,23 +19,19 @@ export const filterPassingsByTime = (passings: EntrantPassingRecord[], upToTime:
     return record.time <= upToTime && record.isExcluded !== true;
   });
 
-const isValidLapPassing = (record: PassingRecord): boolean => !(record.lapNo === undefined || record.lapNo === null || record.lapNo < 1);
+const isValidLapPassing = (record: ParticipantPassingRecord): boolean => !(record.lapNo === undefined || record.lapNo === null || record.lapNo < 1);
 
 export const getLapsOnly = (sortedRecords: EntrantPassingRecord[]): ParticipantPassingRecord[] => {
-  const laps: ParticipantPassingRecord[][] = [];
+  const laps: ParticipantPassingRecord[] = [];
 
   sortedRecords.forEach((record) => {
-    const entrantId = record.entrantId;
-
-    if (record.lapNo === undefined || record.lapNo === null || record.lapNo < 1) {
+    if (!isValidLapPassing(record)) {
       return; // Skip records without a valid lap number
     }
-    if (!laps[record.lapNo - 1]) {
-      laps[record.lapNo - 1] = [];
-    }
-    laps[record.lapNo - 1].push(record);
+    laps.push(record);
   });
-  
+
+  return laps;
 };
 
 const getIncludedLapsOnly = (

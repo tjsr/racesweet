@@ -5,6 +5,8 @@ import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
 import { CategoryList } from '../views/display/categories';
 import { EventCategoryId } from '../model/eventcategory';
 import { EventParticipantId } from '../model/eventparticipant';
+import type { EventTimeRecord } from '../model/timerecord';
+import { HandicapView } from '../views/display/handicap';
 import { RecentRecords } from '../views/display/recent';
 import { TestSession } from '../testdata/testsession';
 import { createRoot } from 'react-dom/client';
@@ -27,6 +29,7 @@ const loadRecords = async (
 };
 
 const RaceSweetMainApp = () => {
+  const [activeView, setActiveView] = useState<'recent' | 'handicap'>('recent');
   const [sessionState, setSessionState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [errorState, setErrorState] = useState<Error|undefined>(undefined);
   const [selectedCategories, setCategorySelected] = useState<Set<EventCategoryId>>(new Set<EventCategoryId>());
@@ -69,18 +72,44 @@ const RaceSweetMainApp = () => {
     });
   }
 
-  return <>
-    <h1>Main content.</h1>
-    <CategoryList categories={sessionState.categories || []} categorySelected={setCategorySelected} />
-    <RecentRecords
-      records={sessionState.records || []}
-      raceStateLookup={sessionState}
-      selectedCategories={hilightCategories}
-      selectedParticipants={recordSelectedParticipants}
-      categorySelected={setRecordSelectedCategories}
-      participantSelected={setRecordSelectedParticipants}
-    />
-  </>
+  const viewSelector = (
+    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+      <button
+        type='button'
+        onClick={() => setActiveView('recent')}
+        disabled={activeView === 'recent'}>
+        Recent Records
+      </button>
+      <button
+        type='button'
+        onClick={() => setActiveView('handicap')}
+        disabled={activeView === 'handicap'}>
+        Handicap Data
+      </button>
+    </div>
+  );
+
+  return (
+    <>
+      <h1>Main content.</h1>
+      {viewSelector}
+      {activeView === 'handicap' ? (
+        <HandicapView />
+      ) : (
+        <>
+          <CategoryList categories={sessionState.categories || []} categorySelected={setCategorySelected} />
+          <RecentRecords
+            records={(sessionState.records as EventTimeRecord[]) || []}
+            raceStateLookup={sessionState}
+            selectedCategories={hilightCategories}
+            selectedParticipants={recordSelectedParticipants}
+            categorySelected={setRecordSelectedCategories}
+            participantSelected={setRecordSelectedParticipants}
+          />
+        </>
+      )}
+    </>
+  );
 };
 
 root.render(<RaceSweetMainApp />);

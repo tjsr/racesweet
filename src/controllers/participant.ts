@@ -583,9 +583,14 @@ export const assignParticpantsToCrossings = (participants: Map<EventParticipantI
 
 export const getPassingsForParticipant = (
   participantId: EventParticipantId,
-  allPassingRecords: ParticipantPassingRecord[]
+  allPassingRecords: TimeRecord[]
 ): ParticipantPassingRecord[] => allPassingRecords.filter(
-  (record) => record.participantId === participantId && record.time !== undefined
+  (record) =>
+    Object.prototype.hasOwnProperty.call(record, 'participantId') &&
+    (record as ParticipantPassingRecord).participantId === participantId &&
+    record.time !== undefined
+).map(
+  (record) => record as ParticipantPassingRecord
 ).sort(compareByTime);
 
 export const calculateParticipantElapsedTimes = (

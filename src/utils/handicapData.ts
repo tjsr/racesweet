@@ -1,30 +1,52 @@
 import { EventEntrantHandicapData, EventHandicapData } from "./apical/apicalData.js";
+import type { HandicapRiderSnapshot, HandicapRoundSnapshot, HandicapSnapshot, HandicapSnapshotEvent } from "../model/handicapSnapshot.js";
 
-const findHighestRankedEntrant = (progressiveHandicapData: Map<string, number>, eventHandicapData: EventHandicapData): string | null => {
-  let highestRankedEntrant: string | null = null;
-  let lowestHandicapTime: number = Infinity;
-  eventHandicapData.entrantData.forEach((entrant) => {
-    const handicapTime = progressiveHandicapData.get(entrant.name);
-    if (handicapTime !== undefined && handicapTime < lowestHandicapTime) {
-      lowestHandicapTime = handicapTime;
-      highestRankedEntrant = entrant.name;
-    }
-  });
-  return highestRankedEntrant;
-};
+interface EventScalingAnchors {
+  highestKnownProgressiveRatio: number;
+  highestKnownRawRatio: number;
+  lowestKnownProgressiveRatio: number;
+  lowestKnownRawRatio: number;
+}
 
-const findLowestRankedEntrant = (progressiveHandicapData: Map<string, number>, eventHandicapData: EventHandicapData): string | null => {
-  let lowestRankedEntrant: string | null = null;
-  let highestHandicapTime: number = -Infinity;
-  eventHandicapData.entrantData.forEach((entrant) => {
-    const handicapTime = progressiveHandicapData.get(entrant.name);
-    if (handicapTime !== undefined && handicapTime > highestHandicapTime) {
-      highestHandicapTime = handicapTime;
-      lowestRankedEntrant = entrant.name;
-    }
+const getEventScalingAnchors = (
+  progressiveHandicapData: Map<string, number>,
+  eventHandicapData: EventHandicapData
+): EventScalingAnchors | undefined => {
+  const eventEntrantsByRawRatio = [...eventHandicapData.entrantData].sort((a, b) => a.ratioScore - b.ratioScore);
+  const knownEntrants = eventEntrantsByRawRatio.filter((entrant) => progressiveHandicapData.has(entrant.name));
+
+  if (knownEntrants.length < 2) {
+    return undefined;
   }
-  );
-  return lowestRankedEntrant;
+
+  const highestKnownEntrant = knownEntrants[0];
+  const lowestKnownEntrant = knownEntrants[knownEntrants.length - 1];
+
+  if (!highestKnownEntrant || !lowestKnownEntrant || highestKnownEntrant.name === lowestKnownEntrant.name) {
+    return undefined;
+  }
+
+  const highestKnownProgressiveRatio = progressiveHandicapData.get(highestKnownEntrant.name);
+  const lowestKnownProgressiveRatio = progressiveHandicapData.get(lowestKnownEntrant.name);
+
+  if (highestKnownProgressiveRatio === undefined || lowestKnownProgressiveRatio === undefined) {
+    return undefined;
+  }
+
+  if (lowestKnownProgressiveRatio <= highestKnownProgressiveRatio) {
+    return undefined;
+  }
+
+  if (lowestKnownEntrant.ratioScore <= highestKnownEntrant.ratioScore) {
+    return undefined;
+  }
+
+  return {
+    highestKnownProgressiveRatio,
+    highestKnownRawRatio: highestKnownEntrant.ratioScore,
+    lowestKnownProgressiveRatio,
+    lowestKnownRawRatio: lowestKnownEntrant.ratioScore,
+  };
 };
 
 export const scaleEventScore = (score: number, highestEventRatio: number, lowestEventRatio: number): number => {
@@ -45,23 +67,28 @@ export const scaleEventScore = (score: number, highestEventRatio: number, lowest
 const isDebugRider = (entrantName: string): boolean => {
   const debugRiders: string[] = [];  // 'gavin erickson', 'adrian dillon', 'nick pile'];
   return debugRiders.includes(entrantName);
-}
+};
+
+const normalizeBetweenAnchors = (value: number, minAnchor: number, maxAnchor: number): number =>
+  (value - minAnchor) / (maxAnchor - minAnchor);
 
 const scaleHandicapData = (progressiveHandicapData: Map<string, number>, eventHandicapData: EventHandicapData): EventEntrantHandicapData[] => {
-  const highestRanked = findHighestRankedEntrant(progressiveHandicapData, eventHandicapData);
-  const highestEventRatio: number | undefined = highestRanked ? eventHandicapData.entrantData.find((entrant) => entrant.name === highestRanked)?.ratioScore || 0.0 : 0.0;
-  const lowestRanked = findLowestRankedEntrant(progressiveHandicapData, eventHandicapData);
-  const lowestEventRatio: number | undefined = lowestRanked ? eventHandicapData.entrantData.find((entrant) => entrant.name === lowestRanked)?.ratioScore || 1.0 : 1.0;
+  const eventAnchors = getEventScalingAnchors(progressiveHandicapData, eventHandicapData);
 
-  // console.log(`Fastest rider for this event was ${highestRanked}=${highestEventRatio.toFixed(4)}, lowest was ${lowestRanked}=${lowestEventRatio.toFixed(4)}`);
   const correctedHandicaps = eventHandicapData.entrantData.map(
     (value: EventEntrantHandicapData) => {
       try {
-        const scaled = scaleEventScore(value.ratioScore, highestEventRatio, lowestEventRatio);
+        const scaled = eventAnchors
+          ? scaleEventScore(
+            normalizeBetweenAnchors(value.ratioScore, eventAnchors.highestKnownRawRatio, eventAnchors.lowestKnownRawRatio),
+            eventAnchors.highestKnownProgressiveRatio,
+            eventAnchors.lowestKnownProgressiveRatio
+          )
+          : scaleEventScore(value.ratioScore, 0.0, 1.0);
         if (isDebugRider(value.name)) {
           console.debug(`Scaled score for ${value.name}=${value.ratioScore.toFixed(4)}=>${scaled.toFixed(4)}`);
         }
-        return { ...value, ratioScore: scaled }
+        return { ...value, ratioScore: scaled };
       } catch (err: unknown) {
         console.error(`Error scaling event score ${value.ratioScore} for ${value.name}:`, err);
         throw err;
@@ -89,21 +116,116 @@ interface ProcessedHandicapData {
   handicapRatio: number;
 }
 
+const getSortedHandicaps = (progressiveHandicapData: Map<string, number>): ProcessedHandicapData[] => {
+  const handicaps: ProcessedHandicapData[] = [];
+  progressiveHandicapData.forEach((handicapTime, entrant) => {
+    handicaps.push({ handicapRatio: handicapTime, name: entrant });
+  });
+  return handicaps.sort((a, b) => a.handicapRatio - b.handicapRatio);
+};
+
+const toNullableNumber = (value: string | undefined): number | null => {
+  if (value === undefined || value.trim() === '') {
+    return null;
+  }
+  const parsedValue = Number(value);
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+};
+
+const parseRoundHandicapString = (roundData: string, eventIds: number[]): Record<string, HandicapRoundSnapshot> => {
+  const roundsByEventId: Record<string, HandicapRoundSnapshot> = {};
+  const tokens = roundData.split(',').map((token) => token.trim());
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const roundToken = tokens[index];
+    if (!/^\d+$/.test(roundToken)) {
+      continue;
+    }
+
+    const eventNumber = Number(roundToken);
+    const eventId = eventIds[eventNumber - 1] ?? eventNumber;
+    const ratioScore = toNullableNumber(tokens[index + 1]);
+    const medianLapTime = toNullableNumber(tokens[index + 2]);
+    const maybeConfidenceToken = tokens[index + 3];
+    const hasExplicitConfidence = maybeConfidenceToken !== undefined && !/^\d+$/.test(maybeConfidenceToken);
+    const confidenceFactor = hasExplicitConfidence ? toNullableNumber(maybeConfidenceToken) : null;
+
+    if (ratioScore !== null || medianLapTime !== null || confidenceFactor !== null) {
+      roundsByEventId[String(eventId)] = {
+        confidenceFactor,
+        eventId,
+        eventNumber,
+        medianLapTime,
+        ratioScore,
+      };
+    }
+
+    index += hasExplicitConfidence ? 3 : 2;
+  }
+
+  return roundsByEventId;
+};
+
 const getEntrantRoundData = (entrantName: string, roundHandicapData: Map<string, string>): string => {
   const roundData = roundHandicapData.get(entrantName);
   return roundData ? roundData : 'No round data';
 };
 
+/**
+ * Entrant keys are stored as `${category}-${fullName}` (all lowercase).
+ * Split on the first hyphen to recover category, then split the remainder
+ * on the first space to recover firstName / surname.
+ */
+const parseEntrantKey = (key: string): { category: string; firstName: string; surname: string } => {
+  const separatorIndex = key.indexOf('-');
+  if (separatorIndex === -1) {
+    return { category: '', firstName: key, surname: '' };
+  }
+  const category = key.substring(0, separatorIndex);
+  const fullName = key.substring(separatorIndex + 1);
+  const spaceIndex = fullName.indexOf(' ');
+  if (spaceIndex === -1) {
+    return { category, firstName: fullName, surname: '' };
+  }
+  return {
+    category,
+    firstName: fullName.substring(0, spaceIndex),
+    surname: fullName.substring(spaceIndex + 1),
+  };
+};
+
 export const outputProcessedHandicaps = (progressiveHandicapData: Map<string, number>, roundHandicapData: Map<string, string>): void => {
   // console.log('Processed Handicap Data:');
-  let handicaps:ProcessedHandicapData[] = [];
-  progressiveHandicapData.forEach((handicapTime, entrant) => {
-    handicaps.push({ name: entrant, handicapRatio: handicapTime });
-  });
-  handicaps = handicaps.sort((a, b) => a.handicapRatio - b.handicapRatio);
+  const handicaps = getSortedHandicaps(progressiveHandicapData);
   handicaps.forEach((entrant) => {
     const entrantRoundData = getEntrantRoundData(entrant.name, roundHandicapData);
     console.log(`${entrant.name},${entrant.handicapRatio.toFixed(4)},${entrantRoundData}`);
   });
+};
+
+export const buildHandicapSnapshot = (
+  progressiveHandicapData: Map<string, number>,
+  roundHandicapData: Map<string, string>,
+  eventIds: number[],
+  events: HandicapSnapshotEvent[] = []
+): HandicapSnapshot => {
+  const riders: HandicapRiderSnapshot[] = getSortedHandicaps(progressiveHandicapData).map((entrant) => {
+    const { category, firstName, surname } = parseEntrantKey(entrant.name);
+    return {
+      category,
+      firstName,
+      handicapRatio: entrant.handicapRatio,
+      name: entrant.name,
+      roundsByEventId: parseRoundHandicapString(roundHandicapData.get(entrant.name) ?? '', eventIds),
+      surname,
+    };
+  });
+
+  return {
+    events,
+    generatedAt: new Date().toISOString(),
+    riders,
+    schemaVersion: '1.0',
+  };
 };
 

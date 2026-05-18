@@ -61,10 +61,10 @@ export const apicalDataFileExists = async (evenId: number): Promise<boolean> => 
     .catch(() => false);
 };
 
-export const generateOrGetCachedEventPath = async (eventId: number): Promise<string> => {
+export const generateOrGetCachedEventPath = async (eventId: number, forceRefreshExcel: boolean = false): Promise<string> => {
   let dataPath: string;
 
-  if (!await apicalDataFileExists(eventId)) {
+  if (forceRefreshExcel || !await apicalDataFileExists(eventId)) {
     // console.log(`No data file exists for eventId ${eventId}. Generating new Excel data...`);
     dataPath = await generateExcelData(eventId).then((response: ApicalExportToExcelResponse) => {
       const { FileGuid, FileName, Cookie } = response;

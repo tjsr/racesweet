@@ -1,4 +1,4 @@
-import type { EventCategory } from "@model/eventcategory";
+import type { EventCategory } from "../model/eventcategory.js";
 import type { PathLike } from "fs";
 import fs from "fs/promises";
 

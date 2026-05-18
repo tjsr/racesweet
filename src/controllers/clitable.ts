@@ -11,6 +11,7 @@ import Table from "cli-table3";
 import { getLapTimeCell } from "./laps.js";
 import { getParticipantNumber } from "./participant.js";
 import { getTimeRecordIdentifier } from "./timerecord.js";
+import { isCrossingRecord } from "./timerecord.js";
 import { millisecondsToTime } from "../app/utils/timeutils.js";
 import { tableTimeString } from "../app/utils/timeutils.js";
 
@@ -112,11 +113,14 @@ const createCliTableRows = (session: Session, filter: (data: ParticipantPassingR
       if (isFlagRecord(record)) {
         row = flagTableRow(record, categoryList);
         flagCount++;
-      } else {
-        row = crossingTableRow(record, categoryList, session);
-        if (filter && filter(record as ParticipantPassingRecord) === false) {
+      } else if (isCrossingRecord(record)) {
+        const crossingRecord = record as ParticipantPassingRecord;
+        row = crossingTableRow(crossingRecord, categoryList, session);
+        if (filter && filter(crossingRecord) === false) {
           return undefined; // Skip this row if it does not match the filter
         }
+      } else {
+        return undefined;
       }
       return row;
     } catch (error) {

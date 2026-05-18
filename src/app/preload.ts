@@ -9,14 +9,6 @@ import { FileReadDataType } from './window.ts';
 // See the Electron documentation for details on how to use preload scripts:
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
 
-type dependencies = 'chrome'| 'node'| 'electron';
-
-interface ProcessVersions {
-  chrome: string;
-  node: string;
-  electron: string;
-}
-
 window.addEventListener('DOMContentLoaded', () => {
   console.log('Content loaded in preload.ts, replacing text...');
   const replaceText = (selector: string, text: string) => {
@@ -97,5 +89,13 @@ contextBridge.exposeInMainWorld(
 );
 
 contextBridge.exposeInMainWorld("nodeAPI", {
-  createBuffer: (data: any) => Buffer.from(data),
+  createBuffer: (data: string | Uint8Array | ArrayBuffer) => {
+    if (typeof data === 'string') {
+      return Buffer.from(data);
+    }
+    if (data instanceof Uint8Array) {
+      return Buffer.from(data);
+    }
+    return Buffer.from(new Uint8Array(data));
+  },
 });
