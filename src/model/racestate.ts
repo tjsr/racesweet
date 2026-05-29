@@ -24,6 +24,8 @@ export interface RaceStateLookup {
   getParticipantLaps(participantId: EventParticipantId): ParticipantPassingRecord[] | null | undefined;
   countTransponderCrossings(txNo: ChipCrossingData['chipCode'], untilTime?: Date): number;
   getTransponderCrossings(txNo: ChipCrossingData['chipCode'], untilTime?: Date): ChipCrossingData[];
+  excludeCrossing(crossingId: TimeRecordId, exclude: boolean): void;
+  updateParticipantCategory(participantId: EventParticipantId, categoryId: EventCategoryId): void;
 }
 
 export interface RaceState {
@@ -298,6 +300,33 @@ export class Session implements RaceState, RaceStateLookup {
       return undefined;
     }
     return this._cachedParticipantLaps.get(participantId) ?? null;
+  }
+
+  public excludeCrossing(crossingId: TimeRecordId, exclude: boolean): void {
+    const record = this._records.get(crossingId.toString());
+    if (record && isCrossingRecord(record)) {
+      (record as ParticipantPassingRecord).isExcluded = exclude;
+      if (record.participantId) {
+        this.__reprocessParticipantLaps(record.participantId);
+      } else {
+        this.__reprocessAllParticipantLaps();
+      }
+    }
+  }
+
+  public updateParticipantCategory(participantId: EventParticipantId, categoryId: EventCategoryId): void {
+    const participant = this.getParticipantById(participantId);
+    if (participant) {
+      participant.categoryId = categoryId;
+      
+      this.records
+        .filter(record => isCrossingRecord(record) && (record as ParticipantPassingRecord).participantId === participantId)
+        .forEach(record => {
+          (record as ParticipantPassingRecord).participantStartRecordId = undefined;
+        });
+
+      this.__reprocessParticipantLaps(participantId);
+    }
   }
 
   public async addCategories(categories: EventCategory[]): Promise<Set<EventCategoryId>|null> {

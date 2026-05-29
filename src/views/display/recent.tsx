@@ -3,7 +3,7 @@ import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../mod
 import { FlagRecord, GreenFlagRecord } from '../../model/flag';
 import { EventCategory, EventCategoryId } from '../../model/eventcategory';
 import { isFlagRecord, isGreenFlag } from '../../controllers/flag';
-import { Box, createTheme, FormControl, InputLabel, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import { Box, createTheme, FormControl, InputLabel, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { MillisecondsDuration, millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.ts';
 import { categoriesTextFromLookupFn, getElapsedTimeForCategory } from '../../controllers/category.ts';
 import "./recent.css"
@@ -32,6 +32,8 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   selectedParticipants?: Set<EventParticipantId>;
   categorySelected?: ((ids: Set<EventCategoryId>) => void) | undefined;
   participantSelected?: ((participantId: Set<EventParticipantId>) => void) | undefined;
+  onExclude?: (crossingId: string, exclude: boolean) => void;
+  onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void;
 }
 
 interface FlagRecordRowProps<FlagType extends FlagRecord> extends RecentRecordRowProps<FlagType> {
@@ -170,6 +172,8 @@ interface PassingRecordRowProps {
   selectedCategories: Set<EventCategoryId> | undefined;
   selectedParticipants: Set<EventParticipantId> | undefined;
   onSelect?: (passingRecord: ParticipantPassingRecord) => void;
+  onExclude?: (crossingId: string, exclude: boolean) => void;
+  onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void;
 }
 
 export const PassingRecordRow = (
@@ -177,6 +181,47 @@ export const PassingRecordRow = (
 ): JSX.Element => {
   const passing: ParticipantPassingRecord = props.passing;
   const rs: RaceStateLookup = props.raceStateLookup;
+  
+  const [contextMenu, setContextMenu] = React.useState<{
+    mouseX: number;
+    mouseY: number;
+  } | null>(null);
+
+  const handleContextMenu = (event: React.MouseEvent) => {
+    event.preventDefault();
+    
+    if (props.onSelect && passing) {
+      props.onSelect(passing);
+    }
+
+    setContextMenu(
+      contextMenu === null
+        ? {
+            mouseX: event.clientX + 2,
+            mouseY: event.clientY - 6,
+          }
+        : null,
+    );
+  };
+
+  const handleClose = () => {
+    setContextMenu(null);
+  };
+
+  const handleExclude = () => {
+    if (props.onExclude) {
+      props.onExclude(passing.id, !passing.isExcluded);
+    }
+    handleClose();
+  };
+
+  const handleChangeCategory = (categoryId: EventCategoryId) => {
+    if (props.onChangeCategory && passing.participantId) {
+      props.onChangeCategory(passing.participantId, categoryId);
+    }
+    handleClose();
+  };
+
   let categoryStr = undefined;
   const timeString = tableTimeString(passing.time);
   const identifier: string = getTimeRecordIdentifier(passing, true);
@@ -233,12 +278,16 @@ export const PassingRecordRow = (
     className += ' excluded';
   }
 
+  const allCategories = (rs as unknown as { categories: EventCategory[] }).categories || [];
+
   return (
     <>
       <TableRow
         key={passing.id}
         data-record-id={passing.id}
         className={className}
+        onContextMenu={handleContextMenu}
+        style={{ cursor: 'context-menu' }}
         onClick={(event: React.MouseEvent<HTMLTableRowElement, MouseEvent>) => {
           if (props.onSelect) {
             props.onSelect(passing);
@@ -255,6 +304,36 @@ export const PassingRecordRow = (
         <TableCell className={cellClasses}>{elapsedTime}</TableCell>
         <TableCell className={cellClasses}>{lapTime}</TableCell>
       </TableRow>
+      <Menu
+        open={contextMenu !== null}
+        onClose={handleClose}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu !== null
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : undefined
+        }
+      >
+        <MenuItem onClick={handleExclude}>
+          {passing.isExcluded ? 'Include crossing' : 'Exclude crossing'}
+        </MenuItem>
+        
+        {passing.participantId && allCategories.length > 0 && [
+          <MenuItem key="cat-header" disabled sx={{ opacity: '1 !important', fontWeight: 'bold' }}>
+            Change Category
+          </MenuItem>,
+          ...allCategories.map((cat) => (
+            <MenuItem 
+              key={cat.id} 
+              onClick={() => handleChangeCategory(cat.id)}
+              selected={entrant?.categoryId === cat.id}
+              sx={{ pl: 4 }}
+            >
+              {cat.name}
+            </MenuItem>
+          ))
+        ]}
+      </Menu>
     </>
   );
 };
@@ -312,6 +391,8 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       selectedCategories={props.selectedCategories}
       selectedParticipants={props.selectedParticipants}
       onSelect={passingRecordSelected}
+      onExclude={props.onExclude}
+      onChangeCategory={props.onChangeCategory}
     />;
   }
 
@@ -400,7 +481,10 @@ const headings: string[] = [
 
 // };
 
-export const RecentRecords = (props: RecordsProps) => {
+export const RecentRecords = (props: RecordsProps & { 
+  onExclude?: (crossingId: string, exclude: boolean) => void,
+  onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void
+}) => {
   const rowSelected = (record: EventTimeRecord): void => {
     console.log('Row selected:', record);
   }
@@ -483,6 +567,8 @@ export const RecentRecords = (props: RecordsProps) => {
                     selectedParticipants={props.selectedParticipants}
                     categorySelected={props.categorySelected}
                     participantSelected={props.participantSelected}
+                    onExclude={props.onExclude}
+                    onChangeCategory={props.onChangeCategory}
                   />
                 ))}
               </TableBody>

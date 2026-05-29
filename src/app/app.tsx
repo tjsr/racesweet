@@ -60,6 +60,31 @@ const RaceSweetMainApp = () => {
     return <>Loading...</>
   }
 
+  const handleExcludeCrossing = (crossingId: string, exclude: boolean) => {
+    sessionState.excludeCrossing(crossingId, exclude);
+    setSessionState(new Session({
+      records: sessionState.records,
+      participants: sessionState.participants,
+      categories: sessionState.categories,
+      teams: sessionState.teams
+    }));
+  };
+
+  const handleChangeCategory = (participantId: string, categoryId: EventCategoryId) => {
+    sessionState.updateParticipantCategory(participantId, categoryId);
+    
+    if (recordSelectedParticipants?.has(participantId)) {
+      setCategorySelected(new Set([categoryId]));
+    }
+
+    setSessionState(new Session({
+      records: sessionState.records,
+      participants: sessionState.participants,
+      categories: sessionState.categories,
+      teams: sessionState.teams
+    }));
+  };
+
   const hilightCategories = new Set<EventCategoryId>();
   if (recordSelectedCategories && recordSelectedCategories.size > 0) {
     recordSelectedCategories.forEach((categoryId: EventCategoryId) => {
@@ -105,6 +130,8 @@ const RaceSweetMainApp = () => {
             selectedParticipants={recordSelectedParticipants}
             categorySelected={setRecordSelectedCategories}
             participantSelected={setRecordSelectedParticipants}
+            onExclude={handleExcludeCrossing}
+            onChangeCategory={handleChangeCategory}
           />
         </>
       )}
