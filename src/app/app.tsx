@@ -344,6 +344,12 @@ export const RaceSweetMainApp = () => {
     setRecordSelectedCategories(participantCategories);
   };
 
+  const handleCategoryListSelected = (categoryIds: Set<EventCategoryId>) => {
+    setCategorySelected(categoryIds);
+    setRecordSelectedParticipants(new Set());
+    setRecordSelectedCategories(new Set());
+  };
+
   const hilightCategories = new Set<EventCategoryId>();
   if (recordSelectedCategories && recordSelectedCategories.size > 0) {
     recordSelectedCategories.forEach((categoryId: EventCategoryId) => {
@@ -381,7 +387,7 @@ export const RaceSweetMainApp = () => {
         <HandicapView />
       ) : (
         <>
-          <CategoryList categories={sessionState.categories || []} categorySelected={setCategorySelected} />
+          <CategoryList categories={sessionState.categories || []} categorySelected={handleCategoryListSelected} />
           <RecentRecords
             records={(sessionState.records as EventTimeRecord[]) || []}
             raceStateLookup={sessionState}
