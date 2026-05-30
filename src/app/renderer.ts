@@ -1,32 +1,12 @@
-declare global {
-  interface Window {
-    versions: {
-      node: () => string;
-      chrome: () => string;
-      electron: () => string;
-    };
-  }
+import './index.css';
+import App from './App.tsx';
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+
+const container = document.getElementById('app');
+if (!container) {
+  throw new Error("Root element with id 'app' not found");
 }
 
-const information = document.getElementById('info');
-if (information) {
-  const chromeVersion = window.versions.chrome();
-  const nodeVersion = window.versions.node();
-  const electronVersion = window.versions.electron();
-
-  if (chromeVersion === undefined || nodeVersion === undefined || electronVersion === undefined) {
-    throw new Error("Unable to retrieve version information");
-  }
-  const versionsString = [
-    [ 'Chrome', chromeVersion ],
-    [ 'Node.js', nodeVersion ],
-    [ 'Electron', electronVersion ],
-  ].map(([name, version], index) => {
-    let str: string = index == versionsString.length ? 'and ' : '';
-    str += `${name} (v${version})`;
-    return str;
-  }).join(', ');
-  information.innerText = `This app is using ${versionsString}.`;
-} else {
-  throw new Error("Element with id 'info' not found");
-}
+const root = createRoot(container);
+root.render(React.createElement(App));
