@@ -13,7 +13,8 @@
         "httpTimeoutSeconds": 30,
         "live": false,
         "pollIntervalSeconds": 30,
-        "selectedEventIds": []
+        "selectedEventIds": [],
+        "apicalEventId": 68
       },
       "listedEvents": []
     }

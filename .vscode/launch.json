@@ -28,13 +28,28 @@
   },
   {
     "name": "Electron Main",
+    "type": "node",
     "request": "launch",
     "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron-forge",
     "args": ["start"],
+    "env": {
+      "NODE_ENV": "development",
+      "ELECTRON_ENABLE_LOGGING": "1"
+    },
+    "sourceMaps": true,
+    "outFiles": [
+      "${workspaceFolder}/.webpack/**/*.js"
+    ],
+    "sourceMapPathOverrides": {
+      "webpack://racesweet/./*": "${workspaceFolder}/*",
+      "webpack:///./*": "${workspaceFolder}/*",
+      "webpack:///./~/*": "${workspaceFolder}/node_modules/*"
+    },
+    "console": "integratedTerminal",
+    "autoAttachChildProcesses": true,
     "skipFiles": [
       "<node_internals>/**"
-    ],
-    "type": "node"
+    ]
   },
   {
     "name": "Electron Renderer",

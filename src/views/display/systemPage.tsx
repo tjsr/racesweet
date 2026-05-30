@@ -60,9 +60,12 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
       await props.onLoadApicalEvents(sourceId);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      const detailedMessage = stack ? `${message}\n${stack}` : message;
+      console.error('Error loading Apical events for source', sourceId, message, error);
       setSourceFetchErrors((current) => ({
         ...current,
-        [sourceId]: message,
+        [sourceId]: detailedMessage,
       }));
     }
   };

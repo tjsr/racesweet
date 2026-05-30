@@ -1,8 +1,8 @@
+import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
+
+import type { ApicalLapByCategory } from '../model/apical.js';
 import type { RaceState } from '../model/racestate.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
-import type { ApicalLapByCategory } from '../model/apical.js';
-
-import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
 
 const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
   return new Promise<T>((resolve, reject) => {
@@ -56,6 +56,7 @@ const authenticateSession = async (source: DataSourceConfig): Promise<string | u
 
   const authUrl = `${trimSlash(apiConfig.baseUrl)}/`;
   const headers = createAuthenticatedHeaders(source);
+  console.log('Authenticating with Apical API at', authUrl, 'using headers', Object.fromEntries(headers.entries()));
 
   const response = await withTimeout(
     fetch(authUrl, {
@@ -90,7 +91,7 @@ export const fetchApicalEvents = async (source: DataSourceConfig): Promise<Apica
   );
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch Apical events: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to fetch Apical events: [${response.status}] ${response.statusText}`);
   }
 
   const payload = await response.json() as Array<{ CompanyName?: string; EventDate?: string; Id: number; Name: string }>;
