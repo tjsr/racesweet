@@ -7,7 +7,22 @@ export type DataSourceType =
   | 'file-racesweet-ledger'
   | 'api-aws-sqs'
   | 'api-http-request'
-  | 'api-apical-data-file';
+  | 'api-apical-data-file'
+  | 'master-entrant-profiles';
+
+export interface MasterEntrantProfile {
+  categoryId?: string;
+  dateOfBirth?: string;
+  entrantId?: string;
+  firstName?: string;
+  gender?: string;
+  lastName?: string;
+  participantId?: string;
+}
+
+export interface MasterEntrantSourceConfig {
+  profiles: MasterEntrantProfile[];
+}
 
 export interface ApicalListedEvent {
   companyName?: string;
@@ -33,6 +48,7 @@ export interface DataSourceConfig {
   enabled: boolean;
   id: string;
   listedEvents?: ApicalListedEvent[];
+  masterEntrantConfig?: MasterEntrantSourceConfig;
   name: string;
   type: DataSourceType;
 }
@@ -76,6 +92,8 @@ export const getDataSourceTypeLabel = (type: DataSourceType): string => {
       return 'HTTP Request';
     case 'api-apical-data-file':
       return 'Apical Data file';
+    case 'master-entrant-profiles':
+      return 'Master Entrant Profiles';
     default:
       return type;
   }
@@ -92,4 +110,12 @@ export const getSessionAssignedSourceIds = (config: SystemConfiguration, eventId
   }
 
   return sessionAssignment.sourceIds;
+};
+
+export const getMasterEntrantProfilesForEvent = (config: SystemConfiguration, eventId: string): MasterEntrantProfile[] => {
+  const sourceIds = getEventAssignedSourceIds(config, eventId);
+
+  return config.dataSources
+    .filter((source) => source.enabled && sourceIds.includes(source.id) && source.type === 'master-entrant-profiles')
+    .flatMap((source) => source.masterEntrantConfig?.profiles || []);
 };

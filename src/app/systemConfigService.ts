@@ -40,6 +40,16 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
     };
   }
 
+  if (type === 'master-entrant-profiles') {
+    return {
+      ...base,
+      masterEntrantConfig: {
+        profiles: [],
+      },
+      name: 'Master Entrant Profiles',
+    };
+  }
+
   return base;
 };
 

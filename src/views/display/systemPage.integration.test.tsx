@@ -5,39 +5,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { EventCatalogState } from '../../app/eventCatalog.js';
 import type { SystemConfiguration } from '../../app/systemConfig.js';
 import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 import { SystemPage } from './systemPage.js';
-
-const catalog: EventCatalogState = {
-  activeEventId: 'event-1',
-  categories: [],
-  entrants: [],
-  events: [
-    {
-      categoryIds: [],
-      date: '2026-06-12',
-      entrantIds: [],
-      format: 'race-weekend',
-      id: 'event-1',
-      name: 'Winter Round',
-      sessionIds: ['session-1'],
-    },
-  ],
-  sessions: [
-    {
-      eventId: 'event-1',
-      id: 'session-1',
-      kind: 'race',
-      name: 'Feature Race',
-      notes: '',
-      scheduledStart: '2026-06-12T10:00:00.000Z',
-      status: 'scheduled',
-    },
-  ],
-};
 
 const config: SystemConfiguration = {
   ...createDefaultSystemConfiguration(),
@@ -91,27 +62,20 @@ describe('SystemPage integration', () => {
     container.remove();
   });
 
-  it('renders source controls and dispatches event/session assignments and apply action', async () => {
-    const onApplySessionSources = vi.fn();
+  it('renders source controls and dispatches dropdown add and source config actions', async () => {
     const onCreateSource = vi.fn();
     const onDeleteSource = vi.fn();
     const onLoadApicalEvents = vi.fn();
     const onSaveApicalSource = vi.fn();
-    const onSaveEventAssignment = vi.fn();
-    const onSaveSessionAssignment = vi.fn();
 
     await act(async () => {
       root.render(
         <SystemPage
-          catalog={catalog}
           config={config}
-          onApplySessionSources={onApplySessionSources}
           onCreateSource={onCreateSource}
           onDeleteSource={onDeleteSource}
           onLoadApicalEvents={onLoadApicalEvents}
           onSaveApicalSource={onSaveApicalSource}
-          onSaveEventAssignment={onSaveEventAssignment}
-          onSaveSessionAssignment={onSaveSessionAssignment}
         />,
       );
     });
@@ -119,11 +83,21 @@ describe('SystemPage integration', () => {
     expect(container.textContent).toContain('System');
     expect(container.textContent).toContain('Apical Source');
 
-    const addMylapsButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Add MyLaps Decoder');
-    expect(addMylapsButton).toBeDefined();
+    const sourceTypeSelect = container.querySelector('select[aria-label="New Data Source Type"]') as HTMLSelectElement;
+    expect(sourceTypeSelect).toBeDefined();
+
     await act(async () => {
-      addMylapsButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      sourceTypeSelect.value = 'timing-mylaps-decoder';
+      sourceTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
+
+    const addSourceButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Add Data Source');
+    expect(addSourceButton).toBeDefined();
+
+    await act(async () => {
+      addSourceButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
     expect(onCreateSource).toHaveBeenCalledWith('timing-mylaps-decoder');
 
     const fetchEventsButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Fetch Apical Events');
@@ -132,12 +106,71 @@ describe('SystemPage integration', () => {
       fetchEventsButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     expect(onLoadApicalEvents).toHaveBeenCalledWith('source-apical');
+  });
 
-    const applyButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Apply Assigned Sources To Session');
-    expect(applyButton).toBeDefined();
+  it('shows fetched Apical events in dropdown and saves selected event id', async () => {
+    const onCreateSource = vi.fn();
+    const onDeleteSource = vi.fn();
+    const onLoadApicalEvents = vi.fn();
+    const onSaveApicalSource = vi.fn();
+
     await act(async () => {
-      applyButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      root.render(
+        <SystemPage
+          config={config}
+          onCreateSource={onCreateSource}
+          onDeleteSource={onDeleteSource}
+          onLoadApicalEvents={onLoadApicalEvents}
+          onSaveApicalSource={onSaveApicalSource}
+        />,
+      );
     });
-    expect(onApplySessionSources).toHaveBeenCalledWith('event-1', 'session-1');
+
+    const eventSelect = container.querySelector('select[aria-label="Apical Selected Event source-apical"]') as HTMLSelectElement;
+    expect(eventSelect).toBeDefined();
+    expect(eventSelect.options.length).toBe(1);
+    expect(eventSelect.value).toBe('1001');
+
+    await act(async () => {
+      eventSelect.value = '1001';
+      eventSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(onSaveApicalSource).toHaveBeenCalledWith('source-apical', expect.objectContaining({
+      apiConfig: expect.objectContaining({
+        apicalEventId: 1001,
+        selectedEventIds: [1001],
+      }),
+    }));
+  });
+
+  it('shows inline error details when fetching Apical events fails', async () => {
+    const onCreateSource = vi.fn();
+    const onDeleteSource = vi.fn();
+    const onLoadApicalEvents = vi.fn(async () => {
+      throw new Error('HTTP 401 Unauthorized');
+    });
+    const onSaveApicalSource = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <SystemPage
+          config={config}
+          onCreateSource={onCreateSource}
+          onDeleteSource={onDeleteSource}
+          onLoadApicalEvents={onLoadApicalEvents}
+          onSaveApicalSource={onSaveApicalSource}
+        />,
+      );
+    });
+
+    const fetchEventsButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Fetch Apical Events');
+    expect(fetchEventsButton).toBeDefined();
+
+    await act(async () => {
+      fetchEventsButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('Failed to fetch Apical events: HTTP 401 Unauthorized');
   });
 });

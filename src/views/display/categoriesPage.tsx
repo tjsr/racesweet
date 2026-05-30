@@ -44,11 +44,28 @@ const parseInteger = (value: string): number | undefined => {
   return parsed;
 };
 
+const getCategorySeriesKey = (category: EventCatalogCategory): string => {
+  const code = (category.code || '').trim().toLowerCase();
+  const name = (category.name || '').trim().toLowerCase();
+  return `${code}|${name}`;
+};
+
+const dedupeCategoriesForDisplay = (categories: EventCatalogCategory[]): EventCatalogCategory[] => {
+  const bySeriesKey = new Map<string, EventCatalogCategory>();
+  categories.forEach((category) => {
+    const key = getCategorySeriesKey(category);
+    if (!bySeriesKey.has(key)) {
+      bySeriesKey.set(key, category);
+    }
+  });
+  return Array.from(bySeriesKey.values());
+};
+
 export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement => {
   const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId)
     ?? props.catalog.events.find((event) => event.id === props.catalog.activeEventId)
     ?? props.catalog.events[0];
-  const eventCategories = getCategoriesForEvent(props.catalog, selectedEvent?.id);
+  const eventCategories = dedupeCategoriesForDisplay(getCategoriesForEvent(props.catalog, selectedEvent?.id));
   const selectedCategory = eventCategories.find((category) => category.id === props.selectedCategoryId) ?? eventCategories[0];
 
   const [formError, setFormError] = React.useState<string | undefined>(undefined);

@@ -21,10 +21,15 @@ const catalog: EventCatalogState = {
   categories: [],
   entrants: [
     {
+      categoryId: 'cat-1',
       categoryIds: ['cat-1'],
+      dateOfBirth: '2000-01-02',
       entrantType: 'rider',
       eventId: 'event-1',
+      firstName: 'Pat',
+      gender: 'female',
       id: 'ent-1',
+      lastName: 'Rider',
       memberParticipantIds: ['p-1'],
       name: 'Pat Rider',
       sessionIds: ['session-1'],
@@ -37,6 +42,20 @@ const catalog: EventCatalogState = {
       memberParticipantIds: ['p-2', 'p-3'],
       name: 'Team Blue',
       sessionIds: ['session-2'],
+      teamMembers: [
+        {
+          categoryId: 'cat-2',
+          firstName: 'Blue',
+          lastName: 'One',
+          participantId: 'p-2',
+        },
+        {
+          categoryId: 'cat-2',
+          firstName: 'Blue',
+          lastName: 'Two',
+          participantId: 'p-3',
+        },
+      ],
     },
   ],
   events: [
@@ -154,5 +173,83 @@ describe('EntrantsPage integration', () => {
     });
 
     expect(onDeleteEntrant).toHaveBeenCalledWith('event-2', 'ent-2');
+  });
+
+  it('edits rider profile fields and updates team composition payloads', async () => {
+    const onCreateEntrant = vi.fn();
+    const onDeleteEntrant = vi.fn();
+    const onSelectEntrant = vi.fn();
+    const onSelectEvent = vi.fn();
+    const onUpdateEntrant = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <EntrantsPage
+          catalog={catalog}
+          onCreateEntrant={onCreateEntrant}
+          onDeleteEntrant={onDeleteEntrant}
+          onSelectEntrant={onSelectEntrant}
+          onSelectEvent={onSelectEvent}
+          onUpdateEntrant={onUpdateEntrant}
+          selectedEntrantId="ent-1"
+          selectedEventId="event-1"
+        />,
+      );
+    });
+
+    const firstNameInput = container.querySelector('input[aria-label="Entrant First Name"]') as HTMLInputElement;
+    const surnameInput = container.querySelector('input[aria-label="Entrant Surname"]') as HTMLInputElement;
+    const genderInput = container.querySelector('input[aria-label="Entrant Gender"]') as HTMLInputElement;
+    const dobInput = container.querySelector('input[aria-label="Entrant Date Of Birth"]') as HTMLInputElement;
+    const categoryInput = container.querySelector('input[aria-label="Entrant Primary Category"]') as HTMLInputElement;
+    const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Entrant');
+
+    await act(async () => {
+      setInputValue(firstNameInput, 'Jordan');
+      setInputValue(surnameInput, 'Taylor');
+      setInputValue(genderInput, 'non-binary');
+      setInputValue(dobInput, '1998-12-24');
+      setInputValue(categoryInput, 'cat-pro');
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onUpdateEntrant).toHaveBeenCalledWith('ent-1', expect.objectContaining({
+      categoryId: 'cat-pro',
+      dateOfBirth: '1998-12-24',
+      firstName: 'Jordan',
+      gender: 'non-binary',
+      lastName: 'Taylor',
+    }));
+
+    await act(async () => {
+      root.render(
+        <EntrantsPage
+          catalog={catalog}
+          onCreateEntrant={onCreateEntrant}
+          onDeleteEntrant={onDeleteEntrant}
+          onSelectEntrant={onSelectEntrant}
+          onSelectEvent={onSelectEvent}
+          onUpdateEntrant={onUpdateEntrant}
+          selectedEntrantId="ent-2"
+          selectedEventId="event-2"
+        />,
+      );
+    });
+
+    const teamMembersInput = container.querySelector('textarea[aria-label="Entrant Team Members"]') as HTMLTextAreaElement;
+    const teamSaveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Entrant');
+
+    await act(async () => {
+      setInputValue(teamMembersInput, 'p-2:Blue:One:cat-2; p-3:Blue:Two:cat-2; p-4:Blue:Three:cat-2');
+      teamSaveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onUpdateEntrant).toHaveBeenLastCalledWith('ent-2', expect.objectContaining({
+      teamMembers: [
+        { categoryId: 'cat-2', firstName: 'Blue', lastName: 'One', participantId: 'p-2' },
+        { categoryId: 'cat-2', firstName: 'Blue', lastName: 'Two', participantId: 'p-3' },
+        { categoryId: 'cat-2', firstName: 'Blue', lastName: 'Three', participantId: 'p-4' },
+      ],
+    }));
   });
 });

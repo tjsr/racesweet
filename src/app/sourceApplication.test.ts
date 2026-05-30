@@ -31,12 +31,25 @@ const incomingCategoriesWithDuplicates: EventCategory[] = [
   },
 ];
 
+const incomingCategoriesWithSeriesDuplicate: EventCategory[] = [
+  {
+    code: 'EX',
+    id: 'cat-existing-v2',
+    name: 'Existing Category',
+  },
+];
+
 describe('sourceApplication', () => {
   it('filters out existing categories and deduplicates incoming category IDs', () => {
     const toAdd = getCategoriesToAdd(existingCategories, incomingCategoriesWithDuplicates);
 
     expect(toAdd).toHaveLength(1);
     expect(toAdd[0]?.id).toBe('cat-new');
+  });
+
+  it('filters out incoming categories that duplicate an existing category series by code and name', () => {
+    const toAdd = getCategoriesToAdd(existingCategories, incomingCategoriesWithSeriesDuplicate);
+    expect(toAdd).toHaveLength(0);
   });
 
   it('applies pulled race state without duplicate category insert attempts', async () => {

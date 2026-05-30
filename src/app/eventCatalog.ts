@@ -47,14 +47,27 @@ export type EventCatalogCategory = EventCategory & {
 };
 
 export interface EventCatalogEntrant {
+  categoryId?: string;
   categoryIds: string[];
+  dateOfBirth?: string;
   entrantType: EntrantType;
   eventId: string;
+  firstName?: string;
+  gender?: string;
   id: string;
+  lastName?: string;
   memberParticipantIds: string[];
   name: string;
   notes?: string;
   sessionIds: string[];
+  teamMembers?: Array<{
+    categoryId?: string;
+    dateOfBirth?: string;
+    firstName: string;
+    gender?: string;
+    lastName: string;
+    participantId: string;
+  }>;
 }
 
 export interface EventCatalogEvent {
@@ -144,7 +157,7 @@ export interface EntrantCreatedMutation extends EventCatalogMutationBase {
 }
 
 export interface EntrantUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogEntrant, 'categoryIds' | 'entrantType' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds'>>;
+  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamMembers'>>;
   entrantId: string;
   type: 'entrant-updated';
 }

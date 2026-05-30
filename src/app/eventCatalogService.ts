@@ -12,6 +12,7 @@ import {
 import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
+import type { MasterEntrantProfile } from './systemConfig.js';
 
 interface EventCatalogServiceOptions {
   onPersistedLedger?: (ledger: EventCatalogLedger) => Promise<void>;
@@ -32,6 +33,23 @@ const entrantNameFromMembers = (members: EventParticipant[]): string => {
 };
 
 const unique = (values: string[]): string[] => Array.from(new Set(values.filter((value) => value.trim().length > 0)));
+const nonEmpty = (value?: string): string | undefined => {
+  if (!value) {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const findProfileForParticipant = (participant: EventParticipant, masterProfiles: MasterEntrantProfile[]): MasterEntrantProfile | undefined => {
+  const participantId = participant.id.toString();
+  const entrantId = participant.entrantId.toString();
+
+  return masterProfiles.find((profile) => {
+    return (profile.participantId && profile.participantId === participantId)
+      || (profile.entrantId && profile.entrantId === entrantId);
+  });
+};
 
 const deriveDistanceRule = (category: EventCategory): CategoryDistanceRule | undefined => {
   if (typeof category.distance === 'number' && Number.isFinite(category.distance)) {
@@ -100,24 +118,65 @@ const deriveEntrantsFromParticipants = (
   eventId: string,
   participants: EventParticipant[],
   defaultSessionIds: string[],
+  masterProfiles: MasterEntrantProfile[] = [],
 ): EventCatalogEntrant[] => {
   const groups = new Map<string, EventParticipant[]>();
   participants.forEach((participant) => {
-    const entrantId = participant.entrantId.toString();
+    const entrantId = nonEmpty(participant.entrantId?.toString()) || participant.id.toString();
     const existing = groups.get(entrantId) || [];
     existing.push(participant);
     groups.set(entrantId, existing);
   });
 
-  return Array.from(groups.entries()).map(([entrantId, members]) => ({
-    categoryIds: unique(members.map((member) => member.categoryId.toString())),
-    entrantType: members.length > 1 ? 'team' : 'rider',
-    eventId,
-    id: entrantId,
-    memberParticipantIds: unique(members.map((member) => member.id.toString())),
-    name: entrantNameFromMembers(members),
-    sessionIds: [...defaultSessionIds],
-  }));
+  return Array.from(groups.entries()).map(([entrantId, members]) => {
+    const enrichedMembers = members.map((member) => {
+      const profile = findProfileForParticipant(member, masterProfiles);
+      const fallbackCategoryId = nonEmpty(profile?.categoryId);
+
+      return {
+        categoryId: nonEmpty(member.categoryId.toString()) || fallbackCategoryId,
+        dateOfBirth: nonEmpty(profile?.dateOfBirth),
+        firstName: nonEmpty(member.firstname) || nonEmpty(profile?.firstName) || '',
+        gender: nonEmpty(profile?.gender),
+        lastName: nonEmpty(member.surname) || nonEmpty(profile?.lastName) || '',
+        participantId: member.id.toString(),
+      };
+    });
+
+    const categoryIds = unique(enrichedMembers.map((member) => member.categoryId || ''));
+    const memberParticipantIds = unique(enrichedMembers.map((member) => member.participantId));
+    const primaryMember = members[0];
+    const primaryProfile = primaryMember ? findProfileForParticipant(primaryMember, masterProfiles) : undefined;
+    const entrantType = members.length > 1 ? 'team' : 'rider';
+    const riderFirstName = entrantType === 'rider'
+      ? (nonEmpty(primaryMember?.firstname) || nonEmpty(primaryProfile?.firstName))
+      : undefined;
+    const riderLastName = entrantType === 'rider'
+      ? (nonEmpty(primaryMember?.surname) || nonEmpty(primaryProfile?.lastName))
+      : undefined;
+    const riderCategoryId = entrantType === 'rider'
+      ? (nonEmpty(primaryMember?.categoryId?.toString()) || nonEmpty(primaryProfile?.categoryId))
+      : undefined;
+    const riderName = [riderFirstName, riderLastName].filter((part) => !!part).join(' ').trim();
+
+    return {
+      categoryId: riderCategoryId,
+      categoryIds,
+      dateOfBirth: entrantType === 'rider' ? nonEmpty(primaryProfile?.dateOfBirth) : undefined,
+      entrantType,
+      eventId,
+      firstName: riderFirstName,
+      gender: entrantType === 'rider' ? nonEmpty(primaryProfile?.gender) : undefined,
+      id: entrantId,
+      lastName: riderLastName,
+      memberParticipantIds,
+      name: riderName || entrantNameFromMembers(members),
+      sessionIds: [...defaultSessionIds],
+      teamMembers: entrantType === 'team'
+        ? enrichedMembers
+        : undefined,
+    };
+  });
 };
 
 export class EventCatalogService {
@@ -173,13 +232,13 @@ export class EventCatalogService {
     ]);
   }
 
-  public async syncEventScaffold(eventId: string, categories: EventCategory[], participants: EventParticipant[]): Promise<EventCatalogState> {
+  public async syncEventScaffold(eventId: string, categories: EventCategory[], participants: EventParticipant[], masterProfiles: MasterEntrantProfile[] = []): Promise<EventCatalogState> {
     const event = this.state.events.find((item) => item.id === eventId);
     const sessionIds = event?.sessionIds || this.state.sessions.filter((session) => session.eventId === eventId).map((session) => session.id.toString());
 
     const scaffoldCategories = deriveCategoriesFromEventData(eventId, categories, participants);
     const categoryIds = scaffoldCategories.map((category) => category.id.toString());
-    const entrants = deriveEntrantsFromParticipants(eventId, participants, sessionIds);
+    const entrants = deriveEntrantsFromParticipants(eventId, participants, sessionIds, masterProfiles);
 
     const existingCategoryIds = new Set(this.state.categories.filter((category) => category.eventId === eventId).map((category) => category.id.toString()));
     const categoryMutations = scaffoldCategories.map((category) => {
@@ -216,11 +275,17 @@ export class EventCatalogService {
       if (existingEntrantsById.has(entrant.id)) {
         return {
           changes: {
+            categoryId: entrant.categoryId,
             categoryIds: entrant.categoryIds,
+            dateOfBirth: entrant.dateOfBirth,
             entrantType: entrant.entrantType,
+            firstName: entrant.firstName,
+            gender: entrant.gender,
+            lastName: entrant.lastName,
             memberParticipantIds: entrant.memberParticipantIds,
             name: entrant.name,
             sessionIds: entrant.sessionIds,
+            teamMembers: entrant.teamMembers,
           },
           entrantId: entrant.id,
           id: createMutationId(),
@@ -422,7 +487,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async updateEntrant(entrantId: string, changes: Partial<Pick<EventCatalogEntrant, 'categoryIds' | 'entrantType' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds'>>): Promise<EventCatalogState> {
+  public async updateEntrant(entrantId: string, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamMembers'>>): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes,

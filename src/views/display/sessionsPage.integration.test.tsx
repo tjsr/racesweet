@@ -6,6 +6,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { EventCatalogState } from '../../app/eventCatalog.js';
+import type { SystemConfiguration } from '../../app/systemConfig.js';
+import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 import { SessionsPage } from './sessionsPage.js';
 
@@ -71,6 +73,34 @@ const catalog: EventCatalogState = {
   ],
 };
 
+const config: SystemConfiguration = {
+  ...createDefaultSystemConfiguration(),
+  dataSources: [
+    {
+      enabled: true,
+      id: 'source-a',
+      name: 'Apical Source A',
+      type: 'api-apical-data-file',
+    },
+    {
+      enabled: true,
+      id: 'source-b',
+      name: 'Archive Feed',
+      type: 'file-apical-data-file',
+    },
+  ],
+  eventSourceAssignments: {
+    'event-1': ['source-a'],
+    'event-2': ['source-b'],
+  },
+  sessionSourceAssignments: {
+    'session-3': {
+      mode: 'specific',
+      sourceIds: ['source-a'],
+    },
+  },
+};
+
 describe('SessionsPage integration', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -91,8 +121,11 @@ describe('SessionsPage integration', () => {
   });
 
   it('defaults to the active event, changes event view from dropdown, and saves session edits', async () => {
+    const onApplySessionSources = vi.fn();
     const onCreateSession = vi.fn();
     const onDeleteSession = vi.fn();
+    const onMakeSessionActive = vi.fn();
+    const onSaveSessionAssignment = vi.fn();
     const onUpdateSession = vi.fn();
 
     const Harness = () => {
@@ -102,12 +135,16 @@ describe('SessionsPage integration', () => {
       return (
         <SessionsPage
           catalog={catalog}
+          config={config}
+          onApplySessionSources={onApplySessionSources}
           onCreateSession={onCreateSession}
           onDeleteSession={onDeleteSession}
+          onMakeSessionActive={onMakeSessionActive}
           onSelectEvent={(eventId) => {
             setSelectedEventId(eventId);
             setSelectedSessionId(catalog.sessions.find((session) => session.eventId === eventId)?.id);
           }}
+          onSaveSessionAssignment={onSaveSessionAssignment}
           onSelectSession={setSelectedSessionId}
           onUpdateSession={onUpdateSession}
           selectedEventId={selectedEventId}
@@ -141,6 +178,15 @@ describe('SessionsPage integration', () => {
 
     expect(onCreateSession).toHaveBeenCalledWith('event-2');
 
+    const makeActiveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Make Active');
+    expect(makeActiveButton).toBeDefined();
+
+    await act(async () => {
+      makeActiveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onMakeSessionActive).toHaveBeenCalledWith('event-2', 'session-3');
+
     const sessionNameInput = container.querySelector('input[aria-label="Sessions Page Name"]') as HTMLInputElement;
     await act(async () => {
       setInputValue(sessionNameInput, 'Updated Test Session');
@@ -154,6 +200,25 @@ describe('SessionsPage integration', () => {
     });
 
     expect(onUpdateSession).toHaveBeenCalledWith('session-3', expect.objectContaining({ name: 'Updated Test Session' }));
+
+    const sourceModeSelect = container.querySelector('select[aria-label="Sessions Source Mode"]') as HTMLSelectElement;
+    expect(sourceModeSelect).toBeDefined();
+
+    await act(async () => {
+      sourceModeSelect.value = 'specific';
+      sourceModeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(onSaveSessionAssignment).toHaveBeenCalledWith('session-3', 'specific', ['source-a']);
+
+    const applySourcesButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Apply Assigned Sources To Session');
+    expect(applySourcesButton).toBeDefined();
+
+    await act(async () => {
+      applySourcesButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onApplySessionSources).toHaveBeenCalledWith('event-2', 'session-3');
 
     const deleteButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Delete Session');
     expect(deleteButton).toBeDefined();

@@ -6,6 +6,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { EventCatalogState } from '../../app/eventCatalog.js';
+import type { SystemConfiguration } from '../../app/systemConfig.js';
+import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 import { EventsScreen } from './events.js';
 
@@ -82,6 +84,22 @@ const catalog: EventCatalogState = {
   ],
 };
 
+const config: SystemConfiguration = {
+  ...createDefaultSystemConfiguration(),
+  dataSources: [
+    {
+      enabled: true,
+      id: 'source-a',
+      name: 'Apical Source A',
+      type: 'api-apical-data-file',
+    },
+  ],
+  eventSourceAssignments: {
+    'event-1': [],
+    'event-2': ['source-a'],
+  },
+};
+
 describe('EventsScreen integration', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -103,6 +121,7 @@ describe('EventsScreen integration', () => {
 
   it('shows event controls and session lists in both center and right panes', async () => {
     const onActivateEvent = vi.fn();
+    const onSaveEventAssignment = vi.fn();
     const onSelectEvent = vi.fn();
     const onSelectSession = vi.fn();
     const onUpdateEvent = vi.fn();
@@ -115,10 +134,12 @@ describe('EventsScreen integration', () => {
       return (
         <EventsScreen
           catalog={{ ...catalog, activeEventId }}
+          config={config}
           onActivateEvent={(eventId) => {
             onActivateEvent(eventId);
             setActiveEventId(eventId);
           }}
+          onSaveEventAssignment={onSaveEventAssignment}
           onSelectEvent={(eventId) => {
             onSelectEvent(eventId);
             setSelectedEventId(eventId);
@@ -179,6 +200,15 @@ describe('EventsScreen integration', () => {
     expect(onSelectSession).toHaveBeenCalledWith('session-3');
     expect(container.textContent).toContain('Selected session: Test Session');
 
+    const eventSourceCheckbox = container.querySelector('input[aria-label="Event Source event-2 source-a"]') as HTMLInputElement;
+    expect(eventSourceCheckbox).toBeDefined();
+
+    await act(async () => {
+      eventSourceCheckbox.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onSaveEventAssignment).toHaveBeenCalledWith('event-2', []);
+
     const activateButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Mark Active');
     expect(activateButton).toBeDefined();
 
@@ -187,5 +217,81 @@ describe('EventsScreen integration', () => {
     });
 
     expect(onActivateEvent).toHaveBeenCalledWith('event-2');
+  });
+
+  it('maintains source assignment independently per event', async () => {
+    const Harness = () => {
+      const [selectedEventId, setSelectedEventId] = React.useState<string | undefined>('event-1');
+      const [selectedSessionId, setSelectedSessionId] = React.useState<string | undefined>('session-1');
+      const [configState, setConfigState] = React.useState<SystemConfiguration>(config);
+
+      return (
+        <EventsScreen
+          catalog={catalog}
+          config={configState}
+          onActivateEvent={() => undefined}
+          onSaveEventAssignment={(eventId, sourceIds) => {
+            setConfigState((current) => ({
+              ...current,
+              eventSourceAssignments: {
+                ...current.eventSourceAssignments,
+                [eventId]: sourceIds,
+              },
+            }));
+          }}
+          onSelectEvent={(eventId) => {
+            setSelectedEventId(eventId);
+            setSelectedSessionId(catalog.sessions.find((session) => session.eventId === eventId)?.id);
+          }}
+          onSelectSession={setSelectedSessionId}
+          onUpdateEvent={() => undefined}
+          selectedEventId={selectedEventId}
+          selectedSessionId={selectedSessionId}
+        />
+      );
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    const event1Checkbox = container.querySelector('input[aria-label="Event Source event-1 source-a"]') as HTMLInputElement;
+    expect(event1Checkbox).toBeDefined();
+    expect(event1Checkbox.checked).toBe(false);
+
+    await act(async () => {
+      event1Checkbox.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const event1CheckboxAfterAssign = container.querySelector('input[aria-label="Event Source event-1 source-a"]') as HTMLInputElement;
+    expect(event1CheckboxAfterAssign.checked).toBe(true);
+
+    const springTestButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Spring Test'));
+    expect(springTestButton).toBeDefined();
+
+    await act(async () => {
+      springTestButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const event2Checkbox = container.querySelector('input[aria-label="Event Source event-2 source-a"]') as HTMLInputElement;
+    expect(event2Checkbox).toBeDefined();
+    expect(event2Checkbox.checked).toBe(true);
+
+    await act(async () => {
+      event2Checkbox.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const event2CheckboxAfterClear = container.querySelector('input[aria-label="Event Source event-2 source-a"]') as HTMLInputElement;
+    expect(event2CheckboxAfterClear.checked).toBe(false);
+
+    const winterRoundButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Winter Round'));
+    expect(winterRoundButton).toBeDefined();
+
+    await act(async () => {
+      winterRoundButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const event1CheckboxFinal = container.querySelector('input[aria-label="Event Source event-1 source-a"]') as HTMLInputElement;
+    expect(event1CheckboxFinal.checked).toBe(true);
   });
 });

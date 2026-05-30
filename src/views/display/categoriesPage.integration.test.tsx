@@ -43,6 +43,15 @@ const catalog: EventCatalogState = {
       teamRules: { teamCompositionRules: [] },
     },
     {
+      code: 'CLB',
+      distanceRule: { kind: 'time', value: '45' },
+      eventId: 'event-1',
+      id: 'cat-2-duplicate',
+      name: 'Clubman',
+      sessionAssignments: [],
+      teamRules: { teamCompositionRules: [] },
+    },
+    {
       code: 'DEV',
       distanceRule: { kind: 'unspecified' },
       eventId: 'event-2',
@@ -147,6 +156,7 @@ describe('CategoriesPage integration', () => {
 
     const clubmanButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Clubman'));
     expect(clubmanButton).toBeDefined();
+    expect(Array.from(container.querySelectorAll('button')).filter((button) => button.textContent?.includes('Clubman'))).toHaveLength(1);
 
     await act(async () => {
       clubmanButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));

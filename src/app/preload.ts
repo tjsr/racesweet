@@ -131,3 +131,9 @@ contextBridge.exposeInMainWorld("nodeAPI", {
     return Buffer.from(new Uint8Array(data));
   },
 });
+
+contextBridge.exposeInMainWorld('versions', {
+  chrome: () => process.versions.chrome,
+  electron: () => process.versions.electron,
+  node: () => process.versions.node,
+});

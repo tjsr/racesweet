@@ -12,7 +12,7 @@ interface EntrantsPageProps {
   onDeleteEntrant: (eventId: string, entrantId: string) => void | Promise<void>;
   onSelectEntrant: (entrantId: string) => void;
   onSelectEvent: (eventId: string) => void;
-  onUpdateEntrant: (entrantId: string, changes: Partial<Pick<EventCatalogEntrant, 'categoryIds' | 'entrantType' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds'>>) => void | Promise<void>;
+  onUpdateEntrant: (entrantId: string, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamMembers'>>) => void | Promise<void>;
   selectedEntrantId?: string;
   selectedEventId?: string;
 }
@@ -27,24 +27,40 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   const selectedEntrant = eventEntrants.find((entrant) => entrant.id === props.selectedEntrantId) ?? eventEntrants[0];
 
   const [entrantDraft, setEntrantDraft] = React.useState({
+    categoryId: selectedEntrant?.categoryId || '',
     categoryIds: selectedEntrant?.categoryIds.join(', ') || '',
+    dateOfBirth: selectedEntrant?.dateOfBirth || '',
     entrantType: selectedEntrant?.entrantType || 'rider',
+    firstName: selectedEntrant?.firstName || '',
+    gender: selectedEntrant?.gender || '',
+    lastName: selectedEntrant?.lastName || '',
     memberParticipantIds: selectedEntrant?.memberParticipantIds.join(', ') || '',
     name: selectedEntrant?.name || '',
     notes: selectedEntrant?.notes || '',
     sessionIds: selectedEntrant?.sessionIds.join(', ') || '',
+    teamMembers: selectedEntrant?.teamMembers?.map((member) => {
+      return `${member.participantId}:${member.firstName}:${member.lastName}:${member.categoryId || ''}`;
+    }).join('; ') || '',
   });
 
   React.useEffect(() => {
     setEntrantDraft({
+      categoryId: selectedEntrant?.categoryId || '',
       categoryIds: selectedEntrant?.categoryIds.join(', ') || '',
+      dateOfBirth: selectedEntrant?.dateOfBirth || '',
       entrantType: selectedEntrant?.entrantType || 'rider',
+      firstName: selectedEntrant?.firstName || '',
+      gender: selectedEntrant?.gender || '',
+      lastName: selectedEntrant?.lastName || '',
       memberParticipantIds: selectedEntrant?.memberParticipantIds.join(', ') || '',
       name: selectedEntrant?.name || '',
       notes: selectedEntrant?.notes || '',
       sessionIds: selectedEntrant?.sessionIds.join(', ') || '',
+      teamMembers: selectedEntrant?.teamMembers?.map((member) => {
+        return `${member.participantId}:${member.firstName}:${member.lastName}:${member.categoryId || ''}`;
+      }).join('; ') || '',
     });
-  }, [selectedEntrant?.id, selectedEntrant?.name, selectedEntrant?.entrantType, selectedEntrant?.notes, selectedEntrant?.categoryIds, selectedEntrant?.memberParticipantIds, selectedEntrant?.sessionIds]);
+  }, [selectedEntrant?.id, selectedEntrant?.name, selectedEntrant?.entrantType, selectedEntrant?.notes, selectedEntrant?.categoryIds, selectedEntrant?.categoryId, selectedEntrant?.dateOfBirth, selectedEntrant?.firstName, selectedEntrant?.gender, selectedEntrant?.lastName, selectedEntrant?.memberParticipantIds, selectedEntrant?.sessionIds, selectedEntrant?.teamMembers]);
 
   return (
     <section className="events-screen">
@@ -112,6 +128,64 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
                   <option value="team">Team</option>
                 </select>
               </label>
+              {entrantDraft.entrantType === 'rider' ? (
+                <>
+                  <label>
+                    First Name
+                    <input
+                      aria-label="Entrant First Name"
+                      type="text"
+                      value={entrantDraft.firstName}
+                      onChange={(event) => setEntrantDraft((current) => ({ ...current, firstName: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Surname
+                    <input
+                      aria-label="Entrant Surname"
+                      type="text"
+                      value={entrantDraft.lastName}
+                      onChange={(event) => setEntrantDraft((current) => ({ ...current, lastName: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Gender
+                    <input
+                      aria-label="Entrant Gender"
+                      type="text"
+                      value={entrantDraft.gender}
+                      onChange={(event) => setEntrantDraft((current) => ({ ...current, gender: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Date of Birth
+                    <input
+                      aria-label="Entrant Date Of Birth"
+                      type="date"
+                      value={entrantDraft.dateOfBirth}
+                      onChange={(event) => setEntrantDraft((current) => ({ ...current, dateOfBirth: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Primary Category ID
+                    <input
+                      aria-label="Entrant Primary Category"
+                      type="text"
+                      value={entrantDraft.categoryId}
+                      onChange={(event) => setEntrantDraft((current) => ({ ...current, categoryId: event.target.value }))}
+                    />
+                  </label>
+                </>
+              ) : (
+                <label>
+                  Team Members (participantId:firstName:lastName:categoryId; ...)
+                  <textarea
+                    aria-label="Entrant Team Members"
+                    value={entrantDraft.teamMembers}
+                    onChange={(event) => setEntrantDraft((current) => ({ ...current, teamMembers: event.target.value }))}
+                  />
+                </label>
+              )}
               <label>
                 Category IDs (comma-separated)
                 <input
@@ -151,12 +225,32 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
                 <button
                   type="button"
                   onClick={() => props.onUpdateEntrant(selectedEntrant.id, {
+                    categoryId: entrantDraft.categoryId || undefined,
                     categoryIds: splitCsv(entrantDraft.categoryIds),
+                    dateOfBirth: entrantDraft.dateOfBirth || undefined,
                     entrantType: entrantDraft.entrantType as EventCatalogEntrant['entrantType'],
+                    firstName: entrantDraft.firstName || undefined,
+                    gender: entrantDraft.gender || undefined,
+                    lastName: entrantDraft.lastName || undefined,
                     memberParticipantIds: splitCsv(entrantDraft.memberParticipantIds),
                     name: entrantDraft.name,
                     notes: entrantDraft.notes || undefined,
                     sessionIds: splitCsv(entrantDraft.sessionIds),
+                    teamMembers: entrantDraft.entrantType === 'team'
+                      ? entrantDraft.teamMembers
+                          .split(';')
+                          .map((memberChunk) => memberChunk.trim())
+                          .filter((memberChunk) => memberChunk.length > 0)
+                          .map((memberChunk) => {
+                            const [participantId, firstName, lastName, categoryId] = memberChunk.split(':').map((item) => item.trim());
+                            return {
+                              categoryId: categoryId || undefined,
+                              firstName: firstName || '',
+                              lastName: lastName || '',
+                              participantId: participantId || '',
+                            };
+                          })
+                      : undefined,
                   })}
                 >
                   Save Entrant

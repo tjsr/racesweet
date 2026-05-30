@@ -18,12 +18,33 @@ const getUniqueCategories = (categories: EventCategory[]): EventCategory[] => {
   return Array.from(byId.values());
 };
 
+const normalizeCategoryText = (value?: string): string => (value || '').trim().toLowerCase();
+
+const categorySeriesKey = (category: EventCategory): string => {
+  const code = normalizeCategoryText(category.code);
+  const name = normalizeCategoryText(category.name);
+  return `${code}|${name}`;
+};
+
 export const getCategoriesToAdd = (
   existingCategories: EventCategory[],
   incomingCategories: EventCategory[],
 ): EventCategory[] => {
   const existingIds = new Set(existingCategories.map((category) => category.id.toString()));
-  return getUniqueCategories(incomingCategories).filter((category) => !existingIds.has(category.id.toString()));
+  const existingSeries = new Set(existingCategories.map((category) => categorySeriesKey(category)));
+  return getUniqueCategories(incomingCategories).filter((category) => {
+    if (existingIds.has(category.id.toString())) {
+      return false;
+    }
+
+    const seriesKey = categorySeriesKey(category);
+    if (existingSeries.has(seriesKey)) {
+      return false;
+    }
+
+    existingSeries.add(seriesKey);
+    return true;
+  });
 };
 
 export const applyPulledRaceStateToSession = async (

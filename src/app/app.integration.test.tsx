@@ -46,6 +46,46 @@ const readGeneratedFixture = async (filePath: string): Promise<string> => {
   throw new Error(`Unknown generated file requested: ${filePath}`);
 };
 
+const readGeneratedFixtureWithConfiguredApicalSource = async (filePath: string): Promise<string> => {
+  if (filePath.includes('event-catalog.json')) {
+    return JSON.stringify({ mutations: [], schemaVersion: 1 });
+  }
+
+  if (filePath.includes('system-config.json')) {
+    return JSON.stringify({
+      dataSources: [
+        {
+          apiConfig: {
+            apicalEventId: 1001,
+            authHeaderName: 'Authorization',
+            authHeaderValue: 'Bearer token',
+            baseUrl: 'https://apical.example.com',
+            companyId: 2,
+            httpTimeoutSeconds: 10,
+            live: false,
+            pollIntervalSeconds: 30,
+            selectedEventIds: [1001],
+          },
+          enabled: true,
+          id: 'source-apical',
+          listedEvents: [],
+          name: 'Apical Source',
+          type: 'api-apical-data-file',
+        },
+      ],
+      eventSourceAssignments: {},
+      schemaVersion: 1,
+      sessionSourceAssignments: {},
+    });
+  }
+
+  if (filePath.includes('admin-overrides.json')) {
+    throw new Error('ENOENT: no such file or directory');
+  }
+
+  throw new Error(`Unknown generated file requested: ${filePath}`);
+};
+
 const clickSectionButton = async (container: HTMLDivElement, sectionName: string): Promise<void> => {
   const sectionButton = container.querySelector(`button[aria-label="${sectionName}"]`) as HTMLButtonElement | null;
   expect(sectionButton).toBeTruthy();
@@ -169,6 +209,7 @@ describe('RaceSweetMainApp integration', () => {
       root.unmount();
     });
     container.remove();
+    vi.restoreAllMocks();
   });
 
   it('renders each main panel with key controls visible', async () => {
@@ -179,11 +220,13 @@ describe('RaceSweetMainApp integration', () => {
     await waitForLoadedApp(container);
 
     expect(container.textContent).not.toContain('Error loading content');
+    expect(container.querySelector('h1')?.textContent).toBe('System');
+    expect(container.textContent).not.toContain('Recent Records');
 
     await clickSectionButton(container, 'System');
     expect(container.querySelector('h1')?.textContent).toBe('System');
-    expect(container.textContent).toContain('Add Apical Data file');
-    expect(container.textContent).toContain('Apply Assigned Sources To Session');
+    expect(container.textContent).toContain('Data Source Type');
+    expect(container.textContent).toContain('Add Data Source');
 
     await clickSectionButton(container, 'Events');
     expect(container.querySelector('h1')?.textContent).toBe('Events');
@@ -203,6 +246,7 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Sessions');
     expect(container.querySelector('h1')?.textContent).toBe('Sessions');
     expect(container.textContent).toContain('Create Session');
+    expect(container.textContent).toContain('Make Active');
     expect(container.querySelector('input[aria-label="Sessions Page Name"]')).toBeTruthy();
 
     await clickSectionButton(container, 'Timing');
@@ -212,11 +256,54 @@ describe('RaceSweetMainApp integration', () => {
 
     await clickSectionButton(container, 'Results');
     expect(container.querySelector('h1')?.textContent).toBe('Results');
-    expect(container.textContent).toContain('Results Tools');
+    expect(container.textContent).toContain('Session race standings and lap-chart view for the selected category scope.');
+    expect(container.querySelector('select[aria-label="Race View Category"]')).toBeTruthy();
+    expect(container.querySelector('select[aria-label="Results View Type"]')).toBeTruthy();
 
     await clickSectionButton(container, 'Reports');
     expect(container.querySelector('h1')?.textContent).toBe('Reports');
-    expect(container.textContent).toContain('Reports Tools');
+    expect(container.textContent).toContain('Category-scoped reports for fastest laps, participant lap times, and lap chart.');
+    expect(container.querySelector('select[aria-label="Race View Category"]')).toBeTruthy();
+    expect(container.querySelector('select[aria-label="Reports View Type"]')).toBeTruthy();
+  });
+
+  it('supports results and reports view selection dropdowns', async () => {
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+
+    await clickSectionButton(container, 'Results');
+    const resultsViewSelect = container.querySelector('select[aria-label="Results View Type"]') as HTMLSelectElement;
+    expect(resultsViewSelect).toBeTruthy();
+
+    await act(async () => {
+      resultsViewSelect.value = 'lap-chart';
+      resultsViewSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('Lap Chart');
+    expect(container.querySelector('table[aria-label="Results Lap Chart Table"]')).toBeTruthy();
+
+    await clickSectionButton(container, 'Reports');
+    const reportViewSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
+    expect(reportViewSelect).toBeTruthy();
+
+    await act(async () => {
+      reportViewSelect.value = 'lap-times';
+      reportViewSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(container.querySelector('select[aria-label="Reports Participant"]')).toBeTruthy();
+    expect(container.querySelector('table[aria-label="Lap Times Report Table"]')).toBeTruthy();
+
+    await act(async () => {
+      reportViewSelect.value = 'fastest-laps';
+      reportViewSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(container.querySelector('table[aria-label="Fastest Laps Report Table"]')).toBeTruthy();
   });
 
   it('keeps panel rendering healthy after edits and panel switches', async () => {
@@ -259,7 +346,7 @@ describe('RaceSweetMainApp integration', () => {
 
     await clickSectionButton(container, 'System');
     expect(container.querySelector('h1')?.textContent).toBe('System');
-    expect(container.textContent).toContain('Apply Assigned Sources To Session');
+    expect(container.textContent).toContain('Configured Data Sources');
 
     await clickSectionButton(container, 'Timing');
     expect(container.querySelector('h1')?.textContent).toBe('Timing');
@@ -267,7 +354,7 @@ describe('RaceSweetMainApp integration', () => {
 
     await clickSectionButton(container, 'Reports');
     expect(container.querySelector('h1')?.textContent).toBe('Reports');
-    expect(container.textContent).toContain('Reports Tools');
+    expect(container.textContent).toContain('Category-scoped reports for fastest laps, participant lap times, and lap chart.');
 
     await clickSectionButton(container, 'Entrants');
     expect(container.querySelector('h1')?.textContent).toBe('Entrants');
@@ -310,7 +397,7 @@ describe('RaceSweetMainApp integration', () => {
 
     await clickSectionButton(container, 'System');
     expect(container.querySelector('h1')?.textContent).toBe('System');
-    expect(container.textContent).toContain('Apply Assigned Sources To Session');
+    expect(container.textContent).toContain('Configured Data Sources');
 
     await clickSectionButton(container, 'Entrants');
     expect(container.querySelector('h1')?.textContent).toBe('Entrants');
@@ -319,5 +406,89 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Sessions');
     expect(container.querySelector('h1')?.textContent).toBe('Sessions');
     expect(container.querySelector('input[aria-label="Sessions Page Name"]')).toBeTruthy();
+  });
+
+  it('persists enriched entrant profile edits across panel switches', async () => {
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    expect(container.textContent).not.toContain('Error loading content');
+
+    await clickSectionButton(container, 'Entrants');
+
+    const firstNameInput = container.querySelector('input[aria-label="Entrant First Name"]') as HTMLInputElement;
+    const surnameInput = container.querySelector('input[aria-label="Entrant Surname"]') as HTMLInputElement;
+    const genderInput = container.querySelector('input[aria-label="Entrant Gender"]') as HTMLInputElement;
+    const dobInput = container.querySelector('input[aria-label="Entrant Date Of Birth"]') as HTMLInputElement;
+    expect(firstNameInput).toBeTruthy();
+    expect(surnameInput).toBeTruthy();
+    expect(genderInput).toBeTruthy();
+    expect(dobInput).toBeTruthy();
+
+    await act(async () => {
+      setInputValue(firstNameInput, 'Integrated');
+      setInputValue(surnameInput, 'Rider');
+      setInputValue(genderInput, 'female');
+      setInputValue(dobInput, '2001-01-15');
+    });
+
+    await clickButtonByText(container, 'Save Entrant');
+    await waitForInputValue(container, 'input[aria-label="Entrant First Name"]', 'Integrated');
+    await waitForInputValue(container, 'input[aria-label="Entrant Surname"]', 'Rider');
+    await waitForInputValue(container, 'input[aria-label="Entrant Gender"]', 'female');
+    await waitForInputValue(container, 'input[aria-label="Entrant Date Of Birth"]', '2001-01-15');
+
+    await clickSectionButton(container, 'System');
+    expect(container.querySelector('h1')?.textContent).toBe('System');
+
+    await clickSectionButton(container, 'Entrants');
+    await waitForInputValue(container, 'input[aria-label="Entrant First Name"]', 'Integrated');
+    await waitForInputValue(container, 'input[aria-label="Entrant Surname"]', 'Rider');
+    await waitForInputValue(container, 'input[aria-label="Entrant Gender"]', 'female');
+    await waitForInputValue(container, 'input[aria-label="Entrant Date Of Birth"]', '2001-01-15');
+  });
+
+  it('keeps app usable when admin overrides file is missing and Apical event list fetch fails', async () => {
+    const requestFileContent = async (filePath: string, _dataType: string): Promise<string> => {
+      return readGeneratedFixtureWithConfiguredApicalSource(filePath);
+    };
+
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer: readFixtureBuffer,
+      requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async () => undefined,
+    };
+
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      .mockResolvedValueOnce(new Response('boom', { status: 500, statusText: 'Server Error' }));
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    expect(container.querySelector('h1')?.textContent).toBe('System');
+    expect(container.textContent).not.toContain('Failed to read admin-overrides.json');
+
+    const fetchEventsButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Fetch Apical Events');
+    expect(fetchEventsButton).toBeDefined();
+
+    await act(async () => {
+      fetchEventsButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await waitForText(container, 'Failed to fetch Apical events: Failed to fetch Apical events: 500 Server Error');
+    expect(container.textContent).not.toContain('Error loading content');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

@@ -5,17 +5,28 @@ import {
   type EventCatalogSession,
   type EventCatalogState,
 } from '../../app/eventCatalog.js';
+import { getEventAssignedSourceIds, type SystemConfiguration } from '../../app/systemConfig.js';
 
 interface SessionsPageProps {
   catalog: EventCatalogState;
+  config: SystemConfiguration;
+  onApplySessionSources: (eventId: string, sessionId: string) => void | Promise<void>;
   onCreateSession: (eventId: string) => void | Promise<void>;
   onDeleteSession: (eventId: string, sessionId: string) => void | Promise<void>;
+  onMakeSessionActive: (eventId: string, sessionId: string) => void | Promise<void>;
   onSelectEvent: (eventId: string) => void;
+  onSaveSessionAssignment: (sessionId: string, mode: 'default' | 'specific', sourceIds: string[]) => void | Promise<void>;
   onSelectSession: (sessionId: string) => void;
   onUpdateSession: (sessionId: string, changes: Partial<Pick<EventCatalogSession, 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>) => void | Promise<void>;
   selectedEventId?: string;
   selectedSessionId?: string;
 }
+
+const toggleInList = (values: string[], value: string): string[] => {
+  return values.includes(value)
+    ? values.filter((item) => item !== value)
+    : [...values, value];
+};
 
 export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
   const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId)
@@ -23,6 +34,11 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
     ?? props.catalog.events[0];
   const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
   const selectedSession = eventSessions.find((session) => session.id === props.selectedSessionId) ?? eventSessions[0];
+  const assignedEventSourceIds = selectedEvent ? getEventAssignedSourceIds(props.config, selectedEvent.id) : [];
+  const sessionAssignment = selectedSession ? (props.config.sessionSourceAssignments[selectedSession.id] || { mode: 'default', sourceIds: [] as string[] }) : undefined;
+  const effectiveSessionSourceIds = sessionAssignment
+    ? (sessionAssignment.mode === 'default' ? assignedEventSourceIds : sessionAssignment.sourceIds)
+    : [];
 
   const [sessionDraft, setSessionDraft] = React.useState({
     kind: selectedSession?.kind || 'practice',
@@ -63,6 +79,13 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
           <div className="events-actions">
             <button type="button" onClick={() => selectedEvent && props.onCreateSession(selectedEvent.id)} disabled={!selectedEvent}>
               Create Session
+            </button>
+            <button
+              type="button"
+              onClick={() => selectedEvent && selectedSession && props.onMakeSessionActive(selectedEvent.id, selectedSession.id)}
+              disabled={!selectedEvent || !selectedSession}
+            >
+              Make Active
             </button>
           </div>
           <div className="events-session-list" role="listbox" aria-label="Sessions for selected event">
@@ -141,12 +164,55 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
                   onChange={(event) => setSessionDraft((current) => ({ ...current, notes: event.target.value }))}
                 />
               </label>
+
+              <h3>Session Data Sources</h3>
+              <label>
+                Source mode
+                <select
+                  aria-label="Sessions Source Mode"
+                  value={sessionAssignment?.mode || 'default'}
+                  onChange={(event) => props.onSaveSessionAssignment(selectedSession.id, event.target.value as 'default' | 'specific', sessionAssignment?.sourceIds || [])}
+                >
+                  <option value="default">Default (all event sources)</option>
+                  <option value="specific">Specific source selection</option>
+                </select>
+              </label>
+
+              {sessionAssignment?.mode === 'specific' ? (
+                props.config.dataSources.length === 0 ? (
+                  <p>No configured data sources are available yet. Add and configure them in System.</p>
+                ) : (
+                  <ul>
+                    {props.config.dataSources.map((source) => {
+                      const checked = sessionAssignment.sourceIds.includes(source.id);
+                      return (
+                        <li key={`session-source-${selectedSession.id}-${source.id}`}>
+                          <label>
+                            <input
+                              aria-label={`Session Source ${selectedSession.id} ${source.id}`}
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => props.onSaveSessionAssignment(selectedSession.id, 'specific', toggleInList(sessionAssignment.sourceIds, source.id))}
+                            />
+                            {source.name}
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )
+              ) : null}
+
+              <p>Effective sources: {effectiveSessionSourceIds.length}</p>
               <div className="events-actions">
                 <button type="button" onClick={() => props.onUpdateSession(selectedSession.id, sessionDraft)}>
                   Save Session
                 </button>
                 <button type="button" onClick={() => selectedEvent && props.onDeleteSession(selectedEvent.id, selectedSession.id)}>
                   Delete Session
+                </button>
+                <button type="button" onClick={() => selectedEvent && props.onApplySessionSources(selectedEvent.id, selectedSession.id)}>
+                  Apply Assigned Sources To Session
                 </button>
               </div>
             </>

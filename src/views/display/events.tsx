@@ -5,10 +5,13 @@ import {
   type EventCatalogEvent,
   type EventCatalogState,
 } from '../../app/eventCatalog.js';
+import { getEventAssignedSourceIds, type SystemConfiguration } from '../../app/systemConfig.js';
 
 interface EventsScreenProps {
   catalog: EventCatalogState;
+  config: SystemConfiguration;
   onActivateEvent: (eventId: string) => void | Promise<void>;
+  onSaveEventAssignment: (eventId: string, sourceIds: string[]) => void | Promise<void>;
   onSelectEvent: (eventId: string) => void;
   onSelectSession: (sessionId: string) => void;
   onUpdateEvent: (eventId: string, changes: { date?: string; format?: EventCatalogEvent['format']; name?: string }) => void | Promise<void>;
@@ -16,12 +19,19 @@ interface EventsScreenProps {
   selectedSessionId?: string;
 }
 
+const toggleInList = (values: string[], value: string): string[] => {
+  return values.includes(value)
+    ? values.filter((item) => item !== value)
+    : [...values, value];
+};
+
 export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
   const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId)
     ?? props.catalog.events.find((event) => event.id === props.catalog.activeEventId)
     ?? props.catalog.events[0];
   const selectedEventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
   const selectedSession = selectedEventSessions.find((session) => session.id === props.selectedSessionId) ?? selectedEventSessions[0];
+  const assignedSourceIds = selectedEvent ? getEventAssignedSourceIds(props.config, selectedEvent.id) : [];
 
   const [eventDraft, setEventDraft] = React.useState({
     date: selectedEvent?.date || '',
@@ -133,6 +143,30 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
                   );
                 })}
               </div>
+
+              <h2>Event Data Sources</h2>
+              {props.config.dataSources.length === 0 ? (
+                <p>No configured data sources are available yet. Add and configure them in System.</p>
+              ) : (
+                <ul>
+                  {props.config.dataSources.map((source) => {
+                    const checked = assignedSourceIds.includes(source.id);
+                    return (
+                      <li key={`event-source-${source.id}`}>
+                        <label>
+                          <input
+                            aria-label={`Event Source ${selectedEvent.id} ${source.id}`}
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => props.onSaveEventAssignment(selectedEvent.id, toggleInList(assignedSourceIds, source.id))}
+                          />
+                          {source.name}
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </>
           ) : (
             <p>No events are defined.</p>

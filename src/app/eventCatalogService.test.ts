@@ -160,11 +160,117 @@ describe('EventCatalogService', () => {
     const categories = getCategoriesForEvent(service.catalog, 'event-2026-racesweet-round-1');
     const entrants = getEntrantsForEvent(service.catalog, 'event-2026-racesweet-round-1');
     const teamA = entrants.find((entrant) => entrant.id === 'team-a');
+    const teamB = entrants.find((entrant) => entrant.id === 'team-b');
 
     expect(event?.categoryIds).toEqual(expect.arrayContaining(['cat-a', 'cat-b', 'cat-c']));
     expect(categories.find((category) => category.id === 'cat-c')).toBeDefined();
     expect(event?.entrantIds).toEqual(expect.arrayContaining(['team-a', 'team-b']));
     expect(teamA?.categoryIds).toEqual(expect.arrayContaining(['cat-a', 'cat-b']));
+    expect(teamA?.entrantType).toBe('team');
+    expect(teamA?.teamMembers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ firstName: 'Pat', lastName: 'Rider', participantId: 'p1' }),
+      expect.objectContaining({ firstName: 'Quinn', lastName: 'Rider', participantId: 'p2' }),
+    ]));
+    expect(teamB?.entrantType).toBe('rider');
+    expect(teamB?.firstName).toBe('Sam');
+    expect(teamB?.lastName).toBe('Rider');
+    expect(teamB?.categoryId).toBe('cat-c');
+  });
+
+  it('supports entrant detail edits for rider fields and category updates', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+
+    await service.updateEntrant('event-2026-racesweet-round-1-entrant-101', {
+      categoryId: 'event-2026-racesweet-round-1-category-clubman',
+      categoryIds: ['event-2026-racesweet-round-1-category-clubman'],
+      dateOfBirth: '1999-04-18',
+      firstName: 'Jordan',
+      gender: 'female',
+      lastName: 'Smith',
+      name: 'Jordan Smith',
+    });
+
+    const entrant = service.catalog.entrants.find((item) => item.id === 'event-2026-racesweet-round-1-entrant-101');
+    expect(entrant).toEqual(expect.objectContaining({
+      categoryId: 'event-2026-racesweet-round-1-category-clubman',
+      categoryIds: ['event-2026-racesweet-round-1-category-clubman'],
+      dateOfBirth: '1999-04-18',
+      firstName: 'Jordan',
+      gender: 'female',
+      lastName: 'Smith',
+      name: 'Jordan Smith',
+    }));
+  });
+
+  it('uses master entrant profiles to backfill missing participant names and profile fields', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+
+    const participants: EventParticipant[] = [
+      {
+        categoryId: 'cat-z',
+        currentResult: undefined,
+        entrantId: 'team-z',
+        firstname: '',
+        id: 'p-z1',
+        identifiers: [],
+        lastRecordTime: null,
+        resultDuration: null,
+        surname: '',
+      },
+    ];
+
+    await service.syncEventScaffold('event-2026-racesweet-round-1', [], participants, [
+      {
+        categoryId: 'cat-z',
+        dateOfBirth: '2003-03-03',
+        entrantId: 'team-z',
+        firstName: 'Alex',
+        gender: 'female',
+        lastName: 'Fallback',
+      },
+    ]);
+
+    const entrant = service.catalog.entrants.find((item) => item.id === 'team-z');
+    expect(entrant).toEqual(expect.objectContaining({
+      categoryId: 'cat-z',
+      categoryIds: ['cat-z'],
+      dateOfBirth: '2003-03-03',
+      firstName: 'Alex',
+      gender: 'female',
+      lastName: 'Fallback',
+      name: 'Alex Fallback',
+    }));
+  });
+
+  it('falls back to participant ID when imported entrant ID is blank', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+
+    const participants: EventParticipant[] = [
+      {
+        categoryId: 'cat-fallback',
+        currentResult: undefined,
+        entrantId: '',
+        firstname: 'Blank',
+        id: 'participant-fallback-id',
+        identifiers: [],
+        lastRecordTime: null,
+        resultDuration: null,
+        surname: 'Entrant',
+      },
+    ];
+
+    await service.syncEventScaffold('event-2026-racesweet-round-1', [], participants);
+
+    const entrant = service.catalog.entrants.find((item) => item.id === 'participant-fallback-id');
+    expect(entrant).toEqual(expect.objectContaining({
+      firstName: 'Blank',
+      id: 'participant-fallback-id',
+      lastName: 'Entrant',
+      name: 'Blank Entrant',
+    }));
   });
 
   it('creates and deletes session/category/entrant through immutable mutations', async () => {
@@ -210,5 +316,37 @@ describe('applyEventCatalogLedger', () => {
     expect(state.categories).toHaveLength(2);
     expect(state.entrants).toHaveLength(1);
     expect(state.sessions).toHaveLength(3);
+  });
+
+  it('rebuilds entrant individual fields from ledger updates', () => {
+    const seed = createSeedEventCatalogLedger();
+    const state = applyEventCatalogLedger({
+      ...seed,
+      mutations: [
+        ...seed.mutations,
+        {
+          changes: {
+            categoryId: 'event-2026-racesweet-round-1-category-clubman',
+            dateOfBirth: '2001-09-21',
+            firstName: 'Taylor',
+            gender: 'male',
+            lastName: 'Rider',
+          },
+          entrantId: 'event-2026-racesweet-round-1-entrant-101',
+          id: 'mutation-entrant-details',
+          timestamp: '2026-05-30T11:22:00.000Z',
+          type: 'entrant-updated' as const,
+        },
+      ],
+    });
+
+    const entrant = state.entrants.find((item) => item.id === 'event-2026-racesweet-round-1-entrant-101');
+    expect(entrant).toEqual(expect.objectContaining({
+      categoryId: 'event-2026-racesweet-round-1-category-clubman',
+      dateOfBirth: '2001-09-21',
+      firstName: 'Taylor',
+      gender: 'male',
+      lastName: 'Rider',
+    }));
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createDefaultSystemConfiguration, getSessionAssignedSourceIds } from './systemConfig.js';
+import { createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.js';
 import { SystemConfigService } from './systemConfigService.js';
 import type { SystemConfigPersistence } from './systemConfigPersistence.js';
 
@@ -85,5 +85,32 @@ describe('SystemConfigService', () => {
     expect(service.state.eventSourceAssignments['event-1']).toEqual([]);
     expect(service.state.sessionSourceAssignments['session-1']).toEqual({ mode: 'specific', sourceIds: [] });
     expect(persistence.save).toHaveBeenCalled();
+  });
+
+  it('supports master entrant profile sources assigned to events', async () => {
+    const persistence = createPersistence();
+    const service = await SystemConfigService.create(persistence);
+
+    await service.createSource('master-entrant-profiles');
+    const source = service.state.dataSources[0];
+
+    await service.updateSource(source.id, {
+      masterEntrantConfig: {
+        profiles: [
+          {
+            entrantId: 'team-7',
+            firstName: 'Master',
+            lastName: 'Record',
+          },
+        ],
+      },
+      name: 'Master Entrants A',
+    });
+    await service.assignSourcesToEvent('event-7', [source.id]);
+
+    const profiles = getMasterEntrantProfilesForEvent(service.state, 'event-7');
+    expect(profiles).toEqual([
+      expect.objectContaining({ entrantId: 'team-7', firstName: 'Master', lastName: 'Record' }),
+    ]);
   });
 });
