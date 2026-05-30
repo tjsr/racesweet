@@ -69,12 +69,38 @@ describe('apicalDataSource', () => {
     expect(String(fetchMock.mock.calls[1]?.[0] || '')).toContain('/raceresult/event/getall');
   });
 
+  it('sends mode cors and credentials omit on authentication request', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
+
+    await fetchApicalEvents(createApicalSource());
+
+    const authCallOptions = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(authCallOptions.mode).toBe('cors');
+    expect(authCallOptions.credentials).toBe('omit');
+  });
+
+  it('sends mode cors and credentials omit on event list request', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
+
+    await fetchApicalEvents(createApicalSource());
+
+    const eventsCallOptions = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    expect(eventsCallOptions.mode).toBe('cors');
+    expect(eventsCallOptions.credentials).toBe('omit');
+  });
+
   it('throws clear error when Apical event list request fails', async () => {
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response('{}', { status: 200 }))
       .mockResolvedValueOnce(new Response('unauthorized', { status: 401, statusText: 'Unauthorized' }));
 
-    await expect(fetchApicalEvents(createApicalSource())).rejects.toThrow('Failed to fetch Apical events: 401 Unauthorized');
+    await expect(fetchApicalEvents(createApicalSource())).rejects.toThrow('[401] Unauthorized');
   });
 
   it('throws clear error when pulling race state without a selected Apical event id', async () => {
@@ -83,6 +109,21 @@ describe('apicalDataSource', () => {
     source.apiConfig!.selectedEventIds = [];
 
     await expect(pullApicalRaceState(source, 'event-1')).rejects.toThrow('No Apical event id is configured for this source.');
+  });
+
+  it('sends mode cors and credentials omit on data file request', async () => {
+    convertDataToRaceState.mockReturnValue({});
+
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
+
+    await pullApicalRaceState(createApicalSource(), 'event-2026-round-1');
+
+    const dataFileCallOptions = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    expect(dataFileCallOptions.mode).toBe('cors');
+    expect(dataFileCallOptions.credentials).toBe('omit');
   });
 
   it('pulls selected Apical event data file and converts to race state', async () => {

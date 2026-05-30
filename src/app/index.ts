@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain } from 'electron';
+import { BrowserWindow, app, ipcMain, session } from 'electron';
 import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
@@ -7,6 +7,7 @@ import {
   WriteContentErrorIpcReceiveChannel,
   WriteContentIpcReceiveChannel
 } from '../model/electronIpc';
+import { injectCorsHeaders, isApicalApiUrl } from './electron/corsHeaders';
 import { readFile, writeFile } from 'node:fs/promises';
 
 import path from 'node:path';
@@ -27,7 +28,19 @@ if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
+const configureCorsForApicalRequests = (): void => {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    if (isApicalApiUrl(details.url)) {
+      callback({ responseHeaders: injectCorsHeaders(details.responseHeaders ?? {}) });
+    } else {
+      callback({ responseHeaders: details.responseHeaders });
+    }
+  });
+};
+
 const createWindow = (): void => {
+  configureCorsForApicalRequests();
+
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     height: 600,

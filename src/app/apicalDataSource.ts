@@ -60,8 +60,10 @@ const authenticateSession = async (source: DataSourceConfig): Promise<string | u
 
   const response = await withTimeout(
     fetch(authUrl, {
+      credentials: 'omit',
       headers,
       method: 'GET',
+      mode: 'cors',
     }),
     apiConfig.httpTimeoutSeconds * 1000,
   );
@@ -84,8 +86,10 @@ export const fetchApicalEvents = async (source: DataSourceConfig): Promise<Apica
 
   const response = await withTimeout(
     fetch(url, {
+      credentials: 'omit',
       headers,
       method: 'GET',
+      mode: 'cors',
     }),
     source.apiConfig.httpTimeoutSeconds * 1000,
   );
@@ -115,8 +119,10 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
 
   const response = await withTimeout(
     fetch(url, {
+      credentials: 'omit',
       headers,
       method: 'GET',
+      mode: 'cors',
     }),
     source.apiConfig.httpTimeoutSeconds * 1000,
   );
