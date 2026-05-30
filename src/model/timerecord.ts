@@ -43,6 +43,7 @@ export const CROSSING_FLAG_LAP_UNDER_MINIMUM = 0x08; // Indicates a crossing is 
 export interface ParticipantPassingRecord extends EventTimeRecord {
   id: PassingRecordId;
   participantId?: EventParticipantId | null | undefined;
+  entrantId?: EventEntrantId | null | undefined;
   participantStartRecordId?: TimeRecordId | null | undefined;
   startingLapRecordId?: TimeRecordId | null | undefined;
   elapsedTime?: number | null | undefined; // in milliseconds

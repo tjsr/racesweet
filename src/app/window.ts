@@ -2,7 +2,7 @@
 // const { ipcMain } = require("electron");
 
 export type AvailableSendChannels = 'askToRead' | 'askToWrite';
-export type AvailableReceiveChannels = 'sendReadContent' | 'sendReadError' | 'sendWriteContent' | 'sendWriteError';
+export type AvailableReceiveChannels = 'sendReadContent' | 'sendReadError' | 'sendWriteSuccess' | 'sendWriteError';
 export type FileReadDataType = 'utf8' | 'buffer' | 'bytearray';
 
 // import { BrowserWindow, app } from 'electron';
@@ -31,6 +31,7 @@ declare global {
       // send: (channel: AvailableSendChannels, ...args: unknown[]) => void;
       requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType) => Promise<DataType>;
       requestBuffer: (filePath: string) => Promise<Buffer>;
+      writeFileContent: (filePath: string, contents: string) => Promise<void>;
     },
     nodeapi: {
       createBuffer: (data: string | Uint8Array | ArrayBuffer) => Buffer;

@@ -1,0 +1,215 @@
+{
+  "mutations": [
+    {
+      "event": {
+        "categoryIds": [],
+        "date": "2026-06-12",
+        "entrantIds": [],
+        "format": "race-weekend",
+        "id": "event-2026-racesweet-round-1",
+        "name": "RaceSweet Round 1",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "mutation-event-seed",
+      "timestamp": "2026-05-30T00:00:00.000Z",
+      "type": "event-created"
+    },
+    {
+      "id": "mutation-session-seed-1",
+      "session": {
+        "eventId": "event-2026-racesweet-round-1",
+        "id": "session-1-practice",
+        "kind": "practice",
+        "name": "Friday Practice",
+        "notes": "Open practice for all confirmed entrants.",
+        "scheduledStart": "2026-06-12T09:00:00.000Z",
+        "status": "scheduled"
+      },
+      "timestamp": "2026-05-30T00:01:00.000Z",
+      "type": "session-created"
+    },
+    {
+      "id": "mutation-session-seed-2",
+      "session": {
+        "eventId": "event-2026-racesweet-round-1",
+        "id": "session-1-qualifying",
+        "kind": "qualifying",
+        "name": "Qualifying",
+        "notes": "Grid positions are determined from fastest valid lap.",
+        "scheduledStart": "2026-06-12T13:00:00.000Z",
+        "status": "scheduled"
+      },
+      "timestamp": "2026-05-30T00:02:00.000Z",
+      "type": "session-created"
+    },
+    {
+      "id": "mutation-session-seed-3",
+      "session": {
+        "eventId": "event-2026-racesweet-round-1",
+        "id": "session-1-race",
+        "kind": "race",
+        "name": "Feature Race",
+        "notes": "Primary points-paying race session.",
+        "scheduledStart": "2026-06-13T14:30:00.000Z",
+        "status": "scheduled"
+      },
+      "timestamp": "2026-05-30T00:03:00.000Z",
+      "type": "session-created"
+    },
+    {
+      "eventId": "event-2026-racesweet-round-1",
+      "id": "mutation-event-active",
+      "timestamp": "2026-05-30T00:04:00.000Z",
+      "type": "event-activated"
+    },
+    {
+      "category": {
+        "code": "A",
+        "description": "",
+        "id": "c46abe1d-2e4d-5aef-829e-fa352228edd4",
+        "name": "A",
+        "eventId": "event-2026-racesweet-round-1"
+      },
+      "id": "event-catalog-1780105878988-73025",
+      "timestamp": "2026-05-30T01:51:18.988Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "B",
+        "description": "",
+        "id": "ed457bb2-cf25-56a0-bb5e-a6e667e1c566",
+        "name": "B",
+        "eventId": "event-2026-racesweet-round-1"
+      },
+      "id": "event-catalog-1780105878989-2719",
+      "timestamp": "2026-05-30T01:51:18.989Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "C",
+        "description": "",
+        "id": "d3616369-5d46-5b5c-a5fa-a7d8b6353667",
+        "name": "C",
+        "eventId": "event-2026-racesweet-round-1"
+      },
+      "id": "event-catalog-1780105878989-45571",
+      "timestamp": "2026-05-30T01:51:18.989Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "D",
+        "description": "",
+        "id": "c9feb4d7-940f-5be7-86ee-edf453611a6b",
+        "name": "D",
+        "eventId": "event-2026-racesweet-round-1"
+      },
+      "id": "event-catalog-1780105878989-43488",
+      "timestamp": "2026-05-30T01:51:18.989Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "EBIKE",
+        "description": "",
+        "id": "13ff029e-400b-5994-9f90-0515f92ebafe",
+        "name": "EBIKE",
+        "eventId": "event-2026-racesweet-round-1"
+      },
+      "id": "event-catalog-1780105878989-28252",
+      "timestamp": "2026-05-30T01:51:18.989Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "Timing Error List",
+        "description": "",
+        "id": "e4dd5bc8-4361-5330-a654-5971612c5902",
+        "name": "Timing Error List",
+        "eventId": "event-2026-racesweet-round-1"
+      },
+      "id": "event-catalog-1780105878989-15072",
+      "timestamp": "2026-05-30T01:51:18.989Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "WA",
+        "description": "",
+        "id": "8b52256b-ceb3-567d-9c5a-14ba6bbbeaac",
+        "name": "WA",
+        "eventId": "event-2026-racesweet-round-1"
+      },
+      "id": "event-catalog-1780105878989-30213",
+      "timestamp": "2026-05-30T01:51:18.989Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "WB",
+        "description": "",
+        "id": "1a7fbc94-d0df-5fae-9cdd-06dec078fb3e",
+        "name": "WB",
+        "eventId": "event-2026-racesweet-round-1"
+      },
+      "id": "event-catalog-1780105878989-68075",
+      "timestamp": "2026-05-30T01:51:18.989Z",
+      "type": "category-created"
+    },
+    {
+      "changes": {
+        "categoryIds": [
+          "c46abe1d-2e4d-5aef-829e-fa352228edd4",
+          "ed457bb2-cf25-56a0-bb5e-a6e667e1c566",
+          "d3616369-5d46-5b5c-a5fa-a7d8b6353667",
+          "c9feb4d7-940f-5be7-86ee-edf453611a6b",
+          "13ff029e-400b-5994-9f90-0515f92ebafe",
+          "e4dd5bc8-4361-5330-a654-5971612c5902",
+          "8b52256b-ceb3-567d-9c5a-14ba6bbbeaac",
+          "1a7fbc94-d0df-5fae-9cdd-06dec078fb3e"
+        ],
+        "entrantIds": [
+          "06e422f5-e943-5d09-8959-3bf34f5dceec",
+          "2c2f7cff-8074-58d7-8ca5-d0c67a7941ac",
+          "79764c6a-6683-51eb-990d-cdf30689a2a3",
+          "5eb15722-89d5-5204-b462-40445207c3e4",
+          "18e51320-a1eb-514e-9237-1b297cef63e0",
+          "082bc91f-6684-5d5b-b856-ae2e56140315",
+          "e7c03b09-5e96-54b0-9e03-7c8b6c1252f0",
+          "d9505720-003f-54d6-932a-575b30e659dc",
+          "065106a2-2a51-5453-bd3a-531fac980609",
+          "2c9efe0c-2a15-58e6-a62e-467998f61d67",
+          "e6333701-4154-56d2-9308-9ec4cc474493",
+          "b3b79e7b-4126-535b-912f-d85fd5b5a619",
+          "aa91d700-d78a-5dc2-beca-c7e4c7b209aa",
+          "cfad630b-bf42-55fa-a51c-77236404359b",
+          "187656b3-4445-513a-b22d-b56398da70b5",
+          "dec7a6b1-45f3-5fd4-a5e1-0a80789e560b",
+          "10b66157-98e9-51a4-aecb-9497a03f8ba3",
+          "a3d2095b-f54b-5607-ae4b-ac75ddf0d250",
+          "cef775b2-5bf7-520e-a19e-075780711eb6",
+          "b4540f4d-2c79-55cf-ab58-ca250df9d708",
+          "3d7897d1-eac4-5456-a850-d3a7b51771c6",
+          "3019af26-edff-5477-bb34-cedf7407fcc4",
+          "6912841c-c063-55ee-8e2e-fdb09f5630ad",
+          "34ad39e9-3140-53a8-91a7-f2c00a79f387",
+          "537e1b02-e5fb-52c8-8d50-6e77d432bb88",
+          "3f345e4a-5ff3-59f5-b031-7be5efcbc0d7",
+          "aacf40e9-1a1c-5d18-9508-5afa75e3482c",
+          "c7b83f82-30ac-506b-96f3-12aea3ba509a"
+        ]
+      },
+      "eventId": "event-2026-racesweet-round-1",
+      "id": "event-catalog-1780105878989-6385",
+      "timestamp": "2026-05-30T01:51:18.989Z",
+      "type": "event-updated"
+    }
+  ],
+  "schemaVersion": 1
+}

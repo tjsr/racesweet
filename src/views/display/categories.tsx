@@ -21,20 +21,8 @@ export const CategoryList = (props: CategoryListProps) => {
       <h2>Categories</h2>
       <DataGrid
         rows={categories}
-        // onClick={((event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-        //   const selectedRow = event.currentTarget;
-        //   const rowId = selectedRow.getAttribute('data-id');
-        //   if (rowId) {
-        //     console.log(`Row with ID ${rowId} clicked`);
-        //   }
-        // })}
-        onRowClick={(params) => {
-          if (params) {
-            console.log(`Row with ID ${params.id} clicked`);
-          }
-        }}
+        onRowClick={() => undefined}
         onRowSelectionModelChange={(newSelection) => {
-          console.log('Selected rows:', newSelection);
           if (props.categorySelected && newSelection.ids) {
             props.categorySelected(new Set(newSelection.ids.values().map((id: GridRowId) => id.toString())));
           }

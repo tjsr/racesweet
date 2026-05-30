@@ -19,3 +19,21 @@ In cycling, it's common to have long event routes or areas within dense forest o
 ## Data ownership
 
 Too often services either lock the owners data behind their service, or in the event of there being an issue, there's no way of users retrieving their own raw data - either to need to manually fix due to software bugs, or because they are not provided access to those services.  We want event event owners to ultimately own their own data and have the ability to have this reside where they choose, rather than paying for a solution.
+
+## Testing coverage policy
+
+All feature work should include automated tests that cover create, update, and delete behavior where that behavior exists.
+
+Required coverage for feature changes:
+
+1. Unit tests must validate update behavior for service logic and state mutation rules.
+2. Unit tests must validate create and delete behavior for service logic that owns those operations.
+3. Integration tests must validate update behavior through user-visible UI or controller flows.
+4. Integration tests must validate create and delete behavior through user-visible UI or controller flows.
+5. Integration tests that modify state should include at least one section/panel switch to confirm rendering remains healthy after mutations.
+
+PR checklist:
+
+1. Added or updated unit tests for relevant create/update/delete logic.
+2. Added or updated integration tests for relevant create/update/delete flows.
+3. Verified state-changing integration tests still render expected controls after navigation.

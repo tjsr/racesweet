@@ -1,8 +1,8 @@
 import React, { type JSX, type ReactNode } from 'react';
 import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../model';
-import { FlagRecord, GreenFlagRecord } from '../../model/flag';
+import { FlagRecord } from '../../model/flag';
 import { EventCategory, EventCategoryId } from '../../model/eventcategory';
-import { isFlagRecord, isGreenFlag } from '../../controllers/flag';
+import { isFlagRecord } from '../../controllers/flag';
 import { Box, createTheme, FormControl, InputLabel, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { MillisecondsDuration, millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.ts';
 import { categoriesTextFromLookupFn, getElapsedTimeForCategory } from '../../controllers/category.ts';
@@ -41,40 +41,39 @@ interface FlagRecordRowProps<FlagType extends FlagRecord> extends RecentRecordRo
   onSelect: (record: FlagType) => void;
 }
 
-interface GreenFlagEventRowProps extends FlagRecordRowProps<GreenFlagRecord> {
-}
-
 export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
   const record: FlagRecord = props.record;
-  // if (!isGreenFlag(record)) {
-  //   const greenFlag: GreenFlagRecord = props.record as GreenFlagRecord;
-  //   return <GreenFlagRow record={greenFlag} index={props.index} />;
-  // }
-    
+
   if (!isFlagRecord(record)) {
     throw new Error('FlagRecord component used with non-flag record');
   }
-  let flagClass = 'flag green';
-  let flagText = 'Green flag'
+
+  const normalizedFlagType = (record.flagType || 'flag').toLowerCase();
+  const prettyType = normalizedFlagType.charAt(0).toUpperCase() + normalizedFlagType.slice(1);
+  const flagText = `${prettyType} flag`;
+  let flagClass = `flag ${normalizedFlagType}`;
   
   if (record.categoryIds?.some((id: EventCategoryId) => props.selectedCategories?.has(id))) {
     flagClass += ' selected-category';
   }
 
-  const categoryList: EventCategory[] = props.categoryList || [];
   const categoryLookup = props.raceStateLookup.getCategoryById.bind(props.raceStateLookup);
+  const categoryText = categoriesTextFromLookupFn(record.categoryIds || [], categoryLookup);
   const elapsedTime = '--:--:--.---';
 
   return (<>
-    <TableRow className={flagClass} key={props.index}
-      onClick={(event: React.MouseEvent<HTMLTableRowElement, MouseEvent>) => {
+    <TableRow
+      className={flagClass}
+      data-record-id={record.id}
+      key={record.id || props.index}
+      onClick={() => {
         if (props.onSelect) {
           props.onSelect(record);
         }
       }}>
       <TableCell colSpan={3}>{record.sequence}{flagText}</TableCell>
       <TableCell colSpan={1}>{tableTimeString(record.time)}</TableCell>
-      <TableCell colSpan={4}>{categoriesTextFromLookupFn(record.categoryIds || [], categoryLookup)}</TableCell>
+      <TableCell colSpan={4}>{categoryText}</TableCell>
       <TableCell colSpan={2}>{elapsedTime}</TableCell>
     </TableRow>
   </>);
@@ -341,8 +340,6 @@ export const PassingRecordRow = (
 
 export const RecordRow = (props: RecentRecordRowProps) => {
   const flagRecordSelected = (record: FlagRecord): void => {
-    console.log('Flag record selected: ', record);
-
     if (props.categorySelected) {
       props.categorySelected(new Set<EventCategoryId>(record.categoryIds));
     }
@@ -366,7 +363,6 @@ export const RecordRow = (props: RecentRecordRowProps) => {
     passing = record as ParticipantPassingRecord;
 
     const passingRecordSelected = (passingRecord: ParticipantPassingRecord): void => {
-      console.log('Passing record selected: ', passingRecord);
       if (!passingRecord.participantId) {
         return;
       }
@@ -485,16 +481,6 @@ export const RecentRecords = (props: RecordsProps & {
   onExclude?: (crossingId: string, exclude: boolean) => void,
   onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void
 }) => {
-  const rowSelected = (record: EventTimeRecord): void => {
-    console.log('Row selected:', record);
-  }
-
-  const rowSelectedEvent = (event: React.MouseEvent<HTMLTableRowElement, MouseEvent>, record: EventTimeRecord) => {
-    console.log('Event: Row selected:', record);
-    // Handle row selection logic here, e.g., update state or call a callback
-    rowSelected(record);
-  }
-
   const [recentFirst, setRecentFirst] = React.useState<boolean>(false);
   const sortedRecords = (props.records || []).sort((a, b) => {
     if (recentFirst) {
@@ -515,9 +501,7 @@ export const RecentRecords = (props: RecordsProps & {
       <Select
         id="show-recent-type"
         defaultValue="all"
-        onChange={(e) => {
-          console.log('Selected type:', e.target.value);
-        }}
+        onChange={() => undefined}
         label="Record types">
         <MenuItem value="all">All records</MenuItem>
         <MenuItem value="category">Only selected category</MenuItem>
@@ -535,7 +519,6 @@ export const RecentRecords = (props: RecordsProps & {
         id="show-recent-order"
         defaultValue="oldest"
         onChange={(e) => {
-          console.log('Selected type:', e.target.value);
           if (e.target.value === 'recent') {
             setRecentFirst(true);
           } else {
@@ -552,9 +535,11 @@ export const RecentRecords = (props: RecordsProps & {
       !(sortedRecords.length > 0) ? <p>No records available.</p> :
         <Box sx={{ flexGrow: 1, width: '100%' }}>
           <TableContainer component={Paper}>
-            <Table component={Paper} stickyHeader sx={{ minWidth: 650 }} size="small">
+            <Table stickyHeader sx={{ minWidth: 650 }} size="small">
               <TableHead>
-                {headings.map((h) => <TableCell>{h}</TableCell>)}
+                <TableRow>
+                  {headings.map((heading) => <TableCell key={heading}>{heading}</TableCell>)}
+                </TableRow>
               </TableHead>
               <TableBody>
                 {sortedRecords.map((record, index) => (

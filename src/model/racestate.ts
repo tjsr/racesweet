@@ -1,4 +1,5 @@
 import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError, SessionStateError } from "../validators/errors.js";
+import type { EventEntrantId } from "./entrant.js";
 import type { EventCategory, EventCategoryId } from "./eventcategory.js";
 import type { EventParticipant, EventParticipantId } from "./eventparticipant.js";
 import type { FlagRecord, GreenFlagRecord } from "./flag.js";
@@ -22,9 +23,12 @@ export interface RaceStateLookup {
   getParticipantById(participantId: EventParticipantId): EventParticipant | undefined;
   getCategoryById(categoryId: EventCategoryId): EventCategory | undefined;
   getParticipantLaps(participantId: EventParticipantId): ParticipantPassingRecord[] | null | undefined;
+  getEntrantIdForParticipant(participantId: EventParticipantId): EventEntrantId | undefined;
   countTransponderCrossings(txNo: ChipCrossingData['chipCode'], untilTime?: Date): number;
   getTransponderCrossings(txNo: ChipCrossingData['chipCode'], untilTime?: Date): ChipCrossingData[];
   excludeCrossing(crossingId: TimeRecordId, exclude: boolean): void;
+  updateCategoryDetails(categoryId: EventCategoryId, changes: Partial<Pick<EventCategory, 'code' | 'description' | 'distance' | 'duration' | 'name' | 'startTime'>>): void;
+  updateEntrantCategory(entrantId: EventEntrantId, categoryId: EventCategoryId): void;
   updateParticipantCategory(participantId: EventParticipantId, categoryId: EventCategoryId): void;
 }
 
@@ -118,6 +122,10 @@ export class Session implements RaceState, RaceStateLookup {
       throw new InvalidIdError(`ParticipantId ${participantId} for participant lookup by Id is not a valid Id type.`);
     }
     return this._participants.get(participantId);
+  }
+
+  public getEntrantIdForParticipant(participantId: EventParticipantId): EventEntrantId | undefined {
+    return this.getParticipantById(participantId)?.entrantId;
   }
 
   // public getCategoryStartFlag(categoryId: EventCategoryId): FlagRecord | undefined {
@@ -326,6 +334,29 @@ export class Session implements RaceState, RaceStateLookup {
         });
 
       this.__reprocessParticipantLaps(participantId);
+    }
+  }
+
+  public updateCategoryDetails(categoryId: EventCategoryId, changes: Partial<Pick<EventCategory, 'code' | 'description' | 'distance' | 'duration' | 'name' | 'startTime'>>): void {
+    const category = this.getCategoryById(categoryId);
+    if (!category) {
+      throw new InvalidCategoryIdError(`Category with ID ${categoryId} does not exist.`);
+    }
+
+    Object.assign(category, changes);
+    this.__reprocessParticipantLapsForCategory(categoryId);
+  }
+
+  public updateEntrantCategory(entrantId: EventEntrantId, categoryId: EventCategoryId): void {
+    const participants = this.participants.filter((participant) => participant.entrantId?.toString() === entrantId.toString());
+
+    participants.forEach((participant) => {
+      this.updateParticipantCategory(participant.id, categoryId);
+    });
+
+    const team = this._teams.get(entrantId.toString());
+    if (team) {
+      team.categoryId = categoryId;
     }
   }
 

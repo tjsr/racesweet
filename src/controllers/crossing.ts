@@ -29,6 +29,7 @@ export const assignEntrantToPlateCrossing = (
   }
 
   crossing.participantId = entrant?.id;
+  crossing.entrantId = entrant?.entrantId || entrant?.id;
 };
 
 export const assignEntrantToTime = (
@@ -72,5 +73,6 @@ export const assignEntrantToChipCrossing = (
   }
 
   crossing.participantId = entrant?.id;
+  crossing.entrantId = entrant?.entrantId || entrant?.id;
 };
 

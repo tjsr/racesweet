@@ -72,6 +72,7 @@ export const createEntrantFromLap = (
   }
   const ep: Partial<EventParticipant> = {
     categoryId: categoryId,
+    entrantId: participantId,
     firstname: nameParts[0],
     id: participantId,
     surname: nameParts[1].toLocaleUpperCase(),
@@ -197,8 +198,9 @@ export const apiParticipantEntrantToEntrantData = (
   );
 
   results.participants.forEach((participant: EventParticipant) => {
-    if (team && team.members.includes(participant.id.toString())) {
+    if (team && !team.members.includes(participant.id.toString())) {
       team.members.push(participant.id.toString());
+      participant.entrantId = team.id;
     }
   });
 

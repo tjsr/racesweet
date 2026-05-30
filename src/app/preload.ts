@@ -2,7 +2,16 @@ import './state.ts';
 
 import { InvalidIpcChannelError, SendChannels } from '../model/electronIpcTypes.ts';
 import { IpcRendererEvent, contextBridge, ipcRenderer } from 'electron';
-import { ReadContentErrorIpcReceiveChannel, ReadContentIpcReceiveChannel, RequestReadIpcSendChannel, VALID_RECEIVE_CHANNELS, VALID_SEND_CHANNELS } from '../model/electronIpc.ts';
+import {
+  ReadContentErrorIpcReceiveChannel,
+  ReadContentIpcReceiveChannel,
+  RequestReadIpcSendChannel,
+  RequestWriteIpcSendChannel,
+  VALID_RECEIVE_CHANNELS,
+  VALID_SEND_CHANNELS,
+  WriteContentErrorIpcReceiveChannel,
+  WriteContentIpcReceiveChannel,
+} from '../model/electronIpc.ts';
 
 import { FileReadDataType } from './window.ts';
 
@@ -44,6 +53,22 @@ ipcRenderer.on(ReadContentErrorIpcReceiveChannel,
     }
   });
 
+ipcRenderer.on(WriteContentIpcReceiveChannel,
+  (event: IpcRendererEvent, eventId: string): void => {
+    if (eventCalls[eventId] !== undefined) {
+      eventCalls[eventId][0](undefined as never);
+      delete eventCalls[eventId];
+    }
+  });
+
+ipcRenderer.on(WriteContentErrorIpcReceiveChannel,
+  (event: IpcRendererEvent, eventId: string, error?: string|Error): void => {
+    if (eventCalls[eventId] !== undefined) {
+      eventCalls[eventId][1](error);
+      delete eventCalls[eventId];
+    }
+  });
+
 contextBridge.exposeInMainWorld(
   "api", {
     receive: (channel: string, func: (...args: unknown[]) => unknown): void => {
@@ -76,6 +101,13 @@ contextBridge.exposeInMainWorld(
           eventCalls[outgoingEventId] = [resolve, reject];
           ipcRenderer.send(RequestReadIpcSendChannel, filePath, outgoingEventId, dataType);
         });
+    },
+    writeFileContent: (filePath: string, contents: string): Promise<void> => {
+      return new Promise<void>((resolve, reject) => {
+        const outgoingEventId = crypto.randomUUID();
+        eventCalls[outgoingEventId] = [resolve as never, reject];
+        ipcRenderer.send(RequestWriteIpcSendChannel, filePath, outgoingEventId, contents);
+      });
     },
     send: (channel: SendChannels, ...args: unknown[]): void => {
       // whitelist channels

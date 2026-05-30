@@ -240,6 +240,7 @@ const createEntrantWithChipCode = (
   const createdEntrant: EventParticipant = {
     categoryId: cat.id,
     currentResult: undefined,
+    entrantId: entrantId,
     firstname: `Entrant ${chipCode}`,
     id: entrantId,
     identifiers: [],
@@ -270,6 +271,7 @@ export const createEntrant = (
   const createdEntrant: Partial<EventParticipant> = {
     categoryId: cat.id,
     currentResult: undefined,
+    entrantId: entrantId,
     id: entrantId,
     identifiers: [],
     lastRecordTime: null,
