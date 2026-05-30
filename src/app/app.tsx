@@ -259,6 +259,9 @@ export const RaceSweetMainApp = () => {
     });
 
     const timers = liveSources.map((source) => {
+      applySourceToSessionState(selectedSessionsEventId, source).catch((error: unknown) => {
+        setErrorState(error as Error);
+      });
       const intervalMs = Math.max(1, source.apiConfig!.pollIntervalSeconds) * 1000;
       return window.setInterval(() => {
         applySourceToSessionState(selectedSessionsEventId, source).catch((error: unknown) => {
