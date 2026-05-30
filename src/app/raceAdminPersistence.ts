@@ -18,11 +18,18 @@ export const createDefaultAdministrativeChanges = (): AdministrativeChanges => (
   schemaVersion: 1,
 });
 
+const isFileNotFoundError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('ENOENT') || message.includes('no such file');
+};
+
 export class ElectronJsonRaceAdminPersistence implements RaceAdminPersistence {
   private readonly filePath: string;
+  private readonly onError: ((error: unknown) => void) | undefined;
 
-  public constructor(filePath: string) {
+  public constructor(filePath: string, onError?: (error: unknown) => void) {
     this.filePath = filePath;
+    this.onError = onError;
   }
 
   public async load(): Promise<AdministrativeChanges> {
@@ -37,7 +44,13 @@ export class ElectronJsonRaceAdminPersistence implements RaceAdminPersistence {
         excludedCrossings: parsed.excludedCrossings || {},
         schemaVersion: 1,
       };
-    } catch (_error: unknown) {
+    } catch (error: unknown) {
+      if (isFileNotFoundError(error)) {
+        console.info(`Admin overrides file not found at ${this.filePath}, using defaults.`);
+      } else {
+        console.error(`Failed to load admin overrides from ${this.filePath}:`, error);
+        this.onError?.(error);
+      }
       return createDefaultAdministrativeChanges();
     }
   }

@@ -42,11 +42,11 @@ const appSections: Array<{ icon: string; id: AppSection; label: string }> = [
   { icon: 'RPT', id: 'Reports', label: 'Reports' },
 ];
 
-const loadAdminService = async (): Promise<RaceAdminService> => {
+const loadAdminService = async (onError?: (error: unknown) => void): Promise<RaceAdminService> => {
   const apicalSession: TestSession = new ApicalElectronFile();
   const eventSession: TestSession = apicalSession; // undefined!; // rfidSession;
 
-  const persistence = new ElectronJsonRaceAdminPersistence('../../src/generated/admin-overrides.json');
+  const persistence = new ElectronJsonRaceAdminPersistence('../../src/generated/admin-overrides.json', onError);
 
   return RaceAdminService.create(async () => {
     await eventSession.loadTestData(false);
@@ -55,13 +55,13 @@ const loadAdminService = async (): Promise<RaceAdminService> => {
   }, persistence);
 };
 
-const loadEventCatalogService = async (): Promise<EventCatalogService> => {
-  const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json');
+const loadEventCatalogService = async (onError?: (error: unknown) => void): Promise<EventCatalogService> => {
+  const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json', onError);
   return EventCatalogService.create(persistence);
 };
 
-const loadSystemConfigService = async (): Promise<SystemConfigService> => {
-  const persistence = new ElectronJsonSystemConfigPersistence('../../src/generated/system-config.json');
+const loadSystemConfigService = async (onError?: (error: unknown) => void): Promise<SystemConfigService> => {
+  const persistence = new ElectronJsonSystemConfigPersistence('../../src/generated/system-config.json', onError);
   return SystemConfigService.create(persistence);
 };
 
@@ -85,6 +85,7 @@ export const RaceSweetMainApp = () => {
   const [sessionState, setSessionState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [, setRenderTick] = useState(0);
   const [errorState, setErrorState] = useState<Error|undefined>(undefined);
+  const [loadWarnings, setLoadWarnings] = useState<string[]>([]);
   const [selectedCategories, setCategorySelected] = useState<Set<EventCategoryId>>(new Set<EventCategoryId>());
   const [selectedCategoryId, setSelectedCategoryId] = useState<string|undefined>(undefined);
   const [selectedCategoriesEventId, setSelectedCategoriesEventId] = useState<string|undefined>(undefined);
@@ -98,7 +99,13 @@ export const RaceSweetMainApp = () => {
 
   useEffect(() => {
     if (!sessionState && !eventCatalogState && !errorState) {
-      Promise.all([loadAdminService(), loadEventCatalogService(), loadSystemConfigService()]).then(([raceService, catalogService, systemService]) => {
+      const warnings: string[] = [];
+      const onLoadError = (error: unknown): void => {
+        const message = error instanceof Error ? error.message : String(error);
+        warnings.push(message);
+      };
+
+      Promise.all([loadAdminService(onLoadError), loadEventCatalogService(onLoadError), loadSystemConfigService(onLoadError)]).then(([raceService, catalogService, systemService]) => {
         const session = raceService.raceState;
         const initialCatalog = catalogService.catalog;
         const initialSystemConfig = systemService.state;
@@ -136,6 +143,7 @@ export const RaceSweetMainApp = () => {
           setSelectedSessionsEventId(initialEventId);
           setSelectedSessionId(sessionList[0]?.id);
           setErrorState(undefined);
+          setLoadWarnings(warnings);
         };
 
         if (shouldSyncScaffold) {
@@ -712,6 +720,17 @@ export const RaceSweetMainApp = () => {
 
   return (
     <div className="app-shell">
+      {loadWarnings.length > 0 && (
+        <div className="load-warnings" role="alert" aria-label="Load warnings">
+          <strong>Warnings:</strong>
+          <ul>
+            {loadWarnings.map((warning, index) => (
+              <li key={index}>{warning}</li>
+            ))}
+          </ul>
+          <button type="button" onClick={() => setLoadWarnings([])}>Dismiss</button>
+        </div>
+      )}
       <nav className="section-nav" aria-label="Application sections">
         {appSections.map((section) => {
           const isActive = activeSection === section.id;
