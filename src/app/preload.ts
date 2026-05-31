@@ -102,13 +102,6 @@ contextBridge.exposeInMainWorld(
           ipcRenderer.send(RequestReadIpcSendChannel, filePath, outgoingEventId, dataType);
         });
     },
-    writeFileContent: (filePath: string, contents: string): Promise<void> => {
-      return new Promise<void>((resolve, reject) => {
-        const outgoingEventId = crypto.randomUUID();
-        eventCalls[outgoingEventId] = [resolve as never, reject];
-        ipcRenderer.send(RequestWriteIpcSendChannel, filePath, outgoingEventId, contents);
-      });
-    },
     send: (channel: SendChannels, ...args: unknown[]): void => {
       // whitelist channels
       if (VALID_SEND_CHANNELS.includes(channel)) {
@@ -116,6 +109,13 @@ contextBridge.exposeInMainWorld(
       } else {
         throw new InvalidIpcChannelError(channel);
       }
+    },
+    writeFileContent: (filePath: string, contents: string): Promise<void> => {
+      return new Promise<void>((resolve, reject) => {
+        const outgoingEventId = crypto.randomUUID();
+        eventCalls[outgoingEventId] = [resolve as never, reject];
+        ipcRenderer.send(RequestWriteIpcSendChannel, filePath, outgoingEventId, contents);
+      });
     },
   }
 );

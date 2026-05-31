@@ -2,8 +2,8 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { createDefaultEventCatalogLedger } from './eventCatalog.js';
 import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.js';
+import { createDefaultEventCatalogLedger } from './eventCatalog.js';
 
 describe('ElectronJsonEventCatalogPersistence', () => {
   it('returns default ledger when file does not exist', async () => {
@@ -60,7 +60,7 @@ describe('ElectronJsonEventCatalogPersistence', () => {
 
   it('returns parsed ledger when file exists and is valid', async () => {
     const ledgerData = {
-      mutations: [{ id: 'mut-1', timestamp: '2025-01-01T00:00:00.000Z', type: 'event-activated', eventId: 'evt-1' }],
+      mutations: [{ eventId: 'evt-1', id: 'mut-1', timestamp: '2025-01-01T00:00:00.000Z', type: 'event-activated' }],
       schemaVersion: 1,
     };
 

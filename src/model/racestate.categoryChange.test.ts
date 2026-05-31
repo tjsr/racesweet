@@ -1,9 +1,9 @@
 import type { EventCategory } from './eventcategory.js';
 import type { EventParticipant } from './eventparticipant.js';
 import type { ParticipantPassingRecord } from './timerecord.js';
-import { createGreenFlagEvent } from '../controllers/flag.js';
 import { RECORD_TX_CROSSING } from './timerecord.js';
 import { Session } from './racestate.js';
+import { createGreenFlagEvent } from '../controllers/flag.js';
 
 const createCategory = (id: string, name: string): EventCategory => {
   return { id, name };

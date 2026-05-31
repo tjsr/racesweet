@@ -1,5 +1,3 @@
-import { describe, expect, it, vi } from 'vitest';
-
 import {
   applyEventCatalogLedger,
   createDefaultEventCatalogLedger,
@@ -8,8 +6,9 @@ import {
   getEntrantsForEvent,
   getSessionsForEvent,
 } from './eventCatalog.js';
-import { EventCatalogService } from './eventCatalogService.js';
+import { describe, expect, it, vi } from 'vitest';
 import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
+import { EventCatalogService } from './eventCatalogService.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 
 const createPersistence = (initial = createDefaultEventCatalogLedger()): EventCatalogPersistence => {

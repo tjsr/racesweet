@@ -1,6 +1,6 @@
 import {
-  createDefaultSystemConfiguration,
   type SystemConfiguration,
+  createDefaultSystemConfiguration,
 } from './systemConfig.js';
 
 export interface SystemConfigPersistence {

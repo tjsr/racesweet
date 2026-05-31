@@ -1,11 +1,11 @@
+import {
+  type AdministrativeChanges,
+  type RaceAdminPersistence,
+  createDefaultAdministrativeChanges,
+} from './raceAdminPersistence.js';
 import type { EventCategoryId } from '../model/eventcategory.js';
 import type { EventEntrantId } from '../model/entrant.js';
 import { RaceAdminService } from './raceAdminService.js';
-import {
-  createDefaultAdministrativeChanges,
-  type AdministrativeChanges,
-  type RaceAdminPersistence,
-} from './raceAdminPersistence.js';
 
 const createSessionDouble = () => {
   const excluded: Record<string, boolean> = {};
@@ -20,7 +20,7 @@ const createSessionDouble = () => {
     },
   };
 
-  return { excluded, entrantCategories, session };
+  return { entrantCategories, excluded, session };
 };
 
 class MemoryPersistence implements RaceAdminPersistence {

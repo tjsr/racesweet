@@ -1,5 +1,5 @@
-import type { EventCategoryId } from '../model/eventcategory.js';
 import type { EventParticipant, EventParticipantId } from '../model/eventparticipant.js';
+import type { EventCategoryId } from '../model/eventcategory.js';
 
 export const selectedCategoriesForParticipants = (
   participantIds: Set<EventParticipantId>,

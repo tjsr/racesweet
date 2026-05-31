@@ -1,16 +1,15 @@
 import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
-import type { EventEntrantId } from "../model/entrant.js";
 import type { FlagRecord, GreenFlagRecord } from "../model/flag.js";
-import { EVENT_SESSION_END } from "../model/timerecord.js";
 import type { ParticipantPassingRecord, TimeRecord } from "../model/timerecord.js";
 import { ParticipantStartFlagError, StartFlagHasNoTimeError } from "../validators/errors.js";
 import { calculateParticipantElapsedTimes, getParticipantNumber, getParticipantTransponders, getPassingsForParticipant } from "./participant.js";
 import { elapsedTimeMilliseconds, millisecondsToTime } from "../app/utils/timeutils.js";
 import { getCategoryFlags, getFlagEvents, getOrCacheGreenFlagForCategory } from "./flag.js";
 import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.js";
-import { compareByTime } from './timerecord.js';
-
+import { EVENT_SESSION_END } from "../model/timerecord.js";
 import type { EventCategoryId } from "../model/eventcategory.js";
+import type { EventEntrantId } from "../model/entrant.js";
+import { compareByTime } from './timerecord.js';
 import { entrantHasAnyTx } from "./participantMatch.js";
 import { setCategoryStartForPassings } from "./category.js";
 import { warn } from "../utils.js";

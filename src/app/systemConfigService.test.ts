@@ -1,8 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
-
 import { createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.js';
-import { SystemConfigService } from './systemConfigService.js';
+import { describe, expect, it, vi } from 'vitest';
 import type { SystemConfigPersistence } from './systemConfigPersistence.js';
+import { SystemConfigService } from './systemConfigService.js';
 
 const createPersistence = (initial = createDefaultSystemConfiguration()): SystemConfigPersistence => {
   let config = initial;

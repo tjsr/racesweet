@@ -1,6 +1,6 @@
 import {
-  createDefaultEventCatalogLedger,
   type EventCatalogLedger,
+  createDefaultEventCatalogLedger,
 } from './eventCatalog.js';
 
 export interface EventCatalogPersistence {

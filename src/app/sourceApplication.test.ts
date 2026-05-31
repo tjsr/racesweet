@@ -1,9 +1,8 @@
+import { applyPulledRaceStateToSession, getCategoriesToAdd } from './sourceApplication.js';
 import { describe, expect, it, vi } from 'vitest';
-
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { TimeRecord } from '../model/timerecord.js';
-import { applyPulledRaceStateToSession, getCategoriesToAdd } from './sourceApplication.js';
 
 const existingCategories: EventCategory[] = [
   {
@@ -68,7 +67,7 @@ describe('sourceApplication', () => {
         categories: incomingCategoriesWithDuplicates,
         participants: [],
         records: [],
-      },
+      }
     );
 
     expect(addCategories).toHaveBeenCalledTimes(1);
@@ -102,8 +101,8 @@ describe('sourceApplication', () => {
           categories: incomingCategoriesWithDuplicates,
           participants: [],
           records: [],
-        },
-      ),
+        }
+      )
     ).resolves.toBeUndefined();
 
     expect(addParticipants).toHaveBeenCalledTimes(1);

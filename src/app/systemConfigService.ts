@@ -1,10 +1,10 @@
 import {
-  createDefaultSystemConfiguration,
-  getDataSourceTypeLabel,
   type DataSourceConfig,
   type DataSourceType,
   type SessionSourceAssignment,
   type SystemConfiguration,
+  createDefaultSystemConfiguration,
+  getDataSourceTypeLabel,
 } from './systemConfig.js';
 import type { SystemConfigPersistence } from './systemConfigPersistence.js';
 
@@ -108,7 +108,7 @@ export class SystemConfigService {
         Object.entries(this.config.eventSourceAssignments).map(([eventId, sourceIds]) => [
           eventId,
           sourceIds.filter((id) => id !== sourceId),
-        ]),
+        ])
       ),
       sessionSourceAssignments: Object.fromEntries(
         Object.entries(this.config.sessionSourceAssignments).map(([sessionId, assignment]) => [
@@ -117,7 +117,7 @@ export class SystemConfigService {
             ...assignment,
             sourceIds: assignment.sourceIds.filter((id) => id !== sourceId),
           },
-        ]),
+        ])
       ),
     };
     await this.persist();

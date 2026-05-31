@@ -1,12 +1,11 @@
-import type { EventCategoryId } from '../model/eventcategory.js';
-import type { EventEntrantId } from '../model/entrant.js';
-import type { RaceStateLookup, Session } from '../model/racestate.js';
-
 import {
-  createDefaultAdministrativeChanges,
   type AdministrativeChanges,
   type RaceAdminPersistence,
+  createDefaultAdministrativeChanges,
 } from './raceAdminPersistence.js';
+import type { RaceStateLookup, Session } from '../model/racestate.js';
+import type { EventCategoryId } from '../model/eventcategory.js';
+import type { EventEntrantId } from '../model/entrant.js';
 
 export class RaceAdminService {
   private changes: AdministrativeChanges;
@@ -21,7 +20,7 @@ export class RaceAdminService {
 
   public static async create(
     sessionLoader: () => Promise<Session & RaceStateLookup>,
-    persistence: RaceAdminPersistence,
+    persistence: RaceAdminPersistence
   ): Promise<RaceAdminService> {
     const session = await sessionLoader();
     const changes = await persistence.load();

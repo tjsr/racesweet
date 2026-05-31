@@ -63,7 +63,7 @@ const authenticateSession = async (source: DataSourceConfig): Promise<string | u
       headers,
       method: 'GET',
     }),
-    apiConfig.httpTimeoutSeconds * 1000,
+    apiConfig.httpTimeoutSeconds * 1000
   );
 
   if (!response.ok) {
@@ -87,7 +87,7 @@ export const fetchApicalEvents = async (source: DataSourceConfig): Promise<Apica
       headers,
       method: 'GET',
     }),
-    source.apiConfig.httpTimeoutSeconds * 1000,
+    source.apiConfig.httpTimeoutSeconds * 1000
   );
 
   if (!response.ok) {
@@ -118,7 +118,7 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
       headers,
       method: 'GET',
     }),
-    source.apiConfig.httpTimeoutSeconds * 1000,
+    source.apiConfig.httpTimeoutSeconds * 1000
   );
 
   if (!response.ok) {
