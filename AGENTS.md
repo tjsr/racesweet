@@ -1,6 +1,14 @@
 # RaceSweet Agent instructions
 
+## Branches
+
+Always make sure when opening a terminal that we know firstly whether it is is a bash, powershell or cmd terminal first, then determine the version so that only commands and syntax valid for that format are attempted.
+
+Then, whenever we create a new branch for an agent to work in, make sure the first thing we do is run `npm i` so that dependencies are installed.
+
 ## Typescript style
+
+New agents should always run `npm i` before trying to run any kind of code or tests.
 
 When writing Typescript, always prefer arrow functions over regular functions.
 
