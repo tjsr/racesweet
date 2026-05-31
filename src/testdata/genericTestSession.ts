@@ -1,8 +1,10 @@
-import type { RaceState } from "../model/racestate.ts";
-import { Session } from "../model/racestate.ts";
-import type { TestSession } from "./testsession.ts";
+import type { RaceState } from "../model/racestate.js";
+import { Session } from "../model/racestate.js";
+import type { TestSession } from "./testsession.js";
 
 export abstract class GenericTestSession extends Session implements TestSession {
+  // private _resourceProvider: RP | undefined;
+
   public constructor(raceState?: RaceState) {
     super(raceState || {
       categories: [],
@@ -11,6 +13,28 @@ export abstract class GenericTestSession extends Session implements TestSession 
       teams: [],
     });
   };
+
+  // public set resourceProvider(provider: RP) {
+  //   this._resourceProvider = provider;
+  // }
+
+  // protected getResource(resource: string): Promise<ResourceType> {
+  //   if (!this.resourceProvider) {
+  //     throw new Error("Resource provider is not set for the test session.");
+  //   }
+  //   return this.resourceProvider.getResource(resource);
+  // }
+
+  // protected getJsonResource(fileName: string): Promise<unknown> {
+  //   return this.getResource(fileName);
+  //   // const resourcePath = this.getResourcePath(fileName);
+  //   // return this.resourceProvider.iterateFile(resourcePath)
+  //   //   .then((data: string) => JSON.parse(data))
+  //   //   .catch((error: unknown) => {
+  //   //     console.error(`Error reading JSON resource from ${resourcePath}:`, error);
+  //   //     throw error;
+  //   //   });
+  // };
 
   public abstract loadCategories(): Promise<void>;
   public abstract loadParticipants(): Promise<void>;
@@ -23,6 +47,7 @@ export abstract class GenericTestSession extends Session implements TestSession 
     if (!noBulkProcess) {
       initPromise = this.beginBulkProcess();
     }
+    console.debug('Loading test data...');
     return initPromise
       .then(() => this.loadCategories().then(() => {
         console.log(`Loaded ${this.categories.length} categories successfully.`);
@@ -44,6 +69,7 @@ export abstract class GenericTestSession extends Session implements TestSession 
       })
       .catch((error: unknown) => {
         console.log('Error loading test data:', error);
+        throw error;
       });
   }
 }

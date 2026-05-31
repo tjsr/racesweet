@@ -1,19 +1,24 @@
-import { GenericTestSession } from "./genericTestSession.ts";
+import { GenericTestSession } from "./genericTestSession.js";
 import type { PathLike } from "fs";
-import type { RaceState } from "../model/racestate.ts";
-import type { TestSession } from "./testsession.ts";
-import type { TimeRecord } from "../model/timerecord.ts";
-import { createGreenFlagEvent } from "../controllers/flag.ts";
-import { getTestFilePath } from "../testing/testDataFiles.ts";
-import { loadCategoriesFromJsonFile } from "../controllers/category.ts";
-import { parseFile } from "../parsers/rfidtiming.ts";
+import type { RaceState } from "../model/racestate.js";
+import { ResourceProvider } from "../controllers/resource/provider.js";
+import { RfidResourceProvider } from "../controllers/resource/rfid.js";
+import type { TestSession } from "./testsession.js";
+import { createGreenFlagEvent } from "../controllers/flag.js";
+import { getTestFilePath } from "../testing/testDataFiles.js";
+import { loadCategoriesFromJsonFile } from '../controllers/import.ts';
 
 const TEST_CROSSINGS_DATA_FILE = 'rfid-2025-06-06.txt';
 const CATEGORIES_TEST_FILE = '2025-06-06-categories.json';
 
 export class RfidIndividualTestRace extends GenericTestSession implements TestSession {
-  constructor(raceState?: RaceState) {
+  private _resourceProvider: ResourceProvider<Buffer>;
+  private _rfidProvider: RfidResourceProvider;
+  
+  constructor(resourceProvider: ResourceProvider<Buffer>, raceState?: RaceState) {
     super(raceState);
+    this._resourceProvider = resourceProvider;
+    this._rfidProvider = new RfidResourceProvider(resourceProvider);
   }
   
   createGreenFlagTestRecords(): Promise<void> {
@@ -60,10 +65,12 @@ export class RfidIndividualTestRace extends GenericTestSession implements TestSe
     ]);
     return Promise.resolve();
   }
-
+  
   public async loadCrossings(): Promise<void> {
-    const filePath = getTestFilePath(TEST_CROSSINGS_DATA_FILE);
-    return parseFile(filePath, new Date('2025-06-06T19:00:00+10:00'))
-      .then((records: TimeRecord[]) => super.addRecords(records));
+    return this._rfidProvider
+      .getResource(TEST_CROSSINGS_DATA_FILE, new Date('2025-06-06T19:00:00+10:00'))
+      .then((records) => {
+        return super.addRecords(records);
+      });
   }
 }

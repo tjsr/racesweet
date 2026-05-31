@@ -1,9 +1,9 @@
-import { DateParseError, InvalidMonthError, InvalidYearError } from "./errors.ts";
+import { DateParseError, InvalidMonthError, InvalidYearError } from "./errors.js";
 
 import { TZDate } from "@date-fns/tz/date";
 import { expandTwoDigitYear } from "./datestring.js";
 import { formatRFC3339 } from "date-fns";
-import { parseRfidTimingDate } from "../rfidTimingDate.ts";
+import { parseRfidTimingDate } from "../rfidtiming/rfidTimingDate.js";
 import { toZonedTime } from "date-fns-tz";
 
 // import { toZonedTime } from "@date-fns/tz";

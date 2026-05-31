@@ -1,5 +1,5 @@
-import type { EventCategoryId } from "./eventcategory.ts";
-import type { IdType } from "./types.ts";
+import type { EventCategoryId } from "./eventcategory.js";
+import type { IdType } from "./types.js";
 
 export type EventEntrantId = IdType;
 

@@ -1,4 +1,4 @@
-import type { TimeRecord } from "./timerecord.ts";
+import type { TimeRecord } from "./timerecord.js";
 
 class DataImportError extends Error {
   constructor(message: string) {
@@ -10,13 +10,6 @@ export class ParticipantSpreadsheetError extends DataImportError {
   constructor(message: string) {
     super(message);
     this.name = "ParticipantSpreadsheetError";
-  }
-}
-
-export class ColumnNotInSpreadsheetError extends ParticipantSpreadsheetError {
-  constructor(message: string) {
-    super(message);
-    this.name = "ColumnNotInSpreadsheetError";
   }
 }
 

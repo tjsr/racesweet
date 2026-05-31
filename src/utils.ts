@@ -1,7 +1,7 @@
-import type { IdType, WithId } from "./model/types.ts";
-import type { uuid, uuid5 } from "./parsers/outreach.ts";
+import type { IdType, WithId } from "./model/types.js";
+import type { uuid, uuid5 } from "./parsers/outreach.js";
 
-import { DateParseError } from "./parsers/date/errors.ts";
+import { DateParseError } from "./parsers/date/errors.js";
 import { v5 } from "uuid";
 
 export const safeIntOption = (...values: string[]): number | undefined => {

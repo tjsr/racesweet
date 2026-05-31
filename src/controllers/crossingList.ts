@@ -1,4 +1,4 @@
-import type { TimeRecord } from "../model/timerecord.ts";
+import type { TimeRecord } from "../model/timerecord.js";
 
 export const assertValidTimeRecord = (event: TimeRecord): void => {
   if (!event) {

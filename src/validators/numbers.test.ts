@@ -1,4 +1,4 @@
-import { validatePositiveNumbers } from "./numbers.ts";
+import { validatePositiveNumbers } from "./numbers.js";
 
 describe("validatePositiveNumbers", () => {
   it("should not throw an error for valid positive numbers", () => {

@@ -1,11 +1,10 @@
 import type { EventCategory, EventCategoryId, PlaceholderCategory } from '../model/eventcategory.ts';
-import type { EventId, IdType } from "../model/types.ts";
+import type { EventId, IdType } from "../model/types.js";
 import type { ParticipantPassingRecord, PassingRecordId, TimeRecord } from '../model/timerecord.ts';
 import { elapsedTimeMilliseconds, getElapsedTimeStart, millisecondsToTime } from '../app/utils/timeutils.ts';
+
 import { CategoryCreateError } from '../model/errors/category.ts';
 import type { FlagRecord } from '../model/flag.ts';
-import { type PathLike } from "fs";
-import fs from 'fs/promises';
 import { v5 as uuidv5 } from 'uuid';
 
 type CategoryId = IdType;
@@ -60,9 +59,6 @@ export const findOrCreateCategory  = (
 export const getCategoryList = (): EventCategory[] => {
   return categories as EventCategory[];
 };
-
-export const loadCategoriesFromJsonFile = async (path: PathLike): Promise<EventCategory[]> =>
-  fs.readFile(path, 'utf8').then(cats => JSON.parse(cats) as EventCategory[]);
 
 export const calculateCategoryElapsedTime = (
   lap: TimeRecord,
@@ -134,6 +130,48 @@ export const setCategoryStartForPassings = (
   });
 };
 
+const categoryOrIdWithWarning = (catId: EventCategoryId, category: EventCategory | undefined): string => {
+  if (category) {
+    return category.name;
+  } else {
+    console.trace(`Category with ID ${catId} not found in categories list.`);
+  }
+  return `&${catId}`;
+};
+
+export const categoryTextFromLookupFn = (
+  eventCategoryId: EventCategoryId,
+  lookupFn: (id: EventCategoryId) => EventCategory | undefined
+): string => {
+  const category = lookupFn(eventCategoryId);
+  return categoryOrIdWithWarning(eventCategoryId, category);
+};
+
+export const categoriesTextFromLookupFn = (
+  selectedCategories: EventCategoryId[],
+  lookupFn: (id: EventCategoryId) => EventCategory | undefined
+): string => {
+  if ((selectedCategories?.length || 0) === 0) {
+    return 'All categories';
+  }
+  return selectedCategories.map((catId: EventCategoryId) => {
+    return categoryTextFromLookupFn(catId, lookupFn);
+  }).join(', ');
+};
+
+export const categoryTextStringFromMap = (
+  selectedCategories: EventCategoryId[],
+  categories: Map<EventCategoryId, EventCategory>
+): string => {
+  if ((selectedCategories?.length || 0) === 0) {
+    return 'All categories';
+  }
+  return selectedCategories.map((catId: EventCategoryId) => {
+    const category = categories.get(catId);
+    return categoryOrIdWithWarning(catId, category);
+  }).join(', ');
+};
+
 export const categoryTextString = (
   selectedCategories: EventCategoryId[],
   categories: EventCategory[]
@@ -145,12 +183,7 @@ export const categoryTextString = (
     const category = categories.find(
       (search: EventCategory) => search.id?.toString() === catId.toString()
     );
-    if (category) {
-      return category.name;
-    } else {
-      console.trace(`Category with ID ${catId} not found in categories list.`);
-    }
-    return `&${catId}`;
+    return categoryOrIdWithWarning(catId, category);
   }).join(', ');
 };
 

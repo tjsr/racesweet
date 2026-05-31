@@ -1,12 +1,12 @@
-import type { ChipCrossingData } from "../model/chipcrossing.ts";
+import type { ChipCrossingData } from "../model/chipcrossing.js";
 import type { PathLike } from "node:fs";
-import type { TimeRecord } from "../model/timerecord.ts";
-import { createIdHash } from "../utils.ts";
-import { fromRfidTimingLine } from "./rfidtiming.js";
-import { getSequenceNumber } from "../app/utils/sequence.ts";
+import type { TimeRecord } from "../model/timerecord.js";
+import { createIdHash } from "../utils.js";
+import { fromRfidTimingLine } from "./rfidtiming/rfidtiming.js";
+import { getSequenceNumber } from "../app/utils/sequence.js";
 import { open } from 'node:fs/promises';
 import { parseLineMatching } from "./genericLineMatcher.js";
-import { parseUnparsedChipCrossings } from "./genericTimeParser.ts";
+import { parseUnparsedChipCrossings } from "./genericTimeParser.js";
 import { v5 as uuidv5 } from 'uuid';
 
 const MAX_ERRORS = 20;
@@ -32,6 +32,8 @@ export const parseSimpleOutreachChipLine = (
   return {
     ...crossingLine,
     chipCode: crossingLine.chipCode!,
+    eventId: undefined,
+    participantId: undefined,
     recordType: 0,
     sequence: getSequenceNumber(),
     timeString: crossingLine.timeString!,

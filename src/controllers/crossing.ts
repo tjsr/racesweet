@@ -1,11 +1,11 @@
-import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.ts";
-import { assignParticipantNumber, createEntrant, createEntrantForUnmatchedChipCode } from "./participant.ts";
-import { findEntrantByChipCode, findEntrantByPlateNumber } from "./participantSearch.ts";
+import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
+import { assignParticipantNumber, createEntrant, createEntrantForUnmatchedChipCode } from "./participant.js";
+import { findEntrantByChipCode, findEntrantByPlateNumber } from "./participantSearch.js";
 
-import type { ChipCrossingData } from "../model/chipcrossing.ts";
-import type { EventCategory } from "../model/eventcategory.ts";
-import type { PlateCrossingData } from "../model/platecrossing.ts";
-import type { TimeRecord } from "../model/timerecord.ts";
+import type { ChipCrossingData } from "../model/chipcrossing.js";
+import type { EventCategory } from "../model/eventcategory.js";
+import type { PlateCrossingData } from "../model/platecrossing.js";
+import type { TimeRecord } from "../model/timerecord.js";
 import { validateCategoriesToCreate } from '../validators/categories.ts';
 
 export const assignEntrantToPlateCrossing = (
@@ -29,6 +29,7 @@ export const assignEntrantToPlateCrossing = (
   }
 
   crossing.participantId = entrant?.id;
+  crossing.entrantId = entrant?.entrantId || entrant?.id;
 };
 
 export const assignEntrantToTime = (
@@ -72,5 +73,6 @@ export const assignEntrantToChipCrossing = (
   }
 
   crossing.participantId = entrant?.id;
+  crossing.entrantId = entrant?.entrantId || entrant?.id;
 };
 

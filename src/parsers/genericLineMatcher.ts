@@ -1,7 +1,7 @@
-import type { ChipCrossingData } from "../model/chipcrossing.ts";
+import type { ChipCrossingData } from "../model/chipcrossing.js";
 import { TZDate } from "@date-fns/tz";
 import { parse } from "date-fns";
-import { parseUnknownDateTimeString } from "./date/datetime.ts";
+import { parseUnknownDateTimeString } from "./date/datetime.js";
 
 // import type { UnparsedChipCrossingData } from "../model/chipcrossing.ts";
 

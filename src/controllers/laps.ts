@@ -1,16 +1,19 @@
-import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.ts";
-import type { FlagRecord, GreenFlagRecord } from "../model/flag.ts";
-import type { ParticipantPassingRecord, TimeRecord } from "../model/timerecord.ts";
-import { ParticipantStartFlagError, StartFlagHasNoTimeError } from "../validators/errors.ts";
-import { calculateParticipantElapsedTimes, getParticipantNumber, getParticipantTransponders, getPassingsForParticipant } from "./participant.ts";
-import { elapsedTimeMilliseconds, millisecondsToTime } from "../app/utils/timeutils.ts";
-import { getFlagEvents, getOrCacheGreenFlagForCategory } from "./flag.ts";
-import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.ts";
+import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
+import type { EventEntrantId } from "../model/entrant.js";
+import type { FlagRecord, GreenFlagRecord } from "../model/flag.js";
+import { EVENT_SESSION_END } from "../model/timerecord.js";
+import type { ParticipantPassingRecord, TimeRecord } from "../model/timerecord.js";
+import { ParticipantStartFlagError, StartFlagHasNoTimeError } from "../validators/errors.js";
+import { calculateParticipantElapsedTimes, getParticipantNumber, getParticipantTransponders, getPassingsForParticipant } from "./participant.js";
+import { elapsedTimeMilliseconds, millisecondsToTime } from "../app/utils/timeutils.js";
+import { getCategoryFlags, getFlagEvents, getOrCacheGreenFlagForCategory } from "./flag.js";
+import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.js";
+import { compareByTime } from './timerecord.js';
 
-import type { EventCategoryId } from "../model/eventcategory.ts";
-import { entrantHasAnyTx } from "./participantMatch.ts";
-import { setCategoryStartForPassings } from "./category.ts";
-import { warn } from "../utils.ts";
+import type { EventCategoryId } from "../model/eventcategory.js";
+import { entrantHasAnyTx } from "./participantMatch.js";
+import { setCategoryStartForPassings } from "./category.js";
+import { warn } from "../utils.js";
 
 const MINIMUM_LAP_TIME_SECONDS = 300;
 
@@ -60,6 +63,8 @@ export const processAllParticipantLaps = (
   silenceWarnings: boolean = false
 ): Map<EventParticipantId, ParticipantPassingRecord[]> => {
   const participantTimesMap = new Map<EventParticipantId, ParticipantPassingRecord[]>();
+  const entrantParticipantMap = new Map<EventEntrantId, EventParticipant[]>();
+  const entrantPassingsMap = new Map<EventEntrantId, ParticipantPassingRecord[]>();
   const eventFlags: FlagRecord[] = getFlagEvents(allTimeRecords);
 
   if (!silenceWarnings && (!eventFlags || eventFlags.length === 0)) {
@@ -69,6 +74,24 @@ export const processAllParticipantLaps = (
   }
 
   const categoryEventFlags: Map<EventCategoryId, GreenFlagRecord> = new Map<EventCategoryId, GreenFlagRecord>();
+
+  const getFinishFlagForCategory = (categoryId: EventCategoryId): FlagRecord | undefined => {
+    return getCategoryFlags(eventFlags, categoryId)
+      .filter((flag) => flag.time !== undefined)
+      .filter((flag) => {
+        const normalizedType = (flag.flagType || '').toLowerCase();
+        return normalizedType === 'chequered' || normalizedType === 'checkered' || (flag.recordType & EVENT_SESSION_END) > 0;
+      })
+      .sort(compareByTime)[0];
+  };
+
+  eventParticipants.forEach((participant) => {
+    const entrantId = participant.entrantId || participant.id;
+    const entrantParticipants = entrantParticipantMap.get(entrantId) || [];
+    entrantParticipants.push(participant);
+    entrantParticipantMap.set(entrantId, entrantParticipants);
+  });
+
   eventParticipants.forEach((participant, participantId) => {
     if (!participant.categoryId) {
       console.error(`Participant ${participantId} has no category ID`);
@@ -83,6 +106,20 @@ export const processAllParticipantLaps = (
       }
       return; // Skip processing this participant if they have no passings
     }
+
+    const entrantId = participant.entrantId || participant.id;
+    const entrantPassings = entrantPassingsMap.get(entrantId) || [];
+    entrantPassings.push(...participantPassings);
+    entrantPassingsMap.set(entrantId, entrantPassings);
+  });
+
+  entrantPassingsMap.forEach((entrantPassings, entrantId) => {
+    const members = entrantParticipantMap.get(entrantId) || [];
+    const participant = members[0];
+    if (!participant) {
+      return;
+    }
+
     const participantCategoryStartFlag: GreenFlagRecord | null | undefined = eventFlags?.length > 0
       ? getOrCacheGreenFlagForCategory(
         participant.categoryId,
@@ -93,20 +130,87 @@ export const processAllParticipantLaps = (
     if (eventFlags?.length > 0) {
       try {
         validateParticipantStartFlag(participantCategoryStartFlag, participant);
-        processParticipantLaps(participant, participantPassings, participantCategoryStartFlag!, minimumLapTimeMilliseconds);
+        const finishFlag = getFinishFlagForCategory(participant.categoryId);
+        processEntrantLaps(entrantPassings, participantCategoryStartFlag!, minimumLapTimeMilliseconds, finishFlag);
       } catch (error: unknown) {
         if (error instanceof ParticipantStartFlagError || error instanceof StartFlagHasNoTimeError) {
           console.error(processAllParticipantLaps.name, error.message);
-          return; // Skip processing this participant if the start flag is invalid
-        } else {
-          throw error; // Re-throw unexpected errors
+          return;
         }
+        throw error;
       }
     }
-    participantTimesMap.set(participantId, participantPassings);
+
+    members.forEach((member) => {
+      participantTimesMap.set(member.id, entrantPassings.filter((passing) => passing.participantId === member.id));
+    });
   });
 
   return participantTimesMap;
+};
+
+const processEntrantLaps = (
+  entrantPassings: ParticipantPassingRecord[],
+  entrantCategoryStartFlag: GreenFlagRecord,
+  minimumLapTimeMilliseconds: number,
+  finishFlag?: FlagRecord
+): void => {
+  setCategoryStartForPassings(entrantCategoryStartFlag.id, entrantPassings);
+
+  const orderedPassings = [...entrantPassings].sort(compareByTime);
+  const finishTime = finishFlag?.time;
+  let hasCountedFirstPassingAfterFinish = false;
+  let previousPassing: ParticipantPassingRecord | undefined;
+  let lapNo = 0;
+
+  orderedPassings.forEach((passing) => {
+    if (passing.time === undefined) {
+      return;
+    }
+
+    if (!isRecordAfterStart(passing, entrantCategoryStartFlag)) {
+      passing.elapsedTime = undefined;
+      passing.lapNo = undefined;
+      passing.lapTime = undefined;
+      passing.isValid = false;
+      passing.isExcluded = true;
+      return;
+    }
+
+    const isAfterFinish = !!finishTime && passing.time.getTime() > finishTime.getTime();
+    if (isAfterFinish && hasCountedFirstPassingAfterFinish) {
+      passing.elapsedTime = elapsedTimeMilliseconds(entrantCategoryStartFlag.time!, passing.time);
+      passing.lapNo = lapNo;
+      passing.lapTime = validTimeAfterLastLap(passing, previousPassing);
+      passing.isValid = false;
+      passing.isExcluded = true;
+      return;
+    }
+
+    passing.elapsedTime = elapsedTimeMilliseconds(entrantCategoryStartFlag.time!, passing.time);
+    const lapTime = previousPassing
+      ? validTimeAfterLastLap(passing, previousPassing)
+      : passing.elapsedTime;
+
+    passing.lapTime = lapTime;
+    passing.startingLapRecordId = previousPassing?.id || entrantCategoryStartFlag.id;
+
+    const shouldForceCountAsFinishLap = isAfterFinish && !hasCountedFirstPassingAfterFinish;
+    if ((lapTime || 0) > minimumLapTimeMilliseconds || shouldForceCountAsFinishLap) {
+      lapNo += 1;
+      previousPassing = passing;
+      passing.isValid = true;
+      passing.isExcluded = false;
+      if (isAfterFinish) {
+        hasCountedFirstPassingAfterFinish = true;
+      }
+    } else {
+      passing.isValid = false;
+      passing.isExcluded = true;
+    }
+
+    passing.lapNo = lapNo;
+  });
 };
 
 const validateParticipantStartFlag = (

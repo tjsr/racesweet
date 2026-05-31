@@ -1,0 +1,51 @@
+.record .flag .green {
+  background-color: #27a845;
+  color: #e1e1e1; 
+}
+
+.excluded {
+  opacity: 0.5;
+  background-color: #a0a0a0;
+}
+
+.invalid-passing {
+  background-color: #ffcccc;
+  color: #a00;
+}
+
+.selected-category {
+  background-color: #ebffd0;
+  font-style: italic;
+}
+
+.selected-participant {
+  background-color: #d0f4ff;
+  font-style: unset;
+  font-weight: unset;
+  font-weight: bold;
+}
+
+.lap-time-session-fastest {
+  color: #a0f;
+  font-weight: bold;
+}
+
+.lap-time-too-fast {
+  color: #a00;
+}
+
+.lap-time-imroved {
+  color: #0a0;
+}
+
+.lap-time-personal-best {
+  color: #ff0;
+}
+
+#recent-records-order-dropdown, #recent-records-type-dropdown {
+  float: right;
+}
+
+h2.recent-records {
+  display: inline-block;
+}

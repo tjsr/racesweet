@@ -1,7 +1,7 @@
-import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.ts";
-import { entrantHasIdentifier, entrantHasPlate } from "./participantMatch.ts";
+import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
+import { entrantHasIdentifier, entrantHasPlate } from "./participantMatch.js";
 
-import type { PlateNumberType } from "../model/types.ts";
+import type { PlateNumberType } from "../model/types.js";
 
 export const findEntrantByPlateNumber = (
   entrants: Map<EventParticipantId, EventParticipant>,

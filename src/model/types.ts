@@ -1,4 +1,4 @@
-export type uuidv5 = string;
+export type uuidv5 = `${string}-${string}-${string}-${string}-${string}` | string;
 export type uuid = uuidv5;
 export type IdType = uuid;
 
