@@ -1,4 +1,4 @@
-﻿import './state.ts';
+import './state.ts';
 
 import { InvalidIpcChannelError, SendChannels } from '../model/electronIpcTypes.ts';
 import { IpcRendererEvent, contextBridge, ipcRenderer } from 'electron';

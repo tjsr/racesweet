@@ -1,12 +1,13 @@
-import React from 'react';
+import type { RaceStateLookup, Session } from '../../model/racestate.js';
 
 import type { EventCatalogEntrant } from '../../app/eventCatalog.js';
-import { HandicapView } from './handicap.js';
-import { millisecondsToTime } from '../../app/utils/timeutils.js';
-import { getParticipantNumber } from '../../controllers/participant.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
-import type { RaceStateLookup, Session } from '../../model/racestate.js';
+import { HandicapView } from './handicap.js';
+import { LapTimesReport } from '../reports/LapTimesReport.js';
 import type { ParticipantPassingRecord } from '../../model/timerecord.js';
+import React from 'react';
+import { getParticipantNumber } from '../../controllers/participant.js';
+import { millisecondsToTime } from '../../app/utils/timeutils.js';
 
 interface CategoryOption {
   id: string;
@@ -419,7 +420,6 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(props.selectedCategoryId || 'overall');
   const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
   const [reportType, setReportType] = React.useState<'fastest-laps' | 'lap-times' | 'lap-chart' | 'handicap-data'>('fastest-laps');
-  const [selectedParticipantId, setSelectedParticipantId] = React.useState<string>('');
   const [handicapShowFilter, setHandicapShowFilter] = React.useState<'all' | 'event-participants-only'>('all');
 
   const allRows = React.useMemo(() => {
@@ -435,42 +435,21 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     return allRows.filter((row) => row.categoryKeys.includes(categoryKey));
   }, [allRows, categories, selectedCategory]);
 
-  const participants = React.useMemo(() => {
-    const categoryKey = selectedCategory === 'overall'
-      ? 'overall'
-      : categoryKeyFromName(categories.find((category) => category.id === selectedCategory)?.name || selectedCategory);
-
-    return props.raceState.participants
-      .filter((participant) => categoryKey === 'overall' || categoryKeyFromId(props.raceState, participant.categoryId?.toString()) === categoryKey)
-      .map((participant) => ({
-        id: participant.id.toString(),
-        name: `${participant.firstname || ''} ${participant.surname || ''}`.trim() || participant.id.toString(),
-      }));
-  }, [categories, props.raceState, selectedCategory]);
-
-  React.useEffect(() => {
-    if (participants.length === 0) {
-      setSelectedParticipantId('');
-      return;
-    }
-    if (!participants.find((participant) => participant.id === selectedParticipantId)) {
-      setSelectedParticipantId(participants[0].id);
-    }
-  }, [participants, selectedParticipantId]);
-
-  const selectedParticipantLaps = React.useMemo(() => {
-    if (!selectedParticipantId) {
-      return [] as ParticipantPassingRecord[];
-    }
-    return (props.raceState.getParticipantLaps(selectedParticipantId) || [])
-      .filter(isValidLap)
-      .sort((a, b) => {
-        if ((a.lapNo || 0) !== (b.lapNo || 0)) {
-          return (a.lapNo || 0) - (b.lapNo || 0);
-        }
-        return (a.elapsedTime || 0) - (b.elapsedTime || 0);
-      });
-  }, [props.raceState, selectedParticipantId]);
+  const passings = React.useMemo(() => {
+    const map = new Map<string, ParticipantPassingRecord[]>();
+    props.raceState.participants.forEach((participant) => {
+      const laps = (props.raceState.getParticipantLaps(participant.id) || [])
+        .filter(isValidLap)
+        .sort((a, b) => {
+          if ((a.lapNo || 0) !== (b.lapNo || 0)) {
+            return (a.lapNo || 0) - (b.lapNo || 0);
+          }
+          return (a.elapsedTime || 0) - (b.elapsedTime || 0);
+        });
+      map.set(participant.id.toString(), laps);
+    });
+    return map;
+  }, [props.raceState]);
 
   const lapChart = React.useMemo(() => {
     return buildLapChart(rows);
@@ -517,22 +496,8 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
               <option value="handicap-data">Handicap Data</option>
             </select>
           </label>
-          {reportType !== 'handicap-data' ? (
+          {reportType !== 'handicap-data' && reportType !== 'lap-times' ? (
             <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
-          ) : null}
-          {reportType === 'lap-times' ? (
-            <label className="page-filter-label">
-              Participant
-              <select
-                aria-label="Reports Participant"
-                value={selectedParticipantId}
-                onChange={(event) => setSelectedParticipantId(event.target.value)}
-              >
-                {participants.map((participant) => (
-                  <option key={participant.id} value={participant.id}>{participant.name}</option>
-                ))}
-              </select>
-            </label>
           ) : null}
           {reportType === 'handicap-data' ? (
             <label className="page-filter-label">
@@ -577,27 +542,11 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
       ) : null}
 
       {reportType === 'lap-times' ? (
-        <section className="events-panel">
-          <h2>Lap Times</h2>
-          <table aria-label="Lap Times Report Table">
-            <thead>
-              <tr>
-                <th>Lap</th>
-                <th>Elapsed Time</th>
-                <th>Lap Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {selectedParticipantLaps.map((lap) => (
-                <tr key={lap.id.toString()}>
-                  <td>{lap.lapNo}</td>
-                  <td>{formatDuration(lap.elapsedTime || undefined)}</td>
-                  <td>{formatDuration(lap.lapTime || undefined)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+        <LapTimesReport
+          participants={props.raceState.participants}
+          categories={categories}
+          passings={passings}
+        />
       ) : null}
 
       {reportType === 'lap-chart' ? (

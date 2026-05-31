@@ -17,7 +17,7 @@ vi.mock('../views/display/recent', () => ({
   RecentRecords: () => React.createElement('div', null, 'Recent Records'),
 }));
 
-import { RaceSweetMainApp } from './app.js';
+import { RaceSweetMainApp } from './App.js';
 
 const readFixtureBuffer = async (filePath: string): Promise<Buffer> => {
   const fileName = path.basename(filePath);
