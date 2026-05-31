@@ -3,7 +3,6 @@
   "compilerOptions": {
     "allowJs": true,
     "allowImportingTsExtensions": true,
-    "baseUrl": ".",
     "experimentalDecorators": true,
     "esModuleInterop": true,
     "jsx": "react-jsx",
