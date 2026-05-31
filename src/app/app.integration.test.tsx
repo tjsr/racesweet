@@ -8,6 +8,7 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 
 import { useUiConsoleGuards } from '../testing/uiConsoleGuards.js';
+import { RaceSweetMainApp } from './App.js';
 
 vi.mock('../views/display/categories', () => ({
   CategoryList: () => React.createElement('div', null, 'Category List'),
@@ -16,8 +17,6 @@ vi.mock('../views/display/categories', () => ({
 vi.mock('../views/display/recent', () => ({
   RecentRecords: () => React.createElement('div', null, 'Recent Records'),
 }));
-
-import { RaceSweetMainApp } from './App.js';
 
 const readFixtureBuffer = async (filePath: string): Promise<Buffer> => {
   const fileName = path.basename(filePath);
