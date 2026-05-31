@@ -368,14 +368,28 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       }
 
       const selectionParticipant: EventParticipant|undefined = props.raceStateLookup.getParticipantById(passingRecord.participantId);
-      if (props.participantSelected !== undefined && selectionParticipant) {
+      if (!selectionParticipant) {
+        return;
+      }
+
+      if (props.selectedParticipants?.has(selectionParticipant.id)) {
+        if (props.participantSelected !== undefined) {
+          props.participantSelected(new Set<EventParticipantId>());
+        }
+        if (props.categorySelected) {
+          props.categorySelected(new Set<EventCategoryId>());
+        }
+        return;
+      }
+
+      if (props.participantSelected !== undefined) {
         const selectedEntrants: Set<EventParticipantId> = new Set<EventParticipantId>();
         selectedEntrants.add(selectionParticipant.id);
         props.participantSelected(selectedEntrants);
       }
 
       if (props.categorySelected && selectionParticipant?.categoryId) {
-        const categorySet = new Set<EventCategoryId>()
+        const categorySet = new Set<EventCategoryId>();
         categorySet.add(selectionParticipant.categoryId);
         props.categorySelected(categorySet);
       }
