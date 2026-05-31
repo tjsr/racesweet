@@ -1,4 +1,4 @@
-import { EventParticipantId } from "src/model";
+import type { EventParticipantId } from '../model/eventparticipant.ts';
 
 class TimeRecordError extends Error {
   constructor(message: string) {

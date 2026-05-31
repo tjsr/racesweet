@@ -12473,6 +12473,2634 @@
       "id": "event-catalog-1780263773622-33933",
       "timestamp": "2026-05-31T21:42:53.622Z",
       "type": "event-updated"
+    },
+    {
+      "category": {
+        "code": "A",
+        "description": "",
+        "id": "9dcb5c33-8709-552f-b325-a66ad464e884",
+        "name": "A",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780263984804-5125",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "B",
+        "description": "",
+        "id": "259fd7f9-80ef-5431-9ae1-f02e09b3e77e",
+        "name": "B",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780263984804-91514",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "C",
+        "description": "",
+        "id": "ace75562-e9b9-5c1a-95da-6e6be64ddd08",
+        "name": "C",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780263984804-47082",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "D",
+        "description": "",
+        "id": "a478f3d7-cf03-5886-b7c3-cbcf5fa70ac0",
+        "name": "D",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780263984804-40139",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "EBIKE",
+        "description": "",
+        "id": "0f71c168-2e5a-51dd-98b8-8c85c890bd60",
+        "name": "EBIKE",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780263984804-86635",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "Timing Error List",
+        "description": "",
+        "id": "ab35dae9-93ed-51f6-a61d-a416573f8c3f",
+        "name": "Timing Error List",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780263984804-29448",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "WA",
+        "description": "",
+        "id": "6af222dc-c60e-571d-ab59-497549ba9ef1",
+        "name": "WA",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780263984804-18231",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "WB",
+        "description": "",
+        "id": "28c4118a-e2fb-59bf-91b2-b627ab081a3c",
+        "name": "WB",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780263984804-97630",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "category-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "9dcb5c33-8709-552f-b325-a66ad464e884",
+        "categoryIds": [
+          "9dcb5c33-8709-552f-b325-a66ad464e884"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Robert",
+        "id": "2a8ee0b7-bd1a-55c9-8bd3-8d347de01ac4",
+        "lastName": "WOOD",
+        "memberParticipantIds": [
+          "2a8ee0b7-bd1a-55c9-8bd3-8d347de01ac4"
+        ],
+        "name": "Robert WOOD",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-95588",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "9dcb5c33-8709-552f-b325-a66ad464e884",
+        "categoryIds": [
+          "9dcb5c33-8709-552f-b325-a66ad464e884"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Stuart",
+        "id": "a8921f09-1509-5b6c-91a4-fe619f4a8680",
+        "lastName": "KENT",
+        "memberParticipantIds": [
+          "a8921f09-1509-5b6c-91a4-fe619f4a8680"
+        ],
+        "name": "Stuart KENT",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-84682",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "9dcb5c33-8709-552f-b325-a66ad464e884",
+        "categoryIds": [
+          "9dcb5c33-8709-552f-b325-a66ad464e884"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Cameron",
+        "id": "8085bd2c-f0b1-5d6a-86ca-c96708287b55",
+        "lastName": "SHAKESPEARE",
+        "memberParticipantIds": [
+          "8085bd2c-f0b1-5d6a-86ca-c96708287b55"
+        ],
+        "name": "Cameron SHAKESPEARE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-89592",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "9dcb5c33-8709-552f-b325-a66ad464e884",
+        "categoryIds": [
+          "9dcb5c33-8709-552f-b325-a66ad464e884"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Riley",
+        "id": "1e77a297-5101-5112-bcde-9c0b97ed1c9e",
+        "lastName": "FLAHERTY",
+        "memberParticipantIds": [
+          "1e77a297-5101-5112-bcde-9c0b97ed1c9e"
+        ],
+        "name": "Riley FLAHERTY",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-91352",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "9dcb5c33-8709-552f-b325-a66ad464e884",
+        "categoryIds": [
+          "9dcb5c33-8709-552f-b325-a66ad464e884"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Mark",
+        "id": "0f27d8e5-35e5-5b6e-9ea5-4904cd15986e",
+        "lastName": "MATHEWS",
+        "memberParticipantIds": [
+          "0f27d8e5-35e5-5b6e-9ea5-4904cd15986e"
+        ],
+        "name": "Mark MATHEWS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-17856",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "259fd7f9-80ef-5431-9ae1-f02e09b3e77e",
+        "categoryIds": [
+          "259fd7f9-80ef-5431-9ae1-f02e09b3e77e"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Adrian",
+        "id": "48bb2bf1-859d-5ce2-bc1a-46b4ff022c00",
+        "lastName": "DILLON",
+        "memberParticipantIds": [
+          "48bb2bf1-859d-5ce2-bc1a-46b4ff022c00"
+        ],
+        "name": "Adrian DILLON",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-64995",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "259fd7f9-80ef-5431-9ae1-f02e09b3e77e",
+        "categoryIds": [
+          "259fd7f9-80ef-5431-9ae1-f02e09b3e77e"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Phil",
+        "id": "51ef2bba-0513-5e81-8261-78c01b1d1e3f",
+        "lastName": "O'NEIL",
+        "memberParticipantIds": [
+          "51ef2bba-0513-5e81-8261-78c01b1d1e3f"
+        ],
+        "name": "Phil O'NEIL",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-12543",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "259fd7f9-80ef-5431-9ae1-f02e09b3e77e",
+        "categoryIds": [
+          "259fd7f9-80ef-5431-9ae1-f02e09b3e77e"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Tony",
+        "id": "529e0fc9-b317-5fde-bee0-5f96bb1516b3",
+        "lastName": "FRENCH",
+        "memberParticipantIds": [
+          "529e0fc9-b317-5fde-bee0-5f96bb1516b3"
+        ],
+        "name": "Tony FRENCH",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-2737",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "259fd7f9-80ef-5431-9ae1-f02e09b3e77e",
+        "categoryIds": [
+          "259fd7f9-80ef-5431-9ae1-f02e09b3e77e"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Tim",
+        "id": "f56322b9-0e33-5945-ad3d-9b94f11b4d18",
+        "lastName": "ROWE",
+        "memberParticipantIds": [
+          "f56322b9-0e33-5945-ad3d-9b94f11b4d18"
+        ],
+        "name": "Tim ROWE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-79913",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "ace75562-e9b9-5c1a-95da-6e6be64ddd08",
+        "categoryIds": [
+          "ace75562-e9b9-5c1a-95da-6e6be64ddd08"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Gavin",
+        "id": "b6ed9188-75d5-5134-b403-8bdba6ceb4cf",
+        "lastName": "ERICKSON",
+        "memberParticipantIds": [
+          "b6ed9188-75d5-5134-b403-8bdba6ceb4cf"
+        ],
+        "name": "Gavin ERICKSON",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-67364",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "ace75562-e9b9-5c1a-95da-6e6be64ddd08",
+        "categoryIds": [
+          "ace75562-e9b9-5c1a-95da-6e6be64ddd08"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Richard",
+        "id": "7c86a11c-a279-5780-b15c-d81871ffdb20",
+        "lastName": "WILLIAMS",
+        "memberParticipantIds": [
+          "7c86a11c-a279-5780-b15c-d81871ffdb20"
+        ],
+        "name": "Richard WILLIAMS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-27296",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "ace75562-e9b9-5c1a-95da-6e6be64ddd08",
+        "categoryIds": [
+          "ace75562-e9b9-5c1a-95da-6e6be64ddd08"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Ben",
+        "id": "d57b49ba-ef7a-5b90-9cd3-8da9ec8efcbf",
+        "lastName": "WILLIAMS",
+        "memberParticipantIds": [
+          "d57b49ba-ef7a-5b90-9cd3-8da9ec8efcbf"
+        ],
+        "name": "Ben WILLIAMS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-56569",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "ace75562-e9b9-5c1a-95da-6e6be64ddd08",
+        "categoryIds": [
+          "ace75562-e9b9-5c1a-95da-6e6be64ddd08"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Vince",
+        "id": "5119fb71-fad1-5c1c-8ade-790e03c7451e",
+        "lastName": "TROTTER",
+        "memberParticipantIds": [
+          "5119fb71-fad1-5c1c-8ade-790e03c7451e"
+        ],
+        "name": "Vince TROTTER",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-49565",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "ace75562-e9b9-5c1a-95da-6e6be64ddd08",
+        "categoryIds": [
+          "ace75562-e9b9-5c1a-95da-6e6be64ddd08"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Ben",
+        "id": "7959392d-2ea9-5d97-b983-96e6a0bd1240",
+        "lastName": "VAN DUIJNE",
+        "memberParticipantIds": [
+          "7959392d-2ea9-5d97-b983-96e6a0bd1240"
+        ],
+        "name": "Ben VAN DUIJNE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-12526",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "ace75562-e9b9-5c1a-95da-6e6be64ddd08",
+        "categoryIds": [
+          "ace75562-e9b9-5c1a-95da-6e6be64ddd08"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Eric",
+        "id": "7a1ba3bb-b426-5663-a5d1-f04e5de28839",
+        "lastName": "VAN DAM",
+        "memberParticipantIds": [
+          "7a1ba3bb-b426-5663-a5d1-f04e5de28839"
+        ],
+        "name": "Eric VAN DAM",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-67224",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "ace75562-e9b9-5c1a-95da-6e6be64ddd08",
+        "categoryIds": [
+          "ace75562-e9b9-5c1a-95da-6e6be64ddd08"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Nick",
+        "id": "99990dd7-51b9-5bd3-bdf1-da0bb0506357",
+        "lastName": "PILE",
+        "memberParticipantIds": [
+          "99990dd7-51b9-5bd3-bdf1-da0bb0506357"
+        ],
+        "name": "Nick PILE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-93256",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "ace75562-e9b9-5c1a-95da-6e6be64ddd08",
+        "categoryIds": [
+          "ace75562-e9b9-5c1a-95da-6e6be64ddd08"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Kelly",
+        "id": "4f302604-d749-5aec-828c-a79fbe726754",
+        "lastName": "WESTON",
+        "memberParticipantIds": [
+          "4f302604-d749-5aec-828c-a79fbe726754"
+        ],
+        "name": "Kelly WESTON",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-42213",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "ace75562-e9b9-5c1a-95da-6e6be64ddd08",
+        "categoryIds": [
+          "ace75562-e9b9-5c1a-95da-6e6be64ddd08"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Martz",
+        "id": "52dd567f-f23c-58e8-855a-971b188d5fe6",
+        "lastName": "KEIR",
+        "memberParticipantIds": [
+          "52dd567f-f23c-58e8-855a-971b188d5fe6"
+        ],
+        "name": "Martz KEIR",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-27418",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "ace75562-e9b9-5c1a-95da-6e6be64ddd08",
+        "categoryIds": [
+          "ace75562-e9b9-5c1a-95da-6e6be64ddd08"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Luis",
+        "id": "54936c43-f0a2-5e1e-a265-3bf024cfc243",
+        "lastName": "GOLDSTRAW",
+        "memberParticipantIds": [
+          "54936c43-f0a2-5e1e-a265-3bf024cfc243"
+        ],
+        "name": "Luis GOLDSTRAW",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-14676",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "ace75562-e9b9-5c1a-95da-6e6be64ddd08",
+        "categoryIds": [
+          "ace75562-e9b9-5c1a-95da-6e6be64ddd08"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Scott",
+        "id": "be34d710-30c7-5a90-a67f-1da90ed17f2a",
+        "lastName": "WILLIAMS",
+        "memberParticipantIds": [
+          "be34d710-30c7-5a90-a67f-1da90ed17f2a"
+        ],
+        "name": "Scott WILLIAMS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-72922",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "a478f3d7-cf03-5886-b7c3-cbcf5fa70ac0",
+        "categoryIds": [
+          "a478f3d7-cf03-5886-b7c3-cbcf5fa70ac0"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Oscar",
+        "id": "cea75f90-9677-5f5d-8058-b474c78272cf",
+        "lastName": "DURANTE",
+        "memberParticipantIds": [
+          "cea75f90-9677-5f5d-8058-b474c78272cf"
+        ],
+        "name": "Oscar DURANTE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-94374",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "a478f3d7-cf03-5886-b7c3-cbcf5fa70ac0",
+        "categoryIds": [
+          "a478f3d7-cf03-5886-b7c3-cbcf5fa70ac0"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Colin",
+        "id": "60919d42-8f67-5e03-87cc-0ce55f95e7b9",
+        "lastName": "LINAHAN",
+        "memberParticipantIds": [
+          "60919d42-8f67-5e03-87cc-0ce55f95e7b9"
+        ],
+        "name": "Colin LINAHAN",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-54067",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "0f71c168-2e5a-51dd-98b8-8c85c890bd60",
+        "categoryIds": [
+          "0f71c168-2e5a-51dd-98b8-8c85c890bd60"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Paul",
+        "id": "8f18621a-ba68-5bb6-9e0f-e326a428bc2e",
+        "lastName": "DURANTE",
+        "memberParticipantIds": [
+          "8f18621a-ba68-5bb6-9e0f-e326a428bc2e"
+        ],
+        "name": "Paul DURANTE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-41176",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "0f71c168-2e5a-51dd-98b8-8c85c890bd60",
+        "categoryIds": [
+          "0f71c168-2e5a-51dd-98b8-8c85c890bd60"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Peter",
+        "id": "1c136ab5-9b5d-5794-a397-65c488a57d7f",
+        "lastName": "HENKEL",
+        "memberParticipantIds": [
+          "1c136ab5-9b5d-5794-a397-65c488a57d7f"
+        ],
+        "name": "Peter HENKEL",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-93903",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "0f71c168-2e5a-51dd-98b8-8c85c890bd60",
+        "categoryIds": [
+          "0f71c168-2e5a-51dd-98b8-8c85c890bd60"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Anthony",
+        "id": "6f93e058-3822-559f-9e6d-0c3c5e6f1179",
+        "lastName": "SPEECHLEY",
+        "memberParticipantIds": [
+          "6f93e058-3822-559f-9e6d-0c3c5e6f1179"
+        ],
+        "name": "Anthony SPEECHLEY",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-21110",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "6af222dc-c60e-571d-ab59-497549ba9ef1",
+        "categoryIds": [
+          "6af222dc-c60e-571d-ab59-497549ba9ef1"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Christy",
+        "id": "545ece2c-3660-5acc-bfd4-2df04f8c1d92",
+        "lastName": "HARRIS",
+        "memberParticipantIds": [
+          "545ece2c-3660-5acc-bfd4-2df04f8c1d92"
+        ],
+        "name": "Christy HARRIS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-91060",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "28c4118a-e2fb-59bf-91b2-b627ab081a3c",
+        "categoryIds": [
+          "28c4118a-e2fb-59bf-91b2-b627ab081a3c"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Amy",
+        "id": "bc3275cc-c510-5010-86c7-879bc522e4f4",
+        "lastName": "TROTTER",
+        "memberParticipantIds": [
+          "bc3275cc-c510-5010-86c7-879bc522e4f4"
+        ],
+        "name": "Amy TROTTER",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-31327",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "28c4118a-e2fb-59bf-91b2-b627ab081a3c",
+        "categoryIds": [
+          "28c4118a-e2fb-59bf-91b2-b627ab081a3c"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Kimberly",
+        "id": "bb510968-b8b1-5dd4-9013-74c9800582a1",
+        "lastName": "DOUGLASS",
+        "memberParticipantIds": [
+          "bb510968-b8b1-5dd4-9013-74c9800582a1"
+        ],
+        "name": "Kimberly DOUGLASS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780263984804-11143",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "entrant-created"
+    },
+    {
+      "changes": {
+        "categoryIds": [
+          "9dcb5c33-8709-552f-b325-a66ad464e884",
+          "259fd7f9-80ef-5431-9ae1-f02e09b3e77e",
+          "ace75562-e9b9-5c1a-95da-6e6be64ddd08",
+          "a478f3d7-cf03-5886-b7c3-cbcf5fa70ac0",
+          "0f71c168-2e5a-51dd-98b8-8c85c890bd60",
+          "ab35dae9-93ed-51f6-a61d-a416573f8c3f",
+          "6af222dc-c60e-571d-ab59-497549ba9ef1",
+          "28c4118a-e2fb-59bf-91b2-b627ab081a3c"
+        ],
+        "entrantIds": [
+          "2a8ee0b7-bd1a-55c9-8bd3-8d347de01ac4",
+          "a8921f09-1509-5b6c-91a4-fe619f4a8680",
+          "8085bd2c-f0b1-5d6a-86ca-c96708287b55",
+          "1e77a297-5101-5112-bcde-9c0b97ed1c9e",
+          "0f27d8e5-35e5-5b6e-9ea5-4904cd15986e",
+          "48bb2bf1-859d-5ce2-bc1a-46b4ff022c00",
+          "51ef2bba-0513-5e81-8261-78c01b1d1e3f",
+          "529e0fc9-b317-5fde-bee0-5f96bb1516b3",
+          "f56322b9-0e33-5945-ad3d-9b94f11b4d18",
+          "b6ed9188-75d5-5134-b403-8bdba6ceb4cf",
+          "7c86a11c-a279-5780-b15c-d81871ffdb20",
+          "d57b49ba-ef7a-5b90-9cd3-8da9ec8efcbf",
+          "5119fb71-fad1-5c1c-8ade-790e03c7451e",
+          "7959392d-2ea9-5d97-b983-96e6a0bd1240",
+          "7a1ba3bb-b426-5663-a5d1-f04e5de28839",
+          "99990dd7-51b9-5bd3-bdf1-da0bb0506357",
+          "4f302604-d749-5aec-828c-a79fbe726754",
+          "52dd567f-f23c-58e8-855a-971b188d5fe6",
+          "54936c43-f0a2-5e1e-a265-3bf024cfc243",
+          "be34d710-30c7-5a90-a67f-1da90ed17f2a",
+          "cea75f90-9677-5f5d-8058-b474c78272cf",
+          "60919d42-8f67-5e03-87cc-0ce55f95e7b9",
+          "8f18621a-ba68-5bb6-9e0f-e326a428bc2e",
+          "1c136ab5-9b5d-5794-a397-65c488a57d7f",
+          "6f93e058-3822-559f-9e6d-0c3c5e6f1179",
+          "545ece2c-3660-5acc-bfd4-2df04f8c1d92",
+          "bc3275cc-c510-5010-86c7-879bc522e4f4",
+          "bb510968-b8b1-5dd4-9013-74c9800582a1"
+        ]
+      },
+      "eventId": "event-2026-racesweet-round-1",
+      "id": "event-catalog-1780263984804-17886",
+      "timestamp": "2026-05-31T21:46:24.804Z",
+      "type": "event-updated"
+    },
+    {
+      "category": {
+        "code": "A",
+        "description": "",
+        "id": "cccc3b28-b409-5ce1-b043-641845e0a468",
+        "name": "A",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264268936-41703",
+      "timestamp": "2026-05-31T21:51:08.936Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "B",
+        "description": "",
+        "id": "79347b69-7f0c-53f3-9412-eb7022308af3",
+        "name": "B",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264268937-37988",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "C",
+        "description": "",
+        "id": "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6",
+        "name": "C",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264268937-95961",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "D",
+        "description": "",
+        "id": "fe9fb6da-0f5c-5ed9-9276-b26492c8af28",
+        "name": "D",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264268937-76056",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "EBIKE",
+        "description": "",
+        "id": "ffa0bfce-874d-5688-9e0d-c1cc40670a20",
+        "name": "EBIKE",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264268937-13554",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "Timing Error List",
+        "description": "",
+        "id": "cf7f9374-6633-564c-92f2-b79f3b24ff5d",
+        "name": "Timing Error List",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264268937-78970",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "WA",
+        "description": "",
+        "id": "a8a132c6-1071-553f-a82f-d8fb93d1bd3b",
+        "name": "WA",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264268937-73996",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "WB",
+        "description": "",
+        "id": "f66f0765-1185-5832-a04a-4e6d1576f434",
+        "name": "WB",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264268937-9468",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "category-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cccc3b28-b409-5ce1-b043-641845e0a468",
+        "categoryIds": [
+          "cccc3b28-b409-5ce1-b043-641845e0a468"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Robert",
+        "id": "5ac6420a-f7f7-5e72-9c4f-7085b73a652b",
+        "lastName": "WOOD",
+        "memberParticipantIds": [
+          "5ac6420a-f7f7-5e72-9c4f-7085b73a652b"
+        ],
+        "name": "Robert WOOD",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-16193",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cccc3b28-b409-5ce1-b043-641845e0a468",
+        "categoryIds": [
+          "cccc3b28-b409-5ce1-b043-641845e0a468"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Stuart",
+        "id": "b6b8ee7d-fc15-5bf3-9370-904f3d31fb09",
+        "lastName": "KENT",
+        "memberParticipantIds": [
+          "b6b8ee7d-fc15-5bf3-9370-904f3d31fb09"
+        ],
+        "name": "Stuart KENT",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-95431",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cccc3b28-b409-5ce1-b043-641845e0a468",
+        "categoryIds": [
+          "cccc3b28-b409-5ce1-b043-641845e0a468"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Cameron",
+        "id": "dc1712f3-395c-5254-98ee-8d82f7eab040",
+        "lastName": "SHAKESPEARE",
+        "memberParticipantIds": [
+          "dc1712f3-395c-5254-98ee-8d82f7eab040"
+        ],
+        "name": "Cameron SHAKESPEARE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-99216",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cccc3b28-b409-5ce1-b043-641845e0a468",
+        "categoryIds": [
+          "cccc3b28-b409-5ce1-b043-641845e0a468"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Riley",
+        "id": "cbd8d9a6-5306-5a27-a67e-e31822e0d7b4",
+        "lastName": "FLAHERTY",
+        "memberParticipantIds": [
+          "cbd8d9a6-5306-5a27-a67e-e31822e0d7b4"
+        ],
+        "name": "Riley FLAHERTY",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-68095",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cccc3b28-b409-5ce1-b043-641845e0a468",
+        "categoryIds": [
+          "cccc3b28-b409-5ce1-b043-641845e0a468"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Mark",
+        "id": "572969f9-1422-5c71-848c-01ee6e62e1dd",
+        "lastName": "MATHEWS",
+        "memberParticipantIds": [
+          "572969f9-1422-5c71-848c-01ee6e62e1dd"
+        ],
+        "name": "Mark MATHEWS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-96575",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "79347b69-7f0c-53f3-9412-eb7022308af3",
+        "categoryIds": [
+          "79347b69-7f0c-53f3-9412-eb7022308af3"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Adrian",
+        "id": "e57ec259-7687-5e7e-9114-950e79235096",
+        "lastName": "DILLON",
+        "memberParticipantIds": [
+          "e57ec259-7687-5e7e-9114-950e79235096"
+        ],
+        "name": "Adrian DILLON",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-74880",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "79347b69-7f0c-53f3-9412-eb7022308af3",
+        "categoryIds": [
+          "79347b69-7f0c-53f3-9412-eb7022308af3"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Phil",
+        "id": "2d0ae3dc-bb52-5334-a728-6a3ce85fbe88",
+        "lastName": "O'NEIL",
+        "memberParticipantIds": [
+          "2d0ae3dc-bb52-5334-a728-6a3ce85fbe88"
+        ],
+        "name": "Phil O'NEIL",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-98765",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "79347b69-7f0c-53f3-9412-eb7022308af3",
+        "categoryIds": [
+          "79347b69-7f0c-53f3-9412-eb7022308af3"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Tony",
+        "id": "5c95f799-9dac-566f-9ec3-a3d3a1b45f20",
+        "lastName": "FRENCH",
+        "memberParticipantIds": [
+          "5c95f799-9dac-566f-9ec3-a3d3a1b45f20"
+        ],
+        "name": "Tony FRENCH",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-61550",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "79347b69-7f0c-53f3-9412-eb7022308af3",
+        "categoryIds": [
+          "79347b69-7f0c-53f3-9412-eb7022308af3"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Tim",
+        "id": "12def820-03a9-58bf-929f-eabe81622640",
+        "lastName": "ROWE",
+        "memberParticipantIds": [
+          "12def820-03a9-58bf-929f-eabe81622640"
+        ],
+        "name": "Tim ROWE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-66131",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6",
+        "categoryIds": [
+          "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Gavin",
+        "id": "37e5c89b-afa2-5ac9-b368-a4f8b5c22f13",
+        "lastName": "ERICKSON",
+        "memberParticipantIds": [
+          "37e5c89b-afa2-5ac9-b368-a4f8b5c22f13"
+        ],
+        "name": "Gavin ERICKSON",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-13101",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6",
+        "categoryIds": [
+          "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Richard",
+        "id": "2ab6892f-a288-5a6e-a0a2-d7d6768fabce",
+        "lastName": "WILLIAMS",
+        "memberParticipantIds": [
+          "2ab6892f-a288-5a6e-a0a2-d7d6768fabce"
+        ],
+        "name": "Richard WILLIAMS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-38984",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6",
+        "categoryIds": [
+          "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Ben",
+        "id": "902316bc-0ff8-5fcf-ac75-17e1bfaf3b5c",
+        "lastName": "WILLIAMS",
+        "memberParticipantIds": [
+          "902316bc-0ff8-5fcf-ac75-17e1bfaf3b5c"
+        ],
+        "name": "Ben WILLIAMS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-82480",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6",
+        "categoryIds": [
+          "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Vince",
+        "id": "dedd469e-64a6-52e6-b62c-d272fa6a4ceb",
+        "lastName": "TROTTER",
+        "memberParticipantIds": [
+          "dedd469e-64a6-52e6-b62c-d272fa6a4ceb"
+        ],
+        "name": "Vince TROTTER",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-4210",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6",
+        "categoryIds": [
+          "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Ben",
+        "id": "d6c4c794-fc0e-57cb-92bc-fd43950b4113",
+        "lastName": "VAN DUIJNE",
+        "memberParticipantIds": [
+          "d6c4c794-fc0e-57cb-92bc-fd43950b4113"
+        ],
+        "name": "Ben VAN DUIJNE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-75134",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6",
+        "categoryIds": [
+          "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Eric",
+        "id": "6745b3d6-e74f-537d-8ec9-13e3a52ef969",
+        "lastName": "VAN DAM",
+        "memberParticipantIds": [
+          "6745b3d6-e74f-537d-8ec9-13e3a52ef969"
+        ],
+        "name": "Eric VAN DAM",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-91782",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6",
+        "categoryIds": [
+          "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Nick",
+        "id": "35a35c99-87df-5e00-b62f-f998485a3f84",
+        "lastName": "PILE",
+        "memberParticipantIds": [
+          "35a35c99-87df-5e00-b62f-f998485a3f84"
+        ],
+        "name": "Nick PILE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-81181",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6",
+        "categoryIds": [
+          "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Kelly",
+        "id": "e5a64c8f-807c-53b3-a4e2-c2b43deff07f",
+        "lastName": "WESTON",
+        "memberParticipantIds": [
+          "e5a64c8f-807c-53b3-a4e2-c2b43deff07f"
+        ],
+        "name": "Kelly WESTON",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-70215",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6",
+        "categoryIds": [
+          "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Martz",
+        "id": "621feae2-93e4-5665-8bba-06cdfbcae8bc",
+        "lastName": "KEIR",
+        "memberParticipantIds": [
+          "621feae2-93e4-5665-8bba-06cdfbcae8bc"
+        ],
+        "name": "Martz KEIR",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-41538",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6",
+        "categoryIds": [
+          "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Luis",
+        "id": "f2c25902-9bbd-533a-ad72-4ca3e71b4d9c",
+        "lastName": "GOLDSTRAW",
+        "memberParticipantIds": [
+          "f2c25902-9bbd-533a-ad72-4ca3e71b4d9c"
+        ],
+        "name": "Luis GOLDSTRAW",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-34815",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6",
+        "categoryIds": [
+          "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Scott",
+        "id": "1105a004-762c-5136-afdf-d62090e94b41",
+        "lastName": "WILLIAMS",
+        "memberParticipantIds": [
+          "1105a004-762c-5136-afdf-d62090e94b41"
+        ],
+        "name": "Scott WILLIAMS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-81028",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "fe9fb6da-0f5c-5ed9-9276-b26492c8af28",
+        "categoryIds": [
+          "fe9fb6da-0f5c-5ed9-9276-b26492c8af28"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Oscar",
+        "id": "c3970891-38e1-528a-ac32-00a4e60f395c",
+        "lastName": "DURANTE",
+        "memberParticipantIds": [
+          "c3970891-38e1-528a-ac32-00a4e60f395c"
+        ],
+        "name": "Oscar DURANTE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-98247",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "fe9fb6da-0f5c-5ed9-9276-b26492c8af28",
+        "categoryIds": [
+          "fe9fb6da-0f5c-5ed9-9276-b26492c8af28"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Colin",
+        "id": "32d795fe-cd3e-5d75-9889-dc61124b796d",
+        "lastName": "LINAHAN",
+        "memberParticipantIds": [
+          "32d795fe-cd3e-5d75-9889-dc61124b796d"
+        ],
+        "name": "Colin LINAHAN",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-53795",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "ffa0bfce-874d-5688-9e0d-c1cc40670a20",
+        "categoryIds": [
+          "ffa0bfce-874d-5688-9e0d-c1cc40670a20"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Paul",
+        "id": "ea952bc8-5668-5b61-be45-fdc37805e5df",
+        "lastName": "DURANTE",
+        "memberParticipantIds": [
+          "ea952bc8-5668-5b61-be45-fdc37805e5df"
+        ],
+        "name": "Paul DURANTE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-93483",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "ffa0bfce-874d-5688-9e0d-c1cc40670a20",
+        "categoryIds": [
+          "ffa0bfce-874d-5688-9e0d-c1cc40670a20"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Peter",
+        "id": "53b43026-5c42-5399-a9de-fef6bab8a913",
+        "lastName": "HENKEL",
+        "memberParticipantIds": [
+          "53b43026-5c42-5399-a9de-fef6bab8a913"
+        ],
+        "name": "Peter HENKEL",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-36356",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "ffa0bfce-874d-5688-9e0d-c1cc40670a20",
+        "categoryIds": [
+          "ffa0bfce-874d-5688-9e0d-c1cc40670a20"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Anthony",
+        "id": "d0916731-309a-564c-bc13-0d655161c439",
+        "lastName": "SPEECHLEY",
+        "memberParticipantIds": [
+          "d0916731-309a-564c-bc13-0d655161c439"
+        ],
+        "name": "Anthony SPEECHLEY",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-83",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "a8a132c6-1071-553f-a82f-d8fb93d1bd3b",
+        "categoryIds": [
+          "a8a132c6-1071-553f-a82f-d8fb93d1bd3b"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Christy",
+        "id": "0fc595b2-9986-5284-af75-7a17c66fc0f9",
+        "lastName": "HARRIS",
+        "memberParticipantIds": [
+          "0fc595b2-9986-5284-af75-7a17c66fc0f9"
+        ],
+        "name": "Christy HARRIS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-67746",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "f66f0765-1185-5832-a04a-4e6d1576f434",
+        "categoryIds": [
+          "f66f0765-1185-5832-a04a-4e6d1576f434"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Amy",
+        "id": "a2cd5270-1940-546a-81c5-f0de02a70d6b",
+        "lastName": "TROTTER",
+        "memberParticipantIds": [
+          "a2cd5270-1940-546a-81c5-f0de02a70d6b"
+        ],
+        "name": "Amy TROTTER",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-61551",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "f66f0765-1185-5832-a04a-4e6d1576f434",
+        "categoryIds": [
+          "f66f0765-1185-5832-a04a-4e6d1576f434"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Kimberly",
+        "id": "866915bb-7069-5cd5-b7e6-2b9a83649ea9",
+        "lastName": "DOUGLASS",
+        "memberParticipantIds": [
+          "866915bb-7069-5cd5-b7e6-2b9a83649ea9"
+        ],
+        "name": "Kimberly DOUGLASS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264268937-82259",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "entrant-created"
+    },
+    {
+      "changes": {
+        "categoryIds": [
+          "cccc3b28-b409-5ce1-b043-641845e0a468",
+          "79347b69-7f0c-53f3-9412-eb7022308af3",
+          "cfd33ef3-9c6c-5922-9d30-f8fce67b4ca6",
+          "fe9fb6da-0f5c-5ed9-9276-b26492c8af28",
+          "ffa0bfce-874d-5688-9e0d-c1cc40670a20",
+          "cf7f9374-6633-564c-92f2-b79f3b24ff5d",
+          "a8a132c6-1071-553f-a82f-d8fb93d1bd3b",
+          "f66f0765-1185-5832-a04a-4e6d1576f434"
+        ],
+        "entrantIds": [
+          "5ac6420a-f7f7-5e72-9c4f-7085b73a652b",
+          "b6b8ee7d-fc15-5bf3-9370-904f3d31fb09",
+          "dc1712f3-395c-5254-98ee-8d82f7eab040",
+          "cbd8d9a6-5306-5a27-a67e-e31822e0d7b4",
+          "572969f9-1422-5c71-848c-01ee6e62e1dd",
+          "e57ec259-7687-5e7e-9114-950e79235096",
+          "2d0ae3dc-bb52-5334-a728-6a3ce85fbe88",
+          "5c95f799-9dac-566f-9ec3-a3d3a1b45f20",
+          "12def820-03a9-58bf-929f-eabe81622640",
+          "37e5c89b-afa2-5ac9-b368-a4f8b5c22f13",
+          "2ab6892f-a288-5a6e-a0a2-d7d6768fabce",
+          "902316bc-0ff8-5fcf-ac75-17e1bfaf3b5c",
+          "dedd469e-64a6-52e6-b62c-d272fa6a4ceb",
+          "d6c4c794-fc0e-57cb-92bc-fd43950b4113",
+          "6745b3d6-e74f-537d-8ec9-13e3a52ef969",
+          "35a35c99-87df-5e00-b62f-f998485a3f84",
+          "e5a64c8f-807c-53b3-a4e2-c2b43deff07f",
+          "621feae2-93e4-5665-8bba-06cdfbcae8bc",
+          "f2c25902-9bbd-533a-ad72-4ca3e71b4d9c",
+          "1105a004-762c-5136-afdf-d62090e94b41",
+          "c3970891-38e1-528a-ac32-00a4e60f395c",
+          "32d795fe-cd3e-5d75-9889-dc61124b796d",
+          "ea952bc8-5668-5b61-be45-fdc37805e5df",
+          "53b43026-5c42-5399-a9de-fef6bab8a913",
+          "d0916731-309a-564c-bc13-0d655161c439",
+          "0fc595b2-9986-5284-af75-7a17c66fc0f9",
+          "a2cd5270-1940-546a-81c5-f0de02a70d6b",
+          "866915bb-7069-5cd5-b7e6-2b9a83649ea9"
+        ]
+      },
+      "eventId": "event-2026-racesweet-round-1",
+      "id": "event-catalog-1780264268937-94769",
+      "timestamp": "2026-05-31T21:51:08.937Z",
+      "type": "event-updated"
+    },
+    {
+      "category": {
+        "code": "A",
+        "description": "",
+        "id": "589570e5-39a8-5108-8a6f-49f1f3dbea79",
+        "name": "A",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264378513-45975",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "B",
+        "description": "",
+        "id": "9be4d8b8-ede3-594e-945d-702cf4cf3706",
+        "name": "B",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264378513-25422",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "C",
+        "description": "",
+        "id": "b586dde6-7755-5590-a2af-24ba4f0ed25a",
+        "name": "C",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264378513-19741",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "D",
+        "description": "",
+        "id": "8382d833-789e-546d-a92f-f34a841faf81",
+        "name": "D",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264378513-23565",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "EBIKE",
+        "description": "",
+        "id": "2cdbe1f4-04fa-5fdc-9a7e-9cb6e67988e8",
+        "name": "EBIKE",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264378513-92130",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "Timing Error List",
+        "description": "",
+        "id": "ab73aec4-4542-5dd7-869f-81257138cd73",
+        "name": "Timing Error List",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264378513-74570",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "WA",
+        "description": "",
+        "id": "14d6ceca-6f8c-5cf6-9dcc-48559eea73fd",
+        "name": "WA",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264378513-30544",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "category-created"
+    },
+    {
+      "category": {
+        "code": "WB",
+        "description": "",
+        "id": "1285da2b-acb6-58f8-9854-caa60ceaa438",
+        "name": "WB",
+        "eventId": "event-2026-racesweet-round-1",
+        "sessionAssignments": [],
+        "teamRules": {
+          "teamCompositionRules": []
+        }
+      },
+      "id": "event-catalog-1780264378513-32876",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "category-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "589570e5-39a8-5108-8a6f-49f1f3dbea79",
+        "categoryIds": [
+          "589570e5-39a8-5108-8a6f-49f1f3dbea79"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Robert",
+        "id": "93f31ac0-2a65-52f7-af47-a7e34099e7e8",
+        "lastName": "WOOD",
+        "memberParticipantIds": [
+          "93f31ac0-2a65-52f7-af47-a7e34099e7e8"
+        ],
+        "name": "Robert WOOD",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-6197",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "589570e5-39a8-5108-8a6f-49f1f3dbea79",
+        "categoryIds": [
+          "589570e5-39a8-5108-8a6f-49f1f3dbea79"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Stuart",
+        "id": "1a7df0e9-46b9-597b-a803-f92f61cf9d85",
+        "lastName": "KENT",
+        "memberParticipantIds": [
+          "1a7df0e9-46b9-597b-a803-f92f61cf9d85"
+        ],
+        "name": "Stuart KENT",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-38401",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "589570e5-39a8-5108-8a6f-49f1f3dbea79",
+        "categoryIds": [
+          "589570e5-39a8-5108-8a6f-49f1f3dbea79"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Cameron",
+        "id": "be3b4751-ee54-530b-afc8-3fea42a0cec1",
+        "lastName": "SHAKESPEARE",
+        "memberParticipantIds": [
+          "be3b4751-ee54-530b-afc8-3fea42a0cec1"
+        ],
+        "name": "Cameron SHAKESPEARE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-91863",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "589570e5-39a8-5108-8a6f-49f1f3dbea79",
+        "categoryIds": [
+          "589570e5-39a8-5108-8a6f-49f1f3dbea79"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Riley",
+        "id": "ba71336b-d13c-5dbf-b9d4-55091a78aa72",
+        "lastName": "FLAHERTY",
+        "memberParticipantIds": [
+          "ba71336b-d13c-5dbf-b9d4-55091a78aa72"
+        ],
+        "name": "Riley FLAHERTY",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-44908",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "589570e5-39a8-5108-8a6f-49f1f3dbea79",
+        "categoryIds": [
+          "589570e5-39a8-5108-8a6f-49f1f3dbea79"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Mark",
+        "id": "9c389cee-8022-5e14-9ef9-74dbdbb103f2",
+        "lastName": "MATHEWS",
+        "memberParticipantIds": [
+          "9c389cee-8022-5e14-9ef9-74dbdbb103f2"
+        ],
+        "name": "Mark MATHEWS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-9733",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "9be4d8b8-ede3-594e-945d-702cf4cf3706",
+        "categoryIds": [
+          "9be4d8b8-ede3-594e-945d-702cf4cf3706"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Adrian",
+        "id": "1b801876-1e1c-51f6-af1c-6410ce57d1d1",
+        "lastName": "DILLON",
+        "memberParticipantIds": [
+          "1b801876-1e1c-51f6-af1c-6410ce57d1d1"
+        ],
+        "name": "Adrian DILLON",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-97737",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "9be4d8b8-ede3-594e-945d-702cf4cf3706",
+        "categoryIds": [
+          "9be4d8b8-ede3-594e-945d-702cf4cf3706"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Phil",
+        "id": "7adb5955-73c8-5c94-aa75-f1ea2457e7fd",
+        "lastName": "O'NEIL",
+        "memberParticipantIds": [
+          "7adb5955-73c8-5c94-aa75-f1ea2457e7fd"
+        ],
+        "name": "Phil O'NEIL",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-99461",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "9be4d8b8-ede3-594e-945d-702cf4cf3706",
+        "categoryIds": [
+          "9be4d8b8-ede3-594e-945d-702cf4cf3706"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Tony",
+        "id": "ec32dd23-1d61-564f-8901-12462ada810c",
+        "lastName": "FRENCH",
+        "memberParticipantIds": [
+          "ec32dd23-1d61-564f-8901-12462ada810c"
+        ],
+        "name": "Tony FRENCH",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-8920",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "9be4d8b8-ede3-594e-945d-702cf4cf3706",
+        "categoryIds": [
+          "9be4d8b8-ede3-594e-945d-702cf4cf3706"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Tim",
+        "id": "8cc08eac-3c5c-5abb-8d6c-a28091a69501",
+        "lastName": "ROWE",
+        "memberParticipantIds": [
+          "8cc08eac-3c5c-5abb-8d6c-a28091a69501"
+        ],
+        "name": "Tim ROWE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-36641",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "b586dde6-7755-5590-a2af-24ba4f0ed25a",
+        "categoryIds": [
+          "b586dde6-7755-5590-a2af-24ba4f0ed25a"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Gavin",
+        "id": "479bc4da-f25e-5b21-9a6f-c931bf870d04",
+        "lastName": "ERICKSON",
+        "memberParticipantIds": [
+          "479bc4da-f25e-5b21-9a6f-c931bf870d04"
+        ],
+        "name": "Gavin ERICKSON",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-57978",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "b586dde6-7755-5590-a2af-24ba4f0ed25a",
+        "categoryIds": [
+          "b586dde6-7755-5590-a2af-24ba4f0ed25a"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Richard",
+        "id": "ca36bbf0-a988-57bc-bcbb-f35317ac9772",
+        "lastName": "WILLIAMS",
+        "memberParticipantIds": [
+          "ca36bbf0-a988-57bc-bcbb-f35317ac9772"
+        ],
+        "name": "Richard WILLIAMS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-30469",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "b586dde6-7755-5590-a2af-24ba4f0ed25a",
+        "categoryIds": [
+          "b586dde6-7755-5590-a2af-24ba4f0ed25a"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Ben",
+        "id": "dfbdcdf7-3925-502e-895c-ae7118d720cf",
+        "lastName": "WILLIAMS",
+        "memberParticipantIds": [
+          "dfbdcdf7-3925-502e-895c-ae7118d720cf"
+        ],
+        "name": "Ben WILLIAMS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-39496",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "b586dde6-7755-5590-a2af-24ba4f0ed25a",
+        "categoryIds": [
+          "b586dde6-7755-5590-a2af-24ba4f0ed25a"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Vince",
+        "id": "ef28037b-079d-5142-b294-fba3472cf343",
+        "lastName": "TROTTER",
+        "memberParticipantIds": [
+          "ef28037b-079d-5142-b294-fba3472cf343"
+        ],
+        "name": "Vince TROTTER",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-32285",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "b586dde6-7755-5590-a2af-24ba4f0ed25a",
+        "categoryIds": [
+          "b586dde6-7755-5590-a2af-24ba4f0ed25a"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Ben",
+        "id": "32d0c191-f6b9-5056-928d-5d462d33c617",
+        "lastName": "VAN DUIJNE",
+        "memberParticipantIds": [
+          "32d0c191-f6b9-5056-928d-5d462d33c617"
+        ],
+        "name": "Ben VAN DUIJNE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-12480",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "b586dde6-7755-5590-a2af-24ba4f0ed25a",
+        "categoryIds": [
+          "b586dde6-7755-5590-a2af-24ba4f0ed25a"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Eric",
+        "id": "e5375c7f-f7f9-58b9-8d36-325bba9df078",
+        "lastName": "VAN DAM",
+        "memberParticipantIds": [
+          "e5375c7f-f7f9-58b9-8d36-325bba9df078"
+        ],
+        "name": "Eric VAN DAM",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-86514",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "b586dde6-7755-5590-a2af-24ba4f0ed25a",
+        "categoryIds": [
+          "b586dde6-7755-5590-a2af-24ba4f0ed25a"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Nick",
+        "id": "4ba80a8d-5a7e-52d7-a9e0-40ca38078e9b",
+        "lastName": "PILE",
+        "memberParticipantIds": [
+          "4ba80a8d-5a7e-52d7-a9e0-40ca38078e9b"
+        ],
+        "name": "Nick PILE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-71867",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "b586dde6-7755-5590-a2af-24ba4f0ed25a",
+        "categoryIds": [
+          "b586dde6-7755-5590-a2af-24ba4f0ed25a"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Kelly",
+        "id": "31e91c49-3faa-5617-9f2d-c0b25eb989bd",
+        "lastName": "WESTON",
+        "memberParticipantIds": [
+          "31e91c49-3faa-5617-9f2d-c0b25eb989bd"
+        ],
+        "name": "Kelly WESTON",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-56002",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "b586dde6-7755-5590-a2af-24ba4f0ed25a",
+        "categoryIds": [
+          "b586dde6-7755-5590-a2af-24ba4f0ed25a"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Martz",
+        "id": "c0a7ab4f-95e9-53f0-86b0-76a27eb0bd92",
+        "lastName": "KEIR",
+        "memberParticipantIds": [
+          "c0a7ab4f-95e9-53f0-86b0-76a27eb0bd92"
+        ],
+        "name": "Martz KEIR",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-67148",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "b586dde6-7755-5590-a2af-24ba4f0ed25a",
+        "categoryIds": [
+          "b586dde6-7755-5590-a2af-24ba4f0ed25a"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Luis",
+        "id": "a635c369-6cb5-5805-9cbf-6e391de8c56d",
+        "lastName": "GOLDSTRAW",
+        "memberParticipantIds": [
+          "a635c369-6cb5-5805-9cbf-6e391de8c56d"
+        ],
+        "name": "Luis GOLDSTRAW",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-33380",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "b586dde6-7755-5590-a2af-24ba4f0ed25a",
+        "categoryIds": [
+          "b586dde6-7755-5590-a2af-24ba4f0ed25a"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Scott",
+        "id": "78ca453b-f2dd-578a-9181-bf5a8ca5395c",
+        "lastName": "WILLIAMS",
+        "memberParticipantIds": [
+          "78ca453b-f2dd-578a-9181-bf5a8ca5395c"
+        ],
+        "name": "Scott WILLIAMS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-8821",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "8382d833-789e-546d-a92f-f34a841faf81",
+        "categoryIds": [
+          "8382d833-789e-546d-a92f-f34a841faf81"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Oscar",
+        "id": "45cd8e92-1412-5d6e-9d50-4985d465f68a",
+        "lastName": "DURANTE",
+        "memberParticipantIds": [
+          "45cd8e92-1412-5d6e-9d50-4985d465f68a"
+        ],
+        "name": "Oscar DURANTE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-4960",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "8382d833-789e-546d-a92f-f34a841faf81",
+        "categoryIds": [
+          "8382d833-789e-546d-a92f-f34a841faf81"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Colin",
+        "id": "b1b77876-d4fe-53d6-ac9b-512cc8a52f95",
+        "lastName": "LINAHAN",
+        "memberParticipantIds": [
+          "b1b77876-d4fe-53d6-ac9b-512cc8a52f95"
+        ],
+        "name": "Colin LINAHAN",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-14087",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "2cdbe1f4-04fa-5fdc-9a7e-9cb6e67988e8",
+        "categoryIds": [
+          "2cdbe1f4-04fa-5fdc-9a7e-9cb6e67988e8"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Paul",
+        "id": "c675b152-17e2-59b1-a30e-4546e8f4369c",
+        "lastName": "DURANTE",
+        "memberParticipantIds": [
+          "c675b152-17e2-59b1-a30e-4546e8f4369c"
+        ],
+        "name": "Paul DURANTE",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-12382",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "2cdbe1f4-04fa-5fdc-9a7e-9cb6e67988e8",
+        "categoryIds": [
+          "2cdbe1f4-04fa-5fdc-9a7e-9cb6e67988e8"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Peter",
+        "id": "cfab1454-7e73-5fac-a18d-37d42b23a87a",
+        "lastName": "HENKEL",
+        "memberParticipantIds": [
+          "cfab1454-7e73-5fac-a18d-37d42b23a87a"
+        ],
+        "name": "Peter HENKEL",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-37398",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "2cdbe1f4-04fa-5fdc-9a7e-9cb6e67988e8",
+        "categoryIds": [
+          "2cdbe1f4-04fa-5fdc-9a7e-9cb6e67988e8"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Anthony",
+        "id": "bc639659-c5fc-5e31-85a5-74ff27ee789e",
+        "lastName": "SPEECHLEY",
+        "memberParticipantIds": [
+          "bc639659-c5fc-5e31-85a5-74ff27ee789e"
+        ],
+        "name": "Anthony SPEECHLEY",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-11682",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "14d6ceca-6f8c-5cf6-9dcc-48559eea73fd",
+        "categoryIds": [
+          "14d6ceca-6f8c-5cf6-9dcc-48559eea73fd"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Christy",
+        "id": "ead789a5-8302-5eab-94ee-3837e4681b0e",
+        "lastName": "HARRIS",
+        "memberParticipantIds": [
+          "ead789a5-8302-5eab-94ee-3837e4681b0e"
+        ],
+        "name": "Christy HARRIS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-48170",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "1285da2b-acb6-58f8-9854-caa60ceaa438",
+        "categoryIds": [
+          "1285da2b-acb6-58f8-9854-caa60ceaa438"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Amy",
+        "id": "3c808902-f89a-543e-b33e-d97002493c7b",
+        "lastName": "TROTTER",
+        "memberParticipantIds": [
+          "3c808902-f89a-543e-b33e-d97002493c7b"
+        ],
+        "name": "Amy TROTTER",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-63621",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "entrant": {
+        "categoryId": "1285da2b-acb6-58f8-9854-caa60ceaa438",
+        "categoryIds": [
+          "1285da2b-acb6-58f8-9854-caa60ceaa438"
+        ],
+        "entrantType": "rider",
+        "eventId": "event-2026-racesweet-round-1",
+        "firstName": "Kimberly",
+        "id": "93ec84e2-949a-58f9-af3b-5ed08cdba153",
+        "lastName": "DOUGLASS",
+        "memberParticipantIds": [
+          "93ec84e2-949a-58f9-af3b-5ed08cdba153"
+        ],
+        "name": "Kimberly DOUGLASS",
+        "sessionIds": [
+          "session-1-practice",
+          "session-1-qualifying",
+          "session-1-race"
+        ]
+      },
+      "id": "event-catalog-1780264378513-34188",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "entrant-created"
+    },
+    {
+      "changes": {
+        "categoryIds": [
+          "589570e5-39a8-5108-8a6f-49f1f3dbea79",
+          "9be4d8b8-ede3-594e-945d-702cf4cf3706",
+          "b586dde6-7755-5590-a2af-24ba4f0ed25a",
+          "8382d833-789e-546d-a92f-f34a841faf81",
+          "2cdbe1f4-04fa-5fdc-9a7e-9cb6e67988e8",
+          "ab73aec4-4542-5dd7-869f-81257138cd73",
+          "14d6ceca-6f8c-5cf6-9dcc-48559eea73fd",
+          "1285da2b-acb6-58f8-9854-caa60ceaa438"
+        ],
+        "entrantIds": [
+          "93f31ac0-2a65-52f7-af47-a7e34099e7e8",
+          "1a7df0e9-46b9-597b-a803-f92f61cf9d85",
+          "be3b4751-ee54-530b-afc8-3fea42a0cec1",
+          "ba71336b-d13c-5dbf-b9d4-55091a78aa72",
+          "9c389cee-8022-5e14-9ef9-74dbdbb103f2",
+          "1b801876-1e1c-51f6-af1c-6410ce57d1d1",
+          "7adb5955-73c8-5c94-aa75-f1ea2457e7fd",
+          "ec32dd23-1d61-564f-8901-12462ada810c",
+          "8cc08eac-3c5c-5abb-8d6c-a28091a69501",
+          "479bc4da-f25e-5b21-9a6f-c931bf870d04",
+          "ca36bbf0-a988-57bc-bcbb-f35317ac9772",
+          "dfbdcdf7-3925-502e-895c-ae7118d720cf",
+          "ef28037b-079d-5142-b294-fba3472cf343",
+          "32d0c191-f6b9-5056-928d-5d462d33c617",
+          "e5375c7f-f7f9-58b9-8d36-325bba9df078",
+          "4ba80a8d-5a7e-52d7-a9e0-40ca38078e9b",
+          "31e91c49-3faa-5617-9f2d-c0b25eb989bd",
+          "c0a7ab4f-95e9-53f0-86b0-76a27eb0bd92",
+          "a635c369-6cb5-5805-9cbf-6e391de8c56d",
+          "78ca453b-f2dd-578a-9181-bf5a8ca5395c",
+          "45cd8e92-1412-5d6e-9d50-4985d465f68a",
+          "b1b77876-d4fe-53d6-ac9b-512cc8a52f95",
+          "c675b152-17e2-59b1-a30e-4546e8f4369c",
+          "cfab1454-7e73-5fac-a18d-37d42b23a87a",
+          "bc639659-c5fc-5e31-85a5-74ff27ee789e",
+          "ead789a5-8302-5eab-94ee-3837e4681b0e",
+          "3c808902-f89a-543e-b33e-d97002493c7b",
+          "93ec84e2-949a-58f9-af3b-5ed08cdba153"
+        ]
+      },
+      "eventId": "event-2026-racesweet-round-1",
+      "id": "event-catalog-1780264378513-89422",
+      "timestamp": "2026-05-31T21:52:58.513Z",
+      "type": "event-updated"
     }
   ],
   "schemaVersion": 1

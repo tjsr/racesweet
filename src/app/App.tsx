@@ -97,10 +97,9 @@ export const RaceSweetMainApp = () => {
 
   useEffect(() => {
     if (!sessionState && !eventCatalogState && !errorState) {
-      const warnings: string[] = [];
       const onLoadError = (error: unknown): void => {
         const message = error instanceof Error ? error.message : String(error);
-        warnings.push(message);
+        setLoadWarnings((existing) => existing.includes(message) ? existing : [...existing, message]);
       };
 
       Promise.all([loadAdminService(onLoadError), loadEventCatalogService(onLoadError), loadSystemConfigService(onLoadError)]).then(([raceService, catalogService, systemService]) => {
@@ -141,7 +140,6 @@ export const RaceSweetMainApp = () => {
           setSelectedSessionsEventId(initialEventId);
           setSelectedSessionId(sessionList[0]?.id);
           setErrorState(undefined);
-          setLoadWarnings(warnings);
         };
 
         if (shouldSyncScaffold) {

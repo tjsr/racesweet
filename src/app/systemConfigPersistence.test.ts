@@ -81,4 +81,22 @@ describe('ElectronJsonSystemConfigPersistence', () => {
     expect(loaded.eventSourceAssignments).toEqual(configData.eventSourceAssignments);
     expect(loaded.schemaVersion).toBe(1);
   });
+
+  it('reports save permission errors without throwing', async () => {
+    const writeFileContent = vi.fn(async () => {
+      throw new Error('EACCES: access is denied');
+    });
+
+    (window as unknown as {
+      api: { writeFileContent: (filePath: string, contents: string) => Promise<void> };
+    }).api = {
+      writeFileContent,
+    };
+
+    const onError = vi.fn();
+    const persistence = new ElectronJsonSystemConfigPersistence('../../src/generated/system-config.json', onError);
+
+    await expect(persistence.save(createDefaultSystemConfiguration())).resolves.toBeUndefined();
+    expect(onError).toHaveBeenCalledOnce();
+  });
 });

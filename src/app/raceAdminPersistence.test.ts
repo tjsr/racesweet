@@ -89,4 +89,24 @@ describe('ElectronJsonRaceAdminPersistence', () => {
       schemaVersion: 1,
     });
   });
+
+  it('reports save permission errors without throwing', async () => {
+    const writeFileContent = vi.fn(async () => {
+      throw new Error('EACCES: permission denied');
+    });
+
+    (window as unknown as {
+      api: {
+        writeFileContent: (filePath: string, contents: string) => Promise<void>;
+      };
+    }).api = {
+      writeFileContent,
+    };
+
+    const onError = vi.fn();
+    const persistence = new ElectronJsonRaceAdminPersistence('../../src/generated/admin-overrides.json', onError);
+
+    await expect(persistence.save(createDefaultAdministrativeChanges())).resolves.toBeUndefined();
+    expect(onError).toHaveBeenCalledOnce();
+  });
 });
