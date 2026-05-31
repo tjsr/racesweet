@@ -18,12 +18,12 @@ export const splitDateTime = (input: string, tzhint?: string): { isoDate?: Date;
   }
 
   const isoDate = new TZDate(input, timeStringHasTimezone(input) ? undefined : tzhint);
-  if (!isNaN(isoDate.getTime())) {
-    console.log('Returning acceptable ISO time.', input, isoDate);
-    const rfcDateString = formatRFC3339(isoDate, { fractionDigits: 3 });
-    const timePart = rfcDateString.split('T')[1].replace(/(Z|[+-]\d{2}:\d{2})$/, '');
+  if (/^\d{4}/.test(input) && !isNaN(isoDate.getTime())) {
+    const datePart = input.includes('T') ? input.split('T')[0] : input.split(' ')[0];
+    const utcString = new Date(+isoDate).toISOString();
+    const timePart = utcString.split('T')[1].replace(/\.000Z$/, 'Z');
     return {
-      date: rfcDateString.split('T')[0],
+      date: datePart,
       isoDate: timeToLocal(isoDate),
       time: timePart,
     };
@@ -41,8 +41,25 @@ export const splitDateTime = (input: string, tzhint?: string): { isoDate?: Date;
   const dateIndex = dateTimeParts[1].includes(':') ? 0 : 1;
 
   const timePart = dateTimeParts[timeIndex];
-  const parsedDateString = parseDateString(dateTimeParts[dateIndex]);
-  const datePart = formatRFC3339(parsedDateString, { fractionDigits: 3 }).split('T')[0];
+  let parsedDateString: Date;
+  let datePart: string;
+  try {
+    parsedDateString = parseDateString(dateTimeParts[dateIndex]);
+    datePart = formatRFC3339(parsedDateString, { fractionDigits: 3 }).split('T')[0];
+  } catch (_err) {
+    // DMY parsing failed — if TZDate gave a valid result (e.g., MM/DD or MM-DD format), fall back to it
+    if (!isNaN(isoDate.getTime())) {
+      const utcIsoString = new Date(+isoDate).toISOString();
+      const fallbackDatePart = utcIsoString.split('T')[0];
+      const fallbackTimePart = utcIsoString.split('T')[1].replace(/\.000Z$/, 'Z');
+      return {
+        date: fallbackDatePart,
+        isoDate: timeToLocal(isoDate),
+        time: fallbackTimePart,
+      };
+    }
+    throw _err;
+  }
 
   // if (!timeStringHasTimezone(timePart) && tzhint) {
   //   timePart = timePart + tzhint;

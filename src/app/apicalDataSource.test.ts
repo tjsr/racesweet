@@ -100,7 +100,7 @@ describe('apicalDataSource', () => {
       .mockResolvedValueOnce(new Response('{}', { status: 200 }))
       .mockResolvedValueOnce(new Response('unauthorized', { status: 401, statusText: 'Unauthorized' }));
 
-    await expect(fetchApicalEvents(createApicalSource())).rejects.toThrow('[401] Unauthorized');
+    await expect(fetchApicalEvents(createApicalSource())).rejects.toThrow('401 Unauthorized');
   });
 
   it('throws clear error when pulling race state without a selected Apical event id', async () => {

@@ -496,7 +496,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
               <option value="handicap-data">Handicap Data</option>
             </select>
           </label>
-          {reportType !== 'handicap-data' && reportType !== 'lap-times' ? (
+          {reportType !== 'handicap-data' ? (
             <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
           ) : null}
           {reportType === 'handicap-data' ? (

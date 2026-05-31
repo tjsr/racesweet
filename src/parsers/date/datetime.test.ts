@@ -159,7 +159,7 @@ describe('parseUnknownDateTimeString', () => {
     const result = parseUnknownDateTimeString(testInput, dateHint);
     expect(result).not.toBeUndefined();
     const rfcStr = formatRFC3339(result, { fractionDigits: 3, in: tz('Australia/Melbourne') });
-    expect(rfcStr).toEqual('2021-07-10T14:15:16.000+11:00');
+    expect(rfcStr).toEqual('2021-07-10T14:15:16.000+10:00');
   });
 });
 
@@ -189,17 +189,17 @@ describe('dateAndTimeStringToDate', () => {
     const utcDateHint = new TZDate('UTC');
     const result = dateAndTimeStringToDate(date, time, utcDateHint);
     expect(result).not.toBeUndefined();
-    expect(result).toEqual('2023-10-01T12:00:00.000Z');
+    expect(result.toISOString()).toContain('2023-10-01T12:00:00.000');
   });
 
-  it ('Should return a valid date object for a valid UTC date and time string', () => {
+  it ('Should return a valid date object for a valid local date and time string', () => {
     const date = '2023-10-01';
     const time = '12:00:00';
     const localDateHint = new TZDate();
     const result = dateAndTimeStringToDate(date, time, localDateHint);
     expect(result).not.toBeUndefined();
-    expect(result).not.toEqual('2023-10-01T12:00:00.000Z');
-    expect(result).toContain('2023-10-01T12:00:00.000');
+    expect(result.toISOString()).not.toEqual('2023-10-01T12:00:00.000Z');
+    expect(result.toISOString()).toContain('2023-10-01T12:00:00.000');
   });
 });
 
