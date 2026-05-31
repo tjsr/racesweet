@@ -1,6 +1,7 @@
 import { DateParseError } from "./errors.js";
 import { TZDate } from "@date-fns/tz";
 import { datePartsToDMY } from "./dateutils.js";
+import { getUserTimezone } from "./datetime.js";
 
 export const parseSplitDateStringToDate = (input: string, delimiter: string = '-', tz?: string): TZDate => {
   if (input.includes(' ') || input.includes('T')) {
@@ -20,7 +21,7 @@ export const parseSplitDateStringToDate = (input: string, delimiter: string = '-
     tz = d.timeZone;
   }
   if (!tz) {
-    tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    tz = getUserTimezone();
   }
   return new TZDate(dmy.year, dmy.month - 1, dmy.day, tz);
 };

@@ -14,7 +14,7 @@ export const systemDateString = /^(?<year>\d{4})[-/](?<month>\d{1,2})[-/](?<day>
 // const reverseDateString = /^(?<day>\d{1,2})[-/](?<month>\d{1,2})[-/](?<year>\d{4})$/;
 
 export const getUserTimezone = (): string => {
-  return 'Australia/Melbourne'; // Replace with actual logic to get user's timezone
+  return Intl.DateTimeFormat().resolvedOptions().timeZone; // Replace with actual logic to get user's timezone
 };
 
 export const combineDateWithTimeString = (date: Date, time: string): TZDate => {
