@@ -15,8 +15,12 @@ export const parseSplitDateStringToDate = (input: string, delimiter: string = '-
   const dmyParts: [string, string, string] = [parts[0], parts[1], parts[2]];
 
   const dmy: { day: number; month: number; year: number } = datePartsToDMY(dmyParts);
-  if (tz) {
-    return new TZDate(dmy.year, dmy.month - 1, dmy.day, tz);
+  if (!tz) {
+    const d: TZDate = new TZDate();
+    tz = d.timeZone;
   }
-  return new TZDate(dmy.year, dmy.month - 1, dmy.day, (new TZDate()).timeZone);
+  if (!tz) {
+    tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  }
+  return new TZDate(dmy.year, dmy.month - 1, dmy.day, tz);
 };
