@@ -2,8 +2,8 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { createDefaultSystemConfiguration } from './systemConfig.js';
 import { ElectronJsonSystemConfigPersistence } from './systemConfigPersistence.js';
+import { createDefaultSystemConfiguration } from './systemConfig.js';
 
 describe('ElectronJsonSystemConfigPersistence', () => {
   it('returns default config when file does not exist', async () => {

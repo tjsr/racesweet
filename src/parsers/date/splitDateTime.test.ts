@@ -1,5 +1,5 @@
 import { parseableDateTimeStrings } from "./parseableDateTimeStrings.js";
-import { splitDateTime } from "./splitDateTime.js";
+import { splitDateTime, timeStringHasTimezone } from "./splitDateTime.js";
 
 describe("splitDateTime", () => {
   it('Should allow a string with a time only, and infer the date as today', () => {
@@ -78,6 +78,49 @@ describe("splitDateTime", () => {
 
     invalidInputs.forEach((input) => {
       expect(() => splitDateTime(input), `Input format ${input} was accepted.`).toThrowError();
+    });
+  });
+});
+
+describe("timeStringHasTimezone", () => {
+  describe("returns true", () => {
+    it.each([
+      ["UTC Z suffix on ISO datetime", "2025-03-01T11:11:45.451Z"],
+      ["UTC Z suffix on space-separated datetime", "2025-03-01 11:11:45.451Z"],
+      ["time-only string with Z", "11:11:45.451Z"],
+      ["bare Z character", "Z"],
+      ["positive offset on ISO datetime", "2025-03-01T11:11:45.451+08:00"],
+      ["positive offset on space-separated datetime", "2025-03-01 11:11:45.451+08:00"],
+      ["positive UTC offset +00:00", "2025-03-01T11:11:45.451+00:00"],
+      ["time-only with positive offset", "11:11:45.451+08:00"],
+      ["negative offset on ISO datetime", "2025-03-01T11:11:45.451-05:00"],
+      ["negative offset on space-separated datetime", "2025-03-01 11:11:45.451-05:00"],
+      ["time-only with negative offset", "11:11:45.451-05:00"],
+      ["bare positive offset string", "+08:00"],
+      ["bare negative offset string", "-05:00"],
+    ])("%s: %s", (_label, input) => {
+      expect(timeStringHasTimezone(input)).toBe(true);
+    });
+  });
+
+  describe("returns false", () => {
+    it.each([
+      ["ISO datetime without timezone", "2025-03-01T11:11:45.451"],
+      ["space-separated datetime without timezone", "2025-03-01 11:11:45.451"],
+      ["time-only string without timezone", "11:11:45.451"],
+      ["date-only string", "2025-03-01"],
+      ["slashed date with time, no timezone", "26/10/2024 09:06:25.888"],
+      ["empty string", ""],
+    ])("%s: %s", (_label, input) => {
+      expect(timeStringHasTimezone(input)).toBe(false);
+    });
+
+    it("returns false for null", () => {
+      expect(timeStringHasTimezone(null as unknown as string)).toBe(false);
+    });
+
+    it("returns false for undefined", () => {
+      expect(timeStringHasTimezone(undefined as unknown as string)).toBe(false);
     });
   });
 });

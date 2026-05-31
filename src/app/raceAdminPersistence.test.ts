@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest';
-
 import {
-  createDefaultAdministrativeChanges,
   ElectronJsonRaceAdminPersistence,
+  createDefaultAdministrativeChanges,
 } from './raceAdminPersistence.js';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('ElectronJsonRaceAdminPersistence', () => {
   it('returns default admin changes when admin-overrides file does not exist', async () => {

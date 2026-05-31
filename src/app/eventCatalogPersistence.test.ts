@@ -2,8 +2,8 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { createDefaultEventCatalogLedger } from './eventCatalog.js';
 import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.js';
+import { createDefaultEventCatalogLedger } from './eventCatalog.js';
 
 describe('ElectronJsonEventCatalogPersistence', () => {
   it('returns default ledger when file does not exist', async () => {

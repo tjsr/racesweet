@@ -5,7 +5,8 @@ import { hasDateComponent } from "./datetime.js";
 import { parseDateString } from "./datestring.js";
 import { timeToLocal } from "./dateutils.js";
 
-const timeStringHasTimezone = (time: string): boolean => time?.includes('Z') || time?.includes('+');
+export const timeStringHasTimezone = (time: string): boolean =>
+  time?.includes('Z') || /[+-]\d{2}:\d{2}/.test(time ?? '');
 
 export const splitDateTime = (input: string, tzhint?: string): { isoDate?: Date; date: string; time: string; } => {
   if (!input) {
