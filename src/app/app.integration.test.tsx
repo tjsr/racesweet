@@ -192,6 +192,27 @@ const ensureAppStylesLoaded = async (): Promise<void> => {
   document.head.appendChild(style);
 };
 
+const getAppStylesheet = (): CSSStyleSheet => {
+  const styleElement = document.head.querySelector(`style[${APP_TEST_STYLE_TAG}="${APP_TEST_STYLE_TAG_VALUE}"]`) as HTMLStyleElement | null;
+  expect(styleElement).toBeTruthy();
+  expect(styleElement!.sheet).toBeTruthy();
+  return styleElement!.sheet as CSSStyleSheet;
+};
+
+const getMediaRule = (sheet: CSSStyleSheet, queryText: string): CSSMediaRule | undefined => {
+  const rules = Array.from(sheet.cssRules);
+  return rules.find((rule) => {
+    return rule instanceof CSSMediaRule && rule.conditionText.includes(queryText);
+  }) as CSSMediaRule | undefined;
+};
+
+const getFirstBodyRule = (mediaRule: CSSMediaRule): CSSStyleRule | undefined => {
+  const rules = Array.from(mediaRule.cssRules);
+  return rules.find((rule) => {
+    return rule instanceof CSSStyleRule && rule.selectorText === 'body';
+  }) as CSSStyleRule | undefined;
+};
+
 describe('RaceSweetMainApp integration', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -585,5 +606,30 @@ describe('RaceSweetMainApp integration', () => {
     const loadedCssText = document.head.querySelector(`style[${APP_TEST_STYLE_TAG}="${APP_TEST_STYLE_TAG_VALUE}"]`)?.textContent || '';
     expect(loadedCssText).toContain('.section-tile.active');
     expect(loadedCssText).toContain('@media (prefers-color-scheme: dark)');
+  });
+
+  it('supports both dark and light themes via parsed media-query rules', async () => {
+    await ensureAppStylesLoaded();
+
+    const stylesheet = getAppStylesheet();
+    const darkRule = getMediaRule(stylesheet, 'prefers-color-scheme: dark');
+    const lightRule = getMediaRule(stylesheet, 'prefers-color-scheme: light');
+
+    expect(darkRule).toBeTruthy();
+    expect(lightRule).toBeTruthy();
+
+    const darkCssText = darkRule!.cssText;
+    const darkBodyRule = getFirstBodyRule(darkRule!);
+    expect(darkCssText).toContain('--color-bg: #1e1e1e');
+    expect(darkCssText).toContain('--color-fg: #f0f0f0');
+    expect(darkBodyRule?.style.getPropertyValue('background').trim()).toBe('var(--color-bg)');
+    expect(darkBodyRule?.style.getPropertyValue('color').trim()).toBe('var(--color-fg)');
+
+    const lightCssText = lightRule!.cssText;
+    const lightBodyRule = getFirstBodyRule(lightRule!);
+    expect(lightCssText).toMatch(/background:\s*(#ddd|rgb\(221,\s*221,\s*221\))/i);
+    expect(lightCssText).toContain('color: black');
+    expect(lightBodyRule?.style.getPropertyValue('background').trim()).toMatch(/^(#ddd|rgb\(221,\s*221,\s*221\))$/i);
+    expect(lightBodyRule?.style.getPropertyValue('color').trim()).toBe('black');
   });
 });
