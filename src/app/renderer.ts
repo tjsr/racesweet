@@ -1,5 +1,5 @@
 import "./index.css";
-import './App.tsx';
+import './App';
 
 /**
  * This file will automatically be loaded by webpack and run in the "renderer" context.

@@ -28,6 +28,11 @@ if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
+process.on('warning', (warning) => {
+  const trace = warning.stack ?? `${warning.name}: ${warning.message}`;
+  console.warn(trace);
+});
+
 const configureCorsForApicalRequests = (): void => {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     if (isApicalApiUrl(details.url)) {
