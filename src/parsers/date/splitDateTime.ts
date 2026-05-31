@@ -21,10 +21,11 @@ export const splitDateTime = (input: string, tzhint?: string): { isoDate?: Date;
   if (!isNaN(isoDate.getTime())) {
     console.log('Returning acceptable ISO time.', input, isoDate);
     const rfcDateString = formatRFC3339(isoDate, { fractionDigits: 3 });
+    const timePart = rfcDateString.split('T')[1].replace(/(Z|[+-]\d{2}:\d{2})$/, '');
     return {
       date: rfcDateString.split('T')[0],
       isoDate: timeToLocal(isoDate),
-      time: rfcDateString.split('T')[1],
+      time: timePart,
     };
   }
 

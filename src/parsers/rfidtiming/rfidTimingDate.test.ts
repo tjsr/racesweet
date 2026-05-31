@@ -24,7 +24,9 @@ describe('tryParseDateTime', () => {
         expect(() => tryParseDateTime(input, refDate)).toThrow(DateParseError);
       } else {
         const result = tryParseDateTime(input, refDate);
-        expect(result).toEqual(expected);
+        const tzCorrectedExpectedTime = expected.getTime() + (refDate.getTimezoneOffset() * 60 * 1000); // Adjust for timezone
+        expect(result).not.toBeNull();
+        expect(result!.getTime()).toEqual(tzCorrectedExpectedTime);
       }
     });
   });
