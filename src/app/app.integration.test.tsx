@@ -252,7 +252,6 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Timing');
     expect(container.querySelector('h1')?.textContent).toBe('Timing');
     expect(container.textContent).toContain('Recent Records');
-    expect(container.textContent).toContain('Handicap Data');
 
     await clickSectionButton(container, 'Results');
     expect(container.querySelector('h1')?.textContent).toBe('Results');
@@ -263,8 +262,9 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Reports');
     expect(container.querySelector('h1')?.textContent).toBe('Reports');
     expect(container.textContent).toContain('Category-scoped reports for fastest laps, participant lap times, and lap chart.');
-    expect(container.querySelector('select[aria-label="Race View Category"]')).toBeTruthy();
     expect(container.querySelector('select[aria-label="Reports View Type"]')).toBeTruthy();
+    expect(container.querySelector('select[aria-label="Race View Category"]')).toBeTruthy();
+    expect(container.textContent).toContain('Handicap Data');
   });
 
   it('supports results and reports view selection dropdowns', async () => {

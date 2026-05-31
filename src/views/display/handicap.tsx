@@ -3,6 +3,7 @@ import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow
 import React, { useEffect, useMemo, useState } from 'react';
 
 interface HandicapViewProps {
+  participantNames?: string[];
   snapshotPath?: string;
 }
 
@@ -112,7 +113,7 @@ const formatRoundCell = (round?: HandicapRoundSnapshot, bold: boolean = false): 
   );
 };
 
-export const HandicapView = ({ snapshotPath = DEFAULT_HANDICAP_SNAPSHOT_PATH }: HandicapViewProps) => {
+export const HandicapView = ({ participantNames, snapshotPath = DEFAULT_HANDICAP_SNAPSHOT_PATH }: HandicapViewProps) => {
   const [error, setError] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [snapshot, setSnapshot] = useState<HandicapSnapshot | undefined>(undefined);
@@ -155,8 +156,13 @@ export const HandicapView = ({ snapshotPath = DEFAULT_HANDICAP_SNAPSHOT_PATH }: 
     if (!snapshot) {
       return [];
     }
-    return [...snapshot.riders].sort((a: HandicapRiderSnapshot, b: HandicapRiderSnapshot) => a.handicapRatio - b.handicapRatio);
-  }, [snapshot]);
+    const sorted = [...snapshot.riders].sort((a: HandicapRiderSnapshot, b: HandicapRiderSnapshot) => a.handicapRatio - b.handicapRatio);
+    if (!participantNames || participantNames.length === 0) {
+      return sorted;
+    }
+    const normalizedNames = new Set(participantNames.map((n) => n.trim().toLowerCase()));
+    return sorted.filter((rider: HandicapRiderSnapshot) => normalizedNames.has(rider.name.trim().toLowerCase()));
+  }, [participantNames, snapshot]);
 
   useEffect(() => {
     if (riders.length < 2) {

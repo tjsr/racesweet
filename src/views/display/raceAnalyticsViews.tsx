@@ -1,6 +1,7 @@
 import React from 'react';
 
 import type { EventCatalogEntrant } from '../../app/eventCatalog.js';
+import { HandicapView } from './handicap.js';
 import { millisecondsToTime } from '../../app/utils/timeutils.js';
 import { getParticipantNumber } from '../../controllers/participant.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
@@ -417,8 +418,9 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   const categories = React.useMemo(() => dedupeCategoryOptions(props.categories), [props.categories]);
   const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(props.selectedCategoryId || 'overall');
   const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
-  const [reportType, setReportType] = React.useState<'fastest-laps' | 'lap-times' | 'lap-chart'>('fastest-laps');
+  const [reportType, setReportType] = React.useState<'fastest-laps' | 'lap-times' | 'lap-chart' | 'handicap-data'>('fastest-laps');
   const [selectedParticipantId, setSelectedParticipantId] = React.useState<string>('');
+  const [handicapShowFilter, setHandicapShowFilter] = React.useState<'all' | 'event-participants-only'>('all');
 
   const allRows = React.useMemo(() => {
     return buildEntrantRows(props.raceState, props.catalogEntrants);
@@ -490,25 +492,34 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     });
   }, [rows]);
 
+  const eventParticipantNames = React.useMemo(() => {
+    return props.raceState.participants.map((participant) =>
+      `${participant.firstname || ''} ${participant.surname || ''}`.trim()
+    ).filter((name) => name.length > 0);
+  }, [props.raceState]);
+
   return (
     <section className="events-screen">
       <h1>Reports</h1>
       <p>Category-scoped reports for fastest laps, participant lap times, and lap chart.</p>
       <section className="events-panel">
         <div className="events-actions">
-          <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
           <label className="page-filter-label">
             Report
             <select
               aria-label="Reports View Type"
               value={reportType}
-              onChange={(event) => setReportType(event.target.value as 'fastest-laps' | 'lap-times' | 'lap-chart')}
+              onChange={(event) => setReportType(event.target.value as 'fastest-laps' | 'lap-times' | 'lap-chart' | 'handicap-data')}
             >
               <option value="fastest-laps">Fastest Laps</option>
               <option value="lap-times">Lap Times</option>
               <option value="lap-chart">Lap Chart</option>
+              <option value="handicap-data">Handicap Data</option>
             </select>
           </label>
+          {reportType !== 'handicap-data' ? (
+            <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
+          ) : null}
           {reportType === 'lap-times' ? (
             <label className="page-filter-label">
               Participant
@@ -520,6 +531,19 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
                 {participants.map((participant) => (
                   <option key={participant.id} value={participant.id}>{participant.name}</option>
                 ))}
+              </select>
+            </label>
+          ) : null}
+          {reportType === 'handicap-data' ? (
+            <label className="page-filter-label">
+              Show
+              <select
+                aria-label="Handicap Show Filter"
+                value={handicapShowFilter}
+                onChange={(event) => setHandicapShowFilter(event.target.value as 'all' | 'event-participants-only')}
+              >
+                <option value="all">All known participants</option>
+                <option value="event-participants-only">Event participants only</option>
               </select>
             </label>
           ) : null}
@@ -623,6 +647,14 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
               <p>Lap Time: {formatDuration(selectedLapEntry.lapTime)}</p>
             </aside>
           ) : null}
+        </section>
+      ) : null}
+
+      {reportType === 'handicap-data' ? (
+        <section className="events-panel">
+          <HandicapView
+            participantNames={handicapShowFilter === 'event-participants-only' ? eventParticipantNames : undefined}
+          />
         </section>
       ) : null}
     </section>

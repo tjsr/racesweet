@@ -12,9 +12,7 @@ import { EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEn
 import { EventParticipantId } from '../model/eventparticipant';
 import type { EventTimeRecord } from '../model/timerecord';
 import { EventCatalogService } from './eventCatalogService';
-import { EventsScreen } from '../views/display/events';
-import { HandicapView } from '../views/display/handicap';
-import { RecentRecords } from '../views/display/recent';
+import { EventsScreen } from '../views/display/events';import { RecentRecords } from '../views/display/recent';
 import { ElectronJsonRaceAdminPersistence } from './raceAdminPersistence';
 import { RaceAdminService } from './raceAdminService';
 import { ReportsPage, ResultsPage } from '../views/display/raceAnalyticsViews';
@@ -76,7 +74,6 @@ const createEmptySessionState = (): Session & RaceStateLookup => {
 
 export const RaceSweetMainApp = () => {
   const [activeSection, setActiveSection] = useState<AppSection>('System');
-  const [activeView, setActiveView] = useState<'recent' | 'handicap'>('recent');
   const [adminService, setAdminService] = useState<RaceAdminService|undefined>(undefined);
   const [eventCatalogService, setEventCatalogService] = useState<EventCatalogService|undefined>(undefined);
   const [eventCatalogState, setEventCatalogState] = useState<EventCatalogState|undefined>(undefined);
@@ -362,44 +359,20 @@ export const RaceSweetMainApp = () => {
     });
   }
 
-  const timingViewSelector = (
-    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-      <button
-        type='button'
-        onClick={() => setActiveView('recent')}
-        disabled={activeView === 'recent'}>
-        Recent Records
-      </button>
-      <button
-        type='button'
-        onClick={() => setActiveView('handicap')}
-        disabled={activeView === 'handicap'}>
-        Handicap Data
-      </button>
-    </div>
-  );
-
   const timingPage = (
     <>
       <h1>Timing</h1>
-      {timingViewSelector}
-      {activeView === 'handicap' ? (
-        <HandicapView />
-      ) : (
-        <>
-          <CategoryList categories={sessionState.categories || []} categorySelected={handleCategoryListSelected} />
-          <RecentRecords
-            records={(sessionState.records as EventTimeRecord[]) || []}
-            raceStateLookup={sessionState}
-            selectedCategories={hilightCategories}
-            selectedParticipants={recordSelectedParticipants}
-            categorySelected={setRecordSelectedCategories}
-            participantSelected={handleParticipantSelected}
-            onExclude={handleExcludeCrossing}
-            onChangeCategory={handleChangeCategory}
-          />
-        </>
-      )}
+      <CategoryList categories={sessionState.categories || []} categorySelected={handleCategoryListSelected} />
+      <RecentRecords
+        records={(sessionState.records as EventTimeRecord[]) || []}
+        raceStateLookup={sessionState}
+        selectedCategories={hilightCategories}
+        selectedParticipants={recordSelectedParticipants}
+        categorySelected={setRecordSelectedCategories}
+        participantSelected={handleParticipantSelected}
+        onExclude={handleExcludeCrossing}
+        onChangeCategory={handleChangeCategory}
+      />
     </>
   );
 
