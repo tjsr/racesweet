@@ -1,4 +1,19 @@
-import adodb from 'node-adodb';
+import type adodb from 'node-adodb';
+
+type AdodbModule = { open: (connectionString: string) => adodb.open };
+
+let _adodb: AdodbModule | undefined;
+
+const requireAdodb = (): AdodbModule => {
+  if (process.platform !== 'win32') {
+    throw new Error('node-adodb is only supported on Windows (requires ADODB/COM)');
+  }
+  if (!_adodb) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _adodb = require('node-adodb') as AdodbModule;
+  }
+  return _adodb;
+};
 
 const accessDbString = (dbFile: string, password?: string): string => {
   let connectionString = `Provider=Microsoft.Jet.OLEDB.4.0;Data Source="${dbFile}";`;
@@ -37,7 +52,7 @@ export const accessQueryUsingConnection = <D extends object>(conn: adodb.open, s
 
 export const getConnection = (dbFile: string, password?: string) => {
   const cn = accessDbString(dbFile, password);
-  const conn = adodb.open(cn);
+  const conn = requireAdodb().open(cn);
   return conn;
 };
 
