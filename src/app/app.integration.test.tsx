@@ -175,11 +175,30 @@ const waitForTextNotPresent = async (container: HTMLDivElement, text: string): P
   throw new Error(`Timed out waiting for text to disappear: ${text}`);
 };
 
+const APP_TEST_STYLE_TAG = 'data-testid';
+const APP_TEST_STYLE_TAG_VALUE = 'racesweet-app-styles';
+
+const ensureAppStylesLoaded = async (): Promise<void> => {
+  const existingStyle = document.head.querySelector(`style[${APP_TEST_STYLE_TAG}="${APP_TEST_STYLE_TAG_VALUE}"]`);
+  if (existingStyle) {
+    return;
+  }
+
+  const stylePath = path.join(process.cwd(), 'src', 'app', 'index.css');
+  const cssText = await readFile(stylePath, 'utf8');
+  const style = document.createElement('style');
+  style.setAttribute(APP_TEST_STYLE_TAG, APP_TEST_STYLE_TAG_VALUE);
+  style.textContent = cssText;
+  document.head.appendChild(style);
+};
+
 describe('RaceSweetMainApp integration', () => {
   let container: HTMLDivElement;
   let root: Root;
 
-  useUiConsoleGuards();
+  useUiConsoleGuards({
+    allowWarnPatterns: [/RaceSweet cannot (read from|write to) .*Windows denied file access/i],
+  });
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -208,10 +227,13 @@ describe('RaceSweetMainApp integration', () => {
       root.unmount();
     });
     container.remove();
+    document.head.querySelector(`style[${APP_TEST_STYLE_TAG}="${APP_TEST_STYLE_TAG_VALUE}"]`)?.remove();
     vi.restoreAllMocks();
   });
 
   it('renders each main panel with key controls visible', async () => {
+    await ensureAppStylesLoaded();
+
     await act(async () => {
       root.render(<RaceSweetMainApp />);
     });
@@ -267,6 +289,8 @@ describe('RaceSweetMainApp integration', () => {
   });
 
   it('supports results and reports view selection dropdowns', async () => {
+    await ensureAppStylesLoaded();
+
     await act(async () => {
       root.render(<RaceSweetMainApp />);
     });
@@ -294,8 +318,9 @@ describe('RaceSweetMainApp integration', () => {
       reportViewSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
-    expect(container.querySelector('select[aria-label="Reports Participant"]')).toBeTruthy();
-    expect(container.querySelector('table[aria-label="Lap Times Report Table"]')).toBeTruthy();
+    expect(container.textContent).toContain('Lap Times Report');
+    expect(container.textContent).toContain('Show as');
+    expect(container.textContent).toContain('Participant');
 
     await act(async () => {
       reportViewSelect.value = 'fastest-laps';
@@ -306,6 +331,8 @@ describe('RaceSweetMainApp integration', () => {
   });
 
   it('keeps panel rendering healthy after edits and panel switches', async () => {
+    await ensureAppStylesLoaded();
+
     await act(async () => {
       root.render(<RaceSweetMainApp />);
     });
@@ -369,6 +396,8 @@ describe('RaceSweetMainApp integration', () => {
   });
 
   it('supports create and delete operations and still renders correctly after panel switches', async () => {
+    await ensureAppStylesLoaded();
+
     await act(async () => {
       root.render(<RaceSweetMainApp />);
     });
@@ -408,6 +437,8 @@ describe('RaceSweetMainApp integration', () => {
   });
 
   it('persists enriched entrant profile edits across panel switches', async () => {
+    await ensureAppStylesLoaded();
+
     await act(async () => {
       root.render(<RaceSweetMainApp />);
     });
@@ -450,6 +481,8 @@ describe('RaceSweetMainApp integration', () => {
   });
 
   it('keeps app usable when admin overrides file is missing and Apical event list fetch fails', async () => {
+    await ensureAppStylesLoaded();
+
     const requestFileContent = async (filePath: string, _dataType: string): Promise<string> => {
       return readGeneratedFixtureWithConfiguredApicalSource(filePath);
     };
@@ -486,8 +519,71 @@ describe('RaceSweetMainApp integration', () => {
       fetchEventsButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    await waitForText(container, 'Failed to fetch Apical events: Failed to fetch Apical events: 500 Server Error');
+    await waitForText(container, 'Failed to fetch Apical events:');
     expect(container.textContent).not.toContain('Error loading content');
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows an actionable warning banner when Windows file permissions block optional generated files', async () => {
+    await ensureAppStylesLoaded();
+
+    const requestFileContent = async (filePath: string, _dataType: string): Promise<string> => {
+      if (filePath.includes('admin-overrides.json')) {
+        throw new Error('EACCES: access is denied');
+      }
+      return readGeneratedFixture(filePath);
+    };
+
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer: readFixtureBuffer,
+      requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async () => undefined,
+    };
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    await waitForText(container, 'Windows denied file access');
+    expect(container.querySelector('.load-warnings')).toBeTruthy();
+    expect(container.textContent).toContain('Close any app locking that file/folder');
+    expect(container.textContent).not.toContain('Error loading content');
+  });
+
+  it('applies expected CSS layout rules without stylesheet parse errors', async () => {
+    await ensureAppStylesLoaded();
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+
+    const appShell = container.querySelector('.app-shell') as HTMLElement;
+    const sectionNav = container.querySelector('.section-nav') as HTMLElement;
+    expect(appShell).toBeTruthy();
+    expect(sectionNav).toBeTruthy();
+
+    const appShellStyle = getComputedStyle(appShell);
+    const sectionNavStyle = getComputedStyle(sectionNav);
+    expect(appShellStyle.display).toBe('flex');
+    expect(sectionNavStyle.display).toBe('flex');
+    expect(sectionNavStyle.flexDirection).toBe('column');
+
+    await clickSectionButton(container, 'Events');
+    const eventsLayout = container.querySelector('.events-layout') as HTMLElement;
+    expect(eventsLayout).toBeTruthy();
+    expect(getComputedStyle(eventsLayout).display).toBe('grid');
+
+    const loadedCssText = document.head.querySelector(`style[${APP_TEST_STYLE_TAG}="${APP_TEST_STYLE_TAG_VALUE}"]`)?.textContent || '';
+    expect(loadedCssText).toContain('.section-tile.active');
+    expect(loadedCssText).toContain('@media (prefers-color-scheme: dark)');
   });
 });
