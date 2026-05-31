@@ -7,14 +7,13 @@ import { CategoriesPage } from '../views/display/categoriesPage.tsx';
 import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.ts';
 import { ElectronJsonSystemConfigPersistence } from './systemConfigPersistence.ts';
 import { EntrantsPage } from '../views/display/entrantsPage.tsx';
-import { EventCategory, EventCategoryId } from '../model/eventcategory.ts';
+import { EventCategoryId } from '../model/eventcategory.ts';
 import { EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
-import type { EventParticipant, EventParticipantId } from '../model/eventparticipant.ts';
+import type { EventParticipantId } from '../model/eventparticipant.ts';
 import type { EventTimeRecord } from '../model/timerecord.ts';
-import type { ParticipantPassingRecord } from '../model/timerecord.ts';
 import { EventCatalogService } from './eventCatalogService.ts';
-import { EventsScreen } from '../views/display/events.tsx';import { RecentRecords } from '../views/display/recent.tsx';
-import { LapTimesReport } from '../views/reports/LapTimesReport.tsx';
+import { EventsScreen } from '../views/display/events.tsx';
+import { RecentRecords } from '../views/display/recent.tsx';
 import { ElectronJsonRaceAdminPersistence } from './raceAdminPersistence.ts';
 import { RaceAdminService } from './raceAdminService.ts';
 import { ReportsPage, ResultsPage } from '../views/display/raceAnalyticsViews.tsx';
@@ -742,40 +741,3 @@ if (appHost) {
   const root = createRoot(appHost as HTMLElement);
   root.render(<RaceSweetMainApp />);
 }
-
-const makeLaps = (
-  participantId: string,
-  count: number,
-  baseLapMs: number
-): ParticipantPassingRecord[] =>
-  Array.from({ length: count }, (_, i) => ({
-    id: `${participantId}-lap-${i + 1}`,
-    participantId,
-    lapNo: i + 1,
-    lapTime: baseLapMs + Math.floor(Math.random() * 5000 - 2500),
-    elapsedTime: (i + 1) * baseLapMs,
-    isExcluded: false,
-    isValid: true,
-    recordType: 16,
-    sequence: i + 1,
-    source: 'sample',
-  }));
-
-const samplePassings = new Map<EventParticipantId, ParticipantPassingRecord[]>([
-  ['1', makeLaps('1', 12, 90000)],
-  ['2', makeLaps('2', 10, 95000)],
-  ['3', makeLaps('3', 8, 88000)],
-]);
-
-const App = () => (
-  <div style={{ maxWidth: '100%', padding: '0' }}>
-    <LapTimesReport
-      title="Lap Times Report"
-      participants={sampleParticipants}
-      categories={sampleCategories}
-      passings={samplePassings}
-    />
-  </div>
-);
-
-export default App;
