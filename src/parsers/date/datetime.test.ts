@@ -124,6 +124,27 @@ describe('hasDateComponent', () => {
 });
 
 describe('parseUnknownDateTimeString', () => {
+  it('should parse using system timezone when dateHint has no timeZone set', () => {
+    const systemTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const dateHintNoTz = new TZDate(2023, 9, 1);
+    expect(dateHintNoTz.timeZone).toBeUndefined();
+
+    const result = parseUnknownDateTimeString('2023-10-01T14:30:00', dateHintNoTz);
+
+    const formatted = formatRFC3339(result, { fractionDigits: 3, in: tz(systemTz) });
+    expect(formatted).toMatch(/^2023-10-01T14:30:00\.000/);
+  });
+
+  it('should parse using dateHint timeZone when dateHint has a known timeZone', () => {
+    const dateHintWithTz = new TZDate(new Date('2023-10-01T00:00:00Z'), 'America/New_York');
+    expect(dateHintWithTz.timeZone).toBe('America/New_York');
+
+    const result = parseUnknownDateTimeString('2023-10-01T12:00:00', dateHintWithTz);
+
+    const formatted = formatRFC3339(result, { fractionDigits: 3, in: tz('America/New_York') });
+    expect(formatted).toEqual('2023-10-01T12:00:00.000-04:00');
+  });
+
   it ('Should return a date object for a valid date-time string with space', () => {
     const testInput = '2023-10-01 12:00:00';
     const result = parseUnknownDateTimeString(testInput, dateHint);
