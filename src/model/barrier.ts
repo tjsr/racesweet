@@ -1,4 +1,4 @@
-import type { ErrorType } from "./racestate.ts";
+import type { ErrorType } from "./racestate.js";
 
 export class Barrier<T> extends Promise<T> {
   // private _resolver: (resolve: (value: T) => void, reject: (reason?: any) => void) => void;

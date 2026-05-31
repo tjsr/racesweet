@@ -1,5 +1,5 @@
-import type { EventParticipant } from "./eventparticipant.ts";
-import type { TimeRecord } from "./timerecord.ts";
+import type { EventParticipant } from "./eventparticipant.js";
+import type { TimeRecord } from "./timerecord.js";
 
 export interface EntrantLap {
   timeRecordId: TimeRecord['id'];

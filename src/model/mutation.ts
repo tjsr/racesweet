@@ -1,4 +1,4 @@
-import type { ISO8601DateTime, IdType, WithId, uuid } from "./types.ts";
+import type { ISO8601DateTime, IdType, WithId, uuid } from "./types.js";
 
 type MutationId = uuid;
 interface TypeMutation<T extends WithId<IdType>> {

@@ -1,8 +1,8 @@
 // const dbFile = process.argv[2];
 // const password = process.argv[3];
 
-import { getConnection } from "./controllers/access.ts";
-import { getEvent } from "./controllers/pmtk.ts";
+import { getConnection } from "./controllers/access.js";
+import { getEvent } from "./controllers/pmtk.js";
 import { v5 as uuidv5 } from "uuid";
 
 process.loadEnvFile('.env.tjsr-yoga');
@@ -15,7 +15,7 @@ export const eventId = process.env.GMBC_MDB_EVENT_ID ? parseInt(process.env.GMBC
 
 const sourceUuid = uuidv5(dbFile, uuidv5.URL);
 
-const data = await getEvent(conn, eventId, sourceUuid);
-
-console.log(data);
+getEvent(conn, eventId, sourceUuid).then((data) => {
+  console.log(data);
+});
 

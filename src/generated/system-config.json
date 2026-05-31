@@ -1,0 +1,25 @@
+{
+  "dataSources": [
+    {
+      "enabled": true,
+      "id": "source-1780113775502-77777",
+      "name": "Apical Data file endpoint",
+      "type": "api-apical-data-file",
+      "apiConfig": {
+        "authHeaderName": "Authorization",
+        "authHeaderValue": "",
+        "baseUrl": "https://apicalracetiming.com.au",
+        "companyId": 2,
+        "httpTimeoutSeconds": 30,
+        "live": false,
+        "pollIntervalSeconds": 30,
+        "selectedEventIds": [],
+        "apicalEventId": 68
+      },
+      "listedEvents": []
+    }
+  ],
+  "eventSourceAssignments": {},
+  "schemaVersion": 1,
+  "sessionSourceAssignments": {}
+}

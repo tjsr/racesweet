@@ -5,10 +5,10 @@ export default defineConfig({
 		// Setup
     setupFiles: ["./vitest.chdir.mts", /* anything */],
 		globals: true,
-		include: ['src/**/*.test.ts'],
+		include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
 		exclude: [ 'node_modules', '.git', '**/*.git' ],
 		environment: 'node', // Use 'jsdom' if you're testing browser-based code,
-		threads: false, // Disable threads for debugging
+		// threads: false, // Disable threads for debugging
   }
 }
 );

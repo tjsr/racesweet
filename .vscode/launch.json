@@ -1,5 +1,6 @@
 {
   "configurations": [
+
   {
     "name": "Launch via NPM",
     "request": "launch",
@@ -27,13 +28,28 @@
   },
   {
     "name": "Electron Main",
-    "program": "${workspaceFolder}/index.mjs",
+    "type": "node",
     "request": "launch",
-    "runtimeExecutable": "electron",
+    "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron-forge",
+    "args": ["start"],
+    "env": {
+      "NODE_ENV": "development",
+      "ELECTRON_ENABLE_LOGGING": "1"
+    },
+    "sourceMaps": true,
+    "outFiles": [
+      "${workspaceFolder}/.webpack/**/*.js"
+    ],
+    "sourceMapPathOverrides": {
+      "webpack://racesweet/./*": "${workspaceFolder}/*",
+      "webpack:///./*": "${workspaceFolder}/*",
+      "webpack:///./~/*": "${workspaceFolder}/node_modules/*"
+    },
+    "console": "integratedTerminal",
+    "autoAttachChildProcesses": true,
     "skipFiles": [
       "<node_internals>/**"
-    ],
-    "type": "node"
+    ]
   },
   {
     "name": "Electron Renderer",
@@ -97,6 +113,18 @@
     ],
     "console": "integratedTerminal",
     "preLaunchTask": "clear-terminal"
-  }
+  },
+  {
+    "type": "node",
+    "request": "launch",
+    "name": "Debug apicalTest",
+    "runtimeExecutable": "tsx",
+    "program": "${workspaceFolder}/src/utils/apical/apicalTest.mts",
+    "skipFiles": [
+      "<node_internals>/**"
+    ],
+    "console": "integratedTerminal",
+    "preLaunchTask": "clear-terminal"
+  } 
   ]
 }

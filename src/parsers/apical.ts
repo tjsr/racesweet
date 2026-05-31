@@ -4,27 +4,28 @@ import {
   type ApicalLapByCategoryViewModel,
   type ApicalParticipantViewModel
 } from "../model/apical.ts";
-import type { EventCategory, EventCategoryId } from "../model/eventcategory.ts";
-import type { EventId, uuid } from "../model/types.ts";
-import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.ts";
-import { RECORD_TX_CROSSING, type TimeRecord } from "../model/timerecord.ts";
-import { assignParticipantNumber, assignTransponder, createParticipantIdFromEventAndCategory } from "../controllers/participant.ts";
-import { generateTeamId, isEntrantTeam } from "../controllers/eventteam.ts";
-import type { ChipCrossingData } from "../model/chipcrossing.ts";
-import type { EventTeam } from "../model/eventteam.ts";
-import type { RaceState } from "../model/racestate.ts";
-import { addToTime } from "../app/utils/timeutils.ts";
-import { createEventCategoryIdFromCategoryCode } from "../controllers/category.ts";
-import { durationStringToMilliseconds } from "./genericTimeParser.ts";
-import { inferTransponderFromRaceNumber } from "../controllers/transponder.ts";
-import { split } from "../utils.ts";
+import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
+import type { EventId, uuid } from "../model/types.js";
+import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
+import { RECORD_TX_CROSSING, type TimeRecord } from "../model/timerecord.js";
+import { assignParticipantNumber, assignTransponder, createParticipantIdFromEventAndCategory } from "../controllers/participant.js";
+import { generateTeamId, isEntrantTeam } from "../controllers/eventteam.js";
+import type { ChipCrossingData } from "../model/chipcrossing.js";
+import type { EventTeam } from "../model/eventteam.js";
+import type { RaceState } from "../model/racestate.js";
+import { addToTime } from "../app/utils/timeutils.js";
+import { createEventCategoryIdFromCategoryCode } from "../controllers/category.js";
+import { durationStringToMilliseconds } from "./genericTimeParser.js";
+import { inferTransponderFromRaceNumber } from "../controllers/transponder.js";
+import { split } from "../utils.js";
 import { v5 as uuidv5 } from 'uuid';
 
 export const createChipCrossingRecord = (
   lap: ApicalLapByCategoryViewModel,
   eventStartTime: Date,
-  txNo: number
-): Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time'> => {
+  txNo: number,
+  eventId: EventId
+): Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time' | 'eventId'> => {
   if (!txNo) {
     throw new Error('Cannot create chip crossing record without transponder number');
   }
@@ -34,8 +35,9 @@ export const createChipCrossingRecord = (
   const lapMs = durationStringToMilliseconds(lap.LapTimeSpan);
   const calculatedRecordTime = addToTime(eventStartTime, lapMs);
 
-  const timeRecord: Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time'> = {
+  const timeRecord: Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time' | 'eventId'> = {
     chipCode: txNo,
+    eventId: eventId,
     id: lap.Id.toString(),
     recordType: RECORD_TX_CROSSING,
     time: calculatedRecordTime,
@@ -70,6 +72,7 @@ export const createEntrantFromLap = (
   }
   const ep: Partial<EventParticipant> = {
     categoryId: categoryId,
+    entrantId: participantId,
     firstname: nameParts[0],
     id: participantId,
     surname: nameParts[1].toLocaleUpperCase(),
@@ -110,10 +113,10 @@ export const convertLapCategoryViewModelToChipCrossing = (
   categoryId: EventCategoryId,
   eventStartTime: Date,
   inferTransponderNumberRange: number
-): Pick<ChipCrossingData, 'participantId'> & ReturnType<typeof createChipCrossingRecord> => {
+): Pick<ChipCrossingData, 'participantId' | 'eventId'> & ReturnType<typeof createChipCrossingRecord> => {
   const epId: EventParticipantId = createParticipantIdFromEventAndCategory(eventId, categoryId, lap.RaceNumber);
   const txNo = inferTransponderFromRaceNumber(lap.RaceNumber, inferTransponderNumberRange);
-  const crossing: Pick<ChipCrossingData, 'participantId'> & ReturnType<typeof createChipCrossingRecord> = createChipCrossingRecord(lap, eventStartTime, txNo);
+  const crossing: Pick<ChipCrossingData, 'participantId' | 'eventId'> & ReturnType<typeof createChipCrossingRecord> = createChipCrossingRecord(lap, eventStartTime, txNo, eventId);
   crossing.participantId = epId;
 
   return crossing;
@@ -195,8 +198,9 @@ export const apiParticipantEntrantToEntrantData = (
   );
 
   results.participants.forEach((participant: EventParticipant) => {
-    if (team && team.members.includes(participant.id.toString())) {
+    if (team && !team.members.includes(participant.id.toString())) {
       team.members.push(participant.id.toString());
+      participant.entrantId = team.id;
     }
   });
 
@@ -207,7 +211,7 @@ export const apiParticipantEntrantToEntrantData = (
   };
 };
 
-export const convertDataToEntrantsMap = (
+export const convertDataToRaceState = (
   eventId: EventId,
   eventStartTime: Date | undefined,
   data: ApicalLapByCategory,

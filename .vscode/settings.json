@@ -21,4 +21,8 @@
   // "vitest.filesWatcherInclude": "**/*.{ts,tsx,mts},src/*.{js,jsx,mjs,cjs,json}",
   "search.useParentIgnoreFiles": false,
   "terminal.integrated.scrollback": 100000,
+  "chat.tools.terminal.autoApprove": {
+    "npm --prefix h:\\dev\\racesweet": true,
+    "npx tsc": true
+  },
 }

@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1,
+    "name": "A Grade Men",
+    "gender": "Men"
+  },
+  {
+    "id": 21,
+    "name": "A Grade Women",
+    "gender": "Women"
+  },
+  {
+    "id": 2,
+    "name": "B Grade Men",
+    "gender": "Men"
+  },
+  {
+    "id": 22,
+    "name": "B Grade Women",
+    "gender": "Women"
+  },
+  {
+    "id": 3,
+    "name": "C Grade Men",
+    "gender": "Men"
+  },
+  {
+    "id": 23,
+    "name": "C Grade Women",
+    "gender": "Women"
+  },
+  {
+    "id": 4,
+    "name": "D Grade Men",
+    "gender": "Men"
+  },
+  {
+    "id": 31,
+    "name": "E-Bike",
+    "gender": "Both"
+  },
+  {
+    "id": 41,
+    "name": "Open",
+    "gender": "Open"
+  }
+]

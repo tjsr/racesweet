@@ -9,9 +9,9 @@ import type {
   tRiders
 } from "./pmtkTableTypes.ts";
 
-import type { EventCategory } from "./eventcategory.ts";
-import type { EventParticipant } from "./eventparticipant.ts";
-import type { TimeRecord } from "./timerecord.ts";
+import type { EventCategory } from "./eventcategory.js";
+import type { EventParticipant } from "./eventparticipant.js";
+import type { TimeRecord } from "./timerecord.js";
 
 export type PMTKRiderResultTypes = tEventRidersResults | tEventRidersResults_Ignoring;
 

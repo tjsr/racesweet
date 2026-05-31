@@ -1,29 +1,35 @@
-import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError } from "../validators/errors.ts";
-import type { EventCategory, EventCategoryId } from "./eventcategory.ts";
-import type { EventParticipant, EventParticipantId } from "./eventparticipant.ts";
-import type { FlagRecord, GreenFlagRecord } from "./flag.ts";
-import { FlagReferencesUnknownCategoryError, InvalidFlagRecordError } from "./errors.ts";
-import { ParticipantNotFoundError, assignParticpantsToCrossings } from "../controllers/participant.ts";
-import type { ParticipantPassingRecord, TimeRecord, TimeRecordId, Validated } from "./timerecord.ts";
-import { addError, compareByTime, isCrossingRecord } from "../controllers/timerecord.ts";
-import { getOrCacheGreenFlagForCategory, hasCategoryIds, isFlagRecord } from "../controllers/flag.ts";
-import { processAllParticipantLaps, processParticipantLaps } from "../controllers/laps.ts";
+import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError, SessionStateError } from "../validators/errors.js";
+import type { EventEntrantId } from "./entrant.js";
+import type { EventCategory, EventCategoryId } from "./eventcategory.js";
+import type { EventParticipant, EventParticipantId } from "./eventparticipant.js";
+import type { FlagRecord, GreenFlagRecord } from "./flag.js";
+import { FlagReferencesUnknownCategoryError, InvalidFlagRecordError } from "./errors.js";
+import { ParticipantNotFoundError, assignParticpantsToCrossings } from "../controllers/participant.js";
+import type { ParticipantPassingRecord, TimeRecord, TimeRecordId, Validated } from "./timerecord.js";
+import { addError, compareByTime, isCrossingRecord } from "../controllers/timerecord.js";
+import { getOrCacheGreenFlagForCategory, hasCategoryIds, isFlagRecord } from "../controllers/flag.js";
+import { processAllParticipantLaps, processParticipantLaps } from "../controllers/laps.js";
 
-import type { ChipCrossingData } from "./chipcrossing.ts";
-import type { EventTeam } from "./eventteam.ts";
-import type { MapOf } from "./types.ts";
-import { crossingMatchesParticipantIdentifiers } from "../controllers/participantMatch.ts";
-import { isParsedChipCrossing } from "../controllers/chipCrossing.ts";
-import { isPlaceholderCatgegory } from "../controllers/category.ts";
-import { isValidId } from "../validators/isValidId.ts";
-import { listToMap } from "../utils.ts";
+import type { ChipCrossingData } from "./chipcrossing.js";
+import type { EventTeam } from "./eventteam.js";
+import type { MapOf } from "./types.js";
+import { crossingMatchesParticipantIdentifiers } from "../controllers/participantMatch.js";
+import { isParsedChipCrossing } from "../controllers/chipCrossing.js";
+import { isPlaceholderCatgegory } from "../controllers/category.js";
+import { isValidId } from "../validators/isValidId.js";
+import { listToMap } from "../utils.js";
 
 export interface RaceStateLookup {
   getParticipantById(participantId: EventParticipantId): EventParticipant | undefined;
   getCategoryById(categoryId: EventCategoryId): EventCategory | undefined;
   getParticipantLaps(participantId: EventParticipantId): ParticipantPassingRecord[] | null | undefined;
+  getEntrantIdForParticipant(participantId: EventParticipantId): EventEntrantId | undefined;
   countTransponderCrossings(txNo: ChipCrossingData['chipCode'], untilTime?: Date): number;
   getTransponderCrossings(txNo: ChipCrossingData['chipCode'], untilTime?: Date): ChipCrossingData[];
+  excludeCrossing(crossingId: TimeRecordId, exclude: boolean): void;
+  updateCategoryDetails(categoryId: EventCategoryId, changes: Partial<Pick<EventCategory, 'code' | 'description' | 'distance' | 'duration' | 'name' | 'startTime'>>): void;
+  updateEntrantCategory(entrantId: EventEntrantId, categoryId: EventCategoryId): void;
+  updateParticipantCategory(participantId: EventParticipantId, categoryId: EventCategoryId): void;
 }
 
 export interface RaceState {
@@ -99,6 +105,9 @@ export class Session implements RaceState, RaceStateLookup {
   };
 
   public getCategoryById(categoryId: EventCategoryId): EventCategory | undefined {
+    if (!this._categories) {
+      throw new SessionStateError('Categories have not been initialized yet.');
+    }
     if (!isValidId(categoryId)) {
       throw new InvalidIdError(`ParticipantId ${categoryId} for category lookup by Id is not a valid Id type.`);
     }
@@ -106,10 +115,17 @@ export class Session implements RaceState, RaceStateLookup {
   }
 
   public getParticipantById(participantId: EventParticipantId): EventParticipant | undefined {
+    if (!this._participants) {
+      throw new SessionStateError('Participants have not been initialized yet.');
+    }
     if (!isValidId(participantId)) {
       throw new InvalidIdError(`ParticipantId ${participantId} for participant lookup by Id is not a valid Id type.`);
     }
     return this._participants.get(participantId);
+  }
+
+  public getEntrantIdForParticipant(participantId: EventParticipantId): EventEntrantId | undefined {
+    return this.getParticipantById(participantId)?.entrantId;
   }
 
   // public getCategoryStartFlag(categoryId: EventCategoryId): FlagRecord | undefined {
@@ -294,6 +310,56 @@ export class Session implements RaceState, RaceStateLookup {
     return this._cachedParticipantLaps.get(participantId) ?? null;
   }
 
+  public excludeCrossing(crossingId: TimeRecordId, exclude: boolean): void {
+    const record = this._records.get(crossingId.toString());
+    if (record && isCrossingRecord(record)) {
+      (record as ParticipantPassingRecord).isExcluded = exclude;
+      if (record.participantId) {
+        this.__reprocessParticipantLaps(record.participantId);
+      } else {
+        this.__reprocessAllParticipantLaps();
+      }
+    }
+  }
+
+  public updateParticipantCategory(participantId: EventParticipantId, categoryId: EventCategoryId): void {
+    const participant = this.getParticipantById(participantId);
+    if (participant) {
+      participant.categoryId = categoryId;
+      
+      this.records
+        .filter(record => isCrossingRecord(record) && (record as ParticipantPassingRecord).participantId === participantId)
+        .forEach(record => {
+          (record as ParticipantPassingRecord).participantStartRecordId = undefined;
+        });
+
+      this.__reprocessParticipantLaps(participantId);
+    }
+  }
+
+  public updateCategoryDetails(categoryId: EventCategoryId, changes: Partial<Pick<EventCategory, 'code' | 'description' | 'distance' | 'duration' | 'name' | 'startTime'>>): void {
+    const category = this.getCategoryById(categoryId);
+    if (!category) {
+      throw new InvalidCategoryIdError(`Category with ID ${categoryId} does not exist.`);
+    }
+
+    Object.assign(category, changes);
+    this.__reprocessParticipantLapsForCategory(categoryId);
+  }
+
+  public updateEntrantCategory(entrantId: EventEntrantId, categoryId: EventCategoryId): void {
+    const participants = this.participants.filter((participant) => participant.entrantId?.toString() === entrantId.toString());
+
+    participants.forEach((participant) => {
+      this.updateParticipantCategory(participant.id, categoryId);
+    });
+
+    const team = this._teams.get(entrantId.toString());
+    if (team) {
+      team.categoryId = categoryId;
+    }
+  }
+
   public async addCategories(categories: EventCategory[]): Promise<Set<EventCategoryId>|null> {
     let addedIds: Set<EventCategoryId>|null = null;
     // let placeholderCategoryParticipants: EventParticipant[]|null = null;
@@ -386,7 +452,7 @@ export class Session implements RaceState, RaceStateLookup {
 
       const minimumLapTimeMilliseconds = this._minimumLapTimeMilliseconds || 60000; // Default to 60 seconds if not set
 
-      const affectedCrossings = this._records.values().filter((record) => crossingMatchesParticipantIdentifiers(participant, record)).map((record) => record as ParticipantPassingRecord);
+      const affectedCrossings = this._records.values().filter((record) => isCrossingRecord(record) && crossingMatchesParticipantIdentifiers(participant, record)).map((record) => record as ParticipantPassingRecord);
       if (this._bulkProcess) {
         return; // If bulk processing, we will handle this later
       }

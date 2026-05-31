@@ -1,6 +1,6 @@
 import { parseFile, parseOutreachLine, parseSimpleOutreachChipLine } from "./outreach.js";
 
-import type { UnsourcedOutreachChipCrossingData } from "./outreach.ts";
+import type { UnsourcedOutreachChipCrossingData } from "./outreach.js";
 import path from 'node:path';
 
 const testdata_dir = path.resolve(path.join('.', 'src', 'testdata'));
@@ -30,7 +30,7 @@ describe('Read in a full outreach file', () => {
     //   dir: testdata_dir,
     // });
     console.log(filePath);
-    const data = await parseFile(filePath);
+    const data = await parseFile(filePath, new Date('2025-03-03T00:00:00Z'));
     expect(data.length).toBe(23624);
   });
 });

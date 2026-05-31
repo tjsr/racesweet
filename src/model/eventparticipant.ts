@@ -1,7 +1,8 @@
-import type { ISO8601DateTime, ISO8601Duration, IdType, WithId } from "./types.ts";
+import type { ISO8601DateTime, ISO8601Duration, IdType, WithId } from "./types.js";
 
-import type { EventCategoryId } from "./eventcategory.ts";
-import type { TimingPointId } from "./timingpoint.ts";
+import type { EventCategoryId } from "./eventcategory.js";
+import type { EventEntrantId } from "./entrant.js";
+import type { TimingPointId } from "./timingpoint.js";
 
 export type EventParticipantId = IdType;
 
@@ -13,6 +14,7 @@ export interface ParticipantIdentifier {
 export interface EventParticipant extends WithId<EventParticipantId> {
   firstname: string;
   surname: string;
+  entrantId: EventEntrantId;
   lastRecordTime: ISO8601DateTime | null;
   lastRecordTimingPoint?: TimingPointId | undefined;
   resultDuration: ISO8601Duration | null;

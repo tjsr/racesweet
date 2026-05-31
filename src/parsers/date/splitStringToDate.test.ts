@@ -1,4 +1,4 @@
-import { DateParseError } from "./errors.ts";
+import { DateParseError } from "./errors.js";
 import { parseSplitDateStringToDate } from "./splitStringToDate.js";
 
 describe('parseSplitDateStringToDate', () => {

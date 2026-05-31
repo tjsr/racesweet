@@ -1,23 +1,23 @@
-import type { ChipCodeType, EventParticipantId } from "../model/eventparticipant.ts";
-import { ColumnNotInSpreadsheetError, ParticipantSpreadsheetError } from "../model/errors.ts";
-import type { EventCategory, EventCategoryId, EventParticipant, ParticipantIdentifier, TimeRecord } from "../model/index.ts";
-import { compareByTime, getTimeRecordIdentifier, isCrossingRecord, isRecordAfterStart } from "./timerecord.ts";
+import type { ChipCodeType, EventParticipantId } from "../model/eventparticipant.js";
+import type { EventCategory, EventCategoryId, EventParticipant, ParticipantIdentifier, TimeRecord } from "../model/index.js";
+import { ImportMappings, SheetData, findColumnNameForSheetColumn, readXlsxFileToJson, readXlsxWorkbookToJson } from "./resource/excel.js";
+import type { WorkBook, WorkSheet } from 'xlsx';
+import { compareByTime, getTimeRecordIdentifier, isCrossingRecord, isRecordAfterStart } from "./timerecord.js";
 import {
   findCategoryByName,
   findOrCreateCategory
 } from "./category.ts";
+import { v1 as randomUUID, v5 as uuidv5 } from 'uuid';
 
-import { CategoryNotFoundError } from "../model/eventcategory.ts";
-import type { EventId } from "../model/types.ts";
-import type { GreenFlagRecord } from "../model/flag.ts";
-import type { ParticipantPassingRecord } from "../model/timerecord.ts";
+import { CategoryNotFoundError } from "../model/eventcategory.js";
+import type { EventId } from "../model/types.js";
+import type { GreenFlagRecord } from "../model/flag.js";
+import type { ParticipantPassingRecord } from "../model/timerecord.js";
+import { ParticipantSpreadsheetError } from "../model/errors.js";
 import type { PathLike } from "fs";
-import type { WorkSheet } from 'xlsx';
-import { assignEntrantToTime } from "./crossing.ts";
-import { elapsedTimeMilliseconds } from "../app/utils/timeutils.ts";
-import { randomUUID } from "crypto";
-import { v5 as uuidv5 } from 'uuid';
-import { validateStartFlag } from "../validators/startflag.ts";
+import { assignEntrantToTime } from "./crossing.js";
+import { elapsedTimeMilliseconds } from "../app/utils/timeutils.js";
+import { validateStartFlag } from "../validators/startflag.js";
 import xlsx from 'xlsx';
 
 const silent: string[] = ['addParticipantIdentifier'];
@@ -240,6 +240,7 @@ const createEntrantWithChipCode = (
   const createdEntrant: EventParticipant = {
     categoryId: cat.id,
     currentResult: undefined,
+    entrantId: entrantId,
     firstname: `Entrant ${chipCode}`,
     id: entrantId,
     identifiers: [],
@@ -270,6 +271,7 @@ export const createEntrant = (
   const createdEntrant: Partial<EventParticipant> = {
     categoryId: cat.id,
     currentResult: undefined,
+    entrantId: entrantId,
     id: entrantId,
     identifiers: [],
     lastRecordTime: null,
@@ -290,83 +292,6 @@ export const createEntrantForUnmatchedChipCode = (
     assignParticipantNumber(createdEntrant, plateNumber);
   }
   return createdEntrant;
-};
-
-interface SheetData {
-  headers: Record<string, unknown>;
-  data: Record<string, unknown>[];
-}
-
-export const readXlsxToJson = (filePath: PathLike): Promise<SheetData> => {
-  let path = filePath.toString();
-  let sheetName = undefined;
-  if (filePath.toString().includes('')) {
-    const workbookLocationParts = filePath.toString().split('!');
-    sheetName = workbookLocationParts[workbookLocationParts.length - 1];
-    path = workbookLocationParts[0];
-  }
-  const workbook = xlsx.readFile(path);
-  const workingSheet: WorkSheet = workbook.Sheets[sheetName || 'Sheet1'] || workbook.Sheets[workbook.SheetNames[0]] || workbook.Sheets[0];
-  const sheetJson: Record<string, unknown>[] = xlsx.utils.sheet_to_json(workingSheet, { header: "A" });
-  const headers = sheetJson.shift() as Record<string, unknown>;
-
-  sheetJson.forEach((row: unknown) => {
-    Object.keys(headers).forEach((key) => {
-      try {
-        const mappedKey: unknown = headers[key];
-        if (!mappedKey) {
-          return;
-        }
-        const rowRecord = row as unknown as Record<string, unknown>;
-        const mappedValue = rowRecord[key];
-        if (mappedValue) {
-          rowRecord[mappedKey as string] = mappedValue;
-        }
-      } catch (error) {
-        const hk = headers ? headers[key] : 'Unknown header mapping';
-        console.error(`Error mapping key ${key} to ${hk}:`, error);
-      }
-    });
-
-    
-    // const rowDataKeys = Object.keys(rowData);
-    // const rowDataValues = Object.values(rowData);
-    // console.log('Row', '>>>>', row);
-
-    // console.debug('Row', '>>>>', row);
-  });
-
-  const result: SheetData = {
-    data: sheetJson,
-    headers: headers,
-  };
-
-  return Promise.resolve(result);
-};
-
-interface ImportMappings {
-  [key: string]: string|number;
-}
-
-const findColumnNameForSheetColumn = (headers: Record<string, string|undefined>, possibleNames: string[]): string|undefined => {
-  const checkNames = [...possibleNames];
-  
-  // , ...possibleNames.map((name) => name.toLowerCase())];
-  for (const name of checkNames) {
-    const foundName = Object.keys(headers).find((header) => {
-      const headerValue = headers[header];
-      if (headerValue && headerValue.toString().replaceAll(' ', '').toLowerCase() === name.replaceAll(' ', '').toLowerCase()) {
-        return true;
-      }
-    });
-    if (foundName) {
-      return foundName;
-    }
-  }
-
-  const possibleNamesString = possibleNames.map((name) => `"${name}"`).join(', ');
-  const errMsg = `Entrant sheet to import does not have a searched for header, looked for columns named ${possibleNamesString}`;
-  throw new ColumnNotInSpreadsheetError(errMsg);
 };
 
 class NoTransponderError extends ParticipantSpreadsheetError {
@@ -416,7 +341,7 @@ const processParticipantRow = (
   }
   const createUnknownCategories: boolean = true;
 
-  const categoryName = row[categorySheetHeader] as string;
+  const categoryName: string = row[categorySheetHeader] as string;
 
   const category: EventCategory | null = createUnknownCategories ? findOrCreateCategory(categoryList, { name: categoryName }) : findCategoryByName(categoryList, categoryName);
   if (!category) {
@@ -464,25 +389,61 @@ const processParticipantRow = (
   return participant as EventParticipant;
 };
 
-export const readParticipantsXlsx = async (filePath: PathLike, mappings: ImportMappings, categoryList: EventCategory[]): Promise<EventParticipant[]> => {
-  return readXlsxToJson(filePath).then((sheetData: SheetData) => {
-    const participants: EventParticipant[] = [];
-    const headers = sheetData.headers as Record<string, string|undefined>;
-    const data: Record<string, unknown>[] = sheetData.data;
-
-    const categorySheetHeader: string = findColumnNameForSheetColumn(headers, ['Category', 'Class', 'Category Name', 'Grade'])!;
-    if (!categorySheetHeader) {
-      throw new Error('Entrant sheet to import does not have a category header.');
-    }
-
-    data.forEach((row: Record<string, unknown>) => {
-      const participant = processParticipantRow(headers, mappings, row, categorySheetHeader, categoryList);
-      participants.push(participant as EventParticipant);
-    });
-    console.log(readParticipantsXlsx.name, `Finished reading ${participants.length} participants from input file ${filePath}.`);
+export const readParticipantsFromWorkbook = async (
+  workbook: WorkBook,
+  mappings: ImportMappings,
+  categoryList: EventCategory[]
+): Promise<EventParticipant[]> => readXlsxWorkbookToJson(workbook)
+  .then((sheetData: SheetData) => readParticipantsXlsx(sheetData, mappings, categoryList))
+  .then((participants: EventParticipant[]) => {
+    console.log(readParticipantsXlsxFromBuffer.name, `Finished reading ${participants.length} participants from stream.`);
     return participants;
   });
+
+
+export const readParticipantsXlsxFromBuffer = async (
+  buffer: Buffer,
+  mappings: ImportMappings,
+  categoryList: EventCategory[]
+): Promise<EventParticipant[]> => readXlsxFileToJson(buffer)
+  .then((sheetData: SheetData) => readParticipantsXlsx(sheetData, mappings, categoryList))
+  .then((participants: EventParticipant[]) => {
+    console.log(readParticipantsXlsxFromBuffer.name, `Finished reading ${participants.length} participants from stream.`);
+    return participants;
+  });
+
+export const readParticipantsXlsxFromFile = async (
+  filePath: PathLike,
+  mappings: ImportMappings,
+  categoryList: EventCategory[]
+): Promise<EventParticipant[]> => readXlsxFileToJson(filePath)
+  .then((sheetData: SheetData) => readParticipantsXlsx(sheetData, mappings, categoryList))
+  .then((participants: EventParticipant[]) => {
+    console.log(readParticipantsXlsxFromFile.name, `Finished reading ${participants.length} participants from input file ${filePath}.`);
+    return participants;
+  });
+
+export const readParticipantsXlsx = async (
+  sheetData: SheetData,
+  mappings: ImportMappings,
+  categoryList: EventCategory[]
+): Promise<EventParticipant[]> => {
+  const participants: EventParticipant[] = [];
+  const headers = sheetData.headers as Record<string, string|undefined>;
+  const data: Record<string, unknown>[] = sheetData.data;
+
+  const categorySheetHeader: string = findColumnNameForSheetColumn(headers, ['Category', 'Class', 'Category Name', 'Grade'])!;
+  if (!categorySheetHeader) {
+    throw new Error('Entrant sheet to import does not have a category header.');
+  }
+
+  data.forEach((row: Record<string, unknown>) => {
+    const participant = processParticipantRow(headers, mappings, row, categorySheetHeader, categoryList);
+    participants.push(participant as EventParticipant);
+  });
+  return participants;
 };
+
 // const calculateLapForTimeRecord = (
 //   passingRecord: ParticipantPassingRecord,
 //   prevLap: EntrantLap|undefined,
@@ -624,9 +585,14 @@ export const assignParticpantsToCrossings = (participants: Map<EventParticipantI
 
 export const getPassingsForParticipant = (
   participantId: EventParticipantId,
-  allPassingRecords: ParticipantPassingRecord[]
+  allPassingRecords: TimeRecord[]
 ): ParticipantPassingRecord[] => allPassingRecords.filter(
-  (record) => record.participantId === participantId && record.time !== undefined
+  (record) =>
+    Object.prototype.hasOwnProperty.call(record, 'participantId') &&
+    (record as ParticipantPassingRecord).participantId === participantId &&
+    record.time !== undefined
+).map(
+  (record) => record as ParticipantPassingRecord
 ).sort(compareByTime);
 
 export const calculateParticipantElapsedTimes = (
@@ -652,4 +618,42 @@ export const createParticipantIdFromEventAndCategory = (
   categoryId: EventCategoryId,
   raceNumber: string
 ): EventParticipantId => uuidv5(`${eventId}-${categoryId}-${raceNumber}`, eventId);
+
+export const readJsonFromSheet = (workbook: xlsx.WorkBook, sheetName: string = 'Sheet1') => {
+  const workingSheet: WorkSheet = workbook.Sheets[sheetName] || workbook.Sheets[workbook.SheetNames[0]] || workbook.Sheets[0];
+  const sheetJson: Record<string, unknown>[] = xlsx.utils.sheet_to_json(workingSheet, { header: "A" });
+  const headers = sheetJson.shift() as Record<string, unknown>;
+
+  sheetJson.forEach((row: unknown) => {
+    Object.keys(headers).forEach((key) => {
+      try {
+        const mappedKey: unknown = headers[key];
+        if (!mappedKey) {
+          return;
+        }
+        const rowRecord = row as unknown as Record<string, unknown>;
+        const mappedValue = rowRecord[key];
+        if (mappedValue) {
+          rowRecord[mappedKey as string] = mappedValue;
+        }
+      } catch (error) {
+        const hk = headers ? headers[key] : 'Unknown header mapping';
+        console.error(`Error mapping key ${key} to ${hk}:`, error);
+      }
+    });
+
+
+    // const rowDataKeys = Object.keys(rowData);
+    // const rowDataValues = Object.values(rowData);
+    // console.log('Row', '>>>>', row);
+    // console.debug('Row', '>>>>', row);
+  });
+
+  const result: SheetData = {
+    data: sheetJson,
+    headers: headers,
+  };
+
+  return Promise.resolve(result);
+};
 

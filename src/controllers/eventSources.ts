@@ -1,5 +1,5 @@
-import type { TimeRecordSource } from "../model/timerecord.ts";
-import type { TimeRecordSourceId } from "../model/types.ts";
+import type { TimeRecordSource } from "../model/timerecord.js";
+import type { TimeRecordSourceId } from "../model/types.js";
 
 export const addTimeRecordSource = (TimeRecordSources: Map<TimeRecordSourceId, TimeRecordSource>, source: TimeRecordSource): void => {
   if (!source) {

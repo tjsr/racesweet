@@ -1,22 +1,24 @@
-import { ApicalTestRace } from './testdata/apical.ts';
+import { ApicalLocalFile } from './testdata/apicalLocalFile.ts';
+import LocalFileResourceProvider from './controllers/resource/local.ts';
 import { OutreachTeamsRaceTestSession } from './testdata/outreach.ts';
 import type { ParticipantPassingRecord } from './model/timerecord.ts';
+import { ResourceProvider } from './controllers/resource/provider.ts';
 import { RfidIndividualTestRace } from './testdata/rfid.ts';
 import type { TestSession } from './testdata/testsession.ts';
 import colors from 'colors';
-import { getCliTable } from "./controllers/clitable.ts";
+import { getCliTable } from "./controllers/clitable.js";
 import { warn } from './utils.ts';
 
 colors.enable();
 
-const _outreachSession: TestSession = new OutreachTeamsRaceTestSession();
-const _rfidSession: TestSession = new RfidIndividualTestRace();
-const apicalSession: TestSession = new ApicalTestRace();
+const localFileResourceProvider: ResourceProvider<Buffer> = new LocalFileResourceProvider<Buffer>('src/testdata');
+const _outreachSession: TestSession = new OutreachTeamsRaceTestSession(localFileResourceProvider);
+const _rfidSession: TestSession = new RfidIndividualTestRace(localFileResourceProvider);
+const apicalSession: TestSession = new ApicalLocalFile();
 
 const eventSession: TestSession = apicalSession; // rfidSession;
-await eventSession.loadTestData(false);
 
-const filter = (data: ParticipantPassingRecord): boolean => {
+const filterDisplayedRows = (data: ParticipantPassingRecord): boolean => {
   if (!data.participantId) {
     return true;
   }
@@ -32,7 +34,7 @@ const filter = (data: ParticipantPassingRecord): boolean => {
   return true;
 };
 
-console.log(getCliTable(eventSession, filter).toString());
-
-
+eventSession.loadTestData(false).then(() => {
+  console.log(getCliTable(eventSession, filterDisplayedRows).toString());
+});
 

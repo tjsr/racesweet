@@ -29,8 +29,8 @@ await import('./set-up-paths.mjs')
 const createWindow = () => {
   const preloadPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'preload.mjs');
   const win = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1280,
+    height: 900,
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: true,
