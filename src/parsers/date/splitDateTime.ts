@@ -18,11 +18,16 @@ export const splitDateTime = (input: string, tzhint?: string): { isoDate?: Date;
     throw new InvalidDateTimeStringError(`Invalid date/time format - missing space or T separator: '${input}'`);
   }
 
-  const isoDate = new TZDate(input, timeStringHasTimezone(input) ? undefined : tzhint);
+  const hasInputTz = timeStringHasTimezone(input);
+  const isoDate = new TZDate(input, hasInputTz ? undefined : tzhint);
   if (!isNaN(isoDate.getTime())) {
     console.log('Returning acceptable ISO time.', input, isoDate);
-    const rfcDateString = formatRFC3339(isoDate, { fractionDigits: 3 });
-    const timePart = rfcDateString.split('T')[1].replace(/(Z|[+-]\d{2}:\d{2})$/, '');
+    const outputInUtc = hasInputTz || tzhint !== undefined;
+    const formatTarget = outputInUtc ? TZDate.tz('UTC', isoDate) : isoDate;
+    const rfcDateString = formatRFC3339(formatTarget, { fractionDigits: 3 });
+    const timePart = outputInUtc
+      ? rfcDateString.split('T')[1]
+      : rfcDateString.split('T')[1].replace(/(Z|[+-]\d{2}:\d{2})$/, '');
     return {
       date: rfcDateString.split('T')[0],
       isoDate: timeToLocal(isoDate),
