@@ -5,6 +5,9 @@
   /* max-width: 38rem; */
   min-height: 100vh;
   padding: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  background: #ddd; color: black;
 }
 
 :root {
@@ -258,6 +261,14 @@
 }
 
 @media (prefers-color-scheme: light) {
+  :root {
+    --color-bg: #ffffff;
+    --color-fg: #000000;
+    --color-surface: #f0f0f0;
+    --color-border: #ccc;
+    --color-tab-active: #4da3ff;
+    --color-error: #ef5350;
+  }
   body { background: var(--color-bg); color: var(--color-fg); }
 }
 

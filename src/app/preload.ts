@@ -1,4 +1,4 @@
-﻿import './state.ts';
+import './state.ts';
 
 import { InvalidIpcChannelError, SendChannels } from '../model/electronIpcTypes.ts';
 import { IpcRendererEvent, contextBridge, ipcRenderer } from 'electron';
@@ -131,6 +131,12 @@ contextBridge.exposeInMainWorld("nodeAPI", {
     return Buffer.from(new Uint8Array(data));
   },
 });
+
+contextBridge.exposeInMainWorld('versions', {
+  chrome: () => process.versions.chrome,
+  electron: () => process.versions.electron,
+  node: () => process.versions.node,
+});import { contextBridge } from 'electron';
 
 contextBridge.exposeInMainWorld('versions', {
   chrome: () => process.versions.chrome,

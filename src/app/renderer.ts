@@ -1,4 +1,20 @@
-﻿/**
+import './index.css';
+import './index.css';
+import './app';
+
+import App from './App.tsx';
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+
+const container = document.getElementById('app');
+if (!container) {
+  throw new Error("Root element with id 'app' not found");
+}
+
+const root = createRoot(container);
+root.render(React.createElement(App));
+
+/**
  * This file will automatically be loaded by webpack and run in the "renderer" context.
  * To learn more about the differences between the "main" and the "renderer" context in
  * Electron, visit:
@@ -26,8 +42,8 @@
  * ```
  */
 
-import './index.css';
+
 // import './versionInfo';
-import './app';
+
 
 console.log('👋 This message is being logged by "renderer.js", included via webpack');
