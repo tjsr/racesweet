@@ -1,4 +1,15 @@
 
+
+export interface ApicalEventResponseEventData {
+  Id: number;
+  Name: string;
+  EventDate: string;
+  CompanyName: string;
+  ThumbPathAndFileName: string;
+}
+
+export type ApicalEventListResponse = ApicalEventResponseEventData[];
+
 export interface ApicalLapByCategoryViewModel {
   Id: number;
   FullName: string;

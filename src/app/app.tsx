@@ -1,4 +1,4 @@
-import { RaceStateLookup, Session } from '../model/racestate.ts';
+﻿import { RaceStateLookup, Session } from '../model/racestate.ts';
 import React, { useEffect, useState } from 'react';
 
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
@@ -706,7 +706,7 @@ export const RaceSweetMainApp = () => {
         <h2>Active Event</h2>
         {activeEvent ? (
           <>
-            <p>{activeEvent.name} · {activeEvent.format} · {activeEvent.date}</p>
+            <p>{activeEvent.name} Â· {activeEvent.format} Â· {activeEvent.date}</p>
             <p>
               {activeEvent.categoryIds.length} categories, {activeEvent.entrantIds.length} entrants, {activeEventSessions.length} sessions in scope.
             </p>

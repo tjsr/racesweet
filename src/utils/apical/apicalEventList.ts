@@ -1,4 +1,4 @@
-import { EventHandicapData } from './apicalData.js';
+﻿import { EventHandicapData } from './apicalData.js';
 import fs from 'fs/promises';
 
 export const COMPANY_GMBC = 2;
@@ -18,7 +18,7 @@ export interface ExtendedApicalEventListData extends ApicalEventResponseEventDat
   EventHandicapData?: EventHandicapData;
 }
 
-export type  ApicalEventListResponse = ApicalEventResponseEventData[];
+export type ApicalEventListResponse = ApicalEventResponseEventData[];
 
 export const getApicalEventList = (companyId: number = COMPANY_GMBC, timestamp: number = Date.now()): Promise<ApicalEventListResponse> => {
   const url = getApicalEventListUrl(companyId, timestamp);
