@@ -17,12 +17,13 @@
     "skipLibCheck": true,
     "target": "ESNext",
     "types": ["vitest/globals"],
-    "verbatimModuleSyntax": false
+    "verbatimModuleSyntax": false,
+    "noUncheckedSideEffectImports": true,
     // "paths": {
     //   "@model/*": ["src/model/*"],
     //   "@parsers/*": ["src/parsers/*"],
     // }
   },
   "src": ["src", "test"],
-  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx", "src/utils/apical/apicalTest.mts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx", "src/utils/apical/apicalTest.mts", "src/types/**/*.d.ts"],
 }
