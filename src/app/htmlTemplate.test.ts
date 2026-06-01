@@ -1,0 +1,29 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { beforeAll, describe, expect, it } from 'vitest';
+
+describe('HTML template (src/app/index.html)', () => {
+  let html: string;
+
+  beforeAll(async () => {
+    html = await readFile(path.join(process.cwd(), 'src', 'app', 'index.html'), 'utf-8');
+  });
+
+  it('has a valid DOCTYPE declaration', () => {
+    expect(html).toMatch(/<!DOCTYPE html>/i);
+  });
+
+  it('has <html>, <head>, and <body> elements', () => {
+    expect(html).toContain('<html');
+    expect(html).toContain('<head>');
+    expect(html).toContain('<body>');
+  });
+
+  it('contains an element with id="app" for React mounting', () => {
+    expect(html).toContain('id="app"');
+  });
+
+  it('does not contain stale script references to ./build/ paths that would 404', () => {
+    expect(html).not.toContain('./build/');
+  });
+});

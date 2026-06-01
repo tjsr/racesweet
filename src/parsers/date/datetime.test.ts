@@ -167,7 +167,7 @@ describe('dateAndTimeStringToIsoFormat', () => {
   it('Should return a valid ISO date string for a valid UTC date and time string', () => {
     const date = '2023-10-01';
     const time = '12:00:00';
-    const utcDateHint = new TZDate('UTC');
+    const utcDateHint = TZDate.tz('UTC');
     const result = dateAndTimeStringToIsoFormat(date, time, utcDateHint);
     expect(result).toEqual('2023-10-01T12:00:00.000Z');
   });
@@ -186,10 +186,10 @@ describe('dateAndTimeStringToDate', () => {
   it ('Should return a valid date object for a valid UTC date and time string', () => {
     const date = '2023-10-01';
     const time = '12:00:00';
-    const utcDateHint = new TZDate('UTC');
+    const utcDateHint = TZDate.tz('UTC');
     const result = dateAndTimeStringToDate(date, time, utcDateHint);
     expect(result).not.toBeUndefined();
-    expect(result.toISOString()).toContain('2023-10-01T12:00:00.000');
+    expect(result.toISOString()).toEqual('2023-10-01T12:00:00.000+00:00');
   });
 
   it ('Should return a valid date object for a valid local date and time string', () => {
@@ -198,8 +198,8 @@ describe('dateAndTimeStringToDate', () => {
     const localDateHint = new TZDate();
     const result = dateAndTimeStringToDate(date, time, localDateHint);
     expect(result).not.toBeUndefined();
-    expect(result.toISOString()).not.toEqual('2023-10-01T12:00:00.000Z');
-    expect(result.toISOString()).toContain('2023-10-01T12:00:00.000');
+    expect(formatRFC3339(result, { fractionDigits: 3 })).not.toEqual('2023-10-01T12:00:00.000Z');
+    expect(formatRFC3339(result, { fractionDigits: 3 })).toContain('2023-10-01T12:00:00.000');
   });
 });
 

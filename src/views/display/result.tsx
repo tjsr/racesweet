@@ -1,4 +1,4 @@
-import { EntrantResult } from "src/controllers/result";
+import type { EntrantResult } from '../../controllers/result.ts';
 
 interface RaceResultProps {
   results: EntrantResult[];

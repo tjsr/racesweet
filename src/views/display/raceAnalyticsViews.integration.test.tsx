@@ -258,20 +258,25 @@ describe('race analytics views integration', () => {
       setSelectValue(reportSelect, 'lap-times');
     });
 
-    const participantSelect = container.querySelector('select[aria-label="Reports Participant"]') as HTMLSelectElement;
-    expect(participantSelect).toBeTruthy();
+    expect(container.textContent).toContain('Lap Times Report');
+    const lapTimesModeSelect = container.querySelector('.lap-times-report__toolbar select') as HTMLSelectElement;
+    expect(lapTimesModeSelect).toBeTruthy();
 
     await act(async () => {
-      setSelectValue(participantSelect, 'p-team-1');
+      setSelectValue(lapTimesModeSelect, 'table');
     });
 
-    expect(container.querySelector('table[aria-label="Lap Times Report Table"]')).toBeTruthy();
+    expect(container.querySelector('table.lap-times-block-table')).toBeTruthy();
     expect(container.textContent).toContain('00:01:05.000');
     expect(container.textContent).toContain('00:01:07.000');
 
     await act(async () => {
-      setSelectValue(categorySelect, 'cat-b');
       setSelectValue(reportSelect, 'fastest-laps');
+    });
+
+    const categorySelectAfterViewChange = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
+    await act(async () => {
+      setSelectValue(categorySelectAfterViewChange, 'cat-b');
     });
 
     expect(container.textContent).toContain('Solo Rider');

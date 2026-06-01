@@ -13,7 +13,6 @@
     "**/node_modules/**": true,
     "**/dist/**": true
   },
-  "vitest.workspaceConfig": "vitest.workspace.ts",
   "vitest.rootConfig": "vitest.config.mts",
   "vitest.cliArguments": "--silent",
   "vitest.logLevel": "verbose",

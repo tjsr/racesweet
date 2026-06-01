@@ -8,7 +8,7 @@ import {
   WriteContentIpcReceiveChannel
 } from '../model/electronIpc';
 import { injectCorsHeaders, isApicalApiUrl } from './electron/corsHeaders';
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 import path from 'node:path';
 
@@ -27,6 +27,22 @@ declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 if (require('electron-squirrel-startup')) {
   app.quit();
 }
+
+const configureChromiumCacheDirectory = (): void => {
+  const baseDir = process.env.LOCALAPPDATA || process.env.TEMP;
+  if (!baseDir) {
+    return;
+  }
+  const cacheDir = path.join(baseDir, 'RaceSweet', 'chromium-cache');
+  app.commandLine.appendSwitch('disk-cache-dir', cacheDir);
+};
+
+configureChromiumCacheDirectory();
+
+process.on('warning', (warning) => {
+  const trace = warning.stack ?? `${warning.name}: ${warning.message}`;
+  console.warn(trace);
+});
 
 const configureCorsForApicalRequests = (): void => {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -92,13 +108,18 @@ ipcMain.on(RequestReadIpcSendChannel, (event: Electron.IpcMainEvent, filename: s
       event.reply(ReadContentIpcReceiveChannel, eventId, data);
     }
   }).catch((error: Error) => {
-    // Handle the error, e.g., file not found or read error
+    const nodeError = error as NodeJS.ErrnoException;
+    if (nodeError.code === 'ENOENT') {
+      console.info(`Optional file not found at ${filePath}.`);
+    } else if (nodeError.code === 'EACCES' || nodeError.code === 'EPERM') {
+      console.warn(`Permission denied while reading ${filePath}.`);
+    }
+    else {
+      // Handle unexpected file read errors.
+      console.error(`Error reading file ${filename} within dir ${__dirname}`, error);
+    }
+
     const errMsg = `Error reading file ${filename} within dir ${__dirname}`;
-    console.error(errMsg, error);
-    // Send a reply back to the renderer process with the error.
-    // It might be safer for some events to not send details of the exception.
-    // You need to implement sendReadError in preload.ts if you're going to handle
-    // errors differently from the 'sendReadContent' event.
     error.message = errMsg + ': ' + error.message;
     event.reply(ReadContentErrorIpcReceiveChannel, eventId, error.message);
   });
@@ -110,11 +131,18 @@ ipcMain.on(RequestWriteIpcSendChannel, (event: Electron.IpcMainEvent, filename: 
   // You need to handle permissions and security based on what you want to allow to be written.
   // I'd probably re-write this to take PathLike.
   const fullPath = path.join(__dirname, filename);
+  const fullDirPath = path.dirname(fullPath);
 
-  writeFile(fullPath, contents).then(() => {
+  mkdir(fullDirPath, { recursive: true }).then(() => writeFile(fullPath, contents)).then(() => {
     event.returnValue = `File ${filename} written successfully.`;
     event.reply(WriteContentIpcReceiveChannel, eventId);
   }).catch((error: Error) => {
+    const nodeError = error as NodeJS.ErrnoException;
+    if (nodeError.code === 'EACCES' || nodeError.code === 'EPERM') {
+      console.warn(`Permission denied while writing ${fullPath}.`);
+    } else {
+      console.error(`Failed to write file ${fullPath}`, error);
+    }
     event.reply(WriteContentErrorIpcReceiveChannel, eventId, error.message);
   });
 });
