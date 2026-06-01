@@ -14,6 +14,7 @@ export const systemDateString = /^(?<year>\d{4})[-/](?<month>\d{1,2})[-/](?<day>
 // const reverseDateString = /^(?<day>\d{1,2})[-/](?<month>\d{1,2})[-/](?<year>\d{4})$/;
 
 export const getUserTimezone = (): string => {
+  // eslint-disable-next-line new-cap
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 };
 
