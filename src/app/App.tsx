@@ -25,7 +25,6 @@ import { selectedCategoriesForParticipants } from './selectionState.ts';
 import { applyPulledRaceStateToSession } from './sourceApplication.ts';
 import { TestSession } from '../testdata/testsession.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
-import { createRoot } from 'react-dom/client';
 import { fetchApicalEvents, pullApicalRaceState } from './apicalDataSource.ts';
 
 type AppSection = 'System' | 'Events' | 'Entrants' | 'Categories' | 'Sessions' | 'Timing' | 'Results' | 'Reports';
@@ -734,8 +733,4 @@ export const RaceSweetMainApp = () => {
   );
 };
 
-const appHost = document.getElementById('app');
-if (appHost) {
-  const root = createRoot(appHost as HTMLElement);
-  root.render(<RaceSweetMainApp />);
-}
+
