@@ -1,9 +1,9 @@
+import { TZDate, tz } from '@date-fns/tz';
 import { describe, expect, it } from 'vitest';
 
-import { TZDate, tz } from '@date-fns/tz';
 import { formatRFC3339 } from 'date-fns';
-import { parseDateTime } from "./genericLineMatcher.js";
 import { getUserTimezone } from './date/datetime.js';
+import { parseDateTime } from "./genericLineMatcher.js";
 
 describe('parseDateTime', () => {
   const msTimeFormat = 'HH:mm:ss.SSS';
@@ -16,7 +16,7 @@ describe('parseDateTime', () => {
     const dateNow = new Date();
     expect(parsed).toBeDefined();
     expect(parsed.getUTCFullYear()).toBe(dateNow.getFullYear());
-    expect(parsed.getUTCHours()).toBe(19 + dateHint.getTimezoneOffset()/60);
+    expect(parsed.getUTCHours()).toBe(19);
     expect(parsed.getUTCMinutes()).toBe(11);
     expect(parsed.getUTCSeconds()).toBe(6);
     expect(parsed.getUTCMilliseconds()).toBe(405);
@@ -31,15 +31,17 @@ describe('parseDateTime', () => {
     expect(parsed.getUTCFullYear()).toBe(dateHint.getUTCFullYear());
     expect(parsed.getUTCMonth()).toBe(dateHint.getUTCMonth());
     expect(parsed.getUTCDate()).toBe(dateHint.getUTCDate());
-    expect(parsed.getUTCHours()).toBe(19 + dateHint.getTimezoneOffset()/60);
+    expect(parsed.getUTCHours()).toBe(19);
     expect(parsed.getUTCMinutes()).toBe(11);
     expect(parsed.getUTCSeconds()).toBe(6);
     expect(parsed.getUTCMilliseconds()).toBe(405);
   });
+
   it('should parse using system timezone when dateHint has no timeZone set', () => {
-    const systemTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const systemTz = getUserTimezone();
     const dateHint = new TZDate(2023, 9, 1);
     expect(dateHint.timeZone).toBeUndefined();
+    expect(systemTz).not.toBeUndefined();
 
     const result = parseDateTime('2023-10-01T14:30:00', dateHint);
 

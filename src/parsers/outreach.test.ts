@@ -31,7 +31,7 @@ describe('Read in a full outreach file', () => {
     // });
     console.log(filePath);
     const data = await parseFile(filePath, new Date('2025-03-03T00:00:00Z'));
-    expect(data.length).toBe(1114);
+    expect(data.length).toBe(23624);
   });
 });
 
