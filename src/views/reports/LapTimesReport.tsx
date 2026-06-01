@@ -1,11 +1,11 @@
+import './LapTimesReport.css';
+
+import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.ts';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { EventCategory } from '../../model/eventcategory.ts';
-import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.ts';
 import type { ParticipantPassingRecord } from '../../model/timerecord.ts';
 import { millisecondsToTime } from '../../app/utils/timeutils.ts';
-
-import './LapTimesReport.css';
 
 export type ShowAs = 'individual' | 'table';
 
