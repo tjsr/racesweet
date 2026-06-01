@@ -80,10 +80,13 @@ export const dateAndTimeStringToDate = (date: string, time: string, dateHint: TZ
   const year = dateValue.getUTCFullYear();
   
   // const [day, month, year] = date.split(/[-/]/).map(Number);
-  const [hour, minute, second, millisecond] = time.split(/[:.]/).map(Number);
+  const hasUtcZ = time.endsWith('Z');
+  const cleanTime = time.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+  const [hour, minute, second, millisecond] = cleanTime.split(/[:.]/).map(Number);
   console.debug(dateAndTimeStringToDate, hour, minute, second, millisecond);
 
-  const output = new TZDate(year, month - 1, day, hour || 0, minute || 0, second || 0, millisecond || 0, dateHint.timeZone || getUserTimezone());
+  const usedTz = hasUtcZ ? 'UTC' : (dateHint.timeZone || (isNaN(dateHint.getTime()) ? 'UTC' : getUserTimezone()));
+  const output = new TZDate(year, month - 1, day, hour || 0, minute || 0, second || 0, millisecond || 0, usedTz);
   return output;
 };
 
