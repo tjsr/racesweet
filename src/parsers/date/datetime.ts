@@ -20,7 +20,7 @@ export const getUserTimezone = (): string => {
 export const combineDateWithTimeString = (date: Date, time: string): TZDate => {
   const [hour, minute, second, millisecond] = time.split(/[:.]/).map(Number);
   const newDate = new TZDate(date.getTime());
-  newDate.setUTCHours(hour || 0, minute || 0, second || undefined, millisecond || undefined);
+  newDate.setUTCHours(hour || 0, minute || 0, second ?? 0, millisecond ?? 0);
   return newDate;
 };
 
