@@ -3,6 +3,7 @@ import { DateParseError, InvalidMonthError, InvalidYearError } from "./errors.js
 import { TZDate } from "@date-fns/tz/date";
 import { expandTwoDigitYear } from "./datestring.js";
 import { formatRFC3339 } from "date-fns";
+import { getUserTimezone } from "./datetime.js";
 import { parseRfidTimingDate } from "../rfidtiming/rfidTimingDate.js";
 import { toZonedTime } from "date-fns-tz";
 
@@ -23,7 +24,7 @@ export const isValidYear = (year: number): boolean => {
 
 export const timeToLocal = (date: Date): TZDate => {
   // eslint-disable-next-line new-cap
-  const tzCurrent: string = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tzCurrent: string = getUserTimezone();
   const tzDate: TZDate = TZDate.tz(tzCurrent, date);
   return tzDate;
 };

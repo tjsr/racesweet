@@ -25,7 +25,6 @@ import { selectedCategoriesForParticipants } from './selectionState.ts';
 import { applyPulledRaceStateToSession } from './sourceApplication.ts';
 import { TestSession } from '../testdata/testsession.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
-import { createRoot } from 'react-dom/client';
 import { fetchApicalEvents, pullApicalRaceState } from './apicalDataSource.ts';
 
 type AppSection = 'System' | 'Events' | 'Entrants' | 'Categories' | 'Sessions' | 'Timing' | 'Results' | 'Reports';
@@ -97,10 +96,9 @@ export const RaceSweetMainApp = () => {
 
   useEffect(() => {
     if (!sessionState && !eventCatalogState && !errorState) {
-      const warnings: string[] = [];
       const onLoadError = (error: unknown): void => {
         const message = error instanceof Error ? error.message : String(error);
-        warnings.push(message);
+        setLoadWarnings((existing) => existing.includes(message) ? existing : [...existing, message]);
       };
 
       Promise.all([loadAdminService(onLoadError), loadEventCatalogService(onLoadError), loadSystemConfigService(onLoadError)]).then(([raceService, catalogService, systemService]) => {
@@ -141,7 +139,6 @@ export const RaceSweetMainApp = () => {
           setSelectedSessionsEventId(initialEventId);
           setSelectedSessionId(sessionList[0]?.id);
           setErrorState(undefined);
-          setLoadWarnings(warnings);
         };
 
         if (shouldSyncScaffold) {
@@ -736,8 +733,4 @@ export const RaceSweetMainApp = () => {
   );
 };
 
-const appHost = document.getElementById('app');
-if (appHost) {
-  const root = createRoot(appHost as HTMLElement);
-  root.render(<RaceSweetMainApp />);
-}
+

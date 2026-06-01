@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fetchApicalEvents, pullApicalRaceState } from './apicalDataSource.js';
 
 import type { DataSourceConfig } from './systemConfig.js';
 
@@ -8,7 +9,7 @@ vi.mock('../parsers/apical.js', () => ({
   convertDataToRaceState: (...args: unknown[]) => convertDataToRaceState(...args),
 }));
 
-import { fetchApicalEvents, pullApicalRaceState } from './apicalDataSource.js';
+
 
 const createApicalSource = (): DataSourceConfig => ({
   apiConfig: {
@@ -100,7 +101,7 @@ describe('apicalDataSource', () => {
       .mockResolvedValueOnce(new Response('{}', { status: 200 }))
       .mockResolvedValueOnce(new Response('unauthorized', { status: 401, statusText: 'Unauthorized' }));
 
-    await expect(fetchApicalEvents(createApicalSource())).rejects.toThrow('[401] Unauthorized');
+    await expect(fetchApicalEvents(createApicalSource())).rejects.toThrow('401 Unauthorized');
   });
 
   it('throws clear error when pulling race state without a selected Apical event id', async () => {

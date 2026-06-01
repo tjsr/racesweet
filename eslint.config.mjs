@@ -16,4 +16,20 @@ export default tseslint.config(
       node: true,
     },
   },
+},
+{
+  files: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+  languageOptions: {
+    globals: {
+      beforeAll: 'readonly',
+      beforeEach: 'readonly',
+      afterAll: 'readonly',
+      afterEach: 'readonly',
+      describe: 'readonly',
+      expect: 'readonly',
+      it: 'readonly',
+      test: 'readonly',
+      vi: 'readonly',
+    },
+  },
 });

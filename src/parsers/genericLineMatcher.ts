@@ -8,8 +8,15 @@ import { parseUnknownDateTimeString } from "./date/datetime.js";
 
 
 export const parseDateTime = (dateTime: string, dateHint: TZDate, dateTimeFormat?: string | undefined): Date => {
+  if (dateHint.timeZone === undefined) {
+    throw new Error("Date hint must have a time zone.");
+  }
+    
   if (dateTimeFormat) {
-    return parse(dateTime, dateTimeFormat, dateHint);
+    const timePart = dateTime.includes(',') ? dateTime.split(',').pop()! : dateTime;
+    // Parse time in UTC using the dateHint's UTC date as reference
+    const utcRef = new TZDate(dateHint.getUTCFullYear(), dateHint.getUTCMonth(), dateHint.getUTCDate(), 'UTC');
+    return parse(timePart, dateTimeFormat, utcRef);
   }
   return parseUnknownDateTimeString(dateTime, dateHint);
 };

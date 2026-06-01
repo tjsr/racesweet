@@ -16,7 +16,7 @@ export const rendererConfig: Configuration = {
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.css'],
     extensionAlias: {
-      '.js': ['.js', '.ts'],
+      '.js': ['.js', '.ts', '.tsx'],
       '.jsx': ['.jsx', '.tsx'],
     }
   },

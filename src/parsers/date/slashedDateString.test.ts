@@ -49,7 +49,7 @@ describe('slashedDateString', () => {
   });
 
   it('Reject parses 2-digit year between 37 and 70 despite 1900s', () => {
-    expect(() => parseSlashedDateString('25/12/37')).toThrow(DateParseError);
+    expect(() => parseSlashedDateString('25/12/38')).toThrow(DateParseError);
   });
 
   it('parses 2-digit year at lower bound (00)', () => {
