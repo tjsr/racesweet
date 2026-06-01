@@ -8,6 +8,10 @@ import { parseUnknownDateTimeString } from "./date/datetime.js";
 
 
 export const parseDateTime = (dateTime: string, dateHint: TZDate, dateTimeFormat?: string | undefined): Date => {
+  if (dateHint.timeZone === undefined) {
+    throw new Error("Date hint must have a time zone.");
+  }
+    
   if (dateTimeFormat) {
     return parse(dateTime, dateTimeFormat, dateHint);
   }
