@@ -1,6 +1,6 @@
+import { TZDate, tz } from '@date-fns/tz';
 import { describe, expect, it } from 'vitest';
 
-import { TZDate, tz } from '@date-fns/tz';
 import { formatRFC3339 } from 'date-fns';
 import { parseDateTime } from "./genericLineMatcher.js";
 
