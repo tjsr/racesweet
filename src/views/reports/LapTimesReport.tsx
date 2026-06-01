@@ -1,11 +1,11 @@
+import './LapTimesReport.css';
+
+import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.ts';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { EventCategory } from '../../model/eventcategory.ts';
-import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.ts';
 import type { ParticipantPassingRecord } from '../../model/timerecord.ts';
 import { millisecondsToTime } from '../../app/utils/timeutils.ts';
-
-import './LapTimesReport.css';
 
 export type ShowAs = 'individual' | 'table';
 
@@ -45,7 +45,7 @@ const IndividualView = ({ participant, laps }: IndividualViewProps) => {
       {validLaps.length === 0 ? (
         <p className="lap-times-report__empty">No lap times recorded.</p>
       ) : (
-        <table className="lap-times-table">
+        <table aria-label="Lap Times Report Table" className="lap-times-table">
           <thead>
             <tr>
               <th>Lap</th>
@@ -251,6 +251,7 @@ export const LapTimesReport = ({
           <label>
             Participant
             <select
+              aria-label="Reports Participant"
               value={selectedParticipantId}
               onChange={(e) => setSelectedParticipantId(e.target.value)}
             >

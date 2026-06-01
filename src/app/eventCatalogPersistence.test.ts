@@ -78,4 +78,22 @@ describe('ElectronJsonEventCatalogPersistence', () => {
     expect(loaded.mutations).toEqual(ledgerData.mutations);
     expect(loaded.schemaVersion).toBe(1);
   });
+
+  it('reports save permission errors without throwing', async () => {
+    const writeFileContent = vi.fn(async () => {
+      throw new Error('EPERM: operation not permitted');
+    });
+
+    (window as unknown as {
+      api: { writeFileContent: (filePath: string, contents: string) => Promise<void> };
+    }).api = {
+      writeFileContent,
+    };
+
+    const onError = vi.fn();
+    const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json', onError);
+
+    await expect(persistence.save(createDefaultEventCatalogLedger())).resolves.toBeUndefined();
+    expect(onError).toHaveBeenCalledOnce();
+  });
 });

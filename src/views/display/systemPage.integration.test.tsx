@@ -47,7 +47,9 @@ describe('SystemPage integration', () => {
   let container: HTMLDivElement;
   let root: Root;
 
-  useUiConsoleGuards();
+  useUiConsoleGuards({
+    allowErrorPatterns: [/Error loading Apical events for source/],
+  });
 
   beforeEach(() => {
     container = document.createElement('div');

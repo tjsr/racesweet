@@ -95,7 +95,7 @@ export const fetchApicalEvents = async (source: DataSourceConfig): Promise<Apica
   );
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch Apical events: [${response.status}] ${response.statusText}`);
+    throw new Error(`Failed to fetch Apical events: ${response.status} ${response.statusText}`);
   }
 
   const payload = await response.json() as Array<{ CompanyName?: string; EventDate?: string; Id: number; Name: string }>;
