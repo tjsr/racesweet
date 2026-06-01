@@ -25,5 +25,5 @@
     // }
   },
   "src": ["src", "test"],
-  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx", "src/utils/apical/apicalTest.mts", "src/types/**/*.d.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx", "src/utils/apical/apicalTest.mts", "src/types/**/*.d.ts", "src/@types/**/*.d.ts"],
 }
