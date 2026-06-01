@@ -1,6 +1,6 @@
+import { RaceSweetMainApp } from './App';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { RaceSweetMainApp } from './App';
 
 export const mountApp = (container: HTMLElement): void => {
   const root = createRoot(container);

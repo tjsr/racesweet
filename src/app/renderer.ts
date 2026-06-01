@@ -1,5 +1,16 @@
 import "./index.css";
-import { startApp } from './mount';
+
+import { startApp } from './mount.js';
+
+declare global {
+  interface Window {
+    versions: {
+      node: () => string;
+      chrome: () => string;
+      electron: () => string;
+    };
+  }
+}
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', startApp);

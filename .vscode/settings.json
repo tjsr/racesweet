@@ -24,4 +24,8 @@
     "npm --prefix h:\\dev\\racesweet": true,
     "npx tsc": true
   },
+  "cognitiveServices": {
+    "endpoint": "http://localhost:11434/v1",
+    "key": "2b6f0b45614f4cb9892c9b3ee1daf863.VXfGGoFMUr8iWAftdPI6iPKD"
+  }
 }

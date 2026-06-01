@@ -1,3 +1,5 @@
+import './index.css';
+
 import { RaceStateLookup, Session } from '../model/racestate.ts';
 import React, { useEffect, useState } from 'react';
 

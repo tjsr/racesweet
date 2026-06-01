@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mountApp, startApp } from './mount.ts';
+
 import React from 'react';
 import { act } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { mountApp, startApp } from './mount';
 
 vi.mock('./App', () => ({
   RaceSweetMainApp: () => React.createElement('div', { 'data-testid': 'app-root' }, 'RaceSweet App'),
