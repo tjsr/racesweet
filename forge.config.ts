@@ -28,6 +28,7 @@ const config: ForgeConfig = {
             html: './src/app/index.html',
             js: './src/app/renderer.ts',
             name: 'main_window',
+            nodeIntegration: true,
             preload: {
               js: './src/app/preload.ts',
             },

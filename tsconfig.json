@@ -1,5 +1,5 @@
 {
-  "extends": ["@tsconfig/node22/tsconfig.json", "@tsconfig/node-ts/tsconfig.json"],
+  "extends": ["@tsconfig/node24/tsconfig.json", "@tsconfig/node-ts/tsconfig.json"],
   "compilerOptions": {
     "allowJs": true,
     "allowImportingTsExtensions": true,
@@ -7,8 +7,8 @@
     "esModuleInterop": true,
     "jsx": "react-jsx",
     "lib": ["ESNext", "dom"],
-    "module": "node16",
-    "moduleResolution": "node16",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "outDir": "./dist",
     "resolveJsonModule": true,
     "rootDir": ".",

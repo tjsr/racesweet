@@ -12,6 +12,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 import path from 'node:path';
 
+const __dirname = path.dirname(__filename);
+
 // import ('electron-squirrel-startup').catch(() => {
 //   app.quit();
 // });
@@ -61,9 +63,11 @@ const createWindow = (): void => {
   const mainWindow = new BrowserWindow({
     height: 600,
     webPreferences: {
+      contextIsolation: false,
+      nodeIntegration: true,
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
-    width: 800,
+    width: 1024,
   });
 
   // and load the index.html of the app.

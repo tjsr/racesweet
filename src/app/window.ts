@@ -20,20 +20,13 @@ export type FileReadDataType = 'utf8' | 'buffer' | 'bytearray';
 declare global {
   interface Window {
     api: {
-      // receivePromise: <T>(channel: AvailableReceiveChannels) => Promise<T>;
-      // receive:
-      //   // ((channel: AvailableReceiveChannels, func: (...args: unknown[]) => unknown) => void) |
-      //   ((channel: 'sendReadError', func: (eventId: string, error: string) => void) => void) |
-      //   ((channel: 'sendReadContent', func: (eventId: string, data: string) => void) => void) |
-      //   ((channel: 'sendWriteContent', func: (eventId: string, data: string) => void) => void) |
-      //   ((channel: 'sendWriteError', func: (eventId: string, error: string) => void) => void) |
-      //   ((channel: string, func: (...data: unknown[]) => void) => void);
-      // send: (channel: AvailableSendChannels, ...args: unknown[]) => void;
+      receive: (channel: AvailableReceiveChannels | string, func: (...args: unknown[]) => unknown) => void;
       requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType) => Promise<DataType>;
       requestBuffer: (filePath: string) => Promise<Buffer>;
       writeFileContent: (filePath: string, contents: string) => Promise<void>;
+      send: (channel: AvailableSendChannels, ...args: unknown[]) => void;
     },
-    nodeapi: {
+    nodeAPI: {
       createBuffer: (data: string | Uint8Array | ArrayBuffer) => Buffer;
     }
     versions: {

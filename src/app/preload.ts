@@ -1,7 +1,7 @@
 import './state.ts';
 
 import { InvalidIpcChannelError, SendChannels } from '../model/electronIpcTypes.ts';
-import { IpcRendererEvent, contextBridge, ipcRenderer } from 'electron';
+import { IpcRendererEvent, ipcRenderer } from 'electron';
 import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
@@ -69,58 +69,53 @@ ipcRenderer.on(WriteContentErrorIpcReceiveChannel,
     }
   });
 
-contextBridge.exposeInMainWorld(
-  "api", {
-    receive: (channel: string, func: (...args: unknown[]) => unknown): void => {
-      // whitelist channels
-      if (VALID_RECEIVE_CHANNELS.includes(channel)) {
-        // Deliberately strip event as it includes `sender` 
-        ipcRenderer.on(channel, (_event: IpcRendererEvent, ...args: unknown[]) => func(...args));
-      } else {
-        throw new InvalidIpcChannelError(channel);
-      }
-    },
-    requestBuffer: (filePath: string): Promise<Buffer> => {
-      return new Promise<Buffer>(
-        (
-          resolve: (value: Buffer | PromiseLike<Buffer>) => void,
-          reject: (reason?: string | Error) => void
-        ) => {
-          const outgoingEventId = crypto.randomUUID(); // Generate a unique event ID for this request
-          eventCalls[outgoingEventId] = [resolve, reject];
-          ipcRenderer.send(RequestReadIpcSendChannel, filePath, outgoingEventId, 'buffer');
-        });
-    },
-    requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType = 'utf8'): Promise<DataType> => {
-      return new Promise<DataType>(
-        (
-          resolve: (value: DataType | PromiseLike<DataType>) => void,
-          reject: (reason?: string | Error) => void
-        ) => {
-          const outgoingEventId = crypto.randomUUID(); // Generate a unique event ID for this request
-          eventCalls[outgoingEventId] = [resolve, reject];
-          ipcRenderer.send(RequestReadIpcSendChannel, filePath, outgoingEventId, dataType);
-        });
-    },
-    writeFileContent: (filePath: string, contents: string): Promise<void> => {
-      return new Promise<void>((resolve, reject) => {
+window.api = {
+  receive: (channel: string, func: (...args: unknown[]) => unknown): void => {
+    if (VALID_RECEIVE_CHANNELS.includes(channel)) {
+      ipcRenderer.on(channel, (_event: IpcRendererEvent, ...args: unknown[]) => func(...args));
+    } else {
+      throw new InvalidIpcChannelError(channel);
+    }
+  },
+  requestBuffer: (filePath: string): Promise<Buffer> => {
+    return new Promise<Buffer>(
+      (
+        resolve: (value: Buffer | PromiseLike<Buffer>) => void,
+        reject: (reason?: string | Error) => void
+      ) => {
         const outgoingEventId = crypto.randomUUID();
-        eventCalls[outgoingEventId] = [resolve as never, reject];
-        ipcRenderer.send(RequestWriteIpcSendChannel, filePath, outgoingEventId, contents);
+        eventCalls[outgoingEventId] = [resolve, reject];
+        ipcRenderer.send(RequestReadIpcSendChannel, filePath, outgoingEventId, 'buffer');
       });
-    },
-    send: (channel: SendChannels, ...args: unknown[]): void => {
-      // whitelist channels
-      if (VALID_SEND_CHANNELS.includes(channel)) {
-        ipcRenderer.send(channel, ...args);
-      } else {
-        throw new InvalidIpcChannelError(channel);
-      }
-    },
-  }
-);
+  },
+  requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType = 'utf8'): Promise<DataType> => {
+    return new Promise<DataType>(
+      (
+        resolve: (value: DataType | PromiseLike<DataType>) => void,
+        reject: (reason?: string | Error) => void
+      ) => {
+        const outgoingEventId = crypto.randomUUID();
+        eventCalls[outgoingEventId] = [resolve, reject];
+        ipcRenderer.send(RequestReadIpcSendChannel, filePath, outgoingEventId, dataType);
+      });
+  },
+  writeFileContent: (filePath: string, contents: string): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      const outgoingEventId = crypto.randomUUID();
+      eventCalls[outgoingEventId] = [resolve as never, reject];
+      ipcRenderer.send(RequestWriteIpcSendChannel, filePath, outgoingEventId, contents);
+    });
+  },
+  send: (channel: SendChannels, ...args: unknown[]): void => {
+    if (VALID_SEND_CHANNELS.includes(channel)) {
+      ipcRenderer.send(channel, ...args);
+    } else {
+      throw new InvalidIpcChannelError(channel);
+    }
+  },
+};
 
-contextBridge.exposeInMainWorld("nodeAPI", {
+window.nodeAPI = {
   createBuffer: (data: string | Uint8Array | ArrayBuffer) => {
     if (typeof data === 'string') {
       return Buffer.from(data);
@@ -130,10 +125,10 @@ contextBridge.exposeInMainWorld("nodeAPI", {
     }
     return Buffer.from(new Uint8Array(data));
   },
-});
+};
 
-contextBridge.exposeInMainWorld('versions', {
+window.versions = {
   chrome: () => process.versions.chrome,
   electron: () => process.versions.electron,
   node: () => process.versions.node,
-});
+};
