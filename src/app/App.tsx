@@ -30,6 +30,8 @@ import { updateCategorySelectionsForChangedParticipant } from './categoryChangeS
 import { fetchApicalEvents, pullApicalRaceState } from './apicalDataSource.ts';
 
 type AppSection = 'System' | 'Events' | 'Entrants' | 'Categories' | 'Sessions' | 'Timing' | 'Results' | 'Reports';
+type UnsavedChangesGuard = (action: () => void | Promise<void>) => void;
+type TimingSessionSelection = 'active' | 'session';
 
 const appSections: Array<{ icon: string; id: AppSection; label: string }> = [
   { icon: 'SYS', id: 'System', label: 'System' },
@@ -95,6 +97,23 @@ export const RaceSweetMainApp = () => {
   const [recordSelectedParticipants, setRecordSelectedParticipants] = useState<Set<EventParticipantId>>(new Set<EventParticipantId>());
   const [selectedSessionsEventId, setSelectedSessionsEventId] = useState<string|undefined>(undefined);
   const [selectedSessionId, setSelectedSessionId] = useState<string|undefined>(undefined);
+  const [selectedTimingEventId, setSelectedTimingEventId] = useState<string|undefined>(undefined);
+  const [selectedTimingSessionId, setSelectedTimingSessionId] = useState<string|undefined>(undefined);
+  const [timingRaceState, setTimingRaceState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
+  const [timingSessionSelection, setTimingSessionSelection] = useState<TimingSessionSelection>('active');
+  const categoryUnsavedChangesGuard = React.useRef<UnsavedChangesGuard | undefined>(undefined);
+  const setCategoryUnsavedChangesGuard = React.useCallback((guard: UnsavedChangesGuard | undefined): void => {
+    categoryUnsavedChangesGuard.current = guard;
+  }, []);
+
+  const changeActiveSection = (section: AppSection): void => {
+    if (activeSection === 'Categories' && section !== activeSection && categoryUnsavedChangesGuard.current) {
+      categoryUnsavedChangesGuard.current(() => setActiveSection(section));
+      return;
+    }
+
+    setActiveSection(section);
+  };
 
   useEffect(() => {
     if (!sessionState && !eventCatalogState && !errorState) {
@@ -126,6 +145,7 @@ export const RaceSweetMainApp = () => {
           const sessionList = getSessionsForEvent(catalog, initialEventId);
           const categoryList = getCategoriesForEvent(catalog, initialEventId);
           const entrantList = getEntrantsForEvent(catalog, initialEventId);
+          const initialSessionId = sessionList.find((session) => session.id === catalog.activeSessionId)?.id || sessionList[0]?.id;
 
           setAdminService(raceService);
           setEventCatalogService(catalogService);
@@ -139,7 +159,10 @@ export const RaceSweetMainApp = () => {
           setSelectedEntrantsEventId(initialEventId);
           setSelectedEntrantId(entrantList[0]?.id);
           setSelectedSessionsEventId(initialEventId);
-          setSelectedSessionId(sessionList[0]?.id);
+          setSelectedSessionId(initialSessionId);
+          setSelectedTimingEventId(initialEventId);
+          setSelectedTimingSessionId(initialSessionId);
+          setTimingRaceState(session);
           setErrorState(undefined);
         };
 
@@ -204,7 +227,8 @@ export const RaceSweetMainApp = () => {
     const nextEventId = preferredEventId || catalog.activeEventId || catalog.events[0]?.id;
     const nextSessions = getSessionsForEvent(catalog, nextEventId);
     const nextCategories = getCategoriesForEvent(catalog, nextEventId);
-    const nextSessionId = preferredSessionId || nextSessions.find((session) => session.id === selectedSessionId)?.id || nextSessions[0]?.id;
+    const activeSessionId = nextSessions.find((session) => session.id === catalog.activeSessionId)?.id;
+    const nextSessionId = preferredSessionId || activeSessionId || nextSessions.find((session) => session.id === selectedSessionId)?.id || nextSessions[0]?.id;
     const nextCategoryId = preferredCategoryId || nextCategories.find((category) => category.id.toString() === selectedCategoryId)?.id?.toString() || nextCategories[0]?.id?.toString();
     const nextEntrants = getEntrantsForEvent(catalog, nextEventId);
     const nextEntrantId = nextEntrants.find((entrant) => entrant.id === selectedEntrantId)?.id || nextEntrants[0]?.id;
@@ -232,11 +256,22 @@ export const RaceSweetMainApp = () => {
     setRenderTick((tick) => tick + 1);
   };
 
-  const applySessionSources = async (eventId: string, sessionId: string, options?: { replaceSessionState?: boolean }): Promise<void> => {
-    let targetSessionState = sessionState;
+  const applySessionSources = async (
+    eventId: string,
+    sessionId: string,
+    options?: {
+      clearSelections?: boolean;
+      replaceSessionState?: boolean;
+      targetSessionState?: Session & RaceStateLookup;
+    }
+  ): Promise<(Session & RaceStateLookup) | undefined> => {
+    let targetSessionState = options?.targetSessionState || sessionState;
     if (options?.replaceSessionState) {
       targetSessionState = createEmptySessionState();
       setSessionState(targetSessionState);
+    }
+
+    if (options?.clearSelections || options?.replaceSessionState) {
       setRecordSelectedParticipants(new Set<EventParticipantId>());
       setCategorySelected(new Set<EventCategoryId>());
       setRecordSelectedCategories(new Set<EventCategoryId>());
@@ -248,7 +283,72 @@ export const RaceSweetMainApp = () => {
     for (const source of sources) {
       await applySourceToSessionState(eventId, source, targetSessionState);
     }
+
+    if (targetSessionState && adminService) {
+      adminService.applyChangesToSession(targetSessionState);
+    }
+
+    return targetSessionState;
   };
+
+  const loadTimingSession = async (eventId: string, sessionId: string): Promise<void> => {
+    const targetSessionState = createEmptySessionState();
+    const loadedState = await applySessionSources(eventId, sessionId, {
+      clearSelections: true,
+      targetSessionState,
+    });
+    setTimingRaceState(loadedState || targetSessionState);
+    setRenderTick((tick) => tick + 1);
+  };
+
+  const selectTimingEvent = (eventId: string): void => {
+    if (!eventCatalogState) {
+      return;
+    }
+
+    const nextSessions = getSessionsForEvent(eventCatalogState, eventId);
+    const nextSessionId = nextSessions.find((session) => session.id === selectedTimingSessionId)?.id || nextSessions[0]?.id;
+    setTimingSessionSelection('session');
+    setSelectedTimingEventId(eventId);
+    setSelectedTimingSessionId(nextSessionId);
+
+    if (nextSessionId) {
+      loadTimingSession(eventId, nextSessionId).catch((error: unknown) => {
+        setErrorState(error as Error);
+      });
+    }
+  };
+
+  const selectTimingSession = (sessionId: string): void => {
+    if (sessionId === 'active') {
+      setTimingSessionSelection('active');
+      setSelectedTimingEventId(eventCatalogState?.activeEventId);
+      setSelectedTimingSessionId(eventCatalogState?.activeSessionId);
+      setTimingRaceState(sessionState);
+      return;
+    }
+
+    const eventId = selectedTimingEventId || eventCatalogState?.activeEventId;
+    if (!eventId) {
+      return;
+    }
+
+    setTimingSessionSelection('session');
+    setSelectedTimingSessionId(sessionId);
+    loadTimingSession(eventId, sessionId).catch((error: unknown) => {
+      setErrorState(error as Error);
+    });
+  };
+
+  useEffect(() => {
+    if (timingSessionSelection !== 'active') {
+      return;
+    }
+
+    setSelectedTimingEventId(eventCatalogState?.activeEventId);
+    setSelectedTimingSessionId(eventCatalogState?.activeSessionId);
+    setTimingRaceState(sessionState);
+  }, [eventCatalogState?.activeEventId, eventCatalogState?.activeSessionId, sessionState, timingSessionSelection]);
 
   useEffect(() => {
     if (!eventCatalogState || !sessionState || !selectedSessionsEventId || !selectedSessionId) {
@@ -297,7 +397,8 @@ export const RaceSweetMainApp = () => {
     if (!adminService) {
       return;
     }
-    adminService.excludeCrossing(crossingId, exclude)
+    const targetRaceState = timingRaceState || sessionState;
+    adminService.excludeCrossingForSession(targetRaceState, crossingId, exclude)
       .then(() => setRenderTick((tick) => tick + 1))
       .catch((error: unknown) => setErrorState(error as Error));
   };
@@ -307,12 +408,13 @@ export const RaceSweetMainApp = () => {
       return;
     }
 
-    const entrantId = sessionState.getEntrantIdForParticipant(participantId);
+    const targetRaceState = timingRaceState || sessionState;
+    const entrantId = targetRaceState.getEntrantIdForParticipant(participantId);
     if (!entrantId) {
       return;
     }
 
-    adminService.updateEntrantCategory(entrantId, categoryId).catch((error: unknown) => {
+    adminService.updateEntrantCategoryForSession(targetRaceState, entrantId, categoryId).catch((error: unknown) => {
       setErrorState(error as Error);
     });
 
@@ -331,9 +433,10 @@ export const RaceSweetMainApp = () => {
   };
 
   const handleParticipantSelected = (participantIds: Set<EventParticipantId>) => {
+    const targetRaceState = timingRaceState || sessionState;
     const participantCategories = selectedCategoriesForParticipants(
       participantIds,
-      sessionState.getParticipantById.bind(sessionState)
+      targetRaceState.getParticipantById.bind(targetRaceState)
     );
 
     setRecordSelectedParticipants(participantIds);
@@ -359,13 +462,55 @@ export const RaceSweetMainApp = () => {
     });
   }
 
+  const displayedTimingRaceState = timingRaceState || sessionState;
+  const timingEventId = timingSessionSelection === 'active'
+    ? eventCatalogState.activeEventId
+    : selectedTimingEventId || eventCatalogState.activeEventId;
+  const timingEvent = eventCatalogState.events.find((event) => event.id === timingEventId)
+    ?? eventCatalogState.events.find((event) => event.id === eventCatalogState.activeEventId)
+    ?? eventCatalogState.events[0];
+  const timingSessions = getSessionsForEvent(eventCatalogState, timingEvent?.id);
+  const timingSessionValue = timingSessionSelection === 'active'
+    ? 'active'
+    : selectedTimingSessionId || timingSessions[0]?.id || '';
+  const activeSession = eventCatalogState.sessions.find((session) => session.id === eventCatalogState.activeSessionId);
+
   const timingPage = (
     <>
       <h1>Timing</h1>
-      <CategoryList categories={sessionState.categories || []} categorySelected={handleCategoryListSelected} />
+      <div className="timing-context-row">
+        <label className="page-filter-label">
+          Event
+          <select
+            aria-label="Timing Event"
+            value={timingEvent?.id || ''}
+            onChange={(event) => selectTimingEvent(event.target.value)}
+          >
+            {eventCatalogState.events.map((event) => (
+              <option key={event.id} value={event.id}>{event.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="page-filter-label">
+          Session
+          <select
+            aria-label="Timing Session"
+            value={timingSessionValue}
+            onChange={(event) => selectTimingSession(event.target.value)}
+          >
+            <option value="active">
+              {activeSession ? `Active session (${activeSession.name})` : 'Active session'}
+            </option>
+            {timingSessions.map((session) => (
+              <option key={session.id} value={session.id}>{session.name}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <CategoryList categories={displayedTimingRaceState.categories || []} categorySelected={handleCategoryListSelected} />
       <RecentRecords
-        records={(sessionState.records as EventTimeRecord[]) || []}
-        raceStateLookup={sessionState}
+        records={(displayedTimingRaceState.records as EventTimeRecord[]) || []}
+        raceStateLookup={displayedTimingRaceState}
         selectedCategories={hilightCategories}
         selectedParticipants={recordSelectedParticipants}
         categorySelected={setRecordSelectedCategories}
@@ -546,7 +691,7 @@ export const RaceSweetMainApp = () => {
               setSelectedEventId(eventId);
 
               if (eventCatalogService) {
-                const catalog = await eventCatalogService.updateSession(sessionId, { status: 'live' });
+                const catalog = await eventCatalogService.activateSession(eventId, sessionId);
                 updateEventCatalogState(catalog, eventId, sessionId, selectedCategoryId);
               }
 
@@ -608,12 +753,13 @@ export const RaceSweetMainApp = () => {
           }}
           onSelectCategory={setSelectedCategoryId}
           onSelectEvent={selectCategoriesEvent}
+          onUnsavedChangesGuardChange={setCategoryUnsavedChangesGuard}
           onUpdateCategory={(categoryId, changes) => {
             if (!eventCatalogService) {
               return;
             }
 
-            eventCatalogService.updateCategory(categoryId, changes).then((catalog) => {
+            return eventCatalogService.updateCategory(categoryId, changes).then((catalog) => {
               const activeEventId = eventCatalogState.activeEventId;
               if (selectedCategoryEventId && selectedCategoryEventId === activeEventId) {
                 sessionState.updateCategoryDetails(categoryId, {
@@ -624,7 +770,7 @@ export const RaceSweetMainApp = () => {
                 setRenderTick((tick) => tick + 1);
               }
               updateEventCatalogState(catalog, selectedSessionsEventId, selectedSessionId, categoryId);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            });
           }}
           selectedCategoryId={selectedCategoryId}
           selectedEventId={selectedCategoryEventId}
@@ -735,7 +881,7 @@ export const RaceSweetMainApp = () => {
               key={section.id}
               type="button"
               className={`section-tile${isActive ? ' active' : ''}`}
-              onClick={() => setActiveSection(section.id)}
+              onClick={() => changeActiveSection(section.id)}
               aria-current={isActive ? 'page' : undefined}
               aria-label={section.label}
             >

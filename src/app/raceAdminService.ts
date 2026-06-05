@@ -1,12 +1,11 @@
-import type { EventCategoryId } from '../model/eventcategory.js';
-import type { EventEntrantId } from '../model/entrant.js';
-import type { RaceStateLookup, Session } from '../model/racestate.js';
-
 import {
-  createDefaultAdministrativeChanges,
   type AdministrativeChanges,
   type RaceAdminPersistence,
+  createDefaultAdministrativeChanges,
 } from './raceAdminPersistence.js';
+import type { RaceStateLookup, Session } from '../model/racestate.js';
+import type { EventCategoryId } from '../model/eventcategory.js';
+import type { EventEntrantId } from '../model/entrant.js';
 
 export class RaceAdminService {
   private changes: AdministrativeChanges;
@@ -21,7 +20,7 @@ export class RaceAdminService {
 
   public static async create(
     sessionLoader: () => Promise<Session & RaceStateLookup>,
-    persistence: RaceAdminPersistence,
+    persistence: RaceAdminPersistence
   ): Promise<RaceAdminService> {
     const session = await sessionLoader();
     const changes = await persistence.load();
@@ -35,7 +34,7 @@ export class RaceAdminService {
   }
 
   public async excludeCrossing(crossingId: string, exclude: boolean): Promise<void> {
-    this.session.excludeCrossing(crossingId, exclude);
+    this.excludeCrossingInSession(this.session, crossingId, exclude);
     this.changes = {
       ...this.changes,
       excludedCrossings: {
@@ -46,8 +45,24 @@ export class RaceAdminService {
     await this.persistence.save(this.changes);
   }
 
+  public async excludeCrossingForSession(session: Session & RaceStateLookup, crossingId: string, exclude: boolean): Promise<void> {
+    this.excludeCrossingInSession(session, crossingId, exclude);
+    this.changes = {
+      ...this.changes,
+      excludedCrossings: {
+        ...this.changes.excludedCrossings,
+        [crossingId]: exclude,
+      },
+    };
+    await this.persistence.save(this.changes);
+  }
+
+  public applyChangesToSession(session: Session & RaceStateLookup): void {
+    this.applyChanges(session);
+  }
+
   public async updateEntrantCategory(entrantId: EventEntrantId, categoryId: EventCategoryId): Promise<void> {
-    this.session.updateEntrantCategory(entrantId, categoryId);
+    this.updateEntrantCategoryInSession(this.session, entrantId, categoryId);
     this.changes = {
       ...this.changes,
       entrantCategories: {
@@ -58,15 +73,35 @@ export class RaceAdminService {
     await this.persistence.save(this.changes);
   }
 
-  private applyChanges(): void {
+  public async updateEntrantCategoryForSession(session: Session & RaceStateLookup, entrantId: EventEntrantId, categoryId: EventCategoryId): Promise<void> {
+    this.updateEntrantCategoryInSession(session, entrantId, categoryId);
+    this.changes = {
+      ...this.changes,
+      entrantCategories: {
+        ...this.changes.entrantCategories,
+        [entrantId]: categoryId,
+      },
+    };
+    await this.persistence.save(this.changes);
+  }
+
+  private applyChanges(session: Session & RaceStateLookup = this.session): void {
     const changes = this.changes || createDefaultAdministrativeChanges();
 
     Object.entries(changes.excludedCrossings).forEach(([crossingId, exclude]) => {
-      this.session.excludeCrossing(crossingId, exclude);
+      this.excludeCrossingInSession(session, crossingId, exclude);
     });
 
     Object.entries(changes.entrantCategories).forEach(([entrantId, categoryId]) => {
-      this.session.updateEntrantCategory(entrantId, categoryId);
+      this.updateEntrantCategoryInSession(session, entrantId, categoryId);
     });
+  }
+
+  private excludeCrossingInSession(session: Session & RaceStateLookup, crossingId: string, exclude: boolean): void {
+    session.excludeCrossing(crossingId, exclude);
+  }
+
+  private updateEntrantCategoryInSession(session: Session & RaceStateLookup, entrantId: EventEntrantId, categoryId: EventCategoryId): void {
+    session.updateEntrantCategory(entrantId, categoryId);
   }
 }

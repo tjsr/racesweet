@@ -1,11 +1,11 @@
+import {
+  type AdministrativeChanges,
+  type RaceAdminPersistence,
+  createDefaultAdministrativeChanges,
+} from './raceAdminPersistence.js';
 import type { EventCategoryId } from '../model/eventcategory.js';
 import type { EventEntrantId } from '../model/entrant.js';
 import { RaceAdminService } from './raceAdminService.js';
-import {
-  createDefaultAdministrativeChanges,
-  type AdministrativeChanges,
-  type RaceAdminPersistence,
-} from './raceAdminPersistence.js';
 
 const createSessionDouble = () => {
   const excluded: Record<string, boolean> = {};
@@ -20,7 +20,7 @@ const createSessionDouble = () => {
     },
   };
 
-  return { excluded, entrantCategories, session };
+  return { entrantCategories, excluded, session };
 };
 
 class MemoryPersistence implements RaceAdminPersistence {
@@ -78,5 +78,29 @@ describe('RaceAdminService', () => {
 
     expect(sessionDouble.excluded.crossing2).toBe(true);
     expect(persistence.snapshot.excludedCrossings.crossing2).toBe(true);
+  });
+
+  it('applies and persists changes against a displayed session state', async () => {
+    const activeSessionDouble = createSessionDouble();
+    const displayedSessionDouble = createSessionDouble();
+    const persistence = new MemoryPersistence({
+      entrantCategories: { team1: 'cat-b' },
+      excludedCrossings: { crossing1: true },
+      schemaVersion: 1,
+    });
+
+    const service = await RaceAdminService.create(async () => activeSessionDouble.session as never, persistence);
+    service.applyChangesToSession(displayedSessionDouble.session as never);
+    await service.excludeCrossingForSession(displayedSessionDouble.session as never, 'crossing2', true);
+    await service.updateEntrantCategoryForSession(displayedSessionDouble.session as never, 'team2', 'cat-c');
+
+    expect(displayedSessionDouble.excluded.crossing1).toBe(true);
+    expect(displayedSessionDouble.excluded.crossing2).toBe(true);
+    expect(displayedSessionDouble.entrantCategories.team1).toBe('cat-b');
+    expect(displayedSessionDouble.entrantCategories.team2).toBe('cat-c');
+    expect(activeSessionDouble.excluded.crossing2).toBeUndefined();
+    expect(activeSessionDouble.entrantCategories.team2).toBeUndefined();
+    expect(persistence.snapshot.excludedCrossings.crossing2).toBe(true);
+    expect(persistence.snapshot.entrantCategories.team2).toBe('cat-c');
   });
 });

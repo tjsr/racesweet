@@ -15,7 +15,11 @@ vi.mock('../views/display/categories', () => ({
 }));
 
 vi.mock('../views/display/recent', () => ({
-  RecentRecords: () => React.createElement('div', null, 'Recent Records'),
+  RecentRecords: (props: { records: unknown[] }) => React.createElement(
+    'div',
+    { 'data-timing-record-count': props.records.length },
+    `Recent Records (${props.records.length})`
+  ),
 }));
 
 const readFixtureBuffer = async (filePath: string): Promise<Buffer> => {
@@ -288,7 +292,7 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Sessions');
     expect(container.querySelector('h1')?.textContent).toBe('Sessions');
     expect(container.textContent).toContain('Create Session');
-    expect(container.textContent).toContain('Make Active');
+    expect(container.textContent).toContain('Active Session');
     expect(container.querySelector('input[aria-label="Sessions Page Name"]')).toBeTruthy();
 
     await clickSectionButton(container, 'Timing');
@@ -455,6 +459,111 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Sessions');
     expect(container.querySelector('h1')?.textContent).toBe('Sessions');
     expect(container.querySelector('input[aria-label="Sessions Page Name"]')).toBeTruthy();
+  });
+
+  it('makes a selected session and its parent event active through persisted catalog mutations', async () => {
+    const writtenFiles: Array<{ content: string; filePath: string }> = [];
+    const requestFileContent = async (filePath: string, _dataType: string): Promise<string> => {
+      return readGeneratedFixture(filePath);
+    };
+
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer: readFixtureBuffer,
+      requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async (filePath: string, content: string) => {
+        writtenFiles.push({ content, filePath });
+      },
+    };
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+
+    await clickSectionButton(container, 'Events');
+    await clickButtonByText(container, 'New');
+    await waitForText(container, 'New Event');
+
+    await clickSectionButton(container, 'Sessions');
+    await waitForText(container, 'No sessions are defined for this event.');
+    await clickButtonByText(container, 'Create Session');
+    await waitForText(container, 'New Session');
+
+    await clickButtonByText(container, 'Make Active');
+    await waitForText(container, 'Active Session');
+
+    const latestCatalogWrite = writtenFiles
+      .filter((write) => write.filePath.includes('event-catalog.json'))
+      .at(-1);
+    expect(latestCatalogWrite).toBeDefined();
+
+    const ledger = JSON.parse(latestCatalogWrite!.content) as { mutations: Array<{ eventId?: string; sessionId?: string; type: string }> };
+    const sessionActivation = ledger.mutations.find((mutation) => mutation.type === 'session-activated');
+    expect(sessionActivation).toEqual(expect.objectContaining({
+      eventId: expect.stringMatching(/^event-/),
+      sessionId: expect.stringMatching(/^session-/),
+      type: 'session-activated',
+    }));
+    expect(ledger.mutations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sessionId: sessionActivation?.sessionId,
+        type: 'session-updated',
+      }),
+    ]));
+
+    await clickSectionButton(container, 'Events');
+    expect(container.textContent).toContain('New Event');
+    expect(container.textContent).toContain('Active Event');
+  });
+
+  it('keeps Timing pinned to an explicitly selected session when the active session changes', async () => {
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+
+    await clickSectionButton(container, 'Timing');
+    const timingEventSelect = container.querySelector('select[aria-label="Timing Event"]') as HTMLSelectElement;
+    const timingSessionSelect = container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement;
+    expect(timingEventSelect).toBeTruthy();
+    expect(timingSessionSelect).toBeTruthy();
+    expect(timingSessionSelect.value).toBe('active');
+
+    await act(async () => {
+      timingSessionSelect.value = 'session-1-qualifying';
+      timingSessionSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    await waitForInputValue(container, 'select[aria-label="Timing Session"]', 'session-1-qualifying');
+    expect(container.textContent).toContain('Recent Records (0)');
+
+    await clickSectionButton(container, 'Sessions');
+    const featureRaceButton = Array.from(container.querySelectorAll('button')).find((button) => {
+      return button.textContent?.includes('Feature Race');
+    }) as HTMLButtonElement | undefined;
+    expect(featureRaceButton).toBeTruthy();
+
+    await act(async () => {
+      featureRaceButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await clickButtonByText(container, 'Make Active');
+    await waitForText(container, 'Active Session');
+
+    await clickSectionButton(container, 'Timing');
+    const pinnedTimingSessionSelect = container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement;
+    expect(pinnedTimingSessionSelect).toBeTruthy();
+    expect(pinnedTimingSessionSelect.value).toBe('session-1-qualifying');
+    expect(container.textContent).toContain('Active session (Feature Race)');
+    expect(container.textContent).toContain('Recent Records (0)');
   });
 
   it('persists enriched entrant profile edits across panel switches', async () => {
