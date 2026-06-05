@@ -34,6 +34,7 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
     ?? props.catalog.events[0];
   const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
   const selectedSession = eventSessions.find((session) => session.id === props.selectedSessionId) ?? eventSessions[0];
+  const selectedSessionIsActive = selectedSession?.id === props.catalog.activeSessionId;
   const assignedEventSourceIds = selectedEvent ? getEventAssignedSourceIds(props.config, selectedEvent.id) : [];
   const sessionAssignment = selectedSession ? (props.config.sessionSourceAssignments[selectedSession.id] || { mode: 'default', sourceIds: [] as string[] }) : undefined;
   const effectiveSessionSourceIds = sessionAssignment
@@ -83,9 +84,9 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
             <button
               type="button"
               onClick={() => selectedEvent && selectedSession && props.onMakeSessionActive(selectedEvent.id, selectedSession.id)}
-              disabled={!selectedEvent || !selectedSession}
+              disabled={!selectedEvent || !selectedSession || selectedSessionIsActive}
             >
-              Make Active
+              {selectedSessionIsActive ? 'Active Session' : 'Make Active'}
             </button>
           </div>
           <div className="events-session-list" role="listbox" aria-label="Sessions for selected event">
@@ -102,6 +103,7 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
                   <strong>{session.name}</strong>
                   <span>{session.kind}</span>
                   <span>{session.status}</span>
+                  {session.id === props.catalog.activeSessionId ? <span className="events-badge">Active</span> : null}
                 </button>
               );
             })}

@@ -20,6 +20,7 @@ const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: str
 
 const catalog: EventCatalogState = {
   activeEventId: 'event-1',
+  activeSessionId: 'session-1',
   categories: [],
   entrants: [],
   events: [
@@ -161,6 +162,7 @@ describe('SessionsPage integration', () => {
     const eventSelect = container.querySelector('select[aria-label="Sessions Event"]') as HTMLSelectElement;
     expect(eventSelect.value).toBe('event-1');
     expect(container.textContent).toContain('Friday Practice');
+    expect(container.textContent).toContain('Active Session');
 
     await act(async () => {
       eventSelect.value = 'event-2';
@@ -168,6 +170,7 @@ describe('SessionsPage integration', () => {
     });
 
     expect(container.textContent).toContain('Test Session');
+    expect(container.textContent).toContain('Make Active');
 
     const createButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Create Session');
     expect(createButton).toBeDefined();
