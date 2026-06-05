@@ -7,3 +7,4 @@ src/testdata/~$*.xlsx
 .webpack/
 backup/
 dist/
+src/generated/
