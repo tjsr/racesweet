@@ -61,7 +61,36 @@ describe('EventCatalogService', () => {
     await service.activateEvent('event-2026-test-day');
 
     expect(service.catalog.activeEventId).toBe('event-2026-test-day');
+    expect(service.catalog.activeSessionId).toBeUndefined();
     expect(activePersistence.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('activates a session and its event through the ledger, persistence, and upstream callback flow', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const onPersistedLedger = vi.fn(async () => undefined);
+    const service = await EventCatalogService.create(seededPersistence, { onPersistedLedger });
+
+    await service.activateSession('event-2026-racesweet-round-1', 'session-1-race');
+
+    const session = service.catalog.sessions.find((item) => item.id === 'session-1-race');
+    expect(service.catalog.activeEventId).toBe('event-2026-racesweet-round-1');
+    expect(service.catalog.activeSessionId).toBe('session-1-race');
+    expect(session?.status).toBe('live');
+    expect(seededPersistence.save).toHaveBeenCalledOnce();
+    expect(onPersistedLedger).toHaveBeenCalledWith(expect.objectContaining({
+      mutations: expect.arrayContaining([
+        expect.objectContaining({
+          eventId: 'event-2026-racesweet-round-1',
+          sessionId: 'session-1-race',
+          type: 'session-activated',
+        }),
+        expect.objectContaining({
+          changes: { status: 'live' },
+          sessionId: 'session-1-race',
+          type: 'session-updated',
+        }),
+      ]),
+    }));
   });
 
   it('creates an event through the ledger, persistence, and upstream callback flow', async () => {
@@ -339,6 +368,7 @@ describe('applyEventCatalogLedger', () => {
       'session-1-qualifying',
       'session-1-race',
     ]);
+    expect(state.activeSessionId).toBe('session-1-practice');
     expect(state.categories).toHaveLength(2);
     expect(state.entrants).toHaveLength(1);
     expect(state.sessions).toHaveLength(3);

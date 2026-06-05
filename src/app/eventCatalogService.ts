@@ -382,6 +382,27 @@ export class EventCatalogService {
     ]);
   }
 
+  public async activateSession(eventId: string, sessionId: string): Promise<EventCatalogState> {
+    return this.appendMutations([
+      {
+        eventId,
+        id: createMutationId(),
+        sessionId,
+        timestamp: createTimestamp(),
+        type: 'session-activated',
+      },
+      {
+        changes: {
+          status: 'live',
+        },
+        id: createMutationId(),
+        sessionId,
+        timestamp: createTimestamp(),
+        type: 'session-updated',
+      },
+    ]);
+  }
+
   public async deleteSession(eventId: string, sessionId: string): Promise<EventCatalogState> {
     const event = this.state.events.find((item) => item.id === eventId);
     return this.appendMutations([
