@@ -9,8 +9,11 @@ import {
 } from '../model/electronIpc';
 import { injectCorsHeaders, isApicalApiUrl } from './electron/corsHeaders';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 
 import path from 'node:path';
+import fs from 'node:fs';
+import net from 'node:net';
 
 const __dirname = path.dirname(__filename);
 
@@ -56,6 +59,71 @@ const configureCorsForApicalRequests = (): void => {
   });
 };
 
+// Create HTTP server for development
+const createHttpServer = (): any => {
+  const PORT = parseInt(process.env.DEBUG_SERVER_PORT || '3000', 10);
+  const STATIC_FOLDER = path.join(__dirname, '..', 'public');
+  const mimeTypes: Record<string, string> = {
+    '.css': 'text/css',
+    '.gif': 'image/gif',
+    '.html': 'text/html',
+    '.ico': 'image/x-icon',
+    '.jpg': 'image/jpeg',
+    '.js': 'application/javascript',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.svg': 'image/svg+xml',
+  };
+
+  const server = createServer((req: any, res: any) => {
+    if (req.url) {
+      const filePath = path.join(STATIC_FOLDER, req.url === '/' ? '../index.html' : req.url);
+      fs.stat(filePath, (err: any, stats: any) => {
+        if (err || !stats.isFile()) {
+          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          console.error(`File not found: ${filePath}`, err);
+          res.end('Not Found');
+          return;
+        }
+
+        const ext = path.extname(filePath).toLowerCase();
+        const contentType = mimeTypes[ext] || 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': contentType });
+        console.log(`Serving file: ${filePath}`);
+
+        const readStream = fs.createReadStream(filePath);
+        readStream.pipe(res);
+      });
+    } else {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Not Found');
+    }
+  });
+
+  server.listen(PORT, (err: any) => {
+    if (err) {
+      // If port is in use, try next available port
+      if (err.code === 'EADDRINUSE') {
+        const nextPort = PORT + 1;
+        console.log(`Port ${PORT} is in use, trying port ${nextPort}...`);
+        if (nextPort > PORT + 10) {
+          console.error(`Could not find available port after trying ports ${PORT} to ${nextPort}`);
+          return;
+        }
+        server.listen(nextPort, () => {
+          console.log(`Development server is running at http://localhost:${nextPort}`);
+        });
+      } else {
+        console.error(`Failed to start server: ${err.message}`);
+      }
+    } else {
+      console.log(`Development server is running at http://localhost:${PORT}`);
+    }
+  });
+
+  return server;
+};
+
 const createWindow = (): void => {
   configureCorsForApicalRequests();
 
@@ -70,8 +138,17 @@ const createWindow = (): void => {
     width: 1024,
   });
 
-  // and load the index.html of the app.
-  mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+  // Create and start HTTP server with auto-port detection
+  const server = createHttpServer();
+  
+  // Get the actual port the server is listening on
+  const actualPort = server.address().port;
+  
+  // Send the actual port to the renderer process
+  mainWindow.webContents.send('actual-port', actualPort);
+  
+  // Load from HTTP server using the actual port
+  mainWindow.loadURL(`http://localhost:${actualPort}`);
 };
 
 // This method will be called when Electron has finished

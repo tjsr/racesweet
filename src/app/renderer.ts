@@ -9,6 +9,7 @@ declare global {
       chrome: () => string;
       electron: () => string;
     };
+    actualPort: number;
   }
 }
 
