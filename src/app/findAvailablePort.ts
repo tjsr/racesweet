@@ -1,54 +1,52 @@
-import { createServer, Server } from 'http';
+import { createServer } from 'node:http';
 
-// Find an available port - simple and safe approach
+export interface FindAvailablePortOptions {
+  maxAttempts?: number;
+  startPort?: number;
+}
 
-const tryPort = async (server: Server, port: number): Promise<number> => {
-  return new Promise((resolve, reject) => {
-    server.listen(port, () => {
-      console.log(`Port ${port} is available`);
-      resolve(port);
+const parseStartPort = (startPort?: number): number => {
+  return startPort ?? parseInt(process.env.DEBUG_SERVER_PORT || '3000', 10);
+};
+
+interface PortCheckResult {
+  available: boolean;
+  port: number;
+}
+
+const canListenOnPort = async (port: number): Promise<PortCheckResult> => {
+  const server = createServer();
+
+  return await new Promise((resolve, reject) => {
+    server.once('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        resolve({ available: false, port });
+        return;
+      }
+      reject(error);
     });
+
+    server.once('listening', () => {
+      const address = server.address();
+      const resolvedPort = address !== null && typeof address !== 'string' ? address.port : port;
+      server.close(() => resolve({ available: true, port: resolvedPort }));
+    });
+
+    server.listen(port);
   });
 };
 
-export const findAvailablePort = (): number => {
-  const defaultPort = parseInt(process.env.DEBUG_SERVER_PORT || '3000', 10);
+export const findAvailablePort = async (options: FindAvailablePortOptions = {}): Promise<number> => {
+  const maxAttempts = options.maxAttempts ?? 10;
+  const startPort = parseStartPort(options.startPort);
 
-  // Try the default port first
-  let port = defaultPort;
-  // If default port is in use, try incrementing ports
-  let attempt = 0;
-  const maxAttempts = 10;
-
-  // Check if port is available by trying to bind
-  const server = createServer((req: any, res: any) => {
-    res.writeHead(200);
-    res.end('OK');
-  });
-
-  let port = tryPort(server, port);
-
-  // server.listen(port, () => {
-  //   // server.close(() => {
-  //     console.log(`Port ${port} is available`);
-  //     return port;
-  //   // });
-  // });
-
-  server.on('error', (err: Error & { code?: string }) => {
-    if (err.code === 'EADDRINUSE') {
-      // Port is in use, close and destroy the server before trying next
-      server.close();
-      port++;
-      attempt++;
-
-      if (attempt >= maxAttempts) {
-        console.error(`Could not find available port after ${maxAttempts} attempts`);
-        return;
-      }
-      setTimeout(() => tryPort(server, port), 100);
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const port = startPort + attempt;
+    const result = await canListenOnPort(port);
+    if (result.available) {
+      return result.port;
     }
-  });
+  }
 
-  return port;
+  throw new Error(`Could not find available port after trying ports ${startPort} to ${startPort + maxAttempts - 1}`);
 };

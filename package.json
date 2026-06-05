@@ -24,8 +24,8 @@
     "lint:json": "jsonlint src/**/*.json",
     "lint:ts": "eslint",
     "serve": "webpack --config webpack.main.config.ts src/app/index",
-    "start": "electron-forge start -- --trace-warnings",
-    "start:no-trace": "electron-forge start",
+    "start": "tsx ./src/app/startElectronForge.ts --trace-warnings",
+    "start:no-trace": "tsx ./src/app/startElectronForge.ts",
     "test": "vitest",
     "test:table": "tsx ./src/printCrossings.ts",
     "types": "mkdirp src/generated/typebox && ts2typebox --input src/model/index.ts --output src/generated/typebox/index.ts"
