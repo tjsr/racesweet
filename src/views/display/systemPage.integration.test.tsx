@@ -53,6 +53,11 @@ const config: SystemConfiguration = {
   },
 };
 
+const insertTextAtCursor = (input: HTMLInputElement, text: string): void => {
+  input.setRangeText(text, input.selectionStart || 0, input.selectionEnd || 0, 'end');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
 describe('SystemPage integration', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -160,7 +165,15 @@ describe('SystemPage integration', () => {
     const onCreateSource = vi.fn();
     const onDeleteSource = vi.fn();
     const onLoadApicalEvents = vi.fn(async () => {
-      throw new Error('HTTP 401 Unauthorized');
+      throw new Error([
+        'Apical event list request returned HTTP 401 Unauthorized.',
+        'URL: https://apicalracetiming.com.au/raceresult/event/getall?companyId=2&_=1780000000000',
+        'HTTP status: 401 Unauthorized',
+        'Request headers:',
+        '  accept: application/json',
+        '  authorization: [redacted, 12 chars]',
+        'Response body: Session authentication failed',
+      ].join('\n'));
     });
     const onSaveSource = vi.fn();
 
@@ -183,7 +196,79 @@ describe('SystemPage integration', () => {
       fetchEventsButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(container.textContent).toContain('Failed to fetch Apical events: HTTP 401 Unauthorized');
+    expect(container.textContent).toContain('Failed to fetch Apical events:');
+    expect(container.textContent).toContain('Apical event list request returned HTTP 401 Unauthorized.');
+    expect(container.textContent).toContain('URL: https://apicalracetiming.com.au/raceresult/event/getall?companyId=2&_=1780000000000');
+    expect(container.textContent).toContain('HTTP status: 401 Unauthorized');
+    expect(container.textContent).toContain('Request headers:');
+    expect(container.textContent).toContain('accept: application/json');
+    expect(container.textContent).toContain('authorization: [redacted, 12 chars]');
+    expect(container.textContent).toContain('Response body: Session authentication failed');
+    expect(container.querySelector('.inline-error pre')).toBeTruthy();
+  });
+
+  it('allows data source fields to be edited from the middle without committing or moving the cursor until blur', async () => {
+    const onCreateSource = vi.fn();
+    const onDeleteSource = vi.fn();
+    const onLoadApicalEvents = vi.fn();
+    const onSaveSource = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <SystemPage
+          config={config}
+          onCreateSource={onCreateSource}
+          onDeleteSource={onDeleteSource}
+          onLoadApicalEvents={onLoadApicalEvents}
+          onSaveSource={onSaveSource}
+        />,
+      );
+    });
+
+    const sourceNameInput = container.querySelector('input[aria-label="Source Name source-apical"]') as HTMLInputElement;
+    expect(sourceNameInput).toBeDefined();
+    sourceNameInput.focus();
+    sourceNameInput.setSelectionRange(7, 7);
+
+    await act(async () => {
+      insertTextAtCursor(sourceNameInput, 'Live ');
+    });
+
+    expect(sourceNameInput.value).toBe('Apical Live Source');
+    expect(sourceNameInput.selectionStart).toBe(12);
+    expect(document.activeElement).toBe(sourceNameInput);
+    expect(onSaveSource).not.toHaveBeenCalled();
+
+    await act(async () => {
+      sourceNameInput.blur();
+    });
+
+    expect(onSaveSource).toHaveBeenCalledWith('source-apical', { name: 'Apical Live Source' });
+
+    onSaveSource.mockClear();
+    const baseUrlInput = container.querySelector('input[aria-label="Apical Base URL source-apical"]') as HTMLInputElement;
+    expect(baseUrlInput).toBeDefined();
+    baseUrlInput.focus();
+    baseUrlInput.setSelectionRange(8, 8);
+
+    await act(async () => {
+      insertTextAtCursor(baseUrlInput, 'www.');
+    });
+
+    expect(baseUrlInput.value).toBe('https://www.apicalracetiming.com.au');
+    expect(baseUrlInput.selectionStart).toBe(12);
+    expect(document.activeElement).toBe(baseUrlInput);
+    expect(onSaveSource).not.toHaveBeenCalled();
+
+    await act(async () => {
+      baseUrlInput.blur();
+    });
+
+    expect(onSaveSource).toHaveBeenCalledWith('source-apical', {
+      apiConfig: expect.objectContaining({
+        baseUrl: 'https://www.apicalracetiming.com.au',
+      }),
+    });
   });
 
   it('opens a local file picker and saves the RFID Timing CSV file path', async () => {

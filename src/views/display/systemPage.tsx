@@ -30,6 +30,37 @@ const sourceTypeOptions: DataSourceType[] = [
   'master-entrant-profiles',
 ];
 
+interface DraftInputProps {
+  ariaLabel: string;
+  onCommit: (value: string) => void | Promise<void>;
+  type?: 'number' | 'text';
+  value: string;
+}
+
+const DraftInput = (props: DraftInputProps): React.ReactElement => {
+  const [draft, setDraft] = React.useState(props.value);
+
+  React.useEffect(() => {
+    setDraft(props.value);
+  }, [props.value]);
+
+  const commit = (): void => {
+    if (draft !== props.value) {
+      void props.onCommit(draft);
+    }
+  };
+
+  return (
+    <input
+      aria-label={props.ariaLabel}
+      type={props.type || 'text'}
+      value={draft}
+      onBlur={commit}
+      onChange={(event) => setDraft(event.target.value)}
+    />
+  );
+};
+
 export const SystemPage = (props: SystemPageProps): React.ReactElement => {
   const [newSourceType, setNewSourceType] = React.useState<DataSourceType>(sourceTypeOptions[0]);
   const [selectedSourceId, setSelectedSourceId] = React.useState<string | undefined>(props.config.dataSources[0]?.id);
@@ -177,11 +208,10 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                     <p>{getDataSourceTypeLabel(source.type)}</p>
                     <label>
                       Source Name
-                      <input
-                        aria-label={`Source Name ${source.id}`}
-                        type="text"
+                      <DraftInput
+                        ariaLabel={`Source Name ${source.id}`}
                         value={source.name}
-                        onChange={(event) => props.onSaveSource(source.id, { name: event.target.value })}
+                        onCommit={(value) => props.onSaveSource(source.id, { name: value })}
                       />
                     </label>
                     <label>
@@ -218,98 +248,95 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                         <h4>Apical Endpoint</h4>
                         <label>
                           Base URL
-                          <input
-                            aria-label={`Apical Base URL ${source.id}`}
-                            type="text"
+                          <DraftInput
+                            ariaLabel={`Apical Base URL ${source.id}`}
                             value={source.apiConfig.baseUrl}
-                            onChange={(event) => props.onSaveSource(source.id, {
+                            onCommit={(value) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
-                                baseUrl: event.target.value,
+                                baseUrl: value,
                               },
                             })}
                           />
                         </label>
                         <label>
                           Auth Header Name
-                          <input
-                            aria-label={`Apical Auth Header Name ${source.id}`}
-                            type="text"
+                          <DraftInput
+                            ariaLabel={`Apical Auth Header Name ${source.id}`}
                             value={source.apiConfig.authHeaderName}
-                            onChange={(event) => props.onSaveSource(source.id, {
+                            onCommit={(value) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
-                                authHeaderName: event.target.value,
+                                authHeaderName: value,
                               },
                             })}
                           />
                         </label>
                         <label>
                           Auth Header Value
-                          <input
-                            aria-label={`Apical Auth Header Value ${source.id}`}
-                            type="text"
+                          <DraftInput
+                            ariaLabel={`Apical Auth Header Value ${source.id}`}
                             value={source.apiConfig.authHeaderValue}
-                            onChange={(event) => props.onSaveSource(source.id, {
+                            onCommit={(value) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
-                                authHeaderValue: event.target.value,
+                                authHeaderValue: value,
                               },
                             })}
                           />
                         </label>
                         <label>
                           Company Id
-                          <input
-                            aria-label={`Apical Company Id ${source.id}`}
+                          <DraftInput
+                            ariaLabel={`Apical Company Id ${source.id}`}
                             type="number"
-                            value={source.apiConfig.companyId}
-                            onChange={(event) => props.onSaveSource(source.id, {
+                            value={source.apiConfig.companyId.toString()}
+                            onCommit={(value) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
-                                companyId: Number(event.target.value) || 2,
+                                companyId: Number(value) || 2,
                               },
                             })}
                           />
                         </label>
                         <label>
                           Apical Event Id
-                          <input
-                            aria-label={`Apical Event Id ${source.id}`}
+                          <DraftInput
+                            ariaLabel={`Apical Event Id ${source.id}`}
                             type="number"
-                            value={source.apiConfig.apicalEventId || ''}
-                            onChange={(event) => props.onSaveSource(source.id, {
+                            value={source.apiConfig.apicalEventId?.toString() || ''}
+                            onCommit={(value) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
-                                apicalEventId: Number(event.target.value) || undefined,
+                                apicalEventId: Number(value) || undefined,
                               },
                             })}
                           />
                         </label>
                         <label>
                           Poll Interval (seconds)
-                          <input
-                            aria-label={`Apical Poll Interval ${source.id}`}
+                          <DraftInput
+                            ariaLabel={`Apical Poll Interval ${source.id}`}
                             type="number"
-                            value={source.apiConfig.pollIntervalSeconds}
-                            onChange={(event) => props.onSaveSource(source.id, {
+                            value={source.apiConfig.pollIntervalSeconds.toString()}
+                            onCommit={(value) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
-                                pollIntervalSeconds: Number(event.target.value) || 30,
+                                pollIntervalSeconds: Number(value) || 30,
                               },
                             })}
                           />
                         </label>
                         <label>
                           HTTP Timeout (seconds)
-                          <input
-                            aria-label={`Apical Http Timeout ${source.id}`}
+                          <DraftInput
+                            ariaLabel={`Apical Http Timeout ${source.id}`}
                             type="number"
-                            value={source.apiConfig.httpTimeoutSeconds}
-                            onChange={(event) => props.onSaveSource(source.id, {
+                            value={source.apiConfig.httpTimeoutSeconds.toString()}
+                            onCommit={(value) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
-                                httpTimeoutSeconds: Number(event.target.value) || 30,
+                                httpTimeoutSeconds: Number(value) || 30,
                               },
                             })}
                           />
@@ -334,9 +361,10 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                           </button>
                         </div>
                         {sourceFetchErrors[source.id] ? (
-                          <p className="inline-error" role="alert">
-                            Failed to fetch Apical events: {sourceFetchErrors[source.id]}
-                          </p>
+                          <div className="inline-error" role="alert">
+                            <p>Failed to fetch Apical events:</p>
+                            <pre>{sourceFetchErrors[source.id]}</pre>
+                          </div>
                         ) : null}
                         {listedEvents.length > 0 ? (
                           <div>
