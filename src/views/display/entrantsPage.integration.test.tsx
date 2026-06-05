@@ -134,6 +134,9 @@ describe('EntrantsPage integration', () => {
     const eventSelect = container.querySelector('select[aria-label="Entrants Event"]') as HTMLSelectElement;
     expect(eventSelect.value).toBe('event-1');
     expect(container.textContent).toContain('Pat Rider');
+    const entrantList = container.querySelector('[aria-label="Entrants for selected event"]');
+    expect(entrantList?.textContent).not.toContain('ent-1');
+    expect(entrantList?.querySelector('.entrant-list-type')?.textContent).toBe('rider');
 
     await act(async () => {
       eventSelect.value = 'event-2';

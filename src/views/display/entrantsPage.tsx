@@ -97,8 +97,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
                   aria-selected={isSelected}
                 >
                   <strong>{entrant.name}</strong>
-                  <span>{entrant.entrantType}</span>
-                  <span>{entrant.id}</span>
+                  <span className="entrant-list-type">{entrant.entrantType}</span>
                 </button>
               );
             })}
