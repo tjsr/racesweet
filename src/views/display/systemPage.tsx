@@ -13,7 +13,8 @@ interface SystemPageProps {
   onCreateSource: (type: DataSourceType) => void | Promise<void>;
   onDeleteSource: (sourceId: string) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: string) => void | Promise<void>;
-  onSaveApicalSource: (sourceId: string, changes: Partial<DataSourceConfig>) => void | Promise<void>;
+  onSaveSource: (sourceId: string, changes: Partial<DataSourceConfig>) => void | Promise<void>;
+  onSelectLocalFile?: () => Promise<string | undefined>;
 }
 
 const sourceTypeOptions: DataSourceType[] = [
@@ -67,6 +68,24 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         [sourceId]: detailedMessage,
       }));
     }
+  };
+
+  const handleSelectRfidCsvFile = async (source: DataSourceConfig): Promise<void> => {
+    if (!props.onSelectLocalFile) {
+      return;
+    }
+
+    const filePath = await props.onSelectLocalFile();
+    if (!filePath) {
+      return;
+    }
+
+    await props.onSaveSource(source.id, {
+      fileConfig: {
+        ...source.fileConfig,
+        filePath,
+      },
+    });
   };
 
   return (
@@ -149,6 +168,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                 const selectedEventIds = source.apiConfig?.selectedEventIds || [];
                 const selectedApicalEventId = selectedEventIds[0] || source.apiConfig?.apicalEventId;
                 const isMasterEntrants = source.type === 'master-entrant-profiles';
+                const isRfidTimingCsv = source.type === 'file-rfid-timing-csv';
                 const masterProfilesJson = JSON.stringify(source.masterEntrantConfig?.profiles || [], null, 2);
 
                 return (
@@ -161,7 +181,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                         aria-label={`Source Name ${source.id}`}
                         type="text"
                         value={source.name}
-                        onChange={(event) => props.onSaveApicalSource(source.id, { name: event.target.value })}
+                        onChange={(event) => props.onSaveSource(source.id, { name: event.target.value })}
                       />
                     </label>
                     <label>
@@ -170,11 +190,30 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                         aria-label={`Source Enabled ${source.id}`}
                         type="checkbox"
                         checked={source.enabled}
-                        onChange={(event) => props.onSaveApicalSource(source.id, { enabled: event.target.checked })}
+                        onChange={(event) => props.onSaveSource(source.id, { enabled: event.target.checked })}
                       />
                     </label>
 
-                    {isApicalApi && source.apiConfig ? (
+                    {isRfidTimingCsv ? (
+                      <>
+                        <h4>RFID Timing CSV File</h4>
+                        <label>
+                          File Path
+                          <input
+                            aria-label={`RFID Timing CSV File Path ${source.id}`}
+                            readOnly
+                            type="text"
+                            value={source.fileConfig?.filePath || ''}
+                            placeholder="No file selected"
+                          />
+                        </label>
+                        <div className="events-actions">
+                          <button type="button" onClick={() => handleSelectRfidCsvFile(source)}>
+                            Edit File
+                          </button>
+                        </div>
+                      </>
+                    ) : isApicalApi && source.apiConfig ? (
                       <>
                         <h4>Apical Endpoint</h4>
                         <label>
@@ -183,7 +222,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                             aria-label={`Apical Base URL ${source.id}`}
                             type="text"
                             value={source.apiConfig.baseUrl}
-                            onChange={(event) => props.onSaveApicalSource(source.id, {
+                            onChange={(event) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
                                 baseUrl: event.target.value,
@@ -197,7 +236,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                             aria-label={`Apical Auth Header Name ${source.id}`}
                             type="text"
                             value={source.apiConfig.authHeaderName}
-                            onChange={(event) => props.onSaveApicalSource(source.id, {
+                            onChange={(event) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
                                 authHeaderName: event.target.value,
@@ -211,7 +250,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                             aria-label={`Apical Auth Header Value ${source.id}`}
                             type="text"
                             value={source.apiConfig.authHeaderValue}
-                            onChange={(event) => props.onSaveApicalSource(source.id, {
+                            onChange={(event) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
                                 authHeaderValue: event.target.value,
@@ -225,7 +264,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                             aria-label={`Apical Company Id ${source.id}`}
                             type="number"
                             value={source.apiConfig.companyId}
-                            onChange={(event) => props.onSaveApicalSource(source.id, {
+                            onChange={(event) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
                                 companyId: Number(event.target.value) || 2,
@@ -239,7 +278,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                             aria-label={`Apical Event Id ${source.id}`}
                             type="number"
                             value={source.apiConfig.apicalEventId || ''}
-                            onChange={(event) => props.onSaveApicalSource(source.id, {
+                            onChange={(event) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
                                 apicalEventId: Number(event.target.value) || undefined,
@@ -253,7 +292,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                             aria-label={`Apical Poll Interval ${source.id}`}
                             type="number"
                             value={source.apiConfig.pollIntervalSeconds}
-                            onChange={(event) => props.onSaveApicalSource(source.id, {
+                            onChange={(event) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
                                 pollIntervalSeconds: Number(event.target.value) || 30,
@@ -267,7 +306,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                             aria-label={`Apical Http Timeout ${source.id}`}
                             type="number"
                             value={source.apiConfig.httpTimeoutSeconds}
-                            onChange={(event) => props.onSaveApicalSource(source.id, {
+                            onChange={(event) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
                                 httpTimeoutSeconds: Number(event.target.value) || 30,
@@ -281,7 +320,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                             aria-label={`Apical Live ${source.id}`}
                             type="checkbox"
                             checked={source.apiConfig.live}
-                            onChange={(event) => props.onSaveApicalSource(source.id, {
+                            onChange={(event) => props.onSaveSource(source.id, {
                               apiConfig: {
                                 ...source.apiConfig!,
                                 live: event.target.checked,
@@ -312,7 +351,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                                   if (!eventId) {
                                     return;
                                   }
-                                  props.onSaveApicalSource(source.id, {
+                                  props.onSaveSource(source.id, {
                                     apiConfig: {
                                       ...source.apiConfig!,
                                       apicalEventId: eventId,
@@ -351,7 +390,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                                   delete next[source.id];
                                   return next;
                                 });
-                                props.onSaveApicalSource(source.id, {
+                                props.onSaveSource(source.id, {
                                   masterEntrantConfig: {
                                     profiles: parsed,
                                   },

@@ -2,6 +2,7 @@ import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
   RequestReadIpcSendChannel,
+  RequestSelectLocalFileIpcInvokeChannel,
   RequestWriteIpcSendChannel,
   WriteContentErrorIpcReceiveChannel,
   WriteContentIpcReceiveChannel
@@ -17,6 +18,9 @@ export class InvalidIpcChannelError extends Error {
 export type SendChannels =
   typeof RequestReadIpcSendChannel |
   typeof RequestWriteIpcSendChannel;
+
+export type InvokeChannels =
+  typeof RequestSelectLocalFileIpcInvokeChannel;
 
 export type ReceiveChannels =
   typeof ReadContentIpcReceiveChannel |

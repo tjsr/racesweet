@@ -1,10 +1,10 @@
+import * as systemConfig from './systemConfig.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.js';
-import { SystemConfigService } from './systemConfigService.js';
 import type { SystemConfigPersistence } from './systemConfigPersistence.js';
+import { SystemConfigService } from './systemConfigService.js';
 
-const createPersistence = (initial = createDefaultSystemConfiguration()): SystemConfigPersistence => {
+const createPersistence = (initial = systemConfig.createDefaultSystemConfiguration()): SystemConfigPersistence => {
   let config = initial;
 
   return {
@@ -50,7 +50,7 @@ describe('SystemConfigService', () => {
 
   it('uses default event assignment for session when mode is default', () => {
     const config = {
-      ...createDefaultSystemConfiguration(),
+      ...systemConfig.createDefaultSystemConfiguration(),
       eventSourceAssignments: {
         'event-1': ['source-a', 'source-b'],
       },
@@ -62,8 +62,8 @@ describe('SystemConfigService', () => {
       },
     };
 
-    expect(getSessionAssignedSourceIds(config, 'event-1', 'session-1')).toEqual(['source-a', 'source-b']);
-    expect(getSessionAssignedSourceIds(config, 'event-1', 'session-2')).toEqual(['source-a', 'source-b']);
+    expect(systemConfig.getSessionAssignedSourceIds(config, 'event-1', 'session-1')).toEqual(['source-a', 'source-b']);
+    expect(systemConfig.getSessionAssignedSourceIds(config, 'event-1', 'session-2')).toEqual(['source-a', 'source-b']);
   });
 
   it('deletes a source and removes it from event and session assignments', async () => {
@@ -108,9 +108,40 @@ describe('SystemConfigService', () => {
     });
     await service.assignSourcesToEvent('event-7', [source.id]);
 
-    const profiles = getMasterEntrantProfilesForEvent(service.state, 'event-7');
+    const profiles = systemConfig.getMasterEntrantProfilesForEvent(service.state, 'event-7');
     expect(profiles).toEqual([
       expect.objectContaining({ entrantId: 'team-7', firstName: 'Master', lastName: 'Record' }),
     ]);
+  });
+
+  it('creates and persists RFID Timing CSV file source config', async () => {
+    const persistence = createPersistence();
+    const service = await SystemConfigService.create(persistence);
+
+    await service.createSource('file-rfid-timing-csv');
+    const source = service.state.dataSources[0];
+    expect(source).toBeDefined();
+    expect(source.type).toBe('file-rfid-timing-csv');
+    expect(source.fileConfig).toEqual({});
+
+    await service.updateSource(source.id, {
+      fileConfig: {
+        filePath: 'src/testdata/2026-05-30.csv',
+      },
+    });
+
+    expect(service.state.dataSources[0]?.fileConfig).toEqual({
+      filePath: 'src/testdata/2026-05-30.csv',
+    });
+    expect(persistence.save).toHaveBeenCalledWith(expect.objectContaining({
+      dataSources: [
+        expect.objectContaining({
+          fileConfig: {
+            filePath: 'src/testdata/2026-05-30.csv',
+          },
+          type: 'file-rfid-timing-csv',
+        }),
+      ],
+    }));
   });
 });

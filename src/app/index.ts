@@ -1,14 +1,16 @@
-import { BrowserWindow, app, ipcMain, session } from 'electron';
+import { BrowserWindow, app, dialog, ipcMain, session } from 'electron';
 import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
   RequestReadIpcSendChannel,
+  RequestSelectLocalFileIpcInvokeChannel,
   RequestWriteIpcSendChannel,
   WriteContentErrorIpcReceiveChannel,
   WriteContentIpcReceiveChannel
 } from '../model/electronIpc';
 import { injectCorsHeaders, isApicalApiUrl } from './electron/corsHeaders';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import type { SelectLocalFileOptions } from './window';
 
 import path from 'node:path';
 
@@ -126,6 +128,24 @@ ipcMain.on(RequestReadIpcSendChannel, (event: Electron.IpcMainEvent, filename: s
     event.reply(ReadContentErrorIpcReceiveChannel, eventId, error.message);
   });
   // event.reply('sendReadContent', filename, data);
+});
+
+ipcMain.handle(RequestSelectLocalFileIpcInvokeChannel, async (event: Electron.IpcMainInvokeEvent, options?: SelectLocalFileOptions): Promise<string | undefined> => {
+  const browserWindow = BrowserWindow.fromWebContents(event.sender);
+  if (!browserWindow) {
+    return undefined;
+  }
+  const result = await dialog.showOpenDialog(browserWindow, {
+    filters: options?.filters,
+    properties: ['openFile'],
+    title: options?.title,
+  });
+
+  if (result.canceled) {
+    return undefined;
+  }
+
+  return result.filePaths[0];
 });
 
 ipcMain.on(RequestWriteIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: string, contents: string) => {

@@ -1,19 +1,19 @@
 import './state.ts';
 
+import { FileReadDataType, SelectLocalFileOptions } from './window.ts';
 import { InvalidIpcChannelError, SendChannels } from '../model/electronIpcTypes.ts';
 import { IpcRendererEvent, ipcRenderer } from 'electron';
 import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
   RequestReadIpcSendChannel,
+  RequestSelectLocalFileIpcInvokeChannel,
   RequestWriteIpcSendChannel,
   VALID_RECEIVE_CHANNELS,
   VALID_SEND_CHANNELS,
   WriteContentErrorIpcReceiveChannel,
   WriteContentIpcReceiveChannel,
 } from '../model/electronIpc.ts';
-
-import { FileReadDataType } from './window.ts';
 
 // See the Electron documentation for details on how to use preload scripts:
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
@@ -37,7 +37,7 @@ window.addEventListener('actual-port', (event: Event) => {
   console.log(`Actual port: ${port}`);
   window.actualPort = port;
 });// Expose the actual port to the renderer process
-window.actualPort = (window as any).actualPort || 3000;
+window.actualPort = window.actualPort || 3000;
 // const {contextBridge, ipcRenderer} = require("electron");
 
 const eventCalls: Record<string, [(data: (never | PromiseLike<never>)) => void, (reason?: string|Error) => void]> = {};
@@ -105,12 +105,8 @@ window.api = {
         ipcRenderer.send(RequestReadIpcSendChannel, filePath, outgoingEventId, dataType);
       });
   },
-  writeFileContent: (filePath: string, contents: string): Promise<void> => {
-    return new Promise<void>((resolve, reject) => {
-      const outgoingEventId = crypto.randomUUID();
-      eventCalls[outgoingEventId] = [resolve as never, reject];
-      ipcRenderer.send(RequestWriteIpcSendChannel, filePath, outgoingEventId, contents);
-    });
+  selectLocalFile: (options?: SelectLocalFileOptions): Promise<string | undefined> => {
+    return ipcRenderer.invoke(RequestSelectLocalFileIpcInvokeChannel, options) as Promise<string | undefined>;
   },
   send: (channel: SendChannels, ...args: unknown[]): void => {
     if (VALID_SEND_CHANNELS.includes(channel)) {
@@ -118,6 +114,13 @@ window.api = {
     } else {
       throw new InvalidIpcChannelError(channel);
     }
+  },
+  writeFileContent: (filePath: string, contents: string): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      const outgoingEventId = crypto.randomUUID();
+      eventCalls[outgoingEventId] = [resolve as never, reject];
+      ipcRenderer.send(RequestWriteIpcSendChannel, filePath, outgoingEventId, contents);
+    });
   },
 };
 

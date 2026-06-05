@@ -4,6 +4,10 @@
 export type AvailableSendChannels = 'askToRead' | 'askToWrite';
 export type AvailableReceiveChannels = 'sendReadContent' | 'sendReadError' | 'sendWriteSuccess' | 'sendWriteError';
 export type FileReadDataType = 'utf8' | 'buffer' | 'bytearray';
+export interface SelectLocalFileOptions {
+  filters?: Array<{ extensions: string[]; name: string }>;
+  title?: string;
+}
 
 // import { BrowserWindow, app } from 'electron';
 
@@ -23,6 +27,7 @@ declare global {
       receive: (channel: AvailableReceiveChannels | string, func: (...args: unknown[]) => unknown) => void;
       requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType) => Promise<DataType>;
       requestBuffer: (filePath: string) => Promise<Buffer>;
+      selectLocalFile: (options?: SelectLocalFileOptions) => Promise<string | undefined>;
       writeFileContent: (filePath: string, contents: string) => Promise<void>;
       send: (channel: AvailableSendChannels, ...args: unknown[]) => void;
     },

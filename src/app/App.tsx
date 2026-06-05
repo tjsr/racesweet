@@ -449,11 +449,17 @@ export const RaceSweetMainApp = () => {
               .then((events) => systemConfigService.persistListedApicalEvents(sourceId, events))
               .then(updateSystemConfigState);
           }}
-          onSaveApicalSource={(sourceId, changes) => {
+          onSaveSource={(sourceId, changes) => {
             if (!systemConfigService) {
               return;
             }
             systemConfigService.updateSource(sourceId, changes).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+          }}
+          onSelectLocalFile={() => {
+            return window.api.selectLocalFile({
+              filters: [{ extensions: ['csv'], name: 'CSV files' }],
+              title: 'Select RFID Timing CSV file',
+            });
           }}
         />
       );

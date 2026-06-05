@@ -24,6 +24,10 @@ export interface MasterEntrantSourceConfig {
   profiles: MasterEntrantProfile[];
 }
 
+export interface LocalFileSourceConfig {
+  filePath?: string;
+}
+
 export interface ApicalListedEvent {
   companyName?: string;
   eventDate?: string;
@@ -46,6 +50,7 @@ export interface ApicalApiSourceConfig {
 export interface DataSourceConfig {
   apiConfig?: ApicalApiSourceConfig;
   enabled: boolean;
+  fileConfig?: LocalFileSourceConfig;
   id: string;
   listedEvents?: ApicalListedEvent[];
   masterEntrantConfig?: MasterEntrantSourceConfig;
@@ -74,28 +79,28 @@ export const createDefaultSystemConfiguration = (): SystemConfiguration => ({
 
 export const getDataSourceTypeLabel = (type: DataSourceType): string => {
   switch (type) {
-    case 'timing-rfid-decoder':
-      return 'RFID Timing Decoder';
-    case 'timing-mylaps-decoder':
-      return 'MyLaps Decoder';
-    case 'timing-dorian-data1-supernode':
-      return 'Dorian DATA-1 Supernode';
-    case 'file-rfid-timing-csv':
-      return 'RFID Timing CSV';
-    case 'file-apical-data-file':
-      return 'Apical data file';
-    case 'file-racesweet-ledger':
-      return 'RaceSweet Ledger';
-    case 'api-aws-sqs':
-      return 'AWS SQS';
-    case 'api-http-request':
-      return 'HTTP Request';
-    case 'api-apical-data-file':
-      return 'Apical Data file';
-    case 'master-entrant-profiles':
-      return 'Master Entrant Profiles';
-    default:
-      return type;
+  case 'timing-rfid-decoder':
+    return 'RFID Timing Decoder';
+  case 'timing-mylaps-decoder':
+    return 'MyLaps Decoder';
+  case 'timing-dorian-data1-supernode':
+    return 'Dorian DATA-1 Supernode';
+  case 'file-rfid-timing-csv':
+    return 'RFID Timing CSV';
+  case 'file-apical-data-file':
+    return 'Apical data file';
+  case 'file-racesweet-ledger':
+    return 'RaceSweet Ledger';
+  case 'api-aws-sqs':
+    return 'AWS SQS';
+  case 'api-http-request':
+    return 'HTTP Request';
+  case 'api-apical-data-file':
+    return 'Apical Data file';
+  case 'master-entrant-profiles':
+    return 'Master Entrant Profiles';
+  default:
+    return type;
   }
 };
 
