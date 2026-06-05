@@ -60,7 +60,7 @@ describe('ElectronJsonEventCatalogPersistence', () => {
 
   it('returns parsed ledger when file exists and is valid', async () => {
     const ledgerData = {
-      mutations: [{ id: 'mut-1', timestamp: '2025-01-01T00:00:00.000Z', type: 'event-activated', eventId: 'evt-1' }],
+      mutations: [{ eventId: 'evt-1', id: 'mut-1', timestamp: '2025-01-01T00:00:00.000Z', type: 'event-activated' }],
       schemaVersion: 1,
     };
 
@@ -95,5 +95,43 @@ describe('ElectronJsonEventCatalogPersistence', () => {
 
     await expect(persistence.save(createDefaultEventCatalogLedger())).resolves.toBeUndefined();
     expect(onError).toHaveBeenCalledOnce();
+  });
+
+  it('writes the event catalog ledger to the configured event data file', async () => {
+    const writeFileContent = vi.fn(async () => undefined);
+
+    (window as unknown as {
+      api: { writeFileContent: (filePath: string, contents: string) => Promise<void> };
+    }).api = {
+      writeFileContent,
+    };
+
+    const ledger = {
+      ...createDefaultEventCatalogLedger(),
+      mutations: [
+        {
+          event: {
+            categoryIds: [],
+            date: '2026-06-05',
+            entrantIds: [],
+            format: 'race-weekend' as const,
+            id: 'event-new',
+            name: 'New Event',
+            sessionIds: [],
+          },
+          id: 'mutation-new-event',
+          timestamp: '2026-06-05T00:00:00.000Z',
+          type: 'event-created' as const,
+        },
+      ],
+    };
+
+    const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json');
+    await persistence.save(ledger);
+
+    expect(writeFileContent).toHaveBeenCalledWith(
+      '../../src/generated/event-catalog.json',
+      JSON.stringify(ledger, null, 2)
+    );
   });
 });

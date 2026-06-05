@@ -478,6 +478,17 @@ export const RaceSweetMainApp = () => {
               updateEventCatalogState(catalog, eventId);
             }).catch((error: unknown) => setErrorState(error as Error));
           }}
+          onCreateEvent={() => {
+            if (!eventCatalogService) {
+              return;
+            }
+
+            const existingEventIds = new Set(eventCatalogState.events.map((event) => event.id));
+            eventCatalogService.createEvent().then((catalog) => {
+              const createdEvent = catalog.events.find((event) => !existingEventIds.has(event.id));
+              updateEventCatalogState(catalog, createdEvent?.id);
+            }).catch((error: unknown) => setErrorState(error as Error));
+          }}
           onSelectEvent={selectEvent}
           onSelectSession={setSelectedSessionId}
           onSaveEventAssignment={(eventId, sourceIds) => {

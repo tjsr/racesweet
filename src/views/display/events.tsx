@@ -11,6 +11,7 @@ interface EventsScreenProps {
   catalog: EventCatalogState;
   config: SystemConfiguration;
   onActivateEvent: (eventId: string) => void | Promise<void>;
+  onCreateEvent: () => void | Promise<void>;
   onSaveEventAssignment: (eventId: string, sourceIds: string[]) => void | Promise<void>;
   onSelectEvent: (eventId: string) => void;
   onSelectSession: (sessionId: string) => void;
@@ -52,7 +53,12 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
       <h1>Events</h1>
       <div className="events-layout">
         <section className="events-panel events-list-panel">
-          <h2>Event List</h2>
+          <div className="events-actions">
+            <h2>Event List</h2>
+            <button type="button" onClick={() => props.onCreateEvent()}>
+              New
+            </button>
+          </div>
           <div className="events-list" role="listbox" aria-label="Defined events">
             {props.catalog.events.map((event) => {
               const isSelected = event.id === selectedEvent?.id;

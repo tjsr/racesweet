@@ -1,5 +1,3 @@
-import { describe, expect, it, vi } from 'vitest';
-
 import {
   applyEventCatalogLedger,
   createDefaultEventCatalogLedger,
@@ -8,8 +6,9 @@ import {
   getEntrantsForEvent,
   getSessionsForEvent,
 } from './eventCatalog.js';
-import { EventCatalogService } from './eventCatalogService.js';
+import { describe, expect, it, vi } from 'vitest';
 import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
+import { EventCatalogService } from './eventCatalogService.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 
 const createPersistence = (initial = createDefaultEventCatalogLedger()): EventCatalogPersistence => {
@@ -63,6 +62,33 @@ describe('EventCatalogService', () => {
 
     expect(service.catalog.activeEventId).toBe('event-2026-test-day');
     expect(activePersistence.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates an event through the ledger, persistence, and upstream callback flow', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const onPersistedLedger = vi.fn(async () => undefined);
+    const service = await EventCatalogService.create(seededPersistence, { onPersistedLedger });
+
+    await service.createEvent();
+
+    const createdEvent = service.catalog.events.find((event) => event.name === 'New Event');
+    expect(createdEvent).toEqual(expect.objectContaining({
+      categoryIds: [],
+      entrantIds: [],
+      format: 'race-weekend',
+      name: 'New Event',
+      sessionIds: [],
+    }));
+    expect(seededPersistence.save).toHaveBeenCalledOnce();
+    expect(onPersistedLedger).toHaveBeenCalledOnce();
+    expect(onPersistedLedger).toHaveBeenCalledWith(expect.objectContaining({
+      mutations: expect.arrayContaining([
+        expect.objectContaining({
+          event: expect.objectContaining({ id: createdEvent?.id, name: 'New Event' }),
+          type: 'event-created',
+        }),
+      ]),
+    }));
   });
 
   it('updates event, session, and category rule details through immutable ledger changes', async () => {

@@ -121,6 +121,7 @@ describe('EventsScreen integration', () => {
 
   it('shows event controls and session lists in both center and right panes', async () => {
     const onActivateEvent = vi.fn();
+    const onCreateEvent = vi.fn();
     const onSaveEventAssignment = vi.fn();
     const onSelectEvent = vi.fn();
     const onSelectSession = vi.fn();
@@ -139,6 +140,7 @@ describe('EventsScreen integration', () => {
             onActivateEvent(eventId);
             setActiveEventId(eventId);
           }}
+          onCreateEvent={onCreateEvent}
           onSaveEventAssignment={onSaveEventAssignment}
           onSelectEvent={(eventId) => {
             onSelectEvent(eventId);
@@ -230,6 +232,7 @@ describe('EventsScreen integration', () => {
           catalog={catalog}
           config={configState}
           onActivateEvent={() => undefined}
+          onCreateEvent={() => undefined}
           onSaveEventAssignment={(eventId, sourceIds) => {
             setConfigState((current) => ({
               ...current,
@@ -293,5 +296,62 @@ describe('EventsScreen integration', () => {
 
     const event1CheckboxFinal = container.querySelector('input[aria-label="Event Source event-1 source-a"]') as HTMLInputElement;
     expect(event1CheckboxFinal.checked).toBe(true);
+  });
+
+  it('creates and selects a new event from the event list pane', async () => {
+    const onCreateEvent = vi.fn();
+
+    const Harness = () => {
+      const [catalogState, setCatalogState] = React.useState<EventCatalogState>(catalog);
+      const [selectedEventId, setSelectedEventId] = React.useState<string | undefined>('event-1');
+
+      return (
+        <EventsScreen
+          catalog={catalogState}
+          config={config}
+          onActivateEvent={() => undefined}
+          onCreateEvent={() => {
+            onCreateEvent();
+            const createdEvent = {
+              categoryIds: [],
+              date: '2026-06-05',
+              entrantIds: [],
+              format: 'race-weekend' as const,
+              id: 'event-new',
+              name: 'New Event',
+              sessionIds: [],
+            };
+            setCatalogState((current) => ({
+              ...current,
+              events: [...current.events, createdEvent],
+            }));
+            setSelectedEventId(createdEvent.id);
+          }}
+          onSaveEventAssignment={() => undefined}
+          onSelectEvent={setSelectedEventId}
+          onSelectSession={() => undefined}
+          onUpdateEvent={() => undefined}
+          selectedEventId={selectedEventId}
+        />
+      );
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    const newButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'New');
+    expect(newButton).toBeDefined();
+
+    await act(async () => {
+      newButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onCreateEvent).toHaveBeenCalledOnce();
+    expect(container.textContent).toContain('New Event');
+    const newEventButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('New Event'));
+    expect(newEventButton?.getAttribute('aria-selected')).toBe('true');
+    const eventNameInput = container.querySelector('input[aria-label="Event Name"]') as HTMLInputElement;
+    expect(eventNameInput.value).toBe('New Event');
   });
 });

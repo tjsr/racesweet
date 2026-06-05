@@ -50,6 +50,10 @@ Unit tests should always be written for all code.  Integration tests should in s
 
 Where possible, unit tests should mock out expensive operations.
 
+When adding new user-facing features, update or add the relevant unit and integration tests in the same change.  Tests must verify both the UI action and the service/persistence side effect, including any configured upstream/API callback when a feature writes event catalog data.
+
+Feature work that creates or changes events, sessions, categories, entrants, data sources, or race data must update state only through the appropriate service layer.  Do not add UI-only state changes that bypass ledger mutation, persistence, or the configured API/upstream callback.
+
 ## Ledger data format
 
 Remember that all data and modifications should occur in a ledger format, where modifications are an action and all previous data is immutable.  State becomes modified by instructions in sequence over time, and once modified never changes.  If we change an entrants category or name for example, the original information will not change but we log a change in the event data to indicate that it has to be updated.  That update is then reflected in the model.

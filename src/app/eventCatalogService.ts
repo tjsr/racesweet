@@ -1,13 +1,13 @@
 import {
-  applyEventCatalogLedger,
-  createSeedEventCatalogLedger,
-  getEntrantsForEvent,
   type CategoryDistanceRule,
   type EventCatalogCategory,
   type EventCatalogEntrant,
   type EventCatalogLedger,
   type EventCatalogSession,
   type EventCatalogState,
+  applyEventCatalogLedger,
+  createSeedEventCatalogLedger,
+  getEntrantsForEvent,
 } from './eventCatalog.js';
 import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
 import type { EventCategory } from '../model/eventcategory.js';
@@ -46,8 +46,8 @@ const findProfileForParticipant = (participant: EventParticipant, masterProfiles
   const entrantId = participant.entrantId.toString();
 
   return masterProfiles.find((profile) => {
-    return (profile.participantId && profile.participantId === participantId)
-      || (profile.entrantId && profile.entrantId === entrantId);
+    return (profile.participantId && profile.participantId === participantId) ||
+      (profile.entrantId && profile.entrantId === entrantId);
   });
 };
 
@@ -80,11 +80,11 @@ const deriveCategoriesFromEventData = (eventId: string, categories: EventCategor
       eventId,
       sessionAssignments: category.startTime
         ? [
-            {
-              sessionId: '',
-              startTime: category.startTime,
-            },
-          ]
+          {
+            sessionId: '',
+            startTime: category.startTime,
+          },
+        ]
         : [],
       teamRules: {
         teamCompositionRules: [],
@@ -118,7 +118,7 @@ const deriveEntrantsFromParticipants = (
   eventId: string,
   participants: EventParticipant[],
   defaultSessionIds: string[],
-  masterProfiles: MasterEntrantProfile[] = [],
+  masterProfiles: MasterEntrantProfile[] = []
 ): EventCatalogEntrant[] => {
   const groups = new Map<string, EventParticipant[]>();
   participants.forEach((participant) => {
@@ -207,6 +207,26 @@ export class EventCatalogService {
 
   public get catalog(): EventCatalogState {
     return this.state;
+  }
+
+  public async createEvent(): Promise<EventCatalogState> {
+    const eventId = createEntityId('event');
+    return this.appendMutations([
+      {
+        event: {
+          categoryIds: [],
+          date: createTimestamp().slice(0, 10),
+          entrantIds: [],
+          format: 'race-weekend',
+          id: eventId,
+          name: 'New Event',
+          sessionIds: [],
+        },
+        id: createMutationId(),
+        timestamp: createTimestamp(),
+        type: 'event-created',
+      },
+    ]);
   }
 
   public async activateEvent(eventId: string): Promise<EventCatalogState> {
