@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-
 import { injectCorsHeaders, isApicalApiUrl } from './corsHeaders.js';
 
 describe('isApicalApiUrl', () => {
@@ -20,7 +19,7 @@ describe('isApicalApiUrl', () => {
   });
 
   it('does not match localhost', () => {
-    expect(isApicalApiUrl('http://localhost:3000/api')).toBe(false);
+    expect(isApicalApiUrl('http://localhost:3001/api')).toBe(false);
   });
 });
 
