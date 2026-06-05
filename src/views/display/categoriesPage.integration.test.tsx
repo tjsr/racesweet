@@ -236,4 +236,183 @@ describe('CategoriesPage integration', () => {
 
     expect(onDeleteCategory).toHaveBeenCalledWith('event-2', 'cat-3');
   });
+
+  it('shows category save failures inline without hiding page content', async () => {
+    const onCreateCategory = vi.fn();
+    const onDeleteCategory = vi.fn();
+    const onUpdateCategory = vi.fn().mockRejectedValue(new Error('Category cat-1 does not exist.'));
+
+    await act(async () => {
+      root.render(
+        <CategoriesPage
+          catalog={catalog}
+          entrants={entrantsByCategory['cat-1']}
+          onCreateCategory={onCreateCategory}
+          onDeleteCategory={onDeleteCategory}
+          onSelectCategory={vi.fn()}
+          onSelectEvent={vi.fn()}
+          onUpdateCategory={onUpdateCategory}
+          selectedCategoryId="cat-1"
+          selectedEventId="event-1"
+        />
+      );
+    });
+
+    const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Category');
+    expect(saveButton).toBeDefined();
+
+    await act(async () => {
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    const errorPane = container.querySelector('.category-save-error.error');
+    expect(errorPane).toBeTruthy();
+    expect(errorPane?.getAttribute('role')).toBe('alert');
+    expect(errorPane?.textContent).toContain('!');
+    expect(errorPane?.textContent).toContain('Category cat-1 does not exist.');
+    expect(container.textContent).toContain('Category Details');
+    expect(container.textContent).toContain('Entrants In Category');
+    expect(container.textContent).not.toContain('Error loading content');
+  });
+
+  it('prompts before replacing a dirty category form and handles save discard and cancel', async () => {
+    const onCreateCategory = vi.fn();
+    const onDeleteCategory = vi.fn();
+    const onUpdateCategory = vi.fn().mockResolvedValue(undefined);
+
+    const Harness = () => {
+      const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | undefined>('cat-1');
+
+      return (
+        <CategoriesPage
+          catalog={catalog}
+          entrants={entrantsByCategory[selectedCategoryId || ''] || []}
+          onCreateCategory={onCreateCategory}
+          onDeleteCategory={onDeleteCategory}
+          onSelectCategory={setSelectedCategoryId}
+          onSelectEvent={vi.fn()}
+          onUpdateCategory={onUpdateCategory}
+          selectedCategoryId={selectedCategoryId}
+          selectedEventId="event-1"
+        />
+      );
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    const categoryNameInput = container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement;
+    await act(async () => {
+      setInputValue(categoryNameInput, 'Premier Edited');
+    });
+
+    const clubmanButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Clubman'));
+    expect(clubmanButton).toBeDefined();
+
+    await act(async () => {
+      clubmanButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('You have unsaved changes to category Premier - save or discard changes?');
+
+    const cancelButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Cancel');
+    expect(cancelButton).toBeDefined();
+
+    await act(async () => {
+      cancelButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onUpdateCategory).not.toHaveBeenCalled();
+    expect((container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement).value).toBe('Premier Edited');
+    expect(container.textContent).toContain('Pat Rider');
+    expect(container.textContent).not.toContain('You have unsaved changes');
+
+    await act(async () => {
+      clubmanButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const promptSaveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save');
+    expect(promptSaveButton).toBeDefined();
+
+    await act(async () => {
+      promptSaveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(onUpdateCategory).toHaveBeenCalledWith('cat-1', expect.objectContaining({ name: 'Premier Edited' }));
+    expect(container.textContent).toContain('Taylor Rider');
+    expect((container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement).value).toBe('Clubman');
+
+    await act(async () => {
+      setInputValue(container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement, 'Clubman Edited');
+    });
+
+    const premierButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Premier'));
+    expect(premierButton).toBeDefined();
+
+    await act(async () => {
+      premierButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const discardButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Discard');
+    expect(discardButton).toBeDefined();
+
+    await act(async () => {
+      discardButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onUpdateCategory).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain('Pat Rider');
+    expect((container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement).value).toBe('Premier');
+  });
+
+  it('registers an unsaved-change guard for external page navigation', async () => {
+    let guard: ((action: () => void | Promise<void>) => void) | undefined;
+    let navigationCompleted = false;
+
+    await act(async () => {
+      root.render(
+        <CategoriesPage
+          catalog={catalog}
+          entrants={entrantsByCategory['cat-1']}
+          onCreateCategory={vi.fn()}
+          onDeleteCategory={vi.fn()}
+          onSelectCategory={vi.fn()}
+          onSelectEvent={vi.fn()}
+          onUnsavedChangesGuardChange={(nextGuard) => {
+            guard = nextGuard;
+          }}
+          onUpdateCategory={vi.fn()}
+          selectedCategoryId="cat-1"
+          selectedEventId="event-1"
+        />
+      );
+    });
+
+    expect(guard).toBeDefined();
+
+    await act(async () => {
+      setInputValue(container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement, 'Premier Edited');
+    });
+
+    await act(async () => {
+      guard!(() => {
+        navigationCompleted = true;
+      });
+    });
+
+    expect(navigationCompleted).toBe(false);
+    expect(container.textContent).toContain('You have unsaved changes to category Premier - save or discard changes?');
+
+    const discardButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Discard');
+    expect(discardButton).toBeDefined();
+
+    await act(async () => {
+      discardButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(navigationCompleted).toBe(true);
+  });
 });
