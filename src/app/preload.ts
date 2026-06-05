@@ -31,7 +31,13 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 });
-
+// Listen for the actual port from the main process
+window.addEventListener('actual-port', (event: Event) => {
+  const port = (event as CustomEvent).detail;
+  console.log(`Actual port: ${port}`);
+  window.actualPort = port;
+});// Expose the actual port to the renderer process
+window.actualPort = (window as any).actualPort || 3000;
 // const {contextBridge, ipcRenderer} = require("electron");
 
 const eventCalls: Record<string, [(data: (never | PromiseLike<never>)) => void, (reason?: string|Error) => void]> = {};
