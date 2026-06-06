@@ -91,7 +91,7 @@ const categoryStringFromId = (
     return `Unknown category &${categoryId}`;
   }
   return category.name || `Unnamed Category &${categoryId}`;
-}
+};
 
 const categoryStringFromParticipant = (
   participant: EventParticipant,
@@ -101,7 +101,7 @@ const categoryStringFromParticipant = (
     return 'No category';
   }
   return categoryStringFromId(participant.categoryId, categoryLookup);
-}
+};
 
 const categoryStringFromParticipantId = (
   participantId: EventParticipantId,
@@ -154,14 +154,14 @@ const UnknownChipRow = (
   const timeString = tableTimeString(passingTime);
 
   return (
-  <TableRow key={timeRecordId} data-record-id={timeRecordId}>
-    <TableCell>{sequenceNumber}</TableCell>
-    <TableCell>Ant</TableCell>
-    <TableCell>{txNo}</TableCell>
-    <TableCell>{timeString}</TableCell>
-    <TableCell>{identifier}</TableCell>
-    <TableCell colSpan={6}>{content}</TableCell>
-  </TableRow>
+    <TableRow key={timeRecordId} data-record-id={timeRecordId}>
+      <TableCell>{sequenceNumber}</TableCell>
+      <TableCell>Ant</TableCell>
+      <TableCell>{txNo}</TableCell>
+      <TableCell>{timeString}</TableCell>
+      <TableCell>{identifier}</TableCell>
+      <TableCell colSpan={6}>{content}</TableCell>
+    </TableRow>
   );
 };
 
@@ -196,9 +196,9 @@ export const PassingRecordRow = (
     setContextMenu(
       contextMenu === null
         ? {
-            mouseX: event.clientX + 2,
-            mouseY: event.clientY - 6,
-          }
+          mouseX: event.clientX + 2,
+          mouseY: event.clientY - 6,
+        }
         : null,
     );
   };
@@ -271,8 +271,6 @@ export const PassingRecordRow = (
     }
   }
 
-  let categoryName = 'No category';
-
   if (passing.isExcluded) {
     className += ' excluded';
   }
@@ -287,7 +285,7 @@ export const PassingRecordRow = (
         className={className}
         onContextMenu={handleContextMenu}
         style={{ cursor: 'context-menu' }}
-        onClick={(event: React.MouseEvent<HTMLTableRowElement, MouseEvent>) => {
+        onClick={(_event: React.MouseEvent<HTMLTableRowElement, MouseEvent>) => {
           if (props.onSelect) {
             props.onSelect(passing);
           }
@@ -309,7 +307,7 @@ export const PassingRecordRow = (
         anchorReference="anchorPosition"
         anchorPosition={
           contextMenu !== null
-            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            ? { left: contextMenu.mouseX, top: contextMenu.mouseY,  }
             : undefined
         }
       >
@@ -343,7 +341,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
     if (props.categorySelected) {
       props.categorySelected(new Set<EventCategoryId>(record.categoryIds));
     }
-  }
+  };
   const record = props.record;
   if (isFlagRecord(record)) {
     return <FlagRecordRow
@@ -355,9 +353,6 @@ export const RecordRow = (props: RecentRecordRowProps) => {
     />;
   }
 
-  const rs = props.raceStateLookup;
-  
-  let ant = '';
   let passing: ParticipantPassingRecord;
   if (isCrossingRecord(record)) {
     passing = record as ParticipantPassingRecord;
@@ -393,7 +388,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
         categorySet.add(selectionParticipant.categoryId);
         props.categorySelected(categorySet);
       }
-    }
+    };
 
     return <PassingRecordRow
       raceStateLookup={props.raceStateLookup}
@@ -409,16 +404,16 @@ export const RecordRow = (props: RecentRecordRowProps) => {
   const identifier = getTimeRecordIdentifier(record, true);
   const txNo = getAutomaticIdentifier(record);
   // if (!plateNumber) {
-    return <UnknownChipRow
-      sequenceNumber={record.sequence}
-      timeRecordId={record.id}
-      ant='?'
-      passingTime={record.time!}
-      txNo={0}
-      identifier={identifier}
-      rs={props.raceStateLookup}
-   />
-    //(passing, rs, identifier, ant, timeString);
+  return <UnknownChipRow
+    sequenceNumber={record.sequence}
+    timeRecordId={record.id}
+    ant='?'
+    passingTime={record.time!}
+    txNo={0}
+    identifier={identifier}
+    rs={props.raceStateLookup}
+  />;
+  // (passing, rs, identifier, ant, timeString);
   // }
   // const plateNumberString: string = plateNumber?.toString() || '';
 
@@ -456,14 +451,14 @@ const formatGridTime = (params: { value: Date | string }) => {
     return params.value.toLocaleString();
   }
   return '';
-}
+};
 
 export const Warnings = ({ warnings }: { warnings: string[] }): JSX.Element => {
   if (!warnings || warnings.length === 0) {
     return <></>;
   }
   return (
-    <Box sx={{ backgroundColor: 'yellow', padding: 2, marginBottom: 2 }}>
+    <Box sx={{ backgroundColor: 'yellow', marginBottom: 2, padding: 2 }}>
       <h3>Warnings</h3>
       <ul>
         {warnings.map((warning, index) => (
@@ -472,7 +467,7 @@ export const Warnings = ({ warnings }: { warnings: string[] }): JSX.Element => {
       </ul>
     </Box>
   );
-}
+};
 
 const headings: string[] = [
   "Seq",
@@ -509,7 +504,7 @@ export const RecentRecords = (props: RecordsProps & {
     <FormControl
       fullWidth={false}
       id="recent-records-type-dropdown"
-      sx={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: 2 }}
+      sx={{ display: 'inline-block', marginLeft: 2, verticalAlign: 'middle' }}
     >
       <InputLabel id="show-recent-type-label">Show</InputLabel>
       <Select
@@ -521,12 +516,12 @@ export const RecentRecords = (props: RecordsProps & {
         <MenuItem value="category">Only selected category</MenuItem>
         <MenuItem value="team">Only selected team</MenuItem>
         <MenuItem value="participant">Only selected participant</MenuItem>
-        </Select>
+      </Select>
     </FormControl>
     <FormControl
       fullWidth={false}
       id="recent-records-order-dropdown"
-      sx={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: 2 }}
+      sx={{ display: 'inline-block', marginLeft: 2, verticalAlign: 'middle' }}
     >
       <InputLabel id="show-recent-order-label">Order</InputLabel>
       <Select
@@ -546,8 +541,8 @@ export const RecentRecords = (props: RecordsProps & {
     </FormControl>
     { warnings?.length > 0 && <Warnings warnings={warnings} />}
     {
-      !(sortedRecords.length > 0) ? <p>No records available.</p> :
-        <Box sx={{ flexGrow: 1, width: '100%' }}>
+      !(sortedRecords.length > 0) ? <p>No records available.</p>
+        : <Box sx={{ flexGrow: 1, width: '100%' }}>
           <TableContainer component={Paper}>
             <Table stickyHeader sx={{ minWidth: 650 }} size="small">
               <TableHead>

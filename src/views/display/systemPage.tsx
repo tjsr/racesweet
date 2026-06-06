@@ -1,11 +1,11 @@
-import React from 'react';
 
 import {
-  type DataSourceType,
   type DataSourceConfig,
+  type DataSourceType,
   type SystemConfiguration,
   getDataSourceTypeLabel,
 } from '../../app/systemConfig.js';
+import React from 'react';
 import { getRuntimeVersions } from '../../app/versionInfo.js';
 
 interface SystemPageProps {

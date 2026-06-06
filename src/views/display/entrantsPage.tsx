@@ -236,18 +236,18 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
                     sessionIds: splitCsv(entrantDraft.sessionIds),
                     teamMembers: entrantDraft.entrantType === 'team'
                       ? entrantDraft.teamMembers
-                          .split(';')
-                          .map((memberChunk) => memberChunk.trim())
-                          .filter((memberChunk) => memberChunk.length > 0)
-                          .map((memberChunk) => {
-                            const [participantId, firstName, lastName, categoryId] = memberChunk.split(':').map((item) => item.trim());
-                            return {
-                              categoryId: categoryId || undefined,
-                              firstName: firstName || '',
-                              lastName: lastName || '',
-                              participantId: participantId || '',
-                            };
-                          })
+                        .split(';')
+                        .map((memberChunk) => memberChunk.trim())
+                        .filter((memberChunk) => memberChunk.length > 0)
+                        .map((memberChunk) => {
+                          const [participantId, firstName, lastName, categoryId] = memberChunk.split(':').map((item) => item.trim());
+                          return {
+                            categoryId: categoryId || undefined,
+                            firstName: firstName || '',
+                            lastName: lastName || '',
+                            participantId: participantId || '',
+                          };
+                        })
                       : undefined,
                   })}
                 >

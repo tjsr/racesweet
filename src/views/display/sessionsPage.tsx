@@ -1,11 +1,11 @@
-import React from 'react';
 
 import {
-  getSessionsForEvent,
   type EventCatalogSession,
   type EventCatalogState,
+  getSessionsForEvent
 } from '../../app/eventCatalog.js';
-import { getEventAssignedSourceIds, type SystemConfiguration } from '../../app/systemConfig.js';
+import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
+import React from 'react';
 
 interface SessionsPageProps {
   catalog: EventCatalogState;
@@ -29,9 +29,9 @@ const toggleInList = (values: string[], value: string): string[] => {
 };
 
 export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
-  const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId)
-    ?? props.catalog.events.find((event) => event.id === props.catalog.activeEventId)
-    ?? props.catalog.events[0];
+  const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId) ??
+    props.catalog.events.find((event) => event.id === props.catalog.activeEventId) ??
+    props.catalog.events[0];
   const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
   const selectedSession = eventSessions.find((session) => session.id === props.selectedSessionId) ?? eventSessions[0];
   const selectedSessionIsActive = selectedSession?.id === props.catalog.activeSessionId;
