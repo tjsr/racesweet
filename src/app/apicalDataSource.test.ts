@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchApicalEvents, pullApicalRaceState } from './apicalDataSource.js';
+
 import type { DataSourceConfig } from './systemConfig.js';
 
 const convertDataToRaceState = vi.fn();
