@@ -1,5 +1,4 @@
 import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError, SessionStateError } from "../validators/errors.js";
-import type { EventEntrantId } from "./entrant.js";
 import type { EventCategory, EventCategoryId } from "./eventcategory.js";
 import type { EventParticipant, EventParticipantId } from "./eventparticipant.js";
 import type { FlagRecord, GreenFlagRecord } from "./flag.js";
@@ -11,6 +10,7 @@ import { getOrCacheGreenFlagForCategory, hasCategoryIds, isFlagRecord } from "..
 import { processAllParticipantLaps, processParticipantLaps } from "../controllers/laps.js";
 
 import type { ChipCrossingData } from "./chipcrossing.js";
+import type { EventEntrantId } from "./entrant.js";
 import type { EventTeam } from "./eventteam.js";
 import type { MapOf } from "./types.js";
 import { crossingMatchesParticipantIdentifiers } from "../controllers/participantMatch.js";

@@ -1,10 +1,11 @@
-import { v5 as uuidv5 } from 'uuid';
 import type { ApicalEventListResponse, ApicalEventResponseEventData, ApicalLapByCategory } from '../model/apical.ts';
-import type { RaceEvent } from '../model/raceevent.ts';
+
 import type { EventId } from '../model/types.ts';
+import type { RaceEvent } from '../model/raceevent.ts';
 import type { RaceState } from '../model/racestate.ts';
-import { getApicalEventList } from '../utils/apical/apicalEventList.ts';
 import { convertDataToRaceState } from '../parsers/apical.ts';
+import { getApicalEventList } from '../utils/apical/apicalEventList.ts';
+import { v5 as uuidv5 } from 'uuid';
 
 const APICAL_EVENT_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 

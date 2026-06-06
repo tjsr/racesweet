@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 
-import React from 'react';
-import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { Root, createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import path from 'node:path';
 
+import React from 'react';
 import type { SystemConfiguration } from '../../app/systemConfig.js';
-import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
-import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 import { SystemPage } from './systemPage.js';
+import { act } from 'react';
+import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
+import path from 'node:path';
+import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 
 const config: SystemConfiguration = {
   ...createDefaultSystemConfiguration(),

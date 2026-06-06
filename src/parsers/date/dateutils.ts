@@ -23,7 +23,7 @@ export const isValidYear = (year: number): boolean => {
 };
 
 export const timeToLocal = (date: Date): TZDate => {
-  // eslint-disable-next-line new-cap
+   
   const tzCurrent: string = getUserTimezone();
   const tzDate: TZDate = TZDate.tz(tzCurrent, date);
   return tzDate;

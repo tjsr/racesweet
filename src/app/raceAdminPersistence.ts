@@ -25,10 +25,10 @@ const isFileNotFoundError = (error: unknown): boolean => {
 
 const isPermissionDeniedError = (error: unknown): boolean => {
   const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
-  return message.includes('eacces')
-    || message.includes('eperm')
-    || message.includes('access is denied')
-    || message.includes('permission denied');
+  return message.includes('eacces') ||
+    message.includes('eperm') ||
+    message.includes('access is denied') ||
+    message.includes('permission denied');
 };
 
 const createPermissionWarning = (filePath: string, action: 'read' | 'write'): string => {

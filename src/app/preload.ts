@@ -14,6 +14,7 @@ import {
   WriteContentErrorIpcReceiveChannel,
   WriteContentIpcReceiveChannel,
 } from '../model/electronIpc.ts';
+import { getRaceSweetServerPort } from './serverPort.ts';
 
 // See the Electron documentation for details on how to use preload scripts:
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
@@ -31,13 +32,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 });
-// Listen for the actual port from the main process
-window.addEventListener('actual-port', (event: Event) => {
-  const port = (event as CustomEvent).detail;
-  console.log(`Actual port: ${port}`);
-  window.actualPort = port;
-});// Expose the actual port to the renderer process
-window.actualPort = window.actualPort || 3000;
+window.actualPort = getRaceSweetServerPort();
 // const {contextBridge, ipcRenderer} = require("electron");
 
 const eventCalls: Record<string, [(data: (never | PromiseLike<never>)) => void, (reason?: string|Error) => void]> = {};

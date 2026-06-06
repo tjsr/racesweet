@@ -1,4 +1,4 @@
-import { findAvailablePort } from './findAvailablePort.ts';
+import { RACESWEET_SERVER_PORT_ENV, getRaceSweetServerPort } from './serverPort.ts';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 
@@ -12,7 +12,7 @@ const electronForgeCli = path.join(
 );
 
 const start = async (): Promise<void> => {
-  const port = await findAvailablePort();
+  const port = getRaceSweetServerPort();
   const electronArgs = process.argv.slice(2);
   const forgeArgs = ['start'];
 
@@ -25,7 +25,7 @@ const start = async (): Promise<void> => {
   const child = spawn(process.execPath, [electronForgeCli, ...forgeArgs], {
     env: {
       ...process.env,
-      DEBUG_SERVER_PORT: String(port),
+      [RACESWEET_SERVER_PORT_ENV]: String(port),
     },
     stdio: 'inherit',
   });

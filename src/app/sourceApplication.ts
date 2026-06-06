@@ -28,7 +28,7 @@ const categorySeriesKey = (category: EventCategory): string => {
 
 export const getCategoriesToAdd = (
   existingCategories: EventCategory[],
-  incomingCategories: EventCategory[],
+  incomingCategories: EventCategory[]
 ): EventCategory[] => {
   const existingIds = new Set(existingCategories.map((category) => category.id.toString()));
   const existingSeries = new Set(existingCategories.map((category) => categorySeriesKey(category)));
@@ -49,7 +49,7 @@ export const getCategoriesToAdd = (
 
 export const applyPulledRaceStateToSession = async (
   sessionState: SessionSourceSink,
-  raceState: Partial<RaceState>,
+  raceState: Partial<RaceState>
 ): Promise<void> => {
   const categoriesToAdd = getCategoriesToAdd(sessionState.categories, raceState.categories || []);
   if (categoriesToAdd.length > 0) {

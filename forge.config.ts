@@ -10,8 +10,9 @@ import { MakerZIP } from '@electron-forge/maker-zip';
 import { WebpackPlugin } from '@electron-forge/plugin-webpack';
 import { mainConfig } from './webpack.main.config.ts';
 import { rendererConfig } from './webpack.renderer.config.ts';
+import { getRaceSweetServerPort } from './src/app/serverPort.ts';
 
-const devServerPort = parseInt(process.env.DEBUG_SERVER_PORT || '3000', 10);
+const devServerPort = getRaceSweetServerPort();
 
 const config: ForgeConfig = {
   packagerConfig: {

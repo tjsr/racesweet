@@ -1,5 +1,5 @@
 {
-  "typescript.tsserver.watchOptions": {
+  "ts.tsserver.watchOptions": {
     "watchFile": "useFsEvents",
     "watchDirectory": "useFsEvents",
     "watchFilePolling": 1000,

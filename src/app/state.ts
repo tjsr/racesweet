@@ -1,6 +1,6 @@
-﻿import type { TimeRecord, TimeRecordSource } from "../model/timerecord.js";
+﻿import type { EventId, TimeRecordSourceId } from "../model/types.js";
+import type { TimeRecord, TimeRecordSource } from "../model/timerecord.js";
 
-import type { EventId, TimeRecordSourceId } from "../model/types.js";
 import type { RaceEvent } from "../model/raceevent.ts";
 import type { RaceState } from "../model/racestate.ts";
 

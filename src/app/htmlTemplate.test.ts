@@ -1,6 +1,7 @@
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
+
+import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 
 describe('HTML template (src/app/index.html)', () => {
   let html: string;
