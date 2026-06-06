@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+
+import type { EventId } from '../../model/types.ts';
+import { ImportEventsModal } from './ImportEventsModal.tsx';
 import type { ImportedEventData } from '../../controllers/apicalImport.ts';
 import type { RaceEvent } from '../../model/raceevent.ts';
-import type { EventId } from '../../model/types.ts';
 import type { RaceState } from '../../model/racestate.ts';
-import { ImportEventsModal } from './ImportEventsModal.tsx';
 
 interface EventsTabProps {
   initialEvents?: RaceEvent[];

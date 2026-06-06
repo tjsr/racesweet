@@ -27,4 +27,8 @@ describe('HTML template (src/app/index.html)', () => {
   it('does not contain stale script references to ./build/ paths that would 404', () => {
     expect(html).not.toContain('./build/');
   });
+
+  it('does not define a static CSP that would override the configured policy header', () => {
+    expect(html).not.toContain('Content-Security-Policy');
+  });
 });

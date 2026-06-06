@@ -19,7 +19,7 @@ describe('isApicalApiUrl', () => {
   });
 
   it('does not match localhost', () => {
-    expect(isApicalApiUrl('http://localhost:3001/api')).toBe(false);
+    expect(isApicalApiUrl('http://localhost:3488/api')).toBe(false);
   });
 });
 

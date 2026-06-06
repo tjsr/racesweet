@@ -82,9 +82,9 @@ module.exports = {
     static: './dist',
     hot: true,
     open: true,
-    port: 3001,
+    port: 3488,
     proxy: {
-      '/api': 'http://localhost:3001'
+      '/api': 'http://localhost:3488'
     }
   }
 };
@@ -96,7 +96,7 @@ module.exports = {
 // vite.config.ts
 export default {
   server: {
-    port: 3001,
+    port: 3488,
     open: true,
     cors: true
   },
@@ -133,7 +133,7 @@ export default {
       "name": "Chrome DevTools",
       "type": "chrome",
       "request": "launch",
-      "url": "http://localhost:3001",
+      "url": "http://localhost:3488",
       "webRoot": "${workspaceFolder}"
     }
   ]

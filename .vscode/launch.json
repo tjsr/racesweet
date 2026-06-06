@@ -55,7 +55,7 @@
     "name": "Electron Renderer",
     "request": "launch",
     "type": "chrome",
-    "url": "${env:DEBUG_RENDERER_URL:http://localhost:3000}",
+    "url": "${env:DEBUG_RENDERER_URL:http://localhost:3488}",
     "webRoot": "${workspaceFolder}/src",
     "sourceMapPathOverrides": {
       "webpack://*/*": "*"

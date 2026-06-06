@@ -8,6 +8,7 @@ import {
   WriteContentErrorIpcReceiveChannel,
   WriteContentIpcReceiveChannel
 } from '../model/electronIpc';
+import { buildContentSecurityPolicy, injectContentSecurityPolicyHeader } from './contentSecurityPolicy';
 import { injectCorsHeaders, isApicalApiUrl } from './electron/corsHeaders';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import type { SelectLocalFileOptions } from './window';
@@ -48,18 +49,25 @@ process.on('warning', (warning) => {
   console.warn(trace);
 });
 
-const configureCorsForApicalRequests = (): void => {
+const configureSecurityHeaders = (): void => {
+  const contentSecurityPolicy = buildContentSecurityPolicy();
+
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    let responseHeaders = details.responseHeaders ?? {};
     if (isApicalApiUrl(details.url)) {
-      callback({ responseHeaders: injectCorsHeaders(details.responseHeaders ?? {}) });
-    } else {
-      callback({ responseHeaders: details.responseHeaders });
+      responseHeaders = injectCorsHeaders(responseHeaders);
     }
+
+    if (details.resourceType === 'mainFrame') {
+      responseHeaders = injectContentSecurityPolicyHeader(responseHeaders, contentSecurityPolicy);
+    }
+
+    callback({ responseHeaders });
   });
 };
 
 const createWindow = (): void => {
-  configureCorsForApicalRequests();
+  configureSecurityHeaders();
 
   // Create the browser window.
   const mainWindow = new BrowserWindow({

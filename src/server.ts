@@ -9,7 +9,7 @@ import path from 'path';
 // const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = 3001;
+const PORT = 3488;
 const STATIC_FOLDER = path.join(__dirname, '..', 'public'); // Folder to serve static files from
 const mimeTypes: Record<string, string> = {
   '.css': 'text/css',

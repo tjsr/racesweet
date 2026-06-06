@@ -9,11 +9,16 @@ export default tseslint.config(
   extends: [
     ...tjsrEslintConfig,
   ],
-  files: ["src/**/*.ts"],
+  files: ["src/**/*.ts:", "src/**/*.tsx"],
   languageOptions: {
     globals:{
       es2021: true,
       node: true,
+    },
+    parser: tseslint.parser,
+    parserOptions: {
+      ecmaVersion: 'latest',
+      sourceType: "module"
     },
   },
 },

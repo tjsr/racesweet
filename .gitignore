@@ -8,3 +8,5 @@ src/testdata/~$*.xlsx
 backup/
 dist/
 src/generated/*
+src/generated/event-catalog.json
+src/generated/system-config.json
