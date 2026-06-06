@@ -1,17 +1,16 @@
 // @vitest-environment jsdom
 
+import type { RaceStateLookup, Session } from '../../model/racestate.js';
+import { ReportsPage, ResultsPage } from './raceAnalyticsViews.js';
+import { createRoot, type Root } from 'react-dom/client';
+import type { EventCatalogEntrant } from '../../app/eventCatalog.js';
+import type { EventCategory } from '../../model/eventcategory.js';
+import type { EventParticipant } from '../../model/eventparticipant.js';
+import type { ParticipantPassingRecord } from '../../model/timerecord.js';
 import React from 'react';
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import type { EventCatalogEntrant } from '../../app/eventCatalog.js';
-import type { EventParticipant } from '../../model/eventparticipant.js';
-import type { EventCategory } from '../../model/eventcategory.js';
-import type { RaceStateLookup, Session } from '../../model/racestate.js';
-import type { ParticipantPassingRecord } from '../../model/timerecord.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
-import { ReportsPage, ResultsPage } from './raceAnalyticsViews.js';
 
 const setSelectValue = (select: HTMLSelectElement, value: string): void => {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');

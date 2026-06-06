@@ -32,4 +32,4 @@ const RaceResult = (props: RaceResultProps) => {
       </table>
     </div>
   );
-}
+};

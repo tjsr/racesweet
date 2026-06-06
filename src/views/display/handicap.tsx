@@ -566,8 +566,8 @@ export const HandicapView = ({ participantNames, snapshotPath = DEFAULT_HANDICAP
                     {formatRoundCell(
                       rider.roundsByEventId[String(roundColumn.eventId)],
                       Boolean(
-                        roundExtremesByEventId.get(roundColumn.eventId)?.fastestRiderNames.has(rider.name)
-                        || roundExtremesByEventId.get(roundColumn.eventId)?.slowestRiderNames.has(rider.name)
+                        roundExtremesByEventId.get(roundColumn.eventId)?.fastestRiderNames.has(rider.name) ||
+                        roundExtremesByEventId.get(roundColumn.eventId)?.slowestRiderNames.has(rider.name)
                       )
                     )}
                   </TableCell>

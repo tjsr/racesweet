@@ -1,10 +1,10 @@
 import React from 'react';
 
 import {
-  getDataSourceTypeLabel,
-  type DataSourceConfig,
   type DataSourceType,
+  type DataSourceConfig,
   type SystemConfiguration,
+  getDataSourceTypeLabel,
 } from '../../app/systemConfig.js';
 import { getRuntimeVersions } from '../../app/versionInfo.js';
 

@@ -1,18 +1,18 @@
-import React, { type JSX, type ReactNode } from 'react';
-import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../model';
-import { FlagRecord } from '../../model/flag';
+import "./recent.css";
+import { Box, FormControl, InputLabel, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { EventCategory, EventCategoryId } from '../../model/eventcategory';
-import { isFlagRecord } from '../../controllers/flag';
-import { Box, createTheme, FormControl, InputLabel, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
-import { MillisecondsDuration, millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.ts';
-import { categoriesTextFromLookupFn, getElapsedTimeForCategory } from '../../controllers/category.ts';
-import "./recent.css"
-import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
-import { ParticipantPassingRecord } from '../../model/timerecord.ts';
+import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../model';
 import { InvalidCategoryIdError, NoCrossingError, NoParticipantError, ParticipantNotFoundError } from '../../validators/errors.ts';
+import { MillisecondsDuration, millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.ts';
+import React, { type JSX } from 'react';
+import { categoriesTextFromLookupFn, getElapsedTimeForCategory } from '../../controllers/category.ts';
+import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
+import { FlagRecord } from '../../model/flag';
+import { ParticipantPassingRecord } from '../../model/timerecord.ts';
 import { RaceStateLookup } from '../../model/racestate.ts';
-import { getParticipantNumber } from '../../controllers/participant.ts';
 import { getLapTimeCell } from '../../controllers/laps.ts';
+import { getParticipantNumber } from '../../controllers/participant.ts';
+import { isFlagRecord } from '../../controllers/flag';
 
 interface RecordsProps {
   records: EventTimeRecord[];

@@ -12,7 +12,7 @@ export default tseslint.config(
   files: ["src/**/*.ts:", "src/**/*.tsx"],
   languageOptions: {
     globals:{
-      es2021: true,
+      es2026: true,
       node: true,
     },
     parser: tseslint.parser,
@@ -21,11 +21,21 @@ export default tseslint.config(
       sourceType: "module"
     },
   },
+  rules: {
+    "@stylistic/js/comma-dangle": 'off'
+  }
 },
 {
   files: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   languageOptions: {
+    parser: tseslint.parser,
+    parserOptions: {
+      ecmaVersion: 'latest',
+      sourceType: "module"
+    },
     globals: {
+      es2026: true,
+      node: true,
       beforeAll: 'readonly',
       beforeEach: 'readonly',
       afterAll: 'readonly',

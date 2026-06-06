@@ -1,10 +1,9 @@
-import React from 'react';
-
 import {
-  getEntrantsForEvent,
   type EventCatalogEntrant,
   type EventCatalogState,
+  getEntrantsForEvent,
 } from '../../app/eventCatalog.js';
+import React from 'react';
 
 interface EntrantsPageProps {
   catalog: EventCatalogState;
@@ -20,9 +19,9 @@ interface EntrantsPageProps {
 const splitCsv = (value: string): string[] => value.split(',').map((item) => item.trim()).filter((item) => item.length > 0);
 
 export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
-  const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId)
-    ?? props.catalog.events.find((event) => event.id === props.catalog.activeEventId)
-    ?? props.catalog.events[0];
+  const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId) ??
+    props.catalog.events.find((event) => event.id === props.catalog.activeEventId) ??
+    props.catalog.events[0];
   const eventEntrants = getEntrantsForEvent(props.catalog, selectedEvent?.id);
   const selectedEntrant = eventEntrants.find((entrant) => entrant.id === props.selectedEntrantId) ?? eventEntrants[0];
 

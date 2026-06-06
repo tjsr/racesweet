@@ -94,7 +94,7 @@ const TableView = ({ participants, passings, lapsPerBlock }: TableViewProps) => 
   const blocks = Array.from({ length: blockCount }, (_, i) => {
     const startLap = i * lapsPerBlock + 1;
     const endLap = Math.min(startLap + lapsPerBlock - 1, maxLaps);
-    return { startLap, endLap };
+    return { endLap, startLap };
   });
 
   return (
