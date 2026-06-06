@@ -76,7 +76,7 @@ const categoryNameFromId = (raceState: Session & RaceStateLookup, categoryId?: s
 
 const categoryKeyFromName = (name: string): string => normalizeText(name);
 
-const categoryKeyFromId = (raceState: Session & RaceStateLookup, categoryId?: string): string => {
+const _categoryKeyFromId = (raceState: Session & RaceStateLookup, categoryId?: string): string => {
   return categoryKeyFromName(categoryNameFromId(raceState, categoryId));
 };
 

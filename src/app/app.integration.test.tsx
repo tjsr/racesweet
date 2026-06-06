@@ -1,14 +1,13 @@
 // @vitest-environment jsdom
 
+import { type Root, createRoot } from 'react-dom/client';
+import { RaceSweetMainApp } from './App.js';
 import React from 'react';
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 
 import { useUiConsoleGuards } from '../testing/uiConsoleGuards.js';
-import { RaceSweetMainApp } from './App.js';
 
 vi.mock('../views/display/categories', () => ({
   CategoryList: () => React.createElement('div', null, 'Category List'),

@@ -1,5 +1,4 @@
 import { allowedFetchUrls, buildContentSecurityPolicy, injectContentSecurityPolicyHeader } from './contentSecurityPolicy.js';
-import { describe, expect, it } from 'vitest';
 
 describe('buildContentSecurityPolicy', () => {
   it('allows fetches to Apical by default', () => {

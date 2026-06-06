@@ -4,7 +4,7 @@ interface RaceResultProps {
   results: EntrantResult[];
 }
 
-const RaceResult = (props: RaceResultProps) => {
+const _RaceResult = (props: RaceResultProps) => {
   const { results } = props;
 
   return (

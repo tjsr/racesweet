@@ -1,5 +1,3 @@
-import { afterEach, beforeEach, expect, vi } from 'vitest';
-
 type UiConsoleGuardOptions = {
   allowErrorPatterns?: RegExp[];
   allowWarnPatterns?: RegExp[];

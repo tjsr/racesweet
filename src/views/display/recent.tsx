@@ -118,7 +118,7 @@ const categoryStringFromParticipantId = (
   return categoryStringFromParticipant(participant, categoryLookup);
 };
 
-const categoriesFromCrossing = (
+const _categoriesFromCrossing = (
   crossing: ParticipantPassingRecord | undefined,
   participantLookup: (id: EventParticipantId) => EventParticipant | undefined,
   categoryLookup: (id: EventCategoryId) => EventCategory | undefined
@@ -134,14 +134,14 @@ const categoriesFromCrossing = (
   return categoryStringFromParticipantId(crossing.participantId, participantLookup, categoryLookup);
 };
 
-interface CompletedLapProps {
+interface _CompletedLapProps {
   elapsedTime: MillisecondsDuration;
 }
 
 const UnknownChipRow = (
-  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, ant }: {
-    ant: string
-    txNo: number,
+  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae }: {
+    antennae: string
+    txNo: number | undefined,
     sequenceNumber: number
     passingTime: Date,
     timeRecordId: string,
@@ -149,14 +149,14 @@ const UnknownChipRow = (
     identifier: string,
   }
 ): JSX.Element => {
-  const txCount = rs.countTransponderCrossings(txNo, passingTime);
+  const txCount = txNo !== undefined ? rs.countTransponderCrossings(txNo, passingTime) : undefined;
   const content = `Unknown transponder ${identifier} (${txCount})`;
   const timeString = tableTimeString(passingTime);
 
   return (
     <TableRow key={timeRecordId} data-record-id={timeRecordId}>
       <TableCell>{sequenceNumber}</TableCell>
-      <TableCell>Ant</TableCell>
+      <TableCell>{antennae}</TableCell>
       <TableCell>{txNo}</TableCell>
       <TableCell>{timeString}</TableCell>
       <TableCell>{identifier}</TableCell>
@@ -232,7 +232,7 @@ export const PassingRecordRow = (
   let lapTime = '';
 
   if (passing.participantId) {
-    let participant = props.raceStateLookup.getParticipantById(passing.participantId);
+    const participant = props.raceStateLookup.getParticipantById(passing.participantId);
     const categoryLookup = props.raceStateLookup.getCategoryById.bind(props.raceStateLookup);
     categoryStr = participant ? categoryStringFromParticipant(participant, categoryLookup) : undefined;
   }
@@ -316,7 +316,7 @@ export const PassingRecordRow = (
         </MenuItem>
         
         {passing.participantId && allCategories.length > 0 && [
-          <MenuItem key="cat-header" disabled sx={{ opacity: '1 !important', fontWeight: 'bold' }}>
+          <MenuItem key="cat-header" disabled sx={{ fontWeight: 'bold', opacity: '1 !important' }}>
             Change Category
           </MenuItem>,
           ...allCategories.map((cat) => (
@@ -407,9 +407,9 @@ export const RecordRow = (props: RecentRecordRowProps) => {
   return <UnknownChipRow
     sequenceNumber={record.sequence}
     timeRecordId={record.id}
-    ant='?'
+    antennae='?'
     passingTime={record.time!}
-    txNo={0}
+    txNo={txNo}
     identifier={identifier}
     rs={props.raceStateLookup}
   />;
@@ -443,7 +443,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
 
 const warnings: string[] = [];
 
-const formatGridTime = (params: { value: Date | string }) => {
+const _formatGridTime = (params: { value: Date | string }) => {
   if (typeof params.value === 'string') {
     return params.value;
   }

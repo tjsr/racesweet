@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import { injectCorsHeaders, isApicalApiUrl } from './corsHeaders.js';
 
 describe('isApicalApiUrl', () => {

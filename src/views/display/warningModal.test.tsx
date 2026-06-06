@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
 
+import { type Root, createRoot } from 'react-dom/client';
 import React from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { act } from 'react';
-
 import { WarningModal } from './warningModal.js';
+import { act } from 'react';
 
 describe('WarningModal', () => {
   let container: HTMLDivElement;

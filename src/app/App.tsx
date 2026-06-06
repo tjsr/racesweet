@@ -1,33 +1,33 @@
 import './index.css';
 
+import { type DataSourceConfig, type SystemConfiguration, createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
+import { EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
 import { RaceStateLookup, Session } from '../model/racestate.ts';
 import React, { useEffect, useState } from 'react';
+import { ReportsPage, ResultsPage } from '../views/display/raceAnalyticsViews.tsx';
+import { fetchApicalEvents, pullApicalRaceState } from './apicalDataSource.ts';
 
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
-import { CategoryList } from '../views/display/categories.tsx';
 import { CategoriesPage } from '../views/display/categoriesPage.tsx';
+import { CategoryList } from '../views/display/categories.tsx';
 import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.ts';
+import { ElectronJsonRaceAdminPersistence } from './raceAdminPersistence.ts';
 import { ElectronJsonSystemConfigPersistence } from './systemConfigPersistence.ts';
 import { EntrantsPage } from '../views/display/entrantsPage.tsx';
+import { EventCatalogService } from './eventCatalogService.ts';
 import { EventCategoryId } from '../model/eventcategory.ts';
-import { EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
 import type { EventParticipantId } from '../model/eventparticipant.ts';
 import type { EventTimeRecord } from '../model/timerecord.ts';
-import { EventCatalogService } from './eventCatalogService.ts';
 import { EventsScreen } from '../views/display/events.tsx';
-import { RecentRecords } from '../views/display/recent.tsx';
-import { ElectronJsonRaceAdminPersistence } from './raceAdminPersistence.ts';
 import { RaceAdminService } from './raceAdminService.ts';
-import { ReportsPage, ResultsPage } from '../views/display/raceAnalyticsViews.tsx';
+import { RecentRecords } from '../views/display/recent.tsx';
 import { SessionsPage } from '../views/display/sessionsPage.tsx';
-import { SystemPage } from '../views/display/systemPage.tsx';
 import { SystemConfigService } from './systemConfigService.ts';
-import { createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds, type DataSourceConfig, type SystemConfiguration } from './systemConfig.ts';
-import { selectedCategoriesForParticipants } from './selectionState.ts';
-import { applyPulledRaceStateToSession } from './sourceApplication.ts';
+import { SystemPage } from '../views/display/systemPage.tsx';
 import { TestSession } from '../testdata/testsession.ts';
+import { applyPulledRaceStateToSession } from './sourceApplication.ts';
+import { selectedCategoriesForParticipants } from './selectionState.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
-import { fetchApicalEvents, pullApicalRaceState } from './apicalDataSource.ts';
 
 type AppSection = 'System' | 'Events' | 'Entrants' | 'Categories' | 'Sessions' | 'Timing' | 'Results' | 'Reports';
 type UnsavedChangesGuard = (action: () => void | Promise<void>) => void;
@@ -135,10 +135,10 @@ export const RaceSweetMainApp = () => {
         const missingCategoryIds = Array.from(participantCategoryIds).filter((categoryId) => !catalogCategoryIds.has(categoryId));
         const missingEntrantIds = Array.from(participantEntrantIds).filter((entrantId) => !catalogEntrantIds.has(entrantId));
         const shouldSyncScaffold = !!initialEventId && (
-          getCategoriesForEvent(initialCatalog, initialEventId).length !== expectedCategoryCount
-          || (initialCatalog.events.find((event) => event.id === initialEventId)?.entrantIds.length || 0) !== participantEntrantIds.size
-          || missingCategoryIds.length > 0
-          || missingEntrantIds.length > 0
+          getCategoriesForEvent(initialCatalog, initialEventId).length !== expectedCategoryCount || 
+          (initialCatalog.events.find((event) => event.id === initialEventId)?.entrantIds.length || 0) !== participantEntrantIds.size ||
+          missingCategoryIds.length > 0 ||
+          missingEntrantIds.length > 0
         );
 
         const finalizeLoad = (catalog: EventCatalogState) => {
@@ -357,10 +357,10 @@ export const RaceSweetMainApp = () => {
 
     const sourceIds = getSessionAssignedSourceIds(systemConfigState, selectedSessionsEventId, selectedSessionId);
     const liveSources = systemConfigState.dataSources.filter((source) => {
-      return sourceIds.includes(source.id)
-        && source.enabled
-        && source.type === 'api-apical-data-file'
-        && !!source.apiConfig?.live;
+      return sourceIds.includes(source.id) &&
+        source.enabled &&
+        source.type === 'api-apical-data-file' &&
+        !!source.apiConfig?.live;
     });
 
     const timers = liveSources.map((source) => {
@@ -387,10 +387,10 @@ export const RaceSweetMainApp = () => {
         <p>There was an error loading the content:</p>
         <pre>{errorState.toString()}</pre>
       </div>
-    </>
+    </>;
   }
   if (!sessionState || !eventCatalogState) {
-    return <>Loading...</>
+    return <>Loading...</>;
   }
 
   const handleExcludeCrossing = (crossingId: string, exclude: boolean) => {
@@ -466,9 +466,9 @@ export const RaceSweetMainApp = () => {
   const timingEventId = timingSessionSelection === 'active'
     ? eventCatalogState.activeEventId
     : selectedTimingEventId || eventCatalogState.activeEventId;
-  const timingEvent = eventCatalogState.events.find((event) => event.id === timingEventId)
-    ?? eventCatalogState.events.find((event) => event.id === eventCatalogState.activeEventId)
-    ?? eventCatalogState.events[0];
+  const timingEvent = eventCatalogState.events.find((event) => event.id === timingEventId) ??
+    eventCatalogState.events.find((event) => event.id === eventCatalogState.activeEventId) ??
+    eventCatalogState.events[0];
   const timingSessions = getSessionsForEvent(eventCatalogState, timingEvent?.id);
   const timingSessionValue = timingSessionSelection === 'active'
     ? 'active'
@@ -521,9 +521,9 @@ export const RaceSweetMainApp = () => {
     </>
   );
 
-  const activeEvent = eventCatalogState.events.find((event) => event.id === eventCatalogState.activeEventId)
-    ?? eventCatalogState.events.find((event) => event.id === selectedEventId)
-    ?? eventCatalogState.events[0];
+  const activeEvent = eventCatalogState.events.find((event) => event.id === eventCatalogState.activeEventId) ??
+    eventCatalogState.events.find((event) => event.id === selectedEventId) ??
+    eventCatalogState.events[0];
   const activeEventSessions = getSessionsForEvent(eventCatalogState, activeEvent?.id);
   const selectedCategoryEventId = selectedCategoriesEventId || eventCatalogState.activeEventId || eventCatalogState.events[0]?.id;
   const selectedCategoryEntrants = getEntrantsForCategory(eventCatalogState, selectedCategoryEventId, selectedCategoryId);

@@ -1,7 +1,5 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest';
-
 import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.js';
 import { createDefaultEventCatalogLedger } from './eventCatalog.js';
 

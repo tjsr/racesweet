@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { Root, createRoot } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import React from 'react';
 import type { SystemConfiguration } from '../../app/systemConfig.js';

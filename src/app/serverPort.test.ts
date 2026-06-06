@@ -1,5 +1,4 @@
 import { DEFAULT_RACESWEET_SERVER_PORT, RACESWEET_SERVER_PORT_ENV, getRaceSweetServerPort } from './serverPort.js';
-import { describe, expect, it } from 'vitest';
 
 describe('getRaceSweetServerPort', () => {
   it('defaults to the RaceSweet server port', () => {

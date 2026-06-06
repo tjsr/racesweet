@@ -2,7 +2,7 @@
 
 import type { RaceStateLookup, Session } from '../../model/racestate.js';
 import { ReportsPage, ResultsPage } from './raceAnalyticsViews.js';
-import { createRoot, type Root } from 'react-dom/client';
+import { type Root, createRoot } from 'react-dom/client';
 import type { EventCatalogEntrant } from '../../app/eventCatalog.js';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
@@ -134,9 +134,6 @@ const categoryLookup = new Map<string, EventCategory>([
 
 const raceState = {
   categories: Array.from(categoryLookup.values()),
-  participants,
-  records: [],
-  teams: [],
   countTransponderCrossings: () => 0,
   excludeCrossing: () => undefined,
   getCategoryById: (categoryId: string) => categoryLookup.get(categoryId),
@@ -144,6 +141,9 @@ const raceState = {
   getParticipantById: (participantId: string) => participants.find((item) => item.id === participantId),
   getParticipantLaps: (participantId: string) => lapsByParticipant.get(participantId) || [],
   getTransponderCrossings: () => [],
+  participants,
+  records: [],
+  teams: [],
   updateCategoryDetails: () => undefined,
   updateEntrantCategory: () => undefined,
   updateParticipantCategory: () => undefined,

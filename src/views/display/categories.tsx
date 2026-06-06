@@ -1,8 +1,8 @@
 import { EventCategory, EventCategoryId } from '../../model/eventcategory.js';
-import { GridEventListener, GridRowId } from '@mui/x-data-grid';
 
 import Box from '@mui/material/Box';
 import { DataGrid } from '@mui/x-data-grid/DataGrid';
+import { GridRowId } from '@mui/x-data-grid';
 
 interface CategoryListProps {
   categories: EventCategory[];
@@ -31,7 +31,7 @@ export const CategoryList = (props: CategoryListProps) => {
         disableMultipleRowSelection={false}
         columns={[
           { field: 'id', headerName: 'ID', width: 90 },
-          { field: 'name', headerName: 'Name', flex: 1 },
+          { field: 'name', flex: 1, headerName: 'Name' },
           { field: 'code', headerName: 'Code', width: 150 },
         ]}
       />

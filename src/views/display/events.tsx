@@ -1,11 +1,10 @@
-import React from 'react';
-
 import {
-  getSessionsForEvent,
   type EventCatalogEvent,
   type EventCatalogState,
+  getSessionsForEvent,
 } from '../../app/eventCatalog.js';
-import { getEventAssignedSourceIds, type SystemConfiguration } from '../../app/systemConfig.js';
+import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
+import React from 'react';
 
 interface EventsScreenProps {
   catalog: EventCatalogState;
@@ -27,9 +26,9 @@ const toggleInList = (values: string[], value: string): string[] => {
 };
 
 export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
-  const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId)
-    ?? props.catalog.events.find((event) => event.id === props.catalog.activeEventId)
-    ?? props.catalog.events[0];
+  const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId) ??
+    props.catalog.events.find((event) => event.id === props.catalog.activeEventId) ??
+    props.catalog.events[0];
   const selectedEventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
   const selectedSession = selectedEventSessions.find((session) => session.id === props.selectedSessionId) ?? selectedEventSessions[0];
   const assignedSourceIds = selectedEvent ? getEventAssignedSourceIds(props.config, selectedEvent.id) : [];

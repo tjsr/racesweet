@@ -1,15 +1,13 @@
 // @vitest-environment jsdom
 
-import React from 'react';
-import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
+import { type Root, createRoot } from 'react-dom/client';
 import type { EventCatalogState } from '../../app/eventCatalog.js';
+import { EventsScreen } from './events.js';
+import React from 'react';
 import type { SystemConfiguration } from '../../app/systemConfig.js';
+import { act } from 'react';
 import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
-import { EventsScreen } from './events.js';
 
 const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: string): void => {
   const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;

@@ -1,5 +1,3 @@
-// import { describe, expect, it } from 'vitest';
-
 import { parseRfidTimingDate, tryParseDateTime } from './rfidTimingDate.ts';
 
 import { DateParseError } from '../date/errors.ts';

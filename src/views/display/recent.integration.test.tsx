@@ -1,19 +1,17 @@
 // @vitest-environment jsdom
 
-import React from 'react';
-import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
+import { type ParticipantPassingRecord, RECORD_TX_CROSSING } from '../../model/timerecord.js';
+import { type Root, createRoot } from 'react-dom/client';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
 import type { FlagRecord } from '../../model/flag.js';
 import type { RaceStateLookup } from '../../model/racestate.js';
-import { RECORD_TX_CROSSING, type ParticipantPassingRecord } from '../../model/timerecord.js';
-import { updateCategorySelectionsForChangedParticipant } from '../../app/categoryChangeState.js';
-import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
-import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
+import React from 'react';
 import { RecentRecords } from './recent.js';
+import { act } from 'react';
+import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
+import { updateCategorySelectionsForChangedParticipant } from '../../app/categoryChangeState.js';
+import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 
 const ensureMatchMedia = (): void => {
   if (!window.matchMedia) {

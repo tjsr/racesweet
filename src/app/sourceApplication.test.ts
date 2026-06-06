@@ -1,5 +1,4 @@
 import { applyPulledRaceStateToSession, getCategoriesToAdd } from './sourceApplication.js';
-import { describe, expect, it, vi } from 'vitest';
 
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';

@@ -1,18 +1,18 @@
-import React from 'react';
-
 import {
-  getCategoriesForEvent,
   type CategoryDistanceRule,
   type EventCatalogCategory,
-  type EventCatalogState,
+  type EventCatalogState
 } from '../../app/eventCatalog.js';
+import { WarningModal, type WarningModalAction } from './warningModal.js';
+
 import {
   formatCategorySessionAssignments,
   formatTeamCompositionRules,
   parseCategorySessionAssignments,
   parseTeamCompositionRules,
 } from '../../app/categoryRules.js';
-import { WarningModal, type WarningModalAction } from './warningModal.js';
+import React from 'react';
+import { getCategoriesForEvent } from '../../app/eventCatalog.js';
 
 interface CategoryEntrantSummary {
   entrantId: string;
@@ -98,9 +98,9 @@ const getCategoryDraft = (category: EventCatalogCategory | undefined): CategoryD
 });
 
 export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement => {
-  const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId)
-    ?? props.catalog.events.find((event) => event.id === props.catalog.activeEventId)
-    ?? props.catalog.events[0];
+  const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId) ??
+    props.catalog.events.find((event) => event.id === props.catalog.activeEventId) ??
+    props.catalog.events[0];
   const eventCategories = dedupeCategoriesForDisplay(getCategoriesForEvent(props.catalog, selectedEvent?.id));
   const selectedCategory = eventCategories.find((category) => category.id === props.selectedCategoryId) ?? eventCategories[0];
 

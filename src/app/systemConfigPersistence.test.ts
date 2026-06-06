@@ -1,7 +1,5 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest';
-
 import { ElectronJsonSystemConfigPersistence } from './systemConfigPersistence.js';
 import { createDefaultSystemConfiguration } from './systemConfig.js';
 

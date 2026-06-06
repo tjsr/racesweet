@@ -125,7 +125,6 @@ describe('hasDateComponent', () => {
 
 describe('parseUnknownDateTimeString', () => {
   it('should parse using system timezone when dateHint has no timeZone set', () => {
-    // eslint-disable-next-line new-cap
     const systemTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const dateHintNoTz = new TZDate(2023, 9, 1);
     expect(dateHintNoTz.timeZone).toBeUndefined();
