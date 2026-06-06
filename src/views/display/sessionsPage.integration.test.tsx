@@ -1,15 +1,17 @@
 // @vitest-environment jsdom
 
-import React from 'react';
-import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import React, { act } from 'react';
+import * as ReactDomClient from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { EventCatalogState } from '../../app/eventCatalog.js';
-import type { SystemConfiguration } from '../../app/systemConfig.js';
-import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
-import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
+import * as EventCatalog from '../../app/eventCatalog.js';
+import * as SystemConfig from '../../app/systemConfig.js';
 import { SessionsPage } from './sessionsPage.js';
+import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
+
+type EventCatalogState = EventCatalog.EventCatalogState;
+type Root = ReturnType<typeof ReactDomClient.createRoot>;
+type SystemConfiguration = ReturnType<typeof SystemConfig.createDefaultSystemConfiguration>;
 
 const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: string): void => {
   const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -75,7 +77,7 @@ const catalog: EventCatalogState = {
 };
 
 const config: SystemConfiguration = {
-  ...createDefaultSystemConfiguration(),
+  ...SystemConfig.createDefaultSystemConfiguration(),
   dataSources: [
     {
       enabled: true,
@@ -111,7 +113,7 @@ describe('SessionsPage integration', () => {
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
-    root = createRoot(container);
+    root = ReactDomClient.createRoot(container);
   });
 
   afterEach(() => {

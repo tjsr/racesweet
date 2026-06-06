@@ -315,6 +315,8 @@ describe('CategoriesPage integration', () => {
       clubmanButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
+    expect(container.querySelector('.warning-modal-backdrop')).toBeTruthy();
+    expect(container.querySelector('.warning-modal')).toBeTruthy();
     expect(container.textContent).toContain('You have unsaved changes to category Premier - save or discard changes?');
 
     const cancelButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Cancel');
@@ -404,6 +406,8 @@ describe('CategoriesPage integration', () => {
     });
 
     expect(navigationCompleted).toBe(false);
+    expect(container.querySelector('.warning-modal-backdrop')).toBeTruthy();
+    expect(container.querySelector('.warning-modal')).toBeTruthy();
     expect(container.textContent).toContain('You have unsaved changes to category Premier - save or discard changes?');
 
     const discardButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Discard');

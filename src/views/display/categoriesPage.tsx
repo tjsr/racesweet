@@ -12,6 +12,7 @@ import {
   parseCategorySessionAssignments,
   parseTeamCompositionRules,
 } from '../../app/categoryRules.js';
+import { WarningModal, type WarningModalAction } from './warningModal.js';
 
 interface CategoryEntrantSummary {
   entrantId: string;
@@ -220,6 +221,23 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
     void action();
   };
 
+  const pendingNavigationActions: WarningModalAction[] = pendingNavigation ? [
+    {
+      label: 'Save',
+      onClick: () => {
+        void saveAndContinuePendingNavigation();
+      },
+    },
+    {
+      label: 'Discard',
+      onClick: discardAndContinuePendingNavigation,
+    },
+    {
+      label: 'Cancel',
+      onClick: () => setPendingNavigation(undefined),
+    },
+  ] : [];
+
   return (
     <section className="events-screen">
       <h1>Categories</h1>
@@ -397,25 +415,12 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
                 </button>
               </div>
               {pendingNavigation ? (
-                <div className="unsaved-changes-prompt" role="dialog" aria-modal="true" aria-label="Unsaved category changes">
-                  <p>You have unsaved changes to category {pendingNavigation.categoryName} - save or discard changes?</p>
-                  <div className="events-actions">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void saveAndContinuePendingNavigation();
-                      }}
-                    >
-                      Save
-                    </button>
-                    <button type="button" onClick={discardAndContinuePendingNavigation}>
-                      Discard
-                    </button>
-                    <button type="button" onClick={() => setPendingNavigation(undefined)}>
-                      Cancel
-                    </button>
-                  </div>
-                </div>
+                <WarningModal
+                  actions={pendingNavigationActions}
+                  ariaLabel="Unsaved category changes"
+                  message={`You have unsaved changes to category ${pendingNavigation.categoryName} - save or discard changes?`}
+                  title="Unsaved Changes"
+                />
               ) : null}
             </>
           ) : (
