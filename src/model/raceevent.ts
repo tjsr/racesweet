@@ -1,4 +1,6 @@
-import type { EventId } from './types.ts';
+import type { IdType } from './types.ts';
+
+export type EventId = IdType;
 
 export interface RaceEvent {
   id: EventId;

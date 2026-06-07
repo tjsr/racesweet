@@ -5,7 +5,14 @@ import {
   createDefaultAdministrativeChanges,
 } from './raceAdminPersistence.js';
 
+const adminOverridesTestPath = '../../test/generated/admin-overrides.test.json';
+
 describe('ElectronJsonRaceAdminPersistence', () => {
+  afterEach(() => {
+    delete (window as unknown as { api?: unknown }).api;
+    vi.restoreAllMocks();
+  });
+
   it('returns default admin changes when admin-overrides file does not exist', async () => {
     const requestFileContent = vi.fn(async () => {
       throw new Error('ENOENT: no such file or directory');
@@ -19,7 +26,7 @@ describe('ElectronJsonRaceAdminPersistence', () => {
       requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
     };
 
-    const persistence = new ElectronJsonRaceAdminPersistence('../../src/generated/admin-overrides.json');
+    const persistence = new ElectronJsonRaceAdminPersistence(adminOverridesTestPath);
     const loaded = await persistence.load();
 
     expect(loaded).toEqual(createDefaultAdministrativeChanges());
@@ -39,7 +46,7 @@ describe('ElectronJsonRaceAdminPersistence', () => {
     };
 
     const onError = vi.fn();
-    const persistence = new ElectronJsonRaceAdminPersistence('../../src/generated/admin-overrides.json', onError);
+    const persistence = new ElectronJsonRaceAdminPersistence(adminOverridesTestPath, onError);
     await persistence.load();
 
     expect(onError).not.toHaveBeenCalled();
@@ -57,7 +64,7 @@ describe('ElectronJsonRaceAdminPersistence', () => {
     };
 
     const onError = vi.fn();
-    const persistence = new ElectronJsonRaceAdminPersistence('../../src/generated/admin-overrides.json', onError);
+    const persistence = new ElectronJsonRaceAdminPersistence(adminOverridesTestPath, onError);
     const loaded = await persistence.load();
 
     expect(loaded).toEqual(createDefaultAdministrativeChanges());
@@ -79,7 +86,7 @@ describe('ElectronJsonRaceAdminPersistence', () => {
       requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
     };
 
-    const persistence = new ElectronJsonRaceAdminPersistence('../../src/generated/admin-overrides.json');
+    const persistence = new ElectronJsonRaceAdminPersistence(adminOverridesTestPath);
     const loaded = await persistence.load();
 
     expect(loaded).toEqual({
@@ -103,7 +110,7 @@ describe('ElectronJsonRaceAdminPersistence', () => {
     };
 
     const onError = vi.fn();
-    const persistence = new ElectronJsonRaceAdminPersistence('../../src/generated/admin-overrides.json', onError);
+    const persistence = new ElectronJsonRaceAdminPersistence(adminOverridesTestPath, onError);
 
     await expect(persistence.save(createDefaultAdministrativeChanges())).resolves.toBeUndefined();
     expect(onError).toHaveBeenCalledOnce();

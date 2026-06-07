@@ -1,9 +1,8 @@
 import { CategoryNotFoundError, type EventCategoryId } from "../model/eventcategory.js";
-import { v1 as randomUUID, v5 as uuidv5 } from "uuid";
+import { v1 as randomUUID, v5 as uuidv5, validate as validateUuid } from "uuid";
 import type {
   ApicalLapByCategory,
 } from "../model/apical.ts";
-import type { EventId } from "../model/types.js";
 import { GenericTestSession } from "./genericTestSession.js";
 import { MAX_ERRORS } from "../parsers/rfidtiming/settings.js";
 import type { RaceState } from "../model/racestate.js";
@@ -16,6 +15,7 @@ import { convertDataToRaceState } from "../parsers/apical.js";
 import { createEventCategoryIdFromCategoryCode } from "../controllers/category.js";
 import { createGreenFlagEvent } from "../controllers/flag.js";
 import { getRfidSourceUuid } from "../parsers/rfidtiming/rfidtiming";
+import { EventId } from "../model/raceevent.ts";
 // import { parseFile } from "../parsers/rfidtiming/file.ts";
 // import LocalFileResourceProvider from "../controllers/resource/local.ts";
 
@@ -37,6 +37,9 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
     return this._eventId;
   }
   public set eventId(value: EventId) {
+    if (!validateUuid(value)) {
+      throw new Error(`Invalid UUID for eventId: ${value}`);
+    }
     this._eventId = value;
   }
 

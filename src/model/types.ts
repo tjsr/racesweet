@@ -19,9 +19,7 @@ export type positionAccuracy = number; // in metres
 
 export type PhysicalLocation = [latitude, longitude] | [latitude, longitude, elevation];
 
-export type TimeRecordSourceId = uuid;export type MapOf<T extends WithId<IdType>> = Map<T['id'], T>;
+export type TimeRecordSourceId = uuid;
+export type MapOf<T extends WithId<IdType>> = Map<T['id'], T>;
 
 export type PlateNumberType = string | number;
-
-export type EventId = uuid;
-

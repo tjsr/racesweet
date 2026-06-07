@@ -3,7 +3,14 @@
 import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.js';
 import { createDefaultEventCatalogLedger } from './eventCatalog.js';
 
+const eventCatalogTestPath = '../../test/generated/event-catalog.test.json';
+
 describe('ElectronJsonEventCatalogPersistence', () => {
+  afterEach(() => {
+    delete (window as unknown as { api?: unknown }).api;
+    vi.restoreAllMocks();
+  });
+
   it('returns default ledger when file does not exist', async () => {
     const requestFileContent = vi.fn(async () => {
       throw new Error('ENOENT: no such file or directory');
@@ -15,7 +22,7 @@ describe('ElectronJsonEventCatalogPersistence', () => {
       requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
     };
 
-    const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json');
+    const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath);
     const loaded = await persistence.load();
 
     expect(loaded).toEqual(createDefaultEventCatalogLedger());
@@ -33,7 +40,7 @@ describe('ElectronJsonEventCatalogPersistence', () => {
     };
 
     const onError = vi.fn();
-    const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json', onError);
+    const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath, onError);
     await persistence.load();
 
     expect(onError).not.toHaveBeenCalled();
@@ -49,7 +56,7 @@ describe('ElectronJsonEventCatalogPersistence', () => {
     };
 
     const onError = vi.fn();
-    const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json', onError);
+    const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath, onError);
     const loaded = await persistence.load();
 
     expect(loaded).toEqual(createDefaultEventCatalogLedger());
@@ -70,7 +77,7 @@ describe('ElectronJsonEventCatalogPersistence', () => {
       requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
     };
 
-    const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json');
+    const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath);
     const loaded = await persistence.load();
 
     expect(loaded.mutations).toEqual(ledgerData.mutations);
@@ -89,7 +96,7 @@ describe('ElectronJsonEventCatalogPersistence', () => {
     };
 
     const onError = vi.fn();
-    const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json', onError);
+    const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath, onError);
 
     await expect(persistence.save(createDefaultEventCatalogLedger())).resolves.toBeUndefined();
     expect(onError).toHaveBeenCalledOnce();
@@ -124,11 +131,11 @@ describe('ElectronJsonEventCatalogPersistence', () => {
       ],
     };
 
-    const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json');
+    const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath);
     await persistence.save(ledger);
 
     expect(writeFileContent).toHaveBeenCalledWith(
-      '../../src/generated/event-catalog.json',
+      eventCatalogTestPath,
       JSON.stringify(ledger, null, 2)
     );
   });

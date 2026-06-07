@@ -1,13 +1,14 @@
 import type { EventCategory, EventCategoryId, PlaceholderCategory } from '../model/eventcategory.ts';
-import type { EventId, IdType } from "../model/types.js";
 import type { ParticipantPassingRecord, PassingRecordId, TimeRecord } from '../model/timerecord.ts';
 import { elapsedTimeMilliseconds, getElapsedTimeStart, millisecondsToTime } from '../app/utils/timeutils.ts';
 
 import { CategoryCreateError } from '../model/errors/category.ts';
+import { EventId } from '../model/raceevent.ts';
 import type { FlagRecord } from '../model/flag.ts';
+import type { IdType } from "../model/types.js";
 import { v5 as uuidv5 } from 'uuid';
 
-type CategoryId = IdType;
+export type CategoryId = IdType;
 
 const categories: Partial<EventCategory>[] = [
   { id: 'cat1', name: 'Test category' },

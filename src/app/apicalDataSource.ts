@@ -1,6 +1,7 @@
 import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
 
 import type { ApicalLapByCategory } from '../model/apical.js';
+import { EventId } from '../model/types.js';
 import type { RaceState } from '../model/racestate.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
 
@@ -234,7 +235,7 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
   return payload;
 };
 
-export const pullApicalRaceState = async (source: DataSourceConfig, eventId: string): Promise<Partial<RaceState>> => {
+export const pullApicalRaceState = async (source: DataSourceConfig, eventId: EventId): Promise<Partial<RaceState>> => {
   if (source.type !== 'api-apical-data-file' || !source.apiConfig) {
     throw new Error(`Unsupported source type for live pull: ${source.type}`);
   }

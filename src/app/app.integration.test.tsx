@@ -252,6 +252,7 @@ describe('RaceSweetMainApp integration', () => {
     });
     container.remove();
     document.head.querySelector(`style[${APP_TEST_STYLE_TAG}="${APP_TEST_STYLE_TAG_VALUE}"]`)?.remove();
+    delete (window as unknown as { api?: unknown }).api;
     vi.restoreAllMocks();
   });
 

@@ -7,7 +7,6 @@ import {
   hasDateComponent,
   parseUnknownDateTimeString
 } from "./datetime.ts";
-import { describe, expect, it } from "vitest";
 
 import { formatRFC3339 } from "date-fns";
 

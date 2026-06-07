@@ -1,6 +1,8 @@
 import { fetchApicalEvents, pullApicalRaceState } from './apicalDataSource.js';
+import { v1 as randomUUID, v5 as uuidv5 } from 'uuid';
 
 import type { DataSourceConfig } from './systemConfig.js';
+import type { EventId } from '../model/raceevent.js';
 
 const convertDataToRaceState = vi.fn();
 
@@ -158,9 +160,9 @@ describe('apicalDataSource', () => {
 
   it('warms an authenticated session before pulling selected Apical event data file', async () => {
     const converted = {
-      categories: [{ id: 'cat-1', name: 'Category 1' }],
-      participants: [{ entrantId: 'ent-1', id: 'p-1' }],
-      records: [{ crossingId: 'x-1' }],
+      categories: [{ id: uuidv5('cat-1', randomUUID()), name: 'Category 1' }],
+      participants: [{ entrantId: uuidv5('ent-1', randomUUID()), id: uuidv5('p-1', randomUUID()) }],
+      records: [{ crossingId: uuidv5('x-1', randomUUID()) }],
     };
     convertDataToRaceState.mockReturnValue(converted);
 
@@ -177,12 +179,13 @@ describe('apicalDataSource', () => {
       }))
       .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
 
-    const result = await pullApicalRaceState(createApicalSource(), 'event-2026-round-1');
+    const round1EventId: EventId = uuidv5('event-2026-round-1', uuidv5.URL);
+    const result = await pullApicalRaceState(createApicalSource(), round1EventId);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[0]?.[0] || '')).toContain('/RaceResult/Event/ExportToExcel?eventId=301');
     expect(String(fetchMock.mock.calls[1]?.[0] || '')).toContain('/raceresult/event/datafile?eventId=301');
-    expect(convertDataToRaceState).toHaveBeenCalledWith('event-2026-round-1', expect.any(Date), [], 200000);
+    expect(convertDataToRaceState).toHaveBeenCalledWith(round1EventId, expect.any(Date), [], 200000);
     expect(result).toBe(converted);
   });
 });

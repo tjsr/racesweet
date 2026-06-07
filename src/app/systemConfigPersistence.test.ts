@@ -3,7 +3,14 @@
 import { ElectronJsonSystemConfigPersistence } from './systemConfigPersistence.js';
 import { createDefaultSystemConfiguration } from './systemConfig.js';
 
+const systemConfigTestPath = '../../test/generated/system-config.test.json';
+
 describe('ElectronJsonSystemConfigPersistence', () => {
+  afterEach(() => {
+    delete (window as unknown as { api?: unknown }).api;
+    vi.restoreAllMocks();
+  });
+
   it('returns default config when file does not exist', async () => {
     const requestFileContent = vi.fn(async () => {
       throw new Error('ENOENT: no such file or directory');
@@ -15,7 +22,7 @@ describe('ElectronJsonSystemConfigPersistence', () => {
       requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
     };
 
-    const persistence = new ElectronJsonSystemConfigPersistence('../../src/generated/system-config.json');
+    const persistence = new ElectronJsonSystemConfigPersistence(systemConfigTestPath);
     const loaded = await persistence.load();
 
     expect(loaded).toEqual(createDefaultSystemConfiguration());
@@ -33,7 +40,7 @@ describe('ElectronJsonSystemConfigPersistence', () => {
     };
 
     const onError = vi.fn();
-    const persistence = new ElectronJsonSystemConfigPersistence('../../src/generated/system-config.json', onError);
+    const persistence = new ElectronJsonSystemConfigPersistence(systemConfigTestPath, onError);
     await persistence.load();
 
     expect(onError).not.toHaveBeenCalled();
@@ -49,7 +56,7 @@ describe('ElectronJsonSystemConfigPersistence', () => {
     };
 
     const onError = vi.fn();
-    const persistence = new ElectronJsonSystemConfigPersistence('../../src/generated/system-config.json', onError);
+    const persistence = new ElectronJsonSystemConfigPersistence(systemConfigTestPath, onError);
     const loaded = await persistence.load();
 
     expect(loaded).toEqual(createDefaultSystemConfiguration());
@@ -72,7 +79,7 @@ describe('ElectronJsonSystemConfigPersistence', () => {
       requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
     };
 
-    const persistence = new ElectronJsonSystemConfigPersistence('../../src/generated/system-config.json');
+    const persistence = new ElectronJsonSystemConfigPersistence(systemConfigTestPath);
     const loaded = await persistence.load();
 
     expect(loaded.dataSources).toEqual(configData.dataSources);
@@ -92,7 +99,7 @@ describe('ElectronJsonSystemConfigPersistence', () => {
     };
 
     const onError = vi.fn();
-    const persistence = new ElectronJsonSystemConfigPersistence('../../src/generated/system-config.json', onError);
+    const persistence = new ElectronJsonSystemConfigPersistence(systemConfigTestPath, onError);
 
     await expect(persistence.save(createDefaultSystemConfiguration())).resolves.toBeUndefined();
     expect(onError).toHaveBeenCalledOnce();

@@ -35,11 +35,13 @@ const ensureMatchMedia = (): void => {
 
 describe('RecentRecords integration', () => {
   let container: HTMLDivElement;
+  let originalMatchMedia: typeof window.matchMedia | undefined;
   let root: Root;
 
   useUiConsoleGuards();
 
   beforeEach(() => {
+    originalMatchMedia = window.matchMedia;
     ensureMatchMedia();
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -51,6 +53,11 @@ describe('RecentRecords integration', () => {
       root.unmount();
     });
     container.remove();
+    if (originalMatchMedia) {
+      window.matchMedia = originalMatchMedia;
+    } else {
+      delete (window as unknown as { matchMedia?: unknown }).matchMedia;
+    }
   });
 
   it('selects rider/category on row click and emits changed category from context menu', async () => {

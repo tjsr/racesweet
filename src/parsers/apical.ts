@@ -5,7 +5,7 @@ import {
   type ApicalParticipantViewModel
 } from "../model/apical.ts";
 import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
-import type { EventId, uuid } from "../model/types.js";
+import type { uuid } from "../model/types.js";
 import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
 import { RECORD_TX_CROSSING, type TimeRecord } from "../model/timerecord.js";
 import { assignParticipantNumber, assignTransponder, createParticipantIdFromEventAndCategory } from "../controllers/participant.js";
@@ -18,7 +18,8 @@ import { createEventCategoryIdFromCategoryCode } from "../controllers/category.j
 import { durationStringToMilliseconds } from "./genericTimeParser.js";
 import { inferTransponderFromRaceNumber } from "../controllers/transponder.js";
 import { split } from "../utils.js";
-import { v5 as uuidv5 } from 'uuid';
+import { v5 as uuidv5, validate as validateUuid } from 'uuid';
+import { EventId } from "../model/raceevent.ts";
 
 export const createChipCrossingRecord = (
   lap: ApicalLapByCategoryViewModel,
@@ -26,6 +27,9 @@ export const createChipCrossingRecord = (
   txNo: number,
   eventId: EventId
 ): Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time' | 'eventId'> => {
+  if (!validateUuid(eventId)) {
+    throw new Error(`Invalid eventId provided: ${eventId}`);
+  }
   if (!txNo) {
     throw new Error('Cannot create chip crossing record without transponder number');
   }
@@ -51,6 +55,12 @@ export const participantToLap = (
   lap: ApicalLapByCategoryViewModel,
   inferTransponderNumberRange: number | undefined
 ): EventParticipant => {
+  if (!validateUuid(eventId)) {
+    throw new Error(`Invalid eventId provided: ${eventId}`);
+  }
+  if (!validateUuid(categoryId)) {
+    throw new Error(`Invalid categoryId provided: ${categoryId}`);
+  }
   const epId: EventParticipantId = createParticipantIdFromEventAndCategory(eventId, categoryId, lap.RaceNumber);
 
   const txNo = inferTransponderNumberRange
@@ -66,6 +76,12 @@ export const createEntrantFromLap = (
   participantId: EventParticipantId,
   txNo: number | undefined
 ): EventParticipant => {
+  if (!validateUuid(participantId)) {
+    throw new Error(`Invalid participantId provided: ${participantId}`);
+  }
+  if (!validateUuid(categoryId)) {
+    throw new Error(`Invalid categoryId provided: ${categoryId}`);
+  }
   const nameParts = split(lap.FullName, ' ', 1);
   if (nameParts.length < 2) {
     throw new Error(`Participant name "${lap.FullName}" does not contain both first and last name.`);
@@ -83,12 +99,19 @@ export const createEntrantFromLap = (
   }
   return ep as EventParticipant;
 };
+
 export const getUniqueParticipantsFromLapCategoryViewModels = (
   lapCategoryViewModels: ApicalLapByCategoryViewModel[],
   eventId: EventId,
   categoryId: EventCategoryId,
   inferTransponderNumberRange?: number
 ): EventParticipant[] => {
+  if (!validateUuid(eventId)) {
+    throw new Error(`Invalid eventId provided: ${eventId}`);
+  }
+  if (!validateUuid(categoryId)) {
+    throw new Error(`Invalid categoryId provided: ${categoryId}`);
+  }
   if (!lapCategoryViewModels || lapCategoryViewModels.length === 0) {
     return [];
   }
@@ -114,6 +137,12 @@ export const convertLapCategoryViewModelToChipCrossing = (
   eventStartTime: Date,
   inferTransponderNumberRange: number
 ): Pick<ChipCrossingData, 'participantId' | 'eventId'> & ReturnType<typeof createChipCrossingRecord> => {
+  if (!validateUuid(eventId)) {
+    throw new Error(`Invalid eventId provided: ${eventId}`);
+  }
+  if (!validateUuid(categoryId)) {
+    throw new Error(`Invalid categoryId provided: ${categoryId}`);
+  }
   const epId: EventParticipantId = createParticipantIdFromEventAndCategory(eventId, categoryId, lap.RaceNumber);
   const txNo = inferTransponderFromRaceNumber(lap.RaceNumber, inferTransponderNumberRange);
   const crossing: Pick<ChipCrossingData, 'participantId' | 'eventId'> & ReturnType<typeof createChipCrossingRecord> = createChipCrossingRecord(lap, eventStartTime, txNo, eventId);
@@ -128,7 +157,14 @@ export const getChipCrossingsFromLapCategoryViewModels = (
   categoryId: EventCategoryId,
   eventStartTime: Date,
   inferTransponderNumberRange: number
-): ReturnType<typeof convertLapCategoryViewModelToChipCrossing>[] => lapCategoryViewModels.map(
+): ReturnType<typeof convertLapCategoryViewModelToChipCrossing>[] => {
+    if (!validateUuid(eventId)) {
+    throw new Error(`Invalid eventId provided: ${eventId}`);
+  }
+  if (!validateUuid(categoryId)) {
+    throw new Error(`Invalid categoryId provided: ${categoryId}`);
+  }
+  return lapCategoryViewModels.map(
   (lap: ApicalLapByCategoryViewModel) => convertLapCategoryViewModelToChipCrossing(
     lap,
     eventId,
@@ -136,6 +172,7 @@ export const getChipCrossingsFromLapCategoryViewModels = (
     eventStartTime,
     inferTransponderNumberRange
   ));
+};
 
 export const convertLapCategoryViewModelsForEntrant = (
   lapCategoryViewModels: ApicalLapByCategoryViewModel[],
@@ -144,6 +181,12 @@ export const convertLapCategoryViewModelsForEntrant = (
   eventStartTime: Date,
   inferTransponderNumberRange?: number
 ): { participants: EventParticipant[]; records?: Partial<ChipCrossingData>[]; } => {
+  if (!validateUuid(eventId)) {
+    throw new Error(`Invalid eventId provided: ${eventId}`);
+  }
+  if (!validateUuid(categoryId)) {
+    throw new Error(`Invalid categoryId provided: ${categoryId}`);
+  }
   const participants: EventParticipant[] = getUniqueParticipantsFromLapCategoryViewModels(
     lapCategoryViewModels,
     eventId,
@@ -176,6 +219,12 @@ export const apiParticipantEntrantToEntrantData = (
   eventStartTime: Date | undefined,
   inferTransponderNumberRange?: number
 ): { team?: EventTeam; participants: EventParticipant[]; records?: Partial<ChipCrossingData>[]; } => {
+  if (!validateUuid(eventId)) {
+    throw new Error(`Invalid eventId provided: ${eventId}`);
+  }
+  if (!validateUuid(categoryId)) {
+    throw new Error(`Invalid categoryId provided: ${categoryId}`);
+  }
   const teamName = entrant.TeamNameDisplay || '';
 
   let team: EventTeam | undefined;
@@ -217,11 +266,16 @@ export const convertDataToRaceState = (
   data: ApicalLapByCategory,
   inferTransponderNumberRange?: number
 ): Partial<RaceState> => {
+  if (validateUuid(eventId) === false) {
+    throw new Error(`Invalid eventId provided: ${eventId}`);
+  }
   const categoriesMap: Map<EventCategoryId, EventCategory> = new Map<EventCategoryId, EventCategory>();
 
   const records: TimeRecord[] = [];
   const participants: EventParticipant[] = [];
   const teams: EventTeam[] = [];
+  assert(data != null);
+  assert(eventId);
   const source: uuid = uuidv5(data.toString(), eventId);
   let sequence = 1;
 
