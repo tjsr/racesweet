@@ -4,6 +4,11 @@ import { TZDate } from "@date-fns/tz/date";
 import { parseableDateTimeStrings } from "./parseableDateTimeStrings.js";
 
 describe("splitDateTime", () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
   it('Should allow a string with a time only, and infer the date as today', () => {
     const testInput = '19:21:17.533';
     expect(() => splitDateTime(testInput)).toThrowError();

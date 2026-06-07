@@ -6,6 +6,11 @@ import { TZDate } from '@date-fns/tz';
 describe('tryParseDateTime', () => {
   const refDate = new TZDate('2023-01-01T00:00:00.000+1100'); // Reference date for timezone
 
+  beforeEach(() => {
+    vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+
   const testCases = [
     { expected: new Date('2023-12-31T23:59:59.999Z'), format: 'dd/MM/yyyy', input: '31/12/2023 23:59:59.999' },
     { expected: new Date('2023-12-31T23:59:59.999Z'), format: 'MM/dd/yyyy', input: '12/31/2023 23:59:59.999' },

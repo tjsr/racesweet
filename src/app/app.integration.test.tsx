@@ -225,6 +225,10 @@ describe('RaceSweetMainApp integration', () => {
   });
 
   beforeEach(() => {
+    vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);

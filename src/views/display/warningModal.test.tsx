@@ -4,10 +4,13 @@ import { type Root, createRoot } from 'react-dom/client';
 import React from 'react';
 import { WarningModal } from './warningModal.js';
 import { act } from 'react';
+import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 
 describe('WarningModal', () => {
   let container: HTMLDivElement;
   let root: Root;
+
+  useUiConsoleGuards();
 
   beforeEach(() => {
     container = document.createElement('div');

@@ -14,6 +14,7 @@ describe('ElectronJsonRaceAdminPersistence', () => {
   });
 
   it('returns default admin changes when admin-overrides file does not exist', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const requestFileContent = vi.fn(async () => {
       throw new Error('ENOENT: no such file or directory');
     });
@@ -30,9 +31,11 @@ describe('ElectronJsonRaceAdminPersistence', () => {
     const loaded = await persistence.load();
 
     expect(loaded).toEqual(createDefaultAdministrativeChanges());
+    expect(infoSpy).toHaveBeenCalledOnce();
   });
 
   it('does not call onError when file is not found (ENOENT)', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const requestFileContent = vi.fn(async () => {
       throw new Error('ENOENT: no such file or directory');
     });
@@ -50,9 +53,11 @@ describe('ElectronJsonRaceAdminPersistence', () => {
     await persistence.load();
 
     expect(onError).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalledOnce();
   });
 
   it('calls onError and returns defaults when file content is invalid JSON', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const requestFileContent = vi.fn(async () => 'not valid json{{{');
 
     (window as unknown as {
@@ -69,6 +74,7 @@ describe('ElectronJsonRaceAdminPersistence', () => {
 
     expect(loaded).toEqual(createDefaultAdministrativeChanges());
     expect(onError).toHaveBeenCalledOnce();
+    expect(errorSpy).toHaveBeenCalledOnce();
   });
 
   it('returns parsed admin changes when file exists', async () => {
@@ -97,6 +103,7 @@ describe('ElectronJsonRaceAdminPersistence', () => {
   });
 
   it('reports save permission errors without throwing', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const writeFileContent = vi.fn(async () => {
       throw new Error('EACCES: permission denied');
     });
@@ -114,5 +121,6 @@ describe('ElectronJsonRaceAdminPersistence', () => {
 
     await expect(persistence.save(createDefaultAdministrativeChanges())).resolves.toBeUndefined();
     expect(onError).toHaveBeenCalledOnce();
+    expect(warnSpy).toHaveBeenCalledOnce();
   });
 });

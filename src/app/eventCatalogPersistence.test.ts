@@ -12,6 +12,7 @@ describe('ElectronJsonEventCatalogPersistence', () => {
   });
 
   it('returns default ledger when file does not exist', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const requestFileContent = vi.fn(async () => {
       throw new Error('ENOENT: no such file or directory');
     });
@@ -26,9 +27,11 @@ describe('ElectronJsonEventCatalogPersistence', () => {
     const loaded = await persistence.load();
 
     expect(loaded).toEqual(createDefaultEventCatalogLedger());
+    expect(infoSpy).toHaveBeenCalledOnce();
   });
 
   it('does not call onError when file is not found (ENOENT)', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const requestFileContent = vi.fn(async () => {
       throw new Error('ENOENT: no such file or directory');
     });
@@ -44,9 +47,11 @@ describe('ElectronJsonEventCatalogPersistence', () => {
     await persistence.load();
 
     expect(onError).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalledOnce();
   });
 
   it('calls onError and returns defaults when file content is invalid JSON', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const requestFileContent = vi.fn(async () => 'not valid json{{{');
 
     (window as unknown as {
@@ -61,6 +66,7 @@ describe('ElectronJsonEventCatalogPersistence', () => {
 
     expect(loaded).toEqual(createDefaultEventCatalogLedger());
     expect(onError).toHaveBeenCalledOnce();
+    expect(errorSpy).toHaveBeenCalledOnce();
   });
 
   it('returns parsed ledger when file exists and is valid', async () => {
@@ -85,6 +91,7 @@ describe('ElectronJsonEventCatalogPersistence', () => {
   });
 
   it('reports save permission errors without throwing', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const writeFileContent = vi.fn(async () => {
       throw new Error('EPERM: operation not permitted');
     });
@@ -100,6 +107,7 @@ describe('ElectronJsonEventCatalogPersistence', () => {
 
     await expect(persistence.save(createDefaultEventCatalogLedger())).resolves.toBeUndefined();
     expect(onError).toHaveBeenCalledOnce();
+    expect(warnSpy).toHaveBeenCalledOnce();
   });
 
   it('writes the event catalog ledger to the configured event data file', async () => {

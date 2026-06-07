@@ -20,6 +20,9 @@ const _timeToExpectation = (time: Date) => {
 
 describe('Read in a full outreach file', () => {
   it('should parse the file correctly', { timeout: 10000 }, async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
     const dataFile = '192.168.1.119 2025-03-03.txt';
     let filePath = path.join(testdata_dir, dataFile);
     if (filePath.startsWith('\\')) {
@@ -29,7 +32,6 @@ describe('Read in a full outreach file', () => {
     //   base: '192.168.1.119 2025-03-03.txt',
     //   dir: testdata_dir,
     // });
-    console.log(filePath);
     const data = await parseFile(filePath, new Date('2025-03-03T00:00:00Z'));
     expect(data.length).toBe(23624);
   });

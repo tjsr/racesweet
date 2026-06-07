@@ -1,14 +1,24 @@
 import { defineConfig } from 'vitest/config';
+import { failOnStderrReporter } from './src/testing/failOnStderrReporter';
 
 export default defineConfig({
 	test: {
 		// Setup
 		setupFiles: ['./vitest.chdir.mts'],
+		sequence: {
+			setupFiles: 'list',
+		},
 		clearMocks: true,
 		globals: true,
 		include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
 		exclude: [ 'node_modules', '.git', '**/*.git' ],
 		environment: 'node', // Use 'jsdom' if you're testing browser-based code,
+		onConsoleLog: (_log, type) => {
+			if (type === 'stderr') {
+				return false;
+			}
+		},
+		reporters: ['default', failOnStderrReporter()],
 		threads: false, // Disable threads for debugging
 		restoreMocks: true,
 		unstubGlobals: true,

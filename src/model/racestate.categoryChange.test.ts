@@ -130,6 +130,7 @@ describe('Session category change regressions', () => {
   });
 
   it('demonstrates why rebuilding Session after category change breaks lap display caches', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const fixture = await createSessionWithProcessedLaps();
 
     fixture.session.updateParticipantCategory(fixture.participant1Id, fixture.categoryBId);
@@ -143,5 +144,6 @@ describe('Session category change regressions', () => {
 
     expect(rebuiltSession.getParticipantLaps(fixture.participant1Id)).toBeUndefined();
     expect(rebuiltSession.getParticipantLaps(fixture.participant2Id)).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledTimes(2);
   });
 });

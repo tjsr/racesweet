@@ -142,6 +142,7 @@ describe('containsDate', () => {
 
 describe('formatDate', () => {
   it('Should format date from multiple input types', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const inputs: string[]  = [
       '2023-10-01',
       '2023/10/01',
@@ -163,6 +164,7 @@ describe('formatDate', () => {
       console.log(`Formatted date: ${result} for ${testInput}`);
       expect(result, `Got incorrect output ${result} from ${testInput}`).toEqual('2023-10-01');
     });
+    expect(logSpy).toHaveBeenCalledTimes(inputs.length);
   });
 
   it('Should handle invalid date format', () => {

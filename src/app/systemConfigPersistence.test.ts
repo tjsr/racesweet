@@ -12,6 +12,7 @@ describe('ElectronJsonSystemConfigPersistence', () => {
   });
 
   it('returns default config when file does not exist', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const requestFileContent = vi.fn(async () => {
       throw new Error('ENOENT: no such file or directory');
     });
@@ -26,9 +27,11 @@ describe('ElectronJsonSystemConfigPersistence', () => {
     const loaded = await persistence.load();
 
     expect(loaded).toEqual(createDefaultSystemConfiguration());
+    expect(infoSpy).toHaveBeenCalledOnce();
   });
 
   it('does not call onError when file is not found (ENOENT)', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const requestFileContent = vi.fn(async () => {
       throw new Error('ENOENT: no such file or directory');
     });
@@ -44,9 +47,11 @@ describe('ElectronJsonSystemConfigPersistence', () => {
     await persistence.load();
 
     expect(onError).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalledOnce();
   });
 
   it('calls onError and returns defaults when file content is invalid JSON', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const requestFileContent = vi.fn(async () => 'not valid json{{{');
 
     (window as unknown as {
@@ -61,6 +66,7 @@ describe('ElectronJsonSystemConfigPersistence', () => {
 
     expect(loaded).toEqual(createDefaultSystemConfiguration());
     expect(onError).toHaveBeenCalledOnce();
+    expect(errorSpy).toHaveBeenCalledOnce();
   });
 
   it('returns parsed config when file exists and is valid', async () => {
@@ -88,6 +94,7 @@ describe('ElectronJsonSystemConfigPersistence', () => {
   });
 
   it('reports save permission errors without throwing', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const writeFileContent = vi.fn(async () => {
       throw new Error('EACCES: access is denied');
     });
@@ -103,5 +110,6 @@ describe('ElectronJsonSystemConfigPersistence', () => {
 
     await expect(persistence.save(createDefaultSystemConfiguration())).resolves.toBeUndefined();
     expect(onError).toHaveBeenCalledOnce();
+    expect(warnSpy).toHaveBeenCalledOnce();
   });
 });

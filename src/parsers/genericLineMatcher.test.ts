@@ -6,6 +6,11 @@ import { parseDateTime } from "./genericLineMatcher.js";
 
 describe('parseDateTime', () => {
   const msTimeFormat = 'HH:mm:ss.SSS';
+
+  beforeEach(() => {
+    vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+  });
+
   it('Should parse a time only', () => {
     const dateHint = TZDate.tz(getUserTimezone());
     const chipLine = '1245,19:11:06.405';

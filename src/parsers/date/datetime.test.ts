@@ -12,6 +12,11 @@ import { formatRFC3339 } from "date-fns";
 
 const dateHint: TZDate = new TZDate();
 
+beforeEach(() => {
+  vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+});
+
 describe('hasDateAndTime', () => {
   it('Should match for string with a T separator', () => {
     const testInput = '2023-10-01T12:00:00';

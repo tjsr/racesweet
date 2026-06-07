@@ -1,4 +1,7 @@
 import { afterEach, vi } from "vitest";
+import { useStderrGuard } from './src/testing/stderrGuard';
+
+useStderrGuard();
 
 // Polyfill ResizeObserver for jsdom environments (not provided by jsdom)
 if (typeof globalThis.ResizeObserver === 'undefined') {
