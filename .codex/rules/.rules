@@ -15,3 +15,15 @@ prefix_rule(
   decision = "allow",
   justification = "Allow interrogation of files."
 )
+
+prefix_rule(
+  pattern = [ "npm", "run", "test" ]
+  decision = "allow",
+  justification = "Allow running tests."
+)
+
+prefix_rule(
+  pattern = [ "npm", "test" ]
+  decision = "allow",
+  justification = "Allow running tests."
+)
