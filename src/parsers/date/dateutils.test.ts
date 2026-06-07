@@ -47,7 +47,7 @@ describe('timeToLocal', () => {
     const localDate: Date = timeToLocal(date);
     expect(localDate).not.toBe(date);
     expect(localDate).toEqual(date);
-    expect(localDate.getTimezoneOffset()).toEqual(date.getTimezoneOffset());
+    expect(localDate.getTimezoneOffset() === date.getTimezoneOffset()).toBe(true);
   });
 });
 

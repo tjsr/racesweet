@@ -8,6 +8,28 @@ import { timeToLocal } from "./dateutils.js";
 export const timeStringHasTimezone = (time: string): boolean =>
   time?.includes('Z') || /[+-]\d{2}:\d{2}/.test(time ?? '');
 
+const parseWithTimezoneHint = (input: string, timezone: string): TZDate => {
+  const dateParts = input.match(
+    /^(?<year>\d{4})[-/](?<month>\d{1,2})[-/](?<day>\d{1,2})[\sT](?<hour>\d{1,2}):(?<minute>\d{1,2})(?::(?<second>\d{1,2})(?:\.(?<millisecond>\d{1,3}))?)?$/
+  );
+
+  if (!dateParts?.groups) {
+    return new TZDate(input, timezone);
+  }
+
+  const { day, hour, millisecond, minute, month, second, year } = dateParts.groups;
+  return new TZDate(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second ?? 0),
+    Number((millisecond ?? '0').padEnd(3, '0')),
+    timezone,
+  );
+};
+
 export const splitDateTime = (input: string, tzhint?: string): { isoDate?: Date; date: string; time: string; } => {
   if (!input) {
     throw new Error("Input cannot be empty");
@@ -22,7 +44,9 @@ export const splitDateTime = (input: string, tzhint?: string): { isoDate?: Date;
   const datePortionIsIso = /^\d{4}[-/T]/.test(input);
 
   if (datePortionIsIso || hasInputTz || tzhint !== undefined) {
-    const isoDate = new TZDate(input, hasInputTz ? undefined : tzhint);
+    const isoDate = !hasInputTz && tzhint
+      ? parseWithTimezoneHint(input, tzhint)
+      : new TZDate(input, hasInputTz ? undefined : tzhint);
     if (!isNaN(isoDate.getTime())) {
       console.log('Returning acceptable ISO time.', input, isoDate);
       const outputInUtc = hasInputTz || tzhint !== undefined;

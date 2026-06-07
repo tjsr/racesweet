@@ -29,20 +29,20 @@ describe("splitDateTime", () => {
 
   it ('Should produce a default time value in the UTC timezone', () => {
     const str = '2025-03-01 11:11:45.451';
-    const result = splitDateTime(str, TZDate.tz('UTC').toISOString());
+    const result = splitDateTime(str, TZDate.tz('UTC').timeZone);
 
-    expect(result.time, `Input string: ${str}`).toEqual('00:11:45.451Z');
+    expect(result.time, `Input string: ${str}`).toEqual('11:11:45.451Z');
   });
 
   it ('Should produce a specified time value in a set timezone', () => {
     const str = '2025-03-01 11:11:45.451+08:00';
-    const result = splitDateTime(str, TZDate.tz('UTC').toISOString());
+    const result = splitDateTime(str, TZDate.tz('UTC').timeZone);
     expect(result.time, `Input string: ${str}`).toEqual('03:11:45.451Z');
   });
 
   it ('Should produce a UTC time value', () => {
     const str = '2025-03-01 11:11:45.451Z';
-    const result = splitDateTime(str, TZDate.tz('UTC').toISOString());
+    const result = splitDateTime(str, TZDate.tz('UTC').timeZone);
     expect(result.time, `Input string: ${str}`).toEqual('11:11:45.451Z');
   });
 
