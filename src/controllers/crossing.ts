@@ -6,6 +6,7 @@ import type { ChipCrossingData } from "../model/chipcrossing.js";
 import type { EventCategory } from "../model/eventcategory.js";
 import type { PlateCrossingData } from "../model/platecrossing.js";
 import type { TimeRecord } from "../model/timerecord.js";
+import assert from "node:assert/strict";
 import { validateCategoriesToCreate } from '../validators/categories.ts';
 
 export const assignEntrantToPlateCrossing = (

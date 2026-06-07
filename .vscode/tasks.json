@@ -22,6 +22,39 @@
       "detail": "Watches TypeScript files for changes"
     },
     {
+      "label": "electron: serve",
+      "type": "shell",
+      "command": "npm run serve",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "electron-forge",
+        "pattern": {
+          "regexp": "."
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Webpack Output Available|Launching Application|Compiled successfully"
+        }
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always"
+      },
+      "detail": "Starts Electron Forge so main, preload, renderer assets, and the dev asset server are available"
+    },
+    {
+      "label": "electron: wait for assets",
+      "type": "shell",
+      "command": "npm run wait:electron-assets",
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always"
+      },
+      "detail": "Waits until the Electron Forge webpack dev asset server is responding"
+    },
+    {
       "label": "clear-terminal",
       "type": "shell",
       "command": "cls",

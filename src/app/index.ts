@@ -1,4 +1,8 @@
+import './runtimeSourceMaps.ts';
+
 import { BrowserWindow, app, dialog, ipcMain, session } from 'electron';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
@@ -10,10 +14,8 @@ import {
 } from '../model/electronIpc';
 import { buildContentSecurityPolicy, injectContentSecurityPolicyHeader } from './contentSecurityPolicy';
 import { injectCorsHeaders, isApicalApiUrl } from './electron/corsHeaders';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { waitForContentServer, waitForWindowContentLoad } from './startupContentServer';
 import type { SelectLocalFileOptions } from './window';
-
-import path from 'node:path';
 
 const __dirname = path.dirname(__filename);
 
@@ -66,12 +68,22 @@ const configureSecurityHeaders = (): void => {
   });
 };
 
-const createWindow = (): void => {
+const showStartupError = (error: Error): void => {
+  const detail = error.stack ?? error.message;
+
+  console.error(`RaceSweet startup failed: ${detail}`);
+  dialog.showErrorBox('RaceSweet startup failed', error.message);
+};
+
+const createWindow = async (): Promise<void> => {
+  await waitForContentServer(MAIN_WINDOW_WEBPACK_ENTRY);
+
   configureSecurityHeaders();
 
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     height: 600,
+    show: false,
     webPreferences: {
       contextIsolation: false,
       nodeIntegration: true,
@@ -80,13 +92,19 @@ const createWindow = (): void => {
     width: 1024,
   });
 
-  mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+  await waitForWindowContentLoad(mainWindow, MAIN_WINDOW_WEBPACK_ENTRY);
+  mainWindow.show();
 };
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
+app.on('ready', () => {
+  createWindow().catch((error: Error) => {
+    showStartupError(error);
+    app.quit();
+  });
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -101,7 +119,10 @@ app.on('activate', (): void => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
+    createWindow().catch((error: Error) => {
+      showStartupError(error);
+      app.quit();
+    });
   }
 });
 

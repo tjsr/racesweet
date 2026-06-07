@@ -1,33 +1,30 @@
-import { RACESWEET_SERVER_PORT_ENV, getRaceSweetServerPort } from './serverPort.ts';
-import path from 'node:path';
 import { spawn } from 'node:child_process';
 
-const electronForgeCli = path.join(
-  process.cwd(),
-  'node_modules',
-  '@electron-forge',
-  'cli',
-  'dist',
-  'electron-forge.js'
-);
+import {
+  buildElectronForgeArgs,
+  createElectronForgeEnv,
+  describeElectronForgeSpawnError,
+  ensureElectronForgeCliAvailable,
+  getElectronForgeCliPath
+} from './electronForgeStartup.ts';
+import { getRaceSweetServerPort } from './serverPort.ts';
 
 const start = async (): Promise<void> => {
   const port = getRaceSweetServerPort();
+  const electronForgeCli = getElectronForgeCliPath();
   const electronArgs = process.argv.slice(2);
-  const forgeArgs = ['start'];
+  const forgeArgs = buildElectronForgeArgs(electronArgs);
 
-  if (electronArgs.length > 0) {
-    forgeArgs.push('--', ...electronArgs);
-  }
-
+  await ensureElectronForgeCliAvailable(electronForgeCli);
   console.log(`Starting Electron Forge webpack dev server on port ${port}`);
 
   const child = spawn(process.execPath, [electronForgeCli, ...forgeArgs], {
-    env: {
-      ...process.env,
-      [RACESWEET_SERVER_PORT_ENV]: String(port),
-    },
+    env: createElectronForgeEnv(port),
     stdio: 'inherit',
+  });
+
+  child.once('spawn', () => {
+    console.log(`Electron Forge process started. Waiting for webpack content server on port ${port}`);
   });
 
   child.on('exit', (code, signal) => {
@@ -39,7 +36,7 @@ const start = async (): Promise<void> => {
   });
 
   child.on('error', (error) => {
-    console.error(error);
+    console.error(describeElectronForgeSpawnError(error, electronForgeCli, port));
     process.exit(1);
   });
 };

@@ -30,8 +30,8 @@
     "name": "Electron Main",
     "type": "node",
     "request": "launch",
-    "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron-forge",
-    "args": ["start"],
+    "runtimeExecutable": "npm",
+    "runtimeArgs": ["run", "serve"],
     "env": {
       "NODE_ENV": "development",
       "ELECTRON_ENABLE_LOGGING": "1"
@@ -55,6 +55,7 @@
     "name": "Electron Renderer",
     "request": "launch",
     "type": "chrome",
+    "preLaunchTask": "electron: serve",
     "url": "${env:DEBUG_RENDERER_URL:http://localhost:3488}",
     "webRoot": "${workspaceFolder}/src",
     "sourceMapPathOverrides": {
@@ -62,34 +63,18 @@
     }
   },
   {
-    "name": "Electron All",
+    "name": "Electron Renderer Attach",
     "request": "launch",
-    "type": "node",
-    "program": "${workspaceFolder}/main.js",
-    "runtimeExecutable": "electron",
-    "runtimeArgs": [
-      "."
-    ],
-    "windows": {
-      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron.cmd"
+    "type": "chrome",
+    "preLaunchTask": "electron: wait for assets",
+    "url": "${env:DEBUG_RENDERER_URL:http://localhost:3488}",
+    "webRoot": "${workspaceFolder}/src",
+    "sourceMapPathOverrides": {
+      "webpack://*/*": "*"
     },
-    "linux": {
-      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron"
-    },
-    "osx": {
-      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron"
-    },
-    "env": {
-      "NODE_ENV": "development"
-    },
-    "sourceMaps": true,
-    "outFiles": [
-      "${workspaceFolder}/**/*.js"
-    ],
-    "skipFiles": [
-      "<node_internals>/**"
-    ],
-    "console": "integratedTerminal"
+    "presentation": {
+      "hidden": true
+    }
   },
   {
     "type": "node",
@@ -125,6 +110,13 @@
     ],
     "console": "integratedTerminal",
     "preLaunchTask": "clear-terminal"
-  } 
+  }
+  ],
+  "compounds": [
+    {
+      "name": "Electron All",
+      "configurations": ["Electron Main", "Electron Renderer Attach"],
+      "stopAll": true
+    }
   ]
 }

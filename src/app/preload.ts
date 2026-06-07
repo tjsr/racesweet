@@ -1,3 +1,4 @@
+import './runtimeSourceMaps.ts';
 import './state.ts';
 
 import { FileReadDataType, SelectLocalFileOptions } from './window.ts';

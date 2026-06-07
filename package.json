@@ -15,7 +15,8 @@
   "vite.main": ".vite/build/main.js",
   "scripts": {
     "build": "npm run types && npm run compile && npm run test && npm run lint",
-    "compile": "tsc && babel index.mjs -d build",
+    "compile": "tsc && npm run compile:electron && babel index.mjs -d build",
+    "compile:electron": "electron-forge package",
     "clean": "rimraf src/generated build dist",
     "generate:handicaps": "tsx ./src/utils/apical/apicalTest.mts",
     "generate:handicaps:force-refresh": "tsx ./src/utils/apical/apicalTest.mts --force-refresh",
@@ -32,7 +33,8 @@
     "test:timezone": "node ./scripts/runTimezoneTests.mjs",
     "test:timezone:docker": "docker build --target timezone-test -f Dockerfile.timezone-test .",
     "test:table": "tsx ./src/printCrossings.ts",
-    "types": "mkdirp src/generated/typebox && ts2typebox --input src/model/index.ts --output src/generated/typebox/index.ts"
+    "types": "mkdirp src/generated/typebox && ts2typebox --input src/model/index.ts --output src/generated/typebox/index.ts",
+    "wait:electron-assets": "tsx ./src/app/waitForElectronAssets.ts"
   },
   "devDependencies": {
     "@babel/cli": "^7.29.7",

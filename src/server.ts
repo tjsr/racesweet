@@ -77,6 +77,7 @@ const server = createServer((req, res) => {
   }
 });
 
+console.log(`Starting server on port $PORT...`);
 server.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);
 });
