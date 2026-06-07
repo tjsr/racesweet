@@ -1,7 +1,8 @@
-import type { Reporter, UserConsoleLog } from 'vitest/reporters';
+import type { Reporter } from 'vitest/reporters';
+import { UserConsoleLog } from 'vitest';
 
 const formatEntityName = (log: UserConsoleLog): string => {
-  const name = log.task?.name || log.origin || log.filename;
+  const name = log.origin;
   return name ? ` in ${name}` : '';
 };
 

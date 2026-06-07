@@ -15,10 +15,10 @@ describe('failOnStderrReporter', () => {
       content: 'bad output',
       task: { name: 'noisy test' },
       type: 'stderr',
-    } as Parameters<NonNullable<typeof reporter.onUserConsoleLog>>[0]);
+    } as unknown as Parameters<NonNullable<typeof reporter.onUserConsoleLog>>[0]);
 
     expect(process.exitCode).toBe(1);
-    expect(writeSpy).toHaveBeenCalledWith('Unexpected stderr output in noisy test:\nbad output\n');
+    expect(writeSpy).toHaveBeenCalledWith('Unexpected stderr output:\nbad output\n');
   });
 
   it('ignores stdout', () => {
@@ -29,7 +29,7 @@ describe('failOnStderrReporter', () => {
       content: 'debug output',
       task: { name: 'chatty test' },
       type: 'stdout',
-    } as Parameters<NonNullable<typeof reporter.onUserConsoleLog>>[0]);
+    } as unknown as Parameters<NonNullable<typeof reporter.onUserConsoleLog>>[0]);
 
     expect(process.exitCode).toBe(originalExitCode);
     expect(writeSpy).not.toHaveBeenCalled();
