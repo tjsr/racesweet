@@ -1,9 +1,4 @@
-import process from "process";
-import { vi } from "vitest";
-
-// const pathValue = new URL(".", import.meta.url).pathname;
-// const pathValue = new URL(".", __filename).pathname;
-// vi.spyOn(process, "cwd").mockReturnValue(pathValue);
+import { afterEach, vi } from "vitest";
 
 // Polyfill ResizeObserver for jsdom environments (not provided by jsdom)
 if (typeof globalThis.ResizeObserver === 'undefined') {
@@ -12,4 +7,26 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     unobserve() {}
     disconnect() {}
   };
+}
+
+if (typeof document !== 'undefined') {
+  // Mock matchMedia for jsdom environments (not provided by jsdom)
+  if (typeof window.matchMedia === 'undefined') {
+    window.matchMedia = () => ({
+      matches: false,
+      media: '',
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => true,
+    });
+  }
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+    delete (window as any).api;
+  });
 }
