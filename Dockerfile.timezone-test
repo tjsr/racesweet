@@ -1,4 +1,4 @@
-FROM node:24-bookworm AS timezone-test
+FROM node:24-bookworm-slim AS timezone-test
 
 WORKDIR /app
 
