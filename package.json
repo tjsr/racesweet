@@ -14,7 +14,8 @@
   "old.main": "index.mjs",
   "vite.main": ".vite/build/main.js",
   "scripts": {
-    "build": "babel index.mjs -d build",
+    "build": "npm run types && npm run compile && npm run test && npm run lint",
+    "compile": "tsc && babel index.mjs -d build",
     "clean": "rimraf src/generated build dist",
     "generate:handicaps": "tsx ./src/utils/apical/apicalTest.mts",
     "generate:handicaps:force-refresh": "tsx ./src/utils/apical/apicalTest.mts --force-refresh",
