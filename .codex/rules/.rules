@@ -1,0 +1,17 @@
+prefix_rule(
+  pattern = [ "Get-Childitem" ]
+  decision = "allow",
+  justification = "Allow reading filesystem structure."
+)
+
+prefix_rule(
+  pattern = [ "Get-Content" ]
+  decision = "allow",
+  justification = "Allow reading file contents."
+)
+
+prefix_rule(
+  pattern = [ "rg" ]
+  decision = "allow",
+  justification = "Allow interrogation of files."
+)
