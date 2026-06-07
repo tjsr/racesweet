@@ -10,7 +10,7 @@ import {
 import { v1 as randomUUID, v5 as uuidv5 } from 'uuid';
 
 import { CategoryNotFoundError } from "../model/eventcategory.js";
-import type { EventId } from "../model/types.js";
+import { EventId } from "../model/raceevent.ts";
 import type { GreenFlagRecord } from "../model/flag.js";
 import type { ParticipantPassingRecord } from "../model/timerecord.js";
 import { ParticipantSpreadsheetError } from "../model/errors.js";

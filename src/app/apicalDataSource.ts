@@ -1,7 +1,7 @@
 import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
 
 import type { ApicalLapByCategory } from '../model/apical.js';
-import { EventId } from '../model/types.js';
+import { EventId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
 

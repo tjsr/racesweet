@@ -1,6 +1,7 @@
-import type { EventId, TimeRecordSourceId, WithId, uuid } from "./types.js";
+import type { TimeRecordSourceId, WithId, uuid } from "./types.js";
 
 import { EventEntrantId } from "./entrant.js";
+import { EventId } from "./raceevent.js";
 import type { EventParticipantId } from "./eventparticipant.js";
 import { v5 as uuidv5 } from "uuid";
 

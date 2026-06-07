@@ -1,7 +1,6 @@
 import type { ApicalEventListResponse, ApicalEventResponseEventData, ApicalLapByCategory } from '../model/apical.ts';
+import type { EventId, RaceEvent } from '../model/raceevent.ts';
 
-import type { EventId } from '../model/types.ts';
-import type { RaceEvent } from '../model/raceevent.ts';
 import type { RaceState } from '../model/racestate.ts';
 import { convertDataToRaceState } from '../parsers/apical.ts';
 import { getApicalEventList } from '../utils/apical/apicalEventList.ts';

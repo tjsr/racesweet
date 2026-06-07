@@ -1,5 +1,5 @@
 import type { ApicalParticipantViewModel } from "../model/apical.js";
-import type { EventId } from "../model/types.js";
+import { EventId } from "../model/raceevent.js";
 import type { EventTeamId } from "../model/eventteam.js";
 import { v5 as uuidv5 } from "uuid";
 
