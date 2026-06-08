@@ -1,5 +1,4 @@
-import { afterEach, vi } from "vitest";
-import { useStderrGuard } from './src/testing/stderrGuard';
+import { useStderrGuard } from './src/testing/stderrGuard.js';
 
 useStderrGuard();
 

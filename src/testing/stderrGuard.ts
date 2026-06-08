@@ -1,5 +1,3 @@
-import { afterEach, beforeEach, expect, vi } from 'vitest';
-
 export const formatStderrWrite = (chunk: unknown): string => {
   if (Buffer.isBuffer(chunk)) {
     return chunk.toString('utf8');
