@@ -267,7 +267,8 @@ export const convertDataToRaceState = (
   data: ApicalLapByCategory,
   inferTransponderNumberRange?: number
 ): Partial<RaceState> => {
-  if (validateUuid(eventId) === false) {
+  if (!validateUuid(eventId)) {
+    console.error('Invalid eventId provided:', eventId);
     throw new Error(`Invalid eventId provided: ${eventId}`);
   }
   const categoriesMap: Map<EventCategoryId, EventCategory> = new Map<EventCategoryId, EventCategory>();

@@ -3,6 +3,7 @@ import { v1 as randomUUID, v5 as uuidv5 } from 'uuid';
 
 import type { DataSourceConfig } from './systemConfig.js';
 import type { EventId } from '../model/raceevent.js';
+import { createEventId } from '../model/ids.js';
 
 const convertDataToRaceState = vi.fn();
 
@@ -152,7 +153,7 @@ describe('apicalDataSource', () => {
     const source = createApicalSource();
     source.apiConfig!.authHeaderValue = '';
 
-    await pullApicalRaceState(source, 'event-2026-round-1');
+    await pullApicalRaceState(source, createEventId());
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]?.[0] || '')).toContain('/raceresult/event/datafile?eventId=301');
@@ -179,7 +180,7 @@ describe('apicalDataSource', () => {
       }))
       .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
 
-    const round1EventId: EventId = uuidv5('event-2026-round-1', uuidv5.URL);
+    const round1EventId: EventId = createEventId();
     const result = await pullApicalRaceState(createApicalSource(), round1EventId);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
