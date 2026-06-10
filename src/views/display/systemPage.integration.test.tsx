@@ -90,6 +90,7 @@ describe('SystemPage integration', () => {
           config={config}
           onCreateSource={onCreateSource}
           onDeleteSource={onDeleteSource}
+          onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
           onSaveSource={onSaveSource}
         />,
@@ -122,6 +123,51 @@ describe('SystemPage integration', () => {
       fetchEventsButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     expect(onLoadApicalEvents).toHaveBeenCalledWith('source-apical');
+
+    const fetchDataButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Fetch event data now');
+    expect(fetchDataButton).toBeDefined();
+  });
+
+  it('dispatches manual Apical data fetches and shows the persisted retrieval timestamp', async () => {
+    const onCreateSource = vi.fn();
+    const onDeleteSource = vi.fn();
+    const onFetchApicalDataNow = vi.fn();
+    const onLoadApicalEvents = vi.fn();
+    const onSaveSource = vi.fn();
+    const retrievedConfig: SystemConfiguration = {
+      ...config,
+      dataSources: [
+        {
+          ...config.dataSources[0]!,
+          dataLastRetrieved: '2026-06-08T09:10:11.123Z',
+        },
+        config.dataSources[1]!,
+      ],
+    };
+
+    await act(async () => {
+      root.render(
+        <SystemPage
+          config={retrievedConfig}
+          onCreateSource={onCreateSource}
+          onDeleteSource={onDeleteSource}
+          onFetchApicalDataNow={onFetchApicalDataNow}
+          onLoadApicalEvents={onLoadApicalEvents}
+          onSaveSource={onSaveSource}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain('Data last retrieved: 2026-06-08T09:10:11.123Z');
+
+    const fetchDataButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Fetch event data now');
+    expect(fetchDataButton).toBeDefined();
+
+    await act(async () => {
+      fetchDataButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onFetchApicalDataNow).toHaveBeenCalledWith('source-apical');
   });
 
   it('shows fetched Apical events in dropdown and saves selected event id', async () => {
@@ -136,6 +182,7 @@ describe('SystemPage integration', () => {
           config={config}
           onCreateSource={onCreateSource}
           onDeleteSource={onDeleteSource}
+          onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
           onSaveSource={onSaveSource}
         />,
@@ -182,6 +229,7 @@ describe('SystemPage integration', () => {
           config={config}
           onCreateSource={onCreateSource}
           onDeleteSource={onDeleteSource}
+          onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
           onSaveSource={onSaveSource}
         />,
@@ -218,6 +266,7 @@ describe('SystemPage integration', () => {
           config={config}
           onCreateSource={onCreateSource}
           onDeleteSource={onDeleteSource}
+          onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
           onSaveSource={onSaveSource}
         />,
@@ -284,6 +333,7 @@ describe('SystemPage integration', () => {
           config={config}
           onCreateSource={onCreateSource}
           onDeleteSource={onDeleteSource}
+          onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
           onSaveSource={onSaveSource}
           onSelectLocalFile={onSelectLocalFile}

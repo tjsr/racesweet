@@ -3,6 +3,7 @@ import { applyPulledRaceStateToSession, getCategoriesToAdd } from './sourceAppli
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { TimeRecord } from '../model/timerecord.js';
+import { isFlagRecord } from '../controllers/flag.js';
 
 const existingCategories: EventCategory[] = [
   {
@@ -62,6 +63,7 @@ describe('sourceApplication', () => {
         addParticipants,
         addRecords,
         categories: existingCategories,
+        records: [],
       },
       {
         categories: incomingCategoriesWithDuplicates,
@@ -93,10 +95,11 @@ describe('sourceApplication', () => {
       applyPulledRaceStateToSession(
         {
           addCategories,
-          addParticipants,
-          addRecords,
-          categories: existingCategories,
-        },
+        addParticipants,
+        addRecords,
+        categories: existingCategories,
+        records: [],
+      },
         {
           categories: incomingCategoriesWithDuplicates,
           participants: [],
@@ -107,5 +110,41 @@ describe('sourceApplication', () => {
 
     expect(addParticipants).toHaveBeenCalledTimes(1);
     expect(addRecords).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds an event start flag before pulled records when the target session has no flags', async () => {
+    const addCategories = vi.fn(async (_categories: EventCategory[]) => null);
+    const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
+    const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
+    const crossing = {
+      chipCode: 200306,
+      eventId: '7b83ad1e-54ba-5f00-9712-1c82d3178640',
+      id: 'crossing-1',
+      recordType: 2,
+      source: 'test-source',
+      time: new Date('2026-06-07T00:01:30.000Z'),
+    } as TimeRecord;
+
+    await applyPulledRaceStateToSession(
+      {
+        addCategories,
+        addParticipants,
+        addRecords,
+        categories: existingCategories,
+        records: [],
+      },
+      {
+        categories: [],
+        eventStartTime: new Date('2026-06-07T00:00:00.000Z'),
+        participants: [],
+        records: [crossing],
+      }
+    );
+
+    const records = addRecords.mock.calls[0]?.[0] || [];
+    expect(records).toHaveLength(2);
+    expect(isFlagRecord(records[0]!)).toBe(true);
+    expect(records[0]?.time?.toISOString()).toBe('2026-06-07T00:00:00.000Z');
+    expect(records[1]).toBe(crossing);
   });
 });

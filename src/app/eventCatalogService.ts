@@ -13,6 +13,15 @@ import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { MasterEntrantProfile } from './systemConfig.js';
+import type { RaceState } from '../model/racestate.js';
+
+interface ApicalCatalogImport {
+  eventDate?: string;
+  eventId: string;
+  eventName: string;
+  raceState: Partial<RaceState>;
+  sessionId: string;
+}
 
 interface EventCatalogServiceOptions {
   onPersistedLedger?: (ledger: EventCatalogLedger) => Promise<void>;
@@ -336,6 +345,82 @@ export class EventCatalogService {
         type: 'event-updated',
       },
     ]);
+  }
+
+  public async importApicalRaceState(importData: ApicalCatalogImport, masterProfiles: MasterEntrantProfile[] = []): Promise<EventCatalogState> {
+    const existingEvent = this.state.events.find((event) => event.id === importData.eventId);
+    const existingSession = this.state.sessions.find((session) => session.id === importData.sessionId);
+    const sessionIds = Array.from(new Set([...(existingEvent?.sessionIds || []), importData.sessionId]));
+    const mutations: EventCatalogLedger['mutations'] = [];
+    const scheduledStart = importData.eventDate ? new Date(importData.eventDate).toISOString() : createTimestamp();
+
+    if (!existingEvent) {
+      mutations.push({
+        event: {
+          categoryIds: [],
+          date: scheduledStart.slice(0, 10),
+          entrantIds: [],
+          format: 'race-weekend',
+          id: importData.eventId,
+          name: importData.eventName,
+          sessionIds,
+        },
+        id: createMutationId(),
+        timestamp: createTimestamp(),
+        type: 'event-created',
+      });
+    } else {
+      mutations.push({
+        changes: {
+          date: scheduledStart.slice(0, 10),
+          name: importData.eventName,
+          sessionIds,
+        },
+        eventId: importData.eventId,
+        id: createMutationId(),
+        timestamp: createTimestamp(),
+        type: 'event-updated',
+      });
+    }
+
+    if (!existingSession) {
+      mutations.push({
+        id: createMutationId(),
+        session: {
+          eventId: importData.eventId,
+          id: importData.sessionId,
+          kind: 'race',
+          name: importData.eventName,
+          notes: 'Imported from Apical data file endpoint.',
+          scheduledStart,
+          status: 'completed',
+        },
+        timestamp: createTimestamp(),
+        type: 'session-created',
+      });
+    } else {
+      mutations.push({
+        changes: {
+          name: importData.eventName,
+          scheduledStart,
+        },
+        id: createMutationId(),
+        sessionId: importData.sessionId,
+        timestamp: createTimestamp(),
+        type: 'session-updated',
+      });
+    }
+
+    if (mutations.length > 0) {
+      await this.appendMutations(mutations);
+    }
+
+    return this.syncEventScaffold(
+      importData.eventId,
+      importData.raceState.categories || [],
+      importData.raceState.participants || [],
+      masterProfiles
+    );
   }
 
   public async createSession(eventId: string): Promise<EventCatalogState> {

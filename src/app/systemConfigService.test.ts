@@ -86,6 +86,42 @@ describe('SystemConfigService', () => {
     expect(persistence.save).toHaveBeenCalled();
   });
 
+  it('persists Apical manual data retrieval time and assigns the fetched event/session source', async () => {
+    const persistence = createPersistence();
+    const service = await SystemConfigService.create(persistence);
+
+    await service.createSource('api-apical-data-file');
+    const sourceId = service.state.dataSources[0]!.id;
+
+    await service.assignSourcesToEvent('event-existing', [sourceId]);
+    await service.persistApicalDataFetch(sourceId, 'event-apical-1001', 'session-apical-1001', '2026-06-08T09:10:11.123Z');
+
+    expect(service.state.dataSources[0]?.dataLastRetrieved).toBe('2026-06-08T09:10:11.123Z');
+    expect(service.state.eventSourceAssignments['event-apical-1001']).toEqual([sourceId]);
+    expect(service.state.sessionSourceAssignments['session-apical-1001']).toEqual({
+      mode: 'specific',
+      sourceIds: [sourceId],
+    });
+    expect(service.state.eventSourceAssignments['event-existing']).toEqual([sourceId]);
+    expect(persistence.save).toHaveBeenLastCalledWith(expect.objectContaining({
+      dataSources: [
+        expect.objectContaining({
+          dataLastRetrieved: '2026-06-08T09:10:11.123Z',
+          id: sourceId,
+        }),
+      ],
+      eventSourceAssignments: expect.objectContaining({
+        'event-apical-1001': [sourceId],
+      }),
+      sessionSourceAssignments: expect.objectContaining({
+        'session-apical-1001': {
+          mode: 'specific',
+          sourceIds: [sourceId],
+        },
+      }),
+    }));
+  });
+
   it('supports master entrant profile sources assigned to events', async () => {
     const persistence = createPersistence();
     const service = await SystemConfigService.create(persistence);

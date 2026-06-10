@@ -160,6 +160,36 @@ export class SystemConfigService {
     return this.updateSource(sourceId, { listedEvents });
   }
 
+  public async persistApicalDataFetch(sourceId: string, eventId: string, sessionId: string, retrievedAt: string): Promise<SystemConfiguration> {
+    const assignedEventSources = this.config.eventSourceAssignments[eventId] || [];
+    this.config = {
+      ...this.config,
+      dataSources: this.config.dataSources.map((source) => {
+        if (source.id !== sourceId) {
+          return source;
+        }
+
+        return {
+          ...source,
+          dataLastRetrieved: retrievedAt,
+        };
+      }),
+      eventSourceAssignments: {
+        ...this.config.eventSourceAssignments,
+        [eventId]: Array.from(new Set([...assignedEventSources, sourceId])),
+      },
+      sessionSourceAssignments: {
+        ...this.config.sessionSourceAssignments,
+        [sessionId]: {
+          mode: 'specific',
+          sourceIds: [sourceId],
+        },
+      },
+    };
+    await this.persist();
+    return this.config;
+  }
+
   private async persist(): Promise<void> {
     const sanitized = {
       ...createDefaultSystemConfiguration(),

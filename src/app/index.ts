@@ -13,7 +13,7 @@ import {
   WriteContentIpcReceiveChannel
 } from '../model/electronIpc';
 import { buildContentSecurityPolicy, injectContentSecurityPolicyHeader } from './contentSecurityPolicy';
-import { injectCorsHeaders, isApicalApiUrl } from './electron/corsHeaders';
+import { injectCorsHeaders, isAllowedCorsDownloadUrl } from './electron/corsHeaders';
 import { waitForContentServer, waitForWindowContentLoad } from './startupContentServer';
 import type { SelectLocalFileOptions } from './window';
 
@@ -56,7 +56,7 @@ const configureSecurityHeaders = (): void => {
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     let responseHeaders = details.responseHeaders ?? {};
-    if (isApicalApiUrl(details.url)) {
+    if (isAllowedCorsDownloadUrl(details.url)) {
       responseHeaders = injectCorsHeaders(responseHeaders);
     }
 

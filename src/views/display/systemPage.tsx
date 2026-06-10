@@ -12,6 +12,7 @@ interface SystemPageProps {
   config: SystemConfiguration;
   onCreateSource: (type: DataSourceType) => void | Promise<void>;
   onDeleteSource: (sourceId: string) => void | Promise<void>;
+  onFetchApicalDataNow: (sourceId: string) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: string) => void | Promise<void>;
   onSaveSource: (sourceId: string, changes: Partial<DataSourceConfig>) => void | Promise<void>;
   onSelectLocalFile?: () => Promise<string | undefined>;
@@ -90,6 +91,26 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
 
     try {
       await props.onLoadApicalEvents(sourceId);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      const detailedMessage = stack ? `${message}\n${stack}` : message;
+      setSourceFetchErrors((current) => ({
+        ...current,
+        [sourceId]: detailedMessage,
+      }));
+    }
+  };
+
+  const handleFetchApicalDataNow = async (sourceId: string): Promise<void> => {
+    setSourceFetchErrors((current) => {
+      const next = { ...current };
+      delete next[sourceId];
+      return next;
+    });
+
+    try {
+      await props.onFetchApicalDataNow(sourceId);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       const stack = error instanceof Error ? error.stack : undefined;
@@ -360,6 +381,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                             Fetch Apical Events
                           </button>
                         </div>
+                        <p>Data last retrieved: {source.dataLastRetrieved || 'Never'}</p>
                         {sourceFetchErrors[source.id] ? (
                           <div className="inline-error" role="alert">
                             <p>Failed to fetch Apical events:</p>
@@ -444,6 +466,11 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                     )}
 
                     <div className="events-actions">
+                      {isApicalApi ? (
+                        <button type="button" onClick={() => handleFetchApicalDataNow(source.id)}>
+                          Fetch event data now
+                        </button>
+                      ) : null}
                       <button type="button" onClick={() => props.onDeleteSource(source.id)}>
                         Delete Source
                       </button>

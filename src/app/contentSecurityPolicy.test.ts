@@ -7,6 +7,7 @@ describe('buildContentSecurityPolicy', () => {
     expect(policy).toContain("connect-src 'self'");
     expect(policy).toContain('https://apicalracetiming.com.au');
     expect(policy).toContain('https://*.apicalracetiming.com.au');
+    expect(policy).toContain('https://*.apical-race-timing.example.com');
   });
 
   it('includes URLs added to the configurable fetch allow-list', () => {

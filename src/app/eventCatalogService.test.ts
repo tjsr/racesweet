@@ -232,6 +232,68 @@ describe('EventCatalogService', () => {
     expect(teamB?.categoryId).toBe('cat-c');
   });
 
+  it('imports Apical race state as an event/session scaffold without activating it', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+    const originalActiveEventId = service.catalog.activeEventId;
+    const originalActiveSessionId = service.catalog.activeSessionId;
+
+    await service.importApicalRaceState({
+      eventDate: '2026-06-07T01:30:00.000Z',
+      eventId: '7b83ad1e-54ba-5f00-9712-1c82d3178640',
+      eventName: 'Apical Round 7',
+      raceState: {
+        categories: [
+          {
+            code: 'A',
+            description: '',
+            id: 'cat-apical-a',
+            name: 'A',
+          },
+        ],
+        participants: [
+          {
+            categoryId: 'cat-apical-a',
+            currentResult: undefined,
+            entrantId: 'entrant-apical-301',
+            firstname: 'Robert',
+            id: 'participant-apical-301',
+            identifiers: [],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'WOOD',
+          },
+        ],
+      },
+      sessionId: 'session-apical-1001',
+    });
+
+    const event = service.catalog.events.find((item) => item.id === '7b83ad1e-54ba-5f00-9712-1c82d3178640');
+    const session = service.catalog.sessions.find((item) => item.id === 'session-apical-1001');
+    const entrant = service.catalog.entrants.find((item) => item.id === 'entrant-apical-301');
+
+    expect(service.catalog.activeEventId).toBe(originalActiveEventId);
+    expect(service.catalog.activeSessionId).toBe(originalActiveSessionId);
+    expect(event).toEqual(expect.objectContaining({
+      date: '2026-06-07',
+      name: 'Apical Round 7',
+      sessionIds: ['session-apical-1001'],
+    }));
+    expect(session).toEqual(expect.objectContaining({
+      eventId: '7b83ad1e-54ba-5f00-9712-1c82d3178640',
+      name: 'Apical Round 7',
+      scheduledStart: '2026-06-07T01:30:00.000Z',
+      status: 'completed',
+    }));
+    expect(entrant).toEqual(expect.objectContaining({
+      categoryIds: ['cat-apical-a'],
+      firstName: 'Robert',
+      lastName: 'WOOD',
+      sessionIds: ['session-apical-1001'],
+    }));
+    expect(seededPersistence.save).toHaveBeenCalledTimes(2);
+  });
+
   it('supports entrant detail edits for rider fields and category updates', async () => {
     const seededPersistence = createPersistence(createSeedEventCatalogLedger());
     const service = await EventCatalogService.create(seededPersistence);

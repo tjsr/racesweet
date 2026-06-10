@@ -5,7 +5,7 @@ import { EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEn
 import { RaceStateLookup, Session } from '../model/racestate.ts';
 import React, { useEffect, useState } from 'react';
 import { ReportsPage, ResultsPage } from '../views/display/raceAnalyticsViews.tsx';
-import { fetchApicalEvents, pullApicalRaceState } from './apicalDataSource.ts';
+import { fetchApicalEvents, fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.ts';
 
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
 import { CategoriesPage } from '../views/display/categoriesPage.tsx';
@@ -581,6 +581,23 @@ export const RaceSweetMainApp = () => {
               return;
             }
             systemConfigService.deleteSource(sourceId).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+          }}
+          onFetchApicalDataNow={(sourceId) => {
+            if (!eventCatalogService || !systemConfigService) {
+              return;
+            }
+            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+            if (!source) {
+              return;
+            }
+
+            return fetchApicalRaceStateNow(source)
+              .then(async (importData) => {
+                const catalog = await eventCatalogService.importApicalRaceState(importData);
+                updateEventCatalogState(catalog, importData.eventId, importData.sessionId);
+                return systemConfigService.persistApicalDataFetch(sourceId, importData.eventId, importData.sessionId, importData.retrievedAt);
+              })
+              .then(updateSystemConfigState);
           }}
           onLoadApicalEvents={(sourceId) => {
             if (!systemConfigService) {

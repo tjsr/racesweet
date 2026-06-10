@@ -2,7 +2,13 @@
   "dataSources": [
     {
       "enabled": true,
-      "id": "source-1780113775502-77777",
+      "id": "source-1781098789523-77813",
+      "name": "Apical data file",
+      "type": "file-apical-data-file"
+    },
+    {
+      "enabled": true,
+      "id": "source-1781098802416-83518",
       "name": "Apical Data file endpoint",
       "type": "api-apical-data-file",
       "apiConfig": {
@@ -16,7 +22,290 @@
         "selectedEventIds": [],
         "apicalEventId": 68
       },
-      "listedEvents": []
+      "listedEvents": [
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-05-29T00:00:00",
+          "id": 68,
+          "name": "Crazy 6 2026"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-05-15T00:00:00",
+          "id": 67,
+          "name": "Autumn NF Round 2"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-05-02T00:00:00",
+          "id": 66,
+          "name": "Autumn NF Round 1 2026"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-04-12T00:00:00",
+          "id": 65,
+          "name": "Dirt Squirts 2026 Summer Race 5"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-03-29T00:00:00",
+          "id": 64,
+          "name": "Dirt Squirts Summer 2026 Round 4"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-03-20T00:00:00",
+          "id": 62,
+          "name": "Summer NF Round 6"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-03-20T00:00:00",
+          "id": 63,
+          "name": "Testing new mats"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-03-15T00:00:00",
+          "id": 61,
+          "name": "Dirt Squirts Summer 2026 Round 3"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-03-13T00:00:00",
+          "id": 60,
+          "name": "Summer NF Round 5"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-02-21T00:00:00",
+          "id": 59,
+          "name": "Summer NF Round 4 2026"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-02-15T00:00:00",
+          "id": 58,
+          "name": "Dirt Squirts Summer 2026 Round 2"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-02-13T00:00:00",
+          "id": 57,
+          "name": "Summer NF Round 3 2026"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-02-06T00:00:00",
+          "id": 56,
+          "name": "Summer Twilight Race 2026"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-02-01T00:00:00",
+          "id": 55,
+          "name": "Dirt Squirts Summer 2026 Round 1"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2026-01-30T00:00:00",
+          "id": 54,
+          "name": "Summer NF Round 1 2026"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-12-06T00:00:00",
+          "id": 52,
+          "name": "Spring NF Round 6 - Femme Race"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-12-06T00:00:00",
+          "id": 53,
+          "name": "Spring NF Round 6 - Men's Race"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-11-28T00:00:00",
+          "id": 51,
+          "name": "Spring NF Round 5"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-11-22T00:00:00",
+          "id": 50,
+          "name": "Crazy 6 on tour Anglesea"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-11-14T00:00:00",
+          "id": 48,
+          "name": "Summer NF Rd3 - Race 1"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-11-14T00:00:00",
+          "id": 49,
+          "name": "Summer NF Rd 3 - Race 2"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-10-31T00:00:00",
+          "id": 46,
+          "name": "Summer NFF Round 2"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-10-31T00:00:00",
+          "id": 47,
+          "name": "Demo Race"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-10-26T00:00:00",
+          "id": 45,
+          "name": "Dirt Squirts Winter Round 5"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-10-25T00:00:00",
+          "id": 44,
+          "name": "Club Champs 2025"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-10-12T00:00:00",
+          "id": 43,
+          "name": "Dirt Squirts Winter Round 4"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-09-14T00:00:00",
+          "id": 42,
+          "name": "Dirt Squirts Winter Round 3"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-09-05T00:00:00",
+          "id": 41,
+          "name": "Winter NF Round 6"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-08-31T00:00:00",
+          "id": 40,
+          "name": "Dirt squirts winter 2025 Round 2"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-08-30T00:00:00",
+          "id": 39,
+          "name": "Winter NF Round 5 - 3 Hour Race"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-08-23T00:00:00",
+          "id": 37,
+          "name": "Vic Schools Race GMBC 2025"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-08-22T00:00:00",
+          "id": 38,
+          "name": "Winter NF Round 4"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-08-16T00:00:00",
+          "id": 36,
+          "name": "Dirt Squirts Winter 2025 Round 1"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-08-09T00:00:00",
+          "id": 35,
+          "name": "Winter NF Round 3"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-08-02T00:00:00",
+          "id": 34,
+          "name": "Winter NF Round 2"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-07-26T00:00:00",
+          "id": 33,
+          "name": "Winter NF Round 1"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-06-21T00:00:00",
+          "id": 32,
+          "name": "Autumn NF Round 6"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-06-13T00:00:00",
+          "id": 31,
+          "name": "Autumn NF Round 5"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-06-06T00:00:00",
+          "id": 30,
+          "name": "Autumn NF Round 4"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-05-31T00:00:00",
+          "id": 29,
+          "name": "Crazy 6"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-05-17T00:00:00",
+          "id": 27,
+          "name": "Forrest Race May 17 2025"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-05-02T00:00:00",
+          "id": 26,
+          "name": "No Frills Autumn 1 (v2)"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-04-29T00:00:00",
+          "id": 24,
+          "name": "Dirt Squirts 29"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-04-28T00:00:00",
+          "id": 23,
+          "name": "Dirt Squirts 28"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-04-22T00:00:00",
+          "id": 20,
+          "name": "DS22"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-04-22T00:00:00",
+          "id": 21,
+          "name": "DS 22-02"
+        },
+        {
+          "companyName": "Geelong Mountain Bike Club",
+          "eventDate": "2025-04-12T00:00:00",
+          "id": 19,
+          "name": "DS6 Test"
+        }
+      ]
     }
   ],
   "eventSourceAssignments": {},

@@ -54,7 +54,7 @@ export const durationStringToMilliseconds = (duration: string): number => {
     const secondsParts = parts[2].split('.');
     const hours = parseInt(parts[0], 10);
     const minutes = parseInt(parts[1], 10);
-    const ms = duration.match(/^\d+$/) ? parseInt(secondsParts[1].substring(0, 3)) : 0; // Take only the first three digits for milliseconds
+    const ms = secondsParts[1] ? parseInt(secondsParts[1].substring(0, 3).padEnd(3, '0'), 10) : 0; // Take only the first three digits for milliseconds
     const seconds = parseInt(secondsParts[0]);
     
     if (isNaN(hours) || isNaN(minutes) || isNaN(seconds) || isNaN(ms)) {

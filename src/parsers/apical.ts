@@ -37,7 +37,7 @@ export const createChipCrossingRecord = (
   if (!eventStartTime) {
     throw new Error(`Event start time is undefined, cannot create crossing record for lap ${lap.Id}`);
   }
-  const lapMs = durationStringToMilliseconds(lap.LapTimeSpan);
+  const lapMs = durationStringToMilliseconds(lap.CumulativeLapTimeSpan || lap.LapTimeSpan);
   const calculatedRecordTime = addToTime(eventStartTime, lapMs);
 
   const timeRecord: Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time' | 'eventId'> = {
@@ -324,6 +324,7 @@ export const convertDataToRaceState = (
 
   return {
     categories,
+    eventStartTime,
     participants,
     records,
     teams,

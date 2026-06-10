@@ -37,6 +37,7 @@ export interface RaceState {
   participants: EventParticipant[];
   categories: EventCategory[];
   teams: EventTeam[];
+  eventStartTime?: Date;
 }
 
 export type ErrorType = string | Error;

@@ -8,6 +8,9 @@ export default defineConfig({
 		sequence: {
 			setupFiles: 'list',
 		},
+		ssr: {
+    	noExternal: ['@mui/material', 'react-transition-group'],
+  	},
 		clearMocks: true,
 		globals: true,
 		include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],

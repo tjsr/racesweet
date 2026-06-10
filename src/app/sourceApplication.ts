@@ -2,12 +2,14 @@ import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { RaceState } from '../model/racestate.js';
 import type { TimeRecord } from '../model/timerecord.js';
+import { createGreenFlagEvent, isFlagRecord } from '../controllers/flag.js';
 
 interface SessionSourceSink {
   addCategories(categories: EventCategory[]): Promise<unknown>;
   addParticipants(participants: EventParticipant[]): void;
   addRecords(records: TimeRecord[], validate?: boolean): Promise<void>;
   categories: EventCategory[];
+  records: TimeRecord[];
 }
 
 const getUniqueCategories = (categories: EventCategory[]): EventCategory[] => {
@@ -64,5 +66,20 @@ export const applyPulledRaceStateToSession = async (
   }
 
   sessionState.addParticipants(raceState.participants || []);
-  await sessionState.addRecords((raceState.records as TimeRecord[]) || [], false);
+  const incomingRecords = (raceState.records as TimeRecord[]) || [];
+  const needsStartFlag = incomingRecords.length > 0 &&
+    !!raceState.eventStartTime &&
+    !sessionState.records.some((record) => isFlagRecord(record));
+  const recordsToAdd = needsStartFlag
+    ? [
+      createGreenFlagEvent({
+        flagValue: 'course',
+        indicatesRaceStart: true,
+        time: raceState.eventStartTime,
+      }),
+      ...incomingRecords,
+    ]
+    : incomingRecords;
+
+  await sessionState.addRecords(recordsToAdd, false);
 };

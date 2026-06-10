@@ -1,24 +1,28 @@
-import { injectCorsHeaders, isApicalApiUrl } from './corsHeaders.js';
+import { injectCorsHeaders, isAllowedCorsDownloadUrl } from './corsHeaders.js';
 
-describe('isApicalApiUrl', () => {
+describe('isAllowedCorsDownloadUrl', () => {
   it('matches apicalracetiming.com.au URLs', () => {
-    expect(isApicalApiUrl('https://apicalracetiming.com.au/raceresult/event/getall')).toBe(true);
+    expect(isAllowedCorsDownloadUrl('https://apicalracetiming.com.au/raceresult/event/getall')).toBe(true);
   });
 
   it('matches apicalracetiming.com.au auth URL', () => {
-    expect(isApicalApiUrl('https://apicalracetiming.com.au/')).toBe(true);
+    expect(isAllowedCorsDownloadUrl('https://apicalracetiming.com.au/')).toBe(true);
+  });
+
+  it('matches apicalracetiming.com.au download URLs from the shared allow-list', () => {
+    expect(isAllowedCorsDownloadUrl('https://apicalracetiming.com.au/Download/DownloadExcel?fileGuid=abc')).toBe(true);
   });
 
   it('matches apical-race-timing URLs', () => {
-    expect(isApicalApiUrl('https://api.apical-race-timing.example.com/raceresult/event/getall')).toBe(true);
+    expect(isAllowedCorsDownloadUrl('https://api.apical-race-timing.example.com/raceresult/event/getall')).toBe(true);
   });
 
   it('does not match unrelated URLs', () => {
-    expect(isApicalApiUrl('https://example.com/api/data')).toBe(false);
+    expect(isAllowedCorsDownloadUrl('https://example.com/api/data')).toBe(false);
   });
 
   it('does not match localhost', () => {
-    expect(isApicalApiUrl('http://localhost:3488/api')).toBe(false);
+    expect(isAllowedCorsDownloadUrl('http://localhost:3488/api')).toBe(false);
   });
 });
 
@@ -35,7 +39,7 @@ describe('injectCorsHeaders', () => {
 
   it('adds Access-Control-Allow-Headers for auth and content-type', () => {
     const result = injectCorsHeaders({});
-    expect(result['Access-Control-Allow-Headers']).toEqual(['Authorization, Content-Type, Accept']);
+    expect(result['Access-Control-Allow-Headers']).toEqual(['Authorization, Content-Type, Accept, X-Requested-With']);
   });
 
   it('preserves existing response headers', () => {

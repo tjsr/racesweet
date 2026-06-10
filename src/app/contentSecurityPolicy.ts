@@ -1,7 +1,6 @@
-export const allowedFetchUrls = [
-  'https://apicalracetiming.com.au',
-  'https://*.apicalracetiming.com.au',
-];
+import { allowedDownloadSites } from './allowedDownloadSites.js';
+
+export const allowedFetchUrls = allowedDownloadSites;
 
 export const buildContentSecurityPolicy = (connectSources: string[] = allowedFetchUrls): string => {
   const directives = [
