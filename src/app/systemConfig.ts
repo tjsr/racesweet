@@ -127,7 +127,7 @@ export const getDataSourceTypeLabel = (type: DataSourceType): string => {
   case 'api-http-request':
     return 'HTTP Request';
   case 'api-apical-data-file':
-    return 'Apical Data file';
+    return 'Apical API data';
   case 'master-entrant-profiles':
     return 'Master Entrant Profiles';
   default:
