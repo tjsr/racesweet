@@ -4,6 +4,21 @@
 export type AvailableSendChannels = 'askToRead' | 'askToWrite';
 export type AvailableReceiveChannels = 'sendReadContent' | 'sendReadError' | 'sendWriteSuccess' | 'sendWriteError';
 export type FileReadDataType = 'utf8' | 'buffer' | 'bytearray';
+export interface ExternalHttpProxyRequest {
+  bodyBase64?: string;
+  headers?: Record<string, string>;
+  method?: string;
+  timeoutMs?: number;
+  url: string;
+}
+export interface ExternalHttpProxyResponse {
+  bodyBase64: string;
+  headers: Record<string, string>;
+  ok: boolean;
+  status: number;
+  statusText: string;
+  url: string;
+}
 export interface SelectLocalFileOptions {
   filters?: Array<{ extensions: string[]; name: string }>;
   title?: string;
@@ -26,6 +41,7 @@ declare global {
     api: {
       receive: (channel: AvailableReceiveChannels | string, func: (...args: unknown[]) => unknown) => void;
       requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType) => Promise<DataType>;
+      requestExternalHttp: (request: ExternalHttpProxyRequest) => Promise<ExternalHttpProxyResponse>;
       requestBuffer: (filePath: string) => Promise<Buffer>;
       selectLocalFile: (options?: SelectLocalFileOptions) => Promise<string | undefined>;
       writeFileContent: (filePath: string, contents: string) => Promise<void>;

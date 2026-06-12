@@ -1,12 +1,12 @@
-import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
-
 import type { ApicalLapByCategory } from '../model/apical.js';
 import { EventId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
-import XLSX from 'xlsx';
 import { convertDataToRaceState } from '../parsers/apical.js';
+import { fetchExternalHttp } from '../utils/externalHttp.js';
 import { remapStackTrace } from './stackTrace.js';
+import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
 import { v5 as uuidv5 } from 'uuid';
+import XLSX from 'xlsx';
 
 const APICAL_EVENT_ID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 
@@ -37,22 +37,6 @@ export interface ApicalSpreadsheetLapsRow {
   TeamNameDisplay: string;
   TotalTimeSpan?: string;
 }
-
-const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
-  return new Promise<T>((resolve, reject) => {
-    const timeoutHandle = setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs);
-
-    promise
-      .then((value) => {
-        clearTimeout(timeoutHandle);
-        resolve(value);
-      })
-      .catch((error: unknown) => {
-        clearTimeout(timeoutHandle);
-        reject(error);
-      });
-  });
-};
 
 const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
@@ -221,8 +205,14 @@ const fetchApicalResponse = async (
 ): Promise<Response> => {
   let response: Response;
   try {
-    response = await withTimeout(fetch(url, init), timeoutMs);
+    response = await fetchExternalHttp(url, {
+      body: init.body,
+      headers: init.headers,
+      method: init.method,
+      timeoutMs,
+    });
   } catch (error: unknown) {
+    console.warn(`An error occurred while trying to fetch ${url}: ${getErrorMessage(error)}`);
     throw new Error(describeRequestFailure(phase, url, init, timeoutMs, error), { cause: error });
   }
 

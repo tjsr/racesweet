@@ -1,5 +1,6 @@
 import XLSX from 'xlsx';
 import { promises as fs } from 'fs';
+import { fetchExternalHttp } from '../externalHttp.js';
 import { getApicalEventExcelFilePath } from './excelGenerate.js';
 
 export interface ApicalSpreadsheetLapsRow {
@@ -24,7 +25,7 @@ export const retrieveExcelData = async (fileGuid: string, fileName: string, even
   // https://apicalracetiming.com.au/Download/DownloadExcel?fileGuid=c991bb98-6f27-4e68-8552-3a06f6bfa42a&filename=Results%20%20Summer%20NF%20Round%204%202026%202026-2-21.xlsx
   // https://apicalracetiming.com.au/Download/DownloadExcel?fileGuid=5ed20f8c-d871-4659-8d3a-bda0484680e6&filename=Results%20%20Summer%20NF%20Round%204%202026%202026-2-21.xlsx
   
-  return fetch(url, {
+  return fetchExternalHttp(url, {
     headers: {
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
       'Accept-Encoding': 'gzip, deflate, br, zstd',

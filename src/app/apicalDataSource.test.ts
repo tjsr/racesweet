@@ -79,6 +79,9 @@ describe('apicalDataSource', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
+    if (typeof globalThis.window !== 'undefined') {
+      delete (globalThis.window as unknown as { api?: unknown }).api;
+    }
   });
 
   it('fetches public Apical event lists without a failing root authentication request', async () => {
@@ -137,6 +140,64 @@ describe('apicalDataSource', () => {
     expect(String(fetchMock.mock.calls[1]?.[0] || '')).toContain('/raceresult/event/getall');
     expect(eventHeaders.get('Authorization')).toBe('Bearer test-token');
     expect(eventHeaders.get('Cookie')).toBe('session=abc123');
+  });
+
+  it('uses the external HTTP IPC proxy when available in renderer context', async () => {
+    if (typeof globalThis.window === 'undefined') {
+      return;
+    }
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const requestExternalHttp = vi
+      .fn()
+      .mockResolvedValueOnce({
+        bodyBase64: Buffer.from(JSON.stringify({ FileGuid: 'file-guid', FileName: 'Round 3.xlsx' })).toString('base64'),
+        headers: { 'set-cookie': 'session=proxy-cookie' },
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        url: 'https://apical.example.com/RaceResult/Event/ExportToExcel?eventId=301',
+      })
+      .mockResolvedValueOnce({
+        bodyBase64: Buffer.from(JSON.stringify([
+          {
+            CompanyName: 'Acme Timing',
+            EventDate: '2026-08-01',
+            Id: 301,
+            Name: 'Round 3',
+          },
+        ])).toString('base64'),
+        headers: { 'content-type': 'application/json' },
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        url: 'https://apical.example.com/raceresult/event/getall?companyId=12',
+      });
+
+    (globalThis.window as unknown as {
+      api?: {
+        requestExternalHttp: (request: unknown) => Promise<unknown>;
+      };
+    }).api = {
+      requestExternalHttp,
+    };
+
+    const events = await fetchApicalEvents(createApicalSource());
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(requestExternalHttp).toHaveBeenCalledTimes(2);
+    expect(String(requestExternalHttp.mock.calls[0]?.[0]?.url || '')).toContain('/RaceResult/Event/ExportToExcel?eventId=301');
+    expect(String(requestExternalHttp.mock.calls[1]?.[0]?.url || '')).toContain('/raceresult/event/getall?companyId=12');
+    expect(events).toEqual([
+      {
+        companyName: 'Acme Timing',
+        eventDate: '2026-08-01',
+        id: 301,
+        name: 'Round 3',
+      },
+    ]);
+
+    delete (globalThis.window as unknown as { api?: unknown }).api;
   });
 
   it('throws clear error when Apical event list request fails', async () => {

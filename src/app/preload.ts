@@ -1,12 +1,13 @@
 import './runtimeSourceMaps.ts';
 import './state.ts';
 
-import { FileReadDataType, SelectLocalFileOptions } from './window.ts';
+import { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileReadDataType, SelectLocalFileOptions } from './window.ts';
 import { InvalidIpcChannelError, SendChannels } from '../model/electronIpcTypes.ts';
 import { IpcRendererEvent, ipcRenderer } from 'electron';
 import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
+  RequestExternalHttpIpcInvokeChannel,
   RequestReadIpcSendChannel,
   RequestSelectLocalFileIpcInvokeChannel,
   RequestWriteIpcSendChannel,
@@ -100,6 +101,9 @@ window.api = {
         eventCalls[outgoingEventId] = [resolve, reject];
         ipcRenderer.send(RequestReadIpcSendChannel, filePath, outgoingEventId, dataType);
       });
+  },
+  requestExternalHttp: (request: ExternalHttpProxyRequest): Promise<ExternalHttpProxyResponse> => {
+    return ipcRenderer.invoke(RequestExternalHttpIpcInvokeChannel, request) as Promise<ExternalHttpProxyResponse>;
   },
   selectLocalFile: (options?: SelectLocalFileOptions): Promise<string | undefined> => {
     return ipcRenderer.invoke(RequestSelectLocalFileIpcInvokeChannel, options) as Promise<string | undefined>;

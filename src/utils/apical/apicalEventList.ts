@@ -1,4 +1,5 @@
 ﻿import { EventHandicapData } from './apicalData.js';
+import { fetchExternalHttp } from '../externalHttp.js';
 import fs from 'fs/promises';
 
 export const COMPANY_GMBC = 2;
@@ -22,7 +23,7 @@ export type ApicalEventListResponse = ApicalEventResponseEventData[];
 
 export const getApicalEventList = (companyId: number = COMPANY_GMBC, timestamp: number = Date.now()): Promise<ApicalEventListResponse> => {
   const url = getApicalEventListUrl(companyId, timestamp);
-  return fetch(url)
+  return fetchExternalHttp(url)
     .then((response) => {
       if (!response.ok) {
         throw new Error(`Failed to fetch event list: ${response.statusText}`);

@@ -1,6 +1,7 @@
 import { ApicalSpreadsheetLapsRow, retrieveExcelData } from './apicalEventSpreadsheet.js';
 
 import { promises as fs } from 'fs';
+import { fetchExternalHttp } from '../externalHttp.js';
 import path from 'path';
 import { tmpdir } from 'os';
 
@@ -13,7 +14,7 @@ export interface ApicalExportToExcelResponse {
 export const generateExcelData = (eventId: number, timestamp: number = Date.now()): Promise<ApicalExportToExcelResponse> => {
   const url = `https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=${eventId}&_=${timestamp}`;
 
-  return fetch(url, {
+  return fetchExternalHttp(url, {
     headers: {
       'X-Requested-With': 'XMLHttpRequest',
     },

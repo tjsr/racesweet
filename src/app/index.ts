@@ -6,6 +6,7 @@ import path from 'node:path';
 import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
+  RequestExternalHttpIpcInvokeChannel,
   RequestReadIpcSendChannel,
   RequestSelectLocalFileIpcInvokeChannel,
   RequestWriteIpcSendChannel,
@@ -15,7 +16,7 @@ import {
 import { buildContentSecurityPolicy, injectContentSecurityPolicyHeader } from './contentSecurityPolicy';
 import { injectCorsHeaders, isAllowedCorsDownloadUrl } from './electron/corsHeaders';
 import { waitForContentServer, waitForWindowContentLoad } from './startupContentServer';
-import type { SelectLocalFileOptions } from './window';
+import type { ExternalHttpProxyRequest, ExternalHttpProxyResponse, SelectLocalFileOptions } from './window';
 
 const __dirname = path.dirname(__filename);
 
@@ -73,6 +74,51 @@ const showStartupError = (error: Error): void => {
 
   console.error(`RaceSweet startup failed: ${detail}`);
   dialog.showErrorBox('RaceSweet startup failed', error.message);
+};
+
+const toHeaderRecord = (headers: Headers): Record<string, string> => {
+  return Array.from(headers.entries()).reduce<Record<string, string>>((accumulator, [name, value]) => {
+    accumulator[name] = value;
+    return accumulator;
+  }, {});
+};
+
+const fetchExternalHttp = async (request: ExternalHttpProxyRequest): Promise<ExternalHttpProxyResponse> => {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(request.url);
+  } catch {
+    throw new Error(`Invalid external request URL: ${request.url}`);
+  }
+
+  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+    throw new Error(`Unsupported external request protocol: ${parsedUrl.protocol}`);
+  }
+
+  const timeoutMs = request.timeoutMs && request.timeoutMs > 0 ? request.timeoutMs : 30000;
+  const abortController = new AbortController();
+  const timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(request.url, {
+      body: request.bodyBase64 ? Buffer.from(request.bodyBase64, 'base64') : undefined,
+      headers: request.headers,
+      method: request.method || 'GET',
+      signal: abortController.signal,
+    });
+    const bodyBuffer = Buffer.from(await response.arrayBuffer());
+
+    return {
+      bodyBase64: bodyBuffer.toString('base64'),
+      headers: toHeaderRecord(response.headers),
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      url: response.url,
+    };
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
 };
 
 const createWindow = async (): Promise<void> => {
@@ -175,6 +221,10 @@ ipcMain.handle(RequestSelectLocalFileIpcInvokeChannel, async (event: Electron.Ip
   }
 
   return result.filePaths[0];
+});
+
+ipcMain.handle(RequestExternalHttpIpcInvokeChannel, async (_event: Electron.IpcMainInvokeEvent, request: ExternalHttpProxyRequest): Promise<ExternalHttpProxyResponse> => {
+  return fetchExternalHttp(request);
 });
 
 ipcMain.on(RequestWriteIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: string, contents: string) => {

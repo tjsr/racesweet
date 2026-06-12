@@ -4,6 +4,7 @@ import type { EventId, RaceEvent } from '../model/raceevent.ts';
 import type { RaceState } from '../model/racestate.ts';
 import { convertDataToRaceState } from '../parsers/apical.ts';
 import { getApicalEventList } from '../utils/apical/apicalEventList.ts';
+import { fetchExternalHttp } from '../utils/externalHttp.js';
 import { v5 as uuidv5 } from 'uuid';
 
 const APICAL_EVENT_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
@@ -25,7 +26,7 @@ const getApicalEventDataUrl = (eventId: number): string =>
   `https://apicalracetiming.com.au/RaceResult/Lap/GetAllByCategoryForEvent?eventId=${eventId}&_=${Date.now()}`;
 
 export const fetchApicalEventData = (eventId: number): Promise<ApicalLapByCategory> =>
-  fetch(getApicalEventDataUrl(eventId))
+  fetchExternalHttp(getApicalEventDataUrl(eventId))
     .then((response) => {
       if (!response.ok) {
         throw new Error(`Failed to fetch event data for event ${eventId}: ${response.statusText}`);
