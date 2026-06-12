@@ -1,6 +1,7 @@
 import {
   type SystemConfiguration,
   createDefaultSystemConfiguration,
+  normalizeSystemConfiguration,
 } from './systemConfig.js';
 
 export interface SystemConfigPersistence {
@@ -40,14 +41,7 @@ export class ElectronJsonSystemConfigPersistence implements SystemConfigPersiste
       const content = await window.api.requestFileContent<string>(this.filePath, 'utf8');
       const parsed = JSON.parse(content) as Partial<SystemConfiguration>;
 
-      return {
-        ...createDefaultSystemConfiguration(),
-        ...parsed,
-        dataSources: parsed.dataSources || [],
-        eventSourceAssignments: parsed.eventSourceAssignments || {},
-        schemaVersion: 1,
-        sessionSourceAssignments: parsed.sessionSourceAssignments || {},
-      };
+      return normalizeSystemConfiguration(parsed);
     } catch (error: unknown) {
       if (isFileNotFoundError(error)) {
         console.info(`System config file not found at ${this.filePath}, using defaults.`);

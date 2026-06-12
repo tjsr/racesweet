@@ -6,6 +6,7 @@ import {
   getDataSourceTypeLabel,
 } from '../../app/systemConfig.js';
 import React from 'react';
+import { formatErrorForDisplay } from '../../app/stackTrace.js';
 import { getRuntimeVersions } from '../../app/versionInfo.js';
 
 interface SystemPageProps {
@@ -92,12 +93,9 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
     try {
       await props.onLoadApicalEvents(sourceId);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      const stack = error instanceof Error ? error.stack : undefined;
-      const detailedMessage = stack ? `${message}\n${stack}` : message;
       setSourceFetchErrors((current) => ({
         ...current,
-        [sourceId]: detailedMessage,
+        [sourceId]: formatErrorForDisplay(error),
       }));
     }
   };
@@ -112,12 +110,9 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
     try {
       await props.onFetchApicalDataNow(sourceId);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      const stack = error instanceof Error ? error.stack : undefined;
-      const detailedMessage = stack ? `${message}\n${stack}` : message;
       setSourceFetchErrors((current) => ({
         ...current,
-        [sourceId]: detailedMessage,
+        [sourceId]: formatErrorForDisplay(error),
       }));
     }
   };
@@ -218,7 +213,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                 const isApicalApi = source.type === 'api-apical-data-file';
                 const listedEvents = source.listedEvents || [];
                 const selectedEventIds = source.apiConfig?.selectedEventIds || [];
-                const selectedApicalEventId = selectedEventIds[0] || source.apiConfig?.apicalEventId;
+                const selectedApicalEventId = selectedEventIds[0];
                 const isMasterEntrants = source.type === 'master-entrant-profiles';
                 const isRfidTimingCsv = source.type === 'file-rfid-timing-csv';
                 const masterProfilesJson = JSON.stringify(source.masterEntrantConfig?.profiles || [], null, 2);
@@ -321,20 +316,6 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                           />
                         </label>
                         <label>
-                          Apical Event Id
-                          <DraftInput
-                            ariaLabel={`Apical Event Id ${source.id}`}
-                            type="number"
-                            value={source.apiConfig.apicalEventId?.toString() || ''}
-                            onCommit={(value) => props.onSaveSource(source.id, {
-                              apiConfig: {
-                                ...source.apiConfig!,
-                                apicalEventId: Number(value) || undefined,
-                              },
-                            })}
-                          />
-                        </label>
-                        <label>
                           Poll Interval (seconds)
                           <DraftInput
                             ariaLabel={`Apical Poll Interval ${source.id}`}
@@ -410,6 +391,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                                   });
                                 }}
                               >
+                                <option value="">Select Apical event</option>
                                 {listedEvents.map((eventItem) => (
                                   <option key={eventItem.id} value={eventItem.id}>
                                     {eventItem.name} ({eventItem.id})

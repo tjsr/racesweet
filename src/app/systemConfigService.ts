@@ -5,6 +5,7 @@ import {
   type SystemConfiguration,
   createDefaultSystemConfiguration,
   getDataSourceTypeLabel,
+  normalizeSystemConfiguration,
 } from './systemConfig.js';
 import type { SystemConfigPersistence } from './systemConfigPersistence.js';
 
@@ -157,7 +158,22 @@ export class SystemConfigService {
   }
 
   public async persistListedApicalEvents(sourceId: string, listedEvents: DataSourceConfig['listedEvents']): Promise<SystemConfiguration> {
-    return this.updateSource(sourceId, { listedEvents });
+    const source = this.config.dataSources.find((item) => item.id === sourceId);
+    if (source?.type !== 'api-apical-data-file' || !source.apiConfig) {
+      return this.updateSource(sourceId, { listedEvents });
+    }
+
+    const listedEventIds = new Set((listedEvents || []).map((eventItem) => eventItem.id));
+    const selectedEventIds = (source.apiConfig.selectedEventIds || []).filter((eventId) => listedEventIds.has(eventId));
+
+    return this.updateSource(sourceId, {
+      apiConfig: {
+        ...source.apiConfig,
+        apicalEventId: selectedEventIds[0],
+        selectedEventIds,
+      },
+      listedEvents,
+    });
   }
 
   public async persistApicalDataFetch(sourceId: string, eventId: string, sessionId: string, retrievedAt: string): Promise<SystemConfiguration> {
@@ -191,11 +207,10 @@ export class SystemConfigService {
   }
 
   private async persist(): Promise<void> {
-    const sanitized = {
+    const sanitized = normalizeSystemConfiguration({
       ...createDefaultSystemConfiguration(),
       ...this.config,
-      schemaVersion: 1 as const,
-    };
+    });
     this.config = sanitized;
     await this.persistence.save(sanitized);
     if (this.options.onPersistedConfig) {

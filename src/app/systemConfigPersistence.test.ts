@@ -93,6 +93,49 @@ describe('ElectronJsonSystemConfigPersistence', () => {
     expect(loaded.schemaVersion).toBe(1);
   });
 
+  it('loads cached Apical events and migrates legacy event id into selected dropdown ids', async () => {
+    const configData = {
+      dataSources: [
+        {
+          apiConfig: {
+            apicalEventId: 1001,
+            authHeaderName: 'Authorization',
+            authHeaderValue: 'Bearer token',
+            baseUrl: 'https://apicalracetiming.com.au',
+            companyId: 2,
+            httpTimeoutSeconds: 10,
+            live: true,
+            pollIntervalSeconds: 30,
+          },
+          enabled: true,
+          id: 'source-apical',
+          listedEvents: [
+            { id: 1001, name: 'Cached Round 1' },
+            { id: 1002, name: 'Cached Round 2' },
+          ],
+          name: 'Apical Source',
+          type: 'api-apical-data-file',
+        },
+      ],
+      eventSourceAssignments: {},
+      schemaVersion: 1,
+      sessionSourceAssignments: {},
+    };
+    const requestFileContent = vi.fn(async () => JSON.stringify(configData));
+
+    (window as unknown as {
+      api: { requestFileContent: <T>(filePath: string, dataType: string) => Promise<T> };
+    }).api = {
+      requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+    };
+
+    const persistence = new ElectronJsonSystemConfigPersistence(systemConfigTestPath);
+    const loaded = await persistence.load();
+
+    expect(loaded.dataSources[0]?.listedEvents).toEqual(configData.dataSources[0].listedEvents);
+    expect(loaded.dataSources[0]?.apiConfig?.selectedEventIds).toEqual([1001]);
+  });
+
   it('reports save permission errors without throwing', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const writeFileContent = vi.fn(async () => {

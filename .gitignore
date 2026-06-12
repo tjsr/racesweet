@@ -11,3 +11,4 @@ src/generated/*
 src/generated/event-catalog.json
 src/generated/system-config.json
 out/
+.env.tjsr-yoga

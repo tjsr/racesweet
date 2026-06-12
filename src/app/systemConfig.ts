@@ -78,6 +78,36 @@ export const createDefaultSystemConfiguration = (): SystemConfiguration => ({
   sessionSourceAssignments: {},
 });
 
+export const normalizeDataSourceConfig = (source: DataSourceConfig): DataSourceConfig => {
+  if (source.type !== 'api-apical-data-file' || !source.apiConfig) {
+    return source;
+  }
+
+  const selectedEventIds = source.apiConfig.selectedEventIds?.length > 0
+    ? source.apiConfig.selectedEventIds
+    : source.apiConfig.apicalEventId
+      ? [source.apiConfig.apicalEventId]
+      : [];
+
+  return {
+    ...source,
+    apiConfig: {
+      ...source.apiConfig,
+      apicalEventId: selectedEventIds[0],
+      selectedEventIds,
+    },
+  };
+};
+
+export const normalizeSystemConfiguration = (config: Partial<SystemConfiguration>): SystemConfiguration => ({
+  ...createDefaultSystemConfiguration(),
+  ...config,
+  dataSources: (config.dataSources || []).map(normalizeDataSourceConfig),
+  eventSourceAssignments: config.eventSourceAssignments || {},
+  schemaVersion: 1,
+  sessionSourceAssignments: config.sessionSourceAssignments || {},
+});
+
 export const getDataSourceTypeLabel = (type: DataSourceType): string => {
   switch (type) {
   case 'timing-rfid-decoder':

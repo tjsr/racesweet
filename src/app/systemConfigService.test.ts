@@ -122,6 +122,27 @@ describe('SystemConfigService', () => {
     }));
   });
 
+  it('persists cached Apical events and clears selections that are not in the dropdown options', async () => {
+    const persistence = createPersistence();
+    const service = await SystemConfigService.create(persistence);
+
+    await service.createSource('api-apical-data-file');
+    const source = service.state.dataSources[0]!;
+    await service.updateSource(source.id, {
+      apiConfig: {
+        ...source.apiConfig!,
+        apicalEventId: 1001,
+        selectedEventIds: [1001],
+      },
+    });
+
+    await service.persistListedApicalEvents(source.id, [{ id: 1002, name: 'Round 2' }]);
+
+    expect(service.state.dataSources[0]?.listedEvents).toEqual([{ id: 1002, name: 'Round 2' }]);
+    expect(service.state.dataSources[0]?.apiConfig?.apicalEventId).toBeUndefined();
+    expect(service.state.dataSources[0]?.apiConfig?.selectedEventIds).toEqual([]);
+  });
+
   it('supports master entrant profile sources assigned to events', async () => {
     const persistence = createPersistence();
     const service = await SystemConfigService.create(persistence);

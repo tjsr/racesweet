@@ -5,6 +5,7 @@ import { EventId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 import XLSX from 'xlsx';
 import { convertDataToRaceState } from '../parsers/apical.js';
+import { remapStackTrace } from './stackTrace.js';
 import { v5 as uuidv5 } from 'uuid';
 
 const APICAL_EVENT_ID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
@@ -58,7 +59,7 @@ const getErrorMessage = (error: unknown): string => error instanceof Error ? err
 const trimSlash = (value: string): string => value.replace(/\/$/, '');
 
 export const getConfiguredApicalEventId = (source: DataSourceConfig): number | undefined => {
-  return source.apiConfig?.apicalEventId || source.apiConfig?.selectedEventIds[0];
+  return source.apiConfig?.selectedEventIds[0] || source.apiConfig?.apicalEventId;
 };
 
 export const createApicalCatalogEventId = (apicalEventId: number): EventId => {
@@ -198,7 +199,7 @@ const formatUnknownErrorDetails = (error: unknown): string => {
     details.push(`Error cause: ${formatUnknownErrorDetails(error.cause)}`);
   }
   if (error.stack) {
-    details.push(`Stack:\n${error.stack}`);
+    details.push(`Stack:\n${remapStackTrace(error.stack)}`);
   }
 
   return details.join('\n');

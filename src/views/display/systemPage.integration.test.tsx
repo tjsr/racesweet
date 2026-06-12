@@ -10,6 +10,21 @@ import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
 import path from 'node:path';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 
+vi.mock('../../app/stackTrace.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../app/stackTrace.js')>();
+
+  return {
+    ...actual,
+    formatErrorForDisplay: (error: unknown): string => {
+      if (!(error instanceof Error)) {
+        return String(error);
+      }
+
+      return `${error.message}\nError: ${error.message}\n    at mapped (webpack://racesweet/./src/app/apicalDataSource.ts:225:13)`;
+    },
+  };
+});
+
 const config: SystemConfiguration = {
   ...createDefaultSystemConfiguration(),
   dataSources: [
@@ -27,7 +42,10 @@ const config: SystemConfiguration = {
       },
       enabled: true,
       id: 'source-apical',
-      listedEvents: [{ id: 1001, name: 'Round 1' }],
+      listedEvents: [
+        { id: 1001, name: 'Round 1' },
+        { id: 1002, name: 'Round 2' },
+      ],
       name: 'Apical Source',
       type: 'api-apical-data-file',
     },
@@ -191,18 +209,21 @@ describe('SystemPage integration', () => {
 
     const eventSelect = container.querySelector('select[aria-label="Apical Selected Event source-apical"]') as HTMLSelectElement;
     expect(eventSelect).toBeDefined();
-    expect(eventSelect.options.length).toBe(1);
+    expect(eventSelect.options.length).toBe(3);
     expect(eventSelect.value).toBe('1001');
+    expect(eventSelect.textContent).toContain('Round 1 (1001)');
+    expect(eventSelect.textContent).toContain('Round 2 (1002)');
+    expect(container.querySelector('input[aria-label="Apical Event Id source-apical"]')).toBeNull();
 
     await act(async () => {
-      eventSelect.value = '1001';
+      eventSelect.value = '1002';
       eventSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
     expect(onSaveSource).toHaveBeenCalledWith('source-apical', expect.objectContaining({
       apiConfig: expect.objectContaining({
-        apicalEventId: 1001,
-        selectedEventIds: [1001],
+        apicalEventId: 1002,
+        selectedEventIds: [1002],
       }),
     }));
   });
@@ -251,6 +272,7 @@ describe('SystemPage integration', () => {
     expect(container.textContent).toContain('accept: application/json');
     expect(container.textContent).toContain('authorization: [redacted, 12 chars]');
     expect(container.textContent).toContain('Response body: Session authentication failed');
+    expect(container.textContent).toContain('webpack://racesweet/./src/app/apicalDataSource.ts:225:13');
     expect(container.querySelector('.inline-error pre')).toBeTruthy();
   });
 

@@ -1,4 +1,5 @@
 import "./index.css";
+import './runtimeSourceMaps.ts';
 
 import { startApp } from './mount.js';
 
