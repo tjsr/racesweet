@@ -6,9 +6,13 @@ import { fetchExternalHttp } from '../utils/externalHttp.js';
 import { remapStackTrace } from './stackTrace.js';
 import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
 import { v5 as uuidv5 } from 'uuid';
-import XLSX from 'xlsx';
+import type * as XlsxNamespace from 'xlsx';
 
 const APICAL_EVENT_ID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+
+type XlsxModule = typeof XlsxNamespace;
+
+let xlsxModulePromise: Promise<XlsxModule> | undefined;
 
 export interface PulledApicalRaceState {
   apicalEventId: number;
@@ -41,6 +45,22 @@ export interface ApicalSpreadsheetLapsRow {
 const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
 const trimSlash = (value: string): string => value.replace(/\/$/, '');
+
+const resolveXlsxModule = (module: Partial<XlsxModule> & { default?: unknown }): XlsxModule => {
+  const defaultModule = module.default as Partial<XlsxModule> | undefined;
+  const candidate = typeof module.read === 'function' ? module : defaultModule;
+
+  if (!candidate || typeof candidate.read !== 'function' || typeof candidate.utils?.sheet_to_json !== 'function') {
+    throw new Error('XLSX module was not loaded correctly. Check the Electron/Webpack xlsx import configuration.');
+  }
+
+  return candidate as XlsxModule;
+};
+
+const loadXlsx = async (): Promise<XlsxModule> => {
+  xlsxModulePromise ||= import('xlsx').then((module) => resolveXlsxModule(module as Partial<XlsxModule> & { default?: unknown }));
+  return xlsxModulePromise;
+};
 
 export const getConfiguredApicalEventId = (source: DataSourceConfig): number | undefined => {
   return source.apiConfig?.selectedEventIds[0] || source.apiConfig?.apicalEventId;
@@ -376,8 +396,18 @@ export const convertApicalSpreadsheetRowsToApicalData = (rows: ApicalSpreadsheet
 };
 
 const readApicalExcelPayload = async (response: Response): Promise<ApicalLapByCategory> => {
+  if (!response) {
+    throw new Error('No response received when trying to read Apical Excel payload');
+  }
+  const XLSX = await loadXlsx();
   const buffer = await response.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
+  if (!workbook) {
+    throw new Error('Failed to parse Apical Excel workbook, no data returned.');
+  }
+  if (!workbook.Sheets) {
+    throw new Error('Apical Excel workbook did not contain any sheets');
+  }
   const worksheet = workbook.Sheets.Laps || workbook.Sheets.Sheet1;
   if (!worksheet) {
     throw new Error('Apical Excel workbook did not contain a Laps or Sheet1 worksheet');
