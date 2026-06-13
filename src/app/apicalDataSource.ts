@@ -1,3 +1,4 @@
+import { ApicalDataException } from '../errors/apicalDataException.js';
 import type { ApicalLapByCategory } from '../model/apical.js';
 import { EventId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
@@ -9,6 +10,7 @@ import { v5 as uuidv5 } from 'uuid';
 import type * as XlsxNamespace from 'xlsx';
 
 const APICAL_EVENT_ID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type XlsxModule = typeof XlsxNamespace;
 
@@ -45,6 +47,8 @@ export interface ApicalSpreadsheetLapsRow {
 const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
 const trimSlash = (value: string): string => value.replace(/\/$/, '');
+
+const isGuid = (value: string): boolean => GUID_REGEX.test(value);
 
 const resolveXlsxModule = (module: Partial<XlsxModule> & { default?: unknown }): XlsxModule => {
   const defaultModule = module.default as Partial<XlsxModule> | undefined;
@@ -232,7 +236,6 @@ const fetchApicalResponse = async (
       timeoutMs,
     });
   } catch (error: unknown) {
-    console.warn(`An error occurred while trying to fetch ${url}: ${getErrorMessage(error)}`);
     throw new Error(describeRequestFailure(phase, url, init, timeoutMs, error), { cause: error });
   }
 
@@ -314,6 +317,8 @@ export const fetchApicalEvents = async (source: DataSourceConfig): Promise<Apica
   }));
 };
 
+const getApicalExcelExportUrl = (baseUrl: string, apicalEventId: number): string => `${trimSlash(baseUrl)}/RaceResult/Event/ExportToExcel?eventId=${apicalEventId}&_=${Date.now()}`;
+
 const generateApicalExcelExport = async (source: DataSourceConfig, apicalEventId: number): Promise<ApicalExportToExcelResponse> => {
   if (!source.apiConfig) {
     throw new Error('Apical API config is missing');
@@ -321,7 +326,7 @@ const generateApicalExcelExport = async (source: DataSourceConfig, apicalEventId
 
   const headers = createAuthenticatedHeaders(source);
   headers.set('X-Requested-With', 'XMLHttpRequest');
-  const url = `${trimSlash(source.apiConfig.baseUrl)}/RaceResult/Event/ExportToExcel?eventId=${apicalEventId}&_=${Date.now()}`;
+  const url = getApicalExcelExportUrl(source.apiConfig.baseUrl, apicalEventId);
   const response = await fetchApicalResponse(
     'Excel export',
     url,
@@ -335,8 +340,8 @@ const generateApicalExcelExport = async (source: DataSourceConfig, apicalEventId
   );
 
   const payload = await response.json() as Partial<ApicalExportToExcelResponse>;
-  if (!payload.FileGuid || !payload.FileName) {
-    throw new Error(`Apical Excel export response format was invalid, payload: ${JSON.stringify(payload)}`);
+  if (!payload.FileGuid || !isGuid(payload.FileGuid) || !payload.FileName) {
+    throw new ApicalDataException(`Apical Excel export response format was invalid, payload: ${JSON.stringify(payload)}`);
   }
 
   return {
@@ -395,31 +400,39 @@ export const convertApicalSpreadsheetRowsToApicalData = (rows: ApicalSpreadsheet
   }));
 };
 
-const readApicalExcelPayload = async (response: Response): Promise<ApicalLapByCategory> => {
+const readApicalExcelPayload = async (sourceUrl: string, response: Response): Promise<ApicalLapByCategory> => {
   if (!response) {
-    throw new Error('No response received when trying to read Apical Excel payload');
+    throw new ApicalDataException(`No response received when trying to read Apical Excel payload from url ${sourceUrl}`);
   }
   const XLSX = await loadXlsx();
   const buffer = await response.arrayBuffer();
+  if (buffer.byteLength === 0) {
+    throw new ApicalDataException(`Apical Excel file downloaded from url ${sourceUrl} was empty`);
+  }
   const workbook = XLSX.read(buffer, { type: 'array' });
   if (!workbook) {
-    throw new Error('Failed to parse Apical Excel workbook, no data returned.');
+    throw new ApicalDataException(`Failed to parse Apical Excel workbook from url ${sourceUrl}, no data returned.`);
   }
-  if (!workbook.Sheets) {
-    throw new Error('Apical Excel workbook did not contain any sheets');
+  if (!workbook.Sheets || Object.keys(workbook.Sheets).length === 0) {
+    throw new ApicalDataException(`Apical Excel workbook from url ${sourceUrl} did not contain any sheets`);
   }
   const worksheet = workbook.Sheets.Laps || workbook.Sheets.Sheet1;
   if (!worksheet) {
-    throw new Error('Apical Excel workbook did not contain a Laps or Sheet1 worksheet');
+    const sheetList = Object.keys(workbook.Sheets).join(', ');
+    throw new ApicalDataException(`Apical Excel workbook from url ${sourceUrl} did not contain a Laps or Sheet1 worksheet, but contained sheets ${sheetList}`);
   }
+  const sheetList = Object.keys(workbook.Sheets).join(', ');
+  console.debug(`Apical Excel workbook from url ${sourceUrl} contains sheets: ${sheetList}, using ${worksheet === workbook.Sheets.Laps ? 'Laps' : 'Sheet1'}`);
 
   const rows = XLSX.utils.sheet_to_json<ApicalSpreadsheetLapsRow>(worksheet);
   if (rows.length === 0) {
-    throw new Error('Apical Excel workbook did not contain lap rows');
+    throw new ApicalDataException(`Apical Excel workbook from url ${sourceUrl} did not contain lap rows, but contained sheets ${sheetList}`);
   }
 
   return convertApicalSpreadsheetRowsToApicalData(rows);
 };
+
+const getApicalExcelFileUrl = (baseUrl: string, fileGuid: string, fileName: string): string => `${trimSlash(baseUrl)}/Download/DownloadExcel?fileGuid=${fileGuid}&filename=${encodeURIComponent(fileName)}`;
 
 const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId: number): Promise<ApicalLapByCategory> => {
   if (!source.apiConfig) {
@@ -433,7 +446,7 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
   }
   headers.set('Accept', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,*/*');
   headers.set('Referrer', `${trimSlash(source.apiConfig.baseUrl)}/raceresult/event/detail?id=${apicalEventId}`);
-  const url = `${trimSlash(source.apiConfig.baseUrl)}/Download/DownloadExcel?fileGuid=${exportResponse.FileGuid}&filename=${encodeURIComponent(exportResponse.FileName)}`;
+  const url = getApicalExcelFileUrl(source.apiConfig.baseUrl, exportResponse.FileGuid, exportResponse.FileName);
 
   const response = await fetchApicalResponse(
     'Excel download',
@@ -447,7 +460,7 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
     source.apiConfig.httpTimeoutSeconds * 1000
   );
 
-  return readApicalExcelPayload(response);
+  return readApicalExcelPayload(url, response);
 };
 
 export const pullApicalRaceState = async (source: DataSourceConfig, eventId: EventId): Promise<Partial<RaceState>> => {
@@ -477,16 +490,20 @@ export const fetchApicalRaceStateNow = async (source: DataSourceConfig): Promise
 
   const eventId = createApicalCatalogEventId(apicalEventId);
   const listedEvent = getListedApicalEvent(source, apicalEventId);
-  const payload = await fetchApicalDataFilePayload(source, apicalEventId);
-  const retrievedAt = new Date().toISOString();
+  try {
+    const payload = await fetchApicalDataFilePayload(source, apicalEventId);
+    const retrievedAt = new Date().toISOString();
 
-  return {
-    apicalEventId,
-    eventDate: listedEvent?.eventDate,
-    eventId,
-    eventName: listedEvent?.name || `Apical Event ${apicalEventId}`,
-    raceState: convertDataToRaceState(eventId, listedEvent?.eventDate ? new Date(listedEvent.eventDate) : new Date(), payload, 200000),
-    retrievedAt,
-    sessionId: createApicalCatalogSessionId(apicalEventId),
-  };
+    return {
+      apicalEventId,
+      eventDate: listedEvent?.eventDate,
+      eventId,
+      eventName: listedEvent?.name || `Apical Event ${apicalEventId}`,
+      raceState: convertDataToRaceState(eventId, listedEvent?.eventDate ? new Date(listedEvent.eventDate) : new Date(), payload, 200000),
+      retrievedAt,
+      sessionId: createApicalCatalogSessionId(apicalEventId),
+    };
+  } catch (error: unknown) {
+    throw new Error(`Failed to fetch Apical data from url ${getApicalExcelExportUrl(source.apiConfig.baseUrl, apicalEventId)} for event id ${apicalEventId}: ${getErrorMessage(error)}`, { cause: error });
+  }
 };

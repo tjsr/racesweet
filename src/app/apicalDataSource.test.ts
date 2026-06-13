@@ -1,12 +1,15 @@
-import { createApicalCatalogEventId, fetchApicalEvents, fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.js';
-import { v1 as randomUUID, v5 as uuidv5 } from 'uuid';
-
-import type { DataSourceConfig } from './systemConfig.js';
-import type { EventId } from '../model/raceevent.js';
+import { ApicalDataException } from '../errors/apicalDataException.js';
 import { createEventId } from '../model/ids.js';
+import type { EventId } from '../model/raceevent.js';
+import { createApicalCatalogEventId, fetchApicalEvents, fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.js';
+import type { DataSourceConfig } from './systemConfig.js';
+import { v1 as randomUUID, v5 as uuidv5 } from 'uuid';
 import XLSX from 'xlsx';
 
 const convertDataToRaceState = vi.fn();
+const APICAL_EVENT_69_FILE_GUID = '1cf63381-1269-4257-b892-ef8b33424103';
+const APICAL_EVENT_69_FILE_NAME = 'Results  GMBC Autumn No Frills Round 4 2026-6-12.xlsx';
+const TEST_FILE_GUID = '11111111-1111-4111-8111-111111111111';
 
 vi.mock('../parsers/apical.js', () => ({
   convertDataToRaceState: (...args: unknown[]) => convertDataToRaceState(...args),
@@ -30,40 +33,56 @@ const createApicalSource = (): DataSourceConfig => ({
   type: 'api-apical-data-file',
 });
 
-const createExcelResponse = (): Response => {
-  const worksheet = XLSX.utils.json_to_sheet([
-    {
-      CategoryName: 'A',
-      CumulativeLapTimeSpan: '00:01:30.2500000',
-      FullName: 'Robert WOOD',
-      LapNumber: 1,
-      LapTimeSpan: '00:01:30.2500000',
-      Position: 1,
-      RaceNumber: 306,
-      TeamNameDisplay: 'Robert WOOD',
+const createApicalEvent69Source = (): DataSourceConfig => {
+  const source = createApicalSource();
+  return {
+    ...source,
+    apiConfig: {
+      ...source.apiConfig!,
+      authHeaderValue: '',
+      baseUrl: 'https://apicalracetiming.com.au',
+      selectedEventIds: [69],
     },
-    {
-      CategoryName: 'A',
-      CumulativeLapTimeSpan: '00:03:30.5000000',
-      FullName: 'Robert WOOD',
-      LapNumber: 2,
-      LapTimeSpan: '00:02:00.2500000',
-      Position: 1,
-      RaceNumber: 306,
-      TeamNameDisplay: 'Robert WOOD',
-    },
-  ]);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Laps');
-  const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
-
-  return new Response(buffer, { status: 200 });
+  };
 };
+
+const createLapsRows = () => [
+  {
+    CategoryName: 'A',
+    CumulativeLapTimeSpan: '00:01:30.2500000',
+    FullName: 'Robert WOOD',
+    LapNumber: 1,
+    LapTimeSpan: '00:01:30.2500000',
+    Position: 1,
+    RaceNumber: 306,
+    TeamNameDisplay: 'Robert WOOD',
+  },
+  {
+    CategoryName: 'A',
+    CumulativeLapTimeSpan: '00:03:30.5000000',
+    FullName: 'Robert WOOD',
+    LapNumber: 2,
+    LapTimeSpan: '00:02:00.2500000',
+    Position: 1,
+    RaceNumber: 306,
+    TeamNameDisplay: 'Robert WOOD',
+  },
+];
+
+const createExcelBuffer = (sheetNames: string[] = ['Laps']): ArrayBuffer => {
+  const workbook = XLSX.utils.book_new();
+  sheetNames.forEach((sheetName) => {
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(createLapsRows()), sheetName);
+  });
+  return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+};
+
+const createExcelResponse = (): Response => new Response(createExcelBuffer(), { status: 200 });
 
 const mockExcelFetch = (cookie?: string): ReturnType<typeof vi.spyOn> => vi
   .spyOn(globalThis, 'fetch')
   .mockResolvedValueOnce(new Response(JSON.stringify({
-    FileGuid: 'file-guid',
+    FileGuid: TEST_FILE_GUID,
     FileName: 'Round 3.xlsx',
   }), {
     headers: cookie ? { 'set-cookie': cookie } : undefined,
@@ -117,7 +136,7 @@ describe('apicalDataSource', () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        FileGuid: 'file-guid',
+        FileGuid: TEST_FILE_GUID,
         FileName: 'Round 3.xlsx',
       }), {
         headers: {
@@ -261,6 +280,83 @@ describe('apicalDataSource', () => {
     await expect(pullApicalRaceState(source, 'event-1')).rejects.toThrow('No Apical event id is configured for this source.');
   });
 
+  it('exports event 69, downloads the returned GUID file, and parses a valid two-sheet workbook', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(1781309520833));
+    convertDataToRaceState.mockReturnValue({
+      categories: [],
+      participants: [],
+      records: [],
+    });
+
+    const excelBuffer = createExcelBuffer(['Laps', 'Sheet1']);
+    const workbook = XLSX.read(excelBuffer, { type: 'array' });
+    expect(Object.keys(workbook.Sheets).sort()).toEqual(['Laps', 'Sheet1']);
+    expect(XLSX.utils.sheet_to_json(workbook.Sheets.Laps!)).toHaveLength(2);
+    expect(XLSX.utils.sheet_to_json(workbook.Sheets.Sheet1!)).toHaveLength(2);
+
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        FileGuid: APICAL_EVENT_69_FILE_GUID,
+        FileName: APICAL_EVENT_69_FILE_NAME,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(excelBuffer, { status: 200 }));
+
+    const source = createApicalEvent69Source();
+    const result = await fetchApicalRaceStateNow(source);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]?.[0] || '')).toBe('https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69&_=1781309520833');
+    expect(APICAL_EVENT_69_FILE_GUID).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    expect(String(fetchMock.mock.calls[1]?.[0] || '')).toBe('https://apicalracetiming.com.au/Download/DownloadExcel?fileGuid=1cf63381-1269-4257-b892-ef8b33424103&filename=Results%20%20GMBC%20Autumn%20No%20Frills%20Round%204%202026-6-12.xlsx');
+    expect(convertDataToRaceState).toHaveBeenCalledWith(createApicalCatalogEventId(69), expect.any(Date), [
+      expect.objectContaining({
+        CategoryName: 'A',
+        ParticipantViewModels: [
+          expect.objectContaining({
+            NumberOfLaps: 2,
+            RaceNumbers: '306',
+            TeamNameDisplay: 'Robert WOOD',
+          }),
+        ],
+      }),
+    ], 200000);
+    expect(result.apicalEventId).toBe(69);
+    expect(result.raceState).toEqual({
+      categories: [],
+      participants: [],
+      records: [],
+    });
+  });
+
+  it('rejects Apical Excel export responses that do not return a GUID file id', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        FileGuid: 'not-a-guid',
+        FileName: APICAL_EVENT_69_FILE_NAME,
+      }), { status: 200 }));
+
+    const promise = pullApicalRaceState(createApicalEvent69Source(), createEventId());
+    await expect(promise).rejects.toThrow(ApicalDataException);
+    await expect(promise).rejects.toThrow(/Apical Excel export response format was invalid/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws an Apical data exception when the Excel download response is empty', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        FileGuid: APICAL_EVENT_69_FILE_GUID,
+        FileName: APICAL_EVENT_69_FILE_NAME,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(new ArrayBuffer(0), { status: 200 }));
+
+    const promise = pullApicalRaceState(createApicalEvent69Source(), createEventId());
+    await expect(promise).rejects.toThrow(ApicalDataException);
+    await expect(promise).rejects.toThrow(/Apical Excel file downloaded from url https:\/\/apicalracetiming\.com\.au\/Download\/DownloadExcel\?fileGuid=1cf63381-1269-4257-b892-ef8b33424103&filename=Results%20%20GMBC%20Autumn%20No%20Frills%20Round%204%202026-6-12\.xlsx was empty/);
+  });
+
   it('pulls public Apical event data through the Excel export and download endpoints', async () => {
     convertDataToRaceState.mockReturnValue({});
 
@@ -273,7 +369,7 @@ describe('apicalDataSource', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[0]?.[0] || '')).toContain('/RaceResult/Event/ExportToExcel?eventId=301');
-    expect(String(fetchMock.mock.calls[1]?.[0] || '')).toContain('/Download/DownloadExcel?fileGuid=file-guid&filename=Round%203.xlsx');
+    expect(String(fetchMock.mock.calls[1]?.[0] || '')).toContain('/Download/DownloadExcel?fileGuid=11111111-1111-4111-8111-111111111111&filename=Round%203.xlsx');
     expect(String(fetchMock.mock.calls[0]?.[0] || '')).not.toContain('/raceresult/event/datafile');
     expect(String(fetchMock.mock.calls[1]?.[0] || '')).not.toContain('/raceresult/event/datafile');
   });
@@ -298,7 +394,7 @@ describe('apicalDataSource', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[0]?.[0] || '')).toContain('/RaceResult/Event/ExportToExcel?eventId=301');
-    expect(String(fetchMock.mock.calls[1]?.[0] || '')).toContain('/Download/DownloadExcel?fileGuid=file-guid&filename=Round%203.xlsx');
+    expect(String(fetchMock.mock.calls[1]?.[0] || '')).toContain('/Download/DownloadExcel?fileGuid=11111111-1111-4111-8111-111111111111&filename=Round%203.xlsx');
     expect(exportHeaders.get('Authorization')).toBe('Bearer test-token');
     expect(exportHeaders.get('X-Requested-With')).toBe('XMLHttpRequest');
     expect(downloadHeaders.get('Cookie')).toBe('session=xyz');

@@ -18,13 +18,13 @@
     "compile": "tsc && npm run compile:electron && babel index.mjs -d build",
     "compile:electron": "electron-forge package",
     "clean": "rimraf src/generated build dist .webpack .vite out",
-    "clean:all": "npm cache clean --force && npm run clean",
+    "clean:all": "npm cache clean --force && npm run clean && npx rimraf node_modules",
     "generate:handicaps": "tsx ./src/utils/apical/apicalTest.mts",
     "generate:handicaps:force-refresh": "tsx ./src/utils/apical/apicalTest.mts --force-refresh",
     "generate:handicaps:refresh-events": "tsx ./src/utils/apical/apicalTest.mts --refresh-events",
     "generate:handicaps:refresh-excel": "tsx ./src/utils/apical/apicalTest.mts --refresh-excel",
     "lint": "npm run lint:ts && npm run lint:json",
-    "lint:json": "jsonlint-cli src/**/*.json",
+    "lint:json": "node ./scripts/lintJson.mjs src",
     "lint:ts": "eslint",
     "kill-port": "tsx ./src/app/killPort.ts",
     "serve": "tsx ./src/app/startElectronForge.ts",
@@ -68,7 +68,7 @@
     "css-loader": "^7.1.4",
     "electron": "^42.4.0",
     "electron-squirrel-startup": "^1.0.1",
-    "eslint": "^10.4.1",
+    "eslint": "^10.5.0",
     "fork-ts-checker-webpack-plugin": "^9.1.0",
     "jsdom": "^29.1.1",
     "jsonlint-cli": "^1.0.1",
@@ -83,7 +83,7 @@
     "typescript": "^6.0.3",
     "vitest": "^4.1.8",
     "webpack-cli": "^7.0.3",
-    "webpack-dev-server": "^5.2.4"
+    "webpack-dev-server": "^5.2.5"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
@@ -118,7 +118,7 @@
   "allowScripts": {
     "electron@37.1.0": true,
     "electron-winstaller@5.4.0": true,
-    "esbuild@0.28.0": true
+    "esbuild@0.28.1": true
   },
   "overrides": {
     "tar": ">7.5.10",

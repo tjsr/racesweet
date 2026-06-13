@@ -771,12 +771,12 @@ describe('RaceSweetMainApp integration', () => {
       },
     };
 
-    vi.spyOn(globalThis, 'fetch')
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
       .mockImplementation(async (url) => {
         const requestUrl = String(url);
         if (requestUrl.includes('/RaceResult/Event/ExportToExcel')) {
           return new Response(JSON.stringify({
-            FileGuid: 'file-guid',
+            FileGuid: '11111111-1111-4111-8111-111111111111',
             FileName: 'Apical Downloaded Round.xlsx',
           }), { status: 200 });
         }
@@ -800,6 +800,10 @@ describe('RaceSweetMainApp integration', () => {
     await waitForTextNotPresent(container, 'Data last retrieved: Never');
     expect(container.textContent).toMatch(/Data last retrieved: \d{4}-\d{2}-\d{2}T/);
     expect(container.textContent).not.toContain('Active Event');
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/Download/DownloadExcel?fileGuid=11111111-1111-4111-8111-111111111111&filename=Apical%20Downloaded%20Round.xlsx'),
+      expect.any(Object)
+    );
 
     const latestConfigWrite = writtenFiles
       .filter((write) => write.filePath.includes('system-config.json'))

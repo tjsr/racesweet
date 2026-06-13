@@ -1,7 +1,8 @@
-import XLSX from 'xlsx';
+import { ApicalDataException } from '../../errors/apicalDataException.js';
 import { promises as fs } from 'fs';
 import { fetchExternalHttp } from '../externalHttp.js';
 import { getApicalEventExcelFilePath } from './excelGenerate.js';
+import XLSX from 'xlsx';
 
 export interface ApicalSpreadsheetLapsRow {
   EventName: string;
@@ -55,6 +56,9 @@ export const retrieveExcelData = async (fileGuid: string, fileName: string, even
       
       const buffer = await blob.arrayBuffer();
       // console.log('ArrayBuffer size:', buffer.byteLength);
+      if (buffer.byteLength === 0) {
+        throw new ApicalDataException(`Apical Excel file downloaded from URL ${url} was empty`);
+      }
       
       const nodeBuffer = Buffer.from(buffer);
       // console.log('Buffer size:', nodeBuffer.length);
@@ -66,8 +70,9 @@ export const retrieveExcelData = async (fileGuid: string, fileName: string, even
       console.log(`Excel data saved to temporary file: ${eventFileOutputPath} (${stats.size} bytes)`);
       return eventFileOutputPath;
     }).catch((error: unknown) => {
-      console.error(`Error retrieving Excel data from URL ${url}:`, error instanceof Error ? error.message : String(error));
-      throw new Error(`Error retrieving Excel data: ${error instanceof Error ? error.message : String(error)}`);
+      throw error instanceof ApicalDataException
+        ? error
+        : new Error(`Error retrieving Excel data: ${error instanceof Error ? error.message : String(error)}`);
     });
 };
 
@@ -76,12 +81,23 @@ export const readTempApicalExcelFile = async (dataPath: string): Promise<ApicalS
   try {
     const fileData = await fs.readFile(dataPath);
     const workbook = XLSX.read(fileData, { type: 'buffer' });
+    if (!workbook.Sheets || Object.keys(workbook.Sheets).length === 0) {
+      throw new ApicalDataException(`Apical Excel workbook ${dataPath} did not contain any sheets`);
+    }
     const worksheet = workbook.Sheets['Laps'] || workbook.Sheets['Sheet1'];
+    if (!worksheet) {
+      throw new ApicalDataException(`Apical Excel workbook ${dataPath} did not contain a Laps or Sheet1 worksheet`);
+    }
     const lapsData = XLSX.utils.sheet_to_json(worksheet) as ApicalSpreadsheetLapsRow[];
+    if (lapsData.length === 0) {
+      throw new ApicalDataException(`Apical Excel workbook ${dataPath} did not contain lap rows`);
+    }
 
     return lapsData;
   } catch (error: unknown) {
-    throw new Error(`Failed to read temporary Excel file: ${error instanceof Error ? error.message : String(error)}`);
+    throw error instanceof ApicalDataException
+      ? error
+      : new Error(`Failed to read temporary Excel file: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 

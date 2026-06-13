@@ -1,9 +1,11 @@
+import { ApicalDataException } from '../../errors/apicalDataException.js';
+import { promises as fs } from 'fs';
+import { tmpdir } from 'os';
+import path from 'path';
+import { fetchExternalHttp } from '../externalHttp.js';
 import { ApicalSpreadsheetLapsRow, retrieveExcelData } from './apicalEventSpreadsheet.js';
 
-import { promises as fs } from 'fs';
-import { fetchExternalHttp } from '../externalHttp.js';
-import path from 'path';
-import { tmpdir } from 'os';
+const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export interface ApicalExportToExcelResponse {
   Cookie: string;
@@ -11,43 +13,30 @@ export interface ApicalExportToExcelResponse {
   FileName: string;
 }
 
-export const generateExcelData = (eventId: number, timestamp: number = Date.now()): Promise<ApicalExportToExcelResponse> => {
+export const generateExcelData = async (eventId: number, timestamp: number = Date.now()): Promise<ApicalExportToExcelResponse> => {
   const url = `https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=${eventId}&_=${timestamp}`;
 
-  return fetchExternalHttp(url, {
+  const response = await fetchExternalHttp(url, {
     headers: {
       'X-Requested-With': 'XMLHttpRequest',
     },
     method: 'GET',
-  })
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error(`Failed to generate Excel data: ${response.statusText}`);
-      }
-      const result = {
-        cookie: response.headers.get('set-cookie') || '',
-        json: response.json(),
-      };
-      return result;
-    })
-    .then((result) => { // }: ApicalExportToExcelResponse) => {
-      const { cookie, json } = result;
-      return json.then((jsonData) => {
-        if (!jsonData || !jsonData.FileGuid || !jsonData.FileName) {
-          throw new Error('Invalid Excel export response format');
-        }
+  });
 
-        if (!json || !jsonData.FileGuid || !jsonData.FileName) {
-          throw new Error('Invalid Excel export response format');
-        }
-        const data: ApicalExportToExcelResponse = {
-          Cookie: cookie,
-          FileGuid: jsonData.FileGuid,
-          FileName: jsonData.FileName,
-        };
-        return data;
-      });
-    });
+  if (!response.ok) {
+    throw new Error(`Failed to generate Excel data: ${response.statusText}`);
+  }
+
+  const jsonData = await response.json() as Partial<ApicalExportToExcelResponse>;
+  if (!jsonData.FileGuid || !GUID_REGEX.test(String(jsonData.FileGuid)) || !jsonData.FileName) {
+    throw new ApicalDataException(`Invalid Excel export response format from url ${url}`);
+  }
+
+  return {
+    Cookie: response.headers.get('set-cookie') || '',
+    FileGuid: jsonData.FileGuid,
+    FileName: jsonData.FileName,
+  };
 };
 
 export const getApicalEventExcelFilePath = (eventId: number): string => {

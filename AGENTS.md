@@ -54,6 +54,12 @@ When adding new user-facing features, update or add the relevant unit and integr
 
 Feature work that creates or changes events, sessions, categories, entrants, data sources, or race data must update state only through the appropriate service layer.  Do not add UI-only state changes that bypass ledger mutation, persistence, or the configured API/upstream callback.
 
+A job is failed if any Vitest test fails.  Existing test failures must be fixed before handoff, not treated as acceptable background noise unless there is a clearly documented external blocker.
+
+Agents must solve existing code failures so the project passes relevant Vitest tests, TypeScript checks, and lint checks before reporting completion.
+
+Run `npm i` before tests or lint whenever dependencies are missing, stale, or suspect.
+
 ## Ledger data format
 
 Remember that all data and modifications should occur in a ledger format, where modifications are an action and all previous data is immutable.  State becomes modified by instructions in sequence over time, and once modified never changes.  If we change an entrants category or name for example, the original information will not change but we log a change in the event data to indicate that it has to be updated.  That update is then reflected in the model.
