@@ -3,6 +3,7 @@
   "compilerOptions": {
     "allowJs": true,
     "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "experimentalDecorators": true,
     "esModuleInterop": true,
     "jsx": "react-jsx",
@@ -16,7 +17,7 @@
     "sourceMap": true,
     "skipLibCheck": true,
     "target": "ESNext",
-    "types": ["vitest/globals"],
+    "types": ["node", "vite/client", "vitest/globals", "vitest/importMeta"],
     "verbatimModuleSyntax": false,
     "noUncheckedSideEffectImports": true,
     // "paths": {

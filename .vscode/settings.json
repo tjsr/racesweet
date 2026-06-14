@@ -8,6 +8,8 @@
     "watchDirectoryTimeout": 1000,
     "log": "off"
   },
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.tsdk": "node_modules/typescript/lib",
   "files.watcherExclude": {
     "**/.git/**": true,
     "**/node_modules/**": true,
