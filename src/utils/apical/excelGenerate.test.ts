@@ -1,4 +1,5 @@
 import { ApicalDataException } from '../../errors/apicalDataException.js';
+import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from './excelDownload.js';
 import { generateExcelData, generateOrGetCachedEventPath, getApicalEventExcelFilePath } from './excelGenerate.js';
 import { promises as fs } from 'fs';
 import { readTempApicalExcelFile, retrieveExcelData } from './apicalEventSpreadsheet.js';
@@ -8,6 +9,19 @@ const APICAL_EVENT_ID = 69;
 const APICAL_FILE_GUID = '1cf63381-1269-4257-b892-ef8b33424103';
 const APICAL_FILE_NAME = 'Results  GMBC Autumn No Frills Round 4 2026-6-12.xlsx';
 const APICAL_TIMESTAMP = 1781309520833;
+
+const expectRequiredDownloadHeaders = (headers: Headers, cookie: string): void => {
+  expect(headers.get('Accept')).toBe(APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER);
+  expect(headers.get('Accept-Encoding')).toBe('gzip, deflate, br, zstd');
+  expect(headers.get('Cache-Control')).toBe('max-age=0');
+  expect(headers.get('Cookie')).toBe(cookie);
+  expect(headers.get('Referrer')).toBe('https://apicalracetiming.com.au/raceresult/event/detail?id=69');
+  expect(headers.get('Sec-Fetch-Dest')).toBe('document');
+  expect(headers.get('Sec-Fetch-Mode')).toBe('navigate');
+  expect(headers.get('Sec-Fetch-Site')).toBe('none');
+  expect(headers.get('Sec-Fetch-User')).toBe('?1');
+  expect(headers.get('Upgrade-Insecure-Requests')).toBe('1');
+};
 
 const createRows = () => [
   {
@@ -92,8 +106,7 @@ describe('apical Excel generation utilities', () => {
     const callOptions = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const headers = new Headers(callOptions.headers);
     expect(String(fetchMock.mock.calls[0]?.[0] || '')).toBe('https://apicalracetiming.com.au/Download/DownloadExcel?fileGuid=1cf63381-1269-4257-b892-ef8b33424103&filename=Results%20%20GMBC%20Autumn%20No%20Frills%20Round%204%202026-6-12.xlsx');
-    expect(headers.get('Cookie')).toBe('session=abc123');
-    expect(headers.get('Referrer')).toBe('https://apicalracetiming.com.au/raceresult/event/detail?id=69');
+    expectRequiredDownloadHeaders(headers, 'session=abc123');
     expect(Object.keys(workbook.Sheets).sort()).toEqual(['Laps', 'Sheet1']);
     expect(lapsRows).toHaveLength(1);
     expect(sheet1Rows).toHaveLength(1);

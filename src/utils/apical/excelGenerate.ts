@@ -5,6 +5,8 @@ import path from 'path';
 import { fetchExternalHttp } from '../externalHttp.js';
 import { ApicalSpreadsheetLapsRow, retrieveExcelData } from './apicalEventSpreadsheet.js';
 
+export { createApicalExcelDownloadHeaders, getApicalExcelDownloadUrl } from './excelDownload.js';
+
 const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export interface ApicalExportToExcelResponse {

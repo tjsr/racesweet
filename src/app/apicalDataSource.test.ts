@@ -3,6 +3,7 @@ import { createEventId } from '../model/ids.js';
 import type { EventId } from '../model/raceevent.js';
 import { createApicalCatalogEventId, fetchApicalEvents, fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.js';
 import type { DataSourceConfig } from './systemConfig.js';
+import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from '../utils/apical/excelDownload.js';
 import { v1 as randomUUID, v5 as uuidv5 } from 'uuid';
 import XLSX from 'xlsx';
 
@@ -10,6 +11,20 @@ const convertDataToRaceState = vi.fn();
 const APICAL_EVENT_69_FILE_GUID = '1cf63381-1269-4257-b892-ef8b33424103';
 const APICAL_EVENT_69_FILE_NAME = 'Results  GMBC Autumn No Frills Round 4 2026-6-12.xlsx';
 const TEST_FILE_GUID = '11111111-1111-4111-8111-111111111111';
+
+const expectRequiredDownloadHeaders = (headers: Headers, baseUrl: string, eventId: number, cookie: string): void => {
+  const trimmedBaseUrl = baseUrl.replace(/\/$/, '');
+  expect(headers.get('Accept')).toBe(APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER);
+  expect(headers.get('Accept-Encoding')).toBe('gzip, deflate, br, zstd');
+  expect(headers.get('Cache-Control')).toBe('max-age=0');
+  expect(headers.get('Cookie')).toBe(cookie);
+  expect(headers.get('Referrer')).toBe(`${trimmedBaseUrl}/raceresult/event/detail?id=${eventId}`);
+  expect(headers.get('Sec-Fetch-Dest')).toBe('document');
+  expect(headers.get('Sec-Fetch-Mode')).toBe('navigate');
+  expect(headers.get('Sec-Fetch-Site')).toBe('none');
+  expect(headers.get('Sec-Fetch-User')).toBe('?1');
+  expect(headers.get('Upgrade-Insecure-Requests')).toBe('1');
+};
 
 vi.mock('../parsers/apical.js', () => ({
   convertDataToRaceState: (...args: unknown[]) => convertDataToRaceState(...args),
@@ -93,6 +108,7 @@ const mockExcelFetch = (cookie?: string): ReturnType<typeof vi.spyOn> => vi
 describe('apicalDataSource', () => {
   beforeEach(() => {
     convertDataToRaceState.mockReset();
+    vi.spyOn(console, 'debug').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -221,13 +237,20 @@ describe('apicalDataSource', () => {
 
   it('throws clear error when Apical event list request fails', async () => {
     vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(new Response('Apical says this session is not authenticated', { status: 401, statusText: 'Unauthorized' }));
+      .mockResolvedValueOnce(new Response('Apical says this session is not authenticated', {
+        headers: {
+          'content-type': 'text/plain',
+          'x-apical-request-id': 'request-401',
+        },
+        status: 401,
+        statusText: 'Unauthorized',
+      }));
 
     const source = createApicalSource();
     source.apiConfig!.authHeaderValue = '';
 
     await expect(fetchApicalEvents(source)).rejects.toThrow(
-      /Apical event list request returned HTTP 401 Unauthorized\.[\s\S]*URL: https:\/\/apical\.example\.com\/raceresult\/event\/getall\?companyId=12&_=.+[\s\S]*HTTP status: 401 Unauthorized[\s\S]*Request headers:[\s\S]*accept: application\/json[\s\S]*Response body: Apical says this session is not authenticated/
+      /Apical event list request returned HTTP 401 Unauthorized\.[\s\S]*URL: https:\/\/apical\.example\.com\/raceresult\/event\/getall\?companyId=12&_=.+[\s\S]*HTTP status: 401 Unauthorized[\s\S]*Request headers:[\s\S]*accept: application\/json[\s\S]*Response headers:[\s\S]*content-type: text\/plain[\s\S]*x-apical-request-id: request-401[\s\S]*Response body: Apical says this session is not authenticated/
     );
   });
 
@@ -241,6 +264,7 @@ describe('apicalDataSource', () => {
   });
 
   it('throws event list error details with forwarded session cookie header redacted', async () => {
+    const debugMock = vi.mocked(console.debug);
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify({
         FileGuid: 'file-guid',
@@ -251,11 +275,21 @@ describe('apicalDataSource', () => {
         },
         status: 200,
       }))
-      .mockResolvedValueOnce(new Response('Session cookie was rejected', { status: 401, statusText: 'Unauthorized' }));
+      .mockResolvedValueOnce(new Response('Session cookie was rejected', {
+        headers: {
+          'set-cookie': 'session=expired',
+        },
+        status: 401,
+        statusText: 'Unauthorized',
+      }));
 
     await expect(fetchApicalEvents(createApicalSource())).rejects.toThrow(
       /Apical event list request returned HTTP 401 Unauthorized\.[\s\S]*Request headers:[\s\S]*authorization: \[redacted, 17 chars\][\s\S]*cookie: \[redacted, 14 chars\][\s\S]*Response body: Session cookie was rejected/
     );
+    const debugOutput = debugMock.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(debugOutput).toContain('set-cookie: session=abc123');
+    expect(debugOutput).toContain('cookie: session=abc123');
+    expect(debugOutput).toContain('set-cookie: session=expired');
   });
 
   it('throws network failure details with request options, timeout, redacted headers, and original cause', async () => {
@@ -268,7 +302,7 @@ describe('apicalDataSource', () => {
     source.apiConfig!.httpTimeoutSeconds = 7;
 
     await expect(fetchApicalEvents(source)).rejects.toThrow(
-      /Apical authentication request failed\.[\s\S]*URL: https:\/\/apical\.example\.com\/RaceResult\/Event\/ExportToExcel\?eventId=301&_=.+[\s\S]*Request options:[\s\S]*method: GET[\s\S]*mode: \(default\)[\s\S]*timeoutMs: 7000[\s\S]*Request headers:[\s\S]*authorization: \[redacted, 17 chars\][\s\S]*x-requested-with: XMLHttpRequest[\s\S]*Error name: TypeError[\s\S]*Error message: Failed to fetch[\s\S]*Error cause:[\s\S]*Error name: Error[\s\S]*Error message: DNS lookup failed[\s\S]*Error code: ENOTFOUND[\s\S]*Stack:/
+      /Apical authentication request failed\.[\s\S]*URL: https:\/\/apical\.example\.com\/RaceResult\/Event\/ExportToExcel\?eventId=301&_=.+[\s\S]*Request options:[\s\S]*method: GET[\s\S]*mode: \(default\)[\s\S]*timeoutMs: 7000[\s\S]*Request headers:[\s\S]*authorization: \[redacted, 17 chars\][\s\S]*x-requested-with: XMLHttpRequest[\s\S]*Response: no HTTP response was received before fetch failed\.[\s\S]*Error name: TypeError[\s\S]*Error message: Failed to fetch[\s\S]*Error cause:[\s\S]*Error name: Error[\s\S]*Error message: DNS lookup failed[\s\S]*Error code: ENOTFOUND[\s\S]*Stack:/
     );
   });
 
@@ -300,7 +334,12 @@ describe('apicalDataSource', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({
         FileGuid: APICAL_EVENT_69_FILE_GUID,
         FileName: APICAL_EVENT_69_FILE_NAME,
-      }), { status: 200 }))
+      }), {
+        headers: {
+          'set-cookie': 'session=event69',
+        },
+        status: 200,
+      }))
       .mockResolvedValueOnce(new Response(excelBuffer, { status: 200 }));
 
     const source = createApicalEvent69Source();
@@ -310,6 +349,7 @@ describe('apicalDataSource', () => {
     expect(String(fetchMock.mock.calls[0]?.[0] || '')).toBe('https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69&_=1781309520833');
     expect(APICAL_EVENT_69_FILE_GUID).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
     expect(String(fetchMock.mock.calls[1]?.[0] || '')).toBe('https://apicalracetiming.com.au/Download/DownloadExcel?fileGuid=1cf63381-1269-4257-b892-ef8b33424103&filename=Results%20%20GMBC%20Autumn%20No%20Frills%20Round%204%202026-6-12.xlsx');
+    expectRequiredDownloadHeaders(new Headers((fetchMock.mock.calls[1]?.[1] as RequestInit).headers), 'https://apicalracetiming.com.au', 69, 'session=event69');
     expect(convertDataToRaceState).toHaveBeenCalledWith(createApicalCatalogEventId(69), expect.any(Date), [
       expect.objectContaining({
         CategoryName: 'A',
@@ -350,11 +390,19 @@ describe('apicalDataSource', () => {
         FileGuid: APICAL_EVENT_69_FILE_GUID,
         FileName: APICAL_EVENT_69_FILE_NAME,
       }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(new ArrayBuffer(0), { status: 200 }));
+      .mockResolvedValueOnce(new Response(new ArrayBuffer(0), {
+        headers: {
+          'content-length': '0',
+          'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'x-apical-request-id': 'download-empty',
+        },
+        status: 200,
+        statusText: 'OK',
+      }));
 
     const promise = pullApicalRaceState(createApicalEvent69Source(), createEventId());
     await expect(promise).rejects.toThrow(ApicalDataException);
-    await expect(promise).rejects.toThrow(/Apical Excel file downloaded from url https:\/\/apicalracetiming\.com\.au\/Download\/DownloadExcel\?fileGuid=1cf63381-1269-4257-b892-ef8b33424103&filename=Results%20%20GMBC%20Autumn%20No%20Frills%20Round%204%202026-6-12\.xlsx was empty/);
+    await expect(promise).rejects.toThrow(/Apical Excel file downloaded from url https:\/\/apicalracetiming\.com\.au\/Download\/DownloadExcel\?fileGuid=1cf63381-1269-4257-b892-ef8b33424103&filename=Results%20%20GMBC%20Autumn%20No%20Frills%20Round%204%202026-6-12\.xlsx was empty[\s\S]*Response status: 200 OK[\s\S]*Response headers:[\s\S]*content-length: 0[\s\S]*content-type: application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet[\s\S]*x-apical-request-id: download-empty/);
   });
 
   it('pulls public Apical event data through the Excel export and download endpoints', async () => {
@@ -370,6 +418,7 @@ describe('apicalDataSource', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[0]?.[0] || '')).toContain('/RaceResult/Event/ExportToExcel?eventId=301');
     expect(String(fetchMock.mock.calls[1]?.[0] || '')).toContain('/Download/DownloadExcel?fileGuid=11111111-1111-4111-8111-111111111111&filename=Round%203.xlsx');
+    expectRequiredDownloadHeaders(new Headers((fetchMock.mock.calls[1]?.[1] as RequestInit).headers), 'https://apical.example.com', 301, '');
     expect(String(fetchMock.mock.calls[0]?.[0] || '')).not.toContain('/raceresult/event/datafile');
     expect(String(fetchMock.mock.calls[1]?.[0] || '')).not.toContain('/raceresult/event/datafile');
   });
@@ -397,7 +446,7 @@ describe('apicalDataSource', () => {
     expect(String(fetchMock.mock.calls[1]?.[0] || '')).toContain('/Download/DownloadExcel?fileGuid=11111111-1111-4111-8111-111111111111&filename=Round%203.xlsx');
     expect(exportHeaders.get('Authorization')).toBe('Bearer test-token');
     expect(exportHeaders.get('X-Requested-With')).toBe('XMLHttpRequest');
-    expect(downloadHeaders.get('Cookie')).toBe('session=xyz');
+    expectRequiredDownloadHeaders(downloadHeaders, 'https://apical.example.com', 301, 'session=xyz');
     expect(convertDataToRaceState).toHaveBeenCalledWith(round1EventId, expect.any(Date), [
       {
         CategoryName: 'A',

@@ -3,6 +3,7 @@ import type { ApicalLapByCategory } from '../model/apical.js';
 import { EventId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
+import { createApicalExcelDownloadHeaders, getApicalExcelDownloadUrl } from '../utils/apical/excelDownload.js';
 import { fetchExternalHttp } from '../utils/externalHttp.js';
 import { remapStackTrace } from './stackTrace.js';
 import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
@@ -141,9 +142,14 @@ const isSensitiveHeader = (name: string): boolean => {
     normalizedName.includes('key');
 };
 
-const formatRequestHeaders = (headersInit: RequestInit['headers']): string => {
+const formatHeaders = (
+  heading: string,
+  headersInit: HeadersInit | undefined,
+  includeSensitiveHeaders: boolean = false,
+  note?: string
+): string => {
   if (!headersInit) {
-    return 'Request headers: (none)';
+    return `${heading} (none)`;
   }
 
   try {
@@ -151,17 +157,42 @@ const formatRequestHeaders = (headersInit: RequestInit['headers']): string => {
     const headerLines = Array.from(headers.entries())
       .sort(([headerNameA], [headerNameB]) => headerNameA.localeCompare(headerNameB))
       .map(([name, value]) => {
-        const displayValue = isSensitiveHeader(name) ? `[redacted, ${value.length} chars]` : value;
+        const displayValue = !includeSensitiveHeaders && isSensitiveHeader(name) ? `[redacted, ${value.length} chars]` : value;
         return `  ${name}: ${displayValue}`;
       });
 
     return headerLines.length > 0
-      ? ['Request headers:', ...headerLines].join('\n')
-      : 'Request headers: (none)';
+      ? [heading, note ? `  (${note})` : undefined, ...headerLines].filter((line): line is string => Boolean(line)).join('\n')
+      : `${heading} (none)`;
   } catch (error: unknown) {
-    return `Request headers: could not format headers: ${getErrorMessage(error)}`;
+    return `${heading} could not format headers: ${getErrorMessage(error)}`;
   }
 };
+
+export const formatRequestHeaders = (
+  headersInit: RequestInit['headers'],
+  includeSensitiveHeaders: boolean = false
+): string => formatHeaders(
+  'Request headers:',
+  headersInit,
+  includeSensitiveHeaders,
+  includeSensitiveHeaders ? 'client-provided fetch headers; sensitive values included for debug output' : 'client-provided fetch headers; sensitive values redacted'
+);
+
+export const formatResponseHeaders = (
+  response: Response,
+  includeSensitiveHeaders: boolean = false
+): string => formatHeaders(
+  'Response headers:',
+  response.headers,
+  includeSensitiveHeaders,
+  includeSensitiveHeaders ? 'sensitive values included for debug output' : 'sensitive values redacted'
+);
+
+const formatResponseStatusAndHeaders = (response: Response): string => [
+  `Response status: ${response.status} ${response.statusText || '(no status text)'}`,
+  formatResponseHeaders(response),
+].join('\n');
 
 const formatRequestOptions = (init: RequestInit, timeoutMs: number): string => [
   'Request options:',
@@ -213,11 +244,12 @@ const formatUnknownErrorDetails = (error: unknown): string => {
   return details.join('\n');
 };
 
-const describeRequestFailure = (phase: string, url: string, init: RequestInit, timeoutMs: number, error: unknown): string => [
+const describeRequestFailure = (phase: string, url: string, init: RequestInit, timeoutMs: number, error: unknown, includeSensitiveHeaders: boolean = false): string => [
   `Apical ${phase} request failed.`,
   `URL: ${url}`,
   formatRequestOptions(init, timeoutMs),
-  formatRequestHeaders(init.headers),
+  formatRequestHeaders(init.headers, includeSensitiveHeaders),
+  'Response: no HTTP response was received before fetch failed.',
   formatUnknownErrorDetails(error),
 ].join('\n');
 
@@ -225,10 +257,16 @@ const fetchApicalResponse = async (
   phase: string,
   url: string,
   init: RequestInit,
-  timeoutMs: number
+  timeoutMs: number,
+  logSensitiveHeaders: boolean = false
 ): Promise<Response> => {
   let response: Response;
   try {
+    console.debug([
+      `Fetching Apical ${phase} request from url ${url}.`,
+      formatRequestOptions(init, timeoutMs),
+      formatRequestHeaders(init.headers, true),
+    ].join('\n'));
     response = await fetchExternalHttp(url, {
       body: init.body,
       headers: init.headers,
@@ -239,13 +277,21 @@ const fetchApicalResponse = async (
     throw new Error(describeRequestFailure(phase, url, init, timeoutMs, error), { cause: error });
   }
 
+  console.debug([
+    `Received Apical ${phase} response from url ${url}.`,
+    `HTTP status: ${response.status} ${response.statusText || '(no status text)'}`,
+    formatRequestHeaders(response.headers, true),
+    formatResponseHeaders(response, true),
+  ].join('\n'));
+
   if (!response.ok) {
     const body = await readResponseBody(response);
     throw new Error([
       `Apical ${phase} request returned HTTP ${response.status} ${response.statusText || '(no status text)'}.`,
       `URL: ${url}`,
       `HTTP status: ${response.status} ${response.statusText || '(no status text)'}`,
-      formatRequestHeaders(init.headers),
+      formatRequestHeaders(init.headers, logSensitiveHeaders),
+      formatResponseHeaders(response, logSensitiveHeaders),
       body ? `Response body: ${body}` : 'Response body: (empty)',
     ].join('\n'));
   }
@@ -338,10 +384,16 @@ const generateApicalExcelExport = async (source: DataSourceConfig, apicalEventId
     },
     source.apiConfig.httpTimeoutSeconds * 1000
   );
+  console.debug(`Request headers for Excel export: ${formatRequestHeaders(headers, true)}`);
+  console.debug(`Response headers for Excel export: ${formatResponseHeaders(response, true)}`);
 
   const payload = await response.json() as Partial<ApicalExportToExcelResponse>;
   if (!payload.FileGuid || !isGuid(payload.FileGuid) || !payload.FileName) {
-    throw new ApicalDataException(`Apical Excel export response format was invalid, payload: ${JSON.stringify(payload)}`);
+    throw new ApicalDataException([
+      `Apical Excel export response format was invalid, payload: ${JSON.stringify(payload)}`,
+      formatRequestHeaders(headers, true),
+      formatResponseStatusAndHeaders(response),
+    ].join('\n'));
   }
 
   return {
@@ -404,35 +456,49 @@ const readApicalExcelPayload = async (sourceUrl: string, response: Response): Pr
   if (!response) {
     throw new ApicalDataException(`No response received when trying to read Apical Excel payload from url ${sourceUrl}`);
   }
+  const responseDiagnostics = formatResponseStatusAndHeaders(response);
   const XLSX = await loadXlsx();
   const buffer = await response.arrayBuffer();
   if (buffer.byteLength === 0) {
-    throw new ApicalDataException(`Apical Excel file downloaded from url ${sourceUrl} was empty`);
+    throw new ApicalDataException([
+      `Apical Excel file downloaded from url ${sourceUrl} was empty`,
+      responseDiagnostics,
+    ].join('\n'));
   }
   const workbook = XLSX.read(buffer, { type: 'array' });
   if (!workbook) {
-    throw new ApicalDataException(`Failed to parse Apical Excel workbook from url ${sourceUrl}, no data returned.`);
+    throw new ApicalDataException([
+      `Failed to parse Apical Excel workbook from url ${sourceUrl}, no data returned.`,
+      responseDiagnostics,
+    ].join('\n'));
   }
   if (!workbook.Sheets || Object.keys(workbook.Sheets).length === 0) {
-    throw new ApicalDataException(`Apical Excel workbook from url ${sourceUrl} did not contain any sheets`);
+    throw new ApicalDataException([
+      `Apical Excel workbook from url ${sourceUrl} did not contain any sheets`,
+      responseDiagnostics,
+    ].join('\n'));
   }
   const worksheet = workbook.Sheets.Laps || workbook.Sheets.Sheet1;
   if (!worksheet) {
     const sheetList = Object.keys(workbook.Sheets).join(', ');
-    throw new ApicalDataException(`Apical Excel workbook from url ${sourceUrl} did not contain a Laps or Sheet1 worksheet, but contained sheets ${sheetList}`);
+    throw new ApicalDataException([
+      `Apical Excel workbook from url ${sourceUrl} did not contain a Laps or Sheet1 worksheet, but contained sheets ${sheetList}`,
+      responseDiagnostics,
+    ].join('\n'));
   }
   const sheetList = Object.keys(workbook.Sheets).join(', ');
   console.debug(`Apical Excel workbook from url ${sourceUrl} contains sheets: ${sheetList}, using ${worksheet === workbook.Sheets.Laps ? 'Laps' : 'Sheet1'}`);
 
   const rows = XLSX.utils.sheet_to_json<ApicalSpreadsheetLapsRow>(worksheet);
   if (rows.length === 0) {
-    throw new ApicalDataException(`Apical Excel workbook from url ${sourceUrl} did not contain lap rows, but contained sheets ${sheetList}`);
+    throw new ApicalDataException([
+      `Apical Excel workbook from url ${sourceUrl} did not contain lap rows, but contained sheets ${sheetList}`,
+      responseDiagnostics,
+    ].join('\n'));
   }
 
   return convertApicalSpreadsheetRowsToApicalData(rows);
 };
-
-const getApicalExcelFileUrl = (baseUrl: string, fileGuid: string, fileName: string): string => `${trimSlash(baseUrl)}/Download/DownloadExcel?fileGuid=${fileGuid}&filename=${encodeURIComponent(fileName)}`;
 
 const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId: number): Promise<ApicalLapByCategory> => {
   if (!source.apiConfig) {
@@ -440,13 +506,8 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
   }
 
   const exportResponse = await generateApicalExcelExport(source, apicalEventId);
-  const headers = new Headers();
-  if (exportResponse.Cookie) {
-    headers.set('Cookie', exportResponse.Cookie);
-  }
-  headers.set('Accept', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,*/*');
-  headers.set('Referrer', `${trimSlash(source.apiConfig.baseUrl)}/raceresult/event/detail?id=${apicalEventId}`);
-  const url = getApicalExcelFileUrl(source.apiConfig.baseUrl, exportResponse.FileGuid, exportResponse.FileName);
+  const headers = createApicalExcelDownloadHeaders(source.apiConfig.baseUrl, apicalEventId, exportResponse.Cookie || '');
+  const url = getApicalExcelDownloadUrl(source.apiConfig.baseUrl, exportResponse.FileGuid, exportResponse.FileName);
 
   const response = await fetchApicalResponse(
     'Excel download',

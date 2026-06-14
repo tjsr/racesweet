@@ -2,6 +2,7 @@
 
 import { type ApicalSpreadsheetLapsRow, convertApicalSpreadsheetRowsToApicalData, createApicalCatalogEventId } from './apicalDataSource.js';
 import { type Root, createRoot } from 'react-dom/client';
+import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from '../utils/apical/excelDownload.js';
 import type { ApicalLapByCategory } from '../model/apical.js';
 import { RaceSweetMainApp } from './App.js';
 import React from 'react';
@@ -157,6 +158,20 @@ const apicalDataToSpreadsheetRows = (apicalData: ApicalLapByCategory): ApicalSpr
       }));
     });
   });
+};
+
+const expectRequiredDownloadHeaders = (headers: Headers, baseUrl: string, eventId: number, cookie: string): void => {
+  const trimmedBaseUrl = baseUrl.replace(/\/$/, '');
+  expect(headers.get('Accept')).toBe(APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER);
+  expect(headers.get('Accept-Encoding')).toBe('gzip, deflate, br, zstd');
+  expect(headers.get('Cache-Control')).toBe('max-age=0');
+  expect(headers.get('Cookie')).toBe(cookie);
+  expect(headers.get('Referrer')).toBe(`${trimmedBaseUrl}/raceresult/event/detail?id=${eventId}`);
+  expect(headers.get('Sec-Fetch-Dest')).toBe('document');
+  expect(headers.get('Sec-Fetch-Mode')).toBe('navigate');
+  expect(headers.get('Sec-Fetch-Site')).toBe('none');
+  expect(headers.get('Sec-Fetch-User')).toBe('?1');
+  expect(headers.get('Upgrade-Insecure-Requests')).toBe('1');
 };
 
 const createApicalWorkbookResponse = (apicalData: ApicalLapByCategory): Response => {
@@ -778,7 +793,12 @@ describe('RaceSweetMainApp integration', () => {
           return new Response(JSON.stringify({
             FileGuid: '11111111-1111-4111-8111-111111111111',
             FileName: 'Apical Downloaded Round.xlsx',
-          }), { status: 200 });
+          }), {
+            headers: {
+              'set-cookie': 'session=apical-cookie',
+            },
+            status: 200,
+          });
         }
 
         if (requestUrl.includes('/Download/DownloadExcel')) {
@@ -804,6 +824,16 @@ describe('RaceSweetMainApp integration', () => {
       expect.stringContaining('/Download/DownloadExcel?fileGuid=11111111-1111-4111-8111-111111111111&filename=Apical%20Downloaded%20Round.xlsx'),
       expect.any(Object)
     );
+    const exportCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/RaceResult/Event/ExportToExcel'));
+    expect(exportCall).toBeDefined();
+    const exportHeaders = new Headers((exportCall![1] as RequestInit).headers);
+    expect(exportHeaders.get('X-Requested-With')).toBe('XMLHttpRequest');
+    expect(exportHeaders.get('Accept')).toBe('application/json');
+
+    const downloadCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/Download/DownloadExcel'));
+    expect(downloadCall).toBeDefined();
+    const downloadHeaders = new Headers((downloadCall![1] as RequestInit).headers);
+    expectRequiredDownloadHeaders(downloadHeaders, 'https://apical.example.com', 1001, 'session=apical-cookie');
 
     const latestConfigWrite = writtenFiles
       .filter((write) => write.filePath.includes('system-config.json'))
