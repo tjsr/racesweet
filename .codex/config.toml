@@ -1,0 +1,8 @@
+[mcp_servers.qualcomm_npu]
+command = "node"
+args = ["./tools/qualcomm-npu-mcp/dist/server.js"]
+cwd = "C:/dev/racesweet"
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+default_tools_approval_mode = "approve"
+enabled_tools = ["summarize_logs", "classify_failure", "rank_files"]

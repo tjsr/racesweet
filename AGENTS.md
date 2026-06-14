@@ -65,3 +65,18 @@ Run `npm i` before tests or lint whenever dependencies are missing, stale, or su
 Remember that all data and modifications should occur in a ledger format, where modifications are an action and all previous data is immutable.  State becomes modified by instructions in sequence over time, and once modified never changes.  If we change an entrants category or name for example, the original information will not change but we log a change in the event data to indicate that it has to be updated.  That update is then reflected in the model.
 
 These changes are sent either by the server as an update to all clients, or stored in the event log when the data is persisted locally.  Every update event is sent to the controller, which will write that log entry to disk, and may also push that event to the server responsible for handling the event.
+
+## Local NPU agents
+
+Check whether or not we have access to either a Qualcomm NPU agent or an own-hosted ollama model on an nVidia GPU.
+
+When a task is small, read-only, and suitable for local inference, prefer the `qualcomm_npu` MCP tools if it is available on the local system.
+
+Use the NPU tools for:
+- Evaluating the output of command line tool output.
+- summarizing test logs
+- classifying known failure patterns
+- ranking likely files to inspect
+- extracting structured facts from local text
+
+Do not use NPU tools for code edits, final decisions, or tasks requiring full repository reasoning unless the user explicitly asks.
