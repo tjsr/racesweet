@@ -93,9 +93,11 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
     try {
       await props.onLoadApicalEvents(sourceId);
     } catch (error: unknown) {
+      const formattedError = formatErrorForDisplay(error);
+      console.error(`Failed to fetch Apical events for source ${sourceId}:\n${formattedError}`);
       setSourceFetchErrors((current) => ({
         ...current,
-        [sourceId]: formatErrorForDisplay(error),
+        [sourceId]: formattedError,
       }));
     }
   };
@@ -110,9 +112,11 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
     try {
       await props.onFetchApicalDataNow(sourceId);
     } catch (error: unknown) {
+      const formattedError = formatErrorForDisplay(error);
+      console.error(`Failed to fetch Apical event data for source ${sourceId}:\n${formattedError}`);
       setSourceFetchErrors((current) => ({
         ...current,
-        [sourceId]: formatErrorForDisplay(error),
+        [sourceId]: formattedError,
       }));
     }
   };

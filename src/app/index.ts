@@ -1,8 +1,7 @@
 import './runtimeSourceMaps.ts';
 
 import { BrowserWindow, app, dialog, ipcMain, session } from 'electron';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import type { ExternalHttpProxyRequest, ExternalHttpProxyResponse, SelectLocalFileOptions } from './window';
 import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
@@ -15,8 +14,11 @@ import {
 } from '../model/electronIpc';
 import { buildContentSecurityPolicy, injectContentSecurityPolicyHeader } from './contentSecurityPolicy';
 import { injectCorsHeaders, isAllowedCorsDownloadUrl } from './electron/corsHeaders';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { waitForContentServer, waitForWindowContentLoad } from './startupContentServer';
-import type { ExternalHttpProxyRequest, ExternalHttpProxyResponse, SelectLocalFileOptions } from './window';
+
+import { fetchExternalHttpProxy } from './externalHttpProxy';
+import path from 'node:path';
 
 const __dirname = path.dirname(__filename);
 
@@ -74,51 +76,6 @@ const showStartupError = (error: Error): void => {
 
   console.error(`RaceSweet startup failed: ${detail}`);
   dialog.showErrorBox('RaceSweet startup failed', error.message);
-};
-
-const toHeaderRecord = (headers: Headers): Record<string, string> => {
-  return Array.from(headers.entries()).reduce<Record<string, string>>((accumulator, [name, value]) => {
-    accumulator[name] = value;
-    return accumulator;
-  }, {});
-};
-
-const fetchExternalHttp = async (request: ExternalHttpProxyRequest): Promise<ExternalHttpProxyResponse> => {
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(request.url);
-  } catch {
-    throw new Error(`Invalid external request URL: ${request.url}`);
-  }
-
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    throw new Error(`Unsupported external request protocol: ${parsedUrl.protocol}`);
-  }
-
-  const timeoutMs = request.timeoutMs && request.timeoutMs > 0 ? request.timeoutMs : 30000;
-  const abortController = new AbortController();
-  const timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);
-
-  try {
-    const response = await fetch(request.url, {
-      body: request.bodyBase64 ? Buffer.from(request.bodyBase64, 'base64') : undefined,
-      headers: request.headers,
-      method: request.method || 'GET',
-      signal: abortController.signal,
-    });
-    const bodyBuffer = Buffer.from(await response.arrayBuffer());
-
-    return {
-      bodyBase64: bodyBuffer.toString('base64'),
-      headers: toHeaderRecord(response.headers),
-      ok: response.ok,
-      status: response.status,
-      statusText: response.statusText,
-      url: response.url,
-    };
-  } finally {
-    clearTimeout(timeoutHandle);
-  }
 };
 
 const createWindow = async (): Promise<void> => {
@@ -224,7 +181,7 @@ ipcMain.handle(RequestSelectLocalFileIpcInvokeChannel, async (event: Electron.Ip
 });
 
 ipcMain.handle(RequestExternalHttpIpcInvokeChannel, async (_event: Electron.IpcMainInvokeEvent, request: ExternalHttpProxyRequest): Promise<ExternalHttpProxyResponse> => {
-  return fetchExternalHttp(request);
+  return fetchExternalHttpProxy(request);
 });
 
 ipcMain.on(RequestWriteIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: string, contents: string) => {
@@ -246,4 +203,15 @@ ipcMain.on(RequestWriteIpcSendChannel, (event: Electron.IpcMainEvent, filename: 
     }
     event.reply(WriteContentErrorIpcReceiveChannel, eventId, error.message);
   });
+});
+
+ipcMain.handle('get-cookies', async (event, targetUrl) => {
+  try {
+    // This queries Chromium's inner cookie database directly
+    const cookies = await session.defaultSession.cookies.get({ url: targetUrl });
+    return cookies; 
+  } catch (error) {
+    console.error('Failed to get cookies:', error);
+    return [];
+  }
 });

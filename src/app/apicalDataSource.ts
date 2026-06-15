@@ -1,20 +1,16 @@
-import { ApicalDataException } from '../errors/apicalDataException.js';
+import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
+
 import type { ApicalLapByCategory } from '../model/apical.js';
 import { EventId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
+import { generateOrGetCachedEventPath } from '../utils/apical/excelGenerate.js';
+import { readTempApicalExcelFile } from '../utils/apical/apicalEventSpreadsheet.js';
 import { fetchExternalHttp } from '../utils/externalHttp.js';
 import { remapStackTrace } from './stackTrace.js';
-import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
 import { v5 as uuidv5 } from 'uuid';
-import type * as XlsxNamespace from 'xlsx';
 
 const APICAL_EVENT_ID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
-const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-type XlsxModule = typeof XlsxNamespace;
-
-let xlsxModulePromise: Promise<XlsxModule> | undefined;
 
 export interface PulledApicalRaceState {
   apicalEventId: number;
@@ -24,12 +20,6 @@ export interface PulledApicalRaceState {
   raceState: Partial<RaceState>;
   retrievedAt: string;
   sessionId: string;
-}
-
-interface ApicalExportToExcelResponse {
-  Cookie?: string;
-  FileGuid: string;
-  FileName: string;
 }
 
 export interface ApicalSpreadsheetLapsRow {
@@ -47,24 +37,6 @@ export interface ApicalSpreadsheetLapsRow {
 const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
 const trimSlash = (value: string): string => value.replace(/\/$/, '');
-
-const isGuid = (value: string): boolean => GUID_REGEX.test(value);
-
-const resolveXlsxModule = (module: Partial<XlsxModule> & { default?: unknown }): XlsxModule => {
-  const defaultModule = module.default as Partial<XlsxModule> | undefined;
-  const candidate = typeof module.read === 'function' ? module : defaultModule;
-
-  if (!candidate || typeof candidate.read !== 'function' || typeof candidate.utils?.sheet_to_json !== 'function') {
-    throw new Error('XLSX module was not loaded correctly. Check the Electron/Webpack xlsx import configuration.');
-  }
-
-  return candidate as XlsxModule;
-};
-
-const loadXlsx = async (): Promise<XlsxModule> => {
-  xlsxModulePromise ||= import('xlsx').then((module) => resolveXlsxModule(module as Partial<XlsxModule> & { default?: unknown }));
-  return xlsxModulePromise;
-};
 
 export const getConfiguredApicalEventId = (source: DataSourceConfig): number | undefined => {
   return source.apiConfig?.selectedEventIds[0] || source.apiConfig?.apicalEventId;
@@ -151,7 +123,7 @@ const formatRequestHeaders = (headersInit: RequestInit['headers']): string => {
     const headerLines = Array.from(headers.entries())
       .sort(([headerNameA], [headerNameB]) => headerNameA.localeCompare(headerNameB))
       .map(([name, value]) => {
-        const displayValue = isSensitiveHeader(name) ? `[redacted, ${value.length} chars]` : value;
+        const displayValue = isSensitiveHeader(name) ? `[redacted, ${value.length} chars; present]` : value;
         return `  ${name}: ${displayValue}`;
       });
 
@@ -160,6 +132,23 @@ const formatRequestHeaders = (headersInit: RequestInit['headers']): string => {
       : 'Request headers: (none)';
   } catch (error: unknown) {
     return `Request headers: could not format headers: ${getErrorMessage(error)}`;
+  }
+};
+
+const formatResponseHeaders = (headersInit: HeadersInit): string => {
+  try {
+    const headerLines = Array.from(new Headers(headersInit).entries())
+      .sort(([headerNameA], [headerNameB]) => headerNameA.localeCompare(headerNameB))
+      .map(([name, value]) => {
+        const displayValue = isSensitiveHeader(name) ? `[redacted, ${value.length} chars; present]` : value;
+        return `  ${name}: ${displayValue}`;
+      });
+
+    return headerLines.length > 0
+      ? ['Response headers:', ...headerLines].join('\n')
+      : 'Response headers: (none)';
+  } catch (error: unknown) {
+    return `Response headers: could not format headers: ${getErrorMessage(error)}`;
   }
 };
 
@@ -228,6 +217,7 @@ const fetchApicalResponse = async (
   timeoutMs: number
 ): Promise<Response> => {
   let response: Response;
+  console.debug(`Apical ${phase} request starting: ${url}\n${formatRequestOptions(init, timeoutMs)}\n${formatRequestHeaders(init.headers)}`);
   try {
     response = await fetchExternalHttp(url, {
       body: init.body,
@@ -236,18 +226,24 @@ const fetchApicalResponse = async (
       timeoutMs,
     });
   } catch (error: unknown) {
-    throw new Error(describeRequestFailure(phase, url, init, timeoutMs, error), { cause: error });
+    const message = describeRequestFailure(phase, url, init, timeoutMs, error);
+    console.error(message);
+    throw new Error(message, { cause: error });
   }
+  console.debug(`Apical ${phase} response received: HTTP ${response.status} ${response.statusText || '(no status text)'}\nURL: ${url}\n${formatResponseHeaders(response.headers)}`);
 
   if (!response.ok) {
     const body = await readResponseBody(response);
-    throw new Error([
+    const message = [
       `Apical ${phase} request returned HTTP ${response.status} ${response.statusText || '(no status text)'}.`,
       `URL: ${url}`,
       `HTTP status: ${response.status} ${response.statusText || '(no status text)'}`,
       formatRequestHeaders(init.headers),
+      formatResponseHeaders(response.headers),
       body ? `Response body: ${body}` : 'Response body: (empty)',
-    ].join('\n'));
+    ].join('\n');
+    console.error(message);
+    throw new Error(message);
   }
 
   return response;
@@ -317,40 +313,6 @@ export const fetchApicalEvents = async (source: DataSourceConfig): Promise<Apica
   }));
 };
 
-const getApicalExcelExportUrl = (baseUrl: string, apicalEventId: number): string => `${trimSlash(baseUrl)}/RaceResult/Event/ExportToExcel?eventId=${apicalEventId}&_=${Date.now()}`;
-
-const generateApicalExcelExport = async (source: DataSourceConfig, apicalEventId: number): Promise<ApicalExportToExcelResponse> => {
-  if (!source.apiConfig) {
-    throw new Error('Apical API config is missing');
-  }
-
-  const headers = createAuthenticatedHeaders(source);
-  headers.set('X-Requested-With', 'XMLHttpRequest');
-  const url = getApicalExcelExportUrl(source.apiConfig.baseUrl, apicalEventId);
-  const response = await fetchApicalResponse(
-    'Excel export',
-    url,
-    {
-      credentials: 'omit',
-      headers,
-      method: 'GET',
-      mode: 'cors',
-    },
-    source.apiConfig.httpTimeoutSeconds * 1000
-  );
-
-  const payload = await response.json() as Partial<ApicalExportToExcelResponse>;
-  if (!payload.FileGuid || !isGuid(payload.FileGuid) || !payload.FileName) {
-    throw new ApicalDataException(`Apical Excel export response format was invalid, payload: ${JSON.stringify(payload)}`);
-  }
-
-  return {
-    Cookie: readSetCookie(response),
-    FileGuid: payload.FileGuid,
-    FileName: payload.FileName,
-  };
-};
-
 const apicalSafeNumber = (value: number | string): string => value.toString().replace(/\D/g, '') || '0';
 
 const getEntrantKey = (row: ApicalSpreadsheetLapsRow): string => [
@@ -400,67 +362,10 @@ export const convertApicalSpreadsheetRowsToApicalData = (rows: ApicalSpreadsheet
   }));
 };
 
-const readApicalExcelPayload = async (sourceUrl: string, response: Response): Promise<ApicalLapByCategory> => {
-  if (!response) {
-    throw new ApicalDataException(`No response received when trying to read Apical Excel payload from url ${sourceUrl}`);
-  }
-  const XLSX = await loadXlsx();
-  const buffer = await response.arrayBuffer();
-  if (buffer.byteLength === 0) {
-    throw new ApicalDataException(`Apical Excel file downloaded from url ${sourceUrl} was empty`);
-  }
-  const workbook = XLSX.read(buffer, { type: 'array' });
-  if (!workbook) {
-    throw new ApicalDataException(`Failed to parse Apical Excel workbook from url ${sourceUrl}, no data returned.`);
-  }
-  if (!workbook.Sheets || Object.keys(workbook.Sheets).length === 0) {
-    throw new ApicalDataException(`Apical Excel workbook from url ${sourceUrl} did not contain any sheets`);
-  }
-  const worksheet = workbook.Sheets.Laps || workbook.Sheets.Sheet1;
-  if (!worksheet) {
-    const sheetList = Object.keys(workbook.Sheets).join(', ');
-    throw new ApicalDataException(`Apical Excel workbook from url ${sourceUrl} did not contain a Laps or Sheet1 worksheet, but contained sheets ${sheetList}`);
-  }
-  const sheetList = Object.keys(workbook.Sheets).join(', ');
-  console.debug(`Apical Excel workbook from url ${sourceUrl} contains sheets: ${sheetList}, using ${worksheet === workbook.Sheets.Laps ? 'Laps' : 'Sheet1'}`);
-
-  const rows = XLSX.utils.sheet_to_json<ApicalSpreadsheetLapsRow>(worksheet);
-  if (rows.length === 0) {
-    throw new ApicalDataException(`Apical Excel workbook from url ${sourceUrl} did not contain lap rows, but contained sheets ${sheetList}`);
-  }
-
+const loadApicalDataFilePayload = async (apicalEventId: number): Promise<ApicalLapByCategory> => {
+  const dataPath = await generateOrGetCachedEventPath(apicalEventId, true);
+  const rows = await readTempApicalExcelFile(dataPath);
   return convertApicalSpreadsheetRowsToApicalData(rows);
-};
-
-const getApicalExcelFileUrl = (baseUrl: string, fileGuid: string, fileName: string): string => `${trimSlash(baseUrl)}/Download/DownloadExcel?fileGuid=${fileGuid}&filename=${encodeURIComponent(fileName)}`;
-
-const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId: number): Promise<ApicalLapByCategory> => {
-  if (!source.apiConfig) {
-    throw new Error('Apical API config is missing');
-  }
-
-  const exportResponse = await generateApicalExcelExport(source, apicalEventId);
-  const headers = new Headers();
-  if (exportResponse.Cookie) {
-    headers.set('Cookie', exportResponse.Cookie);
-  }
-  headers.set('Accept', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,*/*');
-  headers.set('Referrer', `${trimSlash(source.apiConfig.baseUrl)}/raceresult/event/detail?id=${apicalEventId}`);
-  const url = getApicalExcelFileUrl(source.apiConfig.baseUrl, exportResponse.FileGuid, exportResponse.FileName);
-
-  const response = await fetchApicalResponse(
-    'Excel download',
-    url,
-    {
-      credentials: 'omit',
-      headers,
-      method: 'GET',
-      mode: 'cors',
-    },
-    source.apiConfig.httpTimeoutSeconds * 1000
-  );
-
-  return readApicalExcelPayload(url, response);
 };
 
 export const pullApicalRaceState = async (source: DataSourceConfig, eventId: EventId): Promise<Partial<RaceState>> => {
@@ -473,7 +378,7 @@ export const pullApicalRaceState = async (source: DataSourceConfig, eventId: Eve
     throw new Error('No Apical event id is configured for this source.');
   }
 
-  const payload = await fetchApicalDataFilePayload(source, apicalEventId);
+  const payload = await loadApicalDataFilePayload(apicalEventId);
   const listedEvent = getListedApicalEvent(source, apicalEventId);
   return convertDataToRaceState(eventId, listedEvent?.eventDate ? new Date(listedEvent.eventDate) : new Date(), payload, 200000);
 };
@@ -491,7 +396,7 @@ export const fetchApicalRaceStateNow = async (source: DataSourceConfig): Promise
   const eventId = createApicalCatalogEventId(apicalEventId);
   const listedEvent = getListedApicalEvent(source, apicalEventId);
   try {
-    const payload = await fetchApicalDataFilePayload(source, apicalEventId);
+    const payload = await loadApicalDataFilePayload(apicalEventId);
     const retrievedAt = new Date().toISOString();
 
     return {
@@ -504,6 +409,6 @@ export const fetchApicalRaceStateNow = async (source: DataSourceConfig): Promise
       sessionId: createApicalCatalogSessionId(apicalEventId),
     };
   } catch (error: unknown) {
-    throw new Error(`Failed to fetch Apical data from url ${getApicalExcelExportUrl(source.apiConfig.baseUrl, apicalEventId)} for event id ${apicalEventId}: ${getErrorMessage(error)}`, { cause: error });
+    throw new Error(`Failed to fetch Apical data for event id ${apicalEventId}: ${getErrorMessage(error)}`, { cause: error });
   }
 };

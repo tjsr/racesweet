@@ -24,7 +24,7 @@
       "<node_internals>/**"
     ],
     "console": "integratedTerminal",
-    "preLaunchTask": "clear-terminal"
+    "preLaunchTask": "debug: clear terminal and runtime caches"
   },
   {
     "name": "Electron Main",
@@ -81,8 +81,9 @@
     "request": "launch",
     "name": "Debug Vitest Tests",
     "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
-    "args": ["run", "--threads", "false"],
+    "args": ["run", "--threads", "false", "--no-cache"],
     "autoAttachChildProcesses": true,
+    "preLaunchTask": "vitest: clear cache",
     "smartStep": true,
     "skipFiles": ["<node_internals>/**"],
     "console": "integratedTerminal"
@@ -97,7 +98,7 @@
       "<node_internals>/**"
     ],
     "console": "integratedTerminal",
-    "preLaunchTask": "clear-terminal"
+    "preLaunchTask": "debug: clear terminal and runtime caches"
   },
   {
     "type": "node",
@@ -109,7 +110,20 @@
       "<node_internals>/**"
     ],
     "console": "integratedTerminal",
-    "preLaunchTask": "clear-terminal"
+    "preLaunchTask": "debug: clear terminal and runtime caches"
+  },
+  {
+    "type": "node",
+    "request": "launch",
+    "name": "Debug apicalTest [limit]",
+    "runtimeExecutable": "tsx",
+    "program": "${workspaceFolder}/src/utils/apical/apicalTest.mts",
+    "skipFiles": [
+      "<node_internals>/**"
+    ],
+    "args": ["--limit=1", "--forceRefresh"],
+    "console": "integratedTerminal",
+    "preLaunchTask": "debug: clear terminal and runtime caches"
   }
   ],
   "compounds": [

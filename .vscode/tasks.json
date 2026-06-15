@@ -62,6 +62,37 @@
         "reveal": "silent",
         "panel": "shared"
       }
+    },
+    {
+      "label": "vitest: clear cache",
+      "type": "shell",
+      "command": "npx vitest --clearCache && npx rimraf node_modules/.vite .vitest",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "detail": "Clears Vitest and Vite transform caches before debug runs so stack traces map to current TypeScript files"
+    },
+    {
+      "label": "runtime: clear caches",
+      "type": "shell",
+      "command": "node ./scripts/clearRuntimeCaches.mjs",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "detail": "Clears TSX/Vite/Vitest runtime caches and stale compiled sidecars before TypeScript debug runs"
+    },
+    {
+      "label": "debug: clear terminal and runtime caches",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "clear-terminal",
+        "runtime: clear caches"
+      ],
+      "problemMatcher": []
     }
   ]
 }

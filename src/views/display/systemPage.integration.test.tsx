@@ -80,7 +80,7 @@ describe('SystemPage integration', () => {
   let root: Root;
 
   useUiConsoleGuards({
-    allowErrorPatterns: [/Error loading Apical events for source/],
+    allowErrorPatterns: [/Error loading Apical events for source/, /Failed to fetch Apical events for source/],
   });
 
   beforeEach(() => {
@@ -239,6 +239,8 @@ describe('SystemPage integration', () => {
         'Request headers:',
         '  accept: application/json',
         '  authorization: [redacted, 12 chars]',
+        'Response headers:',
+        '  content-type: text/plain',
         'Response body: Session authentication failed',
       ].join('\n'));
     });
@@ -271,6 +273,8 @@ describe('SystemPage integration', () => {
     expect(container.textContent).toContain('Request headers:');
     expect(container.textContent).toContain('accept: application/json');
     expect(container.textContent).toContain('authorization: [redacted, 12 chars]');
+    expect(container.textContent).toContain('Response headers:');
+    expect(container.textContent).toContain('content-type: text/plain');
     expect(container.textContent).toContain('Response body: Session authentication failed');
     expect(container.textContent).toContain('webpack://racesweet/./src/app/apicalDataSource.ts:225:13');
     expect(container.querySelector('.inline-error pre')).toBeTruthy();

@@ -302,6 +302,7 @@ describe('RaceSweetMainApp integration', () => {
   let root: Root;
 
   useUiConsoleGuards({
+    allowErrorPatterns: [/Apical .* request returned HTTP/, /Failed to fetch Apical events for source/, /Failed to fetch Apical event data for source/],
     allowWarnPatterns: [/RaceSweet cannot (read from|write to) .*Windows denied file access/i],
   });
 
@@ -778,7 +779,12 @@ describe('RaceSweetMainApp integration', () => {
           return new Response(JSON.stringify({
             FileGuid: '11111111-1111-4111-8111-111111111111',
             FileName: 'Apical Downloaded Round.xlsx',
-          }), { status: 200 });
+          }), {
+            headers: {
+              'set-cookie': 'session=app-integration',
+            },
+            status: 200,
+          });
         }
 
         if (requestUrl.includes('/Download/DownloadExcel')) {
@@ -801,9 +807,12 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.textContent).toMatch(/Data last retrieved: \d{4}-\d{2}-\d{2}T/);
     expect(container.textContent).not.toContain('Active Event');
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/Download/DownloadExcel?fileGuid=11111111-1111-4111-8111-111111111111&filename=Apical%20Downloaded%20Round.xlsx'),
+      expect.stringContaining('https://apicalracetiming.com.au/Download/DownloadExcel?fileGuid=11111111-1111-4111-8111-111111111111&filename=Apical%20Downloaded%20Round.xlsx'),
       expect.any(Object)
     );
+    const downloadCall = fetchMock.mock.calls.find((call) => String(call[0]).includes('/Download/DownloadExcel'));
+    const downloadHeaders = new Headers((downloadCall?.[1] as RequestInit | undefined)?.headers);
+    expect(downloadHeaders.get('Cookie')).toBe('session=app-integration');
 
     const latestConfigWrite = writtenFiles
       .filter((write) => write.filePath.includes('system-config.json'))

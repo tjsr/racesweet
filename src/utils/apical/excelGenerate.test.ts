@@ -115,6 +115,66 @@ describe('apical Excel generation utilities', () => {
       .rejects.toThrow(ApicalDataException);
   });
 
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+    ['empty', ''],
+    ['whitespace', '   '],
+    ['line-break', 'session=abc123\r\nx=1'],
+    ['missing value separator', 'session'],
+  ])('rejects a %s cookie before requesting the Apical Excel file', async (_label, cookie) => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+
+    await expect(retrieveExcelData(APICAL_FILE_GUID, APICAL_FILE_NAME, APICAL_EVENT_ID, cookie as string))
+      .rejects.toThrow(ApicalDataException);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+    ['empty', ''],
+    ['whitespace', '   '],
+    ['url encoded', 'Results%20GMBC.xlsx'],
+    ['path separator', 'Results/GMBC.xlsx'],
+    ['line-break', 'Results\r\nGMBC.xlsx'],
+  ])('rejects a %s file name before requesting the Apical Excel file', async (_label, fileName) => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+
+    await expect(retrieveExcelData(APICAL_FILE_GUID, fileName as string, APICAL_EVENT_ID, 'session=abc123'))
+      .rejects.toThrow(ApicalDataException);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('includes request and response details when the Apical Excel download fails', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('Forbidden', {
+        headers: {
+          'content-type': 'text/plain',
+        },
+        status: 403,
+        statusText: 'Forbidden',
+      }));
+
+    await expect(retrieveExcelData(APICAL_FILE_GUID, APICAL_FILE_NAME, APICAL_EVENT_ID, 'session=abc123'))
+      .rejects.toThrow(/url=https:\/\/apicalracetiming\.com\.au\/Download\/DownloadExcel\?fileGuid=1cf63381-1269-4257-b892-ef8b33424103&filename=Results%20%20GMBC%20Autumn%20No%20Frills%20Round%204%202026-6-12\.xlsx.*"cookie":"session=abc123".*responseStatus=403.*"content-type":"text\/plain"/s);
+  });
+
+  it('includes request and response details when the Apical Excel download returns an empty blob', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(new ArrayBuffer(0), {
+        headers: {
+          'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+        status: 200,
+      }));
+
+    await expect(retrieveExcelData(APICAL_FILE_GUID, APICAL_FILE_NAME, APICAL_EVENT_ID, 'session=abc123'))
+      .rejects.toThrow(/response blob was empty.*"cookie":"session=abc123".*responseStatus=200/s);
+  });
+
   it('refreshes uncached Apical event Excel data through export and download touch-points', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')

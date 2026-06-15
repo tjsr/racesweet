@@ -1,6 +1,8 @@
 import { EventEntrantHandicapData, EventHandicapData } from "./apical/apicalData.js";
 import type { HandicapRiderSnapshot, HandicapRoundSnapshot, HandicapSnapshot, HandicapSnapshotEvent } from "../model/handicapSnapshot.js";
 
+import { HandicapDataException } from "../errors/handicapDataException.js";
+
 interface EventScalingAnchors {
   highestKnownProgressiveRatio: number;
   highestKnownRawRatio: number;
@@ -8,7 +10,7 @@ interface EventScalingAnchors {
   lowestKnownRawRatio: number;
 }
 
-const getEventScalingAnchors = (
+export const getEventScalingAnchors = (
   progressiveHandicapData: Map<string, number>,
   eventHandicapData: EventHandicapData
 ): EventScalingAnchors | undefined => {
@@ -26,8 +28,28 @@ const getEventScalingAnchors = (
     return undefined;
   }
 
+  if (highestKnownEntrant.ratioScore < 0) {
+    throw new HandicapDataException(`Highest known entrant ${highestKnownEntrant.name} has invalid raw ratio score ${highestKnownEntrant.ratioScore}`);
+  }
+  if (lowestKnownEntrant.ratioScore > 1.0) {
+    throw new HandicapDataException(`Lowest known entrant ${lowestKnownEntrant.name} has invalid raw ratio score ${lowestKnownEntrant.ratioScore}`);
+  }
+  if (lowestKnownEntrant.ratioScore < 0) {
+    throw new HandicapDataException(`Lowest known entrant ${lowestKnownEntrant.name} has non-positive raw ratio score ${lowestKnownEntrant.ratioScore}`);
+  }
+  if (highestKnownEntrant.ratioScore > 1.0) {
+    throw new HandicapDataException(`Highest known entrant ${highestKnownEntrant.name} has raw ratio score greater than 1.0: ${highestKnownEntrant.ratioScore}`);
+  }
+
   const highestKnownProgressiveRatio = progressiveHandicapData.get(highestKnownEntrant.name);
   const lowestKnownProgressiveRatio = progressiveHandicapData.get(lowestKnownEntrant.name);
+  if (highestKnownProgressiveRatio !== undefined && highestKnownProgressiveRatio < 0) {
+    throw new HandicapDataException(`Progressive handicap ratio for highest known entrant ${highestKnownEntrant.name} must be greater than or equal to 0, got ${highestKnownProgressiveRatio}`);
+  }
+
+  if (lowestKnownProgressiveRatio !== undefined && lowestKnownProgressiveRatio > 1.0) {
+    throw new HandicapDataException(`Progressive handicap ratio for lowest known entrant ${lowestKnownEntrant.name} must be less than or equal to 1.0, got ${lowestKnownProgressiveRatio}`);
+  }
 
   if (highestKnownProgressiveRatio === undefined || lowestKnownProgressiveRatio === undefined) {
     return undefined;
@@ -51,13 +73,19 @@ const getEventScalingAnchors = (
 
 export const scaleEventScore = (score: number, highestEventRatio: number, lowestEventRatio: number): number => {
   if (highestEventRatio < 0) {
-    throw new Error(`Highest event ratio ${highestEventRatio} must be greater than 0`);
+    throw new HandicapDataException(`Highest event ratio ${highestEventRatio} must be greater than 0`);
+  }
+  if (highestEventRatio > 1.0) {
+    throw new HandicapDataException(`Highest event ratio ${highestEventRatio} must be less than or equal to 1.0`);
+  }
+  if (lowestEventRatio < 0) {
+    throw new HandicapDataException(`Lowest event ratio ${lowestEventRatio} must be greater than or equal to 0`);
   }
   if (lowestEventRatio > 1.0) {
-    throw new Error(`Lowest event ratio ${lowestEventRatio} must be less than 1.0`);
+    throw new HandicapDataException(`Lowest event ratio ${lowestEventRatio} must be less than 1.0`);
   }
   if (lowestEventRatio <= highestEventRatio) {
-    throw new Error(`Lowest event ratio ${lowestEventRatio} must be greater than highest event ratio ${highestEventRatio}`);
+    throw new HandicapDataException(`Lowest event ratio ${lowestEventRatio} must be greater than highest event ratio ${highestEventRatio}`);
   }
   const scaledRange = lowestEventRatio - highestEventRatio;
   const scaledScore = (scaledRange * score) + highestEventRatio;
@@ -69,10 +97,48 @@ const isDebugRider = (entrantName: string): boolean => {
   return debugRiders.includes(entrantName);
 };
 
-const normalizeBetweenAnchors = (value: number, minAnchor: number, maxAnchor: number): number =>
-  (value - minAnchor) / (maxAnchor - minAnchor);
+export const normalizeBetweenAnchors = (value: number, minAnchor: number, maxAnchor: number): number => {
+  if  (minAnchor >= maxAnchor) {
+    throw new HandicapDataException(`minAnchor ${minAnchor} must be less than maxAnchor ${maxAnchor} (processing ${value}).`);
+  }
+  return (value - minAnchor) / (maxAnchor - minAnchor);
+};
 
-const scaleHandicapData = (progressiveHandicapData: Map<string, number>, eventHandicapData: EventHandicapData): EventEntrantHandicapData[] => {
+const isValidHandicapRatio = (ratio: number): boolean => Number.isFinite(ratio) && ratio >= 0 && ratio <= 1;
+
+const normalizeCorrectedHandicaps = (correctedHandicaps: EventEntrantHandicapData[]): EventEntrantHandicapData[] => {
+  if (correctedHandicaps.every((entrant) => isValidHandicapRatio(entrant.ratioScore))) {
+    return correctedHandicaps;
+  }
+
+  const ratioScores = correctedHandicaps.map((entrant) => entrant.ratioScore);
+  const lowestRatio = Math.min(...ratioScores);
+  const highestRatio = Math.max(...ratioScores);
+
+  if (!Number.isFinite(lowestRatio) || !Number.isFinite(highestRatio)) {
+    throw new HandicapDataException('Corrected handicap scores must be finite before final normalization.');
+  }
+
+  if (lowestRatio === highestRatio) {
+    const normalizedRatio = lowestRatio < 0 ? 0 : 1;
+    return correctedHandicaps.map((entrant) => ({ ...entrant, ratioScore: normalizedRatio }));
+  }
+
+  return correctedHandicaps.map((entrant) => ({
+    ...entrant,
+    ratioScore: normalizeBetweenAnchors(entrant.ratioScore, lowestRatio, highestRatio),
+  }));
+};
+
+const assertCorrectedHandicapsInRange = (correctedHandicaps: EventEntrantHandicapData[]): void => {
+  correctedHandicaps.forEach((entrant) => {
+    if (!isValidHandicapRatio(entrant.ratioScore)) {
+      throw new HandicapDataException(`Scaled handicap score for ${entrant.name} is out of bounds: ${entrant.ratioScore}`);
+    }
+  });
+};
+
+export const scaleHandicapData = (progressiveHandicapData: Map<string, number>, eventHandicapData: EventHandicapData): EventEntrantHandicapData[] => {
   const eventAnchors = getEventScalingAnchors(progressiveHandicapData, eventHandicapData);
 
   const correctedHandicaps = eventHandicapData.entrantData.map(
@@ -94,7 +160,9 @@ const scaleHandicapData = (progressiveHandicapData: Map<string, number>, eventHa
         throw err;
       }
     });
-  return correctedHandicaps;
+  const normalizedHandicaps = normalizeCorrectedHandicaps(correctedHandicaps);
+  assertCorrectedHandicapsInRange(normalizedHandicaps);
+  return normalizedHandicaps;
 };
 
 export const processHandicaps = (progressiveHandicapData: Map<string, number>, eventHandicapData: EventHandicapData) => {
