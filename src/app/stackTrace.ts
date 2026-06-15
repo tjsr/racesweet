@@ -1,6 +1,9 @@
 import { mapSourcePosition, type Position } from 'source-map-support';
+import { readFileSync } from 'node:fs';
+import { SourceMapConsumer } from 'source-map-support/node_modules/source-map';
 
 export type SourcePositionMapper = (position: Position) => Position;
+type SourceMapConsumerInstance = InstanceType<typeof SourceMapConsumer>;
 
 const stackFrameLocationPattern =
   /(?<source>(?:[A-Za-z]:\\|file:\/\/\/|https?:\/\/|webpack:\/\/|\/|\.{1,2}\/)[^)\s]+):(?<line>\d+):(?<column>\d+)/;
@@ -10,6 +13,11 @@ const stackFrameMethodPattern =
 
 const formatSourcePosition = (position: Position): string =>
   `${position.source}:${position.line}:${position.column + 1}`;
+
+const normalizeMappedStackText = (stack: string): string =>
+  stack
+    .replace(/webpack:\/\/racesweet\/\.\/[^)\s]*?webpack:\/racesweet\/([^)\s]+)/gi, 'webpack://racesweet/./$1')
+    .replace(/webpack:\/\/racesweet\/(?!\.\/)/g, 'webpack://racesweet/./');
 
 const getSourceFileName = (source: string): string | undefined => {
   const cleanSource = source.split(/[?#]/)[0] || source;
@@ -37,35 +45,105 @@ const annotateStackFrameMethod = (line: string, source: string, lineNumber: numb
 
 const isHttpUrl = (value: string): boolean => /^https?:\/\//i.test(value);
 
+const sourceMapConsumers = new Map<string, SourceMapConsumerInstance | undefined>();
+
 const getLocalWebpackSourceCandidates = (source: string): string[] => {
-  if (!isHttpUrl(source)) {
+  if (isHttpUrl(source)) {
+    let pathname: string;
+    try {
+      pathname = decodeURIComponent(new URL(source).pathname);
+    } catch {
+      return [];
+    }
+
+    const generatedFileName = pathname.split('/').pop();
+    if (!generatedFileName) {
+      return [];
+    }
+
+    const normalizedPath = pathname.replace(/\\/g, '/');
+    const isRendererFrame = normalizedPath.includes('/main_window/');
+    if (!isRendererFrame) {
+      return [];
+    }
+
+    const cwd = process.cwd();
+    return [
+      `${cwd}\\.webpack\\renderer\\main_window\\${generatedFileName}`,
+      `${cwd}\\.webpack\\x64\\renderer\\main_window\\${generatedFileName}`,
+      `${cwd}\\.webpack\\arm64\\renderer\\main_window\\${generatedFileName}`,
+    ];
+  }
+
+  const normalizedSource = source.replace(/\//g, '\\');
+  if (!normalizedSource.includes('\\.webpack\\')) {
     return [];
   }
 
-  let pathname: string;
+  return [source];
+};
+
+const readSourceMapConsumer = (source: string): SourceMapConsumerInstance | undefined => {
+  const mapPath = `${source}.map`;
+  if (sourceMapConsumers.has(mapPath)) {
+    return sourceMapConsumers.get(mapPath);
+  }
+
   try {
-    pathname = decodeURIComponent(new URL(source).pathname);
+    const mapData = JSON.parse(readFileSync(mapPath, 'utf8'));
+    const consumer = new SourceMapConsumer(mapData) as SourceMapConsumerInstance;
+    sourceMapConsumers.set(mapPath, consumer);
+    return consumer;
   } catch {
-    return [];
+    sourceMapConsumers.set(mapPath, undefined);
+    return undefined;
+  }
+};
+
+const normalizeMappedSource = (source: string): string => {
+  const webpackPrefix = 'webpack://racesweet/';
+  const normalized = source.replace(/\\/g, '/');
+  const embeddedWebpackMatch = /webpack:\/racesweet\/(?<sourcePath>.+)$/i.exec(normalized);
+  if (embeddedWebpackMatch?.groups?.sourcePath) {
+    return `${webpackPrefix}./${embeddedWebpackMatch.groups.sourcePath}`;
   }
 
-  const generatedFileName = pathname.split('/').pop();
-  if (!generatedFileName) {
-    return [];
+  if (normalized.startsWith(`${webpackPrefix}./`)) {
+    return normalized;
   }
 
-  const normalizedPath = pathname.replace(/\\/g, '/');
-  const isRendererFrame = normalizedPath.includes('/main_window/');
-  if (!isRendererFrame) {
-    return [];
+  if (normalized.startsWith(webpackPrefix)) {
+    return `${webpackPrefix}./${normalized.slice(webpackPrefix.length)}`;
   }
 
-  const cwd = process.cwd();
-  return [
-    `${cwd}\\.webpack\\renderer\\main_window\\${generatedFileName}`,
-    `${cwd}\\.webpack\\x64\\renderer\\main_window\\${generatedFileName}`,
-    `${cwd}\\.webpack\\arm64\\renderer\\main_window\\${generatedFileName}`,
-  ];
+  if (normalized.startsWith('webpack://')) {
+    return normalized;
+  }
+
+  const sourcePath = normalized.replace(/^webpack:\/\//, '').replace(/^\/+/, '');
+  return `${webpackPrefix}${sourcePath}`;
+};
+
+const mapWithLocalSourceMap = (position: Position): Position | undefined => {
+  const sourceCandidates = getLocalWebpackSourceCandidates(position.source);
+
+  for (const source of sourceCandidates) {
+    const consumer = readSourceMapConsumer(source);
+    const mappedPosition = consumer?.originalPositionFor({
+      column: position.column,
+      line: position.line,
+    });
+
+    if (mappedPosition?.source && mappedPosition.line != null && mappedPosition.column != null) {
+      return {
+        column: mappedPosition.column,
+        line: mappedPosition.line,
+        source: normalizeMappedSource(mappedPosition.source),
+      };
+    }
+  }
+
+  return undefined;
 };
 
 const mapWithFallbackCandidates = (position: Position, mapPosition: SourcePositionMapper): Position => {
@@ -86,18 +164,21 @@ const mapWithFallbackCandidates = (position: Position, mapPosition: SourcePositi
       mappedPosition.line !== candidatePosition.line ||
       mappedPosition.column !== candidatePosition.column
     ) {
-      return mappedPosition;
+      return {
+        ...mappedPosition,
+        source: normalizeMappedSource(mappedPosition.source),
+      };
     }
   }
 
-  return mapPosition(position);
+  return mapWithLocalSourceMap(position) || mapPosition(position);
 };
 
 export const remapStackTrace = (
   stack: string,
   mapPosition: SourcePositionMapper = mapSourcePosition
 ): string =>
-  stack.split('\n').map((line) => {
+  normalizeMappedStackText(stack.split('\n').map((line) => {
     const match = stackFrameLocationPattern.exec(line);
     if (!match?.groups) {
       return line;
@@ -118,17 +199,21 @@ export const remapStackTrace = (
 
     const mappedLine = line.replace(match[0], formatSourcePosition(mappedPosition));
     return annotateStackFrameMethod(mappedLine, mappedPosition.source, mappedPosition.line);
-  }).join('\n');
+  }).join('\n'));
 
 export const formatErrorForDisplay = (error: unknown): string => {
   if (!(error instanceof Error)) {
     return String(error);
   }
 
-  const message = error.message;
-  if (!error.stack) {
-    return message;
+  const details = [
+    error.message,
+    error.stack ? remapStackTrace(error.stack) : undefined,
+  ].filter((value): value is string => !!value);
+
+  if (error.cause !== undefined) {
+    details.push(`Caused by:\n${formatErrorForDisplay(error.cause)}`);
   }
 
-  return `${message}\n${remapStackTrace(error.stack)}`;
+  return details.join('\n');
 };

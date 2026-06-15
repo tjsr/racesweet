@@ -3,7 +3,7 @@ import './state.ts';
 
 import { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileReadDataType, SelectLocalFileOptions } from './window.ts';
 import { InvalidIpcChannelError, SendChannels } from '../model/electronIpcTypes.ts';
-import { IpcRendererEvent, ipcRenderer } from 'electron';
+import { IpcRendererEvent, contextBridge, ipcRenderer } from 'electron';
 import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
@@ -16,6 +16,7 @@ import {
   WriteContentErrorIpcReceiveChannel,
   WriteContentIpcReceiveChannel,
 } from '../model/electronIpc.ts';
+
 import { getRaceSweetServerPort } from './serverPort.ts';
 
 // See the Electron documentation for details on how to use preload scripts:
@@ -35,7 +36,14 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 window.actualPort = getRaceSweetServerPort();
-// const {contextBridge, ipcRenderer} = require("electron");
+
+
+contextBridge.exposeInMainWorld('api', {
+  requestExternalHttp: (url: string, options: ExternalHttpProxyRequest) => { /* your existing code */ },
+  
+  // Add this helper to ask the main process for cookies
+  getAppCookies: (targetUrl: string) => ipcRenderer.invoke('get-cookies', targetUrl)
+});
 
 const eventCalls: Record<string, [(data: (never | PromiseLike<never>)) => void, (reason?: string|Error) => void]> = {};
 

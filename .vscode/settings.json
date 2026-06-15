@@ -16,7 +16,7 @@
     "**/dist/**": true
   },
   "vitest.rootConfig": "vitest.config.mts",
-  "vitest.cliArguments": "--silent",
+  "vitest.cliArguments": "--silent --no-cache",
   "vitest.logLevel": "verbose",
   "vitest.configSearchPatternExclude": "{.git/**,**/node_modules/**,**/.*/**,**/*.d.ts}",
   // "vitest.filesWatcherInclude": "**/*.{ts,tsx,mts},src/*.{js,jsx,mjs,cjs,json}",

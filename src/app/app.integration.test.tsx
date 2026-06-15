@@ -317,6 +317,7 @@ describe('RaceSweetMainApp integration', () => {
   let root: Root;
 
   useUiConsoleGuards({
+    allowErrorPatterns: [/Apical .* request returned HTTP/, /Failed to fetch Apical events for source/, /Failed to fetch Apical event data for source/],
     allowWarnPatterns: [/RaceSweet cannot (read from|write to) .*Windows denied file access/i],
   });
 
@@ -821,7 +822,7 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.textContent).toMatch(/Data last retrieved: \d{4}-\d{2}-\d{2}T/);
     expect(container.textContent).not.toContain('Active Event');
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/Download/DownloadExcel?fileGuid=11111111-1111-4111-8111-111111111111&filename=Apical%20Downloaded%20Round.xlsx'),
+      expect.stringContaining('https://apicalracetiming.com.au/Download/DownloadExcel?fileGuid=11111111-1111-4111-8111-111111111111&filename=Apical%20Downloaded%20Round.xlsx'),
       expect.any(Object)
     );
     const exportCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/RaceResult/Event/ExportToExcel'));

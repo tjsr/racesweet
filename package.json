@@ -30,7 +30,7 @@
     "serve": "tsx ./src/app/startElectronForge.ts",
     "start": "tsx ./src/app/startElectronForge.ts --trace-warnings",
     "start:no-trace": "tsx ./src/app/startElectronForge.ts",
-    "test": "vitest run",
+    "test": "rimraf node_modules/.vite .vitest && vitest run",
     "test:integration:all": "node ./scripts/runIntegrationTests.mjs",
     "test:watch": "vitest watch",
     "test:timezone": "node ./scripts/runTimezoneTests.mjs",
@@ -83,7 +83,7 @@
     "ts2typebox": "^1.6.2",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8",
+    "vitest": "^4.1.9",
     "webpack-cli": "^7.0.3",
     "webpack-dev-server": "^5.2.5"
   },
