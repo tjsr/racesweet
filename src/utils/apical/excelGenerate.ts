@@ -1,13 +1,9 @@
-import { ApicalSpreadsheetLapsRow, retrieveExcelData } from './apicalEventSpreadsheet.js';
-
 import { ApicalDataException } from '../../errors/apicalDataException.js';
 import { fetchExternalHttp } from '../externalHttp.js';
+import { ApicalSpreadsheetLapsRow, retrieveExcelData } from './apicalEventSpreadsheet.js';
 import { promises as fs } from 'fs';
-import path from 'path';
 import { tmpdir } from 'os';
 import path from 'path';
-import { fetchExternalHttp } from '../externalHttp.js';
-import { ApicalSpreadsheetLapsRow, retrieveExcelData } from './apicalEventSpreadsheet.js';
 
 export { createApicalExcelDownloadHeaders, getApicalExcelDownloadUrl } from './excelDownload.js';
 

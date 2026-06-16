@@ -1,17 +1,21 @@
-import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
-
+import { ApicalDataException } from '../errors/apicalDataException.js';
 import type { ApicalLapByCategory } from '../model/apical.js';
 import { EventId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
-import { generateOrGetCachedEventPath } from '../utils/apical/excelGenerate.js';
-import { readTempApicalExcelFile } from '../utils/apical/apicalEventSpreadsheet.js';
 import { createApicalExcelDownloadHeaders, getApicalExcelDownloadUrl } from '../utils/apical/excelDownload.js';
 import { fetchExternalHttp } from '../utils/externalHttp.js';
 import { remapStackTrace } from './stackTrace.js';
+import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
 import { v5 as uuidv5 } from 'uuid';
+import type * as XlsxNamespace from 'xlsx';
 
 const APICAL_EVENT_ID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+type XlsxModule = typeof XlsxNamespace;
+
+let xlsxModulePromise: Promise<XlsxModule> | undefined;
 
 export interface PulledApicalRaceState {
   apicalEventId: number;
@@ -21,6 +25,12 @@ export interface PulledApicalRaceState {
   raceState: Partial<RaceState>;
   retrievedAt: string;
   sessionId: string;
+}
+
+interface ApicalExportToExcelResponse {
+  Cookie?: string;
+  FileGuid: string;
+  FileName: string;
 }
 
 export interface ApicalSpreadsheetLapsRow {
@@ -38,6 +48,24 @@ export interface ApicalSpreadsheetLapsRow {
 const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
 const trimSlash = (value: string): string => value.replace(/\/$/, '');
+
+const isGuid = (value: string): boolean => GUID_REGEX.test(value);
+
+const resolveXlsxModule = (module: Partial<XlsxModule> & { default?: unknown }): XlsxModule => {
+  const defaultModule = module.default as Partial<XlsxModule> | undefined;
+  const candidate = typeof module.read === 'function' ? module : defaultModule;
+
+  if (!candidate || typeof candidate.read !== 'function' || typeof candidate.utils?.sheet_to_json !== 'function') {
+    throw new Error('XLSX module was not loaded correctly. Check the Electron/Webpack xlsx import configuration.');
+  }
+
+  return candidate as XlsxModule;
+};
+
+const loadXlsx = async (): Promise<XlsxModule> => {
+  xlsxModulePromise ||= import('xlsx').then((module) => resolveXlsxModule(module as Partial<XlsxModule> & { default?: unknown }));
+  return xlsxModulePromise;
+};
 
 export const getConfiguredApicalEventId = (source: DataSourceConfig): number | undefined => {
   return source.apiConfig?.selectedEventIds[0] || source.apiConfig?.apicalEventId;
@@ -129,7 +157,7 @@ const formatHeaders = (
     const headerLines = Array.from(headers.entries())
       .sort(([headerNameA], [headerNameB]) => headerNameA.localeCompare(headerNameB))
       .map(([name, value]) => {
-        const displayValue = !includeSensitiveHeaders && isSensitiveHeader(name) ? `[redacted, ${value.length} chars]` : value;
+        const displayValue = !includeSensitiveHeaders && isSensitiveHeader(name) ? `[redacted, ${value.length} chars; present]` : value;
         return `  ${name}: ${displayValue}`;
       });
 
@@ -372,7 +400,6 @@ const generateApicalExcelExport = async (source: DataSourceConfig, apicalEventId
       formatResponseStatusAndHeaders(response),
     ].join('\n'));
   }
-
   return {
     Cookie: readSetCookie(response),
     FileGuid: payload.FileGuid,
@@ -483,7 +510,10 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
   }
 
   const exportResponse = await generateApicalExcelExport(source, apicalEventId);
-  const headers = createApicalExcelDownloadHeaders(source.apiConfig.baseUrl, apicalEventId, exportResponse.Cookie || '');
+  const downloadCookie = getAuthHeader(source) || source.apiConfig.baseUrl.includes('apicalracetiming.com.au')
+    ? exportResponse.Cookie || ''
+    : '';
+  const headers = createApicalExcelDownloadHeaders(source.apiConfig.baseUrl, apicalEventId, downloadCookie);
   const url = getApicalExcelDownloadUrl(source.apiConfig.baseUrl, exportResponse.FileGuid, exportResponse.FileName);
 
   const response = await fetchApicalResponse(
@@ -501,6 +531,10 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
   return readApicalExcelPayload(url, response);
 };
 
+const loadApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId: number): Promise<ApicalLapByCategory> => {
+  return fetchApicalDataFilePayload(source, apicalEventId);
+};
+
 export const pullApicalRaceState = async (source: DataSourceConfig, eventId: EventId): Promise<Partial<RaceState>> => {
   if (source.type !== 'api-apical-data-file' || !source.apiConfig) {
     throw new Error(`Unsupported source type for live pull: ${source.type}`);
@@ -511,7 +545,7 @@ export const pullApicalRaceState = async (source: DataSourceConfig, eventId: Eve
     throw new Error('No Apical event id is configured for this source.');
   }
 
-  const payload = await loadApicalDataFilePayload(apicalEventId);
+  const payload = await loadApicalDataFilePayload(source, apicalEventId);
   const listedEvent = getListedApicalEvent(source, apicalEventId);
   return convertDataToRaceState(eventId, listedEvent?.eventDate ? new Date(listedEvent.eventDate) : new Date(), payload, 200000);
 };
@@ -529,7 +563,7 @@ export const fetchApicalRaceStateNow = async (source: DataSourceConfig): Promise
   const eventId = createApicalCatalogEventId(apicalEventId);
   const listedEvent = getListedApicalEvent(source, apicalEventId);
   try {
-    const payload = await loadApicalDataFilePayload(apicalEventId);
+    const payload = await loadApicalDataFilePayload(source, apicalEventId);
     const retrievedAt = new Date().toISOString();
 
     return {

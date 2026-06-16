@@ -1,21 +1,40 @@
-import type { DataSourceConfig } from './systemConfig.js';
+import XLSX from 'xlsx';
 import { createApicalCatalogEventId, fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.js';
+import type { DataSourceConfig } from './systemConfig.js';
 
 const convertDataToRaceState = vi.fn();
-const generateOrGetCachedEventPath = vi.fn();
-const readTempApicalExcelFile = vi.fn();
 
 vi.mock('../parsers/apical.js', () => ({
   convertDataToRaceState: (...args: unknown[]) => convertDataToRaceState(...args),
 }));
 
-vi.mock('../utils/apical/excelGenerate.js', () => ({
-  generateOrGetCachedEventPath: (...args: unknown[]) => generateOrGetCachedEventPath(...args),
-}));
+const createLapsRows = () => [
+  {
+    CategoryName: 'A',
+    CumulativeLapTimeSpan: '00:03:30.5000000',
+    FullName: 'Robert WOOD',
+    LapNumber: 1,
+    LapTimeSpan: '00:03:30.5000000',
+    Position: 1,
+    RaceNumber: 306,
+    TeamNameDisplay: 'Robert WOOD',
+  },
+];
 
-vi.mock('../utils/apical/apicalEventSpreadsheet.js', () => ({
-  readTempApicalExcelFile: (...args: unknown[]) => readTempApicalExcelFile(...args),
-}));
+const createExcelResponse = (): Response => {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(createLapsRows()), 'Laps');
+  const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+  return new Response(buffer, { status: 200 });
+};
+
+const mockExcelFetch = (): ReturnType<typeof vi.spyOn> => vi
+  .spyOn(globalThis, 'fetch')
+  .mockResolvedValueOnce(new Response(JSON.stringify({
+    FileGuid: '11111111-1111-4111-8111-111111111111',
+    FileName: 'Round 3.xlsx',
+  }), { status: 200 }))
+  .mockResolvedValueOnce(createExcelResponse());
 
 const createApicalSource = (): DataSourceConfig => ({
   apiConfig: {
@@ -44,32 +63,24 @@ const createApicalSource = (): DataSourceConfig => ({
 describe('apicalDataSource cached Excel flow', () => {
   beforeEach(() => {
     convertDataToRaceState.mockReset();
-    generateOrGetCachedEventPath.mockReset();
-    readTempApicalExcelFile.mockReset();
+    vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
-  it('fetches Apical race state now through generateOrGetCachedEventPath with force refresh', async () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('fetches Apical race state now through Excel export and download responses', async () => {
     const convertedRaceState = { categories: [], participants: [], records: [] };
-    const rows = [
-      {
-        CategoryName: 'A',
-        CumulativeLapTimeSpan: '00:03:30.5000000',
-        FullName: 'Robert WOOD',
-        LapNumber: 1,
-        LapTimeSpan: '00:03:30.5000000',
-        Position: 1,
-        RaceNumber: 306,
-        TeamNameDisplay: 'Robert WOOD',
-      },
-    ];
-    generateOrGetCachedEventPath.mockResolvedValue('C:\\temp\\apical_event_301.xlsx');
-    readTempApicalExcelFile.mockResolvedValue(rows);
     convertDataToRaceState.mockReturnValue(convertedRaceState);
+    const fetchMock = mockExcelFetch();
 
     const result = await fetchApicalRaceStateNow(createApicalSource());
 
-    expect(generateOrGetCachedEventPath).toHaveBeenCalledWith(301, true);
-    expect(readTempApicalExcelFile).toHaveBeenCalledWith('C:\\temp\\apical_event_301.xlsx');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]?.[0] || '')).toContain('/RaceResult/Event/ExportToExcel?eventId=301');
+    expect(String(fetchMock.mock.calls[1]?.[0] || '')).toContain('/Download/DownloadExcel?fileGuid=11111111-1111-4111-8111-111111111111&filename=Round%203.xlsx');
     expect(convertDataToRaceState).toHaveBeenCalledWith(
       createApicalCatalogEventId(301),
       new Date('2026-06-07T01:30:00.000Z'),
@@ -90,24 +101,13 @@ describe('apicalDataSource cached Excel flow', () => {
     expect(result.raceState).toBe(convertedRaceState);
   });
 
-  it('pulls live Apical race state through the same cached Excel helper', async () => {
-    generateOrGetCachedEventPath.mockResolvedValue('C:\\temp\\apical_event_301.xlsx');
-    readTempApicalExcelFile.mockResolvedValue([
-      {
-        CategoryName: 'A',
-        CumulativeLapTimeSpan: '00:03:30.5000000',
-        FullName: 'Robert WOOD',
-        LapNumber: 1,
-        LapTimeSpan: '00:03:30.5000000',
-        Position: 1,
-        RaceNumber: 306,
-        TeamNameDisplay: 'Robert WOOD',
-      },
-    ]);
+  it('pulls live Apical race state through the direct Excel export and download flow', async () => {
     convertDataToRaceState.mockReturnValue({});
+    const fetchMock = mockExcelFetch();
 
     await pullApicalRaceState(createApicalSource(), 'event-1');
 
-    expect(generateOrGetCachedEventPath).toHaveBeenCalledWith(301, true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]?.[0] || '')).toContain('/RaceResult/Event/ExportToExcel?eventId=301');
   });
 });
