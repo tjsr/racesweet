@@ -108,15 +108,18 @@ const fetchWithElectronSession = async (request: ExternalHttpProxyRequest): Prom
 };
 
 const getExternalHttpProxy = (): ((request: ExternalHttpProxyRequest) => Promise<ExternalHttpProxyResponse>) | undefined => {
+  if (typeof globalThis.window !== 'undefined') {
+    const rendererProxy = globalThis.window.api?.requestExternalHttp;
+    if (typeof rendererProxy === 'function') {
+      return rendererProxy;
+    }
+  }
+
   if (typeof session?.defaultSession?.fetch === 'function') {
     return fetchWithElectronSession;
   }
 
-  if (typeof globalThis.window === 'undefined') {
-    return undefined;
-  }
-
-  return globalThis.window.api?.requestExternalHttp;
+  return undefined;
 };
 
 const createProxyRequest = (url: string, options: ExternalHttpRequestOptions): ExternalHttpProxyRequest => ({

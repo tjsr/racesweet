@@ -26,6 +26,7 @@ import { SystemConfigService } from './systemConfigService.ts';
 import { SystemPage } from '../views/display/systemPage.tsx';
 import { TestSession } from '../testdata/testsession.ts';
 import { applyPulledRaceStateToSession } from './sourceApplication.ts';
+import { formatErrorForDisplay } from './stackTrace.ts';
 import { selectedCategoriesForParticipants } from './selectionState.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
 
@@ -385,7 +386,7 @@ export const RaceSweetMainApp = () => {
       <h1>Error loading content</h1>
       <div className="error">
         <p>There was an error loading the content:</p>
-        <pre>{errorState.toString()}</pre>
+        <pre>{formatErrorForDisplay(errorState)}</pre>
       </div>
     </>;
   }

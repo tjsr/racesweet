@@ -3,6 +3,7 @@ import {
   createDefaultSystemConfiguration,
   normalizeSystemConfiguration,
 } from './systemConfig.js';
+import { RendererApiUnavailableError, getRendererApi } from './rendererApi.js';
 
 export interface SystemConfigPersistence {
   load(): Promise<SystemConfiguration>;
@@ -38,11 +39,15 @@ export class ElectronJsonSystemConfigPersistence implements SystemConfigPersiste
 
   public async load(): Promise<SystemConfiguration> {
     try {
-      const content = await window.api.requestFileContent<string>(this.filePath, 'utf8');
+      const api = getRendererApi(['requestFileContent']);
+      const content = await api.requestFileContent<string>(this.filePath, 'utf8');
       const parsed = JSON.parse(content) as Partial<SystemConfiguration>;
 
       return normalizeSystemConfiguration(parsed);
     } catch (error: unknown) {
+      if (error instanceof RendererApiUnavailableError) {
+        throw error;
+      }
       if (isFileNotFoundError(error)) {
         console.info(`System config file not found at ${this.filePath}, using defaults.`);
       } else if (isPermissionDeniedError(error)) {
@@ -59,7 +64,8 @@ export class ElectronJsonSystemConfigPersistence implements SystemConfigPersiste
 
   public async save(config: SystemConfiguration): Promise<void> {
     try {
-      await window.api.writeFileContent(this.filePath, JSON.stringify(config, null, 2));
+      const api = getRendererApi(['writeFileContent']);
+      await api.writeFileContent(this.filePath, JSON.stringify(config, null, 2));
     } catch (error: unknown) {
       if (isPermissionDeniedError(error)) {
         const warning = createPermissionWarning(this.filePath, 'write');

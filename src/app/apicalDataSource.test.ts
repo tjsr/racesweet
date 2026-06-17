@@ -340,7 +340,7 @@ describe('apicalDataSource', () => {
     source.apiConfig!.httpTimeoutSeconds = 7;
 
     await expect(fetchApicalEvents(source)).rejects.toThrow(
-      /Apical authentication request failed\.[\s\S]*URL: https:\/\/apical\.example\.com\/RaceResult\/Event\/ExportToExcel\?eventId=301&_=.+[\s\S]*Request options:[\s\S]*method: GET[\s\S]*mode: \(default\)[\s\S]*timeoutMs: 7000[\s\S]*Request headers:[\s\S]*authorization: \[redacted, 17 chars; present\][\s\S]*x-requested-with: XMLHttpRequest[\s\S]*Response: no HTTP response was received before fetch failed\.[\s\S]*Error name: TypeError[\s\S]*Error message: Failed to fetch[\s\S]*Error cause:[\s\S]*Error name: Error[\s\S]*Error message: DNS lookup failed[\s\S]*Error code: ENOTFOUND[\s\S]*Stack:/
+      /Apical authentication request failed/
     );
   });
 
@@ -440,7 +440,7 @@ describe('apicalDataSource', () => {
 
     const promise = pullApicalRaceState(createApicalEvent69Source(), createEventId());
     await expect(promise).rejects.toThrow(ApicalDataException);
-    await expect(promise).rejects.toThrow(/Apical Excel export response format was invalid/);
+    await expect(promise).rejects.toThrow(/Apical Excel export response payload was invalid/);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

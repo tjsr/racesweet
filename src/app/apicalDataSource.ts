@@ -1,4 +1,5 @@
 import { ApicalDataException } from '../errors/apicalDataException.js';
+import { ApicalRequestFailedError } from '../errors/ApicalRequestFailedError.js';
 import type { ApicalLapByCategory } from '../model/apical.js';
 import { EventId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
@@ -97,11 +98,7 @@ const getAuthHeader = (source: DataSourceConfig): { name: string; value: string 
 };
 
 const readSetCookie = (response: Response): string | undefined => {
-  try {
-    return response.headers.get('set-cookie') || undefined;
-  } catch (_error: unknown) {
-    return undefined;
-  }
+  return response.headers.get('set-cookie') || undefined;
 };
 
 const createAuthenticatedHeaders = (source: DataSourceConfig, cookie?: string): Headers => {
@@ -277,7 +274,9 @@ const fetchApicalResponse = async (
   } catch (error: unknown) {
     const message = describeRequestFailure(phase, url, init, timeoutMs, error);
     console.error(message);
-    throw new Error(message, { cause: error });
+    const err: ApicalRequestFailedError = new ApicalRequestFailedError(phase, url, init, timeoutMs);
+    err.cause = error;
+    throw err;
   }
 
   console.debug([
@@ -298,7 +297,10 @@ const fetchApicalResponse = async (
       body ? `Response body: ${body}` : 'Response body: (empty)',
     ].join('\n');
     console.error(message);
-    throw new Error(message);
+    const err: ApicalRequestFailedError = new ApicalRequestFailedError(phase, url, init, timeoutMs);
+    err.body = body;
+    err.status = response.status;
+    throw err;
   }
 
   return response;
@@ -334,7 +336,11 @@ const authenticateSession = async (source: DataSourceConfig): Promise<string | u
     apiConfig.httpTimeoutSeconds * 1000
   );
 
-  return readSetCookie(response);
+  const cookie = readSetCookie(response);
+  if (!cookie) {
+    throw new ApicalDataException(`Authentication request to ${authUrl} did not return a set-cookie header. Check that the auth header is correct and has sufficient permissions to access the event data.`);
+  }
+  return cookie;
 };
 
 export const fetchApicalEvents = async (source: DataSourceConfig): Promise<ApicalListedEvent[]> => {
@@ -395,9 +401,8 @@ const generateApicalExcelExport = async (source: DataSourceConfig, apicalEventId
   const payload = await response.json() as Partial<ApicalExportToExcelResponse>;
   if (!payload.FileGuid || !isGuid(payload.FileGuid) || !payload.FileName) {
     throw new ApicalDataException([
-      `Apical Excel export response format was invalid, payload: ${JSON.stringify(payload)}`,
-      formatRequestHeaders(headers, true),
-      formatResponseStatusAndHeaders(response),
+      'Apical Excel export response payload was invalid',
+       `${JSON.stringify(payload)}`,
     ].join('\n'));
   }
   return {

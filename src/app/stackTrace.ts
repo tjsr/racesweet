@@ -201,14 +201,36 @@ export const remapStackTrace = (
     return annotateStackFrameMethod(mappedLine, mappedPosition.source, mappedPosition.line);
   }).join('\n'));
 
+const getErrorHeading = (error: Error): string =>
+  error.message ? `${error.name}: ${error.message}` : error.name;
+
+const removeDuplicateStackHeading = (error: Error, stack: string): string | undefined => {
+  const stackLines = stack.split('\n');
+  const firstLine = stackLines[0]?.trim();
+  const duplicateHeadings = new Set([
+    error.message,
+    getErrorHeading(error),
+  ]);
+
+  if (firstLine && duplicateHeadings.has(firstLine)) {
+    const stackFrames = stackLines.slice(1).join('\n').trimEnd();
+    return stackFrames || undefined;
+  }
+
+  return stack;
+};
+
 export const formatErrorForDisplay = (error: unknown): string => {
   if (!(error instanceof Error)) {
     return String(error);
   }
 
+  const stackFrames = error.stack
+    ? removeDuplicateStackHeading(error, remapStackTrace(error.stack))
+    : undefined;
   const details = [
-    error.message,
-    error.stack ? remapStackTrace(error.stack) : undefined,
+    getErrorHeading(error),
+    stackFrames,
   ].filter((value): value is string => !!value);
 
   if (error.cause !== undefined) {

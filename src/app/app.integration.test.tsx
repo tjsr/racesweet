@@ -414,6 +414,44 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.textContent).toContain('Handicap Data');
   });
 
+  it('shows source-mapped stack details when content loading fails', async () => {
+    const persistenceError = new Error('Catalog ledger could not be written');
+    persistenceError.stack = [
+      'Error: Catalog ledger could not be written',
+      '    at writeCatalog (webpack://racesweet/./src/app/eventCatalogPersistence.ts:84:7)',
+      '    at async RaceSweetMainApp (webpack://racesweet/./src/app/App.tsx:659:15)',
+    ].join('\n');
+
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer: readFixtureBuffer,
+      requestFileContent: readGeneratedFixture as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async (filePath: string) => {
+        if (filePath.includes('event-catalog.json')) {
+          throw persistenceError;
+        }
+      },
+    };
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForText(container, 'Error loading content');
+
+    const errorDetails = container.querySelector('.error pre');
+    expect(errorDetails).toBeTruthy();
+    expect(errorDetails!.textContent).toContain('Catalog ledger could not be written');
+    expect(errorDetails!.textContent).toContain('Error: Catalog ledger could not be written');
+    expect(errorDetails!.textContent).toContain('webpack://racesweet/./src/app/eventCatalogPersistence.ts:84:7');
+    expect(errorDetails!.textContent).toContain('webpack://racesweet/./src/app/App.tsx:659:15');
+  });
+
   it('supports results and reports view selection dropdowns', async () => {
     await ensureAppStylesLoaded();
 
@@ -946,6 +984,9 @@ describe('RaceSweetMainApp integration', () => {
 
     const loadedCssText = document.head.querySelector(`style[${APP_TEST_STYLE_TAG}="${APP_TEST_STYLE_TAG_VALUE}"]`)?.textContent || '';
     expect(loadedCssText).toContain('.section-tile.active');
+    expect(loadedCssText).toContain('.error pre');
+    expect(loadedCssText).toContain('white-space: pre-wrap');
+    expect(loadedCssText).toContain('overflow-wrap: anywhere');
     expect(loadedCssText).toContain('@media (prefers-color-scheme: dark)');
   });
 

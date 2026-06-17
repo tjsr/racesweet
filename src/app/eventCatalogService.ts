@@ -27,6 +27,12 @@ interface EventCatalogServiceOptions {
   onPersistedLedger?: (ledger: EventCatalogLedger) => Promise<void>;
 }
 
+const assertEventCatalogPersistence = (persistence: EventCatalogPersistence): void => {
+  if (!persistence || typeof persistence.load !== 'function' || typeof persistence.save !== 'function') {
+    throw new Error('EventCatalogService.create requires a persistence object with load() and save() methods.');
+  }
+};
+
 const createMutationId = (): string => `event-catalog-${Date.now()}-${Math.round(Math.random() * 100000)}`;
 const createTimestamp = (): string => new Date().toISOString();
 const createEntityId = (prefix: string): string => `${prefix}-${Date.now()}-${Math.round(Math.random() * 100000)}`;
@@ -202,6 +208,7 @@ export class EventCatalogService {
   }
 
   public static async create(persistence: EventCatalogPersistence, options: EventCatalogServiceOptions = {}): Promise<EventCatalogService> {
+    assertEventCatalogPersistence(persistence);
     let ledger = await persistence.load();
     if (ledger.mutations.length === 0) {
       ledger = createSeedEventCatalogLedger();

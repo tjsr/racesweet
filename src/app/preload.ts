@@ -18,6 +18,7 @@ import {
 } from '../model/electronIpc.ts';
 
 import { getRaceSweetServerPort } from './serverPort.ts';
+import { assertRendererApi } from './rendererApi.ts';
 
 // See the Electron documentation for details on how to use preload scripts:
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
@@ -36,14 +37,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 window.actualPort = getRaceSweetServerPort();
-
-
-contextBridge.exposeInMainWorld('api', {
-  requestExternalHttp: (url: string, options: ExternalHttpProxyRequest) => { /* your existing code */ },
-  
-  // Add this helper to ask the main process for cookies
-  getAppCookies: (targetUrl: string) => ipcRenderer.invoke('get-cookies', targetUrl)
-});
 
 const eventCalls: Record<string, [(data: (never | PromiseLike<never>)) => void, (reason?: string|Error) => void]> = {};
 
@@ -80,7 +73,7 @@ ipcRenderer.on(WriteContentErrorIpcReceiveChannel,
     }
   });
 
-window.api = {
+const rendererApi: Window['api'] = {
   receive: (channel: string, func: (...args: unknown[]) => unknown): void => {
     if (VALID_RECEIVE_CHANNELS.includes(channel)) {
       ipcRenderer.on(channel, (_event: IpcRendererEvent, ...args: unknown[]) => func(...args));
@@ -131,6 +124,13 @@ window.api = {
     });
   },
 };
+
+assertRendererApi(rendererApi);
+window.api = rendererApi;
+
+if ((process as NodeJS.Process & { contextIsolated?: boolean }).contextIsolated) {
+  contextBridge.exposeInMainWorld('api', rendererApi);
+}
 
 window.nodeAPI = {
   createBuffer: (data: string | Uint8Array | ArrayBuffer) => {

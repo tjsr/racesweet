@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.js';
+import { EventCatalogService } from './eventCatalogService.js';
 import { createDefaultEventCatalogLedger } from './eventCatalog.js';
 
 const eventCatalogTestPath = '../../test/generated/event-catalog.test.json';
@@ -28,6 +29,36 @@ describe('ElectronJsonEventCatalogPersistence', () => {
 
     expect(loaded).toEqual(createDefaultEventCatalogLedger());
     expect(infoSpy).toHaveBeenCalledOnce();
+  });
+
+  it('throws a clear assertion when window.api is missing during load', async () => {
+    const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath);
+
+    await expect(persistence.load()).rejects.toThrow(/window\.api must be populated/);
+  });
+
+  it('throws a clear assertion when window.api.writeFileContent is missing during save', async () => {
+    (window as unknown as {
+      api: { requestFileContent: <T>(filePath: string, dataType: string) => Promise<T> };
+    }).api = {
+      requestFileContent: vi.fn(),
+    };
+
+    const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath);
+
+    await expect(persistence.save(createDefaultEventCatalogLedger())).rejects.toThrow(/Missing methods: writeFileContent/);
+  });
+
+  it('fails EventCatalogService.create clearly when seed persistence cannot access window.api.writeFileContent', async () => {
+    (window as unknown as {
+      api: { requestFileContent: <T>(filePath: string, dataType: string) => Promise<T> };
+    }).api = {
+      requestFileContent: vi.fn(async () => JSON.stringify(createDefaultEventCatalogLedger())) as <T>(filePath: string, dataType: string) => Promise<T>,
+    };
+
+    const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath);
+
+    await expect(EventCatalogService.create(persistence)).rejects.toThrow(/Missing methods: writeFileContent/);
   });
 
   it('does not call onError when file is not found (ENOENT)', async () => {

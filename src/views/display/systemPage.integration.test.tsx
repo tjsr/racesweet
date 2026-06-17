@@ -20,7 +20,7 @@ vi.mock('../../app/stackTrace.js', async (importOriginal) => {
         return String(error);
       }
 
-      return `${error.message}\nError: ${error.message}\n    at mapped (webpack://racesweet/./src/app/apicalDataSource.ts:225:13)`;
+      return `Error: ${error.message}\n    at mapped (webpack://racesweet/./src/app/apicalDataSource.ts:225:13)`;
     },
   };
 });
@@ -277,7 +277,9 @@ describe('SystemPage integration', () => {
     expect(container.textContent).toContain('content-type: text/plain');
     expect(container.textContent).toContain('Response body: Session authentication failed');
     expect(container.textContent).toContain('webpack://racesweet/./src/app/apicalDataSource.ts:225:13');
-    expect(container.querySelector('.inline-error pre')).toBeTruthy();
+    const inlineError = container.querySelector('.inline-error pre');
+    expect(inlineError).toBeTruthy();
+    expect(inlineError?.textContent?.match(/Apical event list request returned HTTP 401 Unauthorized\./g)).toHaveLength(1);
   });
 
   it('allows data source fields to be edited from the middle without committing or moving the cursor until blur', async () => {

@@ -97,7 +97,8 @@ describe('stack trace formatting', () => {
 
     const formattedError = formatErrorForDisplay(error);
 
-    expect(formattedError).toContain('Failed to fetch');
+    expect(formattedError).toContain('Error: Failed to fetch');
+    expect(formattedError.match(/Failed to fetch/g)).toHaveLength(1);
     expect(formattedError).toContain('C:\\dev\\racesweet\\.webpack\\x64\\renderer\\main_window\\index.js:200:11');
   });
 
@@ -129,6 +130,7 @@ describe('stack trace formatting', () => {
     const formattedError = formatErrorForDisplay(error);
 
     expect(formattedError).toContain('at fetchApicalResponse [apicalDataSource.ts:321] (webpack://racesweet/./src/app/apicalDataSource.ts:321:5)');
+    expect(formattedError.match(/Failed to fetch Apical events/g)).toHaveLength(1);
     expect(formattedError).not.toContain(`${bundlePath}:200:11`);
   });
 
@@ -157,5 +159,6 @@ describe('stack trace formatting', () => {
     expect(formattedError).toContain('Failed to fetch Apical data from url https://apical.example.com/RaceResult/Event/ExportToExcel?eventId=301');
     expect(formattedError).toContain('Caused by:');
     expect(formattedError).toContain('Apical Excel download request returned HTTP 403 Forbidden.');
+    expect(formattedError.match(/Apical Excel download request returned HTTP 403 Forbidden\./g)).toHaveLength(1);
   });
 });

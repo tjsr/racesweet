@@ -39,6 +39,11 @@ interface DraftInputProps {
   value: string;
 }
 
+interface SourceFetchError {
+  details: string;
+  title: string;
+}
+
 const DraftInput = (props: DraftInputProps): React.ReactElement => {
   const [draft, setDraft] = React.useState(props.value);
 
@@ -66,7 +71,7 @@ const DraftInput = (props: DraftInputProps): React.ReactElement => {
 export const SystemPage = (props: SystemPageProps): React.ReactElement => {
   const [newSourceType, setNewSourceType] = React.useState<DataSourceType>(sourceTypeOptions[0]);
   const [selectedSourceId, setSelectedSourceId] = React.useState<string | undefined>(props.config.dataSources[0]?.id);
-  const [sourceFetchErrors, setSourceFetchErrors] = React.useState<Record<string, string>>({});
+  const [sourceFetchErrors, setSourceFetchErrors] = React.useState<Record<string, SourceFetchError>>({});
   const [masterProfileDraftErrors, setMasterProfileDraftErrors] = React.useState<Record<string, string>>({});
 
   React.useEffect(() => {
@@ -97,7 +102,10 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
       console.error(`Failed to fetch Apical events for source ${sourceId}:\n${formattedError}`);
       setSourceFetchErrors((current) => ({
         ...current,
-        [sourceId]: formattedError,
+        [sourceId]: {
+          details: formattedError,
+          title: 'Failed to fetch Apical events',
+        },
       }));
     }
   };
@@ -116,7 +124,10 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
       console.error(`Failed to fetch Apical event data for source ${sourceId}:\n${formattedError}`);
       setSourceFetchErrors((current) => ({
         ...current,
-        [sourceId]: formattedError,
+        [sourceId]: {
+          details: formattedError,
+          title: 'Failed to fetch Apical event data',
+        },
       }));
     }
   };
@@ -221,6 +232,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                 const isMasterEntrants = source.type === 'master-entrant-profiles';
                 const isRfidTimingCsv = source.type === 'file-rfid-timing-csv';
                 const masterProfilesJson = JSON.stringify(source.masterEntrantConfig?.profiles || [], null, 2);
+                const sourceFetchError = sourceFetchErrors[source.id];
 
                 return (
                   <>
@@ -367,10 +379,10 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                           </button>
                         </div>
                         <p>Data last retrieved: {source.dataLastRetrieved || 'Never'}</p>
-                        {sourceFetchErrors[source.id] ? (
+                        {sourceFetchError ? (
                           <div className="inline-error" role="alert">
-                            <p>Failed to fetch Apical events:</p>
-                            <pre>{sourceFetchErrors[source.id]}</pre>
+                            <p>{sourceFetchError.title}:</p>
+                            <pre>{sourceFetchError.details}</pre>
                           </div>
                         ) : null}
                         {listedEvents.length > 0 ? (

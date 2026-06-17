@@ -1,5 +1,6 @@
 import type { EventCategoryId } from '../model/eventcategory.js';
 import type { EventEntrantId } from '../model/entrant.js';
+import { RendererApiUnavailableError, getRendererApi } from './rendererApi.js';
 
 export interface AdministrativeChanges {
   entrantCategories: Record<EventEntrantId, EventCategoryId>;
@@ -47,7 +48,8 @@ export class ElectronJsonRaceAdminPersistence implements RaceAdminPersistence {
 
   public async load(): Promise<AdministrativeChanges> {
     try {
-      const content = await window.api.requestFileContent<string>(this.filePath, 'utf8');
+      const api = getRendererApi(['requestFileContent']);
+      const content = await api.requestFileContent<string>(this.filePath, 'utf8');
       const parsed = JSON.parse(content) as Partial<AdministrativeChanges>;
 
       return {
@@ -58,6 +60,9 @@ export class ElectronJsonRaceAdminPersistence implements RaceAdminPersistence {
         schemaVersion: 1,
       };
     } catch (error: unknown) {
+      if (error instanceof RendererApiUnavailableError) {
+        throw error;
+      }
       if (isFileNotFoundError(error)) {
         console.info(`Admin overrides file not found at ${this.filePath}, using defaults.`);
       } else if (isPermissionDeniedError(error)) {
@@ -74,7 +79,8 @@ export class ElectronJsonRaceAdminPersistence implements RaceAdminPersistence {
 
   public async save(changes: AdministrativeChanges): Promise<void> {
     try {
-      await window.api.writeFileContent(this.filePath, JSON.stringify(changes, null, 2));
+      const api = getRendererApi(['writeFileContent']);
+      await api.writeFileContent(this.filePath, JSON.stringify(changes, null, 2));
     } catch (error: unknown) {
       if (isPermissionDeniedError(error)) {
         const warning = createPermissionWarning(this.filePath, 'write');

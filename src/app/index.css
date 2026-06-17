@@ -220,6 +220,14 @@
   color: var(--color-error);
 }
 
+.error pre,
+.inline-error pre {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .warning-icon {
   align-items: center;
   border: 1px solid currentColor;

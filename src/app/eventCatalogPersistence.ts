@@ -2,6 +2,7 @@ import {
   type EventCatalogLedger,
   createDefaultEventCatalogLedger,
 } from './eventCatalog.js';
+import { RendererApiUnavailableError, getRendererApi } from './rendererApi.js';
 
 export interface EventCatalogPersistence {
   load(): Promise<EventCatalogLedger>;
@@ -37,7 +38,8 @@ export class ElectronJsonEventCatalogPersistence implements EventCatalogPersiste
 
   public async load(): Promise<EventCatalogLedger> {
     try {
-      const content = await window.api.requestFileContent<string>(this.filePath, 'utf8');
+      const api = getRendererApi(['requestFileContent']);
+      const content = await api.requestFileContent<string>(this.filePath, 'utf8');
       const parsed = JSON.parse(content) as Partial<EventCatalogLedger>;
 
       return {
@@ -47,6 +49,9 @@ export class ElectronJsonEventCatalogPersistence implements EventCatalogPersiste
         schemaVersion: 1,
       };
     } catch (error: unknown) {
+      if (error instanceof RendererApiUnavailableError) {
+        throw error;
+      }
       if (isFileNotFoundError(error)) {
         console.info(`Event catalog file not found at ${this.filePath}, using defaults.`);
       } else if (isPermissionDeniedError(error)) {
@@ -63,7 +68,8 @@ export class ElectronJsonEventCatalogPersistence implements EventCatalogPersiste
 
   public async save(ledger: EventCatalogLedger): Promise<void> {
     try {
-      await window.api.writeFileContent(this.filePath, JSON.stringify(ledger, null, 2));
+      const api = getRendererApi(['writeFileContent']);
+      await api.writeFileContent(this.filePath, JSON.stringify(ledger, null, 2));
     } catch (error: unknown) {
       if (isPermissionDeniedError(error)) {
         const warning = createPermissionWarning(this.filePath, 'write');

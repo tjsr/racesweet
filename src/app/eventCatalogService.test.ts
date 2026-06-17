@@ -23,6 +23,12 @@ const createPersistence = (initial = createDefaultEventCatalogLedger()): EventCa
 };
 
 describe('EventCatalogService', () => {
+  it('rejects malformed persistence objects before loading the event catalog', async () => {
+    await expect(EventCatalogService.create({ load: vi.fn() } as unknown as EventCatalogPersistence)).rejects.toThrow(
+      'EventCatalogService.create requires a persistence object with load() and save() methods.'
+    );
+  });
+
   it('seeds the ledger when no events file exists yet', async () => {
     const emptyPersistence = createPersistence();
 
@@ -32,6 +38,33 @@ describe('EventCatalogService', () => {
     expect(service.catalog.activeEventId).toBe('event-2026-racesweet-round-1');
     expect(service.catalog.entrants.length).toBeGreaterThan(0);
     expect(emptyPersistence.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists and publishes the seeded ledger during create when the loaded ledger is empty', async () => {
+    const emptyPersistence = createPersistence();
+    const onPersistedLedger = vi.fn(async () => undefined);
+
+    const service = await EventCatalogService.create(emptyPersistence, { onPersistedLedger });
+
+    const savedLedger = vi.mocked(emptyPersistence.save).mock.calls[0]?.[0];
+    expect(emptyPersistence.load).toHaveBeenCalledOnce();
+    expect(emptyPersistence.save).toHaveBeenCalledOnce();
+    expect(savedLedger).toEqual(createSeedEventCatalogLedger());
+    expect(onPersistedLedger).toHaveBeenCalledWith(savedLedger);
+    expect(service.catalog).toEqual(applyEventCatalogLedger(savedLedger!));
+  });
+
+  it('does not seed or save when create loads an existing persisted ledger', async () => {
+    const seededLedger = createSeedEventCatalogLedger();
+    const seededPersistence = createPersistence(seededLedger);
+    const onPersistedLedger = vi.fn(async () => undefined);
+
+    const service = await EventCatalogService.create(seededPersistence, { onPersistedLedger });
+
+    expect(seededPersistence.load).toHaveBeenCalledOnce();
+    expect(seededPersistence.save).not.toHaveBeenCalled();
+    expect(onPersistedLedger).not.toHaveBeenCalled();
+    expect(service.catalog).toEqual(applyEventCatalogLedger(seededLedger));
   });
 
   it('activates an event by appending a ledger mutation and persisting it', async () => {
