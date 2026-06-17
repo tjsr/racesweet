@@ -60,6 +60,8 @@ Agents must solve existing code failures so the project passes relevant Vitest t
 
 Run `npm i` before tests or lint whenever dependencies are missing, stale, or suspect.
 
+All Markdown files must pass the repository's Markdown lint checks. When adding or editing Markdown, run the relevant Markdown lint command before handoff and fix any reported issues.
+
 ## Ledger data format
 
 Remember that all data and modifications should occur in a ledger format, where modifications are an action and all previous data is immutable.  State becomes modified by instructions in sequence over time, and once modified never changes.  If we change an entrants category or name for example, the original information will not change but we log a change in the event data to indicate that it has to be updated.  That update is then reflected in the model.
