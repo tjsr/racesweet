@@ -1,24 +1,33 @@
 // @vitest-environment jsdom
 
 const electronMocks = vi.hoisted(() => ({
+  cookiesGet: vi.fn(),
   sessionFetch: vi.fn(),
 }));
 
 vi.mock('electron', () => ({
   session: {
     defaultSession: {
+      cookies: {
+        get: electronMocks.cookiesGet,
+      },
       fetch: electronMocks.sessionFetch,
     },
   },
 }));
 
-import { fetchExternalHttp, isSensitiveHeader } from './externalHttp.js';
+import { fetchExternalHttp, hasExternalHttpProxy, isSensitiveHeader } from './externalHttp.js';
 
 describe('fetchExternalHttp', () => {
   afterEach(() => {
     delete (globalThis.window as unknown as { api?: unknown }).api;
     vi.restoreAllMocks();
+    electronMocks.cookiesGet.mockReset();
     electronMocks.sessionFetch.mockReset();
+  });
+
+  it('reports that an external HTTP proxy is available in Electron', () => {
+    expect(hasExternalHttpProxy()).toBe(true);
   });
 
   it('prefers the renderer IPC external HTTP proxy when window.api is available', async () => {
@@ -101,6 +110,54 @@ describe('fetchExternalHttp', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('set-cookie')).toBe('ASP.NET_SessionId=abc123; path=/; HttpOnly');
     expect(await response.json()).toEqual({ ok: true });
+  });
+
+  it('uses Electron session cookies when Electron fetch hides set-cookie headers', async () => {
+    electronMocks.sessionFetch.mockResolvedValueOnce({
+      arrayBuffer: async () => Buffer.from('{"ok":true}'),
+      headers: new Headers({
+        'content-type': 'application/json',
+      }),
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      url: 'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69',
+    } as unknown as Response);
+    electronMocks.cookiesGet.mockResolvedValueOnce([
+      { name: 'ASP.NET_SessionId', value: 'abc123' },
+    ]);
+
+    const response = await fetchExternalHttp(
+      'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69',
+      {
+        method: 'GET',
+      }
+    );
+
+    expect(electronMocks.sessionFetch).toHaveBeenCalled();
+    expect(response.headers.get('cookie')).toBe('ASP.NET_SessionId=abc123');
+    expect(await response.json()).toEqual({ ok: true });
+  });
+
+  it('fails when Electron session cookies cannot be read after Electron fetch hides set-cookie headers', async () => {
+    electronMocks.sessionFetch.mockResolvedValueOnce({
+      arrayBuffer: async () => Buffer.from('{"ok":true}'),
+      headers: new Headers({
+        'content-type': 'application/json',
+      }),
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      url: 'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69',
+    } as unknown as Response);
+    electronMocks.cookiesGet.mockRejectedValueOnce(new Error('cookie permission denied'));
+
+    await expect(fetchExternalHttp(
+      'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69',
+      {
+        method: 'GET',
+      }
+    )).rejects.toThrow('Failed to read Electron session cookies for external HTTP response: cookie permission denied');
   });
 });
 

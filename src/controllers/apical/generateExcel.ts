@@ -16,7 +16,7 @@ interface GenerateExcelDataOptions {
 
 const readDocumentCookie = (): string | undefined => {
   if (typeof document === 'undefined') {
-    return undefined;
+    throw new Error('Cannot read document cookie: document is undefined');
   }
 
   const cookie = document.cookie.trim();
@@ -24,7 +24,7 @@ const readDocumentCookie = (): string | undefined => {
 };
 
 const readResponseCookie = (response: Response): string | undefined => {
-  return response.headers.get('set-cookie') || readDocumentCookie();
+  return response.headers.get('set-cookie') || response.headers.get('cookie') || readDocumentCookie();
 };
 
 const normalizeGenerateExcelDataOptions = (timestampOrOptions: number | GenerateExcelDataOptions): GenerateExcelDataOptions => {

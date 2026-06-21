@@ -1,3 +1,5 @@
+import { session } from 'electron';
+
 import type { ExternalHttpProxyRequest, ExternalHttpProxyResponse } from './window.js';
 
 const readSetCookieHeaders = (headers: Headers): string[] => {
@@ -30,6 +32,27 @@ export const toExternalHttpHeaderRecord = (headers: Headers): Record<string, str
   return headerRecord;
 };
 
+const readElectronCookieHeader = async (url: string): Promise<string | undefined> => {
+  const getCookies = session.defaultSession.cookies?.get;
+  if (typeof getCookies !== 'function') {
+    throw new Error('Electron session cookie store is unavailable while trying to read cookies for external HTTP response');
+  }
+
+  let cookies: Electron.Cookie[];
+  try {
+    cookies = await getCookies.call(session.defaultSession.cookies, { url });
+  } catch (error: unknown) {
+    throw new Error(`Failed to read Electron session cookies for external HTTP response: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const cookieHeader = cookies
+    .filter((cookie) => cookie.name.trim().length > 0)
+    .map((cookie) => `${cookie.name}=${cookie.value}`)
+    .join('; ');
+
+  return cookieHeader.length > 0 ? cookieHeader : undefined;
+};
+
 export const fetchExternalHttpProxy = async (request: ExternalHttpProxyRequest): Promise<ExternalHttpProxyResponse> => {
   let parsedUrl: URL;
   try {
@@ -47,17 +70,24 @@ export const fetchExternalHttpProxy = async (request: ExternalHttpProxyRequest):
   const timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);
 
   try {
-    const response = await fetch(request.url, {
+    const response = await session.defaultSession.fetch(request.url, {
       body: request.bodyBase64 ? Buffer.from(request.bodyBase64, 'base64') : undefined,
       headers: request.headers,
       method: request.method || 'GET',
       signal: abortController.signal,
     });
     const bodyBuffer = Buffer.from(await response.arrayBuffer());
+    const headers = toExternalHttpHeaderRecord(response.headers);
+    if (!headers['set-cookie'] && !headers.cookie) {
+      const cookieHeader = await readElectronCookieHeader(response.url || request.url);
+      if (cookieHeader) {
+        headers.cookie = cookieHeader;
+      }
+    }
 
     return {
       bodyBase64: bodyBuffer.toString('base64'),
-      headers: toExternalHttpHeaderRecord(response.headers),
+      headers,
       ok: response.ok,
       status: response.status,
       statusText: response.statusText,
