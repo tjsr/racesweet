@@ -1,5 +1,6 @@
 import type { ApicalLapByCategory } from '../model/apical.js';
-import { convertDataToRaceState, createChipCrossingRecord } from './apical.js';
+import { apicalTimeToMilliseconds, convertDataToRaceState, createChipCrossingRecord } from './apical.js';
+import { excelTimeToMilliseconds } from './genericTimeParser.js';
 
 const eventId = '7b83ad1e-54ba-5f00-9712-1c82d3178640';
 
@@ -20,6 +21,33 @@ describe('Apical parser', () => {
     );
 
     expect(crossing.time!.toISOString()).toBe('2026-06-07T00:03:30.500Z');
+  });
+
+  it('converts Excel time fractions to milliseconds', () => {
+    expect(excelTimeToMilliseconds(0.0202351041666667)).toBe(1748313);
+  });
+
+  it('chooses Excel time parsing for numeric Apical lap values', () => {
+    expect(apicalTimeToMilliseconds(0.0202351041666667)).toBe(1748313);
+    expect(apicalTimeToMilliseconds('00:29:08.3130000')).toBe(1748313);
+  });
+
+  it('creates chip crossing timestamps from numeric Excel time values', () => {
+    const crossing = createChipCrossingRecord(
+      {
+        CumulativeLapTimeSpan: 0.0202351041666667,
+        FullName: 'Robert WOOD',
+        Id: 1243,
+        LapNumber: 1,
+        LapTimeSpan: 0.0202351041666667,
+        RaceNumber: '306',
+      },
+      new Date('2026-06-07T00:00:00.000Z'),
+      200306,
+      eventId
+    );
+
+    expect(crossing.time!.toISOString()).toBe('2026-06-07T00:29:08.313Z');
   });
 
   it('converts Apical results into entrants, categories, and ordered crossing times', () => {

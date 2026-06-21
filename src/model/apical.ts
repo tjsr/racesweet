@@ -15,8 +15,8 @@ export interface ApicalLapByCategoryViewModel {
   FullName: string;
   RaceNumber: string;
   LapNumber: number;
-  LapTimeSpan: string;
-  CumulativeLapTimeSpan: string;
+  LapTimeSpan: string | number;
+  CumulativeLapTimeSpan: string | number;
 }
 
 export interface ApicalParticipantViewModel {
@@ -25,7 +25,7 @@ export interface ApicalParticipantViewModel {
   CategoryName: string;
   RaceNumbers: string;
   NumberOfLaps: number;
-  TotalTimeSpan: string | null;
+  TotalTimeSpan: string | number | null;
   Position: number;
 }
 

@@ -18,8 +18,8 @@ export interface ApicalSpreadsheetLapsRow {
   FullName: string;
   LapNumber: number;
   TimeOfDay: string;
-  LapTimeSpan: string;
-  CumulativeLapTimeSpan: string;
+  LapTimeSpan: string | number;
+  CumulativeLapTimeSpan: string | number;
   LapSeconds: number;
   CumulativeSeconds: number;
   RaceNumber: number;

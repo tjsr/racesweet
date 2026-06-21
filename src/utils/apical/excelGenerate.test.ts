@@ -122,6 +122,41 @@ describe('apical Excel generation utilities', () => {
       .rejects.toThrow(ApicalDataException);
   });
 
+  it('includes a reproducible curl command when the Excel export request fails', async () => {
+    document.cookie = 'ASP.NET_SessionId=document-session';
+    vi.spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('network blocked'));
+
+    await expect(generateExcelData(APICAL_EVENT_ID, {
+      headers: {
+        Authorization: 'Bearer abc123',
+        'X-Apical-Company': 'GMBC',
+      },
+      timestamp: APICAL_TIMESTAMP,
+    })).rejects.toThrow(new RegExp([
+      'Failed to generate Apical Excel export data\\.',
+      'Cause: network blocked',
+      'Replicate request with: curl --include --location --request GET',
+      "--header 'access-control-allow-credentials: true'",
+      "--header 'authorization: Bearer abc123'",
+      "--header 'cookie: ASP\\.NET_SessionId=document-session'",
+      "--header 'x-apical-company: GMBC'",
+      "--header 'x-requested-with: XMLHttpRequest'",
+      `'https://apicalracetiming\\.com\\.au/RaceResult/Event/ExportToExcel\\?eventId=69&_=1781309520833'`,
+    ].join('.*'), 's'));
+  });
+
+  it('includes a reproducible curl command when the Excel export response is invalid', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        FileGuid: 'not-a-guid',
+        FileName: APICAL_FILE_NAME,
+      }), { status: 200 }));
+
+    await expect(generateExcelData(APICAL_EVENT_ID, APICAL_TIMESTAMP))
+      .rejects.toThrow(/Replicate request with: curl --include --location --request GET.*RaceResult\/Event\/ExportToExcel/s);
+  });
+
   it('downloads the returned Apical Excel file and verifies sheets and data rows', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')

@@ -3,6 +3,7 @@ import type { TimeRecord } from "../model/timerecord.js";
 import { asUnparsedChipCrossing } from "../controllers/chipCrossing.js";
 import { formatRFC3339 } from "date-fns";
 import { timeOrTimeToday } from "./date/dateutils.js";
+import { TimeParseError } from "./date/errors.js";
 
 export const parseUnparsedChipCrossings = (
   eventDate: Date,
@@ -45,9 +46,12 @@ export const parseUnparsedChipCrossings = (
 };
 
 export const durationStringToMilliseconds = (duration: string): number => {
+  if (!duration || typeof duration !== 'string') {
+    throw new TimeParseError('Invalid duration', duration);
+  }
   const parts = duration.split(':');
   if (parts.length !== 3) {
-    throw new Error(`Invalid duration format: ${duration}`);
+    throw new TimeParseError('Invalid duration format', duration);
   }
 
   try {
@@ -58,7 +62,7 @@ export const durationStringToMilliseconds = (duration: string): number => {
     const seconds = parseInt(secondsParts[0]);
     
     if (isNaN(hours) || isNaN(minutes) || isNaN(seconds) || isNaN(ms)) {
-      throw new Error(`Invalid duration values: ${duration}`);
+      throw new TimeParseError('Invalid duration values', duration);
     }
     
     return ((hours * 3600 + minutes * 60 + seconds) * 1000) + ms; // Convert to milliseconds
@@ -66,4 +70,12 @@ export const durationStringToMilliseconds = (duration: string): number => {
     console.error(`Error parsing duration string "${duration}": ${error instanceof Error ? error.message : String(error)}`, error);
     throw error;
   }
+};
+
+export const excelTimeToMilliseconds = (excelTime: number): number => {
+  if (typeof excelTime !== 'number' || !Number.isFinite(excelTime)) {
+    throw new TimeParseError('Invalid Excel time', String(excelTime));
+  }
+
+  return Math.round(excelTime * 24 * 60 * 60 * 1000);
 };

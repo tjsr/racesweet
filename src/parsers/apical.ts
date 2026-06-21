@@ -16,11 +16,30 @@ import type { EventTeam } from "../model/eventteam.js";
 import type { RaceState } from "../model/racestate.js";
 import { addToTime } from "../app/utils/timeutils.js";
 import { createEventCategoryIdFromCategoryCode } from "../controllers/category.js";
-import { durationStringToMilliseconds } from "./genericTimeParser.js";
+import { durationStringToMilliseconds, excelTimeToMilliseconds } from "./genericTimeParser.js";
 import { inferTransponderFromRaceNumber } from "../controllers/transponder.js";
 import { split } from "../utils.js";
 import { v5 as uuidv5, validate as validateUuid } from 'uuid';
 import { EventId } from "../model/raceevent.ts";
+import { TimeParseError } from "./date/errors.ts";
+
+const hasLapTimeValue = (value: string | number | null | undefined): value is string | number => {
+  return typeof value === 'number' || (typeof value === 'string' && value.trim().length > 0);
+};
+
+export const apicalTimeToMilliseconds = (timeValue: string | number): number => {
+  return typeof timeValue === 'number'
+    ? excelTimeToMilliseconds(timeValue)
+    : durationStringToMilliseconds(timeValue);
+};
+
+const getLapTimeValue = (lap: ApicalLapByCategoryViewModel): string | number => {
+  if (hasLapTimeValue(lap.CumulativeLapTimeSpan)) {
+    return lap.CumulativeLapTimeSpan;
+  }
+
+  return lap.LapTimeSpan;
+};
 
 export const createChipCrossingRecord = (
   lap: ApicalLapByCategoryViewModel,
@@ -37,17 +56,25 @@ export const createChipCrossingRecord = (
   if (!eventStartTime) {
     throw new Error(`Event start time is undefined, cannot create crossing record for lap ${lap.Id}`);
   }
-  const lapMs = durationStringToMilliseconds(lap.CumulativeLapTimeSpan || lap.LapTimeSpan);
-  const calculatedRecordTime = addToTime(eventStartTime, lapMs);
+  try {
+    const lapTimeValue = getLapTimeValue(lap);
+    const lapMs = apicalTimeToMilliseconds(lapTimeValue);
+    const calculatedRecordTime = addToTime(eventStartTime, lapMs);
 
-  const timeRecord: Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time' | 'eventId'> = {
-    chipCode: txNo,
-    eventId: eventId,
-    id: lap.Id.toString(),
-    recordType: RECORD_TX_CROSSING,
-    time: calculatedRecordTime,
-  };
-  return timeRecord;
+    const timeRecord: Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time' | 'eventId'> = {
+      chipCode: txNo,
+      eventId: eventId,
+      id: lap.Id.toString(),
+      recordType: RECORD_TX_CROSSING,
+      time: calculatedRecordTime,
+    };
+    return timeRecord;
+  } catch (error: unknown) {
+    if (error instanceof TimeParseError) {
+      console.error(`Error parsing lap time for lap ${lap.Id} with time value "${getLapTimeValue(lap)}":`, error);
+    }
+    throw error;
+  }
 };
 
 export const participantToLap = (

@@ -14,6 +14,45 @@ interface GenerateExcelDataOptions {
   timestamp?: number;
 }
 
+const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`;
+
+const createCurlCommand = (url: string, headers: Headers): string => {
+  const commandParts = [
+    'curl',
+    '--include',
+    '--location',
+    '--request',
+    'GET',
+  ];
+  const curlHeaders = new Headers(headers);
+  const documentCookie = typeof document === 'undefined' ? undefined : document.cookie.trim();
+  if (!curlHeaders.has('Cookie') && documentCookie) {
+    curlHeaders.set('Cookie', documentCookie);
+  }
+
+  Array.from(curlHeaders.entries())
+    .sort(([leftName], [rightName]) => leftName.localeCompare(rightName))
+    .forEach(([name, value]) => {
+      commandParts.push('--header', shellQuote(`${name}: ${value}`));
+    });
+
+  commandParts.push(shellQuote(url));
+  return commandParts.join(' ');
+};
+
+const createGenerateExcelError = (message: string, url: string, headers: Headers, cause?: unknown): Error => {
+  const causeMessage = cause instanceof Error ? cause.message : cause ? String(cause) : undefined;
+  const details = [
+    message,
+    causeMessage ? `Cause: ${causeMessage}` : undefined,
+    `Replicate request with: ${createCurlCommand(url, headers)}`,
+  ].filter((line): line is string => Boolean(line));
+
+  return cause instanceof ApicalDataException
+    ? new ApicalDataException(details.join('\n'))
+    : new Error(details.join('\n'));
+};
+
 const readDocumentCookie = (): string | undefined => {
   if (typeof document === 'undefined') {
     throw new Error('Cannot read document cookie: document is undefined');
@@ -42,46 +81,50 @@ export const generateExcelData = async (eventId: number, timestampOrOptions: num
   headers.set('Access-Control-Allow-Credentials', 'true');
   const url = getApicalExcelExportUrl(baseUrl, eventId, timestamp);
 
-  const response = await fetchExternalHttp(url, {
-    credentials: 'include',
-    headers,
-    method: 'GET',
-  });
+  try {
+    const response = await fetchExternalHttp(url, {
+      credentials: 'include',
+      headers,
+      method: 'GET',
+    });
 
-  if (!response.ok) {
-    throw new Error(`Failed to generate Excel data: ${response.statusText}`);
+    if (!response.ok) {
+      throw new Error(`Failed to generate Excel data: ${response.statusText}`);
+    }
+
+    const jsonData = await response.json() as Partial<ApicalExportToExcelResponse>;
+    if (!jsonData.FileGuid || !isGuid(jsonData.FileGuid) || !jsonData.FileName) {
+      throw new ApicalDataException([
+        'Apical Excel export response payload was invalid',
+        `${JSON.stringify(jsonData)}`,
+      ].join('\n'));
+    }
+
+    const cookieHeader = readResponseCookie(response);
+
+    if (!cookieHeader) {
+      const normalizedHeaderKeys = Array.from(response.headers.keys()).map((key) => key.toLowerCase());
+      const headerKeys = normalizedHeaderKeys.join(', ');
+      const hasConvertedSetCookie = normalizedHeaderKeys.includes('set-cookie');
+
+      throw new ApicalDataException(`Missing set-cookie header in Excel export response from url ${url} (hasConvertedSetCookie=${hasConvertedSetCookie}, headers=${headerKeys})`);
+    }
+
+    // const setCookieHeaders = (response.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie?.();
+    // let setCookieHeader = Array.isArray(setCookieHeaders) ? setCookieHeaders.join('; ') : setCookieHeaders;
+
+    // console.log(`Cookie: ${response.headers.get('cookie')}.  SetCookie: ${response.headers.get('set-cookie')}.`);
+    // if (!setCookieHeader) {
+    //   setCookieHeader =  response.headers.get('Set-Cookie') || (response.headers as any).get('cookie');
+    // }
+
+
+    return {
+      Cookie: cookieHeader,
+      FileGuid: jsonData.FileGuid,
+      FileName: jsonData.FileName,
+    };
+  } catch (error: unknown) {
+    throw createGenerateExcelError('Failed to generate Apical Excel export data.', url, headers, error);
   }
-
-  const jsonData = await response.json() as Partial<ApicalExportToExcelResponse>;
-  if (!jsonData.FileGuid || !isGuid(jsonData.FileGuid) || !jsonData.FileName) {
-    throw new ApicalDataException([
-      'Apical Excel export response payload was invalid',
-      `${JSON.stringify(jsonData)}`,
-    ].join('\n'));
-  }
-
-  const cookieHeader = readResponseCookie(response);
-
-  if (!cookieHeader) {
-    const normalizedHeaderKeys = Array.from(response.headers.keys()).map((key) => key.toLowerCase());
-    const headerKeys = normalizedHeaderKeys.join(', ');
-    const hasConvertedSetCookie = normalizedHeaderKeys.includes('set-cookie');
-
-    throw new ApicalDataException(`Missing set-cookie header in Excel export response from url ${url} (hasConvertedSetCookie=${hasConvertedSetCookie}, headers=${headerKeys})`);
-  }
-
-  // const setCookieHeaders = (response.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie?.();
-  // let setCookieHeader = Array.isArray(setCookieHeaders) ? setCookieHeaders.join('; ') : setCookieHeaders;
-  
-  // console.log(`Cookie: ${response.headers.get('cookie')}.  SetCookie: ${response.headers.get('set-cookie')}.`);
-  // if (!setCookieHeader) {
-  //   setCookieHeader =  response.headers.get('Set-Cookie') || (response.headers as any).get('cookie');
-  // }
-
-
-  return {
-    Cookie: cookieHeader,
-    FileGuid: jsonData.FileGuid,
-    FileName: jsonData.FileName,
-  };
 };

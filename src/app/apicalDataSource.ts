@@ -38,14 +38,14 @@ interface ApicalExportToExcelResponse {
 
 export interface ApicalSpreadsheetLapsRow {
   CategoryName: string;
-  CumulativeLapTimeSpan: string;
+  CumulativeLapTimeSpan: string | number;
   FullName: string;
   LapNumber: number;
-  LapTimeSpan: string;
+  LapTimeSpan: string | number;
   Position: number;
   RaceNumber: number | string;
   TeamNameDisplay: string;
-  TotalTimeSpan?: string;
+  TotalTimeSpan?: string | number;
 }
 
 const resolveXlsxModule = (module: Partial<XlsxModule> & { default?: unknown }): XlsxModule => {
