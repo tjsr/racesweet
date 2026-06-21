@@ -101,7 +101,8 @@ describe('apicalDataSource cached Excel flow', () => {
           ],
         }),
       ],
-      200000
+      200000,
+      expect.any(String)
     );
     expect(result.raceState).toBe(convertedRaceState);
   });

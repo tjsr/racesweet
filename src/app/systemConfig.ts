@@ -64,8 +64,15 @@ export interface SessionSourceAssignment {
   sourceIds: string[];
 }
 
+export type EventTimeDisplayZoneMode = 'event' | 'system' | 'gmt';
+
+export interface EventOptionsConfig {
+  timeDisplayZoneMode?: EventTimeDisplayZoneMode;
+}
+
 export interface SystemConfiguration {
   dataSources: DataSourceConfig[];
+  eventOptions: Record<string, EventOptionsConfig>;
   eventSourceAssignments: Record<string, string[]>;
   schemaVersion: 1;
   sessionSourceAssignments: Record<string, SessionSourceAssignment>;
@@ -73,6 +80,7 @@ export interface SystemConfiguration {
 
 export const createDefaultSystemConfiguration = (): SystemConfiguration => ({
   dataSources: [],
+  eventOptions: {},
   eventSourceAssignments: {},
   schemaVersion: 1,
   sessionSourceAssignments: {},
@@ -103,6 +111,7 @@ export const normalizeSystemConfiguration = (config: Partial<SystemConfiguration
   ...createDefaultSystemConfiguration(),
   ...config,
   dataSources: (config.dataSources || []).map(normalizeDataSourceConfig),
+  eventOptions: config.eventOptions || {},
   eventSourceAssignments: config.eventSourceAssignments || {},
   schemaVersion: 1,
   sessionSourceAssignments: config.sessionSourceAssignments || {},

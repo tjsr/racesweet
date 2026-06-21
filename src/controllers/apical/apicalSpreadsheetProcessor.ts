@@ -33,6 +33,7 @@ export const convertApicalSpreadsheetRowsToApicalData = (rows: ApicalSpreadsheet
           LapNumber: Number(row.LapNumber),
           LapTimeSpan: row.LapTimeSpan,
           RaceNumber: row.RaceNumber.toString(),
+          TimeOfDay: row.TimeOfDay,
         })),
         NumberOfLaps: sortedRows.length,
         Position: Number(firstRow.Position) || 0,

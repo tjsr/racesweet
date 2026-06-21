@@ -4,6 +4,7 @@ import {
   getSessionsForEvent,
 } from '../../app/eventCatalog.js';
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
+import { getSupportedTimeZones, getSystemTimeZone } from '../../app/utils/timeutils.js';
 import React from 'react';
 
 interface EventsScreenProps {
@@ -14,7 +15,7 @@ interface EventsScreenProps {
   onSaveEventAssignment: (eventId: string, sourceIds: string[]) => void | Promise<void>;
   onSelectEvent: (eventId: string) => void;
   onSelectSession: (sessionId: string) => void;
-  onUpdateEvent: (eventId: string, changes: { date?: string; format?: EventCatalogEvent['format']; name?: string }) => void | Promise<void>;
+  onUpdateEvent: (eventId: string, changes: { date?: string; format?: EventCatalogEvent['format']; name?: string; timeZone?: string }) => void | Promise<void>;
   selectedEventId?: string;
   selectedSessionId?: string;
 }
@@ -32,11 +33,14 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
   const selectedEventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
   const selectedSession = selectedEventSessions.find((session) => session.id === props.selectedSessionId) ?? selectedEventSessions[0];
   const assignedSourceIds = selectedEvent ? getEventAssignedSourceIds(props.config, selectedEvent.id) : [];
+  const timeZoneOptions = React.useMemo(() => getSupportedTimeZones(), []);
+  const systemTimeZone = React.useMemo(() => getSystemTimeZone(), []);
 
   const [eventDraft, setEventDraft] = React.useState({
     date: selectedEvent?.date || '',
     format: selectedEvent?.format || 'race-weekend',
     name: selectedEvent?.name || '',
+    timeZone: selectedEvent?.timeZone || systemTimeZone,
   });
 
   React.useEffect(() => {
@@ -44,8 +48,9 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
       date: selectedEvent?.date || '',
       format: selectedEvent?.format || 'race-weekend',
       name: selectedEvent?.name || '',
+      timeZone: selectedEvent?.timeZone || systemTimeZone,
     });
-  }, [selectedEvent?.date, selectedEvent?.format, selectedEvent?.id, selectedEvent?.name]);
+  }, [selectedEvent?.date, selectedEvent?.format, selectedEvent?.id, selectedEvent?.name, selectedEvent?.timeZone, systemTimeZone]);
 
   return (
     <section className="events-screen">
@@ -115,6 +120,20 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
                   value={eventDraft.date}
                   onChange={(event) => setEventDraft((current) => ({ ...current, date: event.target.value }))}
                 />
+              </label>
+              <label>
+                Event Time Zone
+                <select
+                  aria-label="Event Time Zone"
+                  value={eventDraft.timeZone}
+                  onChange={(event) => setEventDraft((current) => ({ ...current, timeZone: event.target.value }))}
+                >
+                  {timeZoneOptions.map((timeZone) => (
+                    <option key={timeZone} value={timeZone}>
+                      {timeZone}
+                    </option>
+                  ))}
+                </select>
               </label>
               <div className="events-actions">
                 <button type="button" onClick={() => props.onUpdateEvent(selectedEvent.id, eventDraft)}>

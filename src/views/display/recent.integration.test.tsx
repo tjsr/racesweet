@@ -239,6 +239,98 @@ describe('RecentRecords integration', () => {
     expect(categorySelection.size).toBe(0);
   });
 
+  it('shows crossing times in the selected event time zone and emits display mode changes', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const participant: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: '101',
+      firstname: 'Pat',
+      id: '101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const crossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: '2001',
+      isValid: true,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-06-07T00:15:30.250Z'),
+    } as ParticipantPassingRecord;
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [categoryA],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getEntrantIdForParticipant: () => participant.entrantId,
+      getParticipantById: () => participant,
+      getParticipantLaps: () => [crossing],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+    const onTimeDisplayZoneModeChange = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          eventTimeZone="Australia/Sydney"
+          onTimeDisplayZoneModeChange={onTimeDisplayZoneModeChange}
+          raceStateLookup={raceStateLookup}
+          records={[crossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+          timeDisplayZoneMode="event"
+        />
+      );
+    });
+
+    expect(container.textContent).toContain('Show times in');
+    expect(container.querySelector('tr[data-record-id="2001"]')?.textContent).toContain('10:15:30.250');
+
+    const timeZoneSelect = Array.from(container.querySelectorAll('[role="combobox"]')).find((element) => {
+      return element.textContent?.includes('Event time-zone');
+    });
+    expect(timeZoneSelect).toBeDefined();
+
+    await act(async () => {
+      timeZoneSelect!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+
+    const gmtOption = Array.from(document.querySelectorAll('li[role="option"]')).find((element) => {
+      return element.textContent?.trim() === 'GMT';
+    });
+    expect(gmtOption).toBeDefined();
+
+    await act(async () => {
+      gmtOption!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onTimeDisplayZoneModeChange).toHaveBeenCalledWith('gmt');
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          eventTimeZone="Australia/Sydney"
+          onTimeDisplayZoneModeChange={onTimeDisplayZoneModeChange}
+          raceStateLookup={raceStateLookup}
+          records={[crossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+          timeDisplayZoneMode="gmt"
+        />
+      );
+    });
+
+    expect(container.querySelector('tr[data-record-id="2001"]')?.textContent).toContain('00:15:30.250');
+  });
+
   it('deselects by toggling: select then deselect same participant row', async () => {
     const categoryA: EventCategory = { id: '1', name: 'Category A' };
 

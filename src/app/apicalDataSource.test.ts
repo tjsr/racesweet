@@ -76,6 +76,7 @@ const createLapsRows = () => {
     Position: 1,
     RaceNumber: 306,
     TeamNameDisplay: 'Robert WOOD',
+    TimeOfDay: '10:01:30.2500000',
   };
 
   const exampleRow2: ApicalSpreadsheetLapsRow =
@@ -84,6 +85,7 @@ const createLapsRows = () => {
     CumulativeLapTimeSpan: '00:03:30.5000000',
     LapNumber: 2,
     LapTimeSpan: '00:02:00.2500000',
+    TimeOfDay: '10:03:30.5000000',
   };
   return [exampleRow, exampleRow2];
 };
@@ -129,12 +131,14 @@ const expectConvertedLapsPayload = (eventId: EventId): void => {
               LapNumber: 1,
               LapTimeSpan: '00:01:30.2500000',
               RaceNumber: '306',
+              TimeOfDay: '10:01:30.2500000',
             }),
             expect.objectContaining({
               CumulativeLapTimeSpan: '00:03:30.5000000',
               LapNumber: 2,
               LapTimeSpan: '00:02:00.2500000',
               RaceNumber: '306',
+              TimeOfDay: '10:03:30.5000000',
             }),
           ],
           NumberOfLaps: 2,
@@ -143,7 +147,7 @@ const expectConvertedLapsPayload = (eventId: EventId): void => {
         }),
       ],
     },
-  ], 200000);
+  ], 200000, expect.any(String));
 };
 
 describe('apicalDataSource', () => {
@@ -597,6 +601,7 @@ describe('apicalDataSource', () => {
       },
       retrievedAt: '2026-06-08T09:10:11.123Z',
       sessionId: 'session-apical-301',
+      timeZone: expect.any(String),
     });
     expect(convertDataToRaceState).toHaveBeenCalledWith(createApicalCatalogEventId(301), new Date('2026-06-07T01:30:00.000Z'), [
       expect.objectContaining({
@@ -609,7 +614,7 @@ describe('apicalDataSource', () => {
           }),
         ],
       }),
-    ], 200000);
+    ], 200000, expect.any(String));
     vi.useRealTimers();
   });
 });

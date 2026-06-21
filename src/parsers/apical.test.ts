@@ -1,26 +1,28 @@
 import type { ApicalLapByCategory } from '../model/apical.js';
-import { apicalTimeToMilliseconds, convertDataToRaceState, createChipCrossingRecord } from './apical.js';
+import { apicalTimeOfDayToDate, apicalTimeToMilliseconds, convertDataToRaceState, createChipCrossingRecord } from './apical.js';
 import { excelTimeToMilliseconds } from './genericTimeParser.js';
 
 const eventId = '7b83ad1e-54ba-5f00-9712-1c82d3178640';
 
 describe('Apical parser', () => {
-  it('creates chip crossing timestamps from cumulative event time', () => {
+  it('creates chip crossing timestamps from TimeOfDay on the session date', () => {
     const crossing = createChipCrossingRecord(
       {
-        CumulativeLapTimeSpan: '00:03:30.5000000',
+        CumulativeLapTimeSpan: '12:03:30.5000000',
         FullName: 'Robert WOOD',
         Id: 1242,
         LapNumber: 2,
-        LapTimeSpan: '00:02:00.0000000',
+        LapTimeSpan: '11:02:00.0000000',
         RaceNumber: '306',
+        TimeOfDay: '10:15:30.2500000',
       },
       new Date('2026-06-07T00:00:00.000Z'),
       200306,
-      eventId
+      eventId,
+      'UTC'
     );
 
-    expect(crossing.time!.toISOString()).toBe('2026-06-07T00:03:30.500Z');
+    expect(crossing.time!.toISOString()).toBe('2026-06-07T10:15:30.250Z');
   });
 
   it('converts Excel time fractions to milliseconds', () => {
@@ -32,7 +34,15 @@ describe('Apical parser', () => {
     expect(apicalTimeToMilliseconds('00:29:08.3130000')).toBe(1748313);
   });
 
-  it('creates chip crossing timestamps from numeric Excel time values', () => {
+  it('combines numeric Excel TimeOfDay values with the session date', () => {
+    expect(apicalTimeOfDayToDate(new Date('2026-06-07T13:45:00.000Z'), 0.5, 'UTC').toISOString()).toBe('2026-06-07T12:00:00.000Z');
+  });
+
+  it('combines TimeOfDay values with the session date in the event time zone', () => {
+    expect(apicalTimeOfDayToDate(new Date('2026-06-07T00:00:00.000Z'), '10:15:30.2500000', 'Australia/Sydney').toISOString()).toBe('2026-06-07T00:15:30.250Z');
+  });
+
+  it('creates chip crossing timestamps from numeric Excel TimeOfDay values', () => {
     const crossing = createChipCrossingRecord(
       {
         CumulativeLapTimeSpan: 0.0202351041666667,
@@ -41,13 +51,15 @@ describe('Apical parser', () => {
         LapNumber: 1,
         LapTimeSpan: 0.0202351041666667,
         RaceNumber: '306',
+        TimeOfDay: 0.5,
       },
       new Date('2026-06-07T00:00:00.000Z'),
       200306,
-      eventId
+      eventId,
+      'UTC'
     );
 
-    expect(crossing.time!.toISOString()).toBe('2026-06-07T00:29:08.313Z');
+    expect(crossing.time!.toISOString()).toBe('2026-06-07T12:00:00.000Z');
   });
 
   it('converts Apical results into entrants, categories, and ordered crossing times', () => {
@@ -65,14 +77,16 @@ describe('Apical parser', () => {
                 LapNumber: 1,
                 LapTimeSpan: '00:01:30.2500000',
                 RaceNumber: '306',
+                TimeOfDay: '10:01:30.2500000',
               },
               {
-                CumulativeLapTimeSpan: '00:03:30.5000000',
+                CumulativeLapTimeSpan: '23:03:30.5000000',
                 FullName: 'Robert WOOD',
                 Id: 1242,
                 LapNumber: 2,
-                LapTimeSpan: '00:02:00.2500000',
+                LapTimeSpan: '22:02:00.2500000',
                 RaceNumber: '306',
+                TimeOfDay: '10:03:30.5000000',
               },
             ],
             NumberOfLaps: 2,
@@ -85,7 +99,7 @@ describe('Apical parser', () => {
       },
     ];
 
-    const raceState = convertDataToRaceState(eventId, new Date('2026-06-07T00:00:00.000Z'), data, 200000);
+    const raceState = convertDataToRaceState(eventId, new Date('2026-06-07T00:00:00.000Z'), data, 200000, 'UTC');
 
     expect(raceState.categories).toEqual([
       expect.objectContaining({
@@ -100,8 +114,8 @@ describe('Apical parser', () => {
       }),
     ]);
     expect(raceState.records?.map((record) => record.time!.toISOString())).toEqual([
-      '2026-06-07T00:01:30.250Z',
-      '2026-06-07T00:03:30.500Z',
+      '2026-06-07T10:01:30.250Z',
+      '2026-06-07T10:03:30.500Z',
     ]);
     expect(raceState.records?.map((record) => ('sequence' in record ? record.sequence : undefined))).toEqual([1, 2]);
   });

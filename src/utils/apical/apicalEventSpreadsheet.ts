@@ -17,7 +17,7 @@ export interface ApicalSpreadsheetLapsRow {
   TeamNameDisplay: string;
   FullName: string;
   LapNumber: number;
-  TimeOfDay: string;
+  TimeOfDay: string | number;
   LapTimeSpan: string | number;
   CumulativeLapTimeSpan: string | number;
   LapSeconds: number;

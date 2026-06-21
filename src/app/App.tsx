@@ -1,11 +1,11 @@
 import './index.css';
 
-import type { DataSourceConfig, SystemConfiguration } from './systemConfig.ts';
+import type { DataSourceConfig, EventTimeDisplayZoneMode, SystemConfiguration } from './systemConfig.ts';
 import { RaceStateLookup, Session } from '../model/racestate.ts';
 import React, { useEffect, useState } from 'react';
 import { ReportsPage, ResultsPage } from '../views/display/raceAnalyticsViews.tsx';
+import { createApicalCatalogEventId, fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.ts';
 import { createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
-import { fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.ts';
 import { getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
 
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
@@ -31,6 +31,7 @@ import { TestSession } from '../testdata/testsession.ts';
 import { applyPulledRaceStateToSession } from './sourceApplication.ts';
 import { fetchApicalEvents } from '../controllers/apical/getResultListJson.ts';
 import { formatErrorForDisplay } from './stackTrace.ts';
+import { getSystemTimeZone } from './utils/timeutils.ts';
 import { selectedCategoriesForParticipants } from './selectionState.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
 
@@ -261,13 +262,18 @@ export const RaceSweetMainApp = () => {
     setSystemConfigState(config);
   };
 
+  const getEventTimeZone = (eventId: string | undefined): string => {
+    const event = eventCatalogState?.events.find((item) => item.id === eventId);
+    return event?.timeZone || getSystemTimeZone();
+  };
+
   const applySourceToSessionState = async (eventId: string, source: DataSourceConfig, targetSessionState?: Session & RaceStateLookup): Promise<void> => {
     const sessionTarget = targetSessionState || sessionState;
     if (source.type !== 'api-apical-data-file' || !sessionTarget) {
       return;
     }
 
-    const raceState = await pullApicalRaceState(source, eventId);
+    const raceState = await pullApicalRaceState(source, eventId, { timeZone: getEventTimeZone(eventId) });
     await applyPulledRaceStateToSession(sessionTarget, raceState);
     setRenderTick((tick) => tick + 1);
   };
@@ -539,6 +545,16 @@ export const RaceSweetMainApp = () => {
     ? 'active'
     : selectedTimingSessionId || timingSessions[0]?.id || '';
   const activeSession = eventCatalogState.sessions.find((session) => session.id === eventCatalogState.activeSessionId);
+  const timingTimeDisplayZoneMode = (timingEvent?.id ? systemConfigState.eventOptions[timingEvent.id]?.timeDisplayZoneMode : undefined) || 'event';
+  const updateTimingTimeDisplayZoneMode = (mode: EventTimeDisplayZoneMode): void => {
+    if (!timingEvent?.id || !systemConfigService) {
+      return;
+    }
+
+    systemConfigService.updateEventOptions(timingEvent.id, { timeDisplayZoneMode: mode })
+      .then(updateSystemConfigState)
+      .catch((error: unknown) => setErrorState(error as Error));
+  };
 
   const timingPage = (
     <>
@@ -574,11 +590,14 @@ export const RaceSweetMainApp = () => {
       </div>
       <CategoryList categories={displayedTimingRaceState.categories || []} categorySelected={handleCategoryListSelected} />
       <RecentRecords
+        eventTimeZone={timingEvent?.timeZone || getSystemTimeZone()}
         records={(displayedTimingRaceState.records as EventTimeRecord[]) || []}
         raceStateLookup={displayedTimingRaceState}
         selectedCategories={hilightCategories}
         selectedParticipants={recordSelectedParticipants}
         categorySelected={setRecordSelectedCategories}
+        timeDisplayZoneMode={timingTimeDisplayZoneMode}
+        onTimeDisplayZoneModeChange={updateTimingTimeDisplayZoneMode}
         participantSelected={handleParticipantSelected}
         onExclude={handleExcludeCrossing}
         onChangeCategory={handleChangeCategory}
@@ -676,7 +695,11 @@ export const RaceSweetMainApp = () => {
               return;
             }
 
-            return fetchApicalRaceStateNow(source)
+            const apicalEventId = source.apiConfig?.selectedEventIds[0] || source.apiConfig?.apicalEventId;
+            const importEventId = apicalEventId ? createApicalCatalogEventId(apicalEventId) : undefined;
+            return fetchApicalRaceStateNow(source, {
+              timeZone: getEventTimeZone(importEventId),
+            })
               .then(async (importData) => {
                 const catalog = await eventCatalogService.importApicalRaceState(importData);
                 updateEventCatalogState(catalog, importData.eventId, importData.sessionId);

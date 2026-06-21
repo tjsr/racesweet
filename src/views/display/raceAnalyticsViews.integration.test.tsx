@@ -115,7 +115,7 @@ const lapsByParticipant = new Map<string, ParticipantPassingRecord[]>([
     'p-team-2',
     [
       createLap('team2-lap1', 'p-team-2', 'team-1', 1, 64000, 64000),
-      createLap('team2-lap2', 'p-team-2', 'team-1', 2, 130000, 66000),
+      createLap('team2-lap2', 'p-team-2', 'team-1', 2, 130000, 63000),
     ],
   ],
   [
@@ -190,7 +190,7 @@ describe('race analytics views integration', () => {
     expect(container.textContent).toContain('Solo Rider');
     expect(container.textContent).toContain('00:02:12.000');
     expect(container.textContent).toContain('00:02:25.000');
-    expect(container.textContent).toContain('00:01:04.000');
+    expect(container.textContent).toContain('00:01:03.000');
     expect(container.textContent).toContain('00:01:10.000');
 
     const categorySelect = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
@@ -253,10 +253,22 @@ describe('race analytics views integration', () => {
     });
 
     expect(container.querySelector('table[aria-label="Fastest Laps Report Table"]')).toBeTruthy();
+    const fastestTable = container.querySelector('table[aria-label="Fastest Laps Report Table"]') as HTMLTableElement;
+    expect(fastestTable.textContent).toContain('On');
     expect(container.textContent).toContain('Team Rocket');
     expect(container.textContent).toContain('Solo Rider');
-    expect(container.textContent).toContain('00:01:04.000');
+    expect(container.textContent).toContain('00:01:03.000');
     expect(container.textContent).toContain('00:01:10.000');
+    const fastestRows = Array.from(fastestTable.querySelectorAll('tbody tr'));
+    const teamFastestRow = fastestRows.find((row) => row.textContent?.includes('Team Rocket'));
+    expect(teamFastestRow).toBeTruthy();
+    expect(Array.from(teamFastestRow!.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
+      'Team Rocket',
+      'Category A',
+      '00:01:03.000',
+      '2',
+      '4',
+    ]);
 
     const categorySelect = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
     expect(container.querySelector('select[aria-label="Race View Event Session"]')).toBeTruthy();

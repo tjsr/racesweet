@@ -140,6 +140,7 @@ describe('EventCatalogService', () => {
       format: 'race-weekend',
       name: 'New Event',
       sessionIds: [],
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     }));
     expect(seededPersistence.save).toHaveBeenCalledOnce();
     expect(onPersistedLedger).toHaveBeenCalledOnce();
@@ -186,6 +187,7 @@ describe('EventCatalogService', () => {
     await service.updateEvent('event-2026-racesweet-round-1', {
       format: 'track-day',
       name: 'RaceSweet Open Track Day',
+      timeZone: 'Australia/Brisbane',
     });
     await service.updateSession('session-1-practice', {
       name: 'Friday Free Practice',
@@ -208,6 +210,7 @@ describe('EventCatalogService', () => {
 
     expect(event?.name).toBe('RaceSweet Open Track Day');
     expect(event?.format).toBe('track-day');
+    expect(event?.timeZone).toBe('Australia/Brisbane');
     expect(session?.name).toBe('Friday Free Practice');
     expect(session?.status).toBe('live');
     expect(category?.distanceRule).toEqual({ kind: 'time', value: '1:45' });
@@ -337,6 +340,7 @@ describe('EventCatalogService', () => {
         ],
       },
       sessionId: 'session-apical-1001',
+      timeZone: 'Australia/Sydney',
     });
 
     const event = service.catalog.events.find((item) => item.id === '7b83ad1e-54ba-5f00-9712-1c82d3178640');
@@ -349,6 +353,7 @@ describe('EventCatalogService', () => {
       date: '2026-06-07',
       name: 'Apical Round 7',
       sessionIds: ['session-apical-1001'],
+      timeZone: 'Australia/Sydney',
     }));
     expect(session).toEqual(expect.objectContaining({
       eventId: '7b83ad1e-54ba-5f00-9712-1c82d3178640',

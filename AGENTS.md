@@ -40,6 +40,10 @@ Session data-source assignment supports default event-wide source selection or s
 
 Apical API source flows should authenticate first using configured auth headers, then query the available event list, then pull event data for configured event IDs with configured timeout/poll settings.
 
+Apical Excel imports must preserve the Laps sheet `TimeOfDay` value through conversion and use it for crossing timestamps by combining it with the session/event date. Do not use `LapTimeSpan` or `CumulativeLapTimeSpan` as crossing timestamps; those fields are lap and elapsed durations.
+
+Event and session imports that receive local clock times without an explicit timezone must parse those times in the event timezone. New events default to the system timezone, and saved events should persist that timezone through the event catalog ledger.
+
 Category metadata in the event catalog should store structured rules (distance mode, team-size/age/gender composition constraints, and per-session start assignments) instead of free-form or UI-only state.
 
 Category starts are session-linked and may include multiple session assignments per category.

@@ -147,16 +147,20 @@ const readApicalDataFixture = async (): Promise<ApicalLapByCategory> => {
 const apicalDataToSpreadsheetRows = (apicalData: ApicalLapByCategory): ApicalSpreadsheetLapsRow[] => {
   return apicalData.flatMap((category) => {
     return category.ParticipantViewModels.flatMap((entrant) => {
-      return entrant.LapByCategoryViewModels.map((lap): ApicalSpreadsheetLapsRow => ({
-        CategoryName: category.CategoryName,
-        CumulativeLapTimeSpan: lap.CumulativeLapTimeSpan,
-        FullName: lap.FullName,
-        LapNumber: lap.LapNumber,
-        LapTimeSpan: lap.LapTimeSpan,
-        Position: entrant.Position,
-        RaceNumber: lap.RaceNumber,
-        TeamNameDisplay: entrant.TeamNameDisplay,
-      }));
+      return entrant.LapByCategoryViewModels.map((lap): ApicalSpreadsheetLapsRow => {
+        const lapWithOptionalTimeOfDay = lap as typeof lap & { TimeOfDay?: string | number };
+        return {
+          CategoryName: category.CategoryName,
+          CumulativeLapTimeSpan: lap.CumulativeLapTimeSpan,
+          FullName: lap.FullName,
+          LapNumber: lap.LapNumber,
+          LapTimeSpan: lap.LapTimeSpan,
+          Position: entrant.Position,
+          RaceNumber: lap.RaceNumber,
+          TeamNameDisplay: entrant.TeamNameDisplay,
+          TimeOfDay: lapWithOptionalTimeOfDay.TimeOfDay || lap.CumulativeLapTimeSpan,
+        };
+      });
     });
   });
 };

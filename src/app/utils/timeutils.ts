@@ -1,6 +1,7 @@
 import type { EventCategoryId } from "../../model/eventcategory.js";
 import type { FlagRecord } from "../../model/flag.js";
 import type { TimeRecord } from "../../model/timerecord.js";
+import { TZDate } from "@date-fns/tz";
 import { findSessionStart } from "../../controllers/session.js";
 import { formatRFC3339 } from "date-fns";
 
@@ -13,6 +14,87 @@ export type UnknownDurationString = '--:--:--.---';
 export type DurationString = `${string}:${string}:${string}.${string}` | UnknownDurationString;
 
 export type TimeStringOrError = DurationString | 'Unknown time' | 'Invalid time' | 'Undefined time';
+
+export type TimeDisplayZoneMode = 'event' | 'system' | 'gmt';
+
+export const getSystemTimeZone = (): string => {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+};
+
+export const normalizeTimeZone = (timeZone: string | undefined): string => {
+  const candidate = timeZone?.trim() || getSystemTimeZone();
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: candidate });
+    return candidate;
+  } catch (_error: unknown) {
+    return getSystemTimeZone();
+  }
+};
+
+export const resolveDisplayTimeZone = (
+  mode: TimeDisplayZoneMode | undefined,
+  eventTimeZone: string | undefined
+): string => {
+  if (mode === 'gmt') {
+    return 'UTC';
+  }
+  if (mode === 'system') {
+    return getSystemTimeZone();
+  }
+  return normalizeTimeZone(eventTimeZone);
+};
+
+export const getSupportedTimeZones = (): string[] => {
+  const supportedValuesOf = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf;
+  const systemTimeZone = getSystemTimeZone();
+  const zones = typeof supportedValuesOf === 'function'
+    ? supportedValuesOf('timeZone')
+    : ['UTC', 'Australia/Sydney', 'Australia/Melbourne', 'Australia/Brisbane', systemTimeZone];
+  return Array.from(new Set([systemTimeZone, ...zones])).sort((left, right) => left.localeCompare(right));
+};
+
+export const getDatePartsInTimeZone = (date: Date, timeZone: string | undefined): { day: number; month: number; year: number } => {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: normalizeTimeZone(timeZone),
+    year: 'numeric',
+  });
+  const parts = Object.fromEntries(formatter.formatToParts(date).map((part) => [part.type, part.value]));
+  return {
+    day: Number(parts.day),
+    month: Number(parts.month),
+    year: Number(parts.year),
+  };
+};
+
+export const dateAtStartOfDayInTimeZone = (date: Date, timeZone: string | undefined): Date => {
+  const normalizedTimeZone = normalizeTimeZone(timeZone);
+  const { day, month, year } = getDatePartsInTimeZone(date, normalizedTimeZone);
+  return new TZDate(year, month - 1, day, 0, 0, 0, 0, normalizedTimeZone);
+};
+
+export const tableTimeStringInTimeZone = (time: Date | undefined, timeZone: string | undefined): string => {
+  if (!time) {
+    return 'Unknown time';
+  }
+
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      fractionalSecondDigits: 3,
+      hour: '2-digit',
+      hourCycle: 'h23',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: normalizeTimeZone(timeZone),
+    });
+    const parts = Object.fromEntries(formatter.formatToParts(time).map((part) => [part.type, part.value]));
+    return `${parts.hour}:${parts.minute}:${parts.second}.${parts.fractionalSecond}`;
+  } catch (error) {
+    console.error(`Error formatting time for time zone ${timeZone}`);
+    throw error;
+  }
+};
 
 export const millisecondsToTime = (milliseconds: MillisecondsDuration): DurationString => {
   const seconds = Math.floor((milliseconds / 1000) % 60);
@@ -62,9 +144,12 @@ export const getElapsedTimeStart = (
   return startTime.time;
 };
 
-export const tableTimeString = (time: Date | undefined): string => {
+export const tableTimeString = (time: Date | undefined, timeZone?: string): string => {
   if (!time) {
     return 'Unknown time';
+  }
+  if (timeZone) {
+    return tableTimeStringInTimeZone(time, timeZone);
   }
   let timeString: TimeStringOrError = !time ? 'Undefined time' : 'Invalid time';
   try {

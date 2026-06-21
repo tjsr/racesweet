@@ -9,6 +9,7 @@ import { convertDataToRaceState } from '../parsers/apical.js';
 import { getErrorMessage } from '../utils.js';
 import { createApicalExcelDownloadHeaders, getApicalExcelDownloadUrl, readApicalExcelPayload } from '../utils/apical/excelDownload.js';
 import { fetchExternalHttp, isSensitiveHeader } from '../utils/externalHttp.js';
+import { getSystemTimeZone } from './utils/timeutils.js';
 import { remapStackTrace } from './stackTrace.js';
 import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
 import { v5 as uuidv5 } from 'uuid';
@@ -28,6 +29,11 @@ export interface PulledApicalRaceState {
   raceState: Partial<RaceState>;
   retrievedAt: string;
   sessionId: string;
+  timeZone: string;
+}
+
+interface ApicalRaceStateOptions {
+  timeZone?: string;
 }
 
 interface ApicalExportToExcelResponse {
@@ -45,6 +51,7 @@ export interface ApicalSpreadsheetLapsRow {
   Position: number;
   RaceNumber: number | string;
   TeamNameDisplay: string;
+  TimeOfDay: string | number;
   TotalTimeSpan?: string | number;
 }
 
@@ -429,7 +436,7 @@ const loadApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId
   return fetchApicalDataFilePayload(source, apicalEventId);
 };
 
-export const pullApicalRaceState = async (source: DataSourceConfig, eventId: EventId): Promise<Partial<RaceState>> => {
+export const pullApicalRaceState = async (source: DataSourceConfig, eventId: EventId, options: ApicalRaceStateOptions = {}): Promise<Partial<RaceState>> => {
   if (source.type !== 'api-apical-data-file' || !source.apiConfig) {
     throw new Error(`Unsupported source type for live pull: ${source.type}`);
   }
@@ -441,10 +448,10 @@ export const pullApicalRaceState = async (source: DataSourceConfig, eventId: Eve
 
   const payload = await loadApicalDataFilePayload(source, apicalEventId);
   const listedEvent = getListedApicalEvent(source, apicalEventId);
-  return convertDataToRaceState(eventId, listedEvent?.eventDate ? new Date(listedEvent.eventDate) : new Date(), payload, 200000);
+  return convertDataToRaceState(eventId, listedEvent?.eventDate ? new Date(listedEvent.eventDate) : new Date(), payload, 200000, options.timeZone || getSystemTimeZone());
 };
 
-export const fetchApicalRaceStateNow = async (source: DataSourceConfig): Promise<PulledApicalRaceState> => {
+export const fetchApicalRaceStateNow = async (source: DataSourceConfig, options: ApicalRaceStateOptions = {}): Promise<PulledApicalRaceState> => {
   if (source.type !== 'api-apical-data-file' || !source.apiConfig) {
     throw new Error(`Unsupported source type for Apical data fetch: ${source.type}`);
   }
@@ -459,15 +466,17 @@ export const fetchApicalRaceStateNow = async (source: DataSourceConfig): Promise
   try {
     const payload = await loadApicalDataFilePayload(source, apicalEventId);
     const retrievedAt = new Date().toISOString();
+    const timeZone = options.timeZone || getSystemTimeZone();
 
     return {
       apicalEventId,
       eventDate: listedEvent?.eventDate,
       eventId,
       eventName: listedEvent?.name || `Apical Event ${apicalEventId}`,
-      raceState: convertDataToRaceState(eventId, listedEvent?.eventDate ? new Date(listedEvent.eventDate) : new Date(), payload, 200000),
+      raceState: convertDataToRaceState(eventId, listedEvent?.eventDate ? new Date(listedEvent.eventDate) : new Date(), payload, 200000, timeZone),
       retrievedAt,
       sessionId: createApicalCatalogSessionId(apicalEventId),
+      timeZone,
     };
   } catch (error: unknown) {
     throw new Error(`Failed to fetch Apical data for event id ${apicalEventId}: ${getErrorMessage(error)}`, { cause: error });

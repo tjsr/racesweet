@@ -15,6 +15,7 @@ export interface ApicalLapByCategoryViewModel {
   FullName: string;
   RaceNumber: string;
   LapNumber: number;
+  TimeOfDay?: string | number;
   LapTimeSpan: string | number;
   CumulativeLapTimeSpan: string | number;
 }

@@ -28,6 +28,7 @@ interface EntrantSummaryRow {
   entrantId: string;
   entrantName: string;
   fastestLap?: number;
+  fastestLapNo?: number;
   lapCount: number;
   laps: ParticipantPassingRecord[];
   memberDetails: Array<{
@@ -162,10 +163,14 @@ const buildEntrantRows = (
         return (a.elapsedTime || 0) - (b.elapsedTime || 0);
       });
 
-    const fastestLap = laps
-      .map((lap) => lap.lapTime || undefined)
-      .filter((lapTime): lapTime is number => typeof lapTime === 'number' && lapTime > 0)
-      .sort((a, b) => a - b)[0];
+    const fastestLapRecord = laps
+      .filter((lap) => typeof lap.lapTime === 'number' && lap.lapTime > 0)
+      .sort((left, right) => {
+        if (left.lapTime !== right.lapTime) {
+          return (left.lapTime || 0) - (right.lapTime || 0);
+        }
+        return (left.lapNo || 0) - (right.lapNo || 0);
+      })[0];
 
     const totalTime = laps.length > 0 ? laps[laps.length - 1].elapsedTime || undefined : undefined;
     const memberDetails = members.map((member) => {
@@ -185,7 +190,8 @@ const buildEntrantRows = (
       categoryName,
       entrantId,
       entrantName: findEntrantName(entrantId, members, catalogEntrantsById),
-      fastestLap,
+      fastestLap: fastestLapRecord?.lapTime || undefined,
+      fastestLapNo: fastestLapRecord?.lapNo || undefined,
       lapCount: laps.length,
       laps,
       memberDetails,
@@ -572,6 +578,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
                 <th>Entrant</th>
                 <th>Category</th>
                 <th>Fastest Lap</th>
+                <th>On</th>
                 <th>Total Laps</th>
               </tr>
             </thead>
@@ -581,6 +588,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
                   <td>{row.entrantName}</td>
                   <td>{row.categoryName}</td>
                   <td>{formatDuration(row.fastestLap)}</td>
+                  <td>{row.fastestLapNo || '-'}</td>
                   <td>{row.lapCount}</td>
                 </tr>
               ))}

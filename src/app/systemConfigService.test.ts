@@ -122,6 +122,22 @@ describe('SystemConfigService', () => {
     }));
   });
 
+  it('persists per-event display options', async () => {
+    const persistence = createPersistence();
+    const service = await SystemConfigService.create(persistence);
+
+    await service.updateEventOptions('event-1', { timeDisplayZoneMode: 'gmt' });
+
+    expect(service.state.eventOptions['event-1']).toEqual({ timeDisplayZoneMode: 'gmt' });
+    expect(persistence.save).toHaveBeenCalledWith(expect.objectContaining({
+      eventOptions: {
+        'event-1': {
+          timeDisplayZoneMode: 'gmt',
+        },
+      },
+    }));
+  });
+
   it('persists cached Apical events and clears selections that are not in the dropdown options', async () => {
     const persistence = createPersistence();
     const service = await SystemConfigService.create(persistence);

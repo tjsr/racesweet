@@ -79,6 +79,7 @@ export interface EventCatalogEvent {
   id: string;
   name: string;
   sessionIds: string[];
+  timeZone?: string;
 }
 
 export interface EventCatalogSession {
@@ -111,7 +112,7 @@ export interface EventCreatedMutation extends EventCatalogMutationBase {
 }
 
 export interface EventUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogEvent, 'categoryIds' | 'date' | 'entrantIds' | 'format' | 'name' | 'sessionIds'>>;
+  changes: Partial<Pick<EventCatalogEvent, 'categoryIds' | 'date' | 'entrantIds' | 'format' | 'name' | 'sessionIds' | 'timeZone'>>;
   eventId: string;
   type: 'event-updated';
 }

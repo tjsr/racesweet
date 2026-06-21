@@ -14,7 +14,7 @@ import { generateTeamId, isEntrantTeam } from "../controllers/eventteam.js";
 import type { ChipCrossingData } from "../model/chipcrossing.js";
 import type { EventTeam } from "../model/eventteam.js";
 import type { RaceState } from "../model/racestate.js";
-import { addToTime } from "../app/utils/timeutils.js";
+import { addToTime, dateAtStartOfDayInTimeZone } from "../app/utils/timeutils.js";
 import { createEventCategoryIdFromCategoryCode } from "../controllers/category.js";
 import { durationStringToMilliseconds, excelTimeToMilliseconds } from "./genericTimeParser.js";
 import { inferTransponderFromRaceNumber } from "../controllers/transponder.js";
@@ -33,19 +33,25 @@ export const apicalTimeToMilliseconds = (timeValue: string | number): number => 
     : durationStringToMilliseconds(timeValue);
 };
 
-const getLapTimeValue = (lap: ApicalLapByCategoryViewModel): string | number => {
-  if (hasLapTimeValue(lap.CumulativeLapTimeSpan)) {
-    return lap.CumulativeLapTimeSpan;
+const getTimeOfDayValue = (lap: ApicalLapByCategoryViewModel): string | number => {
+  if (hasLapTimeValue(lap.TimeOfDay)) {
+    return lap.TimeOfDay;
   }
 
-  return lap.LapTimeSpan;
+  throw new TimeParseError(`Missing Apical TimeOfDay for lap ${lap.Id}`, String(lap.TimeOfDay));
+};
+
+export const apicalTimeOfDayToDate = (sessionDate: Date, timeOfDay: string | number, timeZone?: string): Date => {
+  const sessionMidnight = dateAtStartOfDayInTimeZone(sessionDate, timeZone);
+  return addToTime(sessionMidnight, apicalTimeToMilliseconds(timeOfDay));
 };
 
 export const createChipCrossingRecord = (
   lap: ApicalLapByCategoryViewModel,
   eventStartTime: Date,
   txNo: number,
-  eventId: EventId
+  eventId: EventId,
+  timeZone?: string
 ): Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time' | 'eventId'> => {
   if (!validateUuid(eventId)) {
     throw new Error(`Invalid eventId provided: ${eventId}`);
@@ -57,9 +63,9 @@ export const createChipCrossingRecord = (
     throw new Error(`Event start time is undefined, cannot create crossing record for lap ${lap.Id}`);
   }
   try {
-    const lapTimeValue = getLapTimeValue(lap);
-    const lapMs = apicalTimeToMilliseconds(lapTimeValue);
-    const calculatedRecordTime = addToTime(eventStartTime, lapMs);
+    const calculatedRecordTime = hasLapTimeValue(lap.TimeOfDay)
+      ? apicalTimeOfDayToDate(eventStartTime, getTimeOfDayValue(lap), timeZone)
+      : addToTime(eventStartTime, apicalTimeToMilliseconds(lap.CumulativeLapTimeSpan));
 
     const timeRecord: Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time' | 'eventId'> = {
       chipCode: txNo,
@@ -71,7 +77,7 @@ export const createChipCrossingRecord = (
     return timeRecord;
   } catch (error: unknown) {
     if (error instanceof TimeParseError) {
-      console.error(`Error parsing lap time for lap ${lap.Id} with time value "${getLapTimeValue(lap)}":`, error);
+      console.error(`Error parsing TimeOfDay for lap ${lap.Id} with value "${lap.TimeOfDay}":`, error);
     }
     throw error;
   }
@@ -163,7 +169,8 @@ export const convertLapCategoryViewModelToChipCrossing = (
   eventId: EventId,
   categoryId: EventCategoryId,
   eventStartTime: Date,
-  inferTransponderNumberRange: number
+  inferTransponderNumberRange: number,
+  timeZone?: string
 ): Pick<ChipCrossingData, 'participantId' | 'eventId'> & ReturnType<typeof createChipCrossingRecord> => {
   if (!validateUuid(eventId)) {
     throw new Error(`Invalid eventId provided: ${eventId}`);
@@ -173,7 +180,7 @@ export const convertLapCategoryViewModelToChipCrossing = (
   }
   const epId: EventParticipantId = createParticipantIdFromEventAndCategory(eventId, categoryId, lap.RaceNumber);
   const txNo = inferTransponderFromRaceNumber(lap.RaceNumber, inferTransponderNumberRange);
-  const crossing: Pick<ChipCrossingData, 'participantId' | 'eventId'> & ReturnType<typeof createChipCrossingRecord> = createChipCrossingRecord(lap, eventStartTime, txNo, eventId);
+  const crossing: Pick<ChipCrossingData, 'participantId' | 'eventId'> & ReturnType<typeof createChipCrossingRecord> = createChipCrossingRecord(lap, eventStartTime, txNo, eventId, timeZone);
   crossing.participantId = epId;
 
   return crossing;
@@ -184,7 +191,8 @@ export const getChipCrossingsFromLapCategoryViewModels = (
   eventId: EventId,
   categoryId: EventCategoryId,
   eventStartTime: Date,
-  inferTransponderNumberRange: number
+  inferTransponderNumberRange: number,
+  timeZone?: string
 ): ReturnType<typeof convertLapCategoryViewModelToChipCrossing>[] => {
     if (!validateUuid(eventId)) {
     throw new Error(`Invalid eventId provided: ${eventId}`);
@@ -198,7 +206,8 @@ export const getChipCrossingsFromLapCategoryViewModels = (
     eventId,
     categoryId,
     eventStartTime,
-    inferTransponderNumberRange
+    inferTransponderNumberRange,
+    timeZone
   ));
 };
 
@@ -207,7 +216,8 @@ export const convertLapCategoryViewModelsForEntrant = (
   categoryId: EventCategoryId,
   eventId: EventId,
   eventStartTime: Date,
-  inferTransponderNumberRange?: number
+  inferTransponderNumberRange?: number,
+  timeZone?: string
 ): { participants: EventParticipant[]; records?: Partial<ChipCrossingData>[]; } => {
   if (!validateUuid(eventId)) {
     throw new Error(`Invalid eventId provided: ${eventId}`);
@@ -230,7 +240,8 @@ export const convertLapCategoryViewModelsForEntrant = (
       eventId,
       categoryId,
       eventStartTime,
-      inferTransponderNumberRange
+      inferTransponderNumberRange,
+      timeZone
     );
   }
 
@@ -245,7 +256,8 @@ export const apiParticipantEntrantToEntrantData = (
   eventId: EventId,
   categoryId: EventCategoryId,
   eventStartTime: Date | undefined,
-  inferTransponderNumberRange?: number
+  inferTransponderNumberRange?: number,
+  timeZone?: string
 ): { team?: EventTeam; participants: EventParticipant[]; records?: Partial<ChipCrossingData>[]; } => {
   if (!validateUuid(eventId)) {
     throw new Error(`Invalid eventId provided: ${eventId}`);
@@ -271,7 +283,8 @@ export const apiParticipantEntrantToEntrantData = (
     categoryId,
     eventId,
     eventStartTime || new Date(), // Default to now if no start time is provided
-    inferTransponderNumberRange
+    inferTransponderNumberRange,
+    timeZone
   );
 
   results.participants.forEach((participant: EventParticipant) => {
@@ -292,7 +305,8 @@ export const convertDataToRaceState = (
   eventId: EventId,
   eventStartTime: Date | undefined,
   data: ApicalLapByCategory,
-  inferTransponderNumberRange?: number
+  inferTransponderNumberRange?: number,
+  timeZone?: string
 ): Partial<RaceState> => {
   if (!validateUuid(eventId)) {
     console.error('Invalid eventId provided:', eventId);
@@ -329,7 +343,7 @@ export const convertDataToRaceState = (
     }
 
     const entrantData = apiCategory.ParticipantViewModels.map((entrant: ApicalParticipantViewModel) => apiParticipantEntrantToEntrantData(
-      entrant, eventId, categoryId, eventStartTime, inferTransponderNumberRange
+      entrant, eventId, categoryId, eventStartTime, inferTransponderNumberRange, timeZone
     ));
 
     entrantData.forEach((entrant) => {

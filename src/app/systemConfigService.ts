@@ -157,6 +157,21 @@ export class SystemConfigService {
     return this.config;
   }
 
+  public async updateEventOptions(eventId: string, changes: SystemConfiguration['eventOptions'][string]): Promise<SystemConfiguration> {
+    this.config = {
+      ...this.config,
+      eventOptions: {
+        ...this.config.eventOptions,
+        [eventId]: {
+          ...(this.config.eventOptions[eventId] || {}),
+          ...changes,
+        },
+      },
+    };
+    await this.persist();
+    return this.config;
+  }
+
   public async persistListedApicalEvents(sourceId: string, listedEvents: DataSourceConfig['listedEvents']): Promise<SystemConfiguration> {
     const source = this.config.dataSources.find((item) => item.id === sourceId);
     if (source?.type !== 'api-apical-data-file' || !source.apiConfig) {

@@ -3,7 +3,7 @@ import { Box, FormControl, InputLabel, Menu, MenuItem, Paper, Select, Table, Tab
 import { EventCategory, EventCategoryId } from '../../model/eventcategory';
 import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../model';
 import { InvalidCategoryIdError, NoCrossingError, NoParticipantError, ParticipantNotFoundError } from '../../validators/errors.ts';
-import { MillisecondsDuration, millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.ts';
+import { type MillisecondsDuration, type TimeDisplayZoneMode, millisecondsToTime, resolveDisplayTimeZone, tableTimeString } from '../../app/utils/timeutils.ts';
 import React, { type JSX } from 'react';
 import { categoriesTextFromLookupFn, getElapsedTimeForCategory } from '../../controllers/category.ts';
 import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
@@ -15,11 +15,14 @@ import { getParticipantNumber } from '../../controllers/participant.ts';
 import { isFlagRecord } from '../../controllers/flag';
 
 interface RecordsProps {
+  eventTimeZone?: string;
+  onTimeDisplayZoneModeChange?: (mode: TimeDisplayZoneMode) => void;
   records: EventTimeRecord[];
   raceStateLookup: RaceStateLookup;
   warnings?: string[];
   selectedCategories: Set<EventCategoryId>;
   selectedParticipants: Set<EventParticipantId>;
+  timeDisplayZoneMode?: TimeDisplayZoneMode;
   categorySelected?: ((ids: Set<EventCategoryId>) => void) | undefined;
   participantSelected?: ((participantId: Set<EventParticipantId>) => void) | undefined;
 }
@@ -34,6 +37,7 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   participantSelected?: ((participantId: Set<EventParticipantId>) => void) | undefined;
   onExclude?: (crossingId: string, exclude: boolean) => void;
   onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void;
+  timeZone?: string;
 }
 
 interface FlagRecordRowProps<FlagType extends FlagRecord> extends RecentRecordRowProps<FlagType> {
@@ -72,7 +76,7 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
         }
       }}>
       <TableCell colSpan={3}>{record.sequence}{flagText}</TableCell>
-      <TableCell colSpan={1}>{tableTimeString(record.time)}</TableCell>
+      <TableCell colSpan={1}>{tableTimeString(record.time, props.timeZone)}</TableCell>
       <TableCell colSpan={4}>{categoryText}</TableCell>
       <TableCell colSpan={2}>{elapsedTime}</TableCell>
     </TableRow>
@@ -139,7 +143,7 @@ interface _CompletedLapProps {
 }
 
 const UnknownChipRow = (
-  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae }: {
+  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae, timeZone }: {
     antennae: string
     txNo: number | undefined,
     sequenceNumber: number
@@ -147,11 +151,12 @@ const UnknownChipRow = (
     timeRecordId: string,
     rs: RaceStateLookup,
     identifier: string,
+    timeZone?: string,
   }
 ): JSX.Element => {
   const txCount = txNo !== undefined ? rs.countTransponderCrossings(txNo, passingTime) : undefined;
   const content = `Unknown transponder ${identifier} (${txCount})`;
-  const timeString = tableTimeString(passingTime);
+  const timeString = tableTimeString(passingTime, timeZone);
 
   return (
     <TableRow key={timeRecordId} data-record-id={timeRecordId}>
@@ -173,6 +178,7 @@ interface PassingRecordRowProps {
   onSelect?: (passingRecord: ParticipantPassingRecord) => void;
   onExclude?: (crossingId: string, exclude: boolean) => void;
   onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void;
+  timeZone?: string;
 }
 
 export const PassingRecordRow = (
@@ -222,7 +228,7 @@ export const PassingRecordRow = (
   };
 
   let categoryStr = undefined;
-  const timeString = tableTimeString(passing.time);
+  const timeString = tableTimeString(passing.time, props.timeZone);
   const identifier: string = getTimeRecordIdentifier(passing, true);
   const entrant = passing.participantId ? rs.getParticipantById(passing.participantId) : undefined;
   let plateNumber: string | number | undefined = undefined;
@@ -350,6 +356,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       raceStateLookup={props.raceStateLookup}
       selectedCategories={props.selectedCategories}
       onSelect={flagRecordSelected}
+      timeZone={props.timeZone}
     />;
   }
 
@@ -398,6 +405,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       onSelect={passingRecordSelected}
       onExclude={props.onExclude}
       onChangeCategory={props.onChangeCategory}
+      timeZone={props.timeZone}
     />;
   }
 
@@ -412,6 +420,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
     txNo={txNo}
     identifier={identifier}
     rs={props.raceStateLookup}
+    timeZone={props.timeZone}
   />;
   // (passing, rs, identifier, ant, timeString);
   // }
@@ -491,6 +500,8 @@ export const RecentRecords = (props: RecordsProps & {
   onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void
 }) => {
   const [recentFirst, setRecentFirst] = React.useState<boolean>(false);
+  const timeDisplayZoneMode = props.timeDisplayZoneMode || 'event';
+  const displayTimeZone = resolveDisplayTimeZone(timeDisplayZoneMode, props.eventTimeZone);
   const sortedRecords = (props.records || []).sort((a, b) => {
     if (recentFirst) {
       return b.time!.getTime() - a.time!.getTime();
@@ -516,6 +527,22 @@ export const RecentRecords = (props: RecordsProps & {
         <MenuItem value="category">Only selected category</MenuItem>
         <MenuItem value="team">Only selected team</MenuItem>
         <MenuItem value="participant">Only selected participant</MenuItem>
+      </Select>
+    </FormControl>
+    <FormControl
+      fullWidth={false}
+      id="recent-records-time-zone-dropdown"
+      sx={{ display: 'inline-block', marginLeft: 2, verticalAlign: 'middle' }}
+    >
+      <InputLabel id="show-recent-times-in-label">Show times in</InputLabel>
+      <Select
+        id="show-recent-times-in"
+        value={timeDisplayZoneMode}
+        onChange={(event) => props.onTimeDisplayZoneModeChange?.(event.target.value as TimeDisplayZoneMode)}
+        label="Show times in">
+        <MenuItem value="event">Event time-zone</MenuItem>
+        <MenuItem value="system">System time-zone</MenuItem>
+        <MenuItem value="gmt">GMT</MenuItem>
       </Select>
     </FormControl>
     <FormControl
@@ -563,6 +590,7 @@ export const RecentRecords = (props: RecordsProps & {
                     participantSelected={props.participantSelected}
                     onExclude={props.onExclude}
                     onChangeCategory={props.onChangeCategory}
+                    timeZone={displayTimeZone}
                   />
                 ))}
               </TableBody>

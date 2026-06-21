@@ -11,6 +11,7 @@ import {
   getEntrantsForEvent,
 } from './eventCatalog.js';
 import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
+import { getSystemTimeZone } from './utils/timeutils.js';
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { MasterEntrantProfile } from './systemConfig.js';
@@ -22,6 +23,7 @@ interface ApicalCatalogImport {
   eventName: string;
   raceState: Partial<RaceState>;
   sessionId: string;
+  timeZone?: string;
 }
 
 interface EventCatalogServiceOptions {
@@ -267,6 +269,7 @@ export class EventCatalogService {
           id: eventId,
           name: 'New Event',
           sessionIds: [],
+          timeZone: getSystemTimeZone(),
         },
         id: createMutationId(),
         timestamp: createTimestamp(),
@@ -286,7 +289,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async updateEvent(eventId: string, changes: { date?: string; format?: EventCatalogState['events'][number]['format']; name?: string; }): Promise<EventCatalogState> {
+  public async updateEvent(eventId: string, changes: { date?: string; format?: EventCatalogState['events'][number]['format']; name?: string; timeZone?: string; }): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes,
@@ -391,6 +394,7 @@ export class EventCatalogService {
     const sessionIds = Array.from(new Set([...(existingEvent?.sessionIds || []), importData.sessionId]));
     const mutations: EventCatalogLedger['mutations'] = [];
     const scheduledStart = importData.eventDate ? new Date(importData.eventDate).toISOString() : createTimestamp();
+    const timeZone = importData.timeZone || existingEvent?.timeZone || getSystemTimeZone();
 
     if (!existingEvent) {
       mutations.push({
@@ -402,6 +406,7 @@ export class EventCatalogService {
           id: importData.eventId,
           name: importData.eventName,
           sessionIds,
+          timeZone,
         },
         id: createMutationId(),
         timestamp: createTimestamp(),
@@ -413,6 +418,7 @@ export class EventCatalogService {
           date: scheduledStart.slice(0, 10),
           name: importData.eventName,
           sessionIds,
+          timeZone,
         },
         eventId: importData.eventId,
         id: createMutationId(),
