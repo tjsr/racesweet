@@ -286,9 +286,9 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
                   }}
                   aria-selected={isSelected}
                 >
-                  <strong>{category.name}</strong>
-                  <span>{category.code || 'No code'}</span>
-                  <span>{category.description || 'No description'}</span>
+                  <strong className="categoryName">{category.name}</strong>
+                  { category.code !== category.name ? <span className="categoryCode">{category.code}</span> : <></> }
+                  { category.description ? <span className="categoryDescription">{category.description}</span> : <></> }
                 </button>
               );
             })}

@@ -190,6 +190,7 @@
 .entrant-list-type {
   align-self: flex-end;
   margin-top: auto;
+  display: inline-block;
 }
 
 .entrant-category-chip {
@@ -197,6 +198,7 @@
   border-radius: 999px;
   font-size: 0.72rem;
   padding: 0.08rem 0.45rem;
+  background-color: #e00000aa;
 }
 
 .entrantTeam,

@@ -142,10 +142,10 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
         onClick={() => props.onSelectEntrant(entrant.id)}
         aria-selected={isSelected}
       >
+        <strong>{entrant.name}</strong>
         {entrant.entrantType === 'rider' ? (
           <span className="entrant-category-chip">{getCategoryName(props.catalog, categoryId)}</span>
         ) : null}
-        <strong>{entrant.name}</strong>
         <span className="entrant-list-type">{entrant.entrantType}</span>
         {teamName ? (
           <span className="entrantTeam">Team: {teamName}</span>
