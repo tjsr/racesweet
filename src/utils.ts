@@ -70,3 +70,11 @@ export const split = (str: string, sep: string, n: number): string[] => {
 export const warn = (message?: string, ...optionalParams: unknown[]): void => {
   console.warn(`Warning: ${message}`, optionalParams);
 };
+
+export const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
+
+export const trimSlash = (value: string): string => value.replace(/\/$/, '');
+
+const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const isGuid = (value: string): boolean => GUID_REGEX.test(value);
+
