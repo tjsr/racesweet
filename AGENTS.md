@@ -28,6 +28,12 @@ Event and session metadata changes must go through the event catalog service lay
 
 Event-scoped screens such as Events, Entrants, Categories, and Sessions should derive their current context from the active event rather than maintaining separate competing sources of truth.
 
+Event catalog UI must prefer scoped selectors and read-only summaries over editable raw IDs. Do not expose event, category, session, entrant, or participant IDs as editable user fields when the app can provide an event-scoped dropdown, multi-select, or display label.
+
+Entrant category editing uses `categoryId` as the primary category and mirrors `categoryIds` from that primary category for normal single-category rider/team edits. Team membership is represented on rider entrants using `teamEntrantId`.
+
+Session, category, entrant, and event UI changes must write through `EventCatalogService` so immutable ledger mutations, file persistence, state rebuild, and configured upstream callbacks stay in the same flow.
+
 System-wide data source configuration must be persisted through the system config service layer (not transient UI-only state), including source definitions, event assignments, and per-session assignment mode.
 
 Session data-source assignment supports default event-wide source selection or specific per-session overrides; when applying session sources, imported data should be pushed into the active race state so crossings/results are recalculated.
