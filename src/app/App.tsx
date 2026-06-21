@@ -579,11 +579,8 @@ export const RaceSweetMainApp = () => {
             value={timingSessionValue}
             onChange={(event) => selectTimingSession(event.target.value)}
           >
-            <option value="active">
-              {activeSession ? `Active session (${activeSession.name})` : 'Active session'}
-            </option>
             {timingSessions.map((session) => (
-              <option key={session.id} value={session.id}>{session.name}</option>
+              <option key={session.id} value={session.id} selected={activeSession?.id == session.id}>{session.name}{activeSession?.id == session.id ? ' (Active)' : ''}</option>
             ))}
           </select>
         </label>
