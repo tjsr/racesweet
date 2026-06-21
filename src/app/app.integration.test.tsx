@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { type ApicalSpreadsheetLapsRow, convertApicalSpreadsheetRowsToApicalData, createApicalCatalogEventId } from './apicalDataSource.js';
+import { type ApicalSpreadsheetLapsRow, createApicalCatalogEventId } from './apicalDataSource.js';
 import { type Root, createRoot } from 'react-dom/client';
 import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from '../utils/apical/excelDownload.js';
 import type { ApicalLapByCategory } from '../model/apical.js';
@@ -8,6 +8,7 @@ import { RaceSweetMainApp } from './App.js';
 import React from 'react';
 import XLSX from 'xlsx';
 import { act } from 'react';
+import { convertApicalSpreadsheetRowsToApicalData } from '../controllers/apical/apicalSpreadsheetProcessor.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
@@ -310,6 +311,122 @@ const getFirstBodyRule = (mediaRule: CSSMediaRule): CSSStyleRule | undefined => 
   return rules.find((rule) => {
     return rule instanceof CSSStyleRule && rule.selectorText === 'body';
   }) as CSSStyleRule | undefined;
+};
+
+interface ApicalImportScenario {
+  apicalData: ApicalLapByCategory;
+  expectedCategoryCount: number;
+  expectedCrossingCount: number;
+  expectedEntrantCount: number;
+  fetchMock: ReturnType<typeof vi.spyOn>;
+  importedEventId: string;
+  writtenConfig: {
+    dataSources: Array<{ dataLastRetrieved?: string }>;
+    eventSourceAssignments: Record<string, string[]>;
+    sessionSourceAssignments: Record<string, { mode: string; sourceIds: string[] }>;
+  };
+  writtenFiles: Array<{ content: string; filePath: string }>;
+}
+
+const createApicalImportExpectations = async (): Promise<{
+  apicalData: ApicalLapByCategory;
+  expectedCategoryCount: number;
+  expectedCrossingCount: number;
+  expectedEntrantCount: number;
+}> => {
+  const apicalData = await readApicalDataFixture();
+  const excelApicalData = convertApicalSpreadsheetRowsToApicalData(apicalDataToSpreadsheetRows(apicalData));
+  const convertedFixture = convertDataToRaceState(
+    createApicalCatalogEventId(1001),
+    new Date('2025-06-06T00:00:00.000Z'),
+    excelApicalData,
+    200000
+  );
+  const expectedCategoryCount = new Set((convertedFixture.categories || []).map((category) => {
+    return `${(category.code || '').trim().toLowerCase()}|${(category.name || '').trim().toLowerCase()}`;
+  })).size;
+  const expectedEntrantCount = new Set((convertedFixture.participants || []).map((participant) => participant.entrantId.toString())).size;
+  const expectedCrossingCount = apicalData.reduce((count, category) => {
+    return count + category.ParticipantViewModels.reduce((lapCount, entrant) => lapCount + entrant.LapByCategoryViewModels.length, 0);
+  }, 0);
+
+  return {
+    apicalData,
+    expectedCategoryCount,
+    expectedCrossingCount,
+    expectedEntrantCount,
+  };
+};
+
+const mockApicalExcelFetch = (apicalData: ApicalLapByCategory): ReturnType<typeof vi.spyOn> => {
+  return vi.spyOn(globalThis, 'fetch')
+    .mockImplementation(async (url) => {
+      const requestUrl = String(url);
+      if (requestUrl.includes('/RaceResult/Event/ExportToExcel')) {
+        return new Response(JSON.stringify({
+          FileGuid: '11111111-1111-4111-8111-111111111111',
+          FileName: 'Apical Downloaded Round.xlsx',
+        }), {
+          headers: {
+            'set-cookie': 'session=apical-cookie',
+          },
+          status: 200,
+        });
+      }
+
+      if (requestUrl.includes('/Download/DownloadExcel')) {
+        return createApicalWorkbookResponse(apicalData);
+      }
+
+      return new Response('Unexpected Apical test URL', { status: 404, statusText: 'Not Found' });
+    });
+};
+
+const renderAndFetchApicalImport = async (root: Root, container: HTMLDivElement): Promise<ApicalImportScenario> => {
+  const writtenFiles: Array<{ content: string; filePath: string }> = [];
+  const expectations = await createApicalImportExpectations();
+
+  (window as unknown as {
+    api: {
+      requestBuffer: (filePath: string) => Promise<Buffer>;
+      requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+      writeFileContent: (filePath: string, content: string) => Promise<void>;
+    };
+  }).api = {
+    requestBuffer: readFixtureBuffer,
+    requestFileContent: readGeneratedFixtureWithListedApicalSource as <T>(filePath: string, dataType: string) => Promise<T>,
+    writeFileContent: async (filePath: string, content: string) => {
+      writtenFiles.push({ content, filePath });
+    },
+  };
+
+  const fetchMock = mockApicalExcelFetch(expectations.apicalData);
+
+  await act(async () => {
+    root.render(<RaceSweetMainApp />);
+  });
+
+  await waitForLoadedApp(container);
+  await clickButtonByText(container, 'Fetch event data now');
+  await waitForTextNotPresent(container, 'Data last retrieved: Never');
+
+  const latestConfigWrite = writtenFiles
+    .filter((write) => write.filePath.includes('system-config.json'))
+    .at(-1);
+  expect(latestConfigWrite).toBeDefined();
+  const writtenConfig = JSON.parse(latestConfigWrite!.content) as ApicalImportScenario['writtenConfig'];
+  const importedEventId = Object.keys(writtenConfig.eventSourceAssignments).find((eventId) => {
+    return writtenConfig.eventSourceAssignments[eventId]?.includes('source-apical');
+  });
+  expect(importedEventId).toBeDefined();
+
+  return {
+    ...expectations,
+    fetchMock,
+    importedEventId: importedEventId!,
+    writtenConfig,
+    writtenFiles,
+  };
 };
 
 describe('RaceSweetMainApp integration', () => {
@@ -793,106 +910,38 @@ describe('RaceSweetMainApp integration', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('fetches Apical event data now, scaffolds views, then populates timing when the imported session is activated', async () => {
-    const writtenFiles: Array<{ content: string; filePath: string }> = [];
-    const apicalData = await readApicalDataFixture();
-    const excelApicalData = convertApicalSpreadsheetRowsToApicalData(apicalDataToSpreadsheetRows(apicalData));
-    const convertedFixture = convertDataToRaceState(
-      createApicalCatalogEventId(1001),
-      new Date('2025-06-06T00:00:00.000Z'),
-      excelApicalData,
-      200000
-    );
-    const expectedCategoryCount = new Set((convertedFixture.categories || []).map((category) => {
-      return `${(category.code || '').trim().toLowerCase()}|${(category.name || '').trim().toLowerCase()}`;
-    })).size;
-    const expectedEntrantCount = new Set((convertedFixture.participants || []).map((participant) => participant.entrantId.toString())).size;
-    const expectedCrossingCount = apicalData.reduce((count, category) => {
-      return count + category.ParticipantViewModels.reduce((lapCount, entrant) => lapCount + entrant.LapByCategoryViewModels.length, 0);
-    }, 0);
+  it('fetches Apical event data now and persists source assignments', async () => {
+    const { fetchMock, writtenConfig } = await renderAndFetchApicalImport(root, container);
 
-    (window as unknown as {
-      api: {
-        requestBuffer: (filePath: string) => Promise<Buffer>;
-        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
-        writeFileContent: (filePath: string, content: string) => Promise<void>;
-      };
-    }).api = {
-      requestBuffer: readFixtureBuffer,
-      requestFileContent: readGeneratedFixtureWithListedApicalSource as <T>(filePath: string, dataType: string) => Promise<T>,
-      writeFileContent: async (filePath: string, content: string) => {
-        writtenFiles.push({ content, filePath });
-      },
-    };
-
-    const fetchMock = vi.spyOn(globalThis, 'fetch')
-      .mockImplementation(async (url) => {
-        const requestUrl = String(url);
-        if (requestUrl.includes('/RaceResult/Event/ExportToExcel')) {
-          return new Response(JSON.stringify({
-            FileGuid: '11111111-1111-4111-8111-111111111111',
-            FileName: 'Apical Downloaded Round.xlsx',
-          }), {
-            headers: {
-              'set-cookie': 'session=apical-cookie',
-            },
-            status: 200,
-          });
-        }
-
-        if (requestUrl.includes('/Download/DownloadExcel')) {
-          return createApicalWorkbookResponse(apicalData);
-        }
-
-        return new Response('Unexpected Apical test URL', { status: 404, statusText: 'Not Found' });
-      });
-
-    await act(async () => {
-      root.render(<RaceSweetMainApp />);
-    });
-
-    await waitForLoadedApp(container);
     expect(container.querySelector('h1')?.textContent).toBe('System');
-    expect(container.textContent).toContain('Data last retrieved: Never');
-
-    await clickButtonByText(container, 'Fetch event data now');
-    await waitForTextNotPresent(container, 'Data last retrieved: Never');
     expect(container.textContent).toMatch(/Data last retrieved: \d{4}-\d{2}-\d{2}T/);
     expect(container.textContent).not.toContain('Active Event');
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('https://apical.example.com/Download/DownloadExcel?fileGuid=11111111-1111-4111-8111-111111111111&filename=Apical%20Downloaded%20Round.xlsx'),
       expect.any(Object)
     );
-    const exportCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/RaceResult/Event/ExportToExcel'));
+    const fetchCalls = fetchMock.mock.calls as Parameters<typeof fetch>[];
+    const exportCall = fetchCalls.find((call) => String(call[0]).includes('/RaceResult/Event/ExportToExcel'));
     expect(exportCall).toBeDefined();
     const exportHeaders = new Headers((exportCall![1] as RequestInit).headers);
     expect(exportHeaders.get('X-Requested-With')).toBe('XMLHttpRequest');
     expect(exportHeaders.get('Accept')).toBe('application/json');
 
-    const downloadCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/Download/DownloadExcel'));
+    const downloadCall = fetchCalls.find((call) => String(call[0]).includes('/Download/DownloadExcel'));
     expect(downloadCall).toBeDefined();
     const downloadHeaders = new Headers((downloadCall![1] as RequestInit).headers);
-    expectRequiredDownloadHeaders(downloadHeaders, 'https://apical.example.com', 1001, '');
+    expectRequiredDownloadHeaders(downloadHeaders, 'https://apical.example.com', 1001, 'session=apical-cookie');
 
-    const latestConfigWrite = writtenFiles
-      .filter((write) => write.filePath.includes('system-config.json'))
-      .at(-1);
-    expect(latestConfigWrite).toBeDefined();
-    const writtenConfig = JSON.parse(latestConfigWrite!.content) as {
-      dataSources: Array<{ dataLastRetrieved?: string }>;
-      eventSourceAssignments: Record<string, string[]>;
-      sessionSourceAssignments: Record<string, { mode: string; sourceIds: string[] }>;
-    };
     expect(writtenConfig.dataSources[0]?.dataLastRetrieved).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(Object.values(writtenConfig.eventSourceAssignments)).toContainEqual(['source-apical']);
     expect(Object.values(writtenConfig.sessionSourceAssignments)).toContainEqual({
       mode: 'specific',
       sourceIds: ['source-apical'],
     });
-    const importedEventId = Object.keys(writtenConfig.eventSourceAssignments).find((eventId) => {
-      return writtenConfig.eventSourceAssignments[eventId]?.includes('source-apical');
-    });
-    expect(importedEventId).toBeDefined();
+  });
+
+  it('scaffolds entrants and categories for fetched Apical event data', async () => {
+    const { apicalData, expectedCategoryCount, expectedEntrantCount } = await renderAndFetchApicalImport(root, container);
 
     await clickSectionButton(container, 'Entrants');
     await waitForText(container, 'Apical Downloaded Round');
@@ -902,6 +951,10 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Categories');
     expect(container.querySelectorAll('[aria-label="Categories for selected event"] .events-list-item')).toHaveLength(expectedCategoryCount);
     expect(container.textContent).toContain(apicalData[0]!.CategoryName);
+  });
+
+  it('populates timing and results when the imported Apical session is activated', async () => {
+    const { expectedCrossingCount, importedEventId } = await renderAndFetchApicalImport(root, container);
 
     await clickSectionButton(container, 'Sessions');
     const sessionsEventSelect = container.querySelector('select[aria-label="Sessions Event"]') as HTMLSelectElement;

@@ -28,19 +28,24 @@ const createExcelResponse = (): Response => {
   return new Response(buffer, { status: 200 });
 };
 
-const mockExcelFetch = (): ReturnType<typeof vi.spyOn> => vi
+const mockExcelFetch = (cookie: string = 'some-cookie-value'): ReturnType<typeof vi.spyOn> => vi
   .spyOn(globalThis, 'fetch')
   .mockResolvedValueOnce(new Response(JSON.stringify({
     FileGuid: '11111111-1111-4111-8111-111111111111',
     FileName: 'Round 3.xlsx',
-  }), { status: 200 }))
+  }), {
+    headers: {
+      'set-cookie': cookie,
+    },
+    status: 200,
+  }))
   .mockResolvedValueOnce(createExcelResponse());
 
-const createApicalSource = (): DataSourceConfig => ({
+const createApicalSource = (baseUrl: string = 'https://apical.example.com'): DataSourceConfig => ({
   apiConfig: {
     authHeaderName: '',
     authHeaderValue: '',
-    baseUrl: 'https://apical.example.com',
+    baseUrl,
     companyId: 2,
     httpTimeoutSeconds: 5,
     live: false,

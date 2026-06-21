@@ -1,9 +1,12 @@
-import { ApicalDataException } from '../../errors/apicalDataException.js';
-import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from './excelDownload.js';
-import { generateExcelData, generateOrGetCachedEventPath, getApicalEventExcelFilePath } from './excelGenerate.js';
+// @vitest-environment jsdom
+
+import { ApicalDataException } from '../../errors/apicalDataException.ts';
+import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from './excelDownload.ts';
+import { generateOrGetCachedEventPath, getApicalEventExcelFilePath } from './excelGenerate.ts';
 import { promises as fs } from 'fs';
-import { readTempApicalExcelFile, retrieveExcelData } from './apicalEventSpreadsheet.js';
+import { readTempApicalExcelFile, retrieveExcelData } from './apicalEventSpreadsheet.ts';
 import XLSX from 'xlsx';
+import { generateExcelData } from '../../controllers/apical/generateExcel.ts';
 
 const APICAL_EVENT_ID = 69;
 const APICAL_FILE_GUID = '1cf63381-1269-4257-b892-ef8b33424103';
@@ -48,8 +51,18 @@ const createExcelBuffer = (): ArrayBuffer => {
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
 };
 
+const clearDocumentCookies = (): void => {
+  document.cookie.split(';').forEach((cookie) => {
+    const cookieName = cookie.split('=')[0]?.trim();
+    if (cookieName) {
+      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+    }
+  });
+};
+
 describe('apical Excel generation utilities', () => {
   afterEach(async () => {
+    clearDocumentCookies();
     vi.restoreAllMocks();
     await fs.unlink(getApicalEventExcelFilePath(APICAL_EVENT_ID)).catch(() => undefined);
   });
@@ -72,12 +85,30 @@ describe('apical Excel generation utilities', () => {
     const callOptions = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const headers = new Headers(callOptions.headers);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String(fetchMock.mock.calls[0]?.[0] || '')).toBe('https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69&_=1781309520833');
+    expect(String(fetchMock.mock.calls[0]?.[0] || '')).toBe('https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69&_=' + APICAL_TIMESTAMP);
     expect(headers.get('X-Requested-With')).toBe('XMLHttpRequest');
     expect(result.FileGuid).toBe(APICAL_FILE_GUID);
     expect(result.FileGuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
     expect(result.FileName).toBe(APICAL_FILE_NAME);
     expect(result.Cookie).toBe('session=abc123');
+  });
+
+  it('uses document cookies when the Excel export response does not expose Set-Cookie', async () => {
+    document.cookie = 'ASP.NET_SessionId=document-session';
+    document.cookie = 'ApicalAuth=document-auth';
+    vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        FileGuid: APICAL_FILE_GUID,
+        FileName: APICAL_FILE_NAME,
+      }), { status: 200 }));
+
+    const result = await generateExcelData(APICAL_EVENT_ID, APICAL_TIMESTAMP);
+
+    expect(result.FileGuid).toBe(APICAL_FILE_GUID);
+    expect(result.FileName).toBe(APICAL_FILE_NAME);
+    expect(result.Cookie).toContain('ASP.NET_SessionId=document-session');
+    expect(result.Cookie).toContain('ApicalAuth=document-auth');
   });
 
   it('rejects export responses that do not include a GUID file id', async () => {
@@ -105,7 +136,7 @@ describe('apical Excel generation utilities', () => {
 
     const callOptions = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const headers = new Headers(callOptions.headers);
-    expect(String(fetchMock.mock.calls[0]?.[0] || '')).toBe('https://apicalracetiming.com.au/Download/DownloadExcel?fileGuid=1cf63381-1269-4257-b892-ef8b33424103&filename=Results%20%20GMBC%20Autumn%20No%20Frills%20Round%204%202026-6-12.xlsx');
+    expect(String(fetchMock.mock.calls[0]?.[0] || '')).toBe('https://apicalracetiming.com.au/Download/DownloadExcel?fileGuid=' + APICAL_FILE_GUID + '&filename=' + encodeURIComponent(APICAL_FILE_NAME));
     expectRequiredDownloadHeaders(headers, 'session=abc123');
     expect(Object.keys(workbook.Sheets).sort()).toEqual(['Laps', 'Sheet1']);
     expect(lapsRows).toHaveLength(1);
@@ -172,7 +203,7 @@ describe('apical Excel generation utilities', () => {
       }));
 
     await expect(retrieveExcelData(APICAL_FILE_GUID, APICAL_FILE_NAME, APICAL_EVENT_ID, 'session=abc123'))
-      .rejects.toThrow(/url=https:\/\/apicalracetiming\.com\.au\/Download\/DownloadExcel\?fileGuid=1cf63381-1269-4257-b892-ef8b33424103&filename=Results%20%20GMBC%20Autumn%20No%20Frills%20Round%204%202026-6-12\.xlsx.*"cookie":"session=abc123".*responseStatus=403.*"content-type":"text\/plain"/s);
+      .rejects.toThrow(new RegExp(`url=https://apicalracetiming\\.com\\.au/Download/DownloadExcel\\?fileGuid=${APICAL_FILE_GUID}&filename=${encodeURIComponent(APICAL_FILE_NAME)}.*"cookie":"session=abc123".*responseStatus=403.*"content-type":"text/plain"`, 's'));
   });
 
   it('includes request and response details when the Apical Excel download returns an empty blob', async () => {
@@ -185,7 +216,7 @@ describe('apical Excel generation utilities', () => {
       }));
 
     await expect(retrieveExcelData(APICAL_FILE_GUID, APICAL_FILE_NAME, APICAL_EVENT_ID, 'session=abc123'))
-      .rejects.toThrow(/response blob was empty.*"cookie":"session=abc123".*responseStatus=200/s);
+      .rejects.toThrow(new RegExp(`response blob was empty.*"cookie":"session=abc123".*responseStatus=200`, 's'));
   });
 
   it('refreshes uncached Apical event Excel data through export and download touch-points', async () => {
@@ -207,7 +238,7 @@ describe('apical Excel generation utilities', () => {
     expect(filePath).toBe(getApicalEventExcelFilePath(APICAL_EVENT_ID));
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[0]?.[0] || '')).toContain('/RaceResult/Event/ExportToExcel?eventId=69');
-    expect(String(fetchMock.mock.calls[1]?.[0] || '')).toBe('https://apicalracetiming.com.au/Download/DownloadExcel?fileGuid=1cf63381-1269-4257-b892-ef8b33424103&filename=Results%20%20GMBC%20Autumn%20No%20Frills%20Round%204%202026-6-12.xlsx');
+    expect(String(fetchMock.mock.calls[1]?.[0] || '')).toBe('https://apicalracetiming.com.au/Download/DownloadExcel?fileGuid=' + APICAL_FILE_GUID + '&filename=' + encodeURIComponent(APICAL_FILE_NAME));
     const stats = await fs.stat(filePath);
     expect(stats.size).toBeGreaterThan(0);
   });

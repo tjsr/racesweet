@@ -12,7 +12,7 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { fetchExternalHttp } from './externalHttp.js';
+import { fetchExternalHttp, isSensitiveHeader } from './externalHttp.js';
 
 describe('fetchExternalHttp', () => {
   afterEach(() => {
@@ -101,5 +101,39 @@ describe('fetchExternalHttp', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('set-cookie')).toBe('ASP.NET_SessionId=abc123; path=/; HttpOnly');
     expect(await response.json()).toEqual({ ok: true });
+  });
+});
+
+describe('isSensitiveHeader', () => {
+  it.each([
+    'authorization',
+    'cookie',
+    'set-cookie',
+    'x-api-token',
+    'x-client-secret',
+    'api-key',
+  ])('identifies %s as sensitive', (headerName) => {
+    expect(isSensitiveHeader(headerName)).toBe(true);
+  });
+
+  it.each([
+    ['Authorization', 'authorization'],
+    ['COOKIE', 'cookie'],
+    ['Set-Cookie', 'set-cookie'],
+    ['X-Api-Token', 'x-api-token'],
+    ['X-Client-Secret', 'x-client-secret'],
+    ['Api-Key', 'api-key'],
+  ])('treats %s the same as %s', (headerName, normalizedHeaderName) => {
+    expect(isSensitiveHeader(headerName)).toBe(isSensitiveHeader(normalizedHeaderName));
+  });
+
+  it.each([
+    'accept',
+    'content-type',
+    'user-agent',
+    'x-requested-with',
+    'cache-control',
+  ])('does not identify %s as sensitive', (headerName) => {
+    expect(isSensitiveHeader(headerName)).toBe(false);
   });
 });

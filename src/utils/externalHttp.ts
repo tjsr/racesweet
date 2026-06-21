@@ -169,3 +169,13 @@ export const fetchExternalHttp = async (url: string, options: ExternalHttpReques
     statusText: proxiedResponse.statusText,
   });
 };
+
+export const isSensitiveHeader = (name: string): boolean => {
+  const normalizedName = name.toLowerCase();
+  return normalizedName === 'authorization' ||
+    normalizedName === 'cookie' ||
+    normalizedName === 'set-cookie' ||
+    normalizedName.includes('token') ||
+    normalizedName.includes('secret') ||
+    normalizedName.includes('key');
+};

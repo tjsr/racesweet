@@ -1,18 +1,20 @@
+import { generateExcelData } from '../controllers/apical/generateExcel.js';
 import { ApicalDataException } from '../errors/apicalDataException.js';
 import { ApicalRequestFailedError } from '../errors/ApicalRequestFailedError.js';
+import { ExcelDownloadException } from '../errors/excelDownloadException.js';
 import type { ApicalLapByCategory } from '../model/apical.js';
 import { EventId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
-import { createApicalExcelDownloadHeaders, getApicalExcelDownloadUrl } from '../utils/apical/excelDownload.js';
-import { fetchExternalHttp } from '../utils/externalHttp.js';
+import { getErrorMessage } from '../utils.js';
+import { createApicalExcelDownloadHeaders, getApicalExcelDownloadUrl, readApicalExcelPayload } from '../utils/apical/excelDownload.js';
+import { fetchExternalHttp, isSensitiveHeader } from '../utils/externalHttp.js';
 import { remapStackTrace } from './stackTrace.js';
 import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
 import { v5 as uuidv5 } from 'uuid';
 import type * as XlsxNamespace from 'xlsx';
 
 const APICAL_EVENT_ID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
-const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type XlsxModule = typeof XlsxNamespace;
 
@@ -46,12 +48,6 @@ export interface ApicalSpreadsheetLapsRow {
   TotalTimeSpan?: string;
 }
 
-const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
-
-const trimSlash = (value: string): string => value.replace(/\/$/, '');
-
-const isGuid = (value: string): boolean => GUID_REGEX.test(value);
-
 const resolveXlsxModule = (module: Partial<XlsxModule> & { default?: unknown }): XlsxModule => {
   const defaultModule = module.default as Partial<XlsxModule> | undefined;
   const candidate = typeof module.read === 'function' ? module : defaultModule;
@@ -63,7 +59,7 @@ const resolveXlsxModule = (module: Partial<XlsxModule> & { default?: unknown }):
   return candidate as XlsxModule;
 };
 
-const loadXlsx = async (): Promise<XlsxModule> => {
+export const loadXlsx = async (): Promise<XlsxModule> => {
   xlsxModulePromise ||= import('xlsx').then((module) => resolveXlsxModule(module as Partial<XlsxModule> & { default?: unknown }));
   return xlsxModulePromise;
 };
@@ -101,7 +97,7 @@ const readSetCookie = (response: Response): string | undefined => {
   return response.headers.get('set-cookie') || undefined;
 };
 
-const createAuthenticatedHeaders = (source: DataSourceConfig, cookie?: string): Headers => {
+export const createAuthenticatedHeaders = (source: DataSourceConfig, cookie?: string): Headers => {
   const headers = new Headers();
   const authHeader = getAuthHeader(source);
   if (authHeader) {
@@ -127,16 +123,6 @@ const readResponseBody = async (response: Response): Promise<string | undefined>
   } catch (error: unknown) {
     return `Could not read response body: ${getErrorMessage(error)}`;
   }
-};
-
-const isSensitiveHeader = (name: string): boolean => {
-  const normalizedName = name.toLowerCase();
-  return normalizedName === 'authorization' ||
-    normalizedName === 'cookie' ||
-    normalizedName === 'set-cookie' ||
-    normalizedName.includes('token') ||
-    normalizedName.includes('secret') ||
-    normalizedName.includes('key');
 };
 
 const formatHeaders = (
@@ -250,7 +236,7 @@ const describeRequestFailure = (phase: string, url: string, init: RequestInit, t
   formatUnknownErrorDetails(error),
 ].join('\n');
 
-const fetchApicalResponse = async (
+export const fetchApicalResponse = async (
   phase: string,
   url: string,
   init: RequestInit,
@@ -275,6 +261,7 @@ const fetchApicalResponse = async (
     const message = describeRequestFailure(phase, url, init, timeoutMs, error);
     console.error(message);
     const err: ApicalRequestFailedError = new ApicalRequestFailedError(phase, url, init, timeoutMs);
+    err.message = message;
     err.cause = error;
     throw err;
   }
@@ -298,6 +285,7 @@ const fetchApicalResponse = async (
     ].join('\n');
     console.error(message);
     const err: ApicalRequestFailedError = new ApicalRequestFailedError(phase, url, init, timeoutMs);
+    err.message = message;
     err.body = body;
     err.status = response.status;
     throw err;
@@ -306,226 +294,111 @@ const fetchApicalResponse = async (
   return response;
 };
 
-const authenticateSession = async (source: DataSourceConfig): Promise<string | undefined> => {
-  const apiConfig = source.apiConfig;
-  if (!apiConfig) {
-    return undefined;
-  }
+// export const authenticateSession = async (source: DataSourceConfig): Promise<string | undefined> => {
+//   const apiConfig = source.apiConfig;
+//   if (!apiConfig) {
+//     return undefined;
+//   }
 
-  const authHeader = getAuthHeader(source);
-  if (!authHeader) {
-    return undefined;
-  }
+//   const authHeader = getAuthHeader(source);
+//   if (!authHeader) {
+//     return undefined;
+//   }
 
-  const authEventId = getConfiguredApicalEventId(source);
-  if (!authEventId) {
-    return undefined;
-  }
+//   const authEventId = getConfiguredApicalEventId(source);
+//   if (!authEventId) {
+//     return undefined;
+//   }
 
-  const authUrl = `${trimSlash(apiConfig.baseUrl)}/RaceResult/Event/ExportToExcel?eventId=${authEventId}&_=${Date.now()}`;
-  const headers = createAuthenticatedHeaders(source);
-  headers.set('X-Requested-With', 'XMLHttpRequest');
+  
+//   const headers = createAuthenticatedHeaders(source);
+//   headers.set('X-Requested-With', 'XMLHttpRequest');
 
-  const response = await fetchApicalResponse(
-    'authentication',
-    authUrl,
-    {
-      headers,
-      method: 'GET',
-    },
-    apiConfig.httpTimeoutSeconds * 1000
-  );
+//   // const response = await fetchApicalResponse(
+//   //   'authentication',
+//   //   authUrl,
+//   //   {
+//   //     headers,
+//   //     method: 'GET',
+//   //   },
+//   //   apiConfig.httpTimeoutSeconds * 1000
+//   // );
 
-  const cookie = readSetCookie(response);
-  if (!cookie) {
-    throw new ApicalDataException(`Authentication request to ${authUrl} did not return a set-cookie header. Check that the auth header is correct and has sufficient permissions to access the event data.`);
-  }
-  return cookie;
-};
+//   const cookie = readSetCookie(response);
+//   if (!cookie) {
+//     throw new ApicalDataException(`Authentication request to ${authUrl} did not return a set-cookie header. Check that the auth header is correct and has sufficient permissions to access the event data.`);
+//   }
+//   return cookie;
+// };
 
-export const fetchApicalEvents = async (source: DataSourceConfig): Promise<ApicalListedEvent[]> => {
-  if (source.type !== 'api-apical-data-file' || !source.apiConfig) {
-    return [];
-  }
+// const generateApicalExcelExport = async (source: DataSourceConfig, apicalEventId: number): Promise<ApicalExportToExcelResponse> => {
+//   if (!source.apiConfig) {
+//     throw new Error('Apical API config is missing');
+//   }
 
-  const cookie = await authenticateSession(source);
-  const headers = createAuthenticatedHeaders(source, cookie);
-  const url = `${trimSlash(source.apiConfig.baseUrl)}/raceresult/event/getall?companyId=${source.apiConfig.companyId}&_=${Date.now()}`;
+//   const headers = createAuthenticatedHeaders(source);
+//   headers.set('X-Requested-With', 'XMLHttpRequest');
+//   const url = getApicalExcelExportUrl(source.apiConfig.baseUrl, apicalEventId);
+//   const response = await fetchApicalResponse(
+//     'Excel export',
+//     url,
+//     {
+//       credentials: 'include',
+//       headers,
+//       method: 'GET',
+//       mode: 'cors',
+//     },
+//     source.apiConfig.httpTimeoutSeconds * 1000
+//   );
+//   console.debug(`Request headers for Excel export: ${formatRequestHeaders(headers, true)}`);
+//   console.debug(`Response headers for Excel export: ${formatResponseHeaders(response, true)}`);
 
-  const response = await fetchApicalResponse(
-    'event list',
-    url,
-    {
-      credentials: 'omit',
-      headers,
-      method: 'GET',
-      mode: 'cors',
-    },
-    source.apiConfig.httpTimeoutSeconds * 1000
-  );
+//   const payload = await response.json() as Partial<ApicalExportToExcelResponse>;
+//   if (!payload.FileGuid || !isGuid(payload.FileGuid) || !payload.FileName) {
+//     throw new ApicalDataException([
+//       'Apical Excel export response payload was invalid',
+//        `${JSON.stringify(payload)}`,
+//     ].join('\n'));
+//   }
+//   return {
+//     Cookie: readSetCookie(response),
+//     FileGuid: payload.FileGuid,
+//     FileName: payload.FileName,
+//   };
+// };
 
-  const payload = await response.json() as Array<{ CompanyName?: string; EventDate?: string; Id: number; Name: string }>;
-
-  return payload.map((eventItem) => ({
-    companyName: eventItem.CompanyName,
-    eventDate: eventItem.EventDate,
-    id: eventItem.Id,
-    name: eventItem.Name,
-  }));
-};
-
-const getApicalExcelExportUrl = (baseUrl: string, apicalEventId: number): string => `${trimSlash(baseUrl)}/RaceResult/Event/ExportToExcel?eventId=${apicalEventId}&_=${Date.now()}`;
-
-const generateApicalExcelExport = async (source: DataSourceConfig, apicalEventId: number): Promise<ApicalExportToExcelResponse> => {
-  if (!source.apiConfig) {
-    throw new Error('Apical API config is missing');
-  }
-
-  const headers = createAuthenticatedHeaders(source);
-  headers.set('X-Requested-With', 'XMLHttpRequest');
-  const url = getApicalExcelExportUrl(source.apiConfig.baseUrl, apicalEventId);
-  const response = await fetchApicalResponse(
-    'Excel export',
-    url,
-    {
-      credentials: 'omit',
-      headers,
-      method: 'GET',
-      mode: 'cors',
-    },
-    source.apiConfig.httpTimeoutSeconds * 1000
-  );
-  console.debug(`Request headers for Excel export: ${formatRequestHeaders(headers, true)}`);
-  console.debug(`Response headers for Excel export: ${formatResponseHeaders(response, true)}`);
-
-  const payload = await response.json() as Partial<ApicalExportToExcelResponse>;
-  if (!payload.FileGuid || !isGuid(payload.FileGuid) || !payload.FileName) {
-    throw new ApicalDataException([
-      'Apical Excel export response payload was invalid',
-       `${JSON.stringify(payload)}`,
-    ].join('\n'));
-  }
-  return {
-    Cookie: readSetCookie(response),
-    FileGuid: payload.FileGuid,
-    FileName: payload.FileName,
-  };
-};
-
-const apicalSafeNumber = (value: number | string): string => value.toString().replace(/\D/g, '') || '0';
-
-const getEntrantKey = (row: ApicalSpreadsheetLapsRow): string => [
-  row.CategoryName,
-  row.TeamNameDisplay,
-  row.FullName,
-  row.RaceNumber,
-].join('|');
-
-export const convertApicalSpreadsheetRowsToApicalData = (rows: ApicalSpreadsheetLapsRow[]): ApicalLapByCategory => {
-  const categories = new Map<string, Map<string, ApicalSpreadsheetLapsRow[]>>();
-
-  rows.forEach((row) => {
-    const categoryName = row.CategoryName?.toString() || 'Uncategorised';
-    const entrantKey = getEntrantKey(row);
-    const entrants = categories.get(categoryName) || new Map<string, ApicalSpreadsheetLapsRow[]>();
-    const entrantRows = entrants.get(entrantKey) || [];
-    entrantRows.push(row);
-    entrants.set(entrantKey, entrantRows);
-    categories.set(categoryName, entrants);
-  });
-
-  return Array.from(categories.entries()).map(([CategoryName, entrants]) => ({
-    CategoryName,
-    ParticipantViewModels: Array.from(entrants.values()).map((entrantRows) => {
-      const sortedRows = [...entrantRows].sort((a, b) => Number(a.LapNumber) - Number(b.LapNumber));
-      const firstRow = sortedRows[0]!;
-      const lastRow = sortedRows[sortedRows.length - 1]!;
-
-      return {
-        CategoryName,
-        LapByCategoryViewModels: sortedRows.map((row) => ({
-          CumulativeLapTimeSpan: row.CumulativeLapTimeSpan,
-          FullName: row.FullName,
-          Id: Number(`${apicalSafeNumber(row.RaceNumber)}${String(row.LapNumber).padStart(3, '0')}`),
-          LapNumber: Number(row.LapNumber),
-          LapTimeSpan: row.LapTimeSpan,
-          RaceNumber: row.RaceNumber.toString(),
-        })),
-        NumberOfLaps: sortedRows.length,
-        Position: Number(firstRow.Position) || 0,
-        RaceNumbers: firstRow.RaceNumber.toString(),
-        TeamNameDisplay: firstRow.TeamNameDisplay || firstRow.FullName,
-        TotalTimeSpan: lastRow.CumulativeLapTimeSpan || firstRow.TotalTimeSpan || null,
-      };
-    }),
-  }));
-};
-
-const readApicalExcelPayload = async (sourceUrl: string, response: Response): Promise<ApicalLapByCategory> => {
-  if (!response) {
-    throw new ApicalDataException(`No response received when trying to read Apical Excel payload from url ${sourceUrl}`);
-  }
-  const responseDiagnostics = formatResponseStatusAndHeaders(response);
-  const XLSX = await loadXlsx();
-  const buffer = await response.arrayBuffer();
-  if (buffer.byteLength === 0) {
-    throw new ApicalDataException([
-      `Apical Excel file downloaded from url ${sourceUrl} was empty`,
-      responseDiagnostics,
-    ].join('\n'));
-  }
-  const workbook = XLSX.read(buffer, { type: 'array' });
-  if (!workbook) {
-    throw new ApicalDataException([
-      `Failed to parse Apical Excel workbook from url ${sourceUrl}, no data returned.`,
-      responseDiagnostics,
-    ].join('\n'));
-  }
-  if (!workbook.Sheets || Object.keys(workbook.Sheets).length === 0) {
-    throw new ApicalDataException([
-      `Apical Excel workbook from url ${sourceUrl} did not contain any sheets`,
-      responseDiagnostics,
-    ].join('\n'));
-  }
-  const worksheet = workbook.Sheets.Laps || workbook.Sheets.Sheet1;
-  if (!worksheet) {
-    const sheetList = Object.keys(workbook.Sheets).join(', ');
-    throw new ApicalDataException([
-      `Apical Excel workbook from url ${sourceUrl} did not contain a Laps or Sheet1 worksheet, but contained sheets ${sheetList}`,
-      responseDiagnostics,
-    ].join('\n'));
-  }
-  const sheetList = Object.keys(workbook.Sheets).join(', ');
-  console.debug(`Apical Excel workbook from url ${sourceUrl} contains sheets: ${sheetList}, using ${worksheet === workbook.Sheets.Laps ? 'Laps' : 'Sheet1'}`);
-
-  const rows = XLSX.utils.sheet_to_json<ApicalSpreadsheetLapsRow>(worksheet);
-  if (rows.length === 0) {
-    throw new ApicalDataException([
-      `Apical Excel workbook from url ${sourceUrl} did not contain lap rows, but contained sheets ${sheetList}`,
-      responseDiagnostics,
-    ].join('\n'));
-  }
-
-  return convertApicalSpreadsheetRowsToApicalData(rows);
-};
+export const apicalSafeNumber = (value: number | string): string => value.toString().replace(/\D/g, '') || '0';
 
 const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId: number): Promise<ApicalLapByCategory> => {
   if (!source.apiConfig) {
     throw new Error('Apical API config is missing');
   }
 
-  const exportResponse = await generateApicalExcelExport(source, apicalEventId);
-  const downloadCookie = getAuthHeader(source) || source.apiConfig.baseUrl.includes('apicalracetiming.com.au')
-    ? exportResponse.Cookie || ''
-    : '';
-  const headers = createApicalExcelDownloadHeaders(source.apiConfig.baseUrl, apicalEventId, downloadCookie);
-  const url = getApicalExcelDownloadUrl(source.apiConfig.baseUrl, exportResponse.FileGuid, exportResponse.FileName);
+  const exportHeaders = createAuthenticatedHeaders(source);
+  const excelData: ApicalExportToExcelResponse = await generateExcelData(apicalEventId, {
+    baseUrl: source.apiConfig.baseUrl,
+    headers: exportHeaders,
+  });
+  // const exportResponse = await generateApicalExcelExport(source, apicalEventId);
+  const headers = createApicalExcelDownloadHeaders(source.apiConfig.baseUrl, apicalEventId);
+  const url = getApicalExcelDownloadUrl(source.apiConfig.baseUrl, excelData.FileGuid, excelData.FileName);
+  if (excelData.Cookie) {
+    headers.set('Cookie', excelData.Cookie);
+  }
+  if (source.apiConfig.baseUrl.includes('apicalracetiming.com.au')) {
+    const authHeader = getAuthHeader(source);
+    if (authHeader) {
+      headers.set('Authorization', authHeader ? `${authHeader.name} ${authHeader.value}` : '');
+    } else if (!excelData.Cookie) {
+      throw new ExcelDownloadException(`Can't download from ${url} with missing Authorization or Cookie header value which can't be set.`);
+    }
+  }
 
   const response = await fetchApicalResponse(
     'Excel download',
     url,
     {
-      credentials: 'omit',
+      credentials: 'include',
       headers,
       method: 'GET',
       mode: 'cors',
@@ -533,7 +406,23 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
     source.apiConfig.httpTimeoutSeconds * 1000
   );
 
-  return readApicalExcelPayload(url, response);
+  try {
+    if (!response) {
+      throw new ApicalDataException(`No response received when trying to read Apical Excel payload.`);
+    }
+
+    const payload = await readApicalExcelPayload(response);
+    return payload;
+  } catch (err: unknown) {
+    if (err instanceof ApicalDataException) {
+      const responseDiagnostics = formatResponseStatusAndHeaders(response);
+      if (err.message === 'Apical Excel file was empty') {
+        throw new ApicalDataException(`Apical Excel file downloaded from url ${url} was empty\n${responseDiagnostics}`, { cause: err });
+      }
+      throw new ApicalDataException(`Failed to read Apical Excel payload from url ${url}: ${err.message}\n${responseDiagnostics}`, { cause: err });
+    }
+    throw err;
+  }
 };
 
 const loadApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId: number): Promise<ApicalLapByCategory> => {

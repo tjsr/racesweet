@@ -5,7 +5,7 @@ import { EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEn
 import { RaceStateLookup, Session } from '../model/racestate.ts';
 import React, { useEffect, useState } from 'react';
 import { ReportsPage, ResultsPage } from '../views/display/raceAnalyticsViews.tsx';
-import { fetchApicalEvents, fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.ts';
+import { fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.ts';
 
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
 import { CategoriesPage } from '../views/display/categoriesPage.tsx';
@@ -26,6 +26,7 @@ import { SystemConfigService } from './systemConfigService.ts';
 import { SystemPage } from '../views/display/systemPage.tsx';
 import { TestSession } from '../testdata/testsession.ts';
 import { applyPulledRaceStateToSession } from './sourceApplication.ts';
+import { fetchApicalEvents } from '../controllers/apical/getResultListJson.ts';
 import { formatErrorForDisplay } from './stackTrace.ts';
 import { selectedCategoriesForParticipants } from './selectionState.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
