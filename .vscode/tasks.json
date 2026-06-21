@@ -16,9 +16,16 @@
     {
       "label": "tsc: watch",
       "type": "shell",
-      "command": "npx tsc --watch",
+      "command": "npx tsc --watch --preserveWatchOutput",
       "isBackground": true,
       "problemMatcher": "$tsc-watch",
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "silent"
+      },
       "detail": "Watches TypeScript files for changes"
     },
     {
