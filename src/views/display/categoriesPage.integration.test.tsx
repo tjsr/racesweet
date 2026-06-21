@@ -14,6 +14,13 @@ const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: str
   input.dispatchEvent(new Event('input', { bubbles: true }));
 };
 
+const setMultiSelectValues = (select: HTMLSelectElement, values: string[]): void => {
+  Array.from(select.options).forEach((option) => {
+    option.selected = values.includes(option.value);
+  });
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+};
+
 const catalog: EventCatalogState = {
   activeEventId: 'event-1',
   categories: [
@@ -68,7 +75,7 @@ const catalog: EventCatalogState = {
       format: 'race-weekend',
       id: 'event-1',
       name: 'Winter Round',
-      sessionIds: [],
+      sessionIds: ['session-1', 'session-2'],
     },
     {
       categoryIds: ['cat-3'],
@@ -77,22 +84,95 @@ const catalog: EventCatalogState = {
       format: 'test-day',
       id: 'event-2',
       name: 'Spring Test',
-      sessionIds: [],
+      sessionIds: ['session-3'],
     },
   ],
-  sessions: [],
+  sessions: [
+    {
+      eventId: 'event-1',
+      id: 'session-1',
+      kind: 'race',
+      name: 'Feature Race',
+      scheduledStart: '2026-06-12T09:00:00.000Z',
+      status: 'scheduled',
+    },
+    {
+      eventId: 'event-1',
+      id: 'session-2',
+      kind: 'practice',
+      name: 'Practice',
+      scheduledStart: '2026-06-12T08:00:00.000Z',
+      status: 'scheduled',
+    },
+    {
+      eventId: 'event-2',
+      id: 'session-3',
+      kind: 'race',
+      name: 'Development Race',
+      scheduledStart: '2026-07-10T10:30:00.000Z',
+      status: 'scheduled',
+    },
+  ],
 };
 
-const entrantsByCategory: Record<string, Array<{ entrantId: string; id: string; name: string }>> = {
+const entrantsByCategory: Record<string, EventCatalogState['entrants']> = {
   'cat-1': [
-    { entrantId: 'ent-1', id: 'p-1', name: 'Pat Rider' },
-    { entrantId: 'ent-2', id: 'p-2', name: 'Quinn Rider' },
+    {
+      categoryId: 'cat-1',
+      categoryIds: ['cat-1'],
+      entrantType: 'team',
+      eventId: 'event-1',
+      id: 'team-1',
+      memberParticipantIds: ['p-1', 'p-2'],
+      name: 'Team Red',
+      sessionIds: ['session-1'],
+    },
+    {
+      categoryId: 'cat-1',
+      categoryIds: ['cat-1'],
+      entrantType: 'rider',
+      eventId: 'event-1',
+      id: 'p-1',
+      memberParticipantIds: ['p-1'],
+      name: 'Pat Rider',
+      sessionIds: ['session-1'],
+      teamEntrantId: 'team-1',
+    },
+    {
+      categoryId: 'cat-1',
+      categoryIds: ['cat-1'],
+      entrantType: 'rider',
+      eventId: 'event-1',
+      id: 'p-2',
+      memberParticipantIds: ['p-2'],
+      name: 'Quinn Rider',
+      sessionIds: ['session-1'],
+      teamEntrantId: 'team-1',
+    },
   ],
   'cat-2': [
-    { entrantId: 'ent-2', id: 'p-3', name: 'Taylor Rider' },
+    {
+      categoryId: 'cat-2',
+      categoryIds: ['cat-2'],
+      entrantType: 'rider',
+      eventId: 'event-1',
+      id: 'p-3',
+      memberParticipantIds: ['p-3'],
+      name: 'Taylor Rider',
+      sessionIds: ['session-2'],
+    },
   ],
   'cat-3': [
-    { entrantId: 'ent-3', id: 'p-4', name: 'Jordan Rider' },
+    {
+      categoryId: 'cat-3',
+      categoryIds: ['cat-3'],
+      entrantType: 'rider',
+      eventId: 'event-2',
+      id: 'p-4',
+      memberParticipantIds: ['p-4'],
+      name: 'Jordan Rider',
+      sessionIds: ['session-3'],
+    },
   ],
 };
 
@@ -186,7 +266,7 @@ describe('CategoriesPage integration', () => {
     const minRiderAgeInput = container.querySelector('input[aria-label="Category Min Rider Age"]') as HTMLInputElement;
     const maxRiderAgeInput = container.querySelector('input[aria-label="Category Max Rider Age"]') as HTMLInputElement;
     const teamGenderRulesInput = container.querySelector('textarea[aria-label="Category Team Gender Rules"]') as HTMLTextAreaElement;
-    const sessionAssignmentsInput = container.querySelector('textarea[aria-label="Category Session Assignments"]') as HTMLTextAreaElement;
+    const sessionAssignmentsInput = container.querySelector('select[aria-label="Category Session Assignments"]') as HTMLSelectElement;
     await act(async () => {
       setInputValue(categoryNameInput, 'Development Cup');
       distanceRuleTypeInput.value = 'time';
@@ -200,7 +280,7 @@ describe('CategoriesPage integration', () => {
       setInputValue(minRiderAgeInput, '15');
       setInputValue(maxRiderAgeInput, '55');
       setInputValue(teamGenderRulesInput, 'female:1:2; male:1:3');
-      setInputValue(sessionAssignmentsInput, 'session-3@2026-07-10T10:30:00.000Z');
+      setMultiSelectValues(sessionAssignmentsInput, ['session-3']);
     });
 
     const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Category');

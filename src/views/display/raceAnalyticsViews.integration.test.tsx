@@ -174,8 +174,14 @@ describe('race analytics views integration', () => {
         <ResultsPage
           categories={categories}
           catalogEntrants={catalogEntrants}
+          eventSessionOptions={[
+            { eventId: 'event-1', eventName: 'Winter Round', value: 'event:event-1' },
+            { eventId: 'event-1', eventName: 'Winter Round', sessionId: 'session-1', sessionName: 'Feature Race', value: 'session:event-1:session-1' },
+          ]}
+          onSelectEventSession={vi.fn()}
           raceState={raceState}
           selectedCategoryId={undefined}
+          selectedEventSessionValue="event:event-1"
         />,
       );
     });
@@ -189,6 +195,9 @@ describe('race analytics views integration', () => {
 
     const categorySelect = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
     expect(categorySelect).toBeTruthy();
+    const eventSessionSelect = container.querySelector('select[aria-label="Race View Event Session"]') as HTMLSelectElement;
+    expect(eventSessionSelect).toBeTruthy();
+    expect(Array.from(eventSessionSelect.options).map((option) => option.textContent)).toEqual(['Winter Round', '  Feature Race']);
 
     const categoryOptions = Array.from(categorySelect.querySelectorAll('option')).map((option) => option.textContent);
     expect(categoryOptions.filter((text) => text === 'Category A')).toHaveLength(1);
@@ -231,8 +240,14 @@ describe('race analytics views integration', () => {
         <ReportsPage
           categories={categories}
           catalogEntrants={catalogEntrants}
+          eventSessionOptions={[
+            { eventId: 'event-1', eventName: 'Winter Round', value: 'event:event-1' },
+            { eventId: 'event-1', eventName: 'Winter Round', sessionId: 'session-1', sessionName: 'Feature Race', value: 'session:event-1:session-1' },
+          ]}
+          onSelectEventSession={vi.fn()}
           raceState={raceState}
           selectedCategoryId={undefined}
+          selectedEventSessionValue="event:event-1"
         />,
       );
     });
@@ -244,6 +259,7 @@ describe('race analytics views integration', () => {
     expect(container.textContent).toContain('00:01:10.000');
 
     const categorySelect = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
+    expect(container.querySelector('select[aria-label="Race View Event Session"]')).toBeTruthy();
     const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
 
     await act(async () => {

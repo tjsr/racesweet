@@ -192,6 +192,32 @@
   margin-top: auto;
 }
 
+.entrant-category-chip {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  padding: 0.08rem 0.45rem;
+}
+
+.entrantTeam,
+.readonly-summary {
+  font-size: 0.86rem;
+}
+
+.events-list-subheading,
+.readonly-summary-section h3 {
+  margin: 0.45rem 0 0.1rem;
+}
+
+.compact-action-label {
+  min-width: 10rem;
+}
+
+.readonly-summary-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
 .events-actions {
   display: flex;
   flex-wrap: wrap;

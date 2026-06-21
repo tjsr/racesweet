@@ -60,6 +60,7 @@ export interface EventCatalogEntrant {
   name: string;
   notes?: string;
   sessionIds: string[];
+  teamEntrantId?: string;
   teamMembers?: Array<{
     categoryId?: string;
     dateOfBirth?: string;
@@ -164,7 +165,7 @@ export interface EntrantCreatedMutation extends EventCatalogMutationBase {
 }
 
 export interface EntrantUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamMembers'>>;
+  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>>;
   entrantId: string;
   type: 'entrant-updated';
 }
@@ -425,6 +426,7 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
         categories: state.categories.filter((category) => category.id !== mutation.categoryId),
         entrants: state.entrants.map((entrant) => ({
           ...entrant,
+          categoryId: entrant.categoryId === mutation.categoryId.toString() ? undefined : entrant.categoryId,
           categoryIds: removeEntry(entrant.categoryIds, mutation.categoryId.toString()),
         })),
         events: state.events.map((event) => ({
@@ -561,5 +563,7 @@ export const getEntrantsForCategory = (
     return [];
   }
 
-  return getEntrantsForEvent(state, eventId).filter((entrant) => entrant.categoryIds.includes(categoryId));
+  return getEntrantsForEvent(state, eventId).filter((entrant) => {
+    return entrant.categoryId === categoryId || entrant.categoryIds.includes(categoryId);
+  });
 };

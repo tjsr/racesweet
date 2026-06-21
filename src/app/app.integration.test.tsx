@@ -217,6 +217,12 @@ const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: str
   input.dispatchEvent(new Event('input', { bubbles: true }));
 };
 
+const setSelectValue = (select: HTMLSelectElement, value: string): void => {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+  descriptor?.set?.call(select, value);
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+};
+
 const clickButtonByText = async (container: HTMLDivElement, label: string): Promise<void> => {
   const button = Array.from(container.querySelectorAll('button')).find((candidate) => candidate.textContent === label) as HTMLButtonElement | undefined;
   expect(button).toBeTruthy();
@@ -345,7 +351,13 @@ const createApicalImportExpectations = async (): Promise<{
   const expectedCategoryCount = new Set((convertedFixture.categories || []).map((category) => {
     return `${(category.code || '').trim().toLowerCase()}|${(category.name || '').trim().toLowerCase()}`;
   })).size;
-  const expectedEntrantCount = new Set((convertedFixture.participants || []).map((participant) => participant.entrantId.toString())).size;
+  const participantGroups = new Map<string, number>();
+  (convertedFixture.participants || []).forEach((participant) => {
+    const entrantId = participant.entrantId.toString() || participant.id.toString();
+    participantGroups.set(entrantId, (participantGroups.get(entrantId) || 0) + 1);
+  });
+  const expectedEntrantCount = (convertedFixture.participants || []).length +
+    Array.from(participantGroups.values()).filter((count) => count > 1).length;
   const expectedCrossingCount = apicalData.reduce((count, category) => {
     return count + category.ParticipantViewModels.reduce((lapCount, entrant) => lapCount + entrant.LapByCategoryViewModels.length, 0);
   }, 0);
@@ -520,12 +532,14 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Results');
     expect(container.querySelector('h1')?.textContent).toBe('Results');
     expect(container.textContent).toContain('Session race standings and lap-chart view for the selected category scope.');
+    expect(container.querySelector('select[aria-label="Race View Event Session"]')).toBeTruthy();
     expect(container.querySelector('select[aria-label="Race View Category"]')).toBeTruthy();
     expect(container.querySelector('select[aria-label="Results View Type"]')).toBeTruthy();
 
     await clickSectionButton(container, 'Reports');
     expect(container.querySelector('h1')?.textContent).toBe('Reports');
     expect(container.textContent).toContain('Category-scoped reports for fastest laps, participant lap times, and lap chart.');
+    expect(container.querySelector('select[aria-label="Race View Event Session"]')).toBeTruthy();
     expect(container.querySelector('select[aria-label="Reports View Type"]')).toBeTruthy();
     expect(container.querySelector('select[aria-label="Race View Category"]')).toBeTruthy();
     expect(container.textContent).toContain('Handicap Data');
@@ -836,7 +850,7 @@ describe('RaceSweetMainApp integration', () => {
 
     const firstNameInput = container.querySelector('input[aria-label="Entrant First Name"]') as HTMLInputElement;
     const surnameInput = container.querySelector('input[aria-label="Entrant Surname"]') as HTMLInputElement;
-    const genderInput = container.querySelector('input[aria-label="Entrant Gender"]') as HTMLInputElement;
+    const genderInput = container.querySelector('select[aria-label="Entrant Gender"]') as HTMLSelectElement;
     const dobInput = container.querySelector('input[aria-label="Entrant Date Of Birth"]') as HTMLInputElement;
     expect(firstNameInput).toBeTruthy();
     expect(surnameInput).toBeTruthy();
@@ -846,14 +860,14 @@ describe('RaceSweetMainApp integration', () => {
     await act(async () => {
       setInputValue(firstNameInput, 'Integrated');
       setInputValue(surnameInput, 'Rider');
-      setInputValue(genderInput, 'female');
+      setSelectValue(genderInput, 'female');
       setInputValue(dobInput, '2001-01-15');
     });
 
     await clickButtonByText(container, 'Save Entrant');
     await waitForInputValue(container, 'input[aria-label="Entrant First Name"]', 'Integrated');
     await waitForInputValue(container, 'input[aria-label="Entrant Surname"]', 'Rider');
-    await waitForInputValue(container, 'input[aria-label="Entrant Gender"]', 'female');
+    await waitForInputValue(container, 'select[aria-label="Entrant Gender"]', 'female');
     await waitForInputValue(container, 'input[aria-label="Entrant Date Of Birth"]', '2001-01-15');
 
     await clickSectionButton(container, 'System');
@@ -862,7 +876,7 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Entrants');
     await waitForInputValue(container, 'input[aria-label="Entrant First Name"]', 'Integrated');
     await waitForInputValue(container, 'input[aria-label="Entrant Surname"]', 'Rider');
-    await waitForInputValue(container, 'input[aria-label="Entrant Gender"]', 'female');
+    await waitForInputValue(container, 'select[aria-label="Entrant Gender"]', 'female');
     await waitForInputValue(container, 'input[aria-label="Entrant Date Of Birth"]', '2001-01-15');
   });
 

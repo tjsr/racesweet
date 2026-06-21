@@ -5,6 +5,7 @@ import {
   type EventCatalogLedger,
   type EventCatalogSession,
   type EventCatalogState,
+  type EntrantType,
   applyEventCatalogLedger,
   createSeedEventCatalogLedger,
   getEntrantsForEvent,
@@ -48,6 +49,7 @@ const entrantNameFromMembers = (members: EventParticipant[]): string => {
 };
 
 const unique = (values: string[]): string[] => Array.from(new Set(values.filter((value) => value.trim().length > 0)));
+const hasOwn = <T extends object>(value: T, key: PropertyKey): boolean => Object.prototype.hasOwnProperty.call(value, key);
 const nonEmpty = (value?: string): string | undefined => {
   if (!value) {
     return undefined;
@@ -143,7 +145,7 @@ const deriveEntrantsFromParticipants = (
     groups.set(entrantId, existing);
   });
 
-  return Array.from(groups.entries()).map(([entrantId, members]) => {
+  return Array.from(groups.entries()).flatMap(([entrantId, members]) => {
     const enrichedMembers = members.map((member) => {
       const profile = findProfileForParticipant(member, masterProfiles);
       const fallbackCategoryId = nonEmpty(profile?.categoryId);
@@ -160,38 +162,66 @@ const deriveEntrantsFromParticipants = (
 
     const categoryIds = unique(enrichedMembers.map((member) => member.categoryId || ''));
     const memberParticipantIds = unique(enrichedMembers.map((member) => member.participantId));
-    const primaryMember = members[0];
-    const primaryProfile = primaryMember ? findProfileForParticipant(primaryMember, masterProfiles) : undefined;
     const entrantType = members.length > 1 ? 'team' : 'rider';
-    const riderFirstName = entrantType === 'rider'
-      ? (nonEmpty(primaryMember?.firstname) || nonEmpty(primaryProfile?.firstName))
-      : undefined;
-    const riderLastName = entrantType === 'rider'
-      ? (nonEmpty(primaryMember?.surname) || nonEmpty(primaryProfile?.lastName))
-      : undefined;
-    const riderCategoryId = entrantType === 'rider'
-      ? (nonEmpty(primaryMember?.categoryId?.toString()) || nonEmpty(primaryProfile?.categoryId))
-      : undefined;
-    const riderName = [riderFirstName, riderLastName].filter((part) => !!part).join(' ').trim();
+    const riderEntries = members.map((member) => {
+      const profile = findProfileForParticipant(member, masterProfiles);
+      const riderFirstName = nonEmpty(member.firstname) || nonEmpty(profile?.firstName);
+      const riderLastName = nonEmpty(member.surname) || nonEmpty(profile?.lastName);
+      const riderCategoryId = nonEmpty(member.categoryId?.toString()) || nonEmpty(profile?.categoryId);
+      const riderName = [riderFirstName, riderLastName].filter((part) => !!part).join(' ').trim();
+      const participantId = member.id.toString();
 
-    return {
-      categoryId: riderCategoryId,
-      categoryIds,
-      dateOfBirth: entrantType === 'rider' ? nonEmpty(primaryProfile?.dateOfBirth) : undefined,
-      entrantType,
-      eventId,
-      firstName: riderFirstName,
-      gender: entrantType === 'rider' ? nonEmpty(primaryProfile?.gender) : undefined,
-      id: entrantId,
-      lastName: riderLastName,
-      memberParticipantIds,
-      name: riderName || entrantNameFromMembers(members),
-      sessionIds: [...defaultSessionIds],
-      teamMembers: entrantType === 'team'
-        ? enrichedMembers
-        : undefined,
-    };
+      return {
+        categoryId: riderCategoryId,
+        categoryIds: riderCategoryId ? [riderCategoryId] : [],
+        dateOfBirth: nonEmpty(profile?.dateOfBirth),
+        entrantType: 'rider' as const,
+        eventId,
+        firstName: riderFirstName,
+        gender: nonEmpty(profile?.gender),
+        id: entrantType === 'team' ? participantId : entrantId,
+        lastName: riderLastName,
+        memberParticipantIds: [participantId],
+        name: riderName || `${member.firstname || ''} ${member.surname || ''}`.trim() || participantId,
+        sessionIds: [...defaultSessionIds],
+        teamEntrantId: entrantType === 'team' ? entrantId : undefined,
+      };
+    });
+
+    if (entrantType === 'rider') {
+      return riderEntries;
+    }
+
+    return [
+      {
+        categoryId: categoryIds[0],
+        categoryIds,
+        entrantType,
+        eventId,
+        id: entrantId,
+        memberParticipantIds,
+        name: entrantNameFromMembers(members),
+        sessionIds: [...defaultSessionIds],
+        teamMembers: enrichedMembers,
+      },
+      ...riderEntries,
+    ];
   });
+};
+
+const normalizeEntrantChanges = (
+  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>>
+): Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>> => {
+  if (!hasOwn(changes, 'categoryId')) {
+    return changes;
+  }
+
+  const categoryId = nonEmpty(changes.categoryId);
+  return {
+    ...changes,
+    categoryId,
+    categoryIds: categoryId ? [categoryId] : [],
+  };
 };
 
 export class EventCatalogService {
@@ -321,6 +351,7 @@ export class EventCatalogService {
             memberParticipantIds: entrant.memberParticipantIds,
             name: entrant.name,
             sessionIds: entrant.sessionIds,
+            teamEntrantId: entrant.teamEntrantId,
             teamMembers: entrant.teamMembers,
           },
           entrantId: entrant.id,
@@ -587,18 +618,21 @@ export class EventCatalogService {
     ]);
   }
 
-  public async createEntrant(eventId: string): Promise<EventCatalogState> {
+  public async createEntrant(eventId: string, entrantType: EntrantType = 'rider'): Promise<EventCatalogState> {
     const entrantId = createEntityId('entrant');
     const event = this.state.events.find((item) => item.id === eventId);
+    const categoryId = event?.categoryIds[0];
     const entrant: EventCatalogEntrant = {
-      categoryIds: [...(event?.categoryIds || [])],
-      entrantType: 'rider',
+      categoryId,
+      categoryIds: categoryId ? [categoryId] : [],
+      entrantType,
       eventId,
       id: entrantId,
       memberParticipantIds: [],
-      name: 'New Entrant',
+      name: entrantType === 'team' ? 'New Team' : 'New Entrant',
       notes: '',
       sessionIds: [...(event?.sessionIds || [])],
+      teamMembers: entrantType === 'team' ? [] : undefined,
     };
 
     return this.appendMutations([
@@ -620,10 +654,10 @@ export class EventCatalogService {
     ]);
   }
 
-  public async updateEntrant(entrantId: string, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamMembers'>>): Promise<EventCatalogState> {
+  public async updateEntrant(entrantId: string, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>>): Promise<EventCatalogState> {
     return this.appendMutations([
       {
-        changes,
+        changes: normalizeEntrantChanges(changes),
         entrantId,
         id: createMutationId(),
         timestamp: createTimestamp(),

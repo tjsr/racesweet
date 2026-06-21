@@ -14,6 +14,14 @@ interface CategoryOption {
   name: string;
 }
 
+export interface EventSessionOption {
+  eventId: string;
+  eventName: string;
+  sessionId?: string;
+  sessionName?: string;
+  value: string;
+}
+
 interface EntrantSummaryRow {
   categoryKeys: string[];
   categoryName: string;
@@ -51,7 +59,10 @@ interface LapChartColumn {
 interface BaseRaceAnalyticsProps {
   categories: CategoryOption[];
   catalogEntrants: EventCatalogEntrant[];
+  eventSessionOptions?: EventSessionOption[];
+  onSelectEventSession?: (value: string) => void;
   raceState: Session & RaceStateLookup;
+  selectedEventSessionValue?: string;
 }
 
 interface ResultsPageProps extends BaseRaceAnalyticsProps {
@@ -277,6 +288,33 @@ const CategorySelector = (props: {
   );
 };
 
+const EventSessionSelector = (props: {
+  onSelectEventSession?: (value: string) => void;
+  options?: EventSessionOption[];
+  selectedValue?: string;
+}): React.ReactElement | null => {
+  if (!props.options || props.options.length === 0 || !props.onSelectEventSession) {
+    return null;
+  }
+
+  return (
+    <label className="page-filter-label">
+      Event/Session
+      <select
+        aria-label="Race View Event Session"
+        value={props.selectedValue || props.options[0]?.value || ''}
+        onChange={(event) => props.onSelectEventSession?.(event.target.value)}
+      >
+        {props.options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.sessionId ? `  ${option.sessionName || option.sessionId}` : option.eventName}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+};
+
 export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
   const categories = React.useMemo(() => dedupeCategoryOptions(props.categories), [props.categories]);
   const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(props.selectedCategoryId || 'overall');
@@ -319,6 +357,11 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
       <p>Session race standings and lap-chart view for the selected category scope.</p>
       <section className="events-panel">
         <div className="events-actions">
+          <EventSessionSelector
+            onSelectEventSession={props.onSelectEventSession}
+            options={props.eventSessionOptions}
+            selectedValue={props.selectedEventSessionValue}
+          />
           <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
           <label className="page-filter-label">
             View
@@ -483,6 +526,11 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
       <p>Category-scoped reports for fastest laps, participant lap times, and lap chart.</p>
       <section className="events-panel">
         <div className="events-actions">
+          <EventSessionSelector
+            onSelectEventSession={props.onSelectEventSession}
+            options={props.eventSessionOptions}
+            selectedValue={props.selectedEventSessionValue}
+          />
           <label className="page-filter-label">
             Report
             <select

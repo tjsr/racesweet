@@ -8,7 +8,7 @@ const LIVE_TEST_ENABLED = process.env.APICAL_LIVE_TESTS === '1';
 const LIVE_APICAL_EVENT_ID = Number(process.env.APICAL_LIVE_EVENT_ID || '69');
 const LIVE_TEST_TIMEOUT_MS = Number(process.env.APICAL_LIVE_TIMEOUT_MS || '60000');
 
-const describeLive = LIVE_TEST_ENABLED || true ? describe : describe.skip;
+const describeLive = LIVE_TEST_ENABLED ? describe : describe.skip;
 
 describeLive('live Apical Excel integration', () => {
   afterEach(async () => {

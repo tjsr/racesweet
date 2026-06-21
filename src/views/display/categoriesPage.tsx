@@ -1,31 +1,23 @@
 import {
   type CategoryDistanceRule,
   type EventCatalogCategory,
-  type EventCatalogState
+  type EventCatalogEntrant,
+  type EventCatalogState,
 } from '../../app/eventCatalog.js';
 import { WarningModal, type WarningModalAction } from './warningModal.js';
-
 import {
-  formatCategorySessionAssignments,
   formatTeamCompositionRules,
-  parseCategorySessionAssignments,
   parseTeamCompositionRules,
 } from '../../app/categoryRules.js';
+import { getCategoriesForEvent, getSessionsForEvent } from '../../app/eventCatalog.js';
 import React from 'react';
-import { getCategoriesForEvent } from '../../app/eventCatalog.js';
-
-interface CategoryEntrantSummary {
-  entrantId: string;
-  id: string;
-  name: string;
-}
 
 type CategoryChanges = Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distanceRule' | 'name' | 'sessionAssignments' | 'teamRules'>>;
 type CategoryExitGuard = (action: () => void | Promise<void>) => void;
 
 interface CategoriesPageProps {
   catalog: EventCatalogState;
-  entrants: CategoryEntrantSummary[];
+  entrants: EventCatalogEntrant[];
   onCreateCategory: (eventId: string) => void | Promise<void>;
   onDeleteCategory: (eventId: string, categoryId: string) => void | Promise<void>;
   onSelectCategory: (categoryId: string) => void;
@@ -45,7 +37,7 @@ interface CategoryDraft {
   maxTeamSize: string;
   minRiderAge: string;
   name: string;
-  sessionAssignments: string;
+  sessionIds: string[];
   teamCompositionRules: string;
 }
 
@@ -93,7 +85,7 @@ const getCategoryDraft = (category: EventCatalogCategory | undefined): CategoryD
   maxTeamSize: category?.teamRules?.maxTeamSize?.toString() || '',
   minRiderAge: category?.teamRules?.minRiderAge?.toString() || '',
   name: category?.name || '',
-  sessionAssignments: formatCategorySessionAssignments(category?.sessionAssignments),
+  sessionIds: category?.sessionAssignments?.map((assignment) => assignment.sessionId).filter((sessionId) => sessionId.length > 0) || [],
   teamCompositionRules: formatTeamCompositionRules(category?.teamRules?.teamCompositionRules),
 });
 
@@ -102,6 +94,7 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
     props.catalog.events.find((event) => event.id === props.catalog.activeEventId) ??
     props.catalog.events[0];
   const eventCategories = dedupeCategoriesForDisplay(getCategoriesForEvent(props.catalog, selectedEvent?.id));
+  const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
   const selectedCategory = eventCategories.find((category) => category.id === props.selectedCategoryId) ?? eventCategories[0];
 
   const [formError, setFormError] = React.useState<string | undefined>(undefined);
@@ -143,7 +136,14 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
       };
     }
     const teamCompositionRules = parseTeamCompositionRules(categoryDraft.teamCompositionRules);
-    const sessionAssignments = parseCategorySessionAssignments(categoryDraft.sessionAssignments);
+    const existingAssignments = selectedCategory?.sessionAssignments || [];
+    const sessionAssignments = categoryDraft.sessionIds.map((sessionId) => {
+      const existing = existingAssignments.find((assignment) => assignment.sessionId === sessionId);
+      return {
+        sessionId,
+        startTime: existing?.startTime || eventSessions.find((session) => session.id === sessionId)?.scheduledStart || '',
+      };
+    });
 
     return {
       code: categoryDraft.code || undefined,
@@ -237,6 +237,9 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
       onClick: () => setPendingNavigation(undefined),
     },
   ] : [];
+  const teamEntrants = props.entrants.filter((entrant) => entrant.entrantType === 'team');
+  const riderEntrants = props.entrants.filter((entrant) => entrant.entrantType === 'rider');
+  const individualEntrants = riderEntrants.filter((entrant) => !entrant.teamEntrantId);
 
   return (
     <section className="events-screen">
@@ -383,12 +386,19 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
               </label>
               <label>
                 Session Assignments
-                <textarea
+                <select
                   aria-label="Category Session Assignments"
-                  value={categoryDraft.sessionAssignments}
-                  onChange={(event) => setCategoryDraft((current) => ({ ...current, sessionAssignments: event.target.value }))}
-                  placeholder="session-1@2026-06-12T09:00:00.000Z; session-2@2026-06-13T13:00:00.000Z"
-                />
+                  multiple
+                  value={categoryDraft.sessionIds}
+                  onChange={(event) => {
+                    const sessionIds = Array.from(event.currentTarget.selectedOptions).map((option) => option.value);
+                    setCategoryDraft((current) => ({ ...current, sessionIds }));
+                  }}
+                >
+                  {eventSessions.map((session) => (
+                    <option key={session.id} value={session.id}>{session.name}</option>
+                  ))}
+                </select>
               </label>
               <div className="events-actions">
                 <div className="category-save-status">
@@ -430,11 +440,40 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
         <section className="events-panel">
           <h2>Entrants In Category</h2>
           {props.entrants.length > 0 ? (
-            <ul className="entrant-summary-list">
-              {props.entrants.map((entrant) => (
-                <li key={entrant.id}>{entrant.name} ({entrant.entrantId})</li>
-              ))}
-            </ul>
+            <div className="entrant-summary-list">
+              {teamEntrants.length > 0 ? (
+                <section>
+                  <h3>Teams</h3>
+                  <ul>
+                    {teamEntrants.map((team) => {
+                      const teamMembers = riderEntrants.filter((entrant) => entrant.teamEntrantId === team.id);
+                      return (
+                        <li key={team.id}>
+                          <strong>{team.name}</strong>
+                          {teamMembers.length > 0 ? (
+                            <ul>
+                              {teamMembers.map((member) => (
+                                <li key={member.id}>{member.name}</li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ) : null}
+              {individualEntrants.length > 0 ? (
+                <section>
+                  <h3>Individual Entrants</h3>
+                  <ul>
+                    {individualEntrants.map((entrant) => (
+                      <li key={entrant.id}>{entrant.name}</li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+            </div>
           ) : (
             <p>No entrants are currently assigned to this category.</p>
           )}

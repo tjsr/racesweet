@@ -14,9 +14,34 @@ const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: str
   input.dispatchEvent(new Event('input', { bubbles: true }));
 };
 
+const setSelectValue = (select: HTMLSelectElement, value: string): void => {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+  descriptor?.set?.call(select, value);
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+};
+
 const catalog: EventCatalogState = {
   activeEventId: 'event-1',
-  categories: [],
+  categories: [
+    {
+      eventId: 'event-1',
+      id: 'cat-1',
+      name: 'Premier',
+      teamRules: { teamCompositionRules: [] },
+    },
+    {
+      eventId: 'event-2',
+      id: 'cat-2',
+      name: 'Teams',
+      teamRules: { maxTeamSize: 2, teamCompositionRules: [] },
+    },
+    {
+      eventId: 'event-2',
+      id: 'cat-pro',
+      name: 'Pro',
+      teamRules: { teamCompositionRules: [] },
+    },
+  ],
   entrants: [
     {
       categoryId: 'cat-1',
@@ -76,7 +101,24 @@ const catalog: EventCatalogState = {
       sessionIds: ['session-2'],
     },
   ],
-  sessions: [],
+  sessions: [
+    {
+      eventId: 'event-1',
+      id: 'session-1',
+      kind: 'race',
+      name: 'Premier Race',
+      scheduledStart: '2026-06-12T09:00:00.000Z',
+      status: 'scheduled',
+    },
+    {
+      eventId: 'event-2',
+      id: 'session-2',
+      kind: 'race',
+      name: 'Teams Race',
+      scheduledStart: '2026-07-10T09:00:00.000Z',
+      status: 'scheduled',
+    },
+  ],
 };
 
 describe('EntrantsPage integration', () => {
@@ -150,7 +192,7 @@ describe('EntrantsPage integration', () => {
       createButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(onCreateEntrant).toHaveBeenCalledWith('event-2');
+    expect(onCreateEntrant).toHaveBeenCalledWith('event-2', 'rider');
 
     const entrantNameInput = container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement;
     await act(async () => {
@@ -200,25 +242,25 @@ describe('EntrantsPage integration', () => {
 
     const firstNameInput = container.querySelector('input[aria-label="Entrant First Name"]') as HTMLInputElement;
     const surnameInput = container.querySelector('input[aria-label="Entrant Surname"]') as HTMLInputElement;
-    const genderInput = container.querySelector('input[aria-label="Entrant Gender"]') as HTMLInputElement;
+    const genderInput = container.querySelector('select[aria-label="Entrant Gender"]') as HTMLSelectElement;
     const dobInput = container.querySelector('input[aria-label="Entrant Date Of Birth"]') as HTMLInputElement;
-    const categoryInput = container.querySelector('input[aria-label="Entrant Primary Category"]') as HTMLInputElement;
+    const categoryInput = container.querySelector('select[aria-label="Entrant Category"]') as HTMLSelectElement;
     const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Entrant');
 
     await act(async () => {
       setInputValue(firstNameInput, 'Jordan');
       setInputValue(surnameInput, 'Taylor');
-      setInputValue(genderInput, 'non-binary');
+      setSelectValue(genderInput, 'female');
       setInputValue(dobInput, '1998-12-24');
-      setInputValue(categoryInput, 'cat-pro');
+      setSelectValue(categoryInput, 'cat-1');
       saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(onUpdateEntrant).toHaveBeenCalledWith('ent-1', expect.objectContaining({
-      categoryId: 'cat-pro',
+      categoryId: 'cat-1',
       dateOfBirth: '1998-12-24',
       firstName: 'Jordan',
-      gender: 'non-binary',
+      gender: 'female',
       lastName: 'Taylor',
     }));
 
@@ -237,20 +279,18 @@ describe('EntrantsPage integration', () => {
       );
     });
 
-    const teamMembersInput = container.querySelector('textarea[aria-label="Entrant Team Members"]') as HTMLTextAreaElement;
+    const teamCategoryInput = container.querySelector('select[aria-label="Entrant Category"]') as HTMLSelectElement;
     const teamSaveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Entrant');
+    expect(container.textContent).toContain('Team Members');
+    expect(container.querySelector('textarea[aria-label="Entrant Team Members"]')).toBeNull();
 
     await act(async () => {
-      setInputValue(teamMembersInput, 'p-2:Blue:One:cat-2; p-3:Blue:Two:cat-2; p-4:Blue:Three:cat-2');
+      setSelectValue(teamCategoryInput, 'cat-pro');
       teamSaveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(onUpdateEntrant).toHaveBeenLastCalledWith('ent-2', expect.objectContaining({
-      teamMembers: [
-        { categoryId: 'cat-2', firstName: 'Blue', lastName: 'One', participantId: 'p-2' },
-        { categoryId: 'cat-2', firstName: 'Blue', lastName: 'Two', participantId: 'p-3' },
-        { categoryId: 'cat-2', firstName: 'Blue', lastName: 'Three', participantId: 'p-4' },
-      ],
+      categoryId: 'cat-pro',
     }));
   });
 });

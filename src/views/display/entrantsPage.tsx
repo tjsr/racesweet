@@ -1,65 +1,158 @@
 import {
+  type EntrantType,
   type EventCatalogEntrant,
   type EventCatalogState,
+  getCategoriesForEvent,
   getEntrantsForEvent,
+  getSessionsForEvent,
 } from '../../app/eventCatalog.js';
 import React from 'react';
 
 interface EntrantsPageProps {
   catalog: EventCatalogState;
-  onCreateEntrant: (eventId: string) => void | Promise<void>;
+  onCreateEntrant: (eventId: string, entrantType?: EntrantType) => void | Promise<void>;
   onDeleteEntrant: (eventId: string, entrantId: string) => void | Promise<void>;
   onSelectEntrant: (entrantId: string) => void;
   onSelectEvent: (eventId: string) => void;
-  onUpdateEntrant: (entrantId: string, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamMembers'>>) => void | Promise<void>;
+  onUpdateEntrant: (entrantId: string, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>>) => void | Promise<void>;
   selectedEntrantId?: string;
   selectedEventId?: string;
 }
 
-const splitCsv = (value: string): string[] => value.split(',').map((item) => item.trim()).filter((item) => item.length > 0);
+interface EntrantDraft {
+  categoryId: string;
+  dateOfBirth: string;
+  firstName: string;
+  gender: string;
+  lastName: string;
+  name: string;
+  notes: string;
+  teamEntrantId: string;
+}
+
+const UNSPECIFIED_GENDER = 'unspecified';
+
+const getCategoryName = (catalog: EventCatalogState, categoryId?: string): string => {
+  if (!categoryId) {
+    return 'No category';
+  }
+
+  return catalog.categories.find((category) => category.id.toString() === categoryId)?.name || categoryId;
+};
+
+const getEntrantDraft = (entrant: EventCatalogEntrant | undefined): EntrantDraft => ({
+  categoryId: entrant?.categoryId || entrant?.categoryIds[0] || '',
+  dateOfBirth: entrant?.dateOfBirth || '',
+  firstName: entrant?.firstName || '',
+  gender: entrant?.gender || UNSPECIFIED_GENDER,
+  lastName: entrant?.lastName || '',
+  name: entrant?.name || '',
+  notes: entrant?.notes || '',
+  teamEntrantId: entrant?.teamEntrantId || '',
+});
+
+const eventSupportsTeams = (catalog: EventCatalogState, eventId: string | undefined): boolean => {
+  if (!eventId) {
+    return false;
+  }
+
+  return getCategoriesForEvent(catalog, eventId).some((category) => (category.teamRules?.maxTeamSize || 0) > 1) ||
+    getEntrantsForEvent(catalog, eventId).some((entrant) => entrant.entrantType === 'team');
+};
+
+const ReadOnlyList = (props: { emptyText: string; items: string[] }): React.ReactElement => {
+  if (props.items.length === 0) {
+    return <p className="readonly-summary">{props.emptyText}</p>;
+  }
+
+  return (
+    <ul className="readonly-summary-list">
+      {props.items.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
+  );
+};
 
 export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId) ??
     props.catalog.events.find((event) => event.id === props.catalog.activeEventId) ??
     props.catalog.events[0];
   const eventEntrants = getEntrantsForEvent(props.catalog, selectedEvent?.id);
+  const eventCategories = getCategoriesForEvent(props.catalog, selectedEvent?.id);
+  const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
+  const teamEntrants = eventEntrants.filter((entrant) => entrant.entrantType === 'team');
+  const riderEntrants = eventEntrants.filter((entrant) => entrant.entrantType === 'rider');
+  const teamsEnabled = eventSupportsTeams(props.catalog, selectedEvent?.id);
   const selectedEntrant = eventEntrants.find((entrant) => entrant.id === props.selectedEntrantId) ?? eventEntrants[0];
-
-  const [entrantDraft, setEntrantDraft] = React.useState({
-    categoryId: selectedEntrant?.categoryId || '',
-    categoryIds: selectedEntrant?.categoryIds.join(', ') || '',
-    dateOfBirth: selectedEntrant?.dateOfBirth || '',
-    entrantType: selectedEntrant?.entrantType || 'rider',
-    firstName: selectedEntrant?.firstName || '',
-    gender: selectedEntrant?.gender || '',
-    lastName: selectedEntrant?.lastName || '',
-    memberParticipantIds: selectedEntrant?.memberParticipantIds.join(', ') || '',
-    name: selectedEntrant?.name || '',
-    notes: selectedEntrant?.notes || '',
-    sessionIds: selectedEntrant?.sessionIds.join(', ') || '',
-    teamMembers: selectedEntrant?.teamMembers?.map((member) => {
-      return `${member.participantId}:${member.firstName}:${member.lastName}:${member.categoryId || ''}`;
-    }).join('; ') || '',
-  });
+  const [createKind, setCreateKind] = React.useState<EntrantType>('rider');
+  const [entrantDraft, setEntrantDraft] = React.useState<EntrantDraft>(getEntrantDraft(selectedEntrant));
 
   React.useEffect(() => {
-    setEntrantDraft({
-      categoryId: selectedEntrant?.categoryId || '',
-      categoryIds: selectedEntrant?.categoryIds.join(', ') || '',
-      dateOfBirth: selectedEntrant?.dateOfBirth || '',
-      entrantType: selectedEntrant?.entrantType || 'rider',
-      firstName: selectedEntrant?.firstName || '',
-      gender: selectedEntrant?.gender || '',
-      lastName: selectedEntrant?.lastName || '',
-      memberParticipantIds: selectedEntrant?.memberParticipantIds.join(', ') || '',
-      name: selectedEntrant?.name || '',
-      notes: selectedEntrant?.notes || '',
-      sessionIds: selectedEntrant?.sessionIds.join(', ') || '',
-      teamMembers: selectedEntrant?.teamMembers?.map((member) => {
-        return `${member.participantId}:${member.firstName}:${member.lastName}:${member.categoryId || ''}`;
-      }).join('; ') || '',
+    setEntrantDraft(getEntrantDraft(selectedEntrant));
+  }, [selectedEntrant]);
+
+  const sessionNames = selectedEntrant
+    ? eventSessions
+      .filter((session) => selectedEntrant.sessionIds.includes(session.id))
+      .map((session) => session.name)
+    : [];
+  const selectedTeamName = selectedEntrant?.teamEntrantId
+    ? teamEntrants.find((team) => team.id === selectedEntrant.teamEntrantId)?.name
+    : undefined;
+
+  const saveEntrant = (): void => {
+    if (!selectedEntrant) {
+      return;
+    }
+
+    if (selectedEntrant.entrantType === 'team') {
+      void props.onUpdateEntrant(selectedEntrant.id, {
+        categoryId: entrantDraft.categoryId || undefined,
+        name: entrantDraft.name,
+        notes: entrantDraft.notes || undefined,
+      });
+      return;
+    }
+
+    void props.onUpdateEntrant(selectedEntrant.id, {
+      categoryId: entrantDraft.categoryId || undefined,
+      dateOfBirth: entrantDraft.dateOfBirth || undefined,
+      firstName: entrantDraft.firstName || undefined,
+      gender: entrantDraft.gender === UNSPECIFIED_GENDER ? undefined : entrantDraft.gender,
+      lastName: entrantDraft.lastName || undefined,
+      name: entrantDraft.name,
+      notes: entrantDraft.notes || undefined,
+      teamEntrantId: entrantDraft.teamEntrantId || undefined,
     });
-  }, [selectedEntrant?.id, selectedEntrant?.name, selectedEntrant?.entrantType, selectedEntrant?.notes, selectedEntrant?.categoryIds, selectedEntrant?.categoryId, selectedEntrant?.dateOfBirth, selectedEntrant?.firstName, selectedEntrant?.gender, selectedEntrant?.lastName, selectedEntrant?.memberParticipantIds, selectedEntrant?.sessionIds, selectedEntrant?.teamMembers]);
+  };
+
+  const renderEntrantButton = (entrant: EventCatalogEntrant): React.ReactElement => {
+    const isSelected = entrant.id === selectedEntrant?.id;
+    const categoryId = entrant.categoryId || entrant.categoryIds[0];
+    const teamName = entrant.teamEntrantId
+      ? teamEntrants.find((team) => team.id === entrant.teamEntrantId)?.name
+      : undefined;
+
+    return (
+      <button
+        key={entrant.id}
+        type="button"
+        className={`events-list-item${isSelected ? ' selected' : ''}`}
+        onClick={() => props.onSelectEntrant(entrant.id)}
+        aria-selected={isSelected}
+      >
+        {entrant.entrantType === 'rider' ? (
+          <span className="entrant-category-chip">{getCategoryName(props.catalog, categoryId)}</span>
+        ) : null}
+        <strong>{entrant.name}</strong>
+        <span className="entrant-list-type">{entrant.entrantType}</span>
+        {teamName ? (
+          <span className="entrantTeam">Team: {teamName}</span>
+        ) : null}
+      </button>
+    );
+  };
 
   return (
     <section className="events-screen">
@@ -80,34 +173,44 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
         <section className="events-panel">
           <h2>Entrant List</h2>
           <div className="events-actions">
-            <button type="button" onClick={() => selectedEvent && props.onCreateEntrant(selectedEvent.id)} disabled={!selectedEvent}>
-              Create Entrant
+            {teamsEnabled ? (
+              <label className="compact-action-label">
+                Create
+                <select
+                  aria-label="Create Entrant Kind"
+                  value={createKind}
+                  onChange={(event) => setCreateKind(event.target.value as EntrantType)}
+                >
+                  <option value="rider">Create entrant</option>
+                  <option value="team">Create team</option>
+                </select>
+              </label>
+            ) : null}
+            <button type="button" onClick={() => selectedEvent && props.onCreateEntrant(selectedEvent.id, teamsEnabled ? createKind : 'rider')} disabled={!selectedEvent}>
+              {teamsEnabled && createKind === 'team' ? 'Create Team' : 'Create Entrant'}
             </button>
           </div>
           <div className="events-list" role="listbox" aria-label="Entrants for selected event">
-            {eventEntrants.map((entrant) => {
-              const isSelected = entrant.id === selectedEntrant?.id;
-              return (
-                <button
-                  key={entrant.id}
-                  type="button"
-                  className={`events-list-item${isSelected ? ' selected' : ''}`}
-                  onClick={() => props.onSelectEntrant(entrant.id)}
-                  aria-selected={isSelected}
-                >
-                  <strong>{entrant.name}</strong>
-                  <span className="entrant-list-type">{entrant.entrantType}</span>
-                </button>
-              );
-            })}
+            {teamsEnabled && teamEntrants.length > 0 ? (
+              <>
+                <h3 className="events-list-subheading">Teams</h3>
+                {teamEntrants.map(renderEntrantButton)}
+              </>
+            ) : null}
+            {riderEntrants.length > 0 ? (
+              <>
+                {teamsEnabled ? <h3 className="events-list-subheading">Riders</h3> : null}
+                {riderEntrants.map(renderEntrantButton)}
+              </>
+            ) : null}
           </div>
         </section>
         <section className="events-panel">
-          <h2>Entrant Details</h2>
+          <h2>{selectedEntrant?.entrantType === 'team' ? 'Team Details' : 'Entrant Details'}</h2>
           {selectedEntrant ? (
             <>
               <label>
-                Entrant Name
+                {selectedEntrant.entrantType === 'team' ? 'Team Name' : 'Entrant Name'}
                 <input
                   aria-label="Entrant Name"
                   type="text"
@@ -115,18 +218,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
                   onChange={(event) => setEntrantDraft((current) => ({ ...current, name: event.target.value }))}
                 />
               </label>
-              <label>
-                Entrant Type
-                <select
-                  aria-label="Entrant Type"
-                  value={entrantDraft.entrantType}
-                  onChange={(event) => setEntrantDraft((current) => ({ ...current, entrantType: event.target.value as EventCatalogEntrant['entrantType'] }))}
-                >
-                  <option value="rider">Rider</option>
-                  <option value="team">Team</option>
-                </select>
-              </label>
-              {entrantDraft.entrantType === 'rider' ? (
+              {selectedEntrant.entrantType === 'rider' ? (
                 <>
                   <label>
                     First Name
@@ -148,12 +240,15 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
                   </label>
                   <label>
                     Gender
-                    <input
+                    <select
                       aria-label="Entrant Gender"
-                      type="text"
                       value={entrantDraft.gender}
                       onChange={(event) => setEntrantDraft((current) => ({ ...current, gender: event.target.value }))}
-                    />
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value={UNSPECIFIED_GENDER}>Unspecified</option>
+                    </select>
                   </label>
                   <label>
                     Date of Birth
@@ -165,52 +260,50 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
                     />
                   </label>
                   <label>
-                    Primary Category ID
-                    <input
-                      aria-label="Entrant Primary Category"
-                      type="text"
-                      value={entrantDraft.categoryId}
-                      onChange={(event) => setEntrantDraft((current) => ({ ...current, categoryId: event.target.value }))}
-                    />
+                    Team
+                    <select
+                      aria-label="Entrant Team"
+                      value={entrantDraft.teamEntrantId}
+                      onChange={(event) => setEntrantDraft((current) => ({ ...current, teamEntrantId: event.target.value }))}
+                    >
+                      <option value="">Individual entry</option>
+                      {teamEntrants.map((team) => (
+                        <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
                   </label>
                 </>
               ) : (
-                <label>
-                  Team Members (participantId:firstName:lastName:categoryId; ...)
-                  <textarea
-                    aria-label="Entrant Team Members"
-                    value={entrantDraft.teamMembers}
-                    onChange={(event) => setEntrantDraft((current) => ({ ...current, teamMembers: event.target.value }))}
+                <>
+                  <h3>Team Members</h3>
+                  <ReadOnlyList
+                    emptyText="No riders are assigned to this team."
+                    items={riderEntrants
+                      .filter((entrant) => entrant.teamEntrantId === selectedEntrant.id)
+                      .map((entrant) => entrant.name)}
                   />
-                </label>
+                </>
               )}
               <label>
-                Category IDs (comma-separated)
-                <input
-                  aria-label="Entrant Category IDs"
-                  type="text"
-                  value={entrantDraft.categoryIds}
-                  onChange={(event) => setEntrantDraft((current) => ({ ...current, categoryIds: event.target.value }))}
-                />
+                Category
+                <select
+                  aria-label="Entrant Category"
+                  value={entrantDraft.categoryId}
+                  onChange={(event) => setEntrantDraft((current) => ({ ...current, categoryId: event.target.value }))}
+                >
+                  <option value="">No category</option>
+                  {eventCategories.map((category) => (
+                    <option key={category.id.toString()} value={category.id.toString()}>{category.name}</option>
+                  ))}
+                </select>
               </label>
-              <label>
-                Session IDs (comma-separated)
-                <input
-                  aria-label="Entrant Session IDs"
-                  type="text"
-                  value={entrantDraft.sessionIds}
-                  onChange={(event) => setEntrantDraft((current) => ({ ...current, sessionIds: event.target.value }))}
-                />
-              </label>
-              <label>
-                Member Participant IDs (comma-separated)
-                <input
-                  aria-label="Entrant Participant IDs"
-                  type="text"
-                  value={entrantDraft.memberParticipantIds}
-                  onChange={(event) => setEntrantDraft((current) => ({ ...current, memberParticipantIds: event.target.value }))}
-                />
-              </label>
+              <section className="readonly-summary-section">
+                <h3>Sessions</h3>
+                <ReadOnlyList emptyText="No sessions are assigned." items={sessionNames} />
+              </section>
+              {selectedEntrant.entrantType === 'rider' && selectedTeamName ? (
+                <p className="readonly-summary">Team: {selectedTeamName}</p>
+              ) : null}
               <label>
                 Notes
                 <textarea
@@ -220,37 +313,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
                 />
               </label>
               <div className="events-actions">
-                <button
-                  type="button"
-                  onClick={() => props.onUpdateEntrant(selectedEntrant.id, {
-                    categoryId: entrantDraft.categoryId || undefined,
-                    categoryIds: splitCsv(entrantDraft.categoryIds),
-                    dateOfBirth: entrantDraft.dateOfBirth || undefined,
-                    entrantType: entrantDraft.entrantType as EventCatalogEntrant['entrantType'],
-                    firstName: entrantDraft.firstName || undefined,
-                    gender: entrantDraft.gender || undefined,
-                    lastName: entrantDraft.lastName || undefined,
-                    memberParticipantIds: splitCsv(entrantDraft.memberParticipantIds),
-                    name: entrantDraft.name,
-                    notes: entrantDraft.notes || undefined,
-                    sessionIds: splitCsv(entrantDraft.sessionIds),
-                    teamMembers: entrantDraft.entrantType === 'team'
-                      ? entrantDraft.teamMembers
-                        .split(';')
-                        .map((memberChunk) => memberChunk.trim())
-                        .filter((memberChunk) => memberChunk.length > 0)
-                        .map((memberChunk) => {
-                          const [participantId, firstName, lastName, categoryId] = memberChunk.split(':').map((item) => item.trim());
-                          return {
-                            categoryId: categoryId || undefined,
-                            firstName: firstName || '',
-                            lastName: lastName || '',
-                            participantId: participantId || '',
-                          };
-                        })
-                      : undefined,
-                  })}
-                >
+                <button type="button" onClick={saveEntrant}>
                   Save Entrant
                 </button>
                 <button type="button" onClick={() => selectedEvent && props.onDeleteEntrant(selectedEvent.id, selectedEntrant.id)}>

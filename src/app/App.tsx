@@ -1,11 +1,12 @@
 import './index.css';
 
-import { type DataSourceConfig, type SystemConfiguration, createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
-import { EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
+import type { DataSourceConfig, SystemConfiguration } from './systemConfig.ts';
 import { RaceStateLookup, Session } from '../model/racestate.ts';
 import React, { useEffect, useState } from 'react';
 import { ReportsPage, ResultsPage } from '../views/display/raceAnalyticsViews.tsx';
+import { createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
 import { fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.ts';
+import { getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
 
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
 import { CategoriesPage } from '../views/display/categoriesPage.tsx';
@@ -15,8 +16,10 @@ import { ElectronJsonRaceAdminPersistence } from './raceAdminPersistence.ts';
 import { ElectronJsonSystemConfigPersistence } from './systemConfigPersistence.ts';
 import { EntrantsPage } from '../views/display/entrantsPage.tsx';
 import { EventCatalogService } from './eventCatalogService.ts';
+import type { EventCatalogState } from './eventCatalog.ts';
 import { EventCategoryId } from '../model/eventcategory.ts';
 import type { EventParticipantId } from '../model/eventparticipant.ts';
+import type { EventSessionOption } from '../views/display/raceAnalyticsViews.tsx';
 import type { EventTimeRecord } from '../model/timerecord.ts';
 import { EventsScreen } from '../views/display/events.tsx';
 import { RaceAdminService } from './raceAdminService.ts';
@@ -101,6 +104,9 @@ export const RaceSweetMainApp = () => {
   const [selectedSessionId, setSelectedSessionId] = useState<string|undefined>(undefined);
   const [selectedTimingEventId, setSelectedTimingEventId] = useState<string|undefined>(undefined);
   const [selectedTimingSessionId, setSelectedTimingSessionId] = useState<string|undefined>(undefined);
+  const [selectedAnalyticsEventId, setSelectedAnalyticsEventId] = useState<string|undefined>(undefined);
+  const [selectedAnalyticsSessionId, setSelectedAnalyticsSessionId] = useState<string|undefined>(undefined);
+  const [analyticsRaceState, setAnalyticsRaceState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [timingRaceState, setTimingRaceState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [timingSessionSelection, setTimingSessionSelection] = useState<TimingSessionSelection>('active');
   const categoryUnsavedChangesGuard = React.useRef<UnsavedChangesGuard | undefined>(undefined);
@@ -164,6 +170,9 @@ export const RaceSweetMainApp = () => {
           setSelectedSessionId(initialSessionId);
           setSelectedTimingEventId(initialEventId);
           setSelectedTimingSessionId(initialSessionId);
+          setSelectedAnalyticsEventId(initialEventId);
+          setSelectedAnalyticsSessionId(initialSessionId);
+          setAnalyticsRaceState(session);
           setTimingRaceState(session);
           setErrorState(undefined);
         };
@@ -241,6 +250,11 @@ export const RaceSweetMainApp = () => {
     setSelectedSessionId(nextSessionId);
     setSelectedCategoriesEventId(nextEventId);
     setSelectedCategoryId(nextCategoryId);
+    setSelectedAnalyticsEventId(nextEventId);
+    setSelectedAnalyticsSessionId(nextSessionId);
+    if (nextEventId === catalog.activeEventId && nextSessionId === catalog.activeSessionId) {
+      setAnalyticsRaceState(sessionState);
+    }
   };
 
   const updateSystemConfigState = (config: SystemConfiguration) => {
@@ -342,6 +356,49 @@ export const RaceSweetMainApp = () => {
     });
   };
 
+  const encodeEventSessionValue = (eventId: string, sessionId?: string): string => {
+    return sessionId ? `session:${eventId}:${sessionId}` : `event:${eventId}`;
+  };
+
+  const selectAnalyticsEventSession = (value: string): void => {
+    if (!eventCatalogState) {
+      return;
+    }
+
+    const [kind, eventId, sessionId] = value.split(':');
+    const nextEventId = kind === 'session' ? eventId : value.replace(/^event:/, '');
+    const eventSessions = getSessionsForEvent(eventCatalogState, nextEventId);
+    const activeSessionForEvent = eventCatalogState.activeEventId === nextEventId
+      ? eventSessions.find((session) => session.id === eventCatalogState.activeSessionId)
+      : undefined;
+    const nextSessionId = kind === 'session'
+      ? sessionId
+      : activeSessionForEvent?.id || eventSessions[0]?.id;
+
+    setSelectedAnalyticsEventId(nextEventId);
+    setSelectedAnalyticsSessionId(nextSessionId);
+
+    if (!nextSessionId) {
+      setAnalyticsRaceState(createEmptySessionState());
+      return;
+    }
+
+    if (nextEventId === eventCatalogState.activeEventId && nextSessionId === eventCatalogState.activeSessionId) {
+      setAnalyticsRaceState(sessionState);
+      return;
+    }
+
+    const targetSessionState = createEmptySessionState();
+    applySessionSources(nextEventId, nextSessionId, {
+      clearSelections: true,
+      targetSessionState,
+    }).then((loadedState) => {
+      setAnalyticsRaceState(loadedState || targetSessionState);
+    }).catch((error: unknown) => {
+      setErrorState(error as Error);
+    });
+  };
+
   useEffect(() => {
     if (timingSessionSelection !== 'active') {
       return;
@@ -351,6 +408,12 @@ export const RaceSweetMainApp = () => {
     setSelectedTimingSessionId(eventCatalogState?.activeSessionId);
     setTimingRaceState(sessionState);
   }, [eventCatalogState?.activeEventId, eventCatalogState?.activeSessionId, sessionState, timingSessionSelection]);
+
+  useEffect(() => {
+    if (selectedAnalyticsEventId === eventCatalogState?.activeEventId && selectedAnalyticsSessionId === eventCatalogState?.activeSessionId) {
+      setAnalyticsRaceState(sessionState);
+    }
+  }, [eventCatalogState?.activeEventId, eventCatalogState?.activeSessionId, selectedAnalyticsEventId, selectedAnalyticsSessionId, sessionState]);
 
   useEffect(() => {
     if (!eventCatalogState || !sessionState || !selectedSessionsEventId || !selectedSessionId) {
@@ -529,11 +592,31 @@ export const RaceSweetMainApp = () => {
   const activeEventSessions = getSessionsForEvent(eventCatalogState, activeEvent?.id);
   const selectedCategoryEventId = selectedCategoriesEventId || eventCatalogState.activeEventId || eventCatalogState.events[0]?.id;
   const selectedCategoryEntrants = getEntrantsForCategory(eventCatalogState, selectedCategoryEventId, selectedCategoryId);
-  const selectedResultsEventId = selectedSessionsEventId || selectedEventId || eventCatalogState.activeEventId || eventCatalogState.events[0]?.id;
+  const selectedResultsEventId = selectedAnalyticsEventId || eventCatalogState.activeEventId || eventCatalogState.events[0]?.id;
+  const selectedResultsSessionId = selectedAnalyticsSessionId || eventCatalogState.activeSessionId || getSessionsForEvent(eventCatalogState, selectedResultsEventId)[0]?.id;
+  const displayedAnalyticsRaceState = analyticsRaceState || sessionState;
+  const selectedEventSessionValue = selectedResultsEventId
+    ? encodeEventSessionValue(selectedResultsEventId, selectedResultsSessionId)
+    : '';
+  const eventSessionOptions = eventCatalogState.events.flatMap((event): EventSessionOption[] => {
+    const eventOption = {
+      eventId: event.id,
+      eventName: event.name,
+      value: encodeEventSessionValue(event.id),
+    };
+    const sessionOptions = getSessionsForEvent(eventCatalogState, event.id).map((session) => ({
+      eventId: event.id,
+      eventName: event.name,
+      sessionId: session.id,
+      sessionName: session.name,
+      value: encodeEventSessionValue(event.id, session.id),
+    }));
+    return [eventOption, ...sessionOptions];
+  });
   const sessionScopedCategories = (() => {
     const normalizeCategoryText = (value: string): string => value.trim().toLowerCase();
     const categorySeriesKey = (_id: string, name: string): string => normalizeCategoryText(name);
-    const sessionId = selectedSessionId;
+    const sessionId = selectedResultsSessionId;
     const candidates = getCategoriesForEvent(eventCatalogState, selectedResultsEventId);
     const fromCatalog = candidates.filter((category) => {
       const assignments = category.sessionAssignments || [];
@@ -544,10 +627,10 @@ export const RaceSweetMainApp = () => {
     });
 
     const categoriesById = new Map(fromCatalog.map((category) => [category.id.toString(), category.name]));
-    sessionState.participants.forEach((participant) => {
+    displayedAnalyticsRaceState.participants.forEach((participant) => {
       const categoryId = participant.categoryId.toString();
       if (!categoriesById.has(categoryId)) {
-        const category = sessionState.getCategoryById(participant.categoryId);
+        const category = displayedAnalyticsRaceState.getCategoryById(participant.categoryId);
         categoriesById.set(categoryId, category?.name || categoryId);
       }
     });
@@ -747,11 +830,7 @@ export const RaceSweetMainApp = () => {
       return (
         <CategoriesPage
           catalog={eventCatalogState}
-          entrants={selectedCategoryEntrants.map((entrant) => ({
-            entrantId: entrant.id,
-            id: entrant.id,
-            name: entrant.name,
-          }))}
+          entrants={selectedCategoryEntrants}
           onCreateCategory={(eventId) => {
             if (!eventCatalogService) {
               return;
@@ -801,12 +880,13 @@ export const RaceSweetMainApp = () => {
       return (
         <EntrantsPage
           catalog={eventCatalogState}
-          onCreateEntrant={(eventId) => {
+          onCreateEntrant={(eventId, entrantType) => {
             if (!eventCatalogService) {
               return;
             }
-            eventCatalogService.createEntrant(eventId).then((catalog) => {
-              const entrant = getEntrantsForEvent(catalog, eventId).find((item) => item.name === 'New Entrant');
+            eventCatalogService.createEntrant(eventId, entrantType).then((catalog) => {
+              const entrantName = entrantType === 'team' ? 'New Team' : 'New Entrant';
+              const entrant = getEntrantsForEvent(catalog, eventId).find((item) => item.name === entrantName);
               updateEventCatalogState(catalog, eventId, selectedSessionId, selectedCategoryId);
               setSelectedEntrantId(entrant?.id);
             }).catch((error: unknown) => setErrorState(error as Error));
@@ -842,9 +922,12 @@ export const RaceSweetMainApp = () => {
       return (
         <ResultsPage
           categories={sessionScopedCategories}
+          eventSessionOptions={eventSessionOptions}
           catalogEntrants={getEntrantsForEvent(eventCatalogState, selectedResultsEventId)}
-          raceState={sessionState}
+          onSelectEventSession={selectAnalyticsEventSession}
+          raceState={displayedAnalyticsRaceState}
           selectedCategoryId={selectedCategoryId}
+          selectedEventSessionValue={selectedEventSessionValue}
         />
       );
     }
@@ -853,9 +936,12 @@ export const RaceSweetMainApp = () => {
       return (
         <ReportsPage
           categories={sessionScopedCategories}
+          eventSessionOptions={eventSessionOptions}
           catalogEntrants={getEntrantsForEvent(eventCatalogState, selectedResultsEventId)}
-          raceState={sessionState}
+          onSelectEventSession={selectAnalyticsEventSession}
+          raceState={displayedAnalyticsRaceState}
           selectedCategoryId={selectedCategoryId}
+          selectedEventSessionValue={selectedEventSessionValue}
         />
       );
     }

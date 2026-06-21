@@ -153,6 +153,32 @@ describe('EventCatalogService', () => {
     }));
   });
 
+  it('creates team entrants through the ledger, persistence, and upstream callback flow', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const onPersistedLedger = vi.fn(async () => undefined);
+    const service = await EventCatalogService.create(seededPersistence, { onPersistedLedger });
+
+    await service.createEntrant('event-2026-racesweet-round-1', 'team');
+
+    const createdTeam = service.catalog.entrants.find((entrant) => entrant.name === 'New Team');
+    expect(createdTeam).toEqual(expect.objectContaining({
+      categoryId: 'event-2026-racesweet-round-1-category-premier',
+      categoryIds: ['event-2026-racesweet-round-1-category-premier'],
+      entrantType: 'team',
+      name: 'New Team',
+      teamMembers: [],
+    }));
+    expect(seededPersistence.save).toHaveBeenCalledOnce();
+    expect(onPersistedLedger).toHaveBeenCalledWith(expect.objectContaining({
+      mutations: expect.arrayContaining([
+        expect.objectContaining({
+          entrant: expect.objectContaining({ id: createdTeam?.id, entrantType: 'team' }),
+          type: 'entrant-created',
+        }),
+      ]),
+    }));
+  });
+
   it('updates event, session, and category rule details through immutable ledger changes', async () => {
     const seededPersistence = createPersistence(createSeedEventCatalogLedger());
     const service = await EventCatalogService.create(seededPersistence);
@@ -259,6 +285,18 @@ describe('EventCatalogService', () => {
       expect.objectContaining({ firstName: 'Pat', lastName: 'Rider', participantId: 'p1' }),
       expect.objectContaining({ firstName: 'Quinn', lastName: 'Rider', participantId: 'p2' }),
     ]));
+    expect(entrants.find((entrant) => entrant.id === 'p1')).toEqual(expect.objectContaining({
+      categoryId: 'cat-a',
+      entrantType: 'rider',
+      name: 'Pat Rider',
+      teamEntrantId: 'team-a',
+    }));
+    expect(entrants.find((entrant) => entrant.id === 'p2')).toEqual(expect.objectContaining({
+      categoryId: 'cat-b',
+      entrantType: 'rider',
+      name: 'Quinn Rider',
+      teamEntrantId: 'team-a',
+    }));
     expect(teamB?.entrantType).toBe('rider');
     expect(teamB?.firstName).toBe('Sam');
     expect(teamB?.lastName).toBe('Rider');
@@ -351,6 +389,29 @@ describe('EventCatalogService', () => {
       lastName: 'Smith',
       name: 'Jordan Smith',
     }));
+  });
+
+  it('normalizes primary entrant category updates and clears deleted category references', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+
+    await service.updateEntrant('event-2026-racesweet-round-1-entrant-101', {
+      categoryId: 'event-2026-racesweet-round-1-category-clubman',
+      teamEntrantId: 'team-linked',
+    });
+
+    let entrant = service.catalog.entrants.find((item) => item.id === 'event-2026-racesweet-round-1-entrant-101');
+    expect(entrant).toEqual(expect.objectContaining({
+      categoryId: 'event-2026-racesweet-round-1-category-clubman',
+      categoryIds: ['event-2026-racesweet-round-1-category-clubman'],
+      teamEntrantId: 'team-linked',
+    }));
+
+    await service.deleteCategory('event-2026-racesweet-round-1', 'event-2026-racesweet-round-1-category-clubman');
+
+    entrant = service.catalog.entrants.find((item) => item.id === 'event-2026-racesweet-round-1-entrant-101');
+    expect(entrant?.categoryId).toBeUndefined();
+    expect(entrant?.categoryIds).toEqual([]);
   });
 
   it('uses master entrant profiles to backfill missing participant names and profile fields', async () => {
