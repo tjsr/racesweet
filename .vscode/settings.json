@@ -9,6 +9,7 @@
     "log": "off"
   },
   "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.preferences.importModuleSpecifierEnding": "js",
   "typescript.tsdk": "node_modules/typescript/lib",
   "files.watcherExclude": {
     "**/.git/**": true,
