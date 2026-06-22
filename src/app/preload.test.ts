@@ -78,7 +78,16 @@ describe('Electron preload renderer API', () => {
     void window.api.requestFileContent<string>('catalog.json', 'utf8');
     void window.api.writeFileContent('catalog.json', '{"schemaVersion":1}');
 
-    expect(ipcRenderer.send).toHaveBeenCalledWith(RequestReadIpcSendChannel, 'catalog.json', '11111111-1111-4111-8111-111111111111', 'utf8');
-    expect(ipcRenderer.send).toHaveBeenCalledWith(RequestWriteIpcSendChannel, 'catalog.json', '22222222-2222-4222-8222-222222222222', '{"schemaVersion":1}');
+    expect(ipcRenderer.send).toHaveBeenCalledWith(
+      RequestReadIpcSendChannel,
+      'catalog.json',
+      '11111111-1111-4111-8111-111111111111',
+      'utf8');
+    expect(ipcRenderer.send).toHaveBeenCalledWith(
+      RequestWriteIpcSendChannel,
+      'catalog.json',
+      '22222222-2222-4222-8222-222222222222',
+      '{"schemaVersion":1}',
+      'utf8');
   });
 });

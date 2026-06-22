@@ -30,6 +30,7 @@ const catalog: EventCatalogState = {
       name: 'Development',
     },
   ],
+  deletedEventIds: [],
   entrants: [],
   events: [
     {
@@ -120,6 +121,7 @@ describe('EventsScreen integration', () => {
   it('shows event controls and session lists in both center and right panes', async () => {
     const onActivateEvent = vi.fn();
     const onCreateEvent = vi.fn();
+    const onDeleteEvent = vi.fn();
     const onSaveEventAssignment = vi.fn();
     const onSelectEvent = vi.fn();
     const onSelectSession = vi.fn();
@@ -139,6 +141,7 @@ describe('EventsScreen integration', () => {
             setActiveEventId(eventId);
           }}
           onCreateEvent={onCreateEvent}
+          onDeleteEvent={onDeleteEvent}
           onSaveEventAssignment={onSaveEventAssignment}
           onSelectEvent={(eventId) => {
             onSelectEvent(eventId);
@@ -217,6 +220,15 @@ describe('EventsScreen integration', () => {
     });
 
     expect(onActivateEvent).toHaveBeenCalledWith('event-2');
+
+    const deleteButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Delete Event');
+    expect(deleteButton).toBeDefined();
+
+    await act(async () => {
+      deleteButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onDeleteEvent).toHaveBeenCalledWith('event-2');
   });
 
   it('maintains source assignment independently per event', async () => {
@@ -231,6 +243,7 @@ describe('EventsScreen integration', () => {
           config={configState}
           onActivateEvent={() => undefined}
           onCreateEvent={() => undefined}
+          onDeleteEvent={() => undefined}
           onSaveEventAssignment={(eventId, sourceIds) => {
             setConfigState((current) => ({
               ...current,
@@ -325,6 +338,7 @@ describe('EventsScreen integration', () => {
             }));
             setSelectedEventId(createdEvent.id);
           }}
+          onDeleteEvent={() => undefined}
           onSaveEventAssignment={() => undefined}
           onSelectEvent={setSelectedEventId}
           onSelectSession={() => undefined}
@@ -351,5 +365,119 @@ describe('EventsScreen integration', () => {
     expect(newEventButton?.getAttribute('aria-selected')).toBe('true');
     const eventNameInput = container.querySelector('input[aria-label="Event Name"]') as HTMLInputElement;
     expect(eventNameInput.value).toBe('New Event');
+  });
+
+  it('removes a deleted event from the event list without displaying its sessions', async () => {
+    const onDeleteEvent = vi.fn();
+
+    const Harness = () => {
+      const [catalogState, setCatalogState] = React.useState<EventCatalogState>(catalog);
+      const [selectedEventId, setSelectedEventId] = React.useState<string | undefined>('event-2');
+      const [selectedSessionId, setSelectedSessionId] = React.useState<string | undefined>('session-3');
+
+      return (
+        <EventsScreen
+          catalog={catalogState}
+          config={config}
+          onActivateEvent={() => undefined}
+          onCreateEvent={() => undefined}
+          onDeleteEvent={(eventId) => {
+            onDeleteEvent(eventId);
+            setCatalogState((current) => ({
+              ...current,
+              deletedEventIds: [...current.deletedEventIds, eventId],
+              events: current.events.filter((event) => event.id !== eventId),
+            }));
+            setSelectedEventId('event-1');
+            setSelectedSessionId('session-1');
+          }}
+          onSaveEventAssignment={() => undefined}
+          onSelectEvent={(eventId) => {
+            setSelectedEventId(eventId);
+            setSelectedSessionId(catalog.sessions.find((session) => session.eventId === eventId)?.id);
+          }}
+          onSelectSession={setSelectedSessionId}
+          onUpdateEvent={() => undefined}
+          selectedEventId={selectedEventId}
+          selectedSessionId={selectedSessionId}
+        />
+      );
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    expect(container.textContent).toContain('Spring Test');
+    expect(container.textContent).toContain('Test Session');
+
+    const deleteButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Delete Event');
+    expect(deleteButton).toBeDefined();
+
+    await act(async () => {
+      deleteButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onDeleteEvent).toHaveBeenCalledWith('event-2');
+    expect(container.textContent).not.toContain('Spring Test');
+    expect(container.textContent).not.toContain('Test Session');
+    expect(container.textContent).toContain('Winter Round');
+  });
+
+  it('prompts before replacing a dirty event form and saves before continuing', async () => {
+    const onUpdateEvent = vi.fn().mockResolvedValue(undefined);
+
+    const Harness = () => {
+      const [selectedEventId, setSelectedEventId] = React.useState<string | undefined>('event-1');
+      const [selectedSessionId, setSelectedSessionId] = React.useState<string | undefined>('session-1');
+
+      return (
+        <EventsScreen
+          catalog={catalog}
+          config={config}
+          onActivateEvent={() => undefined}
+          onCreateEvent={() => undefined}
+          onDeleteEvent={() => undefined}
+          onSaveEventAssignment={() => undefined}
+          onSelectEvent={(eventId) => {
+            setSelectedEventId(eventId);
+            setSelectedSessionId(catalog.sessions.find((session) => session.eventId === eventId)?.id);
+          }}
+          onSelectSession={setSelectedSessionId}
+          onUpdateEvent={onUpdateEvent}
+          selectedEventId={selectedEventId}
+          selectedSessionId={selectedSessionId}
+        />
+      );
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    await act(async () => {
+      setInputValue(container.querySelector('input[aria-label="Event Name"]') as HTMLInputElement, 'Winter Edited');
+    });
+
+    const springTestButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Spring Test'));
+    expect(springTestButton).toBeDefined();
+
+    await act(async () => {
+      springTestButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.querySelector('.warning-modal-backdrop')).toBeTruthy();
+    expect(container.textContent).toContain('You have unsaved changes to event Winter Round - save or discard changes?');
+
+    const promptSaveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save');
+    expect(promptSaveButton).toBeDefined();
+
+    await act(async () => {
+      promptSaveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(onUpdateEvent).toHaveBeenCalledWith('event-1', expect.objectContaining({ name: 'Winter Edited' }));
+    expect((container.querySelector('input[aria-label="Event Name"]') as HTMLInputElement).value).toBe('Spring Test');
   });
 });

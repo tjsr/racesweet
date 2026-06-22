@@ -31,6 +31,10 @@ export const readApicalExcelPayload = async (response: Response): Promise<Apical
     throw new ApicalDataException('No response received when trying to read Apical Excel payload.');
   }
   const buffer = await response.arrayBuffer();
+  return readApicalExcelPayloadBuffer(buffer);
+};
+
+export const readApicalExcelPayloadBuffer = async (buffer: ArrayBuffer): Promise<ApicalLapByCategory> => {
   if (buffer.byteLength === 0) {
     throw new ApicalDataException('Apical Excel file was empty');
   }

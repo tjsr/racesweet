@@ -1,4 +1,5 @@
 import type { EventCategory, EventCategoryId } from '../model/eventcategory.js';
+import type { RaceState } from '../model/racestate.js';
 
 export type EventFormat = 'race-weekend' | 'test-day' | 'track-day' | 'other';
 export type EventSessionKind = 'practice' | 'qualifying' | 'race' | 'warmup' | 'other';
@@ -96,6 +97,7 @@ export interface EventCatalogState {
   activeEventId?: string;
   activeSessionId?: string;
   categories: EventCatalogCategory[];
+  deletedEventIds: string[];
   entrants: EventCatalogEntrant[];
   events: EventCatalogEvent[];
   sessions: EventCatalogSession[];
@@ -117,6 +119,11 @@ export interface EventUpdatedMutation extends EventCatalogMutationBase {
   type: 'event-updated';
 }
 
+export interface EventDeletedMutation extends EventCatalogMutationBase {
+  eventId: string;
+  type: 'event-deleted';
+}
+
 export interface EventActivatedMutation extends EventCatalogMutationBase {
   eventId: string;
   type: 'event-activated';
@@ -128,7 +135,7 @@ export interface SessionCreatedMutation extends EventCatalogMutationBase {
 }
 
 export interface SessionUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogSession, 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>;
+  changes: Partial<Pick<EventCatalogSession, 'eventId' | 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>;
   sessionId: string;
   type: 'session-updated';
 }
@@ -142,6 +149,13 @@ export interface SessionActivatedMutation extends EventCatalogMutationBase {
 export interface SessionDeletedMutation extends EventCatalogMutationBase {
   sessionId: string;
   type: 'session-deleted';
+}
+
+export interface RaceStateImportedMutation extends EventCatalogMutationBase {
+  eventId: string;
+  raceState: Partial<RaceState>;
+  sessionId: string;
+  type: 'race-state-imported';
 }
 
 export interface CategoryCreatedMutation extends EventCatalogMutationBase {
@@ -185,7 +199,9 @@ export type EventCatalogMutation =
   | EntrantUpdatedMutation
   | EventActivatedMutation
   | EventCreatedMutation
+  | EventDeletedMutation
   | EventUpdatedMutation
+  | RaceStateImportedMutation
   | SessionActivatedMutation
   | SessionCreatedMutation
   | SessionDeletedMutation
@@ -205,6 +221,7 @@ export const createDefaultEventCatalogState = (): EventCatalogState => ({
   activeEventId: undefined,
   activeSessionId: undefined,
   categories: [],
+  deletedEventIds: [],
   entrants: [],
   events: [],
   sessions: [],
@@ -369,6 +386,10 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
   return ledger.mutations.reduce<EventCatalogState>((state, mutation) => {
     switch (mutation.type) {
     case 'event-created': {
+      if (state.deletedEventIds.includes(mutation.event.id)) {
+        return state;
+      }
+
       return {
         ...state,
         activeEventId: state.activeEventId ?? mutation.event.id,
@@ -376,6 +397,10 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
       };
     }
     case 'event-updated': {
+      if (state.deletedEventIds.includes(mutation.eventId)) {
+        return state;
+      }
+
       return {
         ...state,
         events: state.events.map((event) => {
@@ -390,7 +415,28 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
         }),
       };
     }
+    case 'event-deleted': {
+      const remainingEvents = state.events.filter((event) => event.id !== mutation.eventId);
+      const nextActiveEventId = state.activeEventId === mutation.eventId
+        ? remainingEvents[0]?.id
+        : state.activeEventId;
+      const nextActiveSessionId = state.activeEventId === mutation.eventId
+        ? state.sessions.find((session) => session.eventId === nextActiveEventId)?.id
+        : state.activeSessionId;
+
+      return {
+        ...state,
+        activeEventId: nextActiveEventId,
+        activeSessionId: nextActiveSessionId,
+        deletedEventIds: [...state.deletedEventIds, mutation.eventId],
+        events: remainingEvents,
+      };
+    }
     case 'event-activated': {
+      if (state.deletedEventIds.includes(mutation.eventId) || !state.events.some((event) => event.id === mutation.eventId)) {
+        return state;
+      }
+
       const existingActiveSession = state.sessions.find((session) => session.id === state.activeSessionId && session.eventId === mutation.eventId);
       const firstEventSession = state.sessions.find((session) => session.eventId === mutation.eventId);
 
@@ -515,6 +561,9 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
         sessions: remainingSessions,
       };
     }
+    case 'race-state-imported': {
+      return state;
+    }
     default: {
       return state;
     }
@@ -526,7 +575,7 @@ export const getSessionsForEvent = (
   state: EventCatalogState,
   eventId: string | undefined
 ): EventCatalogSession[] => {
-  if (!eventId) {
+  if (!eventId || !state.events.some((event) => event.id === eventId)) {
     return [];
   }
 
@@ -537,7 +586,7 @@ export const getCategoriesForEvent = (
   state: EventCatalogState,
   eventId: string | undefined
 ): EventCatalogCategory[] => {
-  if (!eventId) {
+  if (!eventId || !state.events.some((event) => event.id === eventId)) {
     return [];
   }
 
@@ -548,7 +597,7 @@ export const getEntrantsForEvent = (
   state: EventCatalogState,
   eventId: string | undefined
 ): EventCatalogEntrant[] => {
-  if (!eventId) {
+  if (!eventId || !state.events.some((event) => event.id === eventId)) {
     return [];
   }
 

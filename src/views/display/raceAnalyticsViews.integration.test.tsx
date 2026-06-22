@@ -181,7 +181,7 @@ describe('race analytics views integration', () => {
           onSelectEventSession={vi.fn()}
           raceState={raceState}
           selectedCategoryId={undefined}
-          selectedEventSessionValue="event:event-1"
+          selectedEventSessionValue="session:event-1:session-1"
         />,
       );
     });
@@ -197,7 +197,9 @@ describe('race analytics views integration', () => {
     expect(categorySelect).toBeTruthy();
     const eventSessionSelect = container.querySelector('select[aria-label="Race View Event Session"]') as HTMLSelectElement;
     expect(eventSessionSelect).toBeTruthy();
-    expect(Array.from(eventSessionSelect.options).map((option) => option.textContent)).toEqual(['Winter Round', '  Feature Race']);
+    expect(Array.from(eventSessionSelect.options).map((option) => option.textContent)).toEqual(['Winter Round', '-> Feature Race']);
+    expect(eventSessionSelect.options[0].disabled).toBe(true);
+    expect(eventSessionSelect.options[1].disabled).toBe(false);
 
     const categoryOptions = Array.from(categorySelect.querySelectorAll('option')).map((option) => option.textContent);
     expect(categoryOptions.filter((text) => text === 'Category A')).toHaveLength(1);
@@ -247,7 +249,7 @@ describe('race analytics views integration', () => {
           onSelectEventSession={vi.fn()}
           raceState={raceState}
           selectedCategoryId={undefined}
-          selectedEventSessionValue="event:event-1"
+          selectedEventSessionValue="session:event-1:session-1"
         />,
       );
     });

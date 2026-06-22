@@ -66,6 +66,7 @@ const catalog: EventCatalogState = {
       teamRules: { teamCompositionRules: [] },
     },
   ],
+  deletedEventIds: [],
   entrants: [],
   events: [
     {

@@ -1,7 +1,7 @@
 import './runtimeSourceMaps.ts';
 
 import { BrowserWindow, app, dialog, ipcMain, session } from 'electron';
-import type { ExternalHttpProxyRequest, ExternalHttpProxyResponse, SelectLocalFileOptions } from './window';
+import type { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileWriteDataType, SelectLocalFileOptions } from './window';
 import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
@@ -184,14 +184,15 @@ ipcMain.handle(RequestExternalHttpIpcInvokeChannel, async (_event: Electron.IpcM
   return fetchExternalHttpProxy(request);
 });
 
-ipcMain.on(RequestWriteIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: string, contents: string) => {
+ipcMain.on(RequestWriteIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: string, contents: string, dataType: FileWriteDataType = 'utf8') => {
   // Use __dirname if you're trying to restrict where things can be written to.
   // You need to handle permissions and security based on what you want to allow to be written.
   // I'd probably re-write this to take PathLike.
   const fullPath = path.join(__dirname, filename);
   const fullDirPath = path.dirname(fullPath);
 
-  mkdir(fullDirPath, { recursive: true }).then(() => writeFile(fullPath, contents)).then(() => {
+  const fileContents = dataType === 'base64' ? Buffer.from(contents, 'base64') : contents;
+  mkdir(fullDirPath, { recursive: true }).then(() => writeFile(fullPath, fileContents)).then(() => {
     event.returnValue = `File ${filename} written successfully.`;
     event.reply(WriteContentIpcReceiveChannel, eventId);
   }).catch((error: Error) => {

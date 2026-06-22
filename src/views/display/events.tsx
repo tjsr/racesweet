@@ -1,9 +1,11 @@
+/* eslint-disable sort-imports */
 import {
   type EventCatalogEvent,
   type EventCatalogState,
   getSessionsForEvent,
 } from '../../app/eventCatalog.js';
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
+import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
 import { getSupportedTimeZones, getSystemTimeZone } from '../../app/utils/timeutils.js';
 import React from 'react';
 
@@ -12,9 +14,11 @@ interface EventsScreenProps {
   config: SystemConfiguration;
   onActivateEvent: (eventId: string) => void | Promise<void>;
   onCreateEvent: () => void | Promise<void>;
+  onDeleteEvent: (eventId: string) => void | Promise<void>;
   onSaveEventAssignment: (eventId: string, sourceIds: string[]) => void | Promise<void>;
   onSelectEvent: (eventId: string) => void;
   onSelectSession: (sessionId: string) => void;
+  onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
   onUpdateEvent: (eventId: string, changes: { date?: string; format?: EventCatalogEvent['format']; name?: string; timeZone?: string }) => void | Promise<void>;
   selectedEventId?: string;
   selectedSessionId?: string;
@@ -26,6 +30,18 @@ const toggleInList = (values: string[], value: string): string[] => {
     : [...values, value];
 };
 
+const getEventDraft = (event: EventCatalogEvent | undefined, systemTimeZone: string): {
+  date: string;
+  format: EventCatalogEvent['format'];
+  name: string;
+  timeZone: string;
+} => ({
+  date: event?.date || '',
+  format: event?.format || 'race-weekend',
+  name: event?.name || '',
+  timeZone: event?.timeZone || systemTimeZone,
+});
+
 export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
   const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId) ??
     props.catalog.events.find((event) => event.id === props.catalog.activeEventId) ??
@@ -35,22 +51,36 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
   const assignedSourceIds = selectedEvent ? getEventAssignedSourceIds(props.config, selectedEvent.id) : [];
   const timeZoneOptions = React.useMemo(() => getSupportedTimeZones(), []);
   const systemTimeZone = React.useMemo(() => getSystemTimeZone(), []);
+  const selectedEventDraft = React.useMemo(() => getEventDraft(selectedEvent, systemTimeZone), [selectedEvent, systemTimeZone]);
 
-  const [eventDraft, setEventDraft] = React.useState({
-    date: selectedEvent?.date || '',
-    format: selectedEvent?.format || 'race-weekend',
-    name: selectedEvent?.name || '',
-    timeZone: selectedEvent?.timeZone || systemTimeZone,
-  });
+  const [eventDraft, setEventDraft] = React.useState(selectedEventDraft);
+  const [savedEventDraft, setSavedEventDraft] = React.useState(selectedEventDraft);
+  const hasUnsavedChanges = selectedEvent
+    ? JSON.stringify(eventDraft) !== JSON.stringify(savedEventDraft)
+    : false;
 
   React.useEffect(() => {
-    setEventDraft({
-      date: selectedEvent?.date || '',
-      format: selectedEvent?.format || 'race-weekend',
-      name: selectedEvent?.name || '',
-      timeZone: selectedEvent?.timeZone || systemTimeZone,
-    });
-  }, [selectedEvent?.date, selectedEvent?.format, selectedEvent?.id, selectedEvent?.name, selectedEvent?.timeZone, systemTimeZone]);
+    setEventDraft(selectedEventDraft);
+    setSavedEventDraft(selectedEventDraft);
+  }, [selectedEventDraft]);
+
+  const saveEvent = async (): Promise<boolean> => {
+    if (!selectedEvent) {
+      return true;
+    }
+
+    await props.onUpdateEvent(selectedEvent.id, eventDraft);
+    setSavedEventDraft(eventDraft);
+    return true;
+  };
+
+  const { requestExit: requestFormExit, warningModal } = useUnsavedChangesWarning({
+    hasUnsavedChanges: hasUnsavedChanges && !!selectedEvent,
+    itemName: selectedEvent?.name || selectedEvent?.id,
+    itemType: 'event',
+    onSave: saveEvent,
+    onUnsavedChangesGuardChange: props.onUnsavedChangesGuardChange,
+  });
 
   return (
     <section className="events-screen">
@@ -59,7 +89,7 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
         <section className="events-panel events-list-panel">
           <div className="events-actions">
             <h2>Event List</h2>
-            <button type="button" onClick={() => props.onCreateEvent()}>
+            <button type="button" onClick={() => requestFormExit(() => props.onCreateEvent())}>
               New
             </button>
           </div>
@@ -73,7 +103,11 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
                   key={event.id}
                   type="button"
                   className={`events-list-item${isSelected ? ' selected' : ''}`}
-                  onClick={() => props.onSelectEvent(event.id)}
+                  onClick={() => {
+                    if (!isSelected) {
+                      requestFormExit(() => props.onSelectEvent(event.id));
+                    }
+                  }}
                   aria-selected={isSelected}
                 >
                   <strong>{event.name}</strong>
@@ -136,7 +170,9 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
                 </select>
               </label>
               <div className="events-actions">
-                <button type="button" onClick={() => props.onUpdateEvent(selectedEvent.id, eventDraft)}>
+                <button type="button" onClick={() => {
+                  void saveEvent();
+                }}>
                   Save Event Details
                 </button>
                 <button
@@ -145,6 +181,9 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
                   disabled={selectedEvent.id === props.catalog.activeEventId}
                 >
                   {selectedEvent.id === props.catalog.activeEventId ? 'Active Event' : 'Mark Active'}
+                </button>
+                <button type="button" onClick={() => requestFormExit(() => props.onDeleteEvent(selectedEvent.id))}>
+                  Delete Event
                 </button>
               </div>
 
@@ -191,6 +230,7 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
                   })}
                 </ul>
               )}
+              {warningModal}
             </>
           ) : (
             <p>No events are defined.</p>

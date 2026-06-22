@@ -4,7 +4,7 @@ import {
   type EventCatalogEntrant,
   type EventCatalogState,
 } from '../../app/eventCatalog.js';
-import { WarningModal, type WarningModalAction } from './warningModal.js';
+import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
 import {
   formatTeamCompositionRules,
   parseTeamCompositionRules,
@@ -13,7 +13,6 @@ import { getCategoriesForEvent, getSessionsForEvent } from '../../app/eventCatal
 import React from 'react';
 
 type CategoryChanges = Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distanceRule' | 'name' | 'sessionAssignments' | 'teamRules'>>;
-type CategoryExitGuard = (action: () => void | Promise<void>) => void;
 
 interface CategoriesPageProps {
   catalog: EventCatalogState;
@@ -22,7 +21,7 @@ interface CategoriesPageProps {
   onDeleteCategory: (eventId: string, categoryId: string) => void | Promise<void>;
   onSelectCategory: (categoryId: string) => void;
   onSelectEvent: (eventId: string) => void;
-  onUnsavedChangesGuardChange?: (guard: CategoryExitGuard | undefined) => void;
+  onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
   onUpdateCategory: (categoryId: string, changes: CategoryChanges) => void | Promise<void>;
   selectedCategoryId?: string;
   selectedEventId?: string;
@@ -39,11 +38,6 @@ interface CategoryDraft {
   name: string;
   sessionIds: string[];
   teamCompositionRules: string;
-}
-
-interface PendingCategoryNavigation {
-  action: () => void | Promise<void>;
-  categoryName: string;
 }
 
 const parseInteger = (value: string): number | undefined => {
@@ -98,7 +92,6 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
   const selectedCategory = eventCategories.find((category) => category.id === props.selectedCategoryId) ?? eventCategories[0];
 
   const [formError, setFormError] = React.useState<string | undefined>(undefined);
-  const [pendingNavigation, setPendingNavigation] = React.useState<PendingCategoryNavigation | undefined>(undefined);
   const [categoryDraft, setCategoryDraft] = React.useState<CategoryDraft>(getCategoryDraft(selectedCategory));
   const [savedCategoryDraft, setSavedCategoryDraft] = React.useState<CategoryDraft>(getCategoryDraft(selectedCategory));
   const selectedCategoryDraft = React.useMemo(() => getCategoryDraft(selectedCategory), [selectedCategory]);
@@ -110,7 +103,6 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
     setCategoryDraft(selectedCategoryDraft);
     setSavedCategoryDraft(selectedCategoryDraft);
     setFormError(undefined);
-    setPendingNavigation(undefined);
   }, [selectedCategoryDraft]);
 
   const buildCategoryChanges = (): CategoryChanges => {
@@ -176,67 +168,14 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
     }
   };
 
-  const requestFormExit = React.useCallback((action: () => void | Promise<void>): void => {
-    if (hasUnsavedChanges && selectedCategory) {
-      setPendingNavigation({
-        action,
-        categoryName: selectedCategory.name || selectedCategory.id.toString(),
-      });
-      return;
-    }
-
-    void action();
-  }, [hasUnsavedChanges, selectedCategory]);
-
-  React.useEffect(() => {
-    props.onUnsavedChangesGuardChange?.(requestFormExit);
-    return () => {
-      props.onUnsavedChangesGuardChange?.(undefined);
-    };
-  }, [props.onUnsavedChangesGuardChange, requestFormExit]);
-
-  const saveAndContinuePendingNavigation = async (): Promise<void> => {
-    if (!pendingNavigation) {
-      return;
-    }
-
-    const saved = await saveCategory();
-    if (!saved) {
-      return;
-    }
-
-    const action = pendingNavigation.action;
-    setPendingNavigation(undefined);
-    await action();
-  };
-
-  const discardAndContinuePendingNavigation = (): void => {
-    if (!pendingNavigation) {
-      return;
-    }
-
-    const action = pendingNavigation.action;
-    setPendingNavigation(undefined);
-    setFormError(undefined);
-    void action();
-  };
-
-  const pendingNavigationActions: WarningModalAction[] = pendingNavigation ? [
-    {
-      label: 'Save',
-      onClick: () => {
-        void saveAndContinuePendingNavigation();
-      },
-    },
-    {
-      label: 'Discard',
-      onClick: discardAndContinuePendingNavigation,
-    },
-    {
-      label: 'Cancel',
-      onClick: () => setPendingNavigation(undefined),
-    },
-  ] : [];
+  const { requestExit: requestFormExit, warningModal } = useUnsavedChangesWarning({
+    hasUnsavedChanges: hasUnsavedChanges && !!selectedCategory,
+    itemName: selectedCategory?.name || selectedCategory?.id.toString(),
+    itemType: 'category',
+    onDiscard: () => setFormError(undefined),
+    onSave: saveCategory,
+    onUnsavedChangesGuardChange: props.onUnsavedChangesGuardChange,
+  });
   const teamEntrants = props.entrants.filter((entrant) => entrant.entrantType === 'team');
   const riderEntrants = props.entrants.filter((entrant) => entrant.entrantType === 'rider');
   const individualEntrants = riderEntrants.filter((entrant) => !entrant.teamEntrantId);
@@ -424,14 +363,7 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
                   Delete Category
                 </button>
               </div>
-              {pendingNavigation ? (
-                <WarningModal
-                  actions={pendingNavigationActions}
-                  ariaLabel="Unsaved category changes"
-                  message={`You have unsaved changes to category ${pendingNavigation.categoryName} - save or discard changes?`}
-                  title="Unsaved Changes"
-                />
-              ) : null}
+              {warningModal}
             </>
           ) : (
             <p>No categories are defined for this event.</p>

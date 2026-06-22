@@ -2,9 +2,10 @@
 import {
   type EventCatalogSession,
   type EventCatalogState,
-  getSessionsForEvent
+  getSessionsForEvent,
 } from '../../app/eventCatalog.js';
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
+import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
 import React from 'react';
 
 interface SessionsPageProps {
@@ -14,9 +15,11 @@ interface SessionsPageProps {
   onCreateSession: (eventId: string) => void | Promise<void>;
   onDeleteSession: (eventId: string, sessionId: string) => void | Promise<void>;
   onMakeSessionActive: (eventId: string, sessionId: string) => void | Promise<void>;
+  onMoveSessionToEvent?: (sessionId: string, eventId: string) => void | Promise<void>;
   onSelectEvent: (eventId: string) => void;
   onSaveSessionAssignment: (sessionId: string, mode: 'default' | 'specific', sourceIds: string[]) => void | Promise<void>;
   onSelectSession: (sessionId: string) => void;
+  onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
   onUpdateSession: (sessionId: string, changes: Partial<Pick<EventCatalogSession, 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>) => void | Promise<void>;
   selectedEventId?: string;
   selectedSessionId?: string;
@@ -27,6 +30,20 @@ const toggleInList = (values: string[], value: string): string[] => {
     ? values.filter((item) => item !== value)
     : [...values, value];
 };
+
+const getSessionDraft = (session: EventCatalogSession | undefined): {
+  kind: EventCatalogSession['kind'];
+  name: string;
+  notes: string;
+  scheduledStart: string;
+  status: EventCatalogSession['status'];
+} => ({
+  kind: session?.kind || 'practice',
+  name: session?.name || '',
+  notes: session?.notes || '',
+  scheduledStart: session?.scheduledStart || '',
+  status: session?.status || 'draft',
+});
 
 export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
   const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId) ??
@@ -40,24 +57,36 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
   const effectiveSessionSourceIds = sessionAssignment
     ? (sessionAssignment.mode === 'default' ? assignedEventSourceIds : sessionAssignment.sourceIds)
     : [];
+  const selectedSessionDraft = React.useMemo(() => getSessionDraft(selectedSession), [selectedSession]);
 
-  const [sessionDraft, setSessionDraft] = React.useState({
-    kind: selectedSession?.kind || 'practice',
-    name: selectedSession?.name || '',
-    notes: selectedSession?.notes || '',
-    scheduledStart: selectedSession?.scheduledStart || '',
-    status: selectedSession?.status || 'draft',
-  });
+  const [sessionDraft, setSessionDraft] = React.useState(selectedSessionDraft);
+  const [savedSessionDraft, setSavedSessionDraft] = React.useState(selectedSessionDraft);
+  const hasUnsavedChanges = selectedSession
+    ? JSON.stringify(sessionDraft) !== JSON.stringify(savedSessionDraft)
+    : false;
 
   React.useEffect(() => {
-    setSessionDraft({
-      kind: selectedSession?.kind || 'practice',
-      name: selectedSession?.name || '',
-      notes: selectedSession?.notes || '',
-      scheduledStart: selectedSession?.scheduledStart || '',
-      status: selectedSession?.status || 'draft',
-    });
-  }, [selectedSession?.id, selectedSession?.kind, selectedSession?.name, selectedSession?.notes, selectedSession?.scheduledStart, selectedSession?.status]);
+    setSessionDraft(selectedSessionDraft);
+    setSavedSessionDraft(selectedSessionDraft);
+  }, [selectedSessionDraft]);
+
+  const saveSession = async (): Promise<boolean> => {
+    if (!selectedSession) {
+      return true;
+    }
+
+    await props.onUpdateSession(selectedSession.id, sessionDraft);
+    setSavedSessionDraft(sessionDraft);
+    return true;
+  };
+
+  const { requestExit: requestFormExit, warningModal } = useUnsavedChangesWarning({
+    hasUnsavedChanges: hasUnsavedChanges && !!selectedSession,
+    itemName: selectedSession?.name || selectedSession?.id,
+    itemType: 'session',
+    onSave: saveSession,
+    onUnsavedChangesGuardChange: props.onUnsavedChangesGuardChange,
+  });
 
   return (
     <section className="events-screen">
@@ -67,7 +96,10 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
         <select
           aria-label="Sessions Event"
           value={selectedEvent?.id || ''}
-          onChange={(event) => props.onSelectEvent(event.target.value)}
+          onChange={(event) => {
+            const eventId = event.target.value;
+            requestFormExit(() => props.onSelectEvent(eventId));
+          }}
         >
           {props.catalog.events.map((event) => (
             <option key={event.id} value={event.id}>{event.name}</option>
@@ -78,7 +110,7 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
         <section className="events-panel">
           <h2>Session List</h2>
           <div className="events-actions">
-            <button type="button" onClick={() => selectedEvent && props.onCreateSession(selectedEvent.id)} disabled={!selectedEvent}>
+            <button type="button" onClick={() => selectedEvent && requestFormExit(() => props.onCreateSession(selectedEvent.id))} disabled={!selectedEvent}>
               Create Session
             </button>
             <button
@@ -97,7 +129,11 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
                   key={session.id}
                   type="button"
                   className={`events-list-item${isSelected ? ' selected' : ''}`}
-                  onClick={() => props.onSelectSession(session.id)}
+                  onClick={() => {
+                    if (!isSelected) {
+                      requestFormExit(() => props.onSelectSession(session.id));
+                    }
+                  }}
                   aria-selected={isSelected}
                 >
                   <strong>{session.name}</strong>
@@ -113,6 +149,25 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
           <h2>Session Details</h2>
           {selectedSession ? (
             <>
+              <label>
+                Parent Event
+                <select
+                  aria-label="Sessions Page Parent Event"
+                  value={selectedSession.eventId}
+                  onChange={(event) => {
+                    const eventId = event.target.value;
+                    const moveSessionToEvent = props.onMoveSessionToEvent;
+                    if (moveSessionToEvent) {
+                      requestFormExit(() => moveSessionToEvent(selectedSession.id, eventId));
+                    }
+                  }}
+                  disabled={!props.onMoveSessionToEvent}
+                >
+                  {props.catalog.events.map((event) => (
+                    <option key={`session-parent-${selectedSession.id}-${event.id}`} value={event.id}>{event.name}</option>
+                  ))}
+                </select>
+              </label>
               <label>
                 Session Name
                 <input
@@ -207,16 +262,19 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
 
               <p>Effective sources: {effectiveSessionSourceIds.length}</p>
               <div className="events-actions">
-                <button type="button" onClick={() => props.onUpdateSession(selectedSession.id, sessionDraft)}>
+                <button type="button" onClick={() => {
+                  void saveSession();
+                }}>
                   Save Session
                 </button>
-                <button type="button" onClick={() => selectedEvent && props.onDeleteSession(selectedEvent.id, selectedSession.id)}>
+                <button type="button" onClick={() => selectedEvent && requestFormExit(() => props.onDeleteSession(selectedEvent.id, selectedSession.id))}>
                   Delete Session
                 </button>
                 <button type="button" onClick={() => selectedEvent && props.onApplySessionSources(selectedEvent.id, selectedSession.id)}>
                   Apply Assigned Sources To Session
                 </button>
               </div>
+              {warningModal}
             </>
           ) : (
             <p>No sessions are defined for this event.</p>

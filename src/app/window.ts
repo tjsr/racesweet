@@ -4,6 +4,7 @@
 export type AvailableSendChannels = 'askToRead' | 'askToWrite';
 export type AvailableReceiveChannels = 'sendReadContent' | 'sendReadError' | 'sendWriteSuccess' | 'sendWriteError';
 export type FileReadDataType = 'utf8' | 'buffer' | 'bytearray';
+export type FileWriteDataType = 'utf8' | 'base64';
 export interface ExternalHttpProxyRequest {
   bodyBase64?: string;
   headers?: Record<string, string>;
@@ -44,7 +45,7 @@ declare global {
       requestExternalHttp: (request: ExternalHttpProxyRequest) => Promise<ExternalHttpProxyResponse>;
       requestBuffer: (filePath: string) => Promise<Buffer>;
       selectLocalFile: (options?: SelectLocalFileOptions) => Promise<string | undefined>;
-      writeFileContent: (filePath: string, contents: string) => Promise<void>;
+      writeFileContent: (filePath: string, contents: string, dataType?: FileWriteDataType) => Promise<void>;
       send: (channel: AvailableSendChannels, ...args: unknown[]) => void;
     },
     nodeAPI: {

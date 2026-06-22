@@ -1,13 +1,10 @@
 import './index.css';
-
-import type { DataSourceConfig, EventTimeDisplayZoneMode, SystemConfiguration } from './systemConfig.ts';
+import { Component, type ReactElement, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type DataSourceConfig, type EventTimeDisplayZoneMode, type SystemConfiguration, createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
+import { type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
+import { type EventSessionOption, ReportsPage, ResultsPage } from '../views/display/raceAnalyticsViews.tsx';
 import { RaceStateLookup, Session } from '../model/racestate.ts';
-import React, { useEffect, useState } from 'react';
-import { ReportsPage, ResultsPage } from '../views/display/raceAnalyticsViews.tsx';
 import { createApicalCatalogEventId, fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.ts';
-import { createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
-import { getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
-
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
 import { CategoriesPage } from '../views/display/categoriesPage.tsx';
 import { CategoryList } from '../views/display/categories.tsx';
@@ -16,11 +13,9 @@ import { ElectronJsonRaceAdminPersistence } from './raceAdminPersistence.ts';
 import { ElectronJsonSystemConfigPersistence } from './systemConfigPersistence.ts';
 import { EntrantsPage } from '../views/display/entrantsPage.tsx';
 import { EventCatalogService } from './eventCatalogService.ts';
-import type { EventCatalogState } from './eventCatalog.ts';
 import { EventCategoryId } from '../model/eventcategory.ts';
-import type { EventParticipantId } from '../model/eventparticipant.ts';
-import type { EventSessionOption } from '../views/display/raceAnalyticsViews.tsx';
-import type { EventTimeRecord } from '../model/timerecord.ts';
+import { type EventParticipantId } from '../model/eventparticipant.ts';
+import { type EventTimeRecord } from '../model/timerecord.ts';
 import { EventsScreen } from '../views/display/events.tsx';
 import { RaceAdminService } from './raceAdminService.ts';
 import { RecentRecords } from '../views/display/recent.tsx';
@@ -28,6 +23,7 @@ import { SessionsPage } from '../views/display/sessionsPage.tsx';
 import { SystemConfigService } from './systemConfigService.ts';
 import { SystemPage } from '../views/display/systemPage.tsx';
 import { TestSession } from '../testdata/testsession.ts';
+import { type UnsavedChangesGuard } from '../views/display/unsavedChangesWarning.tsx';
 import { applyPulledRaceStateToSession } from './sourceApplication.ts';
 import { fetchApicalEvents } from '../controllers/apical/getResultListJson.ts';
 import { formatErrorForDisplay } from './stackTrace.ts';
@@ -36,8 +32,22 @@ import { selectedCategoriesForParticipants } from './selectionState.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
 
 type AppSection = 'System' | 'Events' | 'Entrants' | 'Categories' | 'Sessions' | 'Timing' | 'Results' | 'Reports';
-type UnsavedChangesGuard = (action: () => void | Promise<void>) => void;
 type TimingSessionSelection = 'active' | 'session';
+
+interface PageErrorFallbackProps {
+  error: Error;
+  title?: string;
+}
+
+interface PageErrorBoundaryProps {
+  children: ReactNode;
+  fallbackTitle?: string;
+  resetKey: string;
+}
+
+interface PageErrorBoundaryState {
+  error?: Error;
+}
 
 const appSections: Array<{ icon: string; id: AppSection; label: string }> = [
   { icon: 'SYS', id: 'System', label: 'System' },
@@ -49,6 +59,38 @@ const appSections: Array<{ icon: string; id: AppSection; label: string }> = [
   { icon: 'RES', id: 'Results', label: 'Results' },
   { icon: 'RPT', id: 'Reports', label: 'Reports' },
 ];
+
+const PageErrorFallback = ({ error, title = 'Error loading content' }: PageErrorFallbackProps): ReactElement => (
+  <>
+    <h1>{title}</h1>
+    <div className="error" role="alert">
+      <p>There was an error loading the content:</p>
+      <pre>{formatErrorForDisplay(error)}</pre>
+    </div>
+  </>
+);
+
+class PageErrorBoundary extends Component<PageErrorBoundaryProps, PageErrorBoundaryState> {
+  public state: PageErrorBoundaryState = {};
+
+  public static getDerivedStateFromError(error: Error): PageErrorBoundaryState {
+    return { error };
+  }
+
+  public componentDidUpdate(previousProps: PageErrorBoundaryProps): void {
+    if (previousProps.resetKey !== this.props.resetKey && this.state.error) {
+      this.setState({ error: undefined });
+    }
+  }
+
+  public render(): ReactNode {
+    if (this.state.error) {
+      return <PageErrorFallback error={this.state.error} title={this.props.fallbackTitle} />;
+    }
+
+    return this.props.children;
+  }
+}
 
 const loadAdminService = async (onError?: (error: unknown) => void): Promise<RaceAdminService> => {
   const apicalSession: TestSession = new ApicalElectronFile();
@@ -110,14 +152,16 @@ export const RaceSweetMainApp = () => {
   const [analyticsRaceState, setAnalyticsRaceState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [timingRaceState, setTimingRaceState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [timingSessionSelection, setTimingSessionSelection] = useState<TimingSessionSelection>('active');
-  const categoryUnsavedChangesGuard = React.useRef<UnsavedChangesGuard | undefined>(undefined);
-  const setCategoryUnsavedChangesGuard = React.useCallback((guard: UnsavedChangesGuard | undefined): void => {
-    categoryUnsavedChangesGuard.current = guard;
+  const [timingErrorState, setTimingErrorState] = useState<Error|undefined>(undefined);
+  const unsavedChangesGuards = useRef<Partial<Record<AppSection, UnsavedChangesGuard>>>({});
+  const setUnsavedChangesGuard = useCallback((section: AppSection, guard: UnsavedChangesGuard | undefined): void => {
+    unsavedChangesGuards.current[section] = guard;
   }, []);
 
   const changeActiveSection = (section: AppSection): void => {
-    if (activeSection === 'Categories' && section !== activeSection && categoryUnsavedChangesGuard.current) {
-      categoryUnsavedChangesGuard.current(() => setActiveSection(section));
+    const activeGuard = unsavedChangesGuards.current[activeSection];
+    if (section !== activeSection && activeGuard) {
+      activeGuard(() => setActiveSection(section));
       return;
     }
 
@@ -267,22 +311,44 @@ export const RaceSweetMainApp = () => {
     return event?.timeZone || getSystemTimeZone();
   };
 
-  const applySourceToSessionState = async (eventId: string, source: DataSourceConfig, targetSessionState?: Session & RaceStateLookup): Promise<void> => {
+  const applySourceToSessionState = async (
+    eventId: string,
+    source: DataSourceConfig,
+    targetSessionState?: Session & RaceStateLookup,
+    options: { cachedSpreadsheetOnly?: boolean; preferCachedSpreadsheet?: boolean } = {}
+  ): Promise<void> => {
     const sessionTarget = targetSessionState || sessionState;
     if (source.type !== 'api-apical-data-file' || !sessionTarget) {
       return;
     }
 
-    const raceState = await pullApicalRaceState(source, eventId, { timeZone: getEventTimeZone(eventId) });
+    const raceState = await pullApicalRaceState(source, eventId, {
+      cachedSpreadsheetOnly: options.cachedSpreadsheetOnly,
+      preferCachedSpreadsheet: options.preferCachedSpreadsheet,
+      timeZone: getEventTimeZone(eventId),
+    });
     await applyPulledRaceStateToSession(sessionTarget, raceState);
     setRenderTick((tick) => tick + 1);
+  };
+
+  const applyPersistedRaceStateToSession = async (eventId: string, sessionId: string, targetSessionState: Session & RaceStateLookup): Promise<boolean> => {
+    const raceState = eventCatalogService?.getImportedRaceState(eventId, sessionId);
+    if (!raceState) {
+      return false;
+    }
+
+    await applyPulledRaceStateToSession(targetSessionState, raceState);
+    return true;
   };
 
   const applySessionSources = async (
     eventId: string,
     sessionId: string,
     options?: {
+      cachedSpreadsheetOnly?: boolean;
       clearSelections?: boolean;
+      preferCachedSpreadsheet?: boolean;
+      preferPersistedRaceState?: boolean;
       replaceSessionState?: boolean;
       targetSessionState?: Session & RaceStateLookup;
     }
@@ -299,11 +365,24 @@ export const RaceSweetMainApp = () => {
       setRecordSelectedCategories(new Set<EventCategoryId>());
     }
 
+    if (targetSessionState && options?.preferPersistedRaceState) {
+      const loadedPersistedState = await applyPersistedRaceStateToSession(eventId, sessionId, targetSessionState);
+      if (loadedPersistedState) {
+        if (adminService) {
+          adminService.applyChangesToSession(targetSessionState);
+        }
+        return targetSessionState;
+      }
+    }
+
     const sourceIds = getSessionAssignedSourceIds(systemConfigState, eventId, sessionId);
     const sources = systemConfigState.dataSources.filter((source) => source.enabled && sourceIds.includes(source.id));
 
     for (const source of sources) {
-      await applySourceToSessionState(eventId, source, targetSessionState);
+      await applySourceToSessionState(eventId, source, targetSessionState, {
+        cachedSpreadsheetOnly: options?.cachedSpreadsheetOnly,
+        preferCachedSpreadsheet: options?.preferCachedSpreadsheet,
+      });
     }
 
     if (targetSessionState && adminService) {
@@ -316,10 +395,14 @@ export const RaceSweetMainApp = () => {
   const loadTimingSession = async (eventId: string, sessionId: string): Promise<void> => {
     const targetSessionState = createEmptySessionState();
     const loadedState = await applySessionSources(eventId, sessionId, {
+      cachedSpreadsheetOnly: true,
       clearSelections: true,
+      preferCachedSpreadsheet: true,
+      preferPersistedRaceState: true,
       targetSessionState,
     });
     setTimingRaceState(loadedState || targetSessionState);
+    setTimingErrorState(undefined);
     setRenderTick((tick) => tick + 1);
   };
 
@@ -336,7 +419,7 @@ export const RaceSweetMainApp = () => {
 
     if (nextSessionId) {
       loadTimingSession(eventId, nextSessionId).catch((error: unknown) => {
-        setErrorState(error as Error);
+        setTimingErrorState(error as Error);
       });
     }
   };
@@ -347,6 +430,7 @@ export const RaceSweetMainApp = () => {
       setSelectedTimingEventId(eventCatalogState?.activeEventId);
       setSelectedTimingSessionId(eventCatalogState?.activeSessionId);
       setTimingRaceState(sessionState);
+      setTimingErrorState(undefined);
       return;
     }
 
@@ -358,7 +442,7 @@ export const RaceSweetMainApp = () => {
     setTimingSessionSelection('session');
     setSelectedTimingSessionId(sessionId);
     loadTimingSession(eventId, sessionId).catch((error: unknown) => {
-      setErrorState(error as Error);
+      setTimingErrorState(error as Error);
     });
   };
 
@@ -372,22 +456,20 @@ export const RaceSweetMainApp = () => {
     }
 
     const [kind, eventId, sessionId] = value.split(':');
-    const nextEventId = kind === 'session' ? eventId : value.replace(/^event:/, '');
+    if (kind !== 'session' || !eventId || !sessionId) {
+      return;
+    }
+
+    const nextEventId = eventId;
     const eventSessions = getSessionsForEvent(eventCatalogState, nextEventId);
-    const activeSessionForEvent = eventCatalogState.activeEventId === nextEventId
-      ? eventSessions.find((session) => session.id === eventCatalogState.activeSessionId)
-      : undefined;
-    const nextSessionId = kind === 'session'
-      ? sessionId
-      : activeSessionForEvent?.id || eventSessions[0]?.id;
+    const nextSessionId = eventSessions.find((session) => session.id === sessionId)?.id;
+
+    if (!nextSessionId) {
+      return;
+    }
 
     setSelectedAnalyticsEventId(nextEventId);
     setSelectedAnalyticsSessionId(nextSessionId);
-
-    if (!nextSessionId) {
-      setAnalyticsRaceState(createEmptySessionState());
-      return;
-    }
 
     if (nextEventId === eventCatalogState.activeEventId && nextSessionId === eventCatalogState.activeSessionId) {
       setAnalyticsRaceState(sessionState);
@@ -413,6 +495,7 @@ export const RaceSweetMainApp = () => {
     setSelectedTimingEventId(eventCatalogState?.activeEventId);
     setSelectedTimingSessionId(eventCatalogState?.activeSessionId);
     setTimingRaceState(sessionState);
+    setTimingErrorState(undefined);
   }, [eventCatalogState?.activeEventId, eventCatalogState?.activeSessionId, sessionState, timingSessionSelection]);
 
   useEffect(() => {
@@ -451,17 +534,48 @@ export const RaceSweetMainApp = () => {
     };
   }, [eventCatalogState, selectedSessionId, selectedSessionsEventId, systemConfigState]);
 
+  const renderShell = (content: ReactElement): ReactElement => (
+    <div className="app-shell">
+      {loadWarnings.length > 0 && (
+        <div className="load-warnings" role="alert" aria-label="Load warnings">
+          <strong>Warnings:</strong>
+          <ul>
+            {loadWarnings.map((warning, index) => (
+              <li key={index}>{warning}</li>
+            ))}
+          </ul>
+          <button type="button" onClick={() => setLoadWarnings([])}>Dismiss</button>
+        </div>
+      )}
+      <nav className="section-nav" aria-label="Application sections">
+        {appSections.map((section) => {
+          const isActive = activeSection === section.id;
+          return (
+            <button
+              key={section.id}
+              type="button"
+              className={`section-tile${isActive ? ' active' : ''}`}
+              onClick={() => changeActiveSection(section.id)}
+              aria-current={isActive ? 'page' : undefined}
+              aria-label={section.label}
+            >
+              <span className="section-icon" aria-hidden="true">{section.icon}</span>
+              <span className="section-label">{section.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+      <main className="section-content">
+        {content}
+      </main>
+    </div>
+  );
+
   if (errorState) {
-    return <>
-      <h1>Error loading content</h1>
-      <div className="error">
-        <p>There was an error loading the content:</p>
-        <pre>{formatErrorForDisplay(errorState)}</pre>
-      </div>
-    </>;
+    return renderShell(<PageErrorFallback error={errorState} />);
   }
   if (!sessionState || !eventCatalogState) {
-    return <>Loading...</>;
+    return renderShell(<>Loading...</>);
   }
 
   const handleExcludeCrossing = (crossingId: string, exclude: boolean) => {
@@ -471,7 +585,7 @@ export const RaceSweetMainApp = () => {
     const targetRaceState = timingRaceState || sessionState;
     adminService.excludeCrossingForSession(targetRaceState, crossingId, exclude)
       .then(() => setRenderTick((tick) => tick + 1))
-      .catch((error: unknown) => setErrorState(error as Error));
+      .catch((error: unknown) => setTimingErrorState(error as Error));
   };
 
   const handleChangeCategory = (participantId: string, categoryId: EventCategoryId) => {
@@ -486,7 +600,7 @@ export const RaceSweetMainApp = () => {
     }
 
     adminService.updateEntrantCategoryForSession(targetRaceState, entrantId, categoryId).catch((error: unknown) => {
-      setErrorState(error as Error);
+      setTimingErrorState(error as Error);
     });
 
     const updatedSelections = updateCategorySelectionsForChangedParticipant({
@@ -553,53 +667,60 @@ export const RaceSweetMainApp = () => {
 
     systemConfigService.updateEventOptions(timingEvent.id, { timeDisplayZoneMode: mode })
       .then(updateSystemConfigState)
-      .catch((error: unknown) => setErrorState(error as Error));
+      .catch((error: unknown) => setTimingErrorState(error as Error));
   };
 
   const timingPage = (
-    <>
-      <h1>Timing</h1>
-      <div className="timing-context-row">
-        <label className="page-filter-label">
-          Event
-          <select
-            aria-label="Timing Event"
-            value={timingEvent?.id || ''}
-            onChange={(event) => selectTimingEvent(event.target.value)}
-          >
-            {eventCatalogState.events.map((event) => (
-              <option key={event.id} value={event.id}>{event.name}</option>
-            ))}
-          </select>
-        </label>
-        <label className="page-filter-label">
-          Session
-          <select
-            aria-label="Timing Session"
-            value={timingSessionValue}
-            onChange={(event) => selectTimingSession(event.target.value)}
-          >
-            {timingSessions.map((session) => (
-              <option key={session.id} value={session.id} selected={activeSession?.id == session.id}>{session.name}{activeSession?.id == session.id ? ' (Active)' : ''}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <CategoryList categories={displayedTimingRaceState.categories || []} categorySelected={handleCategoryListSelected} />
-      <RecentRecords
-        eventTimeZone={timingEvent?.timeZone || getSystemTimeZone()}
-        records={(displayedTimingRaceState.records as EventTimeRecord[]) || []}
-        raceStateLookup={displayedTimingRaceState}
-        selectedCategories={hilightCategories}
-        selectedParticipants={recordSelectedParticipants}
-        categorySelected={setRecordSelectedCategories}
-        timeDisplayZoneMode={timingTimeDisplayZoneMode}
-        onTimeDisplayZoneModeChange={updateTimingTimeDisplayZoneMode}
-        participantSelected={handleParticipantSelected}
-        onExclude={handleExcludeCrossing}
-        onChangeCategory={handleChangeCategory}
-      />
-    </>
+    <PageErrorBoundary fallbackTitle="Timing" resetKey={`${activeSection}:${timingEvent?.id || ''}:${timingSessionValue}`}>
+      {timingErrorState ? (
+        <PageErrorFallback error={timingErrorState} title="Timing" />
+      ) : (
+        <>
+          <h1>Timing</h1>
+          <div className="timing-context-row">
+            <label className="page-filter-label">
+              Event
+              <select
+                aria-label="Timing Event"
+                value={timingEvent?.id || ''}
+                onChange={(event) => selectTimingEvent(event.target.value)}
+              >
+                {eventCatalogState.events.map((event) => (
+                  <option key={event.id} value={event.id}>{event.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="page-filter-label">
+              Session
+              <select
+                aria-label="Timing Session"
+                value={timingSessionValue}
+                onChange={(event) => selectTimingSession(event.target.value)}
+              >
+                <option value="active">Active session ({activeSession?.name || 'None'})</option>
+                {timingSessions.map((session) => (
+                  <option key={session.id} value={session.id}>{session.name}{activeSession?.id == session.id ? ' (Active)' : ''}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <CategoryList categories={displayedTimingRaceState.categories || []} categorySelected={handleCategoryListSelected} />
+          <RecentRecords
+            eventTimeZone={timingEvent?.timeZone || getSystemTimeZone()}
+            records={(displayedTimingRaceState.records as EventTimeRecord[]) || []}
+            raceStateLookup={displayedTimingRaceState}
+            selectedCategories={hilightCategories}
+            selectedParticipants={recordSelectedParticipants}
+            categorySelected={setRecordSelectedCategories}
+            timeDisplayZoneMode={timingTimeDisplayZoneMode}
+            onTimeDisplayZoneModeChange={updateTimingTimeDisplayZoneMode}
+            participantSelected={handleParticipantSelected}
+            onExclude={handleExcludeCrossing}
+            onChangeCategory={handleChangeCategory}
+          />
+        </>
+      )}
+    </PageErrorBoundary>
   );
 
   const activeEvent = eventCatalogState.events.find((event) => event.id === eventCatalogState.activeEventId) ??
@@ -662,7 +783,7 @@ export const RaceSweetMainApp = () => {
     return Array.from(dedupedBySeries.values());
   })();
 
-  const sectionContent = (): React.ReactElement => {
+  const sectionContent = (): ReactElement => {
     if (activeSection === 'Timing') {
       return timingPage;
     }
@@ -756,6 +877,15 @@ export const RaceSweetMainApp = () => {
               updateEventCatalogState(catalog, createdEvent?.id);
             }).catch((error: unknown) => setErrorState(error as Error));
           }}
+          onDeleteEvent={(eventId) => {
+            if (!eventCatalogService) {
+              return;
+            }
+
+            eventCatalogService.deleteEvent(eventId).then((catalog) => {
+              updateEventCatalogState(catalog);
+            }).catch((error: unknown) => setErrorState(error as Error));
+          }}
           onSelectEvent={selectEvent}
           onSelectSession={setSelectedSessionId}
           onSaveEventAssignment={(eventId, sourceIds) => {
@@ -764,13 +894,17 @@ export const RaceSweetMainApp = () => {
             }
             systemConfigService.assignSourcesToEvent(eventId, sourceIds).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
           }}
+          onUnsavedChangesGuardChange={(guard) => setUnsavedChangesGuard('Events', guard)}
           onUpdateEvent={(eventId, changes) => {
             if (!eventCatalogService) {
               return;
             }
-            eventCatalogService.updateEvent(eventId, changes).then((catalog) => {
+            return eventCatalogService.updateEvent(eventId, changes).then((catalog) => {
               updateEventCatalogState(catalog, eventId);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            }).catch((error: unknown) => {
+              setErrorState(error as Error);
+              throw error;
+            });
           }}
           selectedEventId={selectedEventId}
           selectedSessionId={selectedSessionId}
@@ -817,12 +951,25 @@ export const RaceSweetMainApp = () => {
                 updateEventCatalogState(catalog, eventId, sessionId, selectedCategoryId);
               }
 
-              await applySessionSources(eventId, sessionId, { replaceSessionState: true });
+              await applySessionSources(eventId, sessionId, {
+                cachedSpreadsheetOnly: true,
+                preferCachedSpreadsheet: true,
+                preferPersistedRaceState: true,
+                replaceSessionState: true,
+              });
             };
 
             activate().catch((error: unknown) => {
               setErrorState(error as Error);
             });
+          }}
+          onMoveSessionToEvent={(sessionId, eventId) => {
+            if (!eventCatalogService) {
+              return;
+            }
+            eventCatalogService.moveSessionToEvent(sessionId, eventId).then((catalog) => {
+              updateEventCatalogState(catalog, eventId, sessionId, selectedCategoryId);
+            }).catch((error: unknown) => setErrorState(error as Error));
           }}
           onSelectEvent={selectSessionsEvent}
           onSaveSessionAssignment={(sessionId, mode, sourceIds) => {
@@ -832,13 +979,17 @@ export const RaceSweetMainApp = () => {
             systemConfigService.assignSourcesToSession(sessionId, { mode, sourceIds }).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
           }}
           onSelectSession={setSelectedSessionId}
+          onUnsavedChangesGuardChange={(guard) => setUnsavedChangesGuard('Sessions', guard)}
           onUpdateSession={(sessionId, changes) => {
             if (!eventCatalogService) {
               return;
             }
-            eventCatalogService.updateSession(sessionId, changes).then((catalog) => {
+            return eventCatalogService.updateSession(sessionId, changes).then((catalog) => {
               updateEventCatalogState(catalog, selectedSessionsEventId, sessionId, selectedCategoryId);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            }).catch((error: unknown) => {
+              setErrorState(error as Error);
+              throw error;
+            });
           }}
           selectedEventId={selectedSessionsEventId}
           selectedSessionId={selectedSessionId}
@@ -871,7 +1022,7 @@ export const RaceSweetMainApp = () => {
           }}
           onSelectCategory={setSelectedCategoryId}
           onSelectEvent={selectCategoriesEvent}
-          onUnsavedChangesGuardChange={setCategoryUnsavedChangesGuard}
+          onUnsavedChangesGuardChange={(guard) => setUnsavedChangesGuard('Categories', guard)}
           onUpdateCategory={(categoryId, changes) => {
             if (!eventCatalogService) {
               return;
@@ -923,14 +1074,18 @@ export const RaceSweetMainApp = () => {
           }}
           onSelectEntrant={setSelectedEntrantId}
           onSelectEvent={selectEntrantsEvent}
+          onUnsavedChangesGuardChange={(guard) => setUnsavedChangesGuard('Entrants', guard)}
           onUpdateEntrant={(entrantId, changes) => {
             if (!eventCatalogService) {
               return;
             }
-            eventCatalogService.updateEntrant(entrantId, changes).then((catalog) => {
+            return eventCatalogService.updateEntrant(entrantId, changes).then((catalog) => {
               updateEventCatalogState(catalog, selectedEntrantsEventId, selectedSessionId, selectedCategoryId);
               setSelectedEntrantId(entrantId);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            }).catch((error: unknown) => {
+              setErrorState(error as Error);
+              throw error;
+            });
           }}
           selectedEntrantId={selectedEntrantId}
           selectedEventId={selectedEntrantsEventId}
@@ -985,42 +1140,7 @@ export const RaceSweetMainApp = () => {
     );
   };
 
-  return (
-    <div className="app-shell">
-      {loadWarnings.length > 0 && (
-        <div className="load-warnings" role="alert" aria-label="Load warnings">
-          <strong>Warnings:</strong>
-          <ul>
-            {loadWarnings.map((warning, index) => (
-              <li key={index}>{warning}</li>
-            ))}
-          </ul>
-          <button type="button" onClick={() => setLoadWarnings([])}>Dismiss</button>
-        </div>
-      )}
-      <nav className="section-nav" aria-label="Application sections">
-        {appSections.map((section) => {
-          const isActive = activeSection === section.id;
-          return (
-            <button
-              key={section.id}
-              type="button"
-              className={`section-tile${isActive ? ' active' : ''}`}
-              onClick={() => changeActiveSection(section.id)}
-              aria-current={isActive ? 'page' : undefined}
-              aria-label={section.label}
-            >
-              <span className="section-icon" aria-hidden="true">{section.icon}</span>
-              <span className="section-label">{section.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-      <main className="section-content">
-        {sectionContent()}
-      </main>
-    </div>
-  );
+  return renderShell(sectionContent());
 };
 
 

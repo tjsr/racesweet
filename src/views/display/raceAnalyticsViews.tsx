@@ -303,17 +303,26 @@ const EventSessionSelector = (props: {
     return null;
   }
 
+  const selectableOptions = props.options.filter((option) => option.sessionId);
+  const selectedValue = selectableOptions.some((option) => option.value === props.selectedValue)
+    ? props.selectedValue
+    : selectableOptions[0]?.value || '';
+
   return (
     <label className="page-filter-label">
       Event/Session
       <select
         aria-label="Race View Event Session"
-        value={props.selectedValue || props.options[0]?.value || ''}
-        onChange={(event) => props.onSelectEventSession?.(event.target.value)}
+        value={selectedValue}
+        onChange={(event) => {
+          if (!event.target.selectedOptions[0]?.disabled) {
+            props.onSelectEventSession?.(event.target.value);
+          }
+        }}
       >
         {props.options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.sessionId ? `  ${option.sessionName || option.sessionId}` : option.eventName}
+          <option key={option.value} value={option.value} disabled={!option.sessionId}>
+            {option.sessionId ? `-> ${option.sessionName || option.sessionId}` : option.eventName}
           </option>
         ))}
       </select>

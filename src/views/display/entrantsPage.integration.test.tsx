@@ -42,6 +42,7 @@ const catalog: EventCatalogState = {
       teamRules: { teamCompositionRules: [] },
     },
   ],
+  deletedEventIds: [],
   entrants: [
     {
       categoryId: 'cat-1',
@@ -292,5 +293,58 @@ describe('EntrantsPage integration', () => {
     expect(onUpdateEntrant).toHaveBeenLastCalledWith('ent-2', expect.objectContaining({
       categoryId: 'cat-pro',
     }));
+  });
+
+  it('prompts before replacing a dirty entrant form and saves before continuing', async () => {
+    const onUpdateEntrant = vi.fn().mockResolvedValue(undefined);
+
+    const Harness = () => {
+      const [selectedEventId, setSelectedEventId] = React.useState<string | undefined>('event-1');
+      const [selectedEntrantId, setSelectedEntrantId] = React.useState<string | undefined>('ent-1');
+
+      return (
+        <EntrantsPage
+          catalog={catalog}
+          onCreateEntrant={() => undefined}
+          onDeleteEntrant={() => undefined}
+          onSelectEntrant={setSelectedEntrantId}
+          onSelectEvent={(eventId) => {
+            setSelectedEventId(eventId);
+            setSelectedEntrantId(catalog.entrants.find((entrant) => entrant.eventId === eventId)?.id);
+          }}
+          onUpdateEntrant={onUpdateEntrant}
+          selectedEntrantId={selectedEntrantId}
+          selectedEventId={selectedEventId}
+        />
+      );
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    await act(async () => {
+      setInputValue(container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement, 'Pat Edited');
+    });
+
+    const eventSelect = container.querySelector('select[aria-label="Entrants Event"]') as HTMLSelectElement;
+    await act(async () => {
+      eventSelect.value = 'event-2';
+      eventSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(container.querySelector('.warning-modal-backdrop')).toBeTruthy();
+    expect(container.textContent).toContain('You have unsaved changes to entrant Pat Rider - save or discard changes?');
+
+    const promptSaveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save');
+    expect(promptSaveButton).toBeDefined();
+
+    await act(async () => {
+      promptSaveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(onUpdateEntrant).toHaveBeenCalledWith('ent-1', expect.objectContaining({ name: 'Pat Edited' }));
+    expect((container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement).value).toBe('Team Blue');
   });
 });

@@ -1,4 +1,4 @@
-import type { AvailableReceiveChannels, AvailableSendChannels, ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileReadDataType, SelectLocalFileOptions } from './window.js';
+import type { AvailableReceiveChannels, AvailableSendChannels, ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileReadDataType, FileWriteDataType, SelectLocalFileOptions } from './window.js';
 
 type RendererApi = {
   receive: (channel: AvailableReceiveChannels | string, func: (...args: unknown[]) => unknown) => void;
@@ -7,7 +7,7 @@ type RendererApi = {
   requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType) => Promise<DataType>;
   selectLocalFile: (options?: SelectLocalFileOptions) => Promise<string | undefined>;
   send: (channel: AvailableSendChannels, ...args: unknown[]) => void;
-  writeFileContent: (filePath: string, contents: string) => Promise<void>;
+  writeFileContent: (filePath: string, contents: string, dataType?: FileWriteDataType) => Promise<void>;
 };
 
 const requiredRendererApiMethods = [

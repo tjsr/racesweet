@@ -11,11 +11,12 @@ import {
   getEntrantsForEvent,
 } from './eventCatalog.js';
 import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
-import { getSystemTimeZone } from './utils/timeutils.js';
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { MasterEntrantProfile } from './systemConfig.js';
 import type { RaceState } from '../model/racestate.js';
+import type { TimeRecord } from '../model/timerecord.js';
+import { getSystemTimeZone } from './utils/timeutils.js';
 
 interface ApicalCatalogImport {
   eventDate?: string;
@@ -39,6 +40,25 @@ const assertEventCatalogPersistence = (persistence: EventCatalogPersistence): vo
 const createMutationId = (): string => `event-catalog-${Date.now()}-${Math.round(Math.random() * 100000)}`;
 const createTimestamp = (): string => new Date().toISOString();
 const createEntityId = (prefix: string): string => `${prefix}-${Date.now()}-${Math.round(Math.random() * 100000)}`;
+
+const reviveDate = (value: Date | string | undefined): Date | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  return value instanceof Date ? value : new Date(value);
+};
+
+const reviveRaceStateDates = (raceState: Partial<RaceState>): Partial<RaceState> => {
+  return {
+    ...raceState,
+    eventStartTime: reviveDate(raceState.eventStartTime),
+    records: (raceState.records || []).map((record): TimeRecord => ({
+      ...record,
+      time: reviveDate(record.time),
+    })),
+  };
+};
 
 const entrantNameFromMembers = (members: EventParticipant[]): string => {
   if (members.length === 0) {
@@ -257,6 +277,18 @@ export class EventCatalogService {
     return this.state;
   }
 
+  public getImportedRaceState(eventId: string, sessionId: string): Partial<RaceState> | undefined {
+    const mutation = [...this.ledger.mutations].reverse().find((candidate) => {
+      return candidate.type === 'race-state-imported' &&
+        candidate.eventId === eventId &&
+        candidate.sessionId === sessionId;
+    });
+
+    return mutation?.type === 'race-state-imported'
+      ? reviveRaceStateDates(mutation.raceState)
+      : undefined;
+  }
+
   public async createEvent(): Promise<EventCatalogState> {
     const eventId = createEntityId('event');
     return this.appendMutations([
@@ -297,6 +329,17 @@ export class EventCatalogService {
         id: createMutationId(),
         timestamp: createTimestamp(),
         type: 'event-updated',
+      },
+    ]);
+  }
+
+  public async deleteEvent(eventId: string): Promise<EventCatalogState> {
+    return this.appendMutations([
+      {
+        eventId,
+        id: createMutationId(),
+        timestamp: createTimestamp(),
+        type: 'event-deleted',
       },
     ]);
   }
@@ -455,6 +498,15 @@ export class EventCatalogService {
       });
     }
 
+    mutations.push({
+      eventId: importData.eventId,
+      id: createMutationId(),
+      raceState: importData.raceState,
+      sessionId: importData.sessionId,
+      timestamp: createTimestamp(),
+      type: 'race-state-imported',
+    });
+
     if (mutations.length > 0) {
       await this.appendMutations(mutations);
     }
@@ -509,6 +561,50 @@ export class EventCatalogService {
         type: 'session-updated',
       },
     ]);
+  }
+
+  public async moveSessionToEvent(sessionId: string, nextEventId: string): Promise<EventCatalogState> {
+    const session = this.state.sessions.find((item) => item.id === sessionId);
+    const nextEvent = this.state.events.find((item) => item.id === nextEventId);
+    if (!session || !nextEvent || session.eventId === nextEventId) {
+      return this.state;
+    }
+
+    const previousEvent = this.state.events.find((item) => item.id === session.eventId);
+    const mutations: EventCatalogLedger['mutations'] = [
+      {
+        changes: {
+          eventId: nextEventId,
+        },
+        id: createMutationId(),
+        sessionId,
+        timestamp: createTimestamp(),
+        type: 'session-updated',
+      },
+      {
+        changes: {
+          sessionIds: unique([...(nextEvent.sessionIds || []), sessionId]),
+        },
+        eventId: nextEventId,
+        id: createMutationId(),
+        timestamp: createTimestamp(),
+        type: 'event-updated',
+      },
+    ];
+
+    if (previousEvent) {
+      mutations.push({
+        changes: {
+          sessionIds: (previousEvent.sessionIds || []).filter((id) => id !== sessionId),
+        },
+        eventId: previousEvent.id,
+        id: createMutationId(),
+        timestamp: createTimestamp(),
+        type: 'event-updated',
+      });
+    }
+
+    return this.appendMutations(mutations);
   }
 
   public async activateSession(eventId: string, sessionId: string): Promise<EventCatalogState> {

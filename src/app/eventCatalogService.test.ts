@@ -98,6 +98,98 @@ describe('EventCatalogService', () => {
     expect(activePersistence.save).toHaveBeenCalledTimes(1);
   });
 
+  it('marks an event as deleted while leaving child catalog data untouched and hidden from event-scoped lookups', async () => {
+    const seededLedger = createSeedEventCatalogLedger();
+    const seededPersistence = createPersistence({
+      ...seededLedger,
+      mutations: [
+        ...seededLedger.mutations,
+        {
+          event: {
+            categoryIds: ['event-2026-test-day-category'],
+            date: '2026-07-01',
+            entrantIds: ['event-2026-test-day-entrant'],
+            format: 'test-day',
+            id: 'event-2026-test-day',
+            name: 'Midwinter Test Day',
+            sessionIds: ['event-2026-test-day-session'],
+          },
+          id: 'mutation-extra-event',
+          timestamp: '2026-05-30T01:00:00.000Z',
+          type: 'event-created',
+        },
+        {
+          category: {
+            code: '',
+            description: '',
+            eventId: 'event-2026-test-day',
+            id: 'event-2026-test-day-category',
+            name: 'Test Category',
+          },
+          id: 'mutation-extra-category',
+          timestamp: '2026-05-30T01:01:00.000Z',
+          type: 'category-created',
+        },
+        {
+          entrant: {
+            categoryIds: ['event-2026-test-day-category'],
+            entrantType: 'rider',
+            eventId: 'event-2026-test-day',
+            id: 'event-2026-test-day-entrant',
+            memberParticipantIds: [],
+            name: 'Test Entrant',
+            sessionIds: ['event-2026-test-day-session'],
+          },
+          id: 'mutation-extra-entrant',
+          timestamp: '2026-05-30T01:02:00.000Z',
+          type: 'entrant-created',
+        },
+        {
+          id: 'mutation-extra-session',
+          session: {
+            eventId: 'event-2026-test-day',
+            id: 'event-2026-test-day-session',
+            kind: 'practice',
+            name: 'Test Session',
+            scheduledStart: '2026-07-01T09:00:00.000Z',
+            status: 'scheduled',
+          },
+          timestamp: '2026-05-30T01:03:00.000Z',
+          type: 'session-created',
+        },
+        {
+          eventId: 'event-2026-test-day',
+          id: 'mutation-extra-event-active',
+          timestamp: '2026-05-30T01:04:00.000Z',
+          type: 'event-activated',
+        },
+      ],
+    });
+    const onPersistedLedger = vi.fn(async () => undefined);
+    const service = await EventCatalogService.create(seededPersistence, { onPersistedLedger });
+
+    await service.deleteEvent('event-2026-test-day');
+
+    expect(service.catalog.events.find((event) => event.id === 'event-2026-test-day')).toBeUndefined();
+    expect(service.catalog.deletedEventIds).toContain('event-2026-test-day');
+    expect(service.catalog.activeEventId).toBe('event-2026-racesweet-round-1');
+    expect(getSessionsForEvent(service.catalog, 'event-2026-test-day')).toEqual([]);
+    expect(getCategoriesForEvent(service.catalog, 'event-2026-test-day')).toEqual([]);
+    expect(getEntrantsForEvent(service.catalog, 'event-2026-test-day')).toEqual([]);
+    expect(service.catalog.sessions.find((session) => session.id === 'event-2026-test-day-session')).toBeDefined();
+    expect(service.catalog.categories.find((category) => category.id === 'event-2026-test-day-category')).toBeDefined();
+    expect(service.catalog.entrants.find((entrant) => entrant.id === 'event-2026-test-day-entrant')).toBeDefined();
+    expect(seededPersistence.save).toHaveBeenCalledOnce();
+    expect(onPersistedLedger).toHaveBeenCalledWith(expect.objectContaining({
+      mutations: expect.arrayContaining([
+        expect.objectContaining({
+          eventId: 'event-2026-test-day',
+          type: 'event-deleted',
+        }),
+      ]),
+    }));
+  });
+
   it('activates a session and its event through the ledger, persistence, and upstream callback flow', async () => {
     const seededPersistence = createPersistence(createSeedEventCatalogLedger());
     const onPersistedLedger = vi.fn(async () => undefined);
@@ -121,6 +213,64 @@ describe('EventCatalogService', () => {
           changes: { status: 'live' },
           sessionId: 'session-1-race',
           type: 'session-updated',
+        }),
+      ]),
+    }));
+  });
+
+  it('moves a session between parent events through one persisted ledger flow', async () => {
+    const baseLedger = createSeedEventCatalogLedger();
+    const seededPersistence = createPersistence({
+      ...baseLedger,
+      mutations: [
+        ...baseLedger.mutations,
+        {
+          event: {
+            categoryIds: [],
+            date: '2026-07-01',
+            entrantIds: [],
+            format: 'test-day',
+            id: 'event-2026-test-day',
+            name: 'Midwinter Test Day',
+            sessionIds: [],
+          },
+          id: 'mutation-extra-event',
+          timestamp: '2026-05-30T01:00:00.000Z',
+          type: 'event-created',
+        },
+      ],
+    });
+    const onPersistedLedger = vi.fn(async () => undefined);
+    const service = await EventCatalogService.create(seededPersistence, { onPersistedLedger });
+
+    await service.moveSessionToEvent('session-1-qualifying', 'event-2026-test-day');
+
+    const movedSession = service.catalog.sessions.find((session) => session.id === 'session-1-qualifying');
+    const sourceEvent = service.catalog.events.find((event) => event.id === 'event-2026-racesweet-round-1');
+    const targetEvent = service.catalog.events.find((event) => event.id === 'event-2026-test-day');
+
+    expect(movedSession?.eventId).toBe('event-2026-test-day');
+    expect(sourceEvent?.sessionIds).not.toContain('session-1-qualifying');
+    expect(targetEvent?.sessionIds).toContain('session-1-qualifying');
+    expect(getSessionsForEvent(service.catalog, 'event-2026-racesweet-round-1').map((session) => session.id)).not.toContain('session-1-qualifying');
+    expect(getSessionsForEvent(service.catalog, 'event-2026-test-day').map((session) => session.id)).toContain('session-1-qualifying');
+    expect(seededPersistence.save).toHaveBeenCalledOnce();
+    expect(onPersistedLedger).toHaveBeenCalledWith(expect.objectContaining({
+      mutations: expect.arrayContaining([
+        expect.objectContaining({
+          changes: { eventId: 'event-2026-test-day' },
+          sessionId: 'session-1-qualifying',
+          type: 'session-updated',
+        }),
+        expect.objectContaining({
+          changes: { sessionIds: ['session-1-qualifying'] },
+          eventId: 'event-2026-test-day',
+          type: 'event-updated',
+        }),
+        expect.objectContaining({
+          changes: { sessionIds: ['session-1-practice', 'session-1-race'] },
+          eventId: 'event-2026-racesweet-round-1',
+          type: 'event-updated',
         }),
       ]),
     }));

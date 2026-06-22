@@ -1,7 +1,7 @@
 import './runtimeSourceMaps.ts';
 import './state.ts';
 
-import { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileReadDataType, SelectLocalFileOptions } from './window.ts';
+import { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileReadDataType, FileWriteDataType, SelectLocalFileOptions } from './window.ts';
 import { InvalidIpcChannelError, SendChannels } from '../model/electronIpcTypes.ts';
 import { IpcRendererEvent, contextBridge, ipcRenderer } from 'electron';
 import {
@@ -116,11 +116,11 @@ const rendererApi: Window['api'] = {
       throw new InvalidIpcChannelError(channel);
     }
   },
-  writeFileContent: (filePath: string, contents: string): Promise<void> => {
+  writeFileContent: (filePath: string, contents: string, dataType: FileWriteDataType = 'utf8'): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
       const outgoingEventId = crypto.randomUUID();
       eventCalls[outgoingEventId] = [resolve as never, reject];
-      ipcRenderer.send(RequestWriteIpcSendChannel, filePath, outgoingEventId, contents);
+      ipcRenderer.send(RequestWriteIpcSendChannel, filePath, outgoingEventId, contents, dataType);
     });
   },
 };

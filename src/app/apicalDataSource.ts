@@ -1,4 +1,5 @@
 import { generateExcelData } from '../controllers/apical/generateExcel.js';
+import { readApicalExcelBuffer } from '../controllers/apical/apicalSpreadsheetProcessor.js';
 import { ApicalDataException } from '../errors/apicalDataException.js';
 import { ApicalRequestFailedError } from '../errors/ApicalRequestFailedError.js';
 import { ExcelDownloadException } from '../errors/excelDownloadException.js';
@@ -7,8 +8,9 @@ import { EventId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
 import { getErrorMessage } from '../utils.js';
-import { createApicalExcelDownloadHeaders, getApicalExcelDownloadUrl, readApicalExcelPayload } from '../utils/apical/excelDownload.js';
+import { createApicalExcelDownloadHeaders, getApicalExcelDownloadUrl, readApicalExcelPayloadBuffer } from '../utils/apical/excelDownload.js';
 import { fetchExternalHttp, isSensitiveHeader } from '../utils/externalHttp.js';
+import { RendererApiUnavailableError, getRendererApi } from './rendererApi.js';
 import { getSystemTimeZone } from './utils/timeutils.js';
 import { remapStackTrace } from './stackTrace.js';
 import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
@@ -33,6 +35,8 @@ export interface PulledApicalRaceState {
 }
 
 interface ApicalRaceStateOptions {
+  cachedSpreadsheetOnly?: boolean;
+  preferCachedSpreadsheet?: boolean;
   timeZone?: string;
 }
 
@@ -80,6 +84,10 @@ export const createApicalCatalogEventId = (apicalEventId: number): EventId => {
 };
 
 export const createApicalCatalogSessionId = (apicalEventId: number): string => `session-apical-${apicalEventId}`;
+
+export const getCachedApicalExcelFilePath = (apicalEventId: number): string => {
+  return `../../src/generated/apical-excel-cache/apical-event-${apicalEventId}.xlsx`;
+};
 
 const getListedApicalEvent = (source: DataSourceConfig, apicalEventId: number): ApicalListedEvent | undefined => {
   return source.listedEvents?.find((eventItem) => eventItem.id === apicalEventId);
@@ -376,6 +384,53 @@ export const fetchApicalResponse = async (
 
 export const apicalSafeNumber = (value: number | string): string => value.toString().replace(/\D/g, '') || '0';
 
+const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+  return Buffer.from(new Uint8Array(buffer)).toString('base64');
+};
+
+const bufferLikeToArrayBuffer = (buffer: ArrayBuffer | Buffer | Uint8Array): ArrayBuffer => {
+  if (buffer instanceof ArrayBuffer) {
+    return buffer;
+  }
+
+  const arrayBuffer = new ArrayBuffer(buffer.byteLength);
+  const copy = new Uint8Array(arrayBuffer);
+  copy.set(new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength));
+  return arrayBuffer;
+};
+
+const readCachedApicalExcelPayload = async (apicalEventId: number): Promise<ApicalLapByCategory | undefined> => {
+  try {
+    const api = getRendererApi(['requestBuffer']);
+    const buffer = await api.requestBuffer(getCachedApicalExcelFilePath(apicalEventId));
+    return readApicalExcelBuffer(bufferLikeToArrayBuffer(buffer));
+  } catch (error: unknown) {
+    if (error instanceof RendererApiUnavailableError) {
+      return undefined;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('ENOENT') || message.includes('no such file')) {
+      return undefined;
+    }
+
+    throw error;
+  }
+};
+
+const cacheApicalExcelPayload = async (apicalEventId: number, buffer: ArrayBuffer): Promise<void> => {
+  try {
+    const api = getRendererApi(['writeFileContent']);
+    await api.writeFileContent(getCachedApicalExcelFilePath(apicalEventId), arrayBufferToBase64(buffer), 'base64');
+  } catch (error: unknown) {
+    if (error instanceof RendererApiUnavailableError) {
+      return;
+    }
+
+    throw error;
+  }
+};
+
 const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId: number): Promise<ApicalLapByCategory> => {
   if (!source.apiConfig) {
     throw new Error('Apical API config is missing');
@@ -418,7 +473,9 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
       throw new ApicalDataException(`No response received when trying to read Apical Excel payload.`);
     }
 
-    const payload = await readApicalExcelPayload(response);
+    const buffer = await response.arrayBuffer();
+    await cacheApicalExcelPayload(apicalEventId, buffer);
+    const payload = await readApicalExcelPayloadBuffer(buffer);
     return payload;
   } catch (err: unknown) {
     if (err instanceof ApicalDataException) {
@@ -432,7 +489,18 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
   }
 };
 
-const loadApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId: number): Promise<ApicalLapByCategory> => {
+const loadApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId: number, options: ApicalRaceStateOptions = {}): Promise<ApicalLapByCategory> => {
+  if (options.preferCachedSpreadsheet) {
+    const cachedPayload = await readCachedApicalExcelPayload(apicalEventId);
+    if (cachedPayload) {
+      return cachedPayload;
+    }
+
+    if (options.cachedSpreadsheetOnly) {
+      throw new ApicalDataException(`Cached Apical Excel spreadsheet was not found for event id ${apicalEventId}. Fetch event data before loading this session.`);
+    }
+  }
+
   return fetchApicalDataFilePayload(source, apicalEventId);
 };
 
@@ -446,7 +514,7 @@ export const pullApicalRaceState = async (source: DataSourceConfig, eventId: Eve
     throw new Error('No Apical event id is configured for this source.');
   }
 
-  const payload = await loadApicalDataFilePayload(source, apicalEventId);
+  const payload = await loadApicalDataFilePayload(source, apicalEventId, options);
   const listedEvent = getListedApicalEvent(source, apicalEventId);
   return convertDataToRaceState(eventId, listedEvent?.eventDate ? new Date(listedEvent.eventDate) : new Date(), payload, 200000, options.timeZone || getSystemTimeZone());
 };
@@ -464,7 +532,7 @@ export const fetchApicalRaceStateNow = async (source: DataSourceConfig, options:
   const eventId = createApicalCatalogEventId(apicalEventId);
   const listedEvent = getListedApicalEvent(source, apicalEventId);
   try {
-    const payload = await loadApicalDataFilePayload(source, apicalEventId);
+    const payload = await loadApicalDataFilePayload(source, apicalEventId, options);
     const retrievedAt = new Date().toISOString();
     const timeZone = options.timeZone || getSystemTimeZone();
 

@@ -24,6 +24,7 @@ const catalog: EventCatalogState = {
   activeEventId: 'event-1',
   activeSessionId: 'session-1',
   categories: [],
+  deletedEventIds: [],
   entrants: [],
   events: [
     {
@@ -128,6 +129,7 @@ describe('SessionsPage integration', () => {
     const onCreateSession = vi.fn();
     const onDeleteSession = vi.fn();
     const onMakeSessionActive = vi.fn();
+    const onMoveSessionToEvent = vi.fn();
     const onSaveSessionAssignment = vi.fn();
     const onUpdateSession = vi.fn();
 
@@ -143,6 +145,7 @@ describe('SessionsPage integration', () => {
           onCreateSession={onCreateSession}
           onDeleteSession={onDeleteSession}
           onMakeSessionActive={onMakeSessionActive}
+          onMoveSessionToEvent={onMoveSessionToEvent}
           onSelectEvent={(eventId) => {
             setSelectedEventId(eventId);
             setSelectedSessionId(catalog.sessions.find((session) => session.eventId === eventId)?.id);
@@ -192,6 +195,16 @@ describe('SessionsPage integration', () => {
 
     expect(onMakeSessionActive).toHaveBeenCalledWith('event-2', 'session-3');
 
+    const parentEventSelect = container.querySelector('select[aria-label="Sessions Page Parent Event"]') as HTMLSelectElement;
+    expect(parentEventSelect.value).toBe('event-2');
+
+    await act(async () => {
+      parentEventSelect.value = 'event-1';
+      parentEventSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(onMoveSessionToEvent).toHaveBeenCalledWith('session-3', 'event-1');
+
     const sessionNameInput = container.querySelector('input[aria-label="Sessions Page Name"]') as HTMLInputElement;
     await act(async () => {
       setInputValue(sessionNameInput, 'Updated Test Session');
@@ -233,5 +246,60 @@ describe('SessionsPage integration', () => {
     });
 
     expect(onDeleteSession).toHaveBeenCalledWith('event-2', 'session-3');
+  });
+
+  it('prompts before replacing a dirty session form and saves before continuing', async () => {
+    const onUpdateSession = vi.fn().mockResolvedValue(undefined);
+
+    const Harness = () => {
+      const [selectedSessionId, setSelectedSessionId] = React.useState<string | undefined>('session-1');
+
+      return (
+        <SessionsPage
+          catalog={catalog}
+          config={config}
+          onApplySessionSources={() => undefined}
+          onCreateSession={() => undefined}
+          onDeleteSession={() => undefined}
+          onMakeSessionActive={() => undefined}
+          onMoveSessionToEvent={() => undefined}
+          onSelectEvent={() => undefined}
+          onSaveSessionAssignment={() => undefined}
+          onSelectSession={setSelectedSessionId}
+          onUpdateSession={onUpdateSession}
+          selectedEventId="event-1"
+          selectedSessionId={selectedSessionId}
+        />
+      );
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    await act(async () => {
+      setInputValue(container.querySelector('input[aria-label="Sessions Page Name"]') as HTMLInputElement, 'Practice Edited');
+    });
+
+    const featureRaceButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Feature Race'));
+    expect(featureRaceButton).toBeDefined();
+
+    await act(async () => {
+      featureRaceButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.querySelector('.warning-modal-backdrop')).toBeTruthy();
+    expect(container.textContent).toContain('You have unsaved changes to session Friday Practice - save or discard changes?');
+
+    const promptSaveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save');
+    expect(promptSaveButton).toBeDefined();
+
+    await act(async () => {
+      promptSaveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(onUpdateSession).toHaveBeenCalledWith('session-1', expect.objectContaining({ name: 'Practice Edited' }));
+    expect((container.querySelector('input[aria-label="Sessions Page Name"]') as HTMLInputElement).value).toBe('Feature Race');
   });
 });

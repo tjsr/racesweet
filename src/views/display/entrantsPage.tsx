@@ -6,6 +6,7 @@ import {
   getEntrantsForEvent,
   getSessionsForEvent,
 } from '../../app/eventCatalog.js';
+import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
 import React from 'react';
 
 interface EntrantsPageProps {
@@ -14,6 +15,7 @@ interface EntrantsPageProps {
   onDeleteEntrant: (eventId: string, entrantId: string) => void | Promise<void>;
   onSelectEntrant: (entrantId: string) => void;
   onSelectEvent: (eventId: string) => void;
+  onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
   onUpdateEntrant: (entrantId: string, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>>) => void | Promise<void>;
   selectedEntrantId?: string;
   selectedEventId?: string;
@@ -85,12 +87,18 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   const riderEntrants = eventEntrants.filter((entrant) => entrant.entrantType === 'rider');
   const teamsEnabled = eventSupportsTeams(props.catalog, selectedEvent?.id);
   const selectedEntrant = eventEntrants.find((entrant) => entrant.id === props.selectedEntrantId) ?? eventEntrants[0];
+  const selectedEntrantDraft = React.useMemo(() => getEntrantDraft(selectedEntrant), [selectedEntrant]);
   const [createKind, setCreateKind] = React.useState<EntrantType>('rider');
-  const [entrantDraft, setEntrantDraft] = React.useState<EntrantDraft>(getEntrantDraft(selectedEntrant));
+  const [entrantDraft, setEntrantDraft] = React.useState<EntrantDraft>(selectedEntrantDraft);
+  const [savedEntrantDraft, setSavedEntrantDraft] = React.useState<EntrantDraft>(selectedEntrantDraft);
+  const hasUnsavedChanges = selectedEntrant
+    ? JSON.stringify(entrantDraft) !== JSON.stringify(savedEntrantDraft)
+    : false;
 
   React.useEffect(() => {
-    setEntrantDraft(getEntrantDraft(selectedEntrant));
-  }, [selectedEntrant]);
+    setEntrantDraft(selectedEntrantDraft);
+    setSavedEntrantDraft(selectedEntrantDraft);
+  }, [selectedEntrantDraft]);
 
   const sessionNames = selectedEntrant
     ? eventSessions
@@ -101,21 +109,22 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
     ? teamEntrants.find((team) => team.id === selectedEntrant.teamEntrantId)?.name
     : undefined;
 
-  const saveEntrant = (): void => {
+  const saveEntrant = async (): Promise<boolean> => {
     if (!selectedEntrant) {
-      return;
+      return true;
     }
 
     if (selectedEntrant.entrantType === 'team') {
-      void props.onUpdateEntrant(selectedEntrant.id, {
+      await props.onUpdateEntrant(selectedEntrant.id, {
         categoryId: entrantDraft.categoryId || undefined,
         name: entrantDraft.name,
         notes: entrantDraft.notes || undefined,
       });
-      return;
+      setSavedEntrantDraft(entrantDraft);
+      return true;
     }
 
-    void props.onUpdateEntrant(selectedEntrant.id, {
+    await props.onUpdateEntrant(selectedEntrant.id, {
       categoryId: entrantDraft.categoryId || undefined,
       dateOfBirth: entrantDraft.dateOfBirth || undefined,
       firstName: entrantDraft.firstName || undefined,
@@ -125,7 +134,17 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
       notes: entrantDraft.notes || undefined,
       teamEntrantId: entrantDraft.teamEntrantId || undefined,
     });
+    setSavedEntrantDraft(entrantDraft);
+    return true;
   };
+
+  const { requestExit: requestFormExit, warningModal } = useUnsavedChangesWarning({
+    hasUnsavedChanges: hasUnsavedChanges && !!selectedEntrant,
+    itemName: selectedEntrant?.name || selectedEntrant?.id,
+    itemType: 'entrant',
+    onSave: saveEntrant,
+    onUnsavedChangesGuardChange: props.onUnsavedChangesGuardChange,
+  });
 
   const renderEntrantButton = (entrant: EventCatalogEntrant): React.ReactElement => {
     const isSelected = entrant.id === selectedEntrant?.id;
@@ -139,7 +158,11 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
         key={entrant.id}
         type="button"
         className={`events-list-item${isSelected ? ' selected' : ''}`}
-        onClick={() => props.onSelectEntrant(entrant.id)}
+        onClick={() => {
+          if (!isSelected) {
+            requestFormExit(() => props.onSelectEntrant(entrant.id));
+          }
+        }}
         aria-selected={isSelected}
       >
         <strong>{entrant.name}</strong>
@@ -162,7 +185,10 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
         <select
           aria-label="Entrants Event"
           value={selectedEvent?.id || ''}
-          onChange={(event) => props.onSelectEvent(event.target.value)}
+          onChange={(event) => {
+            const eventId = event.target.value;
+            requestFormExit(() => props.onSelectEvent(eventId));
+          }}
         >
           {props.catalog.events.map((event) => (
             <option key={event.id} value={event.id}>{event.name}</option>
@@ -186,7 +212,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
                 </select>
               </label>
             ) : null}
-            <button type="button" onClick={() => selectedEvent && props.onCreateEntrant(selectedEvent.id, teamsEnabled ? createKind : 'rider')} disabled={!selectedEvent}>
+            <button type="button" onClick={() => selectedEvent && requestFormExit(() => props.onCreateEntrant(selectedEvent.id, teamsEnabled ? createKind : 'rider'))} disabled={!selectedEvent}>
               {teamsEnabled && createKind === 'team' ? 'Create Team' : 'Create Entrant'}
             </button>
           </div>
@@ -313,13 +339,16 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
                 />
               </label>
               <div className="events-actions">
-                <button type="button" onClick={saveEntrant}>
+                <button type="button" onClick={() => {
+                  void saveEntrant();
+                }}>
                   Save Entrant
                 </button>
-                <button type="button" onClick={() => selectedEvent && props.onDeleteEntrant(selectedEvent.id, selectedEntrant.id)}>
+                <button type="button" onClick={() => selectedEvent && requestFormExit(() => props.onDeleteEntrant(selectedEvent.id, selectedEntrant.id))}>
                   Delete Entrant
                 </button>
               </div>
+              {warningModal}
             </>
           ) : (
             <p>No entrants are defined for this event.</p>
