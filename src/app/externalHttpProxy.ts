@@ -72,6 +72,7 @@ export const fetchExternalHttpProxy = async (request: ExternalHttpProxyRequest):
   try {
     const response = await session.defaultSession.fetch(request.url, {
       body: request.bodyBase64 ? Buffer.from(request.bodyBase64, 'base64') : undefined,
+      credentials: request.credentials,
       headers: request.headers,
       method: request.method || 'GET',
       signal: abortController.signal,

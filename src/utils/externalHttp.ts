@@ -10,6 +10,7 @@ export interface ExternalHttpRequestOptions {
 
 interface ExternalHttpProxyRequest {
   bodyBase64?: string;
+  credentials?: RequestCredentials;
   headers?: Record<string, string>;
   method?: string;
   timeoutMs?: number;
@@ -109,6 +110,7 @@ const fetchWithElectronSession = async (request: ExternalHttpProxyRequest): Prom
   try {
     const response = await session.defaultSession.fetch(request.url, {
       body: request.bodyBase64 ? Buffer.from(request.bodyBase64, 'base64') : undefined,
+      credentials: request.credentials,
       headers: request.headers,
       method: request.method || 'GET',
       signal: abortController.signal,
@@ -154,6 +156,7 @@ export const hasExternalHttpProxy = (): boolean => getExternalHttpProxy() !== un
 
 const createProxyRequest = (url: string, options: ExternalHttpRequestOptions): ExternalHttpProxyRequest => ({
   bodyBase64: toRequestBodyBase64(options.body),
+  credentials: options.credentials,
   headers: toHeaderRecord(options.headers),
   method: options.method || 'GET',
   timeoutMs: options.timeoutMs,

@@ -111,6 +111,24 @@ describe('apical Excel generation utilities', () => {
     expect(result.Cookie).toContain('ApicalAuth=document-auth');
   });
 
+  it('uses a cookie header synthesized by the Electron external HTTP proxy', async () => {
+    vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        FileGuid: APICAL_FILE_GUID,
+        FileName: APICAL_FILE_NAME,
+      }), {
+        headers: {
+          cookie: 'ASP.NET_SessionId=electron-session',
+        },
+        status: 200,
+      }));
+
+    const result = await generateExcelData(APICAL_EVENT_ID, APICAL_TIMESTAMP);
+
+    expect(result.Cookie).toBe('ASP.NET_SessionId=electron-session');
+  });
+
   it('rejects export responses that do not include a GUID file id', async () => {
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify({

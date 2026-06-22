@@ -7,6 +7,7 @@ export type FileReadDataType = 'utf8' | 'buffer' | 'bytearray';
 export type FileWriteDataType = 'utf8' | 'base64';
 export interface ExternalHttpProxyRequest {
   bodyBase64?: string;
+  credentials?: RequestCredentials;
   headers?: Record<string, string>;
   method?: string;
   timeoutMs?: number;

@@ -50,6 +50,7 @@ describe('external HTTP proxy', () => {
     } as unknown as Response);
 
     const response = await fetchExternalHttpProxy({
+      credentials: 'include',
       headers: {
         'X-Requested-With': 'XMLHttpRequest',
       },
@@ -60,6 +61,7 @@ describe('external HTTP proxy', () => {
     expect(electronMocks.sessionFetch).toHaveBeenCalledWith(
       'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=67',
       expect.objectContaining({
+        credentials: 'include',
         headers: {
           'X-Requested-With': 'XMLHttpRequest',
         },
@@ -87,14 +89,22 @@ describe('external HTTP proxy', () => {
     ]);
 
     const response = await fetchExternalHttpProxy({
+      credentials: 'include',
       method: 'GET',
       url: 'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=67',
     });
 
-    expect(electronMocks.sessionFetch).toHaveBeenCalled();
+    expect(electronMocks.sessionFetch).toHaveBeenCalledWith(
+      'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=67',
+      expect.objectContaining({
+        credentials: 'include',
+        method: 'GET',
+      })
+    );
     expect(electronMocks.cookiesGet).toHaveBeenCalledWith({
       url: 'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=67',
     });
+    expect(response.headers['set-cookie']).toBeUndefined();
     expect(response.headers.cookie).toBe('ASP.NET_SessionId=abc123; RaceSweetAuth=def456');
   });
 

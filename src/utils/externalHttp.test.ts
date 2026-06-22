@@ -55,6 +55,7 @@ describe('fetchExternalHttp', () => {
           Cookie: 'session=renderer-cookie',
           'X-Requested-With': 'XMLHttpRequest',
         },
+        credentials: 'include',
         method: 'GET',
         timeoutMs: 5000,
       }
@@ -66,6 +67,7 @@ describe('fetchExternalHttp', () => {
         cookie: 'session=renderer-cookie',
         'x-requested-with': 'XMLHttpRequest',
       },
+      credentials: 'include',
       method: 'GET',
       timeoutMs: 5000,
       url: 'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69',
@@ -90,6 +92,7 @@ describe('fetchExternalHttp', () => {
     const response = await fetchExternalHttp(
       'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69',
       {
+        credentials: 'include',
         headers: {
           'X-Requested-With': 'XMLHttpRequest',
         },
@@ -101,6 +104,7 @@ describe('fetchExternalHttp', () => {
     expect(electronMocks.sessionFetch).toHaveBeenCalledWith(
       'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69',
       expect.objectContaining({
+        credentials: 'include',
         headers: {
           'x-requested-with': 'XMLHttpRequest',
         },
@@ -130,11 +134,22 @@ describe('fetchExternalHttp', () => {
     const response = await fetchExternalHttp(
       'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69',
       {
+        credentials: 'include',
         method: 'GET',
       }
     );
 
-    expect(electronMocks.sessionFetch).toHaveBeenCalled();
+    expect(electronMocks.sessionFetch).toHaveBeenCalledWith(
+      'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69',
+      expect.objectContaining({
+        credentials: 'include',
+        method: 'GET',
+      })
+    );
+    expect(electronMocks.cookiesGet).toHaveBeenCalledWith({
+      url: 'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69',
+    });
+    expect(response.headers.get('set-cookie')).toBeNull();
     expect(response.headers.get('cookie')).toBe('ASP.NET_SessionId=abc123');
     expect(await response.json()).toEqual({ ok: true });
   });
