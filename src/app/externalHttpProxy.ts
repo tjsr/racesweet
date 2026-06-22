@@ -83,6 +83,8 @@ export const fetchExternalHttpProxy = async (request: ExternalHttpProxyRequest):
       const cookieHeader = await readElectronCookieHeader(response.url || request.url);
       if (cookieHeader) {
         headers.cookie = cookieHeader;
+      } else {
+        console.warn(`External HTTP response for ${response.url || request.url} did not expose set-cookie and the Electron session cookie store did not contain cookies for that URL.`);
       }
     }
 

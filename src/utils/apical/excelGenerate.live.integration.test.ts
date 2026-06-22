@@ -19,6 +19,9 @@ describe.skipIf(!runLiveApicalTests)('live Apical Excel integration', () => {
 
     expect(exportData.FileGuid).toMatch(GUID_REGEX);
     expect(exportData.FileName).toBe(APICAL_FILE_NAME);
+    if (!exportData.Cookie) {
+      throw new Error('Live Apical export did not return readable cookie data for the standalone Excel download helper');
+    }
     expect(exportData.Cookie.trim().length).toBeGreaterThan(0);
 
     const filePath = await retrieveExcelData(exportData.FileGuid, exportData.FileName, APICAL_EVENT_ID, exportData.Cookie);

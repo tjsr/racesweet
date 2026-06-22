@@ -129,6 +129,24 @@ describe('apical Excel generation utilities', () => {
     expect(result.Cookie).toBe('ASP.NET_SessionId=electron-session');
   });
 
+  it('logs a warning and continues when the Excel export response has no readable cookie data', async () => {
+    const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        FileGuid: APICAL_FILE_GUID,
+        FileName: APICAL_FILE_NAME,
+      }), { status: 200 }));
+
+    const result = await generateExcelData(APICAL_EVENT_ID, APICAL_TIMESTAMP);
+
+    expect(result).toEqual({
+      FileGuid: APICAL_FILE_GUID,
+      FileName: APICAL_FILE_NAME,
+    });
+    expect(warnMock).toHaveBeenCalledWith(expect.stringContaining('did not include readable cookie data'));
+  });
+
   it('rejects export responses that do not include a GUID file id', async () => {
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify({

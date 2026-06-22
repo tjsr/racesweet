@@ -2,7 +2,6 @@ import { generateExcelData } from '../controllers/apical/generateExcel.js';
 import { readApicalExcelBuffer } from '../controllers/apical/apicalSpreadsheetProcessor.js';
 import { ApicalDataException } from '../errors/apicalDataException.js';
 import { ApicalRequestFailedError } from '../errors/ApicalRequestFailedError.js';
-import { ExcelDownloadException } from '../errors/excelDownloadException.js';
 import type { ApicalLapByCategory } from '../model/apical.js';
 import { EventId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
@@ -268,6 +267,7 @@ export const fetchApicalResponse = async (
     ].join('\n'));
     response = await fetchExternalHttp(url, {
       body: init.body,
+      credentials: init.credentials,
       headers: init.headers,
       method: init.method,
       timeoutMs,
@@ -446,13 +446,13 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
   const url = getApicalExcelDownloadUrl(source.apiConfig.baseUrl, excelData.FileGuid, excelData.FileName);
   if (excelData.Cookie) {
     headers.set('Cookie', excelData.Cookie);
+  } else {
+    console.warn(`Apical Excel export for event id ${apicalEventId} did not provide cookie data. Continuing with credentialed Electron fetch; the download may still succeed if the cookie is held in the Electron session.`);
   }
   if (source.apiConfig.baseUrl.includes('apicalracetiming.com.au')) {
     const authHeader = getAuthHeader(source);
     if (authHeader) {
       headers.set('Authorization', authHeader ? `${authHeader.name} ${authHeader.value}` : '');
-    } else if (!excelData.Cookie) {
-      throw new ExcelDownloadException(`Can't download from ${url} with missing Authorization or Cookie header value which can't be set.`);
     }
   }
 

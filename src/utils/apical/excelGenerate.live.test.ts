@@ -18,6 +18,10 @@ describeLive('live Apical Excel integration', () => {
   it('generates an Excel export, reuses the returned cookie, and reads the downloaded workbook', async () => {
     const exportResponse = await generateExcelData(LIVE_APICAL_EVENT_ID);
 
+    if (!exportResponse.Cookie) {
+      throw new Error('Live Apical export did not return readable cookie data for the standalone Excel download helper');
+    }
+
     expect(exportResponse.Cookie).toMatch(/^[!#$%&'*+\-.^_`|~0-9A-Za-z]+=/);
     expect(exportResponse.FileGuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
     expect(exportResponse.FileName).toBeTruthy();

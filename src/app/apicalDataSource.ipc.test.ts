@@ -106,7 +106,7 @@ describe('apicalDataSource renderer IPC flow', () => {
     expect(requestExternalHttp).toHaveBeenCalledTimes(2);
 
     const exportRequest = requestExternalHttp.mock.calls[0]?.[0] as { headers?: Record<string, string>; url: string };
-    const downloadRequest = requestExternalHttp.mock.calls[1]?.[0] as { headers?: Record<string, string>; url: string };
+    const downloadRequest = requestExternalHttp.mock.calls[1]?.[0] as { credentials?: RequestCredentials; headers?: Record<string, string>; url: string };
 
     expect(exportRequest.url).toContain('/RaceResult/Event/ExportToExcel?eventId=301');
     expect(exportRequest.headers).toEqual(expect.objectContaining({
@@ -124,5 +124,54 @@ describe('apicalDataSource renderer IPC flow', () => {
       participants: [],
       records: [],
     });
+  });
+
+  it('continues through renderer IPC when the export response does not expose cookie data', async () => {
+    const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const requestExternalHttp = vi
+      .fn()
+      .mockResolvedValueOnce({
+        bodyBase64: Buffer.from(JSON.stringify({
+          FileGuid: '11111111-1111-4111-8111-111111111111',
+          FileName: 'Round 3.xlsx',
+        })).toString('base64'),
+        headers: { 'content-type': 'application/json' },
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        url: 'https://apical.example.com/RaceResult/Event/ExportToExcel?eventId=301',
+      })
+      .mockResolvedValueOnce({
+        bodyBase64: Buffer.from(createExcelBuffer()).toString('base64'),
+        headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        url: 'https://apical.example.com/Download/DownloadExcel?fileGuid=11111111-1111-4111-8111-111111111111&filename=Round%203.xlsx',
+      });
+
+    (window as unknown as {
+      api: {
+        requestExternalHttp: (request: unknown) => Promise<unknown>;
+      };
+    }).api = {
+      requestExternalHttp,
+    };
+
+    await fetchApicalRaceStateNow(createApicalSource());
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(requestExternalHttp).toHaveBeenCalledTimes(2);
+
+    const exportRequest = requestExternalHttp.mock.calls[0]?.[0] as { credentials?: RequestCredentials; headers?: Record<string, string>; url: string };
+    const downloadRequest = requestExternalHttp.mock.calls[1]?.[0] as { credentials?: RequestCredentials; headers?: Record<string, string>; url: string };
+
+    expect(exportRequest.credentials).toBe('include');
+    expect(downloadRequest.credentials).toBe('include');
+    expect(downloadRequest.headers).toEqual(expect.not.objectContaining({
+      cookie: expect.any(String),
+    }));
+    expect(warnMock.mock.calls.map((call) => call.join(' ')).join('\n')).toContain('did not provide cookie data');
   });
 });

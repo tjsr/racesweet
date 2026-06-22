@@ -154,6 +154,36 @@ describe('fetchExternalHttp', () => {
     expect(await response.json()).toEqual({ ok: true });
   });
 
+  it('warns and continues when Electron fetch hides set-cookie headers and the session has no cookies for the URL', async () => {
+    const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    electronMocks.sessionFetch.mockResolvedValueOnce({
+      arrayBuffer: async () => Buffer.from('{"ok":true}'),
+      headers: new Headers({
+        'content-type': 'application/json',
+      }),
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      url: 'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69',
+    } as unknown as Response);
+    electronMocks.cookiesGet.mockResolvedValueOnce([]);
+
+    const response = await fetchExternalHttp(
+      'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69',
+      {
+        credentials: 'include',
+        method: 'GET',
+      }
+    );
+
+    expect(electronMocks.cookiesGet).toHaveBeenCalledWith({
+      url: 'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=69',
+    });
+    expect(response.headers.get('cookie')).toBeNull();
+    expect(warnMock).toHaveBeenCalledWith(expect.stringContaining('Electron session cookie store did not contain cookies'));
+    expect(await response.json()).toEqual({ ok: true });
+  });
+
   it('fails when Electron session cookies cannot be read after Electron fetch hides set-cookie headers', async () => {
     electronMocks.sessionFetch.mockResolvedValueOnce({
       arrayBuffer: async () => Buffer.from('{"ok":true}'),

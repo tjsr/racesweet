@@ -58,7 +58,7 @@ const validateFileName = (fileName: unknown): string => {
   return fileName;
 };
 
-export const retrieveExcelData = async (fileGuid: string, fileName: string, eventId: number, Cookie: string): Promise<string> => {
+export const retrieveExcelData = async (fileGuid: string, fileName: string, eventId: number, Cookie: string | undefined): Promise<string> => {
   const validatedFileName = validateFileName(fileName);
   const validatedCookie = validateCookie(Cookie);
   const baseUrl = 'https://apicalracetiming.com.au';

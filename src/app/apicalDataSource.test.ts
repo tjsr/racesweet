@@ -155,6 +155,7 @@ describe('apicalDataSource', () => {
     convertDataToRaceState.mockReset();
     vi.spyOn(console, 'debug').mockImplementation(() => undefined);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -218,11 +219,36 @@ describe('apicalDataSource', () => {
     const eventHeaders = eventCallOptions.headers as Headers;
 
     expect(String(fetchMock.mock.calls[0]?.[0] || '')).toContain('/RaceResult/Event/ExportToExcel?eventId=301');
+    expect(authCallOptions.credentials).toBe('include');
     expect(authHeaders.get('Authorization')).toBe('Bearer test-token');
     expect(authHeaders.get('X-Requested-With')).toBe('XMLHttpRequest');
     expect(String(fetchMock.mock.calls[1]?.[0] || '')).toContain('/raceresult/event/getall');
+    expect(eventCallOptions.credentials).toBe('include');
     expect(eventHeaders.get('Authorization')).toBe('Bearer test-token');
     expect(eventHeaders.get('Cookie')).toBe('session=abc123');
+  });
+
+  it('continues an authenticated event list fetch when the warm-up response does not expose cookie data', async () => {
+    const warnMock = vi.mocked(console.warn);
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        FileGuid: TEST_FILE_GUID,
+        FileName: 'Round 3.xlsx',
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
+
+    const requestHost = 'apical.example.com';
+    await fetchApicalEvents(createApicalSource(requestHost));
+
+    const authCallOptions = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const eventCallOptions = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    const eventHeaders = eventCallOptions.headers as Headers;
+
+    expect(authCallOptions.credentials).toBe('include');
+    expect(eventCallOptions.credentials).toBe('include');
+    expect(eventHeaders.get('Cookie')).toBeNull();
+    expect(warnMock).toHaveBeenCalledWith(expect.stringContaining('authentication response did not include readable cookie data'));
   });
 
   it('uses the external HTTP IPC proxy when available in renderer context', async () => {
@@ -420,6 +446,27 @@ describe('apicalDataSource', () => {
     expect(APICAL_EVENT_69_FILE_GUID).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
     expect(getFetchUrl(fetchMock, 1)).toBe('https://apicalracetiming.com.au/Download/DownloadExcel?fileGuid=1cf63381-1269-4257-b892-ef8b33424103&filename=Results%20%20GMBC%20Autumn%20No%20Frills%20Round%204%202026-6-12.xlsx');
     expectRequiredDownloadHeaders(getFetchHeaders(fetchMock, 1), 'https://apicalracetiming.com.au', APICAL_APP_TEST_EVENT_ID, 'session=event69');
+  });
+
+  it('continues a direct event data fetch when the export response does not expose cookie data', async () => {
+    convertDataToRaceState.mockReturnValue({});
+    const warnMock = vi.mocked(console.warn);
+
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        FileGuid: APICAL_EVENT_69_FILE_GUID,
+        FileName: APICAL_EVENT_69_FILE_NAME,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(createExcelBuffer(), { status: 200 }));
+
+    await fetchApicalRaceStateNow(createApicalEvent69Source('apicalracetiming.com.au'));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect((fetchMock.mock.calls[0]?.[1] as RequestInit).credentials).toBe('include');
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).credentials).toBe('include');
+    expect(getFetchHeaders(fetchMock, 1).has('Cookie')).toBe(false);
+    expect(warnMock.mock.calls.map((call) => call.join(' ')).join('\n')).toContain('did not provide cookie data');
   });
 
   it('parses a valid two-sheet Apical workbook before converting event 69 race state', async () => {

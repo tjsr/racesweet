@@ -108,6 +108,33 @@ describe('external HTTP proxy', () => {
     expect(response.headers.cookie).toBe('ASP.NET_SessionId=abc123; RaceSweetAuth=def456');
   });
 
+  it('warns and continues when set-cookie is hidden and the Electron session has no cookies for the URL', async () => {
+    const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    electronMocks.sessionFetch.mockResolvedValueOnce({
+      arrayBuffer: async () => Buffer.from('{"ok":true}'),
+      headers: new Headers({
+        'content-type': 'application/json',
+      }),
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      url: 'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=67',
+    } as unknown as Response);
+    electronMocks.cookiesGet.mockResolvedValueOnce([]);
+
+    const response = await fetchExternalHttpProxy({
+      credentials: 'include',
+      method: 'GET',
+      url: 'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=67',
+    });
+
+    expect(electronMocks.cookiesGet).toHaveBeenCalledWith({
+      url: 'https://apicalracetiming.com.au/RaceResult/Event/ExportToExcel?eventId=67',
+    });
+    expect(response.headers.cookie).toBeUndefined();
+    expect(warnMock).toHaveBeenCalledWith(expect.stringContaining('Electron session cookie store did not contain cookies'));
+  });
+
   it('fails when Electron session cookies cannot be read after set-cookie is hidden', async () => {
     electronMocks.sessionFetch.mockResolvedValueOnce({
       arrayBuffer: async () => Buffer.from('{"ok":true}'),

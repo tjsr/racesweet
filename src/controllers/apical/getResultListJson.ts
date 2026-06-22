@@ -10,6 +10,10 @@ const hasAuthHeader = (source: DataSourceConfig): boolean => {
   return Boolean(apiConfig?.authHeaderName.trim() && apiConfig.authHeaderValue.trim());
 };
 
+const readResponseCookie = (response: Response): string | undefined => {
+  return response.headers.get('set-cookie') || response.headers.get('cookie') || undefined;
+};
+
 const authenticateSession = async (source: DataSourceConfig): Promise<string | undefined> => {
   if (!source.apiConfig || !hasAuthHeader(source)) {
     return undefined;
@@ -34,7 +38,12 @@ const authenticateSession = async (source: DataSourceConfig): Promise<string | u
     source.apiConfig.httpTimeoutSeconds * 1000
   );
 
-  return response.headers.get('set-cookie') || undefined;
+  const cookie = readResponseCookie(response);
+  if (!cookie) {
+    console.warn('Apical authentication response did not include readable cookie data. Continuing with credentialed Electron fetch; the event list may still succeed if the cookie is held in the Electron session.');
+  }
+
+  return cookie;
 };
 
 export const fetchApicalEvents = async (source: DataSourceConfig): Promise<ApicalListedEvent[]> => {

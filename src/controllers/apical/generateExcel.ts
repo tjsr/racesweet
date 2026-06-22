@@ -55,7 +55,7 @@ const createGenerateExcelError = (message: string, url: string, headers: Headers
 
 const readDocumentCookie = (): string | undefined => {
   if (typeof document === 'undefined') {
-    throw new Error('Cannot read document cookie: document is undefined');
+    return undefined;
   }
 
   const cookie = document.cookie.trim();
@@ -107,7 +107,7 @@ export const generateExcelData = async (eventId: number, timestampOrOptions: num
       const headerKeys = normalizedHeaderKeys.join(', ');
       const hasConvertedSetCookie = normalizedHeaderKeys.includes('set-cookie');
 
-      throw new ApicalDataException(`Missing set-cookie header in Excel export response from url ${url} (hasConvertedSetCookie=${hasConvertedSetCookie}, headers=${headerKeys})`);
+      console.warn(`Apical Excel export response from url ${url} did not include readable cookie data (hasConvertedSetCookie=${hasConvertedSetCookie}, headers=${headerKeys}). Continuing without an explicit Cookie header; Electron may still send session cookies through credentialed fetch.`);
     }
 
     // const setCookieHeaders = (response.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie?.();
@@ -120,7 +120,7 @@ export const generateExcelData = async (eventId: number, timestampOrOptions: num
 
 
     return {
-      Cookie: cookieHeader,
+      ...(cookieHeader ? { Cookie: cookieHeader } : {}),
       FileGuid: jsonData.FileGuid,
       FileName: jsonData.FileName,
     };
