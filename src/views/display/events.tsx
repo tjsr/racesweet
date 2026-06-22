@@ -1,4 +1,3 @@
-/* eslint-disable sort-imports */
 import {
   type EventCatalogEvent,
   type EventCatalogState,
