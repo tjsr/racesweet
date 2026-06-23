@@ -1,12 +1,12 @@
-import { type EventCategory, type EventCategoryId } from '../../../model/eventcategory.js';
-import { CategoryList } from '../timing/categoryList.js';
-import { type EventCatalogState } from '../../eventCatalog.js';
-import { type EventParticipantId } from '../../../model/eventparticipant.js';
-import { type EventTimeRecord } from '../../../model/timerecord.js';
-import { type RaceStateLookup } from '../../../model/racestate.js';
+import { type EventCategory, type EventCategoryId } from '../../model/eventcategory.js';
+import { CategoryList } from '../../app/views/timing/categoryList.js';
+import { type EventCatalogState } from '../../app/eventCatalog.js';
+import { type EventParticipantId } from '../../model/eventparticipant.js';
+import { type EventTimeRecord } from '../../model/timerecord.js';
+import { type RaceStateLookup } from '../../model/racestate.js';
 import React from 'react';
-import { RecentRecords } from '../timing/recentRecords.js';
-import { type TimeDisplayZoneMode } from '../../utils/timeutils.js';
+import { RecentRecords } from '../../app/views/timing/recentRecords.js';
+import { type TimeDisplayZoneMode } from '../../app/utils/timeutils.js';
 
 type EventCatalogEvent = EventCatalogState['events'][number];
 type EventCatalogSession = EventCatalogState['sessions'][number];

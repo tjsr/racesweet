@@ -1,5 +1,5 @@
 import React from 'react';
-import { SystemPage } from '../system/systemPage.js';
+import { SystemPage } from '../../app/views/system/systemPage.js';
 
 type SystemContextProps = React.ComponentProps<typeof SystemPage>;
 

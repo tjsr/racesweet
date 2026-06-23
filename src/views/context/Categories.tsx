@@ -1,4 +1,4 @@
-import { CategoriesPage } from '../categories/categoriesPage.js';
+import { CategoriesPage } from '../../app/views/categories/categoriesPage.js';
 import React from 'react';
 
 type CategoriesContextProps = React.ComponentProps<typeof CategoriesPage>;

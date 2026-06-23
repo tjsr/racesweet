@@ -1,5 +1,5 @@
 import React from 'react';
-import { ResultsPage } from '../results/resultsPage.js';
+import { ResultsPage } from '../../app/views/results/resultsPage.js';
 
 type ResultsContextProps = React.ComponentProps<typeof ResultsPage>;
 

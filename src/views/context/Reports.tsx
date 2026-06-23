@@ -1,5 +1,5 @@
 import React from 'react';
-import { ReportsPage } from '../reports/reportsPage.js';
+import { ReportsPage } from '../../app/views/reports/reportsPage.js';
 
 type ReportsContextProps = React.ComponentProps<typeof ReportsPage>;
 
