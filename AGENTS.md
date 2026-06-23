@@ -1,5 +1,12 @@
 # RaceSweet Agent instructions
 
+## Initial checks
+
+Do these checks initially and once at the start of each session - don't repeat them once done.
+
+- Check whether we have access to an NPU to run models on as in the `Local NPU agents` section
+- Run `npm i` once only.
+
 ## Branches
 
 Always make sure when opening a terminal that we know firstly whether it is is a bash, powershell or cmd terminal first, then determine the version so that only commands and syntax valid for that format are attempted.
@@ -81,7 +88,7 @@ A job is failed if any Vitest test fails.  Existing test failures must be fixed 
 
 Agents must solve existing code failures so the project passes relevant Vitest tests, TypeScript checks, and lint checks before reporting completion.
 
-Run `npm i` before tests or lint whenever dependencies are missing, stale, or suspect.
+Run `npm i` if it has not already been run within this agent session before tests or lint whenever dependencies are missing, stale, or suspect.
 
 All Markdown files must pass the repository's Markdown lint checks. When adding or editing Markdown, run the relevant Markdown lint command before handoff and fix any reported issues.
 
@@ -98,6 +105,7 @@ Check whether or not we have access to either a Qualcomm NPU agent or an own-hos
 When a task is small, read-only, and suitable for local inference, prefer the `qualcomm_npu` MCP tools if it is available on the local system.
 
 Use the NPU tools for:
+
 - Evaluating the output of command line tool output.
 - summarizing test logs
 - classifying known failure patterns
