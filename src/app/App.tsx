@@ -2,27 +2,27 @@ import './index.css';
 import { Component, type ReactElement, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { type DataSourceConfig, type EventTimeDisplayZoneMode, type SystemConfiguration, createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
 import { type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
-import { type EventSessionOption, ReportsPage, ResultsPage } from '../views/display/raceAnalyticsViews.tsx';
 import { RaceStateLookup, Session } from '../model/racestate.ts';
 import { createApicalCatalogEventId, fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.ts';
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
-import { CategoriesPage } from '../views/display/categoriesPage.tsx';
-import { CategoryList } from '../views/display/categories.tsx';
+import { CategoriesContext } from './views/context/Categories.tsx';
 import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.ts';
 import { ElectronJsonRaceAdminPersistence } from './raceAdminPersistence.ts';
 import { ElectronJsonSystemConfigPersistence } from './systemConfigPersistence.ts';
-import { EntrantsPage } from '../views/display/entrantsPage.tsx';
+import { EntrantsContext } from './views/context/Entrants.tsx';
 import { EventCatalogService } from './eventCatalogService.ts';
 import { EventCategoryId } from '../model/eventcategory.ts';
 import { type EventParticipantId } from '../model/eventparticipant.ts';
-import { type EventTimeRecord } from '../model/timerecord.ts';
-import { EventsScreen } from '../views/display/events.tsx';
+import { type EventSessionOption } from './views/results/resultsPage.tsx';
+import { EventsContext } from './views/context/Events.tsx';
 import { RaceAdminService } from './raceAdminService.ts';
-import { RecentRecords } from '../views/display/recent.tsx';
-import { SessionsPage } from '../views/display/sessionsPage.tsx';
+import { ReportsContext } from './views/context/Reports.tsx';
+import { ResultsContext } from './views/context/Results.tsx';
+import { SessionsContext } from './views/context/Sessions.tsx';
 import { SystemConfigService } from './systemConfigService.ts';
-import { SystemPage } from '../views/display/systemPage.tsx';
+import { SystemContext } from './views/context/System.tsx';
 import { TestSession } from '../testdata/testsession.ts';
+import { TimingContext } from './views/context/Timing.tsx';
 import { type UnsavedChangesGuard } from '../views/display/unsavedChangesWarning.tsx';
 import { applyPulledRaceStateToSession } from './sourceApplication.ts';
 import { fetchApicalEvents } from '../controllers/apical/getResultListJson.ts';
@@ -675,50 +675,26 @@ export const RaceSweetMainApp = () => {
       {timingErrorState ? (
         <PageErrorFallback error={timingErrorState} title="Timing" />
       ) : (
-        <>
-          <h1>Timing</h1>
-          <div className="timing-context-row">
-            <label className="page-filter-label">
-              Event
-              <select
-                aria-label="Timing Event"
-                value={timingEvent?.id || ''}
-                onChange={(event) => selectTimingEvent(event.target.value)}
-              >
-                {eventCatalogState.events.map((event) => (
-                  <option key={event.id} value={event.id}>{event.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="page-filter-label">
-              Session
-              <select
-                aria-label="Timing Session"
-                value={timingSessionValue}
-                onChange={(event) => selectTimingSession(event.target.value)}
-              >
-                <option value="active">Active session ({activeSession?.name || 'None'})</option>
-                {timingSessions.map((session) => (
-                  <option key={session.id} value={session.id}>{session.name}{activeSession?.id == session.id ? ' (Active)' : ''}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <CategoryList categories={displayedTimingRaceState.categories || []} categorySelected={handleCategoryListSelected} />
-          <RecentRecords
-            eventTimeZone={timingEvent?.timeZone || getSystemTimeZone()}
-            records={(displayedTimingRaceState.records as EventTimeRecord[]) || []}
-            raceStateLookup={displayedTimingRaceState}
-            selectedCategories={hilightCategories}
-            selectedParticipants={recordSelectedParticipants}
-            categorySelected={setRecordSelectedCategories}
-            timeDisplayZoneMode={timingTimeDisplayZoneMode}
-            onTimeDisplayZoneModeChange={updateTimingTimeDisplayZoneMode}
-            participantSelected={handleParticipantSelected}
-            onExclude={handleExcludeCrossing}
-            onChangeCategory={handleChangeCategory}
-          />
-        </>
+        <TimingContext
+          activeSession={activeSession}
+          categoryListSelected={handleCategoryListSelected}
+          eventTimeZone={timingEvent?.timeZone || getSystemTimeZone()}
+          events={eventCatalogState.events}
+          onChangeCategory={handleChangeCategory}
+          onExclude={handleExcludeCrossing}
+          onSelectEvent={selectTimingEvent}
+          onSelectSession={selectTimingSession}
+          onTimeDisplayZoneModeChange={updateTimingTimeDisplayZoneMode}
+          participantSelected={handleParticipantSelected}
+          raceState={displayedTimingRaceState}
+          recordCategorySelected={setRecordSelectedCategories}
+          selectedCategories={hilightCategories}
+          selectedParticipants={recordSelectedParticipants}
+          sessions={timingSessions}
+          timeDisplayZoneMode={timingTimeDisplayZoneMode}
+          timingEvent={timingEvent}
+          timingSessionValue={timingSessionValue}
+        />
       )}
     </PageErrorBoundary>
   );
@@ -790,7 +766,7 @@ export const RaceSweetMainApp = () => {
 
     if (activeSection === 'System') {
       return (
-        <SystemPage
+        <SystemContext
           config={systemConfigState}
           onCreateSource={(type) => {
             if (!systemConfigService) {
@@ -855,7 +831,7 @@ export const RaceSweetMainApp = () => {
 
     if (activeSection === 'Events') {
       return (
-        <EventsScreen
+        <EventsContext
           catalog={eventCatalogState}
           config={systemConfigState}
           onActivateEvent={(eventId) => {
@@ -914,7 +890,7 @@ export const RaceSweetMainApp = () => {
 
     if (activeSection === 'Sessions') {
       return (
-        <SessionsPage
+        <SessionsContext
           catalog={eventCatalogState}
           config={systemConfigState}
           onApplySessionSources={(eventId, sessionId) => {
@@ -999,7 +975,7 @@ export const RaceSweetMainApp = () => {
 
     if (activeSection === 'Categories') {
       return (
-        <CategoriesPage
+        <CategoriesContext
           catalog={eventCatalogState}
           entrants={selectedCategoryEntrants}
           onCreateCategory={(eventId) => {
@@ -1049,7 +1025,7 @@ export const RaceSweetMainApp = () => {
 
     if (activeSection === 'Entrants') {
       return (
-        <EntrantsPage
+        <EntrantsContext
           catalog={eventCatalogState}
           onCreateEntrant={(eventId, entrantType) => {
             if (!eventCatalogService) {
@@ -1095,7 +1071,7 @@ export const RaceSweetMainApp = () => {
 
     if (activeSection === 'Results') {
       return (
-        <ResultsPage
+        <ResultsContext
           categories={sessionScopedCategories}
           eventSessionOptions={eventSessionOptions}
           catalogEntrants={getEntrantsForEvent(eventCatalogState, selectedResultsEventId)}
@@ -1109,7 +1085,7 @@ export const RaceSweetMainApp = () => {
 
     if (activeSection === 'Reports') {
       return (
-        <ReportsPage
+        <ReportsContext
           categories={sessionScopedCategories}
           eventSessionOptions={eventSessionOptions}
           catalogEntrants={getEntrantsForEvent(eventCatalogState, selectedResultsEventId)}

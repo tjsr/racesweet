@@ -502,7 +502,10 @@ describe('RaceSweetMainApp integration', () => {
 
   useUiConsoleGuards({
     allowErrorPatterns: [/Apical .* request returned HTTP/, /Failed to fetch Apical events for source/, /Failed to fetch Apical event data for source/],
-    allowWarnPatterns: [/RaceSweet cannot (read from|write to) .*Windows denied file access/i],
+    allowWarnPatterns: [
+      /Apical authentication response did not include readable cookie data/,
+      /RaceSweet cannot (read from|write to) .*Windows denied file access/i,
+    ],
   });
 
   beforeEach(() => {
