@@ -16,6 +16,19 @@ Imports should always be of ESModule format, and avoid require unless absolutely
 
 Imports should be sorted alphabetically.
 
+## Project structure
+
+Place all files in the following locations:
+
+- src: General source that doesn't fit in to any other below category.  
+- src\app: Code relating to the electron app including IPC definitions and security objects only used in app mode.
+- src\controller: Code for updating application state and calling endpoints.
+- src\state: State management stores.  
+- src\views: All UI-related code.  
+- src\views\[context]: Controls that appear within any given context.
+- src\views\context: Top-level view context panes.
+- src\model: Data model and object definition.
+
 ## Data mutation and persistence
 
 Any instruction that changes race data must be implemented through the admin service layer and must be persisted immediately.
