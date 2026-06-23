@@ -5,6 +5,7 @@ export const WriteContentErrorIpcReceiveChannel = 'sendWriteError';
 
 export const RequestReadIpcSendChannel = 'askToRead';
 export const RequestExternalHttpIpcInvokeChannel = 'askToRequestExternalHttp';
+export const RequestOpenLocalFileIpcInvokeChannel = 'askToOpenLocalFile';
 export const RequestSelectLocalFileIpcInvokeChannel = 'askToSelectLocalFile';
 export const RequestWriteIpcSendChannel = 'askToWrite';
 
@@ -22,6 +23,7 @@ export const VALID_SEND_CHANNELS = [
 
 export const VALID_INVOKE_CHANNELS = [
   RequestExternalHttpIpcInvokeChannel,
+  RequestOpenLocalFileIpcInvokeChannel,
   RequestSelectLocalFileIpcInvokeChannel,
 ];
 

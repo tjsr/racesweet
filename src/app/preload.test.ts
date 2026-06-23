@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { RequestReadIpcSendChannel, RequestWriteIpcSendChannel } from '../model/electronIpc.js';
+import { RequestOpenLocalFileIpcInvokeChannel, RequestReadIpcSendChannel, RequestWriteIpcSendChannel } from '../model/electronIpc.js';
 import { contextBridge, ipcRenderer } from 'electron';
 
 vi.mock('electron', () => ({
@@ -48,6 +48,7 @@ describe('Electron preload renderer API', () => {
     expect(contextBridge.exposeInMainWorld).not.toHaveBeenCalled();
     expect(window.api).toEqual(expect.objectContaining({
       receive: expect.any(Function),
+      openLocalFile: expect.any(Function),
       requestBuffer: expect.any(Function),
       requestExternalHttp: expect.any(Function),
       requestFileContent: expect.any(Function),
@@ -64,6 +65,7 @@ describe('Electron preload renderer API', () => {
 
     expect(contextBridge.exposeInMainWorld).toHaveBeenCalledWith('api', window.api);
     expect(window.api.writeFileContent).toEqual(expect.any(Function));
+    expect(window.api.openLocalFile).toEqual(expect.any(Function));
     expect(window.api.requestFileContent).toEqual(expect.any(Function));
   });
 
@@ -89,5 +91,18 @@ describe('Electron preload renderer API', () => {
       '22222222-2222-4222-8222-222222222222',
       '{"schemaVersion":1}',
       'utf8');
+  });
+
+  it('opens local files through the invoke IPC bridge', async () => {
+    setContextIsolation(false);
+
+    await import('./preload.js');
+
+    void window.api.openLocalFile('../../src/generated/apical-excel-cache/apical-event-1001.xlsx');
+
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(
+      RequestOpenLocalFileIpcInvokeChannel,
+      '../../src/generated/apical-excel-cache/apical-event-1001.xlsx'
+    );
   });
 });

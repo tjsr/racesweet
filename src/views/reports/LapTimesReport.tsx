@@ -1,11 +1,11 @@
 import './LapTimesReport.css';
 
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.ts';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.ts';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { EventCategory } from '../../model/eventcategory.ts';
 import type { ParticipantPassingRecord } from '../../model/timerecord.ts';
-import { millisecondsToTime } from '../../app/utils/timeutils.ts';
 
 export type ShowAs = 'individual' | 'table';
 
@@ -50,6 +50,7 @@ const IndividualView = ({ participant, laps }: IndividualViewProps) => {
             <tr>
               <th>Lap</th>
               <th>Lap Time</th>
+              <th>Time of day</th>
               <th>Elapsed</th>
             </tr>
           </thead>
@@ -61,6 +62,7 @@ const IndividualView = ({ participant, laps }: IndividualViewProps) => {
               >
                 <td>{lap.lapNo}</td>
                 <td>{formatMs(lap.lapTime)}</td>
+                <td>{tableTimeString(lap.time)}</td>
                 <td>{formatMs(lap.elapsedTime)}</td>
               </tr>
             ))}

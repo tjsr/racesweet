@@ -14,6 +14,7 @@ interface SystemPageProps {
   onCreateSource: (type: DataSourceType) => void | Promise<void>;
   onDeleteSource: (sourceId: string) => void | Promise<void>;
   onFetchApicalDataNow: (sourceId: string) => void | Promise<void>;
+  onOpenLocalFile?: (filePath: string) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: string) => void | Promise<void>;
   onSaveSource: (sourceId: string, changes: Partial<DataSourceConfig>) => void | Promise<void>;
   onSelectLocalFile?: () => Promise<string | undefined>;
@@ -130,6 +131,14 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         },
       }));
     }
+  };
+
+  const handleOpenLocalFile = async (filePath: string): Promise<void> => {
+    if (!props.onOpenLocalFile) {
+      return;
+    }
+
+    await props.onOpenLocalFile(filePath);
   };
 
   const handleSelectRfidCsvFile = async (source: DataSourceConfig): Promise<void> => {
@@ -379,6 +388,21 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                           </button>
                         </div>
                         <p>Data last retrieved: {source.dataLastRetrieved || 'Never'}</p>
+                        {source.apicalDataFilePath ? (
+                          <p>
+                            <a
+                              href="#"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                void handleOpenLocalFile(source.apicalDataFilePath!);
+                              }}
+                            >
+                              Open downloaded Apical Excel file
+                            </a>
+                            <br />
+                            <span>{source.apicalDataFilePath}</span>
+                          </p>
+                        ) : null}
                         {sourceFetchError ? (
                           <div className="inline-error" role="alert">
                             <p>{sourceFetchError.title}:</p>

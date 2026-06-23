@@ -7,7 +7,7 @@ import { ParticipantNotFoundError, assignParticpantsToCrossings } from "../contr
 import type { ParticipantPassingRecord, TimeRecord, TimeRecordId, Validated } from "./timerecord.js";
 import { addError, compareByTime, isCrossingRecord } from "../controllers/timerecord.js";
 import { getOrCacheGreenFlagForCategory, hasCategoryIds, isFlagRecord } from "../controllers/flag.js";
-import { processAllParticipantLaps, processParticipantLaps } from "../controllers/laps.js";
+import { processAllParticipantLaps } from "../controllers/laps.js";
 
 import type { ChipCrossingData } from "./chipcrossing.js";
 import type { EventEntrantId } from "./entrant.js";
@@ -164,14 +164,7 @@ export class Session implements RaceState, RaceStateLookup {
     if (!participant) {
       throw new ParticipantNotFoundError(`Participant with ID ${participantId} not found. Cannot reprocess laps.`);
     }
-    const categoryStart = this.__getCategoryGreenFlag(participant.categoryId);
-    if (categoryStart) {
-      const participantLaps = this.getParticipantLaps(participantId);
-      if (participantLaps) {
-        processParticipantLaps(participant, participantLaps, categoryStart, this._minimumLapTimeMilliseconds);
-        this._cachedParticipantLaps?.set(participantId, participantLaps);
-      }
-    }
+    this.__reprocessAllParticipantLaps();
   }
 
   private __validateCategory(categoryId: EventCategoryId): void {
@@ -451,8 +444,6 @@ export class Session implements RaceState, RaceStateLookup {
         console.error(`Participant has no ID:`, participant);
       }
 
-      const minimumLapTimeMilliseconds = this._minimumLapTimeMilliseconds || 60000; // Default to 60 seconds if not set
-
       const affectedCrossings = this._records.values().filter((record) => isCrossingRecord(record) && crossingMatchesParticipantIdentifiers(participant, record)).map((record) => record as ParticipantPassingRecord);
       if (this._bulkProcess) {
         return; // If bulk processing, we will handle this later
@@ -470,9 +461,6 @@ export class Session implements RaceState, RaceStateLookup {
         }
       }
       
-      if (participantCategoryStartFlag) {
-        processParticipantLaps(participant, [...affectedCrossings], participantCategoryStartFlag!, minimumLapTimeMilliseconds);
-      }
       affectedCrossings.forEach((crossing: ParticipantPassingRecord) => {
         crossing.participantId = participant.id;
         crossing.participantStartRecordId = participantCategoryStartFlag?.id;

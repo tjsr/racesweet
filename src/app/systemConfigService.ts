@@ -191,7 +191,7 @@ export class SystemConfigService {
     });
   }
 
-  public async persistApicalDataFetch(sourceId: string, eventId: string, sessionId: string, retrievedAt: string): Promise<SystemConfiguration> {
+  public async persistApicalDataFetch(sourceId: string, eventId: string, sessionId: string, retrievedAt: string, apicalDataFilePath?: string): Promise<SystemConfiguration> {
     const assignedEventSources = this.config.eventSourceAssignments[eventId] || [];
     this.config = {
       ...this.config,
@@ -202,6 +202,7 @@ export class SystemConfigService {
 
         return {
           ...source,
+          apicalDataFilePath,
           dataLastRetrieved: retrievedAt,
         };
       }),

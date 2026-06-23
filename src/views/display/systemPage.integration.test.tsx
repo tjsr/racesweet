@@ -151,12 +151,14 @@ describe('SystemPage integration', () => {
     const onDeleteSource = vi.fn();
     const onFetchApicalDataNow = vi.fn();
     const onLoadApicalEvents = vi.fn();
+    const onOpenLocalFile = vi.fn();
     const onSaveSource = vi.fn();
     const retrievedConfig: SystemConfiguration = {
       ...config,
       dataSources: [
         {
           ...config.dataSources[0]!,
+          apicalDataFilePath: '../../src/generated/apical-excel-cache/apical-event-1001.xlsx',
           dataLastRetrieved: '2026-06-08T09:10:11.123Z',
         },
         config.dataSources[1]!,
@@ -171,12 +173,23 @@ describe('SystemPage integration', () => {
           onDeleteSource={onDeleteSource}
           onFetchApicalDataNow={onFetchApicalDataNow}
           onLoadApicalEvents={onLoadApicalEvents}
+          onOpenLocalFile={onOpenLocalFile}
           onSaveSource={onSaveSource}
         />,
       );
     });
 
     expect(container.textContent).toContain('Data last retrieved: 2026-06-08T09:10:11.123Z');
+    expect(container.textContent).toContain('../../src/generated/apical-excel-cache/apical-event-1001.xlsx');
+
+    const apicalFileLink = Array.from(container.querySelectorAll('a')).find((link) => link.textContent === 'Open downloaded Apical Excel file');
+    expect(apicalFileLink).toBeDefined();
+
+    await act(async () => {
+      apicalFileLink!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onOpenLocalFile).toHaveBeenCalledWith('../../src/generated/apical-excel-cache/apical-event-1001.xlsx');
 
     const fetchDataButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Fetch event data now');
     expect(fetchDataButton).toBeDefined();

@@ -45,6 +45,7 @@ declare global {
       requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType) => Promise<DataType>;
       requestExternalHttp: (request: ExternalHttpProxyRequest) => Promise<ExternalHttpProxyResponse>;
       requestBuffer: (filePath: string) => Promise<Buffer>;
+      openLocalFile: (filePath: string) => Promise<void>;
       selectLocalFile: (options?: SelectLocalFileOptions) => Promise<string | undefined>;
       writeFileContent: (filePath: string, contents: string, dataType?: FileWriteDataType) => Promise<void>;
       send: (channel: AvailableSendChannels, ...args: unknown[]) => void;

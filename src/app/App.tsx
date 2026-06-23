@@ -797,7 +797,7 @@ export const RaceSweetMainApp = () => {
               .then(async (importData) => {
                 const catalog = await eventCatalogService.importApicalRaceState(importData);
                 updateEventCatalogState(catalog, importData.eventId, importData.sessionId);
-                return systemConfigService.persistApicalDataFetch(sourceId, importData.eventId, importData.sessionId, importData.retrievedAt);
+                return systemConfigService.persistApicalDataFetch(sourceId, importData.eventId, importData.sessionId, importData.retrievedAt, importData.apicalDataFilePath);
               })
               .then(updateSystemConfigState);
           }}
@@ -813,6 +813,7 @@ export const RaceSweetMainApp = () => {
               .then((events) => systemConfigService.persistListedApicalEvents(sourceId, events))
               .then(updateSystemConfigState);
           }}
+          onOpenLocalFile={(filePath) => window.api.openLocalFile(filePath)}
           onSaveSource={(sourceId, changes) => {
             if (!systemConfigService) {
               return;

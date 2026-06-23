@@ -69,6 +69,37 @@ describe('processAllParticipantLaps entrant sequencing', () => {
     expect(riderTwoPassings[0].lapTime).toBe(360000);
   });
 
+  it('uses the previous team crossing rather than the previous rider crossing for lap time', () => {
+    const participants = new Map<string, EventParticipant>([
+      ['p1', participant('p1', '101', 'team-a')],
+      ['p2', participant('p2', '102', 'team-a')],
+    ]);
+
+    const records = [
+      createGreenFlagEvent({
+        categoryIds: [category.id],
+        flagValue: 'course',
+        id: 'flag-1',
+        recordType: 4,
+        sequence: 1,
+        source: 'test',
+        time: new Date('2026-05-30T10:00:00.000Z'),
+      }),
+      passing('c1', 'p1', 'team-a', 2, '2026-05-30T10:06:00.000Z'),
+      passing('c2', 'p2', 'team-a', 3, '2026-05-30T10:12:00.000Z'),
+      passing('c3', 'p1', 'team-a', 4, '2026-05-30T10:18:00.000Z'),
+    ];
+
+    const processed = processAllParticipantLaps(records, participants, 300000, true);
+    const riderOnePassings = processed.get('p1') || [];
+    const riderTwoPassings = processed.get('p2') || [];
+
+    expect(riderOnePassings.map((record) => record.lapNo)).toEqual([1, 3]);
+    expect(riderTwoPassings[0].lapNo).toBe(2);
+    expect(riderOnePassings[1].startingLapRecordId).toBe('c2');
+    expect(riderOnePassings[1].lapTime).toBe(360000);
+  });
+
   it('does not count crossings before the category green flag time', () => {
     const participants = new Map<string, EventParticipant>([
       ['p1', participant('p1', '101', 'team-a')],

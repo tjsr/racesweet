@@ -1,11 +1,12 @@
 import './runtimeSourceMaps.ts';
 
-import { BrowserWindow, app, dialog, ipcMain, session } from 'electron';
+import { BrowserWindow, app, dialog, ipcMain, session, shell } from 'electron';
 import type { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileWriteDataType, SelectLocalFileOptions } from './window';
 import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
   RequestExternalHttpIpcInvokeChannel,
+  RequestOpenLocalFileIpcInvokeChannel,
   RequestReadIpcSendChannel,
   RequestSelectLocalFileIpcInvokeChannel,
   RequestWriteIpcSendChannel,
@@ -182,6 +183,14 @@ ipcMain.handle(RequestSelectLocalFileIpcInvokeChannel, async (event: Electron.Ip
 
 ipcMain.handle(RequestExternalHttpIpcInvokeChannel, async (_event: Electron.IpcMainInvokeEvent, request: ExternalHttpProxyRequest): Promise<ExternalHttpProxyResponse> => {
   return fetchExternalHttpProxy(request);
+});
+
+ipcMain.handle(RequestOpenLocalFileIpcInvokeChannel, async (_event: Electron.IpcMainInvokeEvent, filename: string): Promise<void> => {
+  const fullPath = path.join(__dirname, filename);
+  const errorMessage = await shell.openPath(fullPath);
+  if (errorMessage) {
+    throw new Error(errorMessage);
+  }
 });
 
 ipcMain.on(RequestWriteIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: string, contents: string, dataType: FileWriteDataType = 'utf8') => {

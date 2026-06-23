@@ -8,6 +8,7 @@ import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
   RequestExternalHttpIpcInvokeChannel,
+  RequestOpenLocalFileIpcInvokeChannel,
   RequestReadIpcSendChannel,
   RequestSelectLocalFileIpcInvokeChannel,
   RequestWriteIpcSendChannel,
@@ -105,6 +106,9 @@ const rendererApi: Window['api'] = {
   },
   requestExternalHttp: (request: ExternalHttpProxyRequest): Promise<ExternalHttpProxyResponse> => {
     return ipcRenderer.invoke(RequestExternalHttpIpcInvokeChannel, request) as Promise<ExternalHttpProxyResponse>;
+  },
+  openLocalFile: (filePath: string): Promise<void> => {
+    return ipcRenderer.invoke(RequestOpenLocalFileIpcInvokeChannel, filePath) as Promise<void>;
   },
   selectLocalFile: (options?: SelectLocalFileOptions): Promise<string | undefined> => {
     return ipcRenderer.invoke(RequestSelectLocalFileIpcInvokeChannel, options) as Promise<string | undefined>;

@@ -9,7 +9,7 @@ import type { EventParticipant } from '../../model/eventparticipant.js';
 import type { ParticipantPassingRecord } from '../../model/timerecord.js';
 import React from 'react';
 import { act } from 'react';
-
+import { tableTimeString } from '../../app/utils/timeutils.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 
 const setSelectValue = (select: HTMLSelectElement, value: string): void => {
@@ -288,6 +288,21 @@ describe('race analytics views integration', () => {
     });
 
     expect(container.textContent).toContain('Lap Times Report');
+    const individualLapTimesTable = container.querySelector('table[aria-label="Lap Times Report Table"]') as HTMLTableElement;
+    expect(individualLapTimesTable).toBeTruthy();
+    expect(Array.from(individualLapTimesTable.querySelectorAll('thead th')).map((cell) => cell.textContent)).toEqual([
+      'Lap',
+      'Lap Time',
+      'Time of day',
+      'Elapsed',
+    ]);
+    expect(Array.from(individualLapTimesTable.querySelectorAll('tbody tr:first-child td')).map((cell) => cell.textContent)).toEqual([
+      '1',
+      '00:01:05.000',
+      tableTimeString(lapsByParticipant.get('p-team-1')![0].time),
+      '00:01:05.000',
+    ]);
+
     const lapTimesModeSelect = container.querySelector('.lap-times-report__toolbar select') as HTMLSelectElement;
     expect(lapTimesModeSelect).toBeTruthy();
 

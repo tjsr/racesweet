@@ -49,6 +49,7 @@ export interface ApicalApiSourceConfig {
 
 export interface DataSourceConfig {
   apiConfig?: ApicalApiSourceConfig;
+  apicalDataFilePath?: string;
   dataLastRetrieved?: string;
   enabled: boolean;
   fileConfig?: LocalFileSourceConfig;

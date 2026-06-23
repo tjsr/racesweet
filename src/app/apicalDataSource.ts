@@ -24,6 +24,7 @@ let xlsxModulePromise: Promise<XlsxModule> | undefined;
 
 export interface PulledApicalRaceState {
   apicalEventId: number;
+  apicalDataFilePath: string;
   eventDate?: string;
   eventId: EventId;
   eventName: string;
@@ -538,6 +539,7 @@ export const fetchApicalRaceStateNow = async (source: DataSourceConfig, options:
 
     return {
       apicalEventId,
+      apicalDataFilePath: getCachedApicalExcelFilePath(apicalEventId),
       eventDate: listedEvent?.eventDate,
       eventId,
       eventName: listedEvent?.name || `Apical Event ${apicalEventId}`,

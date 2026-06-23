@@ -638,6 +638,7 @@ describe('apicalDataSource', () => {
 
     expect(result).toEqual({
       apicalEventId: 301,
+      apicalDataFilePath: '../../src/generated/apical-excel-cache/apical-event-301.xlsx',
       eventDate: '2026-06-07T01:30:00.000Z',
       eventId: createApicalCatalogEventId(301),
       eventName: 'Round 3',

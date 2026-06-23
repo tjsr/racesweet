@@ -94,8 +94,15 @@ describe('SystemConfigService', () => {
     const sourceId = service.state.dataSources[0]!.id;
 
     await service.assignSourcesToEvent('event-existing', [sourceId]);
-    await service.persistApicalDataFetch(sourceId, 'event-apical-1001', 'session-apical-1001', '2026-06-08T09:10:11.123Z');
+    await service.persistApicalDataFetch(
+      sourceId,
+      'event-apical-1001',
+      'session-apical-1001',
+      '2026-06-08T09:10:11.123Z',
+      '../../src/generated/apical-excel-cache/apical-event-1001.xlsx'
+    );
 
+    expect(service.state.dataSources[0]?.apicalDataFilePath).toBe('../../src/generated/apical-excel-cache/apical-event-1001.xlsx');
     expect(service.state.dataSources[0]?.dataLastRetrieved).toBe('2026-06-08T09:10:11.123Z');
     expect(service.state.eventSourceAssignments['event-apical-1001']).toEqual([sourceId]);
     expect(service.state.sessionSourceAssignments['session-apical-1001']).toEqual({
@@ -106,6 +113,7 @@ describe('SystemConfigService', () => {
     expect(persistence.save).toHaveBeenLastCalledWith(expect.objectContaining({
       dataSources: [
         expect.objectContaining({
+          apicalDataFilePath: '../../src/generated/apical-excel-cache/apical-event-1001.xlsx',
           dataLastRetrieved: '2026-06-08T09:10:11.123Z',
           id: sourceId,
         }),

@@ -257,6 +257,9 @@ export const calculateParticipantLapTimes = (
     if (!isRecordAfterStart(passing, participantCategoryStartFlag)) {
       passing.lapNo = undefined;
       passing.lapTime = undefined;
+      passing.elapsedTime = undefined;
+      passing.isExcluded = true;
+      passing.isValid = false;
       return;
     }
     let lapTime: number | undefined | null;

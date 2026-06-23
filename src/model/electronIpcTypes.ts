@@ -1,5 +1,6 @@
 import {
   RequestExternalHttpIpcInvokeChannel,
+  RequestOpenLocalFileIpcInvokeChannel,
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
   RequestReadIpcSendChannel,
@@ -22,6 +23,7 @@ export type SendChannels =
 
 export type InvokeChannels =
   typeof RequestExternalHttpIpcInvokeChannel |
+  typeof RequestOpenLocalFileIpcInvokeChannel |
   typeof RequestSelectLocalFileIpcInvokeChannel;
 
 export type ReceiveChannels =
