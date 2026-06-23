@@ -7,6 +7,7 @@ import { type MillisecondsDuration, type TimeDisplayZoneMode, millisecondsToTime
 import React, { type JSX } from 'react';
 import { categoriesTextFromLookupFn, getElapsedTimeForCategory } from '../../controllers/category.ts';
 import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
+import { EventTeam } from '../../model/eventteam.ts';
 import { FlagRecord } from '../../model/flag';
 import { ParticipantPassingRecord } from '../../model/timerecord.ts';
 import { RaceStateLookup } from '../../model/racestate.ts';
@@ -138,6 +139,16 @@ const _categoriesFromCrossing = (
   return categoryStringFromParticipantId(crossing.participantId, participantLookup, categoryLookup);
 };
 
+const getPassingEntrantName = (participant: EventParticipant, rs: RaceStateLookup): string => {
+  const participantName = `${participant.firstname} ${participant.surname}`;
+  const teams = (rs as unknown as { teams?: EventTeam[] }).teams || [];
+  const team = teams.find((candidate) => {
+    return candidate.name !== participantName && candidate.members.includes(participant.id);
+  });
+
+  return team?.name ? `${participantName} (${team.name})` : participantName;
+};
+
 interface _CompletedLapProps {
   elapsedTime: MillisecondsDuration;
 }
@@ -248,7 +259,7 @@ export const PassingRecordRow = (
 
   if (entrant) {
     plateNumber = getParticipantNumber(entrant);
-    entrantName = `${entrant.firstname} ${entrant.surname}`;
+    entrantName = getPassingEntrantName(entrant, rs);
     const entrantLaps: ParticipantPassingRecord[] | undefined |null = rs.getParticipantLaps(entrant.id);
     if (entrantLaps) {
       // const lap = entrantLaps.find((l) => l.timeRecordId === evt.id);

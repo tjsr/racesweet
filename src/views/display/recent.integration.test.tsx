@@ -4,6 +4,7 @@ import { type ParticipantPassingRecord, RECORD_TX_CROSSING } from '../../model/t
 import { type Root, createRoot } from 'react-dom/client';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
+import type { EventTeam } from '../../model/eventteam.js';
 import type { FlagRecord } from '../../model/flag.js';
 import type { RaceStateLookup } from '../../model/racestate.js';
 import React from 'react';
@@ -329,6 +330,92 @@ describe('RecentRecords integration', () => {
     });
 
     expect(container.querySelector('tr[data-record-id="2001"]')?.textContent).toContain('00:15:30.250');
+  });
+
+  it('shows the team name only for crossings by a member of a team', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const teamMember: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'team-1',
+      firstname: 'Pat',
+      id: '101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'RIDER',
+    };
+    const individualEntrant: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: '102',
+      firstname: 'Quinn',
+      id: '102',
+      identifiers: [{ fromTime: undefined, racePlate: '102', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'SOLO',
+    };
+    const team: EventTeam = {
+      categoryId: categoryA.id,
+      description: '',
+      id: 'team-1',
+      members: [teamMember.id],
+      name: 'Rocket Squad',
+    };
+    const teamCrossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: '2001',
+      isValid: true,
+      participantId: teamMember.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const individualCrossing: ParticipantPassingRecord = {
+      chipCode: 100102,
+      id: '2002',
+      isValid: true,
+      participantId: individualEntrant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:07:00.000Z'),
+    } as ParticipantPassingRecord;
+    const participants = new Map([
+      [teamMember.id, teamMember],
+      [individualEntrant.id, individualEntrant],
+    ]);
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[], teams: EventTeam[] } = {
+      categories: [categoryA],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+      getParticipantById: (participantId) => participants.get(participantId),
+      getParticipantLaps: (participantId) => participantId === teamMember.id ? [teamCrossing] : [individualCrossing],
+      getTransponderCrossings: () => [],
+      teams: [team],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[teamCrossing, individualCrossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    expect(container.querySelector('tr[data-record-id="2001"]')?.textContent).toContain('Pat RIDER (Rocket Squad)');
+    expect(container.querySelector('tr[data-record-id="2002"]')?.textContent).toContain('Quinn SOLO');
+    expect(container.querySelector('tr[data-record-id="2002"]')?.textContent).not.toContain('(Rocket Squad)');
   });
 
   it('deselects by toggling: select then deselect same participant row', async () => {
