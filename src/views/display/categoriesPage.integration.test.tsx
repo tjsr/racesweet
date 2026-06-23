@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { type Root, createRoot } from 'react-dom/client';
-import { CategoriesPage } from './categoriesPage.js';
+import { CategoriesPage } from '../context/Categories.js';
 import type { EventCatalogState } from '../../app/eventCatalog.js';
 import React from 'react';
 import { act } from 'react';
