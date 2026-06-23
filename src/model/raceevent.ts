@@ -9,3 +9,5 @@ export interface RaceEvent {
   date: string;
   companyName: string;
 }
+
+export type SessionId = IdType;

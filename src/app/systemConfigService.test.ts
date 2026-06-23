@@ -92,6 +92,7 @@ describe('SystemConfigService', () => {
 
     await service.createSource('api-apical-data-file');
     const sourceId = service.state.dataSources[0]!.id;
+    const expectedApicalDataFilePath = systemConfig.normalizeOptionalSystemFilePath('../../src/generated/apical-excel-cache/apical-event-1001.xlsx');
 
     await service.assignSourcesToEvent('event-existing', [sourceId]);
     await service.persistApicalDataFetch(
@@ -102,7 +103,7 @@ describe('SystemConfigService', () => {
       '../../src/generated/apical-excel-cache/apical-event-1001.xlsx'
     );
 
-    expect(service.state.dataSources[0]?.apicalDataFilePath).toBe('../../src/generated/apical-excel-cache/apical-event-1001.xlsx');
+    expect(service.state.dataSources[0]?.apicalDataFilePath).toBe(expectedApicalDataFilePath);
     expect(service.state.dataSources[0]?.dataLastRetrieved).toBe('2026-06-08T09:10:11.123Z');
     expect(service.state.eventSourceAssignments['event-apical-1001']).toEqual([sourceId]);
     expect(service.state.sessionSourceAssignments['session-apical-1001']).toEqual({
@@ -113,7 +114,7 @@ describe('SystemConfigService', () => {
     expect(persistence.save).toHaveBeenLastCalledWith(expect.objectContaining({
       dataSources: [
         expect.objectContaining({
-          apicalDataFilePath: '../../src/generated/apical-excel-cache/apical-event-1001.xlsx',
+          apicalDataFilePath: expectedApicalDataFilePath,
           dataLastRetrieved: '2026-06-08T09:10:11.123Z',
           id: sourceId,
         }),
@@ -143,6 +144,28 @@ describe('SystemConfigService', () => {
           timeDisplayZoneMode: 'gmt',
         },
       },
+    }));
+  });
+
+  it('normalizes the Apical Excel cache directory to an absolute system config path', async () => {
+    const normalizedConfig = systemConfig.normalizeSystemConfiguration({
+      ...systemConfig.createDefaultSystemConfiguration(),
+      apicalExcelCacheDirectoryPath: 'src/generated/custom-apical-cache',
+    });
+
+    expect(normalizedConfig.apicalExcelCacheDirectoryPath).toBe(systemConfig.normalizeSystemDirectoryPath('src/generated/custom-apical-cache'));
+    expect(systemConfig.normalizeSystemDirectoryPath(undefined)).toBe(systemConfig.DEFAULT_APICAL_EXCEL_CACHE_DIRECTORY_PATH);
+  });
+
+  it('persists Apical Excel cache directory changes as absolute paths', async () => {
+    const persistence = createPersistence();
+    const service = await SystemConfigService.create(persistence);
+
+    await service.updateApicalExcelCacheDirectoryPath('src/generated/custom-apical-cache');
+
+    expect(service.state.apicalExcelCacheDirectoryPath).toBe(systemConfig.normalizeSystemDirectoryPath('src/generated/custom-apical-cache'));
+    expect(persistence.save).toHaveBeenCalledWith(expect.objectContaining({
+      apicalExcelCacheDirectoryPath: systemConfig.normalizeSystemDirectoryPath('src/generated/custom-apical-cache'),
     }));
   });
 

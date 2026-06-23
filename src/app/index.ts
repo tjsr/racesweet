@@ -23,6 +23,10 @@ import path from 'node:path';
 
 const __dirname = path.dirname(__filename);
 
+const resolveAppFilePath = (filename: string): string => {
+  return path.isAbsolute(filename) ? filename : path.join(__dirname, filename);
+};
+
 // import ('electron-squirrel-startup').catch(() => {
 //   app.quit();
 // });
@@ -136,7 +140,7 @@ app.on('activate', (): void => {
 ipcMain.on(RequestReadIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: string, dataType?: string): void => {
   // const fs = require('fs');
   // const path = require('path');
-  const filePath = path.join(__dirname, filename);
+  const filePath = resolveAppFilePath(filename);
   
   readFile(filePath).then((data: Buffer) => {
     if (dataType === 'utf-8' || dataType === 'utf8') {
@@ -186,7 +190,7 @@ ipcMain.handle(RequestExternalHttpIpcInvokeChannel, async (_event: Electron.IpcM
 });
 
 ipcMain.handle(RequestOpenLocalFileIpcInvokeChannel, async (_event: Electron.IpcMainInvokeEvent, filename: string): Promise<void> => {
-  const fullPath = path.join(__dirname, filename);
+  const fullPath = resolveAppFilePath(filename);
   const errorMessage = await shell.openPath(fullPath);
   if (errorMessage) {
     throw new Error(errorMessage);
@@ -197,7 +201,7 @@ ipcMain.on(RequestWriteIpcSendChannel, (event: Electron.IpcMainEvent, filename: 
   // Use __dirname if you're trying to restrict where things can be written to.
   // You need to handle permissions and security based on what you want to allow to be written.
   // I'd probably re-write this to take PathLike.
-  const fullPath = path.join(__dirname, filename);
+  const fullPath = resolveAppFilePath(filename);
   const fullDirPath = path.dirname(fullPath);
 
   const fileContents = dataType === 'base64' ? Buffer.from(contents, 'base64') : contents;

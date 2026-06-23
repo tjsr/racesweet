@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 export type DataSourceType =
   | 'timing-rfid-decoder'
   | 'timing-mylaps-decoder'
@@ -72,6 +74,7 @@ export interface EventOptionsConfig {
 }
 
 export interface SystemConfiguration {
+  apicalExcelCacheDirectoryPath: string;
   dataSources: DataSourceConfig[];
   eventOptions: Record<string, EventOptionsConfig>;
   eventSourceAssignments: Record<string, string[]>;
@@ -79,7 +82,20 @@ export interface SystemConfiguration {
   sessionSourceAssignments: Record<string, SessionSourceAssignment>;
 }
 
+export const DEFAULT_APICAL_EXCEL_CACHE_DIRECTORY_PATH = path.resolve('src/generated/apical-excel-cache');
+
+export const normalizeSystemDirectoryPath = (directoryPath: string | undefined): string => {
+  const trimmedPath = directoryPath?.trim();
+  return path.resolve(trimmedPath && trimmedPath.length > 0 ? trimmedPath : DEFAULT_APICAL_EXCEL_CACHE_DIRECTORY_PATH);
+};
+
+export const normalizeOptionalSystemFilePath = (filePath: string | undefined): string | undefined => {
+  const trimmedPath = filePath?.trim();
+  return trimmedPath && trimmedPath.length > 0 ? path.resolve(trimmedPath) : undefined;
+};
+
 export const createDefaultSystemConfiguration = (): SystemConfiguration => ({
+  apicalExcelCacheDirectoryPath: DEFAULT_APICAL_EXCEL_CACHE_DIRECTORY_PATH,
   dataSources: [],
   eventOptions: {},
   eventSourceAssignments: {},
@@ -100,6 +116,7 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig): DataSourceC
 
   return {
     ...source,
+    apicalDataFilePath: normalizeOptionalSystemFilePath(source.apicalDataFilePath),
     apiConfig: {
       ...source.apiConfig,
       apicalEventId: selectedEventIds[0],
@@ -111,6 +128,7 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig): DataSourceC
 export const normalizeSystemConfiguration = (config: Partial<SystemConfiguration>): SystemConfiguration => ({
   ...createDefaultSystemConfiguration(),
   ...config,
+  apicalExcelCacheDirectoryPath: normalizeSystemDirectoryPath(config.apicalExcelCacheDirectoryPath),
   dataSources: (config.dataSources || []).map(normalizeDataSourceConfig),
   eventOptions: config.eventOptions || {},
   eventSourceAssignments: config.eventSourceAssignments || {},

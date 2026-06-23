@@ -1,6 +1,7 @@
 import React from 'react';
 import { parseTeamCompositionRules } from '../../app/categoryRules.js';
 import { type CategoryDistanceRule, getCategoriesForEvent, getSessionsForEvent } from '../../app/eventCatalog.js';
+import { SessionId } from '../../model/raceevent.js';
 import { parseInteger } from '../../parsers/parseInteger.js';
 import { CategoriesPageProps, CategoryChanges, CategoryDraft, dedupeCategoriesForDisplay, getCategoryDraft } from '../display/categoriesPage.js';
 import { useUnsavedChangesWarning } from '../display/unsavedChangesWarning.js';
@@ -57,7 +58,7 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
     }
     const teamCompositionRules = parseTeamCompositionRules(categoryDraft.teamCompositionRules);
     const existingAssignments = selectedCategory?.sessionAssignments || [];
-    const sessionAssignments = categoryDraft.sessionIds.map((sessionId) => {
+    const sessionAssignments = categoryDraft.sessionIds.map((sessionId: SessionId) => {
       const existing = existingAssignments.find((assignment) => assignment.sessionId === sessionId);
       return {
         sessionId,

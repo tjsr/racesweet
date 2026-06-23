@@ -4,9 +4,10 @@ import { createEventId } from '../model/ids.js';
 import type { EventId } from '../model/raceevent.js';
 import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from '../utils/apical/excelDownload.js';
 import { ApicalDataException } from '../errors/apicalDataException.js';
-import { ApicalSpreadsheetLapsRow, createApicalCatalogEventId, fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.js';
+import { ApicalSpreadsheetLapsRow, createApicalCatalogEventId, fetchApicalRaceStateNow, getCachedApicalExcelFilePath, pullApicalRaceState } from './apicalDataSource.js';
 import type { DataSourceConfig } from './systemConfig.js';
 import { fetchApicalEvents } from '../controllers/apical/getResultListJson.js';
+import path from 'node:path';
 
 const convertDataToRaceState = vi.fn();
 const APICAL_APP_TEST_EVENT_ID = 670;
@@ -394,6 +395,13 @@ describe('apicalDataSource', () => {
     await expect(pullApicalRaceState(source, 'event-1')).rejects.toThrow('No Apical event id is configured for this source.');
   });
 
+  it('resolves cached Apical Excel file paths from the configured cache directory', () => {
+    const configuredCacheDirectory = path.join(process.cwd(), 'src', 'generated', 'custom-apical-cache');
+
+    expect(getCachedApicalExcelFilePath(301, configuredCacheDirectory)).toBe(path.join(configuredCacheDirectory, 'apical-event-301.xlsx'));
+    expect(path.isAbsolute(getCachedApicalExcelFilePath(301, 'src/generated/custom-apical-cache'))).toBe(true);
+  });
+
   it('exports configured Apical app event 69 using the selected Apical event id', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(1781309520833));
@@ -638,7 +646,7 @@ describe('apicalDataSource', () => {
 
     expect(result).toEqual({
       apicalEventId: 301,
-      apicalDataFilePath: '../../src/generated/apical-excel-cache/apical-event-301.xlsx',
+      apicalDataFilePath: getCachedApicalExcelFilePath(301),
       eventDate: '2026-06-07T01:30:00.000Z',
       eventId: createApicalCatalogEventId(301),
       eventName: 'Round 3',

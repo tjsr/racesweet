@@ -100,6 +100,7 @@ describe('SystemPage integration', () => {
     const onCreateSource = vi.fn();
     const onDeleteSource = vi.fn();
     const onLoadApicalEvents = vi.fn();
+    const onSaveApicalExcelCacheDirectoryPath = vi.fn();
     const onSaveSource = vi.fn();
 
     await act(async () => {
@@ -110,6 +111,7 @@ describe('SystemPage integration', () => {
           onDeleteSource={onDeleteSource}
           onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
+          onSaveApicalExcelCacheDirectoryPath={onSaveApicalExcelCacheDirectoryPath}
           onSaveSource={onSaveSource}
         />,
       );
@@ -144,6 +146,22 @@ describe('SystemPage integration', () => {
 
     const fetchDataButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Fetch event data now');
     expect(fetchDataButton).toBeDefined();
+
+    const cacheDirectoryInput = container.querySelector('input[aria-label="Apical Excel Cache Directory"]') as HTMLInputElement;
+    expect(cacheDirectoryInput).toBeDefined();
+    expect(path.isAbsolute(cacheDirectoryInput.value)).toBe(true);
+    cacheDirectoryInput.focus();
+    cacheDirectoryInput.setSelectionRange(cacheDirectoryInput.value.length, cacheDirectoryInput.value.length);
+
+    await act(async () => {
+      insertTextAtCursor(cacheDirectoryInput, '-local');
+    });
+
+    await act(async () => {
+      cacheDirectoryInput.blur();
+    });
+
+    expect(onSaveApicalExcelCacheDirectoryPath).toHaveBeenCalledWith(`${config.apicalExcelCacheDirectoryPath}-local`);
   });
 
   it('dispatches manual Apical data fetches and shows the persisted retrieval timestamp', async () => {
@@ -174,6 +192,7 @@ describe('SystemPage integration', () => {
           onFetchApicalDataNow={onFetchApicalDataNow}
           onLoadApicalEvents={onLoadApicalEvents}
           onOpenLocalFile={onOpenLocalFile}
+          onSaveApicalExcelCacheDirectoryPath={vi.fn()}
           onSaveSource={onSaveSource}
         />,
       );
@@ -215,6 +234,7 @@ describe('SystemPage integration', () => {
           onDeleteSource={onDeleteSource}
           onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
+          onSaveApicalExcelCacheDirectoryPath={vi.fn()}
           onSaveSource={onSaveSource}
         />,
       );
@@ -267,6 +287,7 @@ describe('SystemPage integration', () => {
           onDeleteSource={onDeleteSource}
           onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
+          onSaveApicalExcelCacheDirectoryPath={vi.fn()}
           onSaveSource={onSaveSource}
         />,
       );
@@ -309,6 +330,7 @@ describe('SystemPage integration', () => {
           onDeleteSource={onDeleteSource}
           onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
+          onSaveApicalExcelCacheDirectoryPath={vi.fn()}
           onSaveSource={onSaveSource}
         />,
       );
@@ -376,6 +398,7 @@ describe('SystemPage integration', () => {
           onDeleteSource={onDeleteSource}
           onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
+          onSaveApicalExcelCacheDirectoryPath={vi.fn()}
           onSaveSource={onSaveSource}
           onSelectLocalFile={onSelectLocalFile}
         />,

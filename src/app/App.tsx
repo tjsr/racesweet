@@ -1,35 +1,36 @@
-import './index.css';
 import { Component, type ReactElement, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { type DataSourceConfig, type EventTimeDisplayZoneMode, type SystemConfiguration, createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
-import { type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
-import { RaceStateLookup, Session } from '../model/racestate.ts';
-import { createApicalCatalogEventId, fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.ts';
-import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
-import { CategoriesContext } from '../views/context/Categories.tsx';
-import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.ts';
-import { ElectronJsonRaceAdminPersistence } from './raceAdminPersistence.ts';
-import { ElectronJsonSystemConfigPersistence } from './systemConfigPersistence.ts';
-import { EntrantsContext } from '../views/context/Entrants.tsx';
-import { EventCatalogService } from './eventCatalogService.ts';
+import { fetchApicalEvents } from '../controllers/apical/getResultListJson.ts';
 import { EventCategoryId } from '../model/eventcategory.ts';
 import { type EventParticipantId } from '../model/eventparticipant.ts';
-import { type EventSessionOption } from './views/results/resultsPage.tsx';
+import { EventId, SessionId } from '../model/raceevent.ts';
+import { RaceStateLookup, Session } from '../model/racestate.ts';
+import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
+import { TestSession } from '../testdata/testsession.ts';
+import { CategoriesContext } from '../views/context/Categories.tsx';
+import { EntrantsContext } from '../views/context/Entrants.tsx';
 import { EventsContext } from '../views/context/Events.tsx';
-import { RaceAdminService } from './raceAdminService.ts';
 import { ReportsContext } from '../views/context/Reports.tsx';
 import { ResultsContext } from '../views/context/Results.tsx';
 import { SessionsContext } from '../views/context/Sessions.tsx';
-import { SystemConfigService } from './systemConfigService.ts';
 import { SystemContext } from '../views/context/System.tsx';
-import { TestSession } from '../testdata/testsession.ts';
 import { TimingContext } from '../views/context/Timing.tsx';
 import { type UnsavedChangesGuard } from '../views/display/unsavedChangesWarning.tsx';
-import { applyPulledRaceStateToSession } from './sourceApplication.ts';
-import { fetchApicalEvents } from '../controllers/apical/getResultListJson.ts';
-import { formatErrorForDisplay } from './stackTrace.ts';
-import { getSystemTimeZone } from './utils/timeutils.ts';
-import { selectedCategoriesForParticipants } from './selectionState.ts';
+import { PulledApicalRaceState, createApicalCatalogEventId, fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
+import { type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
+import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.ts';
+import { EventCatalogService } from './eventCatalogService.ts';
+import './index.css';
+import { ElectronJsonRaceAdminPersistence } from './raceAdminPersistence.ts';
+import { RaceAdminService } from './raceAdminService.ts';
+import { selectedCategoriesForParticipants } from './selectionState.ts';
+import { applyPulledRaceStateToSession } from './sourceApplication.ts';
+import { formatErrorForDisplay } from './stackTrace.ts';
+import { type DataSourceConfig, type EventTimeDisplayZoneMode, type SystemConfiguration, createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
+import { ElectronJsonSystemConfigPersistence } from './systemConfigPersistence.ts';
+import { SystemConfigService } from './systemConfigService.ts';
+import { getSystemTimeZone } from './utils/timeutils.ts';
+import { type EventSessionOption } from './views/results/resultsPage.tsx';
 
 type AppSection = 'System' | 'Events' | 'Entrants' | 'Categories' | 'Sessions' | 'Timing' | 'Results' | 'Reports';
 type TimingSessionSelection = 'active' | 'session';
@@ -323,6 +324,7 @@ export const RaceSweetMainApp = () => {
     }
 
     const raceState = await pullApicalRaceState(source, eventId, {
+      apicalExcelCacheDirectoryPath: systemConfigState.apicalExcelCacheDirectoryPath,
       cachedSpreadsheetOnly: options.cachedSpreadsheetOnly,
       preferCachedSpreadsheet: options.preferCachedSpreadsheet,
       timeZone: getEventTimeZone(eventId),
@@ -392,7 +394,7 @@ export const RaceSweetMainApp = () => {
     return targetSessionState;
   };
 
-  const loadTimingSession = async (eventId: string, sessionId: string): Promise<void> => {
+  const loadTimingSession = async (eventId: EventId, sessionId: SessionId): Promise<void> => {
     const targetSessionState = createEmptySessionState();
     const loadedState = await applySessionSources(eventId, sessionId, {
       cachedSpreadsheetOnly: true,
@@ -406,7 +408,7 @@ export const RaceSweetMainApp = () => {
     setRenderTick((tick) => tick + 1);
   };
 
-  const selectTimingEvent = (eventId: string): void => {
+  const selectTimingEvent = (eventId: EventId): void => {
     if (!eventCatalogState) {
       return;
     }
@@ -792,9 +794,10 @@ export const RaceSweetMainApp = () => {
             const apicalEventId = source.apiConfig?.selectedEventIds[0] || source.apiConfig?.apicalEventId;
             const importEventId = apicalEventId ? createApicalCatalogEventId(apicalEventId) : undefined;
             return fetchApicalRaceStateNow(source, {
+              apicalExcelCacheDirectoryPath: systemConfigState.apicalExcelCacheDirectoryPath,
               timeZone: getEventTimeZone(importEventId),
             })
-              .then(async (importData) => {
+              .then(async (importData: PulledApicalRaceState) => {
                 const catalog = await eventCatalogService.importApicalRaceState(importData);
                 updateEventCatalogState(catalog, importData.eventId, importData.sessionId);
                 return systemConfigService.persistApicalDataFetch(sourceId, importData.eventId, importData.sessionId, importData.retrievedAt, importData.apicalDataFilePath);
@@ -814,6 +817,12 @@ export const RaceSweetMainApp = () => {
               .then(updateSystemConfigState);
           }}
           onOpenLocalFile={(filePath) => window.api.openLocalFile(filePath)}
+          onSaveApicalExcelCacheDirectoryPath={(directoryPath) => {
+            if (!systemConfigService) {
+              return;
+            }
+            systemConfigService.updateApicalExcelCacheDirectoryPath(directoryPath).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+          }}
           onSaveSource={(sourceId, changes) => {
             if (!systemConfigService) {
               return;

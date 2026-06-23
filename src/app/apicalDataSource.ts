@@ -12,7 +12,8 @@ import { fetchExternalHttp, isSensitiveHeader } from '../utils/externalHttp.js';
 import { RendererApiUnavailableError, getRendererApi } from './rendererApi.js';
 import { getSystemTimeZone } from './utils/timeutils.js';
 import { remapStackTrace } from './stackTrace.js';
-import type { ApicalListedEvent, DataSourceConfig } from './systemConfig.js';
+import { DEFAULT_APICAL_EXCEL_CACHE_DIRECTORY_PATH, normalizeSystemDirectoryPath, type ApicalListedEvent, type DataSourceConfig } from './systemConfig.js';
+import path from 'node:path';
 import { v5 as uuidv5 } from 'uuid';
 import type * as XlsxNamespace from 'xlsx';
 
@@ -35,6 +36,7 @@ export interface PulledApicalRaceState {
 }
 
 interface ApicalRaceStateOptions {
+  apicalExcelCacheDirectoryPath?: string;
   cachedSpreadsheetOnly?: boolean;
   preferCachedSpreadsheet?: boolean;
   timeZone?: string;
@@ -85,8 +87,11 @@ export const createApicalCatalogEventId = (apicalEventId: number): EventId => {
 
 export const createApicalCatalogSessionId = (apicalEventId: number): string => `session-apical-${apicalEventId}`;
 
-export const getCachedApicalExcelFilePath = (apicalEventId: number): string => {
-  return `../../src/generated/apical-excel-cache/apical-event-${apicalEventId}.xlsx`;
+export const getCachedApicalExcelFilePath = (
+  apicalEventId: number,
+  cacheDirectoryPath: string = DEFAULT_APICAL_EXCEL_CACHE_DIRECTORY_PATH
+): string => {
+  return path.resolve(normalizeSystemDirectoryPath(cacheDirectoryPath), `apical-event-${apicalEventId}.xlsx`);
 };
 
 const getListedApicalEvent = (source: DataSourceConfig, apicalEventId: number): ApicalListedEvent | undefined => {
@@ -400,10 +405,10 @@ const bufferLikeToArrayBuffer = (buffer: ArrayBuffer | Buffer | Uint8Array): Arr
   return arrayBuffer;
 };
 
-const readCachedApicalExcelPayload = async (apicalEventId: number): Promise<ApicalLapByCategory | undefined> => {
+const readCachedApicalExcelPayload = async (apicalEventId: number, cacheDirectoryPath: string): Promise<ApicalLapByCategory | undefined> => {
   try {
     const api = getRendererApi(['requestBuffer']);
-    const buffer = await api.requestBuffer(getCachedApicalExcelFilePath(apicalEventId));
+    const buffer = await api.requestBuffer(getCachedApicalExcelFilePath(apicalEventId, cacheDirectoryPath));
     return readApicalExcelBuffer(bufferLikeToArrayBuffer(buffer));
   } catch (error: unknown) {
     if (error instanceof RendererApiUnavailableError) {
@@ -419,10 +424,10 @@ const readCachedApicalExcelPayload = async (apicalEventId: number): Promise<Apic
   }
 };
 
-const cacheApicalExcelPayload = async (apicalEventId: number, buffer: ArrayBuffer): Promise<void> => {
+const cacheApicalExcelPayload = async (apicalEventId: number, buffer: ArrayBuffer, cacheDirectoryPath: string): Promise<void> => {
   try {
     const api = getRendererApi(['writeFileContent']);
-    await api.writeFileContent(getCachedApicalExcelFilePath(apicalEventId), arrayBufferToBase64(buffer), 'base64');
+    await api.writeFileContent(getCachedApicalExcelFilePath(apicalEventId, cacheDirectoryPath), arrayBufferToBase64(buffer), 'base64');
   } catch (error: unknown) {
     if (error instanceof RendererApiUnavailableError) {
       return;
@@ -432,7 +437,7 @@ const cacheApicalExcelPayload = async (apicalEventId: number, buffer: ArrayBuffe
   }
 };
 
-const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId: number): Promise<ApicalLapByCategory> => {
+const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId: number, cacheDirectoryPath: string): Promise<ApicalLapByCategory> => {
   if (!source.apiConfig) {
     throw new Error('Apical API config is missing');
   }
@@ -475,7 +480,7 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
     }
 
     const buffer = await response.arrayBuffer();
-    await cacheApicalExcelPayload(apicalEventId, buffer);
+    await cacheApicalExcelPayload(apicalEventId, buffer, cacheDirectoryPath);
     const payload = await readApicalExcelPayloadBuffer(buffer);
     return payload;
   } catch (err: unknown) {
@@ -491,8 +496,9 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
 };
 
 const loadApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId: number, options: ApicalRaceStateOptions = {}): Promise<ApicalLapByCategory> => {
+  const cacheDirectoryPath = normalizeSystemDirectoryPath(options.apicalExcelCacheDirectoryPath);
   if (options.preferCachedSpreadsheet) {
-    const cachedPayload = await readCachedApicalExcelPayload(apicalEventId);
+    const cachedPayload = await readCachedApicalExcelPayload(apicalEventId, cacheDirectoryPath);
     if (cachedPayload) {
       return cachedPayload;
     }
@@ -502,7 +508,7 @@ const loadApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId
     }
   }
 
-  return fetchApicalDataFilePayload(source, apicalEventId);
+  return fetchApicalDataFilePayload(source, apicalEventId, cacheDirectoryPath);
 };
 
 export const pullApicalRaceState = async (source: DataSourceConfig, eventId: EventId, options: ApicalRaceStateOptions = {}): Promise<Partial<RaceState>> => {
@@ -539,7 +545,7 @@ export const fetchApicalRaceStateNow = async (source: DataSourceConfig, options:
 
     return {
       apicalEventId,
-      apicalDataFilePath: getCachedApicalExcelFilePath(apicalEventId),
+      apicalDataFilePath: getCachedApicalExcelFilePath(apicalEventId, options.apicalExcelCacheDirectoryPath),
       eventDate: listedEvent?.eventDate,
       eventId,
       eventName: listedEvent?.name || `Apical Event ${apicalEventId}`,

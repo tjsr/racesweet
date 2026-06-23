@@ -6,6 +6,8 @@ import {
   createDefaultSystemConfiguration,
   getDataSourceTypeLabel,
   normalizeSystemConfiguration,
+  normalizeSystemDirectoryPath,
+  normalizeOptionalSystemFilePath,
 } from './systemConfig.js';
 import type { SystemConfigPersistence } from './systemConfigPersistence.js';
 
@@ -75,7 +77,7 @@ export class SystemConfigService {
 
   public static async create(persistence: SystemConfigPersistence, options: SystemConfigServiceOptions = {}): Promise<SystemConfigService> {
     const config = await persistence.load();
-    return new SystemConfigService(persistence, config, options);
+    return new SystemConfigService(persistence, normalizeSystemConfiguration(config), options);
   }
 
   public get state(): SystemConfiguration {
@@ -172,6 +174,15 @@ export class SystemConfigService {
     return this.config;
   }
 
+  public async updateApicalExcelCacheDirectoryPath(directoryPath: string): Promise<SystemConfiguration> {
+    this.config = {
+      ...this.config,
+      apicalExcelCacheDirectoryPath: normalizeSystemDirectoryPath(directoryPath),
+    };
+    await this.persist();
+    return this.config;
+  }
+
   public async persistListedApicalEvents(sourceId: string, listedEvents: DataSourceConfig['listedEvents']): Promise<SystemConfiguration> {
     const source = this.config.dataSources.find((item) => item.id === sourceId);
     if (source?.type !== 'api-apical-data-file' || !source.apiConfig) {
@@ -193,6 +204,7 @@ export class SystemConfigService {
 
   public async persistApicalDataFetch(sourceId: string, eventId: string, sessionId: string, retrievedAt: string, apicalDataFilePath?: string): Promise<SystemConfiguration> {
     const assignedEventSources = this.config.eventSourceAssignments[eventId] || [];
+    const normalizedApicalDataFilePath = normalizeOptionalSystemFilePath(apicalDataFilePath);
     this.config = {
       ...this.config,
       dataSources: this.config.dataSources.map((source) => {
@@ -202,7 +214,7 @@ export class SystemConfigService {
 
         return {
           ...source,
-          apicalDataFilePath,
+          apicalDataFilePath: normalizedApicalDataFilePath,
           dataLastRetrieved: retrievedAt,
         };
       }),
