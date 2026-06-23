@@ -1,4 +1,4 @@
-import { Component, type ReactElement, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { Component, type ReactElement, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchApicalEvents } from '../controllers/apical/getResultListJson.ts';
 import { EventCategoryId } from '../model/eventcategory.ts';
 import { type EventParticipantId } from '../model/eventparticipant.ts';
@@ -15,7 +15,7 @@ import { SessionsContext } from '../views/context/Sessions.tsx';
 import { SystemContext } from '../views/context/System.tsx';
 import { TimingContext } from '../views/context/Timing.tsx';
 import { type UnsavedChangesGuard } from '../views/display/unsavedChangesWarning.tsx';
-import { PulledApicalRaceState, createApicalCatalogEventId, fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.ts';
+import { PulledApicalRaceState, createApicalCatalogEventId, createApicalCatalogSessionId, fetchApicalRaceStateNow, getConfiguredApicalEventId, pullApicalRaceState } from './apicalDataSource.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
 import { type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
 import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.ts';
@@ -37,12 +37,14 @@ type TimingSessionSelection = 'active' | 'session';
 
 interface PageErrorFallbackProps {
   error: Error;
+  onDismiss?: () => void;
   title?: string;
 }
 
 interface PageErrorBoundaryProps {
   children: ReactNode;
   fallbackTitle?: string;
+  onError?: (error: Error) => void;
   resetKey: string;
 }
 
@@ -61,12 +63,24 @@ const appSections: Array<{ icon: string; id: AppSection; label: string }> = [
   { icon: 'RPT', id: 'Reports', label: 'Reports' },
 ];
 
-const PageErrorFallback = ({ error, title = 'Error loading content' }: PageErrorFallbackProps): ReactElement => (
+interface DisplayedErrorLogEntry {
+  details: string;
+  id: string;
+  source: string;
+  timestamp: string;
+}
+
+const PageErrorFallback = ({ error, onDismiss, title = 'Error loading content' }: PageErrorFallbackProps): ReactElement => (
   <>
     <h1>{title}</h1>
     <div className="error" role="alert">
       <p>There was an error loading the content:</p>
       <pre>{formatErrorForDisplay(error)}</pre>
+      {onDismiss ? (
+        <button type="button" onClick={onDismiss}>
+          Dismiss
+        </button>
+      ) : null}
     </div>
   </>
 );
@@ -76,6 +90,10 @@ class PageErrorBoundary extends Component<PageErrorBoundaryProps, PageErrorBound
 
   public static getDerivedStateFromError(error: Error): PageErrorBoundaryState {
     return { error };
+  }
+
+  public componentDidCatch(error: Error): void {
+    this.props.onError?.(error);
   }
 
   public componentDidUpdate(previousProps: PageErrorBoundaryProps): void {
@@ -125,6 +143,61 @@ const createEmptySessionState = (): Session & RaceStateLookup => {
   }) as Session & RaceStateLookup;
 };
 
+const getImportedApicalDataFilePath = (
+  config: SystemConfiguration,
+  eventCatalogService: EventCatalogService,
+  source: DataSourceConfig
+): string | undefined => {
+  const candidateEventIds = new Set<string>();
+  const candidateSessionIds = new Set<string>();
+  const apicalEventId = source.apiConfig?.selectedEventIds[0] || source.apiConfig?.apicalEventId;
+
+  Object.entries(config.eventSourceAssignments).forEach(([eventId, sourceIds]) => {
+    if (sourceIds.includes(source.id)) {
+      candidateEventIds.add(eventId);
+    }
+  });
+
+  Object.entries(config.sessionSourceAssignments).forEach(([sessionId, assignment]) => {
+    if (assignment.sourceIds.includes(source.id)) {
+      candidateSessionIds.add(sessionId);
+    }
+  });
+
+  if (apicalEventId) {
+    candidateEventIds.add(createApicalCatalogEventId(apicalEventId));
+    candidateSessionIds.add(createApicalCatalogSessionId(apicalEventId));
+  }
+
+  for (const eventId of candidateEventIds) {
+    for (const sessionId of candidateSessionIds) {
+      const apicalDataFilePath = eventCatalogService.getImportedRaceStateMetadata(eventId, sessionId)?.apicalDataFilePath;
+      if (apicalDataFilePath) {
+        return apicalDataFilePath;
+      }
+    }
+  }
+
+  return undefined;
+};
+
+const loadSystemConfigWithImportedApicalPaths = async (
+  systemConfigService: SystemConfigService,
+  eventCatalogService: EventCatalogService
+): Promise<SystemConfiguration> => {
+  const sourceFilePaths: Record<string, string | undefined> = {};
+
+  systemConfigService.state.dataSources.forEach((source) => {
+    if (source.type !== 'api-apical-data-file' || source.apicalDataFilePath || !source.dataLastRetrieved) {
+      return;
+    }
+
+    sourceFilePaths[source.id] = getImportedApicalDataFilePath(systemConfigService.state, eventCatalogService, source);
+  });
+
+  return systemConfigService.persistApicalDataFilePaths(sourceFilePaths);
+};
+
 export const RaceSweetMainApp = () => {
   const [activeSection, setActiveSection] = useState<AppSection>('System');
   const [adminService, setAdminService] = useState<RaceAdminService|undefined>(undefined);
@@ -135,6 +208,7 @@ export const RaceSweetMainApp = () => {
   const [sessionState, setSessionState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [, setRenderTick] = useState(0);
   const [errorState, setErrorState] = useState<Error|undefined>(undefined);
+  const [displayedErrorLogEntries, setDisplayedErrorLogEntries] = useState<DisplayedErrorLogEntry[]>([]);
   const [loadWarnings, setLoadWarnings] = useState<string[]>([]);
   const [selectedCategories, setCategorySelected] = useState<Set<EventCategoryId>>(new Set<EventCategoryId>());
   const [selectedCategoryId, setSelectedCategoryId] = useState<string|undefined>(undefined);
@@ -159,15 +233,55 @@ export const RaceSweetMainApp = () => {
     unsavedChangesGuards.current[section] = guard;
   }, []);
 
+  const logDisplayedError = useCallback((source: string, error: unknown): void => {
+    const timestamp = new Date().toISOString();
+    setDisplayedErrorLogEntries((current) => [
+      ...current,
+      {
+        details: formatErrorForDisplay(error),
+        id: `${timestamp}-${current.length}`,
+        source,
+        timestamp,
+      },
+    ]);
+  }, []);
+
+  const dismissDisplayedErrors = useCallback((): void => {
+    setErrorState(undefined);
+    setTimingErrorState(undefined);
+  }, []);
+
+  const displayedErrorLogText = useMemo((): string => {
+    return displayedErrorLogEntries.map((entry) => {
+      return `[${entry.timestamp}] ${entry.source}\n${entry.details}`;
+    }).join('\n\n');
+  }, [displayedErrorLogEntries]);
+
   const changeActiveSection = (section: AppSection): void => {
+    const activateSection = (): void => {
+      dismissDisplayedErrors();
+      setActiveSection(section);
+    };
     const activeGuard = unsavedChangesGuards.current[activeSection];
     if (section !== activeSection && activeGuard) {
-      activeGuard(() => setActiveSection(section));
+      activeGuard(activateSection);
       return;
     }
 
-    setActiveSection(section);
+    activateSection();
   };
+
+  useEffect(() => {
+    if (errorState) {
+      logDisplayedError('Application', errorState);
+    }
+  }, [errorState, logDisplayedError]);
+
+  useEffect(() => {
+    if (timingErrorState) {
+      logDisplayedError('Timing', timingErrorState);
+    }
+  }, [timingErrorState, logDisplayedError]);
 
   useEffect(() => {
     if (!sessionState && !eventCatalogState && !errorState) {
@@ -176,10 +290,10 @@ export const RaceSweetMainApp = () => {
         setLoadWarnings((existing) => existing.includes(message) ? existing : [...existing, message]);
       };
 
-      Promise.all([loadAdminService(onLoadError), loadEventCatalogService(onLoadError), loadSystemConfigService(onLoadError)]).then(([raceService, catalogService, systemService]) => {
+      Promise.all([loadAdminService(onLoadError), loadEventCatalogService(onLoadError), loadSystemConfigService(onLoadError)]).then(async ([raceService, catalogService, systemService]) => {
         const session = raceService.raceState;
         const initialCatalog = catalogService.catalog;
-        const initialSystemConfig = systemService.state;
+        const initialSystemConfig = await loadSystemConfigWithImportedApicalPaths(systemService, catalogService);
         const initialEventId = initialCatalog.activeEventId || initialCatalog.events[0]?.id;
         const participantCategoryIds = new Set(session.participants.map((participant) => participant.categoryId.toString()));
         const participantEntrantIds = new Set(session.participants.map((participant) => participant.entrantId.toString()));
@@ -343,6 +457,23 @@ export const RaceSweetMainApp = () => {
     return true;
   };
 
+  const applyPersistedRaceStateForSourceToSession = async (source: DataSourceConfig, targetSessionState: Session & RaceStateLookup): Promise<boolean> => {
+    if (source.type !== 'api-apical-data-file') {
+      return false;
+    }
+
+    const apicalEventId = getConfiguredApicalEventId(source);
+    if (!apicalEventId) {
+      return false;
+    }
+
+    return applyPersistedRaceStateToSession(
+      createApicalCatalogEventId(apicalEventId),
+      createApicalCatalogSessionId(apicalEventId),
+      targetSessionState
+    );
+  };
+
   const applySessionSources = async (
     eventId: string,
     sessionId: string,
@@ -367,6 +498,9 @@ export const RaceSweetMainApp = () => {
       setRecordSelectedCategories(new Set<EventCategoryId>());
     }
 
+    const sourceIds = getSessionAssignedSourceIds(systemConfigState, eventId, sessionId);
+    const sources = systemConfigState.dataSources.filter((source) => source.enabled && sourceIds.includes(source.id));
+
     if (targetSessionState && options?.preferPersistedRaceState) {
       const loadedPersistedState = await applyPersistedRaceStateToSession(eventId, sessionId, targetSessionState);
       if (loadedPersistedState) {
@@ -375,10 +509,17 @@ export const RaceSweetMainApp = () => {
         }
         return targetSessionState;
       }
-    }
 
-    const sourceIds = getSessionAssignedSourceIds(systemConfigState, eventId, sessionId);
-    const sources = systemConfigState.dataSources.filter((source) => source.enabled && sourceIds.includes(source.id));
+      for (const source of sources) {
+        const loadedSourcePersistedState = await applyPersistedRaceStateForSourceToSession(source, targetSessionState);
+        if (loadedSourcePersistedState) {
+          if (adminService) {
+            adminService.applyChangesToSession(targetSessionState);
+          }
+          return targetSessionState;
+        }
+      }
+    }
 
     for (const source of sources) {
       await applySourceToSessionState(eventId, source, targetSessionState, {
@@ -574,7 +715,7 @@ export const RaceSweetMainApp = () => {
   );
 
   if (errorState) {
-    return renderShell(<PageErrorFallback error={errorState} />);
+    return renderShell(<PageErrorFallback error={errorState} onDismiss={() => setErrorState(undefined)} />);
   }
   if (!sessionState || !eventCatalogState) {
     return renderShell(<>Loading...</>);
@@ -673,9 +814,13 @@ export const RaceSweetMainApp = () => {
   };
 
   const timingPage = (
-    <PageErrorBoundary fallbackTitle="Timing" resetKey={`${activeSection}:${timingEvent?.id || ''}:${timingSessionValue}`}>
+    <PageErrorBoundary
+      fallbackTitle="Timing"
+      onError={(error) => logDisplayedError('Timing render', error)}
+      resetKey={`${activeSection}:${timingEvent?.id || ''}:${timingSessionValue}`}
+    >
       {timingErrorState ? (
-        <PageErrorFallback error={timingErrorState} title="Timing" />
+        <PageErrorFallback error={timingErrorState} onDismiss={() => setTimingErrorState(undefined)} title="Timing" />
       ) : (
         <TimingContext
           activeSession={activeSession}
@@ -770,6 +915,8 @@ export const RaceSweetMainApp = () => {
       return (
         <SystemContext
           config={systemConfigState}
+          displayedErrorLog={displayedErrorLogText}
+          onDisplayError={logDisplayedError}
           onCreateSource={(type) => {
             if (!systemConfigService) {
               return;

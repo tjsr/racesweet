@@ -19,12 +19,18 @@ import type { TimeRecord } from '../model/timerecord.js';
 import { getSystemTimeZone } from './utils/timeutils.js';
 
 interface ApicalCatalogImport {
+  apicalDataFilePath?: string;
   eventDate?: string;
   eventId: string;
   eventName: string;
   raceState: Partial<RaceState>;
   sessionId: string;
   timeZone?: string;
+}
+
+export interface ImportedRaceStateMetadata {
+  apicalDataFilePath?: string;
+  raceState: Partial<RaceState>;
 }
 
 interface EventCatalogServiceOptions {
@@ -277,16 +283,25 @@ export class EventCatalogService {
     return this.state;
   }
 
-  public getImportedRaceState(eventId: string, sessionId: string): Partial<RaceState> | undefined {
+  public getImportedRaceStateMetadata(eventId: string, sessionId: string): ImportedRaceStateMetadata | undefined {
     const mutation = [...this.ledger.mutations].reverse().find((candidate) => {
       return candidate.type === 'race-state-imported' &&
         candidate.eventId === eventId &&
         candidate.sessionId === sessionId;
     });
 
-    return mutation?.type === 'race-state-imported'
-      ? reviveRaceStateDates(mutation.raceState)
-      : undefined;
+    if (mutation?.type !== 'race-state-imported') {
+      return undefined;
+    }
+
+    return {
+      apicalDataFilePath: mutation.apicalDataFilePath,
+      raceState: reviveRaceStateDates(mutation.raceState),
+    };
+  }
+
+  public getImportedRaceState(eventId: string, sessionId: string): Partial<RaceState> | undefined {
+    return this.getImportedRaceStateMetadata(eventId, sessionId)?.raceState;
   }
 
   public async createEvent(): Promise<EventCatalogState> {
@@ -499,6 +514,7 @@ export class EventCatalogService {
     }
 
     mutations.push({
+      apicalDataFilePath: importData.apicalDataFilePath,
       eventId: importData.eventId,
       id: createMutationId(),
       raceState: importData.raceState,

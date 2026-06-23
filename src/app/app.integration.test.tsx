@@ -382,7 +382,7 @@ interface ApicalImportScenario {
   fetchMock: ReturnType<typeof vi.spyOn>;
   importedEventId: string;
   writtenConfig: {
-    dataSources: Array<{ dataLastRetrieved?: string }>;
+    dataSources: Array<{ apicalDataFilePath?: string; dataLastRetrieved?: string }>;
     eventSourceAssignments: Record<string, string[]>;
     sessionSourceAssignments: Record<string, { mode: string; sourceIds: string[] }>;
   };
@@ -894,7 +894,7 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.textContent).toContain('Recent Records (0)');
   });
 
-  it('keeps navigation visible and leaves a Timing error when navigating away', async () => {
+  it('keeps navigation visible, dismisses Timing errors when navigating away, and saves them to the System log', async () => {
     const requestFileContent = async (filePath: string, _dataType: string): Promise<string> => {
       return readGeneratedFixtureWithTimingAssignedApicalSource(filePath);
     };
@@ -929,11 +929,18 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.querySelector('nav[aria-label="Application sections"]')).toBeTruthy();
     expect(container.querySelector('button[aria-label="Events"]')).toBeTruthy();
     expect(container.querySelector('h1')?.textContent).toBe('Timing');
+    expect(Array.from(container.querySelectorAll('button')).some((button) => button.textContent === 'Dismiss')).toBe(true);
 
     await clickSectionButton(container, 'Events');
     expect(container.querySelector('h1')?.textContent).toBe('Events');
     expect(container.textContent).not.toContain('Cached Apical Excel spreadsheet was not found');
     expect(container.querySelector('nav[aria-label="Application sections"]')).toBeTruthy();
+
+    await clickSectionButton(container, 'System');
+    const errorLog = container.querySelector('textarea[aria-label="Application Error Log"]') as HTMLTextAreaElement;
+    expect(errorLog).toBeTruthy();
+    expect(errorLog.value).toContain('Timing');
+    expect(errorLog.value).toContain('Cached Apical Excel spreadsheet was not found');
   });
 
   it('persists enriched entrant profile edits across panel switches', async () => {
@@ -1047,17 +1054,170 @@ describe('RaceSweetMainApp integration', () => {
     expectRequiredDownloadHeaders(downloadHeaders, 'https://apical.example.com', 1001, 'session=apical-cookie');
 
     expect(writtenConfig.dataSources[0]?.dataLastRetrieved).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(writtenConfig.dataSources[0]?.apicalDataFilePath).toBe(getCachedApicalExcelFilePath(1001));
     expect(Object.values(writtenConfig.eventSourceAssignments)).toContainEqual(['source-apical']);
     expect(Object.values(writtenConfig.sessionSourceAssignments)).toContainEqual({
       mode: 'specific',
       sourceIds: ['source-apical'],
     });
+    const latestCatalogWrite = writtenFiles
+      .filter((write) => write.filePath.includes('event-catalog.json'))
+      .at(-1);
+    expect(latestCatalogWrite).toBeDefined();
+    expect(JSON.parse(latestCatalogWrite!.content)).toEqual(expect.objectContaining({
+      mutations: expect.arrayContaining([
+        expect.objectContaining({
+          apicalDataFilePath: getCachedApicalExcelFilePath(1001),
+          type: 'race-state-imported',
+        }),
+      ]),
+    }));
     expect(writtenFiles).toEqual(expect.arrayContaining([
       expect.objectContaining({
         dataType: 'base64',
         filePath: getCachedApicalExcelFilePath(1001),
       }),
     ]));
+  });
+
+  it('loads Apical cache paths from event data and shows them with the retrieval timestamp', async () => {
+    const importedEventId = createApicalCatalogEventId(1001);
+    const importedSessionId = createApicalCatalogSessionId(1001);
+    const apicalDataFilePath = getCachedApicalExcelFilePath(1001);
+    const writtenFiles: Array<{ content: string; dataType?: string; filePath: string }> = [];
+
+    const requestFileContent = async (filePath: string, _dataType: string): Promise<string> => {
+      if (filePath.includes('event-catalog.json')) {
+        return JSON.stringify({
+          mutations: [
+            {
+              event: {
+                categoryIds: [],
+                date: '2025-06-06',
+                entrantIds: [],
+                format: 'race-weekend',
+                id: importedEventId,
+                name: 'Apical Downloaded Round',
+                sessionIds: [importedSessionId],
+                timeZone: 'Australia/Sydney',
+              },
+              id: 'mutation-apical-event',
+              timestamp: '2025-06-06T00:00:00.000Z',
+              type: 'event-created',
+            },
+            {
+              id: 'mutation-apical-session',
+              session: {
+                eventId: importedEventId,
+                id: importedSessionId,
+                kind: 'race',
+                name: 'Apical Downloaded Round',
+                scheduledStart: '2025-06-06T00:00:00.000Z',
+                status: 'completed',
+              },
+              timestamp: '2025-06-06T00:00:01.000Z',
+              type: 'session-created',
+            },
+            {
+              apicalDataFilePath,
+              eventId: importedEventId,
+              id: 'mutation-apical-race-state',
+              raceState: {},
+              sessionId: importedSessionId,
+              timestamp: '2025-06-06T00:00:02.000Z',
+              type: 'race-state-imported',
+            },
+          ],
+          schemaVersion: 1,
+        });
+      }
+
+      if (filePath.includes('system-config.json')) {
+        return JSON.stringify({
+          dataSources: [
+            {
+              apiConfig: {
+                apicalEventId: 1001,
+                authHeaderName: 'Authorization',
+                authHeaderValue: 'Bearer token',
+                baseUrl: 'https://apical.example.com',
+                companyId: 2,
+                httpTimeoutSeconds: 10,
+                live: false,
+                pollIntervalSeconds: 30,
+                selectedEventIds: [1001],
+              },
+              dataLastRetrieved: '2026-06-08T09:10:11.123Z',
+              enabled: true,
+              id: 'source-apical',
+              listedEvents: [
+                {
+                  eventDate: '2025-06-06T00:00:00.000Z',
+                  id: 1001,
+                  name: 'Apical Downloaded Round',
+                },
+              ],
+              name: 'Apical Source',
+              type: 'api-apical-data-file',
+            },
+          ],
+          eventSourceAssignments: {
+            [importedEventId]: ['source-apical'],
+          },
+          schemaVersion: 1,
+          sessionSourceAssignments: {
+            [importedSessionId]: {
+              mode: 'specific',
+              sourceIds: ['source-apical'],
+            },
+          },
+        });
+      }
+
+      if (filePath.includes('admin-overrides.json')) {
+        throw new Error('ENOENT: no such file or directory');
+      }
+
+      throw new Error(`Unknown generated file requested: ${filePath}`);
+    };
+
+    (window as unknown as {
+      api: {
+        openLocalFile: (filePath: string) => Promise<void>;
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string, dataType?: string) => Promise<void>;
+      };
+    }).api = {
+      openLocalFile: vi.fn(async () => undefined),
+      requestBuffer: readFixtureBuffer,
+      requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async (filePath: string, content: string, dataType?: string) => {
+        writtenFiles.push({ content, dataType, filePath });
+      },
+    };
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+
+    expect(container.textContent).toContain('Data last retrieved: 2026-06-08T09:10:11.123Z');
+    expect(container.textContent).toContain(apicalDataFilePath);
+    const latestConfigWrite = writtenFiles
+      .filter((write) => write.filePath.includes('system-config.json'))
+      .at(-1);
+    expect(latestConfigWrite).toBeDefined();
+    expect(JSON.parse(latestConfigWrite!.content)).toEqual(expect.objectContaining({
+      dataSources: [
+        expect.objectContaining({
+          apicalDataFilePath,
+          dataLastRetrieved: '2026-06-08T09:10:11.123Z',
+          id: 'source-apical',
+        }),
+      ],
+    }));
   });
 
   it('loads imported Apical timing sessions from the event ledger without re-reading the Excel source', async () => {

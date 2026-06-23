@@ -164,6 +164,44 @@ describe('SystemPage integration', () => {
     expect(onSaveApicalExcelCacheDirectoryPath).toHaveBeenCalledWith(`${config.apicalExcelCacheDirectoryPath}-local`);
   });
 
+  it('shows the application error log in a read-only textarea below configured data sources', async () => {
+    const displayedErrorLog = [
+      '[2026-06-23T01:02:03.004Z] Application',
+      'Error: Catalog ledger could not be written',
+      '    at mapped (webpack://racesweet/./src/app/eventCatalogPersistence.ts:84:7)',
+    ].join('\n');
+
+    await act(async () => {
+      root.render(
+        <SystemPage
+          config={config}
+          displayedErrorLog={displayedErrorLog}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={vi.fn()}
+          onSaveApicalExcelCacheDirectoryPath={vi.fn()}
+          onSaveSource={vi.fn()}
+        />,
+      );
+    });
+
+    const configuredDataSourcesHeading = Array.from(container.querySelectorAll('h2')).find((heading) => {
+      return heading.textContent === 'Configured Data Sources';
+    });
+    const logHeading = Array.from(container.querySelectorAll('h2')).find((heading) => {
+      return heading.textContent === 'Log';
+    });
+    const errorLog = container.querySelector('textarea[aria-label="Application Error Log"]') as HTMLTextAreaElement;
+
+    expect(configuredDataSourcesHeading).toBeTruthy();
+    expect(logHeading).toBeTruthy();
+    expect(configuredDataSourcesHeading!.compareDocumentPosition(logHeading!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(errorLog).toBeTruthy();
+    expect(errorLog.readOnly).toBe(true);
+    expect(errorLog.value).toBe(displayedErrorLog);
+  });
+
   it('dispatches manual Apical data fetches and shows the persisted retrieval timestamp', async () => {
     const onCreateSource = vi.fn();
     const onDeleteSource = vi.fn();
@@ -278,6 +316,7 @@ describe('SystemPage integration', () => {
       ].join('\n'));
     });
     const onSaveSource = vi.fn();
+    const onDisplayError = vi.fn();
 
     await act(async () => {
       root.render(
@@ -285,6 +324,7 @@ describe('SystemPage integration', () => {
           config={config}
           onCreateSource={onCreateSource}
           onDeleteSource={onDeleteSource}
+          onDisplayError={onDisplayError}
           onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
           onSaveApicalExcelCacheDirectoryPath={vi.fn()}
@@ -314,6 +354,19 @@ describe('SystemPage integration', () => {
     const inlineError = container.querySelector('.inline-error pre');
     expect(inlineError).toBeTruthy();
     expect(inlineError?.textContent?.match(/Apical event list request returned HTTP 401 Unauthorized\./g)).toHaveLength(1);
+    expect(onDisplayError).toHaveBeenCalledWith('System', expect.any(Error));
+
+    const dismissButton = Array.from(container.querySelectorAll('.inline-error button')).find((button) => {
+      return button.textContent === 'Dismiss';
+    });
+    expect(dismissButton).toBeTruthy();
+
+    await act(async () => {
+      dismissButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).not.toContain('Failed to fetch Apical events:');
+    expect(container.querySelector('.inline-error')).toBeNull();
   });
 
   it('allows data source fields to be edited from the middle without committing or moving the cursor until blur', async () => {

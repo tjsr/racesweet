@@ -152,6 +152,7 @@ export interface SessionDeletedMutation extends EventCatalogMutationBase {
 }
 
 export interface RaceStateImportedMutation extends EventCatalogMutationBase {
+  apicalDataFilePath?: string;
   eventId: string;
   raceState: Partial<RaceState>;
   sessionId: string;

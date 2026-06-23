@@ -72,7 +72,14 @@ export const ImportEventsModal = ({ existingEvents, onImportComplete, onClose }:
               </label>
             ))}
           </fieldset>
-          {error && <p className="error-message" role="alert">{error}</p>}
+          {error ? (
+            <div className="error-message" role="alert">
+              <p>{error}</p>
+              <button type="button" onClick={() => setError(undefined)}>
+                Dismiss
+              </button>
+            </div>
+          ) : null}
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose} disabled={isImporting}>

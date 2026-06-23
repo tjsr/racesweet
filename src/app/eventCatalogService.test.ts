@@ -463,6 +463,7 @@ describe('EventCatalogService', () => {
     const originalActiveSessionId = service.catalog.activeSessionId;
 
     await service.importApicalRaceState({
+      apicalDataFilePath: '../../src/generated/apical-excel-cache/apical-event-1001.xlsx',
       eventDate: '2026-06-07T01:30:00.000Z',
       eventId: '7b83ad1e-54ba-5f00-9712-1c82d3178640',
       eventName: 'Apical Round 7',
@@ -516,6 +517,24 @@ describe('EventCatalogService', () => {
       firstName: 'Robert',
       lastName: 'WOOD',
       sessionIds: ['session-apical-1001'],
+    }));
+    expect(service.getImportedRaceStateMetadata(
+      '7b83ad1e-54ba-5f00-9712-1c82d3178640',
+      'session-apical-1001'
+    )).toEqual(expect.objectContaining({
+      apicalDataFilePath: '../../src/generated/apical-excel-cache/apical-event-1001.xlsx',
+      raceState: expect.objectContaining({
+        categories: expect.arrayContaining([expect.objectContaining({ id: 'cat-apical-a' })]),
+      }),
+    }));
+    expect(seededPersistence.save).toHaveBeenLastCalledWith(expect.objectContaining({
+      mutations: expect.arrayContaining([
+        expect.objectContaining({
+          apicalDataFilePath: '../../src/generated/apical-excel-cache/apical-event-1001.xlsx',
+          sessionId: 'session-apical-1001',
+          type: 'race-state-imported',
+        }),
+      ]),
     }));
     expect(seededPersistence.save).toHaveBeenCalledTimes(2);
   });

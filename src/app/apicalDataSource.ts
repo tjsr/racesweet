@@ -504,7 +504,8 @@ const loadApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId
     }
 
     if (options.cachedSpreadsheetOnly) {
-      throw new ApicalDataException(`Cached Apical Excel spreadsheet was not found for event id ${apicalEventId}. Fetch event data before loading this session.`);
+      const cacheFilePath = getCachedApicalExcelFilePath(apicalEventId, cacheDirectoryPath);
+      throw new ApicalDataException(`Cached Apical Excel spreadsheet was not found for event id ${apicalEventId} at ${cacheFilePath}. Fetch event data before loading this session.`);
     }
   }
 

@@ -131,6 +131,49 @@ describe('SystemConfigService', () => {
     }));
   });
 
+  it('backfills persisted Apical cache paths recovered from event data', async () => {
+    const persistence = createPersistence({
+      ...systemConfig.createDefaultSystemConfiguration(),
+      dataSources: [
+        {
+          apiConfig: {
+            authHeaderName: 'Authorization',
+            authHeaderValue: '',
+            baseUrl: 'https://apical.example.com',
+            companyId: 2,
+            httpTimeoutSeconds: 30,
+            live: false,
+            pollIntervalSeconds: 30,
+            selectedEventIds: [1001],
+          },
+          dataLastRetrieved: '2026-06-08T09:10:11.123Z',
+          enabled: true,
+          id: 'source-apical',
+          name: 'Apical Data file endpoint',
+          type: 'api-apical-data-file',
+        },
+      ],
+    });
+    const service = await SystemConfigService.create(persistence);
+    const expectedApicalDataFilePath = systemConfig.normalizeOptionalSystemFilePath('../../src/generated/apical-excel-cache/apical-event-1001.xlsx');
+
+    await service.persistApicalDataFilePaths({
+      'source-apical': '../../src/generated/apical-excel-cache/apical-event-1001.xlsx',
+    });
+
+    expect(service.state.dataSources[0]?.apicalDataFilePath).toBe(expectedApicalDataFilePath);
+    expect(service.state.dataSources[0]?.dataLastRetrieved).toBe('2026-06-08T09:10:11.123Z');
+    expect(persistence.save).toHaveBeenLastCalledWith(expect.objectContaining({
+      dataSources: [
+        expect.objectContaining({
+          apicalDataFilePath: expectedApicalDataFilePath,
+          dataLastRetrieved: '2026-06-08T09:10:11.123Z',
+          id: 'source-apical',
+        }),
+      ],
+    }));
+  });
+
   it('persists per-event display options', async () => {
     const persistence = createPersistence();
     const service = await SystemConfigService.create(persistence);

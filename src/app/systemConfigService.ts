@@ -234,6 +234,32 @@ export class SystemConfigService {
     return this.config;
   }
 
+  public async persistApicalDataFilePaths(sourceFilePaths: Record<string, string | undefined>): Promise<SystemConfiguration> {
+    let changed = false;
+    this.config = {
+      ...this.config,
+      dataSources: this.config.dataSources.map((source) => {
+        const apicalDataFilePath = normalizeOptionalSystemFilePath(sourceFilePaths[source.id]);
+        if (!apicalDataFilePath || source.apicalDataFilePath === apicalDataFilePath) {
+          return source;
+        }
+
+        changed = true;
+        return {
+          ...source,
+          apicalDataFilePath,
+        };
+      }),
+    };
+
+    if (!changed) {
+      return this.config;
+    }
+
+    await this.persist();
+    return this.config;
+  }
+
   private async persist(): Promise<void> {
     const sanitized = normalizeSystemConfiguration({
       ...createDefaultSystemConfiguration(),

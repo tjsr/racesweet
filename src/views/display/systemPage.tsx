@@ -11,8 +11,10 @@ import { getRuntimeVersions } from '../../app/versionInfo.js';
 
 interface SystemPageProps {
   config: SystemConfiguration;
+  displayedErrorLog?: string;
   onCreateSource: (type: DataSourceType) => void | Promise<void>;
   onDeleteSource: (sourceId: string) => void | Promise<void>;
+  onDisplayError?: (source: string, error: unknown) => void;
   onFetchApicalDataNow: (sourceId: string) => void | Promise<void>;
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: string) => void | Promise<void>;
@@ -102,6 +104,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
     } catch (error: unknown) {
       const formattedError = formatErrorForDisplay(error);
       console.error(`Failed to fetch Apical events for source ${sourceId}:\n${formattedError}`);
+      props.onDisplayError?.('System', error);
       setSourceFetchErrors((current) => ({
         ...current,
         [sourceId]: {
@@ -124,6 +127,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
     } catch (error: unknown) {
       const formattedError = formatErrorForDisplay(error);
       console.error(`Failed to fetch Apical event data for source ${sourceId}:\n${formattedError}`);
+      props.onDisplayError?.('System', error);
       setSourceFetchErrors((current) => ({
         ...current,
         [sourceId]: {
@@ -420,6 +424,18 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                           <div className="inline-error" role="alert">
                             <p>{sourceFetchError.title}:</p>
                             <pre>{sourceFetchError.details}</pre>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSourceFetchErrors((current) => {
+                                  const next = { ...current };
+                                  delete next[source.id];
+                                  return next;
+                                });
+                              }}
+                            >
+                              Dismiss
+                            </button>
                           </div>
                         ) : null}
                         {listedEvents.length > 0 ? (
@@ -482,6 +498,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                                 });
                               } catch (error: unknown) {
                                 const message = error instanceof Error ? error.message : String(error);
+                                props.onDisplayError?.('System', error);
                                 setMasterProfileDraftErrors((current) => ({
                                   ...current,
                                   [source.id]: message,
@@ -491,9 +508,21 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                           />
                         </label>
                         {masterProfileDraftErrors[source.id] ? (
-                          <p className="inline-error" role="alert">
-                            Failed to parse profiles: {masterProfileDraftErrors[source.id]}
-                          </p>
+                          <div className="inline-error" role="alert">
+                            <p>Failed to parse profiles: {masterProfileDraftErrors[source.id]}</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMasterProfileDraftErrors((current) => {
+                                  const next = { ...current };
+                                  delete next[source.id];
+                                  return next;
+                                });
+                              }}
+                            >
+                              Dismiss
+                            </button>
+                          </div>
                         ) : null}
                       </>
                     ) : (
@@ -518,6 +547,18 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
             )}
           </section>
         </div>
+      </section>
+
+      <section className="events-panel">
+        <h2>Log</h2>
+        <label>
+          Error Log
+          <textarea
+            aria-label="Application Error Log"
+            readOnly
+            value={props.displayedErrorLog || ''}
+          />
+        </label>
       </section>
     </section>
   );
