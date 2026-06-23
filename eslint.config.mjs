@@ -22,8 +22,15 @@ export default tseslint.config(
     },
   },
   rules: {
-    "@stylistic/js/comma-dangle": 'off'
-  }
+    "@stylistic/js/comma-dangle": 'off',
+    "sort-imports": [
+      "error",
+      {
+        "ignoreDeclarationSort": true,
+        "ignoreMemberSort": false
+      }
+    ]
+  },
 },
 {
   files: ['src/**/*.test.ts', 'src/**/*.test.tsx'],

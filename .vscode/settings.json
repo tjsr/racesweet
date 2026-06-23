@@ -8,9 +8,9 @@
     "watchDirectoryTimeout": 1000,
     "log": "off"
   },
-  "typescript.enablePromptUseWorkspaceTsdk": true,
-  "typescript.preferences.importModuleSpecifierEnding": "js",
-  "typescript.tsdk": "node_modules/typescript/lib",
+  "js/ts.tsdk.promptToUseWorkspaceVersion": true,
+  "js/ts.tsdk.preferences.importModuleSpecifierEnding": "ts",
+  "js/ts.tsdk.path": "node_modules/typescript/lib",
   "files.watcherExclude": {
     "**/.git/**": true,
     "**/node_modules/**": true,
@@ -29,7 +29,13 @@
     "rs": true
   },
   "cognitiveServices": {
-    "endpoint": "http://localhost:11434/v1",
-    "key": "2b6f0b45614f4cb9892c9b3ee1daf863.VXfGGoFMUr8iWAftdPI6iPKD"
+    "endpoint": "http://localhost:11434",
+    "key": ""
+  },
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
   }
 }
