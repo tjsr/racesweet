@@ -190,25 +190,35 @@ describe('SystemConfigService', () => {
     }));
   });
 
-  it('normalizes the Apical Excel cache directory to an absolute system config path', async () => {
+  it('normalizes the local storage directory to an absolute system config path', async () => {
     const normalizedConfig = systemConfig.normalizeSystemConfiguration({
       ...systemConfig.createDefaultSystemConfiguration(),
-      apicalExcelCacheDirectoryPath: 'src/generated/custom-apical-cache',
+      localStorageDirectoryPath: 'src/generated/custom-storage',
     });
 
-    expect(normalizedConfig.apicalExcelCacheDirectoryPath).toBe(systemConfig.normalizeSystemDirectoryPath('src/generated/custom-apical-cache'));
-    expect(systemConfig.normalizeSystemDirectoryPath(undefined)).toBe(systemConfig.DEFAULT_APICAL_EXCEL_CACHE_DIRECTORY_PATH);
+    expect(normalizedConfig.localStorageDirectoryPath).toBe(systemConfig.normalizeSystemDirectoryPath('src/generated/custom-storage'));
+    expect(systemConfig.normalizeSystemDirectoryPath(undefined)).toBe(systemConfig.DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH);
   });
 
-  it('persists Apical Excel cache directory changes as absolute paths', async () => {
+  it('migrates legacy Apical Excel cache directory config to the local storage parent path', async () => {
+    const normalizedConfig = systemConfig.normalizeSystemConfiguration({
+      ...systemConfig.createDefaultSystemConfiguration(),
+      apicalExcelCacheDirectoryPath: 'src/generated/custom-storage/apical-excel-cache',
+      localStorageDirectoryPath: undefined,
+    });
+
+    expect(normalizedConfig.localStorageDirectoryPath).toBe(systemConfig.normalizeSystemDirectoryPath('src/generated/custom-storage'));
+  });
+
+  it('persists local storage directory changes as absolute paths', async () => {
     const persistence = createPersistence();
     const service = await SystemConfigService.create(persistence);
 
-    await service.updateApicalExcelCacheDirectoryPath('src/generated/custom-apical-cache');
+    await service.updateLocalStorageDirectoryPath('src/generated/custom-storage');
 
-    expect(service.state.apicalExcelCacheDirectoryPath).toBe(systemConfig.normalizeSystemDirectoryPath('src/generated/custom-apical-cache'));
+    expect(service.state.localStorageDirectoryPath).toBe(systemConfig.normalizeSystemDirectoryPath('src/generated/custom-storage'));
     expect(persistence.save).toHaveBeenCalledWith(expect.objectContaining({
-      apicalExcelCacheDirectoryPath: systemConfig.normalizeSystemDirectoryPath('src/generated/custom-apical-cache'),
+      localStorageDirectoryPath: systemConfig.normalizeSystemDirectoryPath('src/generated/custom-storage'),
     }));
   });
 

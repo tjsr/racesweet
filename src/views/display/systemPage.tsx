@@ -18,7 +18,7 @@ interface SystemPageProps {
   onFetchApicalDataNow: (sourceId: string) => void | Promise<void>;
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: string) => void | Promise<void>;
-  onSaveApicalExcelCacheDirectoryPath: (directoryPath: string) => void | Promise<void>;
+  onSaveLocalStorageDirectoryPath: (directoryPath: string) => void | Promise<void>;
   onSaveSource: (sourceId: string, changes: Partial<DataSourceConfig>) => void | Promise<void>;
   onSelectLocalFile?: () => Promise<string | undefined>;
 }
@@ -179,13 +179,13 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
       </section>
 
       <section className="events-panel">
-        <h2>Apical Cache</h2>
+        <h2>Local storage location</h2>
         <label>
-          Excel Cache Directory
+          Storage Directory
           <DraftInput
-            ariaLabel="Apical Excel Cache Directory"
-            value={props.config.apicalExcelCacheDirectoryPath}
-            onCommit={props.onSaveApicalExcelCacheDirectoryPath}
+            ariaLabel="Local Storage Directory"
+            value={props.config.localStorageDirectoryPath}
+            onCommit={props.onSaveLocalStorageDirectoryPath}
           />
         </label>
       </section>

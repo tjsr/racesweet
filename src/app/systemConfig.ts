@@ -75,19 +75,20 @@ export interface EventOptionsConfig {
 }
 
 export interface SystemConfiguration {
-  apicalExcelCacheDirectoryPath: string;
   dataSources: DataSourceConfig[];
   eventOptions: Record<string, EventOptionsConfig>;
   eventSourceAssignments: Record<string, string[]>;
+  localStorageDirectoryPath: string;
   schemaVersion: 1;
   sessionSourceAssignments: Record<string, SessionSourceAssignment>;
 }
 
-export const DEFAULT_APICAL_EXCEL_CACHE_DIRECTORY_PATH = path.resolve('src/generated/apical-excel-cache');
+export const DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH = path.resolve('src/generated');
+const APICAL_EXCEL_CACHE_DIRECTORY_NAME = 'apical-excel-cache';
 
 export const normalizeSystemDirectoryPath = (directoryPath: string | undefined): string => {
   const trimmedPath = directoryPath?.trim();
-  return path.resolve(trimmedPath && trimmedPath.length > 0 ? trimmedPath : DEFAULT_APICAL_EXCEL_CACHE_DIRECTORY_PATH);
+  return path.resolve(trimmedPath && trimmedPath.length > 0 ? trimmedPath : DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH);
 };
 
 export const normalizeOptionalSystemFilePath = (filePath: string | undefined): string | undefined => {
@@ -96,13 +97,27 @@ export const normalizeOptionalSystemFilePath = (filePath: string | undefined): s
 };
 
 export const createDefaultSystemConfiguration = (): SystemConfiguration => ({
-  apicalExcelCacheDirectoryPath: DEFAULT_APICAL_EXCEL_CACHE_DIRECTORY_PATH,
   dataSources: [],
   eventOptions: {},
   eventSourceAssignments: {},
+  localStorageDirectoryPath: DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH,
   schemaVersion: 1,
   sessionSourceAssignments: {},
 });
+
+const normalizeLocalStorageDirectoryPath = (
+  directoryPath: string | undefined,
+  legacyApicalExcelCacheDirectoryPath: string | undefined
+): string => {
+  if (directoryPath !== undefined) {
+    return normalizeSystemDirectoryPath(directoryPath);
+  }
+
+  const normalizedLegacyPath = normalizeSystemDirectoryPath(legacyApicalExcelCacheDirectoryPath);
+  return path.basename(normalizedLegacyPath) === APICAL_EXCEL_CACHE_DIRECTORY_NAME
+    ? path.dirname(normalizedLegacyPath)
+    : normalizedLegacyPath;
+};
 
 export const normalizeDataSourceConfig = (source: DataSourceConfig): DataSourceConfig => {
   if (source.type !== 'api-apical-data-file' || !source.apiConfig) {
@@ -126,16 +141,25 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig): DataSourceC
   };
 };
 
-export const normalizeSystemConfiguration = (config: Partial<SystemConfiguration>): SystemConfiguration => ({
-  ...createDefaultSystemConfiguration(),
-  ...config,
-  apicalExcelCacheDirectoryPath: normalizeSystemDirectoryPath(config.apicalExcelCacheDirectoryPath),
-  dataSources: (config.dataSources || []).map(normalizeDataSourceConfig),
-  eventOptions: config.eventOptions || {},
-  eventSourceAssignments: config.eventSourceAssignments || {},
-  schemaVersion: 1,
-  sessionSourceAssignments: config.sessionSourceAssignments || {},
-});
+export const normalizeSystemConfiguration = (
+  config: Partial<SystemConfiguration> & { apicalExcelCacheDirectoryPath?: string }
+): SystemConfiguration => {
+  const {
+    apicalExcelCacheDirectoryPath: _legacyApicalExcelCacheDirectoryPath,
+    ...currentConfig
+  } = config;
+
+  return {
+    ...createDefaultSystemConfiguration(),
+    ...currentConfig,
+    dataSources: (config.dataSources || []).map(normalizeDataSourceConfig),
+    eventOptions: config.eventOptions || {},
+    eventSourceAssignments: config.eventSourceAssignments || {},
+    localStorageDirectoryPath: normalizeLocalStorageDirectoryPath(config.localStorageDirectoryPath, config.apicalExcelCacheDirectoryPath),
+    schemaVersion: 1,
+    sessionSourceAssignments: config.sessionSourceAssignments || {},
+  };
+};
 
 export const getDataSourceTypeLabel = (type: DataSourceType): string => {
   switch (type) {

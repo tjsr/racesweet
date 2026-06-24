@@ -395,16 +395,17 @@ describe('apicalDataSource', () => {
     await expect(pullApicalRaceState(source, createEventId())).rejects.toThrow('No Apical event id is configured for this source.');
   });
 
-  it('resolves cached Apical Excel file paths from the configured cache directory', () => {
-    const configuredCacheDirectory = path.join(process.cwd(), 'src', 'generated', 'custom-apical-cache');
+  it('resolves cached Apical Excel file paths under the configured local storage directory', () => {
+    const configuredLocalStorageDirectory = path.join(process.cwd(), 'src', 'generated', 'custom-storage');
+    const expectedCacheDirectory = path.join(configuredLocalStorageDirectory, 'apical-excel-cache');
 
-    expect(getCachedApicalExcelFilePath(301, configuredCacheDirectory)).toBe(path.join(configuredCacheDirectory, 'apical-event-301.xlsx'));
-    expect(path.isAbsolute(getCachedApicalExcelFilePath(301, 'src/generated/custom-apical-cache'))).toBe(true);
+    expect(getCachedApicalExcelFilePath(301, configuredLocalStorageDirectory)).toBe(path.join(expectedCacheDirectory, 'apical-event-301.xlsx'));
+    expect(path.isAbsolute(getCachedApicalExcelFilePath(301, 'src/generated/custom-storage'))).toBe(true);
   });
 
   it('includes the attempted cached spreadsheet filename when cached-only loading misses', async () => {
-    const cacheDirectoryPath = path.join(process.cwd(), 'src', 'generated', 'custom-apical-cache');
-    const expectedCacheFilePath = getCachedApicalExcelFilePath(301, cacheDirectoryPath);
+    const localStorageDirectoryPath = path.join(process.cwd(), 'src', 'generated', 'custom-storage');
+    const expectedCacheFilePath = getCachedApicalExcelFilePath(301, localStorageDirectoryPath);
     const requestBuffer = vi.fn(async () => {
       throw new Error(`ENOENT: no such file or directory, open '${expectedCacheFilePath}'`);
     });
@@ -418,8 +419,8 @@ describe('apicalDataSource', () => {
     };
 
     await expect(pullApicalRaceState(createApicalSource('apical.example.com'), createEventId(), {
-      apicalExcelCacheDirectoryPath: cacheDirectoryPath,
       cachedSpreadsheetOnly: true,
+      localStorageDirectoryPath,
       preferCachedSpreadsheet: true,
     })).rejects.toThrow(`Cached Apical Excel spreadsheet was not found for event id 301 at ${expectedCacheFilePath}.`);
     expect(requestBuffer).toHaveBeenCalledWith(expectedCacheFilePath);

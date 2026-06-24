@@ -15,9 +15,10 @@ import { createApicalExcelDownloadHeaders, getApicalExcelDownloadUrl, readApical
 import { fetchExternalHttp, isSensitiveHeader } from '../utils/externalHttp.js';
 import { RendererApiUnavailableError, getRendererApi } from './rendererApi.js';
 import { remapStackTrace } from './stackTrace.js';
-import { DEFAULT_APICAL_EXCEL_CACHE_DIRECTORY_PATH, normalizeSystemDirectoryPath, type ApicalListedEvent, type DataSourceConfig } from './systemConfig.js';
+import { DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH, normalizeSystemDirectoryPath, type ApicalListedEvent, type DataSourceConfig } from './systemConfig.js';
 import { getSystemTimeZone } from './utils/timeutils.js';
 const APICAL_EVENT_ID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+const APICAL_EXCEL_CACHE_DIRECTORY_NAME = 'apical-excel-cache';
 
 type XlsxModule = typeof XlsxNamespace;
 
@@ -38,6 +39,7 @@ export interface PulledApicalRaceState {
 interface ApicalRaceStateOptions {
   apicalExcelCacheDirectoryPath?: string;
   cachedSpreadsheetOnly?: boolean;
+  localStorageDirectoryPath?: string;
   preferCachedSpreadsheet?: boolean;
   timeZone?: string;
 }
@@ -89,9 +91,9 @@ export const createApicalCatalogSessionId = (apicalEventId: number): SessionId =
 
 export const getCachedApicalExcelFilePath = (
   apicalEventId: number,
-  cacheDirectoryPath: string = DEFAULT_APICAL_EXCEL_CACHE_DIRECTORY_PATH
+  localStorageDirectoryPath: string = DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH
 ): string => {
-  return path.resolve(normalizeSystemDirectoryPath(cacheDirectoryPath), `apical-event-${apicalEventId}.xlsx`);
+  return path.resolve(normalizeSystemDirectoryPath(localStorageDirectoryPath), APICAL_EXCEL_CACHE_DIRECTORY_NAME, `apical-event-${apicalEventId}.xlsx`);
 };
 
 const getListedApicalEvent = (source: DataSourceConfig, apicalEventId: number): ApicalListedEvent | undefined => {
@@ -496,20 +498,20 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
 };
 
 const loadApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId: number, options: ApicalRaceStateOptions = {}): Promise<ApicalLapByCategory> => {
-  const cacheDirectoryPath = normalizeSystemDirectoryPath(options.apicalExcelCacheDirectoryPath);
+  const localStorageDirectoryPath = normalizeSystemDirectoryPath(options.localStorageDirectoryPath || options.apicalExcelCacheDirectoryPath);
   if (options.preferCachedSpreadsheet) {
-    const cachedPayload = await readCachedApicalExcelPayload(apicalEventId, cacheDirectoryPath);
+    const cachedPayload = await readCachedApicalExcelPayload(apicalEventId, localStorageDirectoryPath);
     if (cachedPayload) {
       return cachedPayload;
     }
 
     if (options.cachedSpreadsheetOnly) {
-      const cacheFilePath = getCachedApicalExcelFilePath(apicalEventId, cacheDirectoryPath);
+      const cacheFilePath = getCachedApicalExcelFilePath(apicalEventId, localStorageDirectoryPath);
       throw new ApicalDataException(`Cached Apical Excel spreadsheet was not found for event id ${apicalEventId} at ${cacheFilePath}. Fetch event data before loading this session.`);
     }
   }
 
-  return fetchApicalDataFilePayload(source, apicalEventId, cacheDirectoryPath);
+  return fetchApicalDataFilePayload(source, apicalEventId, localStorageDirectoryPath);
 };
 
 export const pullApicalRaceState = async (source: DataSourceConfig, eventId: EventId, options: ApicalRaceStateOptions = {}): Promise<Partial<RaceState>> => {
@@ -549,7 +551,7 @@ export const fetchApicalRaceStateNow = async (source: DataSourceConfig, options:
 
     return {
       apicalEventId,
-      apicalDataFilePath: getCachedApicalExcelFilePath(apicalEventId, options.apicalExcelCacheDirectoryPath),
+      apicalDataFilePath: getCachedApicalExcelFilePath(apicalEventId, options.localStorageDirectoryPath || options.apicalExcelCacheDirectoryPath),
       eventDate: listedEvent?.eventDate,
       eventId,
       eventName: listedEvent?.name || `Apical Event ${apicalEventId}`,

@@ -452,8 +452,8 @@ export const RaceSweetMainApp = () => {
     }
 
     const raceState = await pullApicalRaceState(source, eventId, {
-      apicalExcelCacheDirectoryPath: systemConfigState.apicalExcelCacheDirectoryPath,
       cachedSpreadsheetOnly: options.cachedSpreadsheetOnly,
+      localStorageDirectoryPath: systemConfigState.localStorageDirectoryPath,
       preferCachedSpreadsheet: options.preferCachedSpreadsheet,
       timeZone: getEventTimeZone(eventId),
     });
@@ -969,7 +969,7 @@ export const RaceSweetMainApp = () => {
             const apicalEventId = source.apiConfig?.selectedEventIds[0] || source.apiConfig?.apicalEventId;
             const importEventId = apicalEventId ? createApicalCatalogEventId(apicalEventId) : undefined;
             return fetchApicalRaceStateNow(source, {
-              apicalExcelCacheDirectoryPath: systemConfigState.apicalExcelCacheDirectoryPath,
+              localStorageDirectoryPath: systemConfigState.localStorageDirectoryPath,
               timeZone: getEventTimeZone(importEventId),
             })
               .then(async (importData: PulledApicalRaceState) => {
@@ -992,11 +992,11 @@ export const RaceSweetMainApp = () => {
               .then(updateSystemConfigState);
           }}
           onOpenLocalFile={(filePath) => window.api.openLocalFile(filePath)}
-          onSaveApicalExcelCacheDirectoryPath={(directoryPath) => {
+          onSaveLocalStorageDirectoryPath={(directoryPath) => {
             if (!systemConfigService) {
               return;
             }
-            systemConfigService.updateApicalExcelCacheDirectoryPath(directoryPath).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+            systemConfigService.updateLocalStorageDirectoryPath(directoryPath).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
           }}
           onSaveSource={(sourceId, changes) => {
             if (!systemConfigService) {

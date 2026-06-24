@@ -174,10 +174,10 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async updateApicalExcelCacheDirectoryPath(directoryPath: string): Promise<SystemConfiguration> {
+  public async updateLocalStorageDirectoryPath(directoryPath: string): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
-      apicalExcelCacheDirectoryPath: normalizeSystemDirectoryPath(directoryPath),
+      localStorageDirectoryPath: normalizeSystemDirectoryPath(directoryPath),
     };
     await this.persist();
     return this.config;
