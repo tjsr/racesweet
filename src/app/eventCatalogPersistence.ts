@@ -1,3 +1,4 @@
+import { rewriteImportedObjectIds } from '../model/ids.js';
 import {
   type EventCatalogLedger,
   createDefaultEventCatalogLedger,
@@ -41,11 +42,12 @@ export class ElectronJsonEventCatalogPersistence implements EventCatalogPersiste
       const api = getRendererApi(['requestFileContent']);
       const content = await api.requestFileContent<string>(this.filePath, 'utf8');
       const parsed = JSON.parse(content) as Partial<EventCatalogLedger>;
+      const mappedParsedData = rewriteImportedObjectIds(parsed).value;
 
       return {
         ...createDefaultEventCatalogLedger(),
-        ...parsed,
-        mutations: parsed.mutations || [],
+        ...mappedParsedData,
+        mutations: mappedParsedData.mutations || [],
         schemaVersion: 1,
       };
     } catch (error: unknown) {

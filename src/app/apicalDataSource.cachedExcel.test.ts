@@ -1,4 +1,5 @@
 import XLSX from 'xlsx';
+import { createEventId } from '../model/ids.js';
 import { createApicalCatalogEventId, fetchApicalRaceStateNow, pullApicalRaceState } from './apicalDataSource.js';
 import type { DataSourceConfig } from './systemConfig.js';
 
@@ -111,7 +112,7 @@ describe('apicalDataSource cached Excel flow', () => {
     convertDataToRaceState.mockReturnValue({});
     const fetchMock = mockExcelFetch();
 
-    await pullApicalRaceState(createApicalSource(), 'event-1');
+    await pullApicalRaceState(createApicalSource(), createEventId());
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[0]?.[0] || '')).toContain('/RaceResult/Event/ExportToExcel?eventId=301');

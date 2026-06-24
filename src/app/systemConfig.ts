@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { EventId, SessionId } from '../model/raceevent';
 
 export type DataSourceType =
   | 'timing-rfid-decoder'
@@ -163,11 +164,11 @@ export const getDataSourceTypeLabel = (type: DataSourceType): string => {
   }
 };
 
-export const getEventAssignedSourceIds = (config: SystemConfiguration, eventId: string): string[] => {
+export const getEventAssignedSourceIds = (config: SystemConfiguration, eventId: EventId): string[] => {
   return config.eventSourceAssignments[eventId] || [];
 };
 
-export const getSessionAssignedSourceIds = (config: SystemConfiguration, eventId: string, sessionId: string): string[] => {
+export const getSessionAssignedSourceIds = (config: SystemConfiguration, eventId: EventId, sessionId: SessionId): string[] => {
   const sessionAssignment = config.sessionSourceAssignments[sessionId];
   if (!sessionAssignment || sessionAssignment.mode === 'default') {
     return getEventAssignedSourceIds(config, eventId);
@@ -176,7 +177,7 @@ export const getSessionAssignedSourceIds = (config: SystemConfiguration, eventId
   return sessionAssignment.sourceIds;
 };
 
-export const getMasterEntrantProfilesForEvent = (config: SystemConfiguration, eventId: string): MasterEntrantProfile[] => {
+export const getMasterEntrantProfilesForEvent = (config: SystemConfiguration, eventId: EventId): MasterEntrantProfile[] => {
   const sourceIds = getEventAssignedSourceIds(config, eventId);
 
   return config.dataSources

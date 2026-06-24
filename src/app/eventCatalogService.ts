@@ -1,21 +1,26 @@
+import { validate as validateUuid } from 'uuid';
+import { CategoryId } from '../controllers/category.js';
+import { EventEntrantId } from '../model/entrant.js';
+import type { EventCategory } from '../model/eventcategory.js';
+import type { EventParticipant } from '../model/eventparticipant.js';
+import { createCategoryId, createEventEntrantId, createEventId, createSessionId, rewriteImportedObjectIds } from '../model/ids.js';
+import { EventId, SessionId } from '../model/raceevent.js';
+import type { RaceState } from '../model/racestate.js';
+import type { TimeRecord } from '../model/timerecord.js';
 import {
   type CategoryDistanceRule,
+  type EntrantType,
   type EventCatalogCategory,
   type EventCatalogEntrant,
   type EventCatalogLedger,
   type EventCatalogSession,
   type EventCatalogState,
-  type EntrantType,
   applyEventCatalogLedger,
   createSeedEventCatalogLedger,
   getEntrantsForEvent,
 } from './eventCatalog.js';
 import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
-import type { EventCategory } from '../model/eventcategory.js';
-import type { EventParticipant } from '../model/eventparticipant.js';
 import type { MasterEntrantProfile } from './systemConfig.js';
-import type { RaceState } from '../model/racestate.js';
-import type { TimeRecord } from '../model/timerecord.js';
 import { getSystemTimeZone } from './utils/timeutils.js';
 
 interface ApicalCatalogImport {
@@ -45,7 +50,6 @@ const assertEventCatalogPersistence = (persistence: EventCatalogPersistence): vo
 
 const createMutationId = (): string => `event-catalog-${Date.now()}-${Math.round(Math.random() * 100000)}`;
 const createTimestamp = (): string => new Date().toISOString();
-const createEntityId = (prefix: string): string => `${prefix}-${Date.now()}-${Math.round(Math.random() * 100000)}`;
 
 const reviveDate = (value: Date | string | undefined): Date | undefined => {
   if (!value) {
@@ -114,11 +118,11 @@ const deriveDistanceRule = (category: EventCategory): CategoryDistanceRule | und
   return undefined;
 };
 
-const deriveCategoriesFromEventData = (eventId: string, categories: EventCategory[], participants: EventParticipant[]): EventCatalogCategory[] => {
-  const byId = new Map<string, EventCatalogCategory>();
+const deriveCategoriesFromEventData = (eventId: EventId, categories: EventCategory[], participants: EventParticipant[]): EventCatalogCategory[] => {
+  const byId = new Map<EventId, EventCatalogCategory>();
 
   categories.forEach((category) => {
-    const id = category.id.toString();
+    const id = validateUuid(category.id) ? category.id : createCategoryId(category.id);
     byId.set(id, {
       ...category,
       distanceRule: deriveDistanceRule(category),
@@ -160,7 +164,7 @@ const deriveCategoriesFromEventData = (eventId: string, categories: EventCategor
 };
 
 const deriveEntrantsFromParticipants = (
-  eventId: string,
+  eventId: EventId,
   participants: EventParticipant[],
   defaultSessionIds: string[],
   masterProfiles: MasterEntrantProfile[] = []
@@ -269,7 +273,7 @@ export class EventCatalogService {
     assertEventCatalogPersistence(persistence);
     let ledger = await persistence.load();
     if (ledger.mutations.length === 0) {
-      ledger = createSeedEventCatalogLedger();
+      ledger = rewriteImportedObjectIds(createSeedEventCatalogLedger()).value;
       await persistence.save(ledger);
       if (options.onPersistedLedger) {
         await options.onPersistedLedger(ledger);
@@ -305,7 +309,7 @@ export class EventCatalogService {
   }
 
   public async createEvent(): Promise<EventCatalogState> {
-    const eventId = createEntityId('event');
+    const eventId = createEventId();
     return this.appendMutations([
       {
         event: {
@@ -325,7 +329,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async activateEvent(eventId: string): Promise<EventCatalogState> {
+  public async activateEvent(eventId: EventId): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         eventId,
@@ -336,7 +340,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async updateEvent(eventId: string, changes: { date?: string; format?: EventCatalogState['events'][number]['format']; name?: string; timeZone?: string; }): Promise<EventCatalogState> {
+  public async updateEvent(eventId: EventId, changes: { date?: string; format?: EventCatalogState['events'][number]['format']; name?: string; timeZone?: string; }): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes,
@@ -348,7 +352,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async deleteEvent(eventId: string): Promise<EventCatalogState> {
+  public async deleteEvent(eventId: EventId): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         eventId,
@@ -359,7 +363,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async syncEventScaffold(eventId: string, categories: EventCategory[], participants: EventParticipant[], masterProfiles: MasterEntrantProfile[] = []): Promise<EventCatalogState> {
+  public async syncEventScaffold(eventId: EventId, categories: EventCategory[], participants: EventParticipant[], masterProfiles: MasterEntrantProfile[] = []): Promise<EventCatalogState> {
     const event = this.state.events.find((item) => item.id === eventId);
     const sessionIds = event?.sessionIds || this.state.sessions.filter((session) => session.eventId === eventId).map((session) => session.id.toString());
 
@@ -447,12 +451,13 @@ export class EventCatalogService {
   }
 
   public async importApicalRaceState(importData: ApicalCatalogImport, masterProfiles: MasterEntrantProfile[] = []): Promise<EventCatalogState> {
-    const existingEvent = this.state.events.find((event) => event.id === importData.eventId);
-    const existingSession = this.state.sessions.find((session) => session.id === importData.sessionId);
-    const sessionIds = Array.from(new Set([...(existingEvent?.sessionIds || []), importData.sessionId]));
+    const normalizedImportData = rewriteImportedObjectIds(importData).value;
+    const existingEvent = this.state.events.find((event) => event.id === normalizedImportData.eventId);
+    const existingSession = this.state.sessions.find((session) => session.id === normalizedImportData.sessionId);
+    const sessionIds = Array.from(new Set([...(existingEvent?.sessionIds || []), normalizedImportData.sessionId]));
     const mutations: EventCatalogLedger['mutations'] = [];
-    const scheduledStart = importData.eventDate ? new Date(importData.eventDate).toISOString() : createTimestamp();
-    const timeZone = importData.timeZone || existingEvent?.timeZone || getSystemTimeZone();
+    const scheduledStart = normalizedImportData.eventDate ? new Date(normalizedImportData.eventDate).toISOString() : createTimestamp();
+    const timeZone = normalizedImportData.timeZone || existingEvent?.timeZone || getSystemTimeZone();
 
     if (!existingEvent) {
       mutations.push({
@@ -461,8 +466,8 @@ export class EventCatalogService {
           date: scheduledStart.slice(0, 10),
           entrantIds: [],
           format: 'race-weekend',
-          id: importData.eventId,
-          name: importData.eventName,
+          id: normalizedImportData.eventId,
+          name: normalizedImportData.eventName,
           sessionIds,
           timeZone,
         },
@@ -474,11 +479,11 @@ export class EventCatalogService {
       mutations.push({
         changes: {
           date: scheduledStart.slice(0, 10),
-          name: importData.eventName,
+          name: normalizedImportData.eventName,
           sessionIds,
           timeZone,
         },
-        eventId: importData.eventId,
+        eventId: normalizedImportData.eventId,
         id: createMutationId(),
         timestamp: createTimestamp(),
         type: 'event-updated',
@@ -489,10 +494,10 @@ export class EventCatalogService {
       mutations.push({
         id: createMutationId(),
         session: {
-          eventId: importData.eventId,
-          id: importData.sessionId,
+          eventId: normalizedImportData.eventId,
+          id: normalizedImportData.sessionId,
           kind: 'race',
-          name: importData.eventName,
+          name: normalizedImportData.eventName,
           notes: 'Imported from Apical data file endpoint.',
           scheduledStart,
           status: 'completed',
@@ -503,22 +508,22 @@ export class EventCatalogService {
     } else {
       mutations.push({
         changes: {
-          name: importData.eventName,
+          name: normalizedImportData.eventName,
           scheduledStart,
         },
         id: createMutationId(),
-        sessionId: importData.sessionId,
+        sessionId: normalizedImportData.sessionId,
         timestamp: createTimestamp(),
         type: 'session-updated',
       });
     }
 
     mutations.push({
-      apicalDataFilePath: importData.apicalDataFilePath,
-      eventId: importData.eventId,
+      apicalDataFilePath: normalizedImportData.apicalDataFilePath,
+      eventId: normalizedImportData.eventId,
       id: createMutationId(),
-      raceState: importData.raceState,
-      sessionId: importData.sessionId,
+      raceState: normalizedImportData.raceState,
+      sessionId: normalizedImportData.sessionId,
       timestamp: createTimestamp(),
       type: 'race-state-imported',
     });
@@ -528,15 +533,15 @@ export class EventCatalogService {
     }
 
     return this.syncEventScaffold(
-      importData.eventId,
-      importData.raceState.categories || [],
-      importData.raceState.participants || [],
+      normalizedImportData.eventId,
+      normalizedImportData.raceState.categories || [],
+      normalizedImportData.raceState.participants || [],
       masterProfiles
     );
   }
 
   public async createSession(eventId: string): Promise<EventCatalogState> {
-    const sessionId = createEntityId('session');
+    const sessionId = createSessionId();
     const session: EventCatalogSession = {
       eventId,
       id: sessionId,
@@ -623,7 +628,7 @@ export class EventCatalogService {
     return this.appendMutations(mutations);
   }
 
-  public async activateSession(eventId: string, sessionId: string): Promise<EventCatalogState> {
+  public async activateSession(eventId: EventId, sessionId: SessionId): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         eventId,
@@ -644,7 +649,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async deleteSession(eventId: string, sessionId: string): Promise<EventCatalogState> {
+  public async deleteSession(eventId: EventId, sessionId: SessionId): Promise<EventCatalogState> {
     const event = this.state.events.find((item) => item.id === eventId);
     return this.appendMutations([
       {
@@ -665,8 +670,8 @@ export class EventCatalogService {
     ]);
   }
 
-  public async createCategory(eventId: string): Promise<EventCatalogState> {
-    const categoryId = createEntityId('category');
+  public async createCategory(eventId: EventId): Promise<EventCatalogState> {
+    const categoryId = createCategoryId();
     const category: EventCatalogCategory = {
       code: '',
       description: '',
@@ -702,7 +707,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async updateCategory(categoryId: string, changes: Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'name' | 'sessionAssignments' | 'startTime' | 'teamRules'>>): Promise<EventCatalogState> {
+  public async updateCategory(categoryId: CategoryId, changes: Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'name' | 'sessionAssignments' | 'startTime' | 'teamRules'>>): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         categoryId,
@@ -714,7 +719,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async deleteCategory(eventId: string, categoryId: string): Promise<EventCatalogState> {
+  public async deleteCategory(eventId: EventId, categoryId: CategoryId): Promise<EventCatalogState> {
     const event = this.state.events.find((item) => item.id === eventId);
 
     return this.appendMutations([
@@ -736,8 +741,8 @@ export class EventCatalogService {
     ]);
   }
 
-  public async createEntrant(eventId: string, entrantType: EntrantType = 'rider'): Promise<EventCatalogState> {
-    const entrantId = createEntityId('entrant');
+  public async createEntrant(eventId: EventId, entrantType: EntrantType = 'rider'): Promise<EventCatalogState> {
+    const entrantId = createEventEntrantId();
     const event = this.state.events.find((item) => item.id === eventId);
     const categoryId = event?.categoryIds[0];
     const entrant: EventCatalogEntrant = {
@@ -772,7 +777,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async updateEntrant(entrantId: string, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>>): Promise<EventCatalogState> {
+  public async updateEntrant(entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>>): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes: normalizeEntrantChanges(changes),
@@ -784,7 +789,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async deleteEntrant(eventId: string, entrantId: string): Promise<EventCatalogState> {
+  public async deleteEntrant(eventId: EventId, entrantId: EventEntrantId): Promise<EventCatalogState> {
     const event = this.state.events.find((item) => item.id === eventId);
 
     return this.appendMutations([

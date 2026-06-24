@@ -7,9 +7,10 @@ import {
   getSessionsForEvent,
 } from './eventCatalog.js';
 
+import type { EventParticipant } from '../model/eventparticipant.js';
+import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, rewriteImportedObjectIds } from '../model/ids.js';
 import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
 import { EventCatalogService } from './eventCatalogService.js';
-import type { EventParticipant } from '../model/eventparticipant.js';
 
 const createPersistence = (initial = createDefaultEventCatalogLedger()): EventCatalogPersistence => {
   let ledger = initial;
@@ -35,7 +36,7 @@ describe('EventCatalogService', () => {
     const service = await EventCatalogService.create(emptyPersistence);
 
     expect(service.catalog.events).toHaveLength(1);
-    expect(service.catalog.activeEventId).toBe('event-2026-racesweet-round-1');
+    expect(service.catalog.activeEventId).toBe(createEventId('event-2026-racesweet-round-1'));
     expect(service.catalog.entrants.length).toBeGreaterThan(0);
     expect(emptyPersistence.save).toHaveBeenCalledTimes(1);
   });
@@ -47,9 +48,10 @@ describe('EventCatalogService', () => {
     const service = await EventCatalogService.create(emptyPersistence, { onPersistedLedger });
 
     const savedLedger = vi.mocked(emptyPersistence.save).mock.calls[0]?.[0];
+    const expectedSeedLedger = rewriteImportedObjectIds(createSeedEventCatalogLedger()).value;
     expect(emptyPersistence.load).toHaveBeenCalledOnce();
     expect(emptyPersistence.save).toHaveBeenCalledOnce();
-    expect(savedLedger).toEqual(createSeedEventCatalogLedger());
+    expect(savedLedger).toEqual(expectedSeedLedger);
     expect(onPersistedLedger).toHaveBeenCalledWith(savedLedger);
     expect(service.catalog).toEqual(applyEventCatalogLedger(savedLedger!));
   });
@@ -461,6 +463,10 @@ describe('EventCatalogService', () => {
     const service = await EventCatalogService.create(seededPersistence);
     const originalActiveEventId = service.catalog.activeEventId;
     const originalActiveSessionId = service.catalog.activeSessionId;
+    const importedCategoryId = createCategoryId('cat-apical-a');
+    const importedEntrantId = createEventEntrantId('entrant-apical-301');
+    const importedParticipantId = createEventParticipantId('participant-apical-301');
+    const importedSessionId = createSessionId('session-apical-1001');
 
     await service.importApicalRaceState({
       apicalDataFilePath: '../../src/generated/apical-excel-cache/apical-event-1001.xlsx',
@@ -495,15 +501,15 @@ describe('EventCatalogService', () => {
     });
 
     const event = service.catalog.events.find((item) => item.id === '7b83ad1e-54ba-5f00-9712-1c82d3178640');
-    const session = service.catalog.sessions.find((item) => item.id === 'session-apical-1001');
-    const entrant = service.catalog.entrants.find((item) => item.id === 'entrant-apical-301');
+    const session = service.catalog.sessions.find((item) => item.id === importedSessionId);
+    const entrant = service.catalog.entrants.find((item) => item.id === importedEntrantId);
 
     expect(service.catalog.activeEventId).toBe(originalActiveEventId);
     expect(service.catalog.activeSessionId).toBe(originalActiveSessionId);
     expect(event).toEqual(expect.objectContaining({
       date: '2026-06-07',
       name: 'Apical Round 7',
-      sessionIds: ['session-apical-1001'],
+      sessionIds: [importedSessionId],
       timeZone: 'Australia/Sydney',
     }));
     expect(session).toEqual(expect.objectContaining({
@@ -513,25 +519,33 @@ describe('EventCatalogService', () => {
       status: 'completed',
     }));
     expect(entrant).toEqual(expect.objectContaining({
-      categoryIds: ['cat-apical-a'],
+      categoryIds: [importedCategoryId],
       firstName: 'Robert',
       lastName: 'WOOD',
-      sessionIds: ['session-apical-1001'],
+      memberParticipantIds: [importedParticipantId],
+      sessionIds: [importedSessionId],
     }));
     expect(service.getImportedRaceStateMetadata(
       '7b83ad1e-54ba-5f00-9712-1c82d3178640',
-      'session-apical-1001'
+      importedSessionId
     )).toEqual(expect.objectContaining({
       apicalDataFilePath: '../../src/generated/apical-excel-cache/apical-event-1001.xlsx',
       raceState: expect.objectContaining({
-        categories: expect.arrayContaining([expect.objectContaining({ id: 'cat-apical-a' })]),
+        categories: expect.arrayContaining([expect.objectContaining({ id: importedCategoryId })]),
+        participants: expect.arrayContaining([
+          expect.objectContaining({
+            categoryId: importedCategoryId,
+            entrantId: importedEntrantId,
+            id: importedParticipantId,
+          }),
+        ]),
       }),
     }));
     expect(seededPersistence.save).toHaveBeenLastCalledWith(expect.objectContaining({
       mutations: expect.arrayContaining([
         expect.objectContaining({
           apicalDataFilePath: '../../src/generated/apical-excel-cache/apical-event-1001.xlsx',
-          sessionId: 'session-apical-1001',
+          sessionId: importedSessionId,
           type: 'race-state-imported',
         }),
       ]),

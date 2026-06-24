@@ -1,5 +1,7 @@
 import { Component, type ReactElement, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { validate as validateUuid } from 'uuid';
 import { fetchApicalEvents } from '../controllers/apical/getResultListJson.ts';
+import { CategoryId } from '../controllers/category.ts';
 import { EventCategoryId } from '../model/eventcategory.ts';
 import { type EventParticipantId } from '../model/eventparticipant.ts';
 import { EventId, SessionId } from '../model/raceevent.ts';
@@ -294,7 +296,15 @@ export const RaceSweetMainApp = () => {
         const session = raceService.raceState;
         const initialCatalog = catalogService.catalog;
         const initialSystemConfig = await loadSystemConfigWithImportedApicalPaths(systemService, catalogService);
-        const initialEventId = initialCatalog.activeEventId || initialCatalog.events[0]?.id;
+        const initialEventId: EventId = initialCatalog.activeEventId || initialCatalog.events[0]?.id;
+        if (!validateUuid(initialEventId)) {
+          throw new Error(`Invalid initial event ID in catalog: ${initialEventId}`);
+        };
+        initialCatalog.events.forEach((event) => {
+          if (!validateUuid(event.id)) {
+            throw new Error(`Invalid event ID in catalog: ${event.id}`);
+          }
+        });
         const participantCategoryIds = new Set(session.participants.map((participant) => participant.categoryId.toString()));
         const participantEntrantIds = new Set(session.participants.map((participant) => participant.entrantId.toString()));
         const catalogCategoryIds = new Set(getCategoriesForEvent(initialCatalog, initialEventId).map((category) => category.id.toString()));
@@ -355,7 +365,7 @@ export const RaceSweetMainApp = () => {
     }
   }, [sessionState, eventCatalogState, errorState]);
   
-  const selectEvent = (eventId: string) => {
+  const selectEvent = (eventId: EventId) => {
     if (!eventCatalogState) {
       return;
     }
@@ -366,7 +376,7 @@ export const RaceSweetMainApp = () => {
     setSelectedEntrantId((current) => nextEntrants.find((entrant) => entrant.id === current)?.id || nextEntrants[0]?.id);
   };
 
-  const selectSessionsEvent = (eventId: string) => {
+  const selectSessionsEvent = (eventId: EventId) => {
     if (!eventCatalogState) {
       return;
     }
@@ -375,7 +385,7 @@ export const RaceSweetMainApp = () => {
     setSelectedSessionId(nextSessions[0]?.id);
   };
 
-  const selectCategoriesEvent = (eventId: string) => {
+  const selectCategoriesEvent = (eventId: EventId) => {
     if (!eventCatalogState) {
       return;
     }
@@ -384,7 +394,7 @@ export const RaceSweetMainApp = () => {
     setSelectedCategoryId(nextCategories[0]?.id.toString());
   };
 
-  const selectEntrantsEvent = (eventId: string) => {
+  const selectEntrantsEvent = (eventId: EventId) => {
     if (!eventCatalogState) {
       return;
     }
@@ -393,7 +403,7 @@ export const RaceSweetMainApp = () => {
     setSelectedEntrantId(nextEntrants[0]?.id);
   };
 
-  const updateEventCatalogState = (catalog: EventCatalogState, preferredEventId?: string, preferredSessionId?: string, preferredCategoryId?: string) => {
+  const updateEventCatalogState = (catalog: EventCatalogState, preferredEventId?: EventId, preferredSessionId?: SessionId, preferredCategoryId?: CategoryId) => {
     setEventCatalogState(catalog);
     const nextEventId = preferredEventId || catalog.activeEventId || catalog.events[0]?.id;
     const nextSessions = getSessionsForEvent(catalog, nextEventId);
@@ -427,12 +437,16 @@ export const RaceSweetMainApp = () => {
   };
 
   const applySourceToSessionState = async (
-    eventId: string,
+    eventId: EventId,
     source: DataSourceConfig,
     targetSessionState?: Session & RaceStateLookup,
     options: { cachedSpreadsheetOnly?: boolean; preferCachedSpreadsheet?: boolean } = {}
   ): Promise<void> => {
+    if (!validateUuid(eventId)) {
+      throw new Error(`Invalid eventId provided: ${eventId}`);
+    }
     const sessionTarget = targetSessionState || sessionState;
+    
     if (source.type !== 'api-apical-data-file' || !sessionTarget) {
       return;
     }
@@ -475,8 +489,8 @@ export const RaceSweetMainApp = () => {
   };
 
   const applySessionSources = async (
-    eventId: string,
-    sessionId: string,
+    eventId: EventId,
+    sessionId: SessionId,
     options?: {
       cachedSpreadsheetOnly?: boolean;
       clearSelections?: boolean;
@@ -486,6 +500,12 @@ export const RaceSweetMainApp = () => {
       targetSessionState?: Session & RaceStateLookup;
     }
   ): Promise<(Session & RaceStateLookup) | undefined> => {
+    if (!validateUuid(eventId)) {
+      throw new Error(`Invalid eventId provided: ${eventId}`);
+    }
+    if (!validateUuid(sessionId)) {
+      throw new Error(`Invalid sessionId provided: ${sessionId}`);
+    }
     let targetSessionState = options?.targetSessionState || sessionState;
     if (options?.replaceSessionState) {
       targetSessionState = createEmptySessionState();
@@ -536,6 +556,12 @@ export const RaceSweetMainApp = () => {
   };
 
   const loadTimingSession = async (eventId: EventId, sessionId: SessionId): Promise<void> => {
+    if (!validateUuid(eventId)) {
+      throw new Error(`Invalid eventId provided: ${eventId}`);
+    }
+    if (!validateUuid(sessionId)) {
+      throw new Error(`Invalid sessionId provided: ${sessionId}`);
+    }
     const targetSessionState = createEmptySessionState();
     const loadedState = await applySessionSources(eventId, sessionId, {
       cachedSpreadsheetOnly: true,
@@ -550,6 +576,9 @@ export const RaceSweetMainApp = () => {
   };
 
   const selectTimingEvent = (eventId: EventId): void => {
+    if (!validateUuid(eventId)) {
+      throw new Error(`Invalid eventId provided: ${eventId}`);
+    }
     if (!eventCatalogState) {
       return;
     }
@@ -1050,12 +1079,15 @@ export const RaceSweetMainApp = () => {
         <SessionsContext
           catalog={eventCatalogState}
           config={systemConfigState}
-          onApplySessionSources={(eventId, sessionId) => {
+          onApplySessionSources={(eventId: EventId, sessionId: SessionId) => {
             applySessionSources(eventId, sessionId).catch((error: unknown) => {
               setErrorState(error as Error);
             });
           }}
-          onCreateSession={(eventId) => {
+          onCreateSession={(eventId: EventId) => {
+            if (!validateUuid(eventId)) {
+              throw new Error(`Invalid eventId provided: ${eventId}`);
+            }
             if (!eventCatalogService) {
               return;
             }
@@ -1073,7 +1105,13 @@ export const RaceSweetMainApp = () => {
               updateEventCatalogState(catalog, eventId, nextSessionId, selectedCategoryId);
             }).catch((error: unknown) => setErrorState(error as Error));
           }}
-          onMakeSessionActive={(eventId, sessionId) => {
+          onMakeSessionActive={(eventId: EventId, sessionId: SessionId) => {
+            if (!validateUuid(eventId)) {
+              throw new Error(`Invalid eventId provided: ${eventId}`);
+            }
+            if (!validateUuid(sessionId)) {
+              throw new Error(`Invalid sessionId provided: ${sessionId}`);
+            }
             const activate = async (): Promise<void> => {
               setSelectedSessionsEventId(eventId);
               setSelectedSessionId(sessionId);

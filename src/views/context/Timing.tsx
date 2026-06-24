@@ -1,12 +1,13 @@
-import { type EventCategory, type EventCategoryId } from '../../model/eventcategory.js';
-import { CategoryList } from '../../app/views/timing/categoryList.js';
-import { type EventCatalogState } from '../../app/eventCatalog.js';
-import { type EventParticipantId } from '../../model/eventparticipant.js';
-import { type EventTimeRecord } from '../../model/timerecord.js';
-import { type RaceStateLookup } from '../../model/racestate.js';
 import React from 'react';
-import { RecentRecords } from '../../app/views/timing/recentRecords.js';
+import { type EventCatalogState } from '../../app/eventCatalog.js';
 import { type TimeDisplayZoneMode } from '../../app/utils/timeutils.js';
+import { CategoryList } from '../../app/views/timing/categoryList.js';
+import { RecentRecords } from '../../app/views/timing/recentRecords.js';
+import { type EventCategory, type EventCategoryId } from '../../model/eventcategory.js';
+import { type EventParticipantId } from '../../model/eventparticipant.js';
+import { EventId, SessionId } from '../../model/raceevent.js';
+import { type RaceStateLookup } from '../../model/racestate.js';
+import { type EventTimeRecord } from '../../model/timerecord.js';
 
 type EventCatalogEvent = EventCatalogState['events'][number];
 type EventCatalogSession = EventCatalogState['sessions'][number];
@@ -22,8 +23,8 @@ interface TimingContextProps {
   events: EventCatalogEvent[];
   onChangeCategory: (participantId: string, categoryId: EventCategoryId) => void;
   onExclude: (crossingId: string, exclude: boolean) => void;
-  onSelectEvent: (eventId: string) => void;
-  onSelectSession: (sessionId: string) => void;
+  onSelectEvent: (eventId: EventId) => void;
+  onSelectSession: (sessionId: SessionId) => void;
   onTimeDisplayZoneModeChange: (mode: TimeDisplayZoneMode) => void;
   participantSelected: (participantId: Set<EventParticipantId>) => void;
   raceState: TimingRaceState;
@@ -48,7 +49,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
             value={props.timingEvent?.id || ''}
             onChange={(event) => props.onSelectEvent(event.target.value)}
           >
-            {props.events.map((event) => (
+            {props.events.map((event: EventCatalogEvent) => (
               <option key={event.id} value={event.id}>{event.name}</option>
             ))}
           </select>

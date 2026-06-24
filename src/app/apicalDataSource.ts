@@ -1,22 +1,22 @@
-import { generateExcelData } from '../controllers/apical/generateExcel.js';
+import path from 'node:path';
+import { v5 as uuidv5, validate as validateUuid } from 'uuid';
+import type * as XlsxNamespace from 'xlsx';
 import { readApicalExcelBuffer } from '../controllers/apical/apicalSpreadsheetProcessor.js';
+import { generateExcelData } from '../controllers/apical/generateExcel.js';
 import { ApicalDataException } from '../errors/apicalDataException.js';
 import { ApicalRequestFailedError } from '../errors/ApicalRequestFailedError.js';
 import type { ApicalLapByCategory } from '../model/apical.js';
-import { EventId } from '../model/raceevent.js';
+import { createSessionId } from '../model/ids.js';
+import { EventId, SessionId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
 import { getErrorMessage } from '../utils.js';
 import { createApicalExcelDownloadHeaders, getApicalExcelDownloadUrl, readApicalExcelPayloadBuffer } from '../utils/apical/excelDownload.js';
 import { fetchExternalHttp, isSensitiveHeader } from '../utils/externalHttp.js';
 import { RendererApiUnavailableError, getRendererApi } from './rendererApi.js';
-import { getSystemTimeZone } from './utils/timeutils.js';
 import { remapStackTrace } from './stackTrace.js';
 import { DEFAULT_APICAL_EXCEL_CACHE_DIRECTORY_PATH, normalizeSystemDirectoryPath, type ApicalListedEvent, type DataSourceConfig } from './systemConfig.js';
-import path from 'node:path';
-import { v5 as uuidv5 } from 'uuid';
-import type * as XlsxNamespace from 'xlsx';
-
+import { getSystemTimeZone } from './utils/timeutils.js';
 const APICAL_EVENT_ID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 
 type XlsxModule = typeof XlsxNamespace;
@@ -85,7 +85,7 @@ export const createApicalCatalogEventId = (apicalEventId: number): EventId => {
   return uuidv5(`apical-event-${apicalEventId}`, APICAL_EVENT_ID_NAMESPACE) as EventId;
 };
 
-export const createApicalCatalogSessionId = (apicalEventId: number): string => `session-apical-${apicalEventId}`;
+export const createApicalCatalogSessionId = (apicalEventId: number): SessionId => createSessionId(`session-apical-${apicalEventId}`);
 
 export const getCachedApicalExcelFilePath = (
   apicalEventId: number,
@@ -513,6 +513,9 @@ const loadApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId
 };
 
 export const pullApicalRaceState = async (source: DataSourceConfig, eventId: EventId, options: ApicalRaceStateOptions = {}): Promise<Partial<RaceState>> => {
+  if (!validateUuid(eventId)) {
+    throw new Error(`Invalid eventId provided: ${eventId}`);
+  }
   if (source.type !== 'api-apical-data-file' || !source.apiConfig) {
     throw new Error(`Unsupported source type for live pull: ${source.type}`);
   }

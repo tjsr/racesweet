@@ -3,6 +3,7 @@
 import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.js';
 import { EventCatalogService } from './eventCatalogService.js';
 import { createDefaultEventCatalogLedger } from './eventCatalog.js';
+import { createEventId } from '../model/ids.js';
 
 const eventCatalogTestPath = '../../test/generated/event-catalog.test.json';
 
@@ -100,11 +101,28 @@ describe('ElectronJsonEventCatalogPersistence', () => {
     expect(errorSpy).toHaveBeenCalledOnce();
   });
 
-  it('returns parsed ledger when file exists and is valid', async () => {
+  it('returns normalized parsed ledger when file exists and is valid', async () => {
     const ledgerData = {
-      mutations: [{ eventId: 'evt-1', id: 'mut-1', timestamp: '2025-01-01T00:00:00.000Z', type: 'event-activated' }],
+      mutations: [
+        {
+          event: {
+            categoryIds: [],
+            date: '2025-01-01',
+            entrantIds: [],
+            format: 'race-weekend',
+            id: 'evt-1',
+            name: 'Legacy Event',
+            sessionIds: [],
+          },
+          id: 'mut-1',
+          timestamp: '2025-01-01T00:00:00.000Z',
+          type: 'event-created',
+        },
+        { eventId: 'evt-1', id: 'mut-2', timestamp: '2025-01-01T00:00:00.000Z', type: 'event-activated' },
+      ],
       schemaVersion: 1,
     };
+    const expectedEventId = createEventId('evt-1');
 
     const requestFileContent = vi.fn(async () => JSON.stringify(ledgerData));
 
@@ -117,7 +135,23 @@ describe('ElectronJsonEventCatalogPersistence', () => {
     const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath);
     const loaded = await persistence.load();
 
-    expect(loaded.mutations).toEqual(ledgerData.mutations);
+    expect(loaded.mutations).toEqual([
+      {
+        event: {
+          categoryIds: [],
+          date: '2025-01-01',
+          entrantIds: [],
+          format: 'race-weekend',
+          id: expectedEventId,
+          name: 'Legacy Event',
+          sessionIds: [],
+        },
+        id: 'mut-1',
+        timestamp: '2025-01-01T00:00:00.000Z',
+        type: 'event-created',
+      },
+      { eventId: expectedEventId, id: 'mut-2', timestamp: '2025-01-01T00:00:00.000Z', type: 'event-activated' },
+    ]);
     expect(loaded.schemaVersion).toBe(1);
   });
 

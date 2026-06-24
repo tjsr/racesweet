@@ -1,4 +1,6 @@
+import { CategoryId } from '../controllers/category.js';
 import type { EventCategory, EventCategoryId } from '../model/eventcategory.js';
+import { EventId, SessionId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 
 export type EventFormat = 'race-weekend' | 'test-day' | 'track-day' | 'other';
@@ -36,23 +38,23 @@ export interface CategoryTeamRules {
 }
 
 export interface CategorySessionAssignment {
-  sessionId: string;
+  sessionId: SessionId;
   startTime: string;
 }
 
 export type EventCatalogCategory = EventCategory & {
   distanceRule?: CategoryDistanceRule;
-  eventId: string;
+  eventId: EventId;
   sessionAssignments?: CategorySessionAssignment[];
   teamRules?: CategoryTeamRules;
 };
 
 export interface EventCatalogEntrant {
-  categoryId?: string;
-  categoryIds: string[];
+  categoryId?: EventCategoryId;
+  categoryIds: EventCategoryId[];
   dateOfBirth?: string;
   entrantType: EntrantType;
-  eventId: string;
+  eventId: EventId;
   firstName?: string;
   gender?: string;
   id: string;
@@ -60,10 +62,10 @@ export interface EventCatalogEntrant {
   memberParticipantIds: string[];
   name: string;
   notes?: string;
-  sessionIds: string[];
+  sessionIds: SessionId[];
   teamEntrantId?: string;
   teamMembers?: Array<{
-    categoryId?: string;
+    categoryId?: EventCategoryId;
     dateOfBirth?: string;
     firstName: string;
     gender?: string;
@@ -73,19 +75,19 @@ export interface EventCatalogEntrant {
 }
 
 export interface EventCatalogEvent {
-  categoryIds: string[];
+  categoryIds: EventCategoryId[];
   date: string;
   entrantIds: string[];
   format: EventFormat;
-  id: string;
+  id: EventId;
   name: string;
-  sessionIds: string[];
+  sessionIds: SessionId[];
   timeZone?: string;
 }
 
 export interface EventCatalogSession {
-  eventId: string;
-  id: string;
+  eventId: EventId;
+  id: SessionId;
   kind: EventSessionKind;
   name: string;
   notes?: string;
@@ -94,10 +96,10 @@ export interface EventCatalogSession {
 }
 
 export interface EventCatalogState {
-  activeEventId?: string;
-  activeSessionId?: string;
+  activeEventId?: EventId;
+  activeSessionId?: SessionId;
   categories: EventCatalogCategory[];
-  deletedEventIds: string[];
+  deletedEventIds: EventId[];
   entrants: EventCatalogEntrant[];
   events: EventCatalogEvent[];
   sessions: EventCatalogSession[];
@@ -115,17 +117,17 @@ export interface EventCreatedMutation extends EventCatalogMutationBase {
 
 export interface EventUpdatedMutation extends EventCatalogMutationBase {
   changes: Partial<Pick<EventCatalogEvent, 'categoryIds' | 'date' | 'entrantIds' | 'format' | 'name' | 'sessionIds' | 'timeZone'>>;
-  eventId: string;
+  eventId: EventId;
   type: 'event-updated';
 }
 
 export interface EventDeletedMutation extends EventCatalogMutationBase {
-  eventId: string;
+  eventId: EventId;
   type: 'event-deleted';
 }
 
 export interface EventActivatedMutation extends EventCatalogMutationBase {
-  eventId: string;
+  eventId: EventId;
   type: 'event-activated';
 }
 
@@ -141,21 +143,21 @@ export interface SessionUpdatedMutation extends EventCatalogMutationBase {
 }
 
 export interface SessionActivatedMutation extends EventCatalogMutationBase {
-  eventId: string;
-  sessionId: string;
+  eventId: EventId;
+  sessionId: SessionId;
   type: 'session-activated';
 }
 
 export interface SessionDeletedMutation extends EventCatalogMutationBase {
-  sessionId: string;
+  sessionId: SessionId;
   type: 'session-deleted';
 }
 
 export interface RaceStateImportedMutation extends EventCatalogMutationBase {
   apicalDataFilePath?: string;
-  eventId: string;
+  eventId: EventId;
   raceState: Partial<RaceState>;
-  sessionId: string;
+  sessionId: SessionId;
   type: 'race-state-imported';
 }
 
@@ -574,7 +576,7 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
 
 export const getSessionsForEvent = (
   state: EventCatalogState,
-  eventId: string | undefined
+  eventId: EventId | undefined
 ): EventCatalogSession[] => {
   if (!eventId || !state.events.some((event) => event.id === eventId)) {
     return [];
@@ -585,7 +587,7 @@ export const getSessionsForEvent = (
 
 export const getCategoriesForEvent = (
   state: EventCatalogState,
-  eventId: string | undefined
+  eventId: EventId | undefined
 ): EventCatalogCategory[] => {
   if (!eventId || !state.events.some((event) => event.id === eventId)) {
     return [];
@@ -596,7 +598,7 @@ export const getCategoriesForEvent = (
 
 export const getEntrantsForEvent = (
   state: EventCatalogState,
-  eventId: string | undefined
+  eventId: EventId | undefined
 ): EventCatalogEntrant[] => {
   if (!eventId || !state.events.some((event) => event.id === eventId)) {
     return [];
@@ -607,8 +609,8 @@ export const getEntrantsForEvent = (
 
 export const getEntrantsForCategory = (
   state: EventCatalogState,
-  eventId: string | undefined,
-  categoryId: string | undefined
+  eventId: EventId | undefined,
+  categoryId: CategoryId | undefined
 ): EventCatalogEntrant[] => {
   if (!eventId || !categoryId) {
     return [];

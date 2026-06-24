@@ -10,6 +10,8 @@ import XLSX from 'xlsx';
 import { act } from 'react';
 import { convertApicalSpreadsheetRowsToApicalData } from '../controllers/apical/apicalSpreadsheetProcessor.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
+import { createSessionId } from '../model/ids.js';
+import { createSeedEventCatalogLedger } from './eventCatalog.js';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { useUiConsoleGuards } from '../testing/uiConsoleGuards.js';
@@ -25,6 +27,9 @@ vi.mock('../views/display/recent', () => ({
     `Recent Records (${props.records.length})`
   ),
 }));
+
+const SEED_QUALIFYING_SESSION_ID = createSessionId('session-1-qualifying');
+const UUID_TEXT_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const readFixtureBuffer = async (filePath: string): Promise<Buffer> => {
   const fileName = path.basename(filePath);
@@ -123,7 +128,7 @@ const readGeneratedFixtureWithTimingAssignedApicalSource = async (filePath: stri
       eventSourceAssignments: {},
       schemaVersion: 1,
       sessionSourceAssignments: {
-        'session-1-qualifying': {
+        [SEED_QUALIFYING_SESSION_ID]: {
           mode: 'specific',
           sourceIds: ['source-apical'],
         },
@@ -835,8 +840,8 @@ describe('RaceSweetMainApp integration', () => {
     const ledger = JSON.parse(latestCatalogWrite!.content) as { mutations: Array<{ eventId?: string; sessionId?: string; type: string }> };
     const sessionActivation = ledger.mutations.find((mutation) => mutation.type === 'session-activated');
     expect(sessionActivation).toEqual(expect.objectContaining({
-      eventId: expect.stringMatching(/^event-/),
-      sessionId: expect.stringMatching(/^session-/),
+      eventId: expect.stringMatching(UUID_TEXT_PATTERN),
+      sessionId: expect.stringMatching(UUID_TEXT_PATTERN),
       type: 'session-activated',
     }));
     expect(ledger.mutations).toEqual(expect.arrayContaining([
@@ -866,11 +871,11 @@ describe('RaceSweetMainApp integration', () => {
     expect(timingSessionSelect.value).toBe('active');
 
     await act(async () => {
-      timingSessionSelect.value = 'session-1-qualifying';
+      timingSessionSelect.value = SEED_QUALIFYING_SESSION_ID;
       timingSessionSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
-    await waitForInputValue(container, 'select[aria-label="Timing Session"]', 'session-1-qualifying');
+    await waitForInputValue(container, 'select[aria-label="Timing Session"]', SEED_QUALIFYING_SESSION_ID);
     expect(container.textContent).toContain('Recent Records (0)');
 
     await clickSectionButton(container, 'Sessions');
@@ -889,7 +894,7 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Timing');
     const pinnedTimingSessionSelect = container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement;
     expect(pinnedTimingSessionSelect).toBeTruthy();
-    expect(pinnedTimingSessionSelect.value).toBe('session-1-qualifying');
+    expect(pinnedTimingSessionSelect.value).toBe(SEED_QUALIFYING_SESSION_ID);
     expect(container.textContent).toContain('Active session (Feature Race)');
     expect(container.textContent).toContain('Recent Records (0)');
   });
@@ -921,7 +926,7 @@ describe('RaceSweetMainApp integration', () => {
     expect(timingSessionSelect).toBeTruthy();
 
     await act(async () => {
-      timingSessionSelect.value = 'session-1-qualifying';
+      timingSessionSelect.value = SEED_QUALIFYING_SESSION_ID;
       timingSessionSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
@@ -1236,6 +1241,125 @@ describe('RaceSweetMainApp integration', () => {
 
     await waitForText(container, `Recent Records (${expectedCrossingCount + 1})`);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('loads selected Timing sessions from imported Apical ledger data for the assigned source before reading cached spreadsheets', async () => {
+    const { apicalData, expectedCrossingCount } = await createApicalImportExpectations();
+    const importedEventId = createApicalCatalogEventId(1001);
+    const importedSessionId = createApicalCatalogSessionId(1001);
+    const apicalDataFilePath = getCachedApicalExcelFilePath(1001);
+    const excelApicalData = convertApicalSpreadsheetRowsToApicalData(apicalDataToSpreadsheetRows(apicalData));
+    const importedRaceState = convertDataToRaceState(
+      importedEventId,
+      new Date('2025-06-06T00:00:00.000Z'),
+      excelApicalData,
+      200000
+    );
+    const requestBuffer = vi.fn(async (filePath: string): Promise<Buffer> => {
+      if (filePath === apicalDataFilePath) {
+        throw new Error(`Cached spreadsheet should not be read: ${filePath}`);
+      }
+
+      return readFixtureBuffer(filePath);
+    });
+
+    const requestFileContent = async (filePath: string, _dataType: string): Promise<string> => {
+      if (filePath.includes('event-catalog.json')) {
+        return JSON.stringify({
+          mutations: [
+            ...createSeedEventCatalogLedger().mutations,
+            {
+              apicalDataFilePath,
+              eventId: importedEventId,
+              id: 'mutation-apical-race-state',
+              raceState: importedRaceState,
+              sessionId: importedSessionId,
+              timestamp: '2025-06-06T00:00:02.000Z',
+              type: 'race-state-imported',
+            },
+          ],
+          schemaVersion: 1,
+        });
+      }
+
+      if (filePath.includes('system-config.json')) {
+        return JSON.stringify({
+          dataSources: [
+            {
+              apiConfig: {
+                apicalEventId: 1001,
+                authHeaderName: 'Authorization',
+                authHeaderValue: 'Bearer token',
+                baseUrl: 'https://apical.example.com',
+                companyId: 2,
+                httpTimeoutSeconds: 10,
+                live: false,
+                pollIntervalSeconds: 30,
+                selectedEventIds: [1001],
+              },
+              apicalDataFilePath,
+              dataLastRetrieved: '2026-06-08T09:10:11.123Z',
+              enabled: true,
+              id: 'source-apical',
+              listedEvents: [
+                {
+                  eventDate: '2025-06-06T00:00:00.000Z',
+                  id: 1001,
+                  name: 'Apical Downloaded Round',
+                },
+              ],
+              name: 'Apical Source',
+              type: 'api-apical-data-file',
+            },
+          ],
+          eventSourceAssignments: {},
+          schemaVersion: 1,
+          sessionSourceAssignments: {
+            [SEED_QUALIFYING_SESSION_ID]: {
+              mode: 'specific',
+              sourceIds: ['source-apical'],
+            },
+          },
+        });
+      }
+
+      if (filePath.includes('admin-overrides.json')) {
+        return JSON.stringify({ entrantCategories: {}, excludedCrossings: {}, schemaVersion: 1 });
+      }
+
+      throw new Error(`Unknown generated file requested: ${filePath}`);
+    };
+
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string, dataType?: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer,
+      requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async () => undefined,
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Network should not be used'));
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    await clickSectionButton(container, 'Timing');
+    const timingSessionSelect = container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement;
+    expect(timingSessionSelect).toBeTruthy();
+
+    await act(async () => {
+      timingSessionSelect.value = SEED_QUALIFYING_SESSION_ID;
+      timingSessionSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    await waitForText(container, `Recent Records (${expectedCrossingCount + 1})`);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(requestBuffer).not.toHaveBeenCalledWith(apicalDataFilePath);
   });
 
   it('falls back to the cached Apical spreadsheet on disk when timing session ledger data is unavailable', async () => {

@@ -1,8 +1,6 @@
 import './runtimeSourceMaps.ts';
 import './state.ts';
 
-import { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileReadDataType, FileWriteDataType, SelectLocalFileOptions } from './window.ts';
-import { InvalidIpcChannelError, SendChannels } from '../model/electronIpcTypes.ts';
 import { IpcRendererEvent, contextBridge, ipcRenderer } from 'electron';
 import {
   ReadContentErrorIpcReceiveChannel,
@@ -17,9 +15,11 @@ import {
   WriteContentErrorIpcReceiveChannel,
   WriteContentIpcReceiveChannel,
 } from '../model/electronIpc.ts';
+import { InvalidIpcChannelError, SendChannels } from '../model/electronIpcTypes.ts';
+import { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileReadDataType, FileWriteDataType, SelectLocalFileOptions } from './window.ts';
 
-import { getRaceSweetServerPort } from './serverPort.ts';
 import { assertRendererApi } from './rendererApi.ts';
+import { getRaceSweetServerPort } from './serverPort.ts';
 
 // See the Electron documentation for details on how to use preload scripts:
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts

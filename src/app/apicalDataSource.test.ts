@@ -1,13 +1,13 @@
+import path from 'node:path';
 import { v1 as randomUUID, v5 as uuidv5 } from 'uuid';
 import XLSX from 'xlsx';
+import { fetchApicalEvents } from '../controllers/apical/getResultListJson.js';
+import { ApicalDataException } from '../errors/apicalDataException.js';
 import { createEventId } from '../model/ids.js';
 import type { EventId } from '../model/raceevent.js';
 import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from '../utils/apical/excelDownload.js';
-import { ApicalDataException } from '../errors/apicalDataException.js';
-import { ApicalSpreadsheetLapsRow, createApicalCatalogEventId, fetchApicalRaceStateNow, getCachedApicalExcelFilePath, pullApicalRaceState } from './apicalDataSource.js';
+import { ApicalSpreadsheetLapsRow, createApicalCatalogEventId, createApicalCatalogSessionId, fetchApicalRaceStateNow, getCachedApicalExcelFilePath, pullApicalRaceState } from './apicalDataSource.js';
 import type { DataSourceConfig } from './systemConfig.js';
-import { fetchApicalEvents } from '../controllers/apical/getResultListJson.js';
-import path from 'node:path';
 
 const convertDataToRaceState = vi.fn();
 const APICAL_APP_TEST_EVENT_ID = 670;
@@ -392,7 +392,7 @@ describe('apicalDataSource', () => {
     source.apiConfig!.apicalEventId = undefined;
     source.apiConfig!.selectedEventIds = [];
 
-    await expect(pullApicalRaceState(source, 'event-1')).rejects.toThrow('No Apical event id is configured for this source.');
+    await expect(pullApicalRaceState(source, createEventId())).rejects.toThrow('No Apical event id is configured for this source.');
   });
 
   it('resolves cached Apical Excel file paths from the configured cache directory', () => {
@@ -400,6 +400,29 @@ describe('apicalDataSource', () => {
 
     expect(getCachedApicalExcelFilePath(301, configuredCacheDirectory)).toBe(path.join(configuredCacheDirectory, 'apical-event-301.xlsx'));
     expect(path.isAbsolute(getCachedApicalExcelFilePath(301, 'src/generated/custom-apical-cache'))).toBe(true);
+  });
+
+  it('includes the attempted cached spreadsheet filename when cached-only loading misses', async () => {
+    const cacheDirectoryPath = path.join(process.cwd(), 'src', 'generated', 'custom-apical-cache');
+    const expectedCacheFilePath = getCachedApicalExcelFilePath(301, cacheDirectoryPath);
+    const requestBuffer = vi.fn(async () => {
+      throw new Error(`ENOENT: no such file or directory, open '${expectedCacheFilePath}'`);
+    });
+    (globalThis as typeof globalThis & { window: Partial<Window> }).window = globalThis.window || {};
+    (globalThis.window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+      };
+    }).api = {
+      requestBuffer,
+    };
+
+    await expect(pullApicalRaceState(createApicalSource('apical.example.com'), createEventId(), {
+      apicalExcelCacheDirectoryPath: cacheDirectoryPath,
+      cachedSpreadsheetOnly: true,
+      preferCachedSpreadsheet: true,
+    })).rejects.toThrow(`Cached Apical Excel spreadsheet was not found for event id 301 at ${expectedCacheFilePath}.`);
+    expect(requestBuffer).toHaveBeenCalledWith(expectedCacheFilePath);
   });
 
   it('exports configured Apical app event 69 using the selected Apical event id', async () => {
@@ -656,7 +679,7 @@ describe('apicalDataSource', () => {
         records: [],
       },
       retrievedAt: '2026-06-08T09:10:11.123Z',
-      sessionId: 'session-apical-301',
+      sessionId: createApicalCatalogSessionId(301),
       timeZone: expect.any(String),
     });
     expect(convertDataToRaceState).toHaveBeenCalledWith(createApicalCatalogEventId(301), new Date('2026-06-07T01:30:00.000Z'), [
