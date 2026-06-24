@@ -752,6 +752,11 @@ export const RecentRecords = (props: RecordsProps & {
   const selectedCategories = props.selectedCategories || new Set<EventCategoryId>();
   const selectedParticipants = props.selectedParticipants || new Set<EventParticipantId>();
   const teamMemberIds = selectedTeamMemberIds(props.raceStateLookup, selectedParticipants);
+  const selectableCategories = (props.raceStateLookup as unknown as { categories?: EventCategory[] }).categories || [];
+  const selectedCategoryIds = Array.from(selectedCategories);
+  const selectedCategoryNames = selectedCategoryIds.map((categoryId) => {
+    return selectableCategories.find((category) => category.id === categoryId)?.name || categoryId;
+  });
   const outsideEventWindowIgnoredRecordIds = React.useMemo(() => {
     return getOutsideEventWindowIgnoredRecordIds(props.records || [], props.raceStateLookup);
   }, [props.records, props.raceStateLookup]);
@@ -824,6 +829,9 @@ export const RecentRecords = (props: RecordsProps & {
       return a.time!.getTime() - b.time!.getTime();
     }
   });
+  const tableContainerStyle = {
+    '--recent-records-table-header-top': toolbarDock.isDocked ? `${toolbarDock.height}px` : '0px',
+  } as React.CSSProperties;
 
   return <>
     <div
@@ -837,6 +845,33 @@ export const RecentRecords = (props: RecordsProps & {
         style={toolbarDock.isDocked ? { left: toolbarDock.left, top: 0, width: toolbarDock.width } : undefined}
       >
         <h2 className="recent-records">Recent Records</h2>
+        <FormControl
+          fullWidth={false}
+          id="recent-records-category-dropdown"
+          sx={{ display: 'inline-block', minWidth: 220, verticalAlign: 'middle' }}
+        >
+          <InputLabel id="show-recent-categories-label" shrink>Categories</InputLabel>
+          <Select
+            displayEmpty
+            multiple
+            id="show-recent-categories"
+            label="Categories"
+            value={selectedCategoryIds}
+            sx={{ minWidth: 180 }}
+            onChange={(event) => {
+              const value = event.target.value;
+              const categoryIds = typeof value === 'string' ? value.split(',') : value;
+              props.categorySelected?.(new Set<EventCategoryId>(categoryIds as EventCategoryId[]));
+            }}
+            renderValue={() => selectedCategoryNames.length > 0 ? selectedCategoryNames.join(', ') : 'All categories'}>
+            {selectableCategories.map((category) => (
+              <MenuItem key={category.id} value={category.id}>
+                <Checkbox checked={selectedCategories.has(category.id)} />
+                <ListItemText primary={category.name || category.id} />
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <FormControl
           fullWidth={false}
           id="recent-records-type-dropdown"
@@ -925,7 +960,7 @@ export const RecentRecords = (props: RecordsProps & {
     {
       !(sortedRecords.length > 0) ? <p>No records available.</p>
         : <Box sx={{ flexGrow: 1, width: '100%' }}>
-          <TableContainer component={Paper}>
+          <TableContainer className="recent-records-table-container" component={Paper} style={tableContainerStyle}>
             <Table stickyHeader sx={{ minWidth: 650 }} size="small">
               <TableHead>
                 <TableRow>

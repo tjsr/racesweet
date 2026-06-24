@@ -1,17 +1,5 @@
 // @vitest-environment jsdom
 
-vi.mock('../../app/views/timing/categoryList.js', async () => {
-  const ReactModule = await import('react');
-
-  return {
-    CategoryList: (props: { selectedCategories?: Set<string> }) => ReactModule.createElement(
-      'div',
-      { 'data-testid': 'category-list-selection' },
-      Array.from(props.selectedCategories || []).sort().join(',')
-    ),
-  };
-});
-
 import { type EventCatalogState } from '../../app/eventCatalog.js';
 import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
 import type { EventCategory } from '../../model/eventcategory.js';
@@ -152,7 +140,6 @@ describe('TimingContext integration', () => {
           onTimeDisplayZoneModeChange={() => undefined}
           participantSelected={handleParticipantSelected}
           raceState={raceState}
-          recordCategorySelected={setSelectedCategories}
           selectedCategories={selectedCategories}
           selectedParticipants={selectedParticipants}
           sessions={[session]}
@@ -167,10 +154,10 @@ describe('TimingContext integration', () => {
       root.render(<Harness />);
     });
 
-    const selectedCategoryState = (): string => {
-      return container.querySelector('[data-testid="category-list-selection"]')?.textContent || '';
+    const selectedCategoryState = (): string | undefined => {
+      return container.querySelector('#recent-records-category-dropdown [role="combobox"]')?.textContent || undefined;
     };
-    expect(selectedCategoryState()).toBe('');
+    expect(selectedCategoryState()).toBe('All categories');
 
     const crossingRow = container.querySelector('tr[data-record-id="crossing-1"]');
     expect(crossingRow).not.toBeNull();
@@ -179,6 +166,6 @@ describe('TimingContext integration', () => {
       crossingRow!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(selectedCategoryState()).toBe(categoryB.id);
+    expect(selectedCategoryState()).toBe(categoryB.name);
   });
 });

@@ -162,18 +162,22 @@ describe('RecentRecords integration', () => {
     const toolbar = container.querySelector('.recent-records-toolbar');
     expect(toolbar).toBeDefined();
     expect(toolbar?.querySelector('h2.recent-records')?.textContent).toBe('Recent Records');
+    expect(toolbar?.querySelector('#recent-records-category-dropdown')).toBeDefined();
     expect(toolbar?.querySelector('#recent-records-type-dropdown')).toBeDefined();
     expect(toolbar?.querySelector('#recent-records-time-zone-dropdown')).toBeDefined();
     expect(toolbar?.querySelector('#recent-records-ignore-dropdown')).toBeDefined();
     expect(toolbar?.querySelector('#recent-records-order-dropdown')).toBeDefined();
   });
 
-  it('docks the recent records toolbar when it scrolls past the viewport top', async () => {
+  it('selects categories from the recent records toolbar', async () => {
+    const categoryA: EventCategory = { code: 'A', id: 'cat-a', name: 'Category A' };
+    const categoryB: EventCategory = { code: 'B', id: 'cat-b', name: 'Category B' };
+    const selectedCategorySets: string[][] = [];
     const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
-      categories: [],
+      categories: [categoryA, categoryB],
       countTransponderCrossings: () => 0,
       excludeCrossing: () => undefined,
-      getCategoryById: () => undefined,
+      getCategoryById: (categoryId) => [categoryA, categoryB].find((category) => category.id === categoryId),
       getEntrantIdForParticipant: () => undefined,
       getParticipantById: () => undefined,
       getParticipantLaps: () => [],
@@ -186,6 +190,7 @@ describe('RecentRecords integration', () => {
     await act(async () => {
       root.render(
         <RecentRecords
+          categorySelected={(categoryIds) => selectedCategorySets.push(Array.from(categoryIds).sort())}
           raceStateLookup={raceStateLookup}
           records={[]}
           selectedCategories={new Set()}
@@ -194,8 +199,77 @@ describe('RecentRecords integration', () => {
       );
     });
 
+    const categorySelect = container.querySelector('#recent-records-category-dropdown [role="combobox"]');
+    expect(categorySelect).toBeDefined();
+    expect(categorySelect?.textContent).toBe('All categories');
+
+    await act(async () => {
+      categorySelect!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+
+    const categoryBOption = Array.from(document.querySelectorAll('li[role="option"]')).find((element) => {
+      return element.textContent?.includes(categoryB.name);
+    });
+    expect(categoryBOption).toBeDefined();
+
+    await act(async () => {
+      categoryBOption!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(selectedCategorySets).toEqual([[categoryB.id]]);
+  });
+
+  it('docks the recent records toolbar when it scrolls past the viewport top', async () => {
+    const category: EventCategory = { id: 'category-1', name: 'Category 1' };
+    const participant: EventParticipant = {
+      categoryId: category.id,
+      currentResult: undefined,
+      entrantId: 'entrant-1',
+      firstname: 'Pat',
+      id: 'participant-1',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const crossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'crossing-1',
+      isValid: true,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [category],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === category.id ? category : undefined,
+      getEntrantIdForParticipant: () => undefined,
+      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantLaps: () => [crossing],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[crossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
     const anchor = container.querySelector('.recent-records-toolbar-anchor') as HTMLDivElement;
     const toolbar = container.querySelector('.recent-records-toolbar') as HTMLDivElement;
+    const tableContainer = container.querySelector('.recent-records-table-container') as HTMLDivElement;
     let anchorTop = 120;
 
     anchor.getBoundingClientRect = () => ({
@@ -226,6 +300,7 @@ describe('RecentRecords integration', () => {
     });
 
     expect(toolbar.classList.contains('docked')).toBe(false);
+    expect(tableContainer.style.getPropertyValue('--recent-records-table-header-top')).toBe('0px');
 
     anchorTop = -1;
     await act(async () => {
@@ -236,6 +311,8 @@ describe('RecentRecords integration', () => {
     expect(toolbar.style.left).toBe('84px');
     expect(toolbar.style.width).toBe('900px');
     expect(anchor.style.height).toBe('52px');
+    expect(tableContainer.style.getPropertyValue('--recent-records-table-header-top')).toBe('52px');
+    expect(container.querySelector('thead th')?.className).toContain('MuiTableCell-stickyHeader');
 
     anchorTop = 20;
     await act(async () => {
@@ -243,6 +320,7 @@ describe('RecentRecords integration', () => {
     });
 
     expect(toolbar.classList.contains('docked')).toBe(false);
+    expect(tableContainer.style.getPropertyValue('--recent-records-table-header-top')).toBe('0px');
   });
 
   it('selects rider/category on row click and emits changed category from context menu', async () => {

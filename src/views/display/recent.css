@@ -60,6 +60,11 @@
   position: fixed;
 }
 
+.recent-records-table-container .MuiTableCell-stickyHeader {
+  top: var(--recent-records-table-header-top, 0);
+  z-index: 7;
+}
+
 h2.recent-records {
   margin: 0;
 }

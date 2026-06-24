@@ -1,7 +1,6 @@
 import React from 'react';
 import { type EventCatalogState } from '../../app/eventCatalog.js';
 import { type TimeDisplayZoneMode } from '../../app/utils/timeutils.js';
-import { CategoryList } from '../../app/views/timing/categoryList.js';
 import { RecentRecords } from '../../app/views/timing/recentRecords.js';
 import { type EventCategory, type EventCategoryId } from '../../model/eventcategory.js';
 import { type EventParticipantId } from '../../model/eventparticipant.js';
@@ -28,7 +27,6 @@ interface TimingContextProps {
   onTimeDisplayZoneModeChange: (mode: TimeDisplayZoneMode) => void;
   participantSelected: (participantId: Set<EventParticipantId>) => void;
   raceState: TimingRaceState;
-  recordCategorySelected: (ids: Set<EventCategoryId>) => void;
   selectedCategories: Set<EventCategoryId>;
   selectedParticipants: Set<EventParticipantId>;
   sessions: EventCatalogSession[];
@@ -68,18 +66,13 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
           </select>
         </label>
       </div>
-      <CategoryList
-        categories={props.raceState.categories || []}
-        categorySelected={props.categoryListSelected}
-        selectedCategories={props.selectedCategories}
-      />
       <RecentRecords
         eventTimeZone={props.eventTimeZone}
         records={(props.raceState.records as EventTimeRecord[]) || []}
         raceStateLookup={props.raceState}
         selectedCategories={props.selectedCategories}
         selectedParticipants={props.selectedParticipants}
-        categorySelected={props.recordCategorySelected}
+        categorySelected={props.categoryListSelected}
         timeDisplayZoneMode={props.timeDisplayZoneMode}
         onTimeDisplayZoneModeChange={props.onTimeDisplayZoneModeChange}
         participantSelected={props.participantSelected}

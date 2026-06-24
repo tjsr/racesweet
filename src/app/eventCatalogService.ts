@@ -437,16 +437,16 @@ export class EventCatalogService {
         await options.onPersistedLedger(ledger);
       }
     } else {
-      // const repairedLedger: EventCatalogLedger = repairAndValidateLoadedLedger(ledger);
-      // if (JSON.stringify(repairedLedger) !== JSON.stringify(ledger)) {
-      // ledger = repairedLedger;
-      await persistence.save(ledger);
-      if (options.onPersistedLedger) {
-        await options.onPersistedLedger(ledger);
+      const repairedLedger: EventCatalogLedger = repairAndValidateLoadedLedger(ledger);
+      if (JSON.stringify(repairedLedger) !== JSON.stringify(ledger)) {
+        ledger = repairedLedger;
+        await persistence.save(ledger);
+        if (options.onPersistedLedger) {
+          await options.onPersistedLedger(ledger);
+        }
+      } else {
+        ledger = repairedLedger;
       }
-      // } else {
-      //   ledger = repairedLedger;
-      // }
     }
 
     return new EventCatalogService(persistence, ledger, options);

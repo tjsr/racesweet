@@ -863,7 +863,6 @@ export const RaceSweetMainApp = () => {
           onTimeDisplayZoneModeChange={updateTimingTimeDisplayZoneMode}
           participantSelected={handleParticipantSelected}
           raceState={displayedTimingRaceState}
-          recordCategorySelected={setRecordSelectedCategories}
           selectedCategories={hilightCategories}
           selectedParticipants={recordSelectedParticipants}
           sessions={timingSessions}
