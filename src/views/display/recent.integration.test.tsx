@@ -34,6 +34,37 @@ const ensureMatchMedia = (): void => {
   }
 };
 
+const getDisplayedRecordIds = (container: HTMLElement): Array<string | null> => {
+  return Array.from(container.querySelectorAll('tr[data-record-id]')).map((row) => row.getAttribute('data-record-id'));
+};
+
+const getRecentRecordsFilterSelect = (): Element | undefined => {
+  return Array.from(document.querySelectorAll('[role="combobox"]')).find((element) => {
+    return element.textContent?.includes('All records') ||
+      element.textContent?.includes('Only selected category') ||
+      element.textContent?.includes('Only selected team') ||
+      element.textContent?.includes('Only selected rider');
+  });
+};
+
+const selectRecentRecordsFilter = async (filterLabel: string): Promise<void> => {
+  const filterSelect = getRecentRecordsFilterSelect();
+  expect(filterSelect).toBeDefined();
+
+  await act(async () => {
+    filterSelect!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  });
+
+  const option = Array.from(document.querySelectorAll('li[role="option"]')).find((element) => {
+    return element.textContent?.trim() === filterLabel;
+  });
+  expect(option).toBeDefined();
+
+  await act(async () => {
+    option!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+};
+
 describe('RecentRecords integration', () => {
   let container: HTMLDivElement;
   let originalMatchMedia: typeof window.matchMedia | undefined;
@@ -416,6 +447,250 @@ describe('RecentRecords integration', () => {
     expect(container.querySelector('tr[data-record-id="2001"]')?.textContent).toContain('Pat RIDER (Rocket Squad)');
     expect(container.querySelector('tr[data-record-id="2002"]')?.textContent).toContain('Quinn SOLO');
     expect(container.querySelector('tr[data-record-id="2002"]')?.textContent).not.toContain('(Rocket Squad)');
+  });
+
+  it('filters records by selected category, rider, and team then restores all records', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const categoryB: EventCategory = { id: '2', name: 'Category B' };
+    const categoryC: EventCategory = { id: '3', name: 'Category C' };
+    const teamMemberOne: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'team-1',
+      firstname: 'Pat',
+      id: '101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'RIDER',
+    };
+    const teamMemberTwo: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'team-1',
+      firstname: 'Quinn',
+      id: '102',
+      identifiers: [{ fromTime: undefined, racePlate: '102', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'RIDER',
+    };
+    const soloRider: EventParticipant = {
+      categoryId: categoryB.id,
+      currentResult: undefined,
+      entrantId: '103',
+      firstname: 'Sam',
+      id: '103',
+      identifiers: [{ fromTime: undefined, racePlate: '103', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'SOLO',
+    };
+    const otherTeamRider: EventParticipant = {
+      categoryId: categoryC.id,
+      currentResult: undefined,
+      entrantId: 'team-2',
+      firstname: 'Taylor',
+      id: '104',
+      identifiers: [{ fromTime: undefined, racePlate: '104', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'OTHER',
+    };
+    const team: EventTeam = {
+      categoryId: categoryA.id,
+      description: '',
+      id: 'team-1',
+      members: [teamMemberOne.id, teamMemberTwo.id],
+      name: 'Rocket Squad',
+    };
+    const crossings: ParticipantPassingRecord[] = [teamMemberOne, teamMemberTwo, soloRider, otherTeamRider].map((participant, index) => ({
+      chipCode: 100100 + index,
+      id: `200${index + 1}`,
+      isValid: true,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: index + 1,
+      source: 'test-source',
+      time: new Date(`2026-05-29T10:0${index + 1}:00.000Z`),
+    }) as ParticipantPassingRecord);
+    const participants = new Map<EventParticipant['id'], EventParticipant>([
+      [teamMemberOne.id, teamMemberOne],
+      [teamMemberTwo.id, teamMemberTwo],
+      [soloRider.id, soloRider],
+      [otherTeamRider.id, otherTeamRider],
+    ]);
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[], teams: EventTeam[] } = {
+      categories: [categoryA, categoryB, categoryC],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => [categoryA, categoryB, categoryC].find((category) => category.id === categoryId),
+      getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+      getParticipantById: (participantId) => participants.get(participantId),
+      getParticipantLaps: (participantId) => crossings.filter((crossing) => crossing.participantId === participantId),
+      getTransponderCrossings: () => [],
+      teams: [team],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={crossings}
+          selectedCategories={new Set([categoryA.id])}
+          selectedParticipants={new Set([teamMemberOne.id])}
+        />
+      );
+    });
+
+    const allRecordIds = ['2001', '2002', '2003', '2004'];
+    expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
+
+    await selectRecentRecordsFilter('Only selected category');
+    expect(getDisplayedRecordIds(container)).toEqual(['2001', '2002']);
+
+    await selectRecentRecordsFilter('All records');
+    expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
+
+    await selectRecentRecordsFilter('Only selected rider');
+    expect(getDisplayedRecordIds(container)).toEqual(['2001']);
+
+    await selectRecentRecordsFilter('All records');
+    expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
+
+    await selectRecentRecordsFilter('Only selected team');
+    expect(getDisplayedRecordIds(container)).toEqual(['2001', '2002']);
+
+    await selectRecentRecordsFilter('All records');
+    expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
+  });
+
+  it('returns to all records when the active show-only selection is deselected', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const categoryB: EventCategory = { id: '2', name: 'Category B' };
+    const teamMemberOne: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'team-1',
+      firstname: 'Pat',
+      id: '101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'RIDER',
+    };
+    const teamMemberTwo: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'team-1',
+      firstname: 'Quinn',
+      id: '102',
+      identifiers: [{ fromTime: undefined, racePlate: '102', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'RIDER',
+    };
+    const soloRider: EventParticipant = {
+      categoryId: categoryB.id,
+      currentResult: undefined,
+      entrantId: '103',
+      firstname: 'Sam',
+      id: '103',
+      identifiers: [{ fromTime: undefined, racePlate: '103', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'SOLO',
+    };
+    const crossings: ParticipantPassingRecord[] = [teamMemberOne, teamMemberTwo, soloRider].map((participant, index) => ({
+      chipCode: 100100 + index,
+      id: `200${index + 1}`,
+      isValid: true,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: index + 1,
+      source: 'test-source',
+      time: new Date(`2026-05-29T10:0${index + 1}:00.000Z`),
+    }) as ParticipantPassingRecord);
+    const participants = new Map<EventParticipant['id'], EventParticipant>([
+      [teamMemberOne.id, teamMemberOne],
+      [teamMemberTwo.id, teamMemberTwo],
+      [soloRider.id, soloRider],
+    ]);
+    const team: EventTeam = {
+      categoryId: categoryA.id,
+      description: '',
+      id: 'team-1',
+      members: [teamMemberOne.id, teamMemberTwo.id],
+      name: 'Rocket Squad',
+    };
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[], teams: EventTeam[] } = {
+      categories: [categoryA, categoryB],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => [categoryA, categoryB].find((category) => category.id === categoryId),
+      getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+      getParticipantById: (participantId) => participants.get(participantId),
+      getParticipantLaps: (participantId) => crossings.filter((crossing) => crossing.participantId === participantId),
+      getTransponderCrossings: () => [],
+      teams: [team],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+    const allRecordIds = ['2001', '2002', '2003'];
+    const filterCases = [
+      { expectedRecordIds: ['2001', '2002'], label: 'Only selected category' },
+      { expectedRecordIds: ['2001'], label: 'Only selected rider' },
+      { expectedRecordIds: ['2001', '2002'], label: 'Only selected team' },
+    ];
+
+    const Harness = () => {
+      const [selectedCategories, setSelectedCategories] = React.useState<Set<EventCategory['id']>>(new Set([categoryA.id]));
+      const [selectedParticipants, setSelectedParticipants] = React.useState<Set<EventParticipant['id']>>(new Set([teamMemberOne.id]));
+
+      const handleParticipantSelected = (participantIds: Set<EventParticipant['id']>) => {
+        setSelectedParticipants(participantIds);
+        setSelectedCategories(selectedCategoriesForParticipants(participantIds, raceStateLookup.getParticipantById));
+      };
+
+      return (
+        <RecentRecords
+          categorySelected={setSelectedCategories}
+          participantSelected={handleParticipantSelected}
+          raceStateLookup={raceStateLookup}
+          records={crossings}
+          selectedCategories={selectedCategories}
+          selectedParticipants={selectedParticipants}
+        />
+      );
+    };
+
+    for (const filterCase of filterCases) {
+      await act(async () => {
+        root.render(<Harness key={filterCase.label} />);
+      });
+
+      expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
+
+      await selectRecentRecordsFilter(filterCase.label);
+      expect(getDisplayedRecordIds(container)).toEqual(filterCase.expectedRecordIds);
+
+      const selectedRow = container.querySelector('tr[data-record-id="2001"]');
+      expect(selectedRow).not.toBeNull();
+
+      await act(async () => {
+        selectedRow!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(getRecentRecordsFilterSelect()?.textContent).toContain('All records');
+      expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
+    }
   });
 
   it('deselects by toggling: select then deselect same participant row', async () => {

@@ -2,15 +2,20 @@ import { EventCategory, EventCategoryId } from '../../model/eventcategory.js';
 
 import Box from '@mui/material/Box';
 import { DataGrid } from '@mui/x-data-grid/DataGrid';
-import { GridRowId } from '@mui/x-data-grid';
+import { GridRowId, type GridRowSelectionModel } from '@mui/x-data-grid';
 
 interface CategoryListProps {
   categories: EventCategory[];
   categorySelected: (ids: Set<EventCategoryId>) => void;
+  selectedCategories?: Set<EventCategoryId>;
 }
 
 export const CategoryList = (props: CategoryListProps) => {
   const { categories } = props;
+  const rowSelectionModel: GridRowSelectionModel = {
+    ids: new Set<GridRowId>(props.selectedCategories || []),
+    type: 'include',
+  };
 
   if (!categories || categories.length === 0) {
     return <p>No categories available.</p>;
@@ -27,6 +32,7 @@ export const CategoryList = (props: CategoryListProps) => {
             props.categorySelected(new Set(newSelection.ids.values().map((id: GridRowId) => id.toString())));
           }
         }}
+        rowSelectionModel={rowSelectionModel}
         rowSelection={true}
         disableMultipleRowSelection={false}
         columns={[

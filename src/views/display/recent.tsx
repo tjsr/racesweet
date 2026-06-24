@@ -15,6 +15,8 @@ import { getLapTimeCell } from '../../controllers/laps.ts';
 import { getParticipantNumber } from '../../controllers/participant.ts';
 import { isFlagRecord } from '../../controllers/flag';
 
+type RecentRecordsFilterMode = 'all' | 'category' | 'participant' | 'team';
+
 interface RecordsProps {
   eventTimeZone?: string;
   onTimeDisplayZoneModeChange?: (mode: TimeDisplayZoneMode) => void;
@@ -502,6 +504,44 @@ const headings: string[] = [
   "Lap Time"
 ];
 
+const recordMatchesSelectedCategory = (
+  record: EventTimeRecord,
+  raceStateLookup: RaceStateLookup,
+  selectedCategories: Set<EventCategoryId>
+): boolean => {
+  if (selectedCategories.size === 0) {
+    return false;
+  }
+
+  if (isFlagRecord(record)) {
+    return record.categoryIds?.some((categoryId) => selectedCategories.has(categoryId)) || false;
+  }
+
+  if (!isCrossingRecord(record) || !record.participantId) {
+    return false;
+  }
+
+  const participant = raceStateLookup.getParticipantById(record.participantId);
+  return !!participant?.categoryId && selectedCategories.has(participant.categoryId);
+};
+
+const selectedTeamMemberIds = (
+  raceStateLookup: RaceStateLookup,
+  selectedParticipants: Set<EventParticipantId>
+): Set<EventParticipantId> => {
+  const teams = (raceStateLookup as unknown as { teams?: EventTeam[] }).teams || [];
+  const selectedTeam = teams.find((team) => team.members.some((memberId) => selectedParticipants.has(memberId)));
+
+  return new Set<EventParticipantId>(selectedTeam?.members || []);
+};
+
+const recordMatchesSelectedParticipants = (
+  record: EventTimeRecord,
+  selectedParticipants: Set<EventParticipantId>
+): boolean => {
+  return isCrossingRecord(record) && !!record.participantId && selectedParticipants.has(record.participantId);
+};
+
 // const RecordTable = (props: RecordTableProps) => {
 
 // };
@@ -511,9 +551,36 @@ export const RecentRecords = (props: RecordsProps & {
   onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void
 }) => {
   const [recentFirst, setRecentFirst] = React.useState<boolean>(false);
+  const [filterMode, setFilterMode] = React.useState<RecentRecordsFilterMode>('all');
   const timeDisplayZoneMode = props.timeDisplayZoneMode || 'event';
   const displayTimeZone = resolveDisplayTimeZone(timeDisplayZoneMode, props.eventTimeZone);
-  const sortedRecords = (props.records || []).sort((a, b) => {
+  const selectedCategories = props.selectedCategories || new Set<EventCategoryId>();
+  const selectedParticipants = props.selectedParticipants || new Set<EventParticipantId>();
+  const teamMemberIds = selectedTeamMemberIds(props.raceStateLookup, selectedParticipants);
+  React.useEffect(() => {
+    const selectedFilterHasNoTarget =
+      (filterMode === 'category' && selectedCategories.size === 0) ||
+      (filterMode === 'participant' && selectedParticipants.size === 0) ||
+      (filterMode === 'team' && teamMemberIds.size === 0);
+
+    if (selectedFilterHasNoTarget) {
+      setFilterMode('all');
+    }
+  }, [filterMode, selectedCategories, selectedParticipants, teamMemberIds]);
+
+  const filteredRecords = (props.records || []).filter((record) => {
+    if (filterMode === 'all') {
+      return true;
+    }
+    if (filterMode === 'category') {
+      return recordMatchesSelectedCategory(record, props.raceStateLookup, selectedCategories);
+    }
+    if (filterMode === 'participant') {
+      return recordMatchesSelectedParticipants(record, selectedParticipants);
+    }
+    return recordMatchesSelectedParticipants(record, teamMemberIds);
+  });
+  const sortedRecords = [...filteredRecords].sort((a, b) => {
     if (recentFirst) {
       return b.time!.getTime() - a.time!.getTime();
     } else {
@@ -531,13 +598,13 @@ export const RecentRecords = (props: RecordsProps & {
       <InputLabel id="show-recent-type-label">Show</InputLabel>
       <Select
         id="show-recent-type"
-        defaultValue="all"
-        onChange={() => undefined}
+        value={filterMode}
+        onChange={(event) => setFilterMode(event.target.value as RecentRecordsFilterMode)}
         label="Record types">
         <MenuItem value="all">All records</MenuItem>
         <MenuItem value="category">Only selected category</MenuItem>
         <MenuItem value="team">Only selected team</MenuItem>
-        <MenuItem value="participant">Only selected participant</MenuItem>
+        <MenuItem value="participant">Only selected rider</MenuItem>
       </Select>
     </FormControl>
     <FormControl

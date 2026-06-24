@@ -68,7 +68,11 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
           </select>
         </label>
       </div>
-      <CategoryList categories={props.raceState.categories || []} categorySelected={props.categoryListSelected} />
+      <CategoryList
+        categories={props.raceState.categories || []}
+        categorySelected={props.categoryListSelected}
+        selectedCategories={props.selectedCategories}
+      />
       <RecentRecords
         eventTimeZone={props.eventTimeZone}
         records={(props.raceState.records as EventTimeRecord[]) || []}
