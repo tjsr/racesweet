@@ -168,6 +168,83 @@ describe('RecentRecords integration', () => {
     expect(toolbar?.querySelector('#recent-records-order-dropdown')).toBeDefined();
   });
 
+  it('docks the recent records toolbar when it scrolls past the viewport top', async () => {
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: () => undefined,
+      getEntrantIdForParticipant: () => undefined,
+      getParticipantById: () => undefined,
+      getParticipantLaps: () => [],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const anchor = container.querySelector('.recent-records-toolbar-anchor') as HTMLDivElement;
+    const toolbar = container.querySelector('.recent-records-toolbar') as HTMLDivElement;
+    let anchorTop = 120;
+
+    anchor.getBoundingClientRect = () => ({
+      bottom: anchorTop + 52,
+      height: 52,
+      left: 84,
+      right: 984,
+      toJSON: () => undefined,
+      top: anchorTop,
+      width: 900,
+      x: 84,
+      y: anchorTop,
+    });
+    toolbar.getBoundingClientRect = () => ({
+      bottom: anchorTop + 52,
+      height: 52,
+      left: 84,
+      right: 984,
+      toJSON: () => undefined,
+      top: anchorTop,
+      width: 900,
+      x: 84,
+      y: anchorTop,
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    expect(toolbar.classList.contains('docked')).toBe(false);
+
+    anchorTop = -1;
+    await act(async () => {
+      window.dispatchEvent(new Event('scroll'));
+    });
+
+    expect(toolbar.classList.contains('docked')).toBe(true);
+    expect(toolbar.style.left).toBe('84px');
+    expect(toolbar.style.width).toBe('900px');
+    expect(anchor.style.height).toBe('52px');
+
+    anchorTop = 20;
+    await act(async () => {
+      window.dispatchEvent(new Event('scroll'));
+    });
+
+    expect(toolbar.classList.contains('docked')).toBe(false);
+  });
+
   it('selects rider/category on row click and emits changed category from context menu', async () => {
     const categoryA: EventCategory = { id: '1', name: 'Category A' };
     const categoryB: EventCategory = { id: '2', name: 'Category B' };

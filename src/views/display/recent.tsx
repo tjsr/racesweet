@@ -739,6 +739,14 @@ export const RecentRecords = (props: RecordsProps & {
   const [recentFirst, setRecentFirst] = React.useState<boolean>(false);
   const [filterMode, setFilterMode] = React.useState<RecentRecordsFilterMode>('all');
   const [ignoreModes, setIgnoreModes] = React.useState<RecentRecordsIgnoreMode[]>([]);
+  const toolbarAnchorRef = React.useRef<HTMLDivElement>(null);
+  const toolbarRef = React.useRef<HTMLDivElement>(null);
+  const [toolbarDock, setToolbarDock] = React.useState({
+    height: 0,
+    isDocked: false,
+    left: 0,
+    width: 0,
+  });
   const timeDisplayZoneMode = props.timeDisplayZoneMode || 'event';
   const displayTimeZone = resolveDisplayTimeZone(timeDisplayZoneMode, props.eventTimeZone);
   const selectedCategories = props.selectedCategories || new Set<EventCategoryId>();
@@ -757,6 +765,42 @@ export const RecentRecords = (props: RecordsProps & {
       setFilterMode('all');
     }
   }, [filterMode, selectedCategories, selectedParticipants, teamMemberIds]);
+  React.useLayoutEffect(() => {
+    const updateToolbarDock = (): void => {
+      const anchor = toolbarAnchorRef.current;
+      const toolbar = toolbarRef.current;
+      if (!anchor || !toolbar) {
+        return;
+      }
+
+      const anchorRect = anchor.getBoundingClientRect();
+      const toolbarRect = toolbar.getBoundingClientRect();
+      const nextDock = {
+        height: toolbarRect.height,
+        isDocked: anchorRect.top <= 0,
+        left: anchorRect.left,
+        width: anchorRect.width,
+      };
+
+      setToolbarDock((current) => {
+        return current.height === nextDock.height &&
+          current.isDocked === nextDock.isDocked &&
+          current.left === nextDock.left &&
+          current.width === nextDock.width
+          ? current
+          : nextDock;
+      });
+    };
+
+    updateToolbarDock();
+    window.addEventListener('resize', updateToolbarDock);
+    window.addEventListener('scroll', updateToolbarDock, true);
+
+    return () => {
+      window.removeEventListener('resize', updateToolbarDock);
+      window.removeEventListener('scroll', updateToolbarDock, true);
+    };
+  }, []);
 
   const filteredRecords = (props.records || []).filter((record) => {
     if (shouldIgnoreRecord(record, outsideEventWindowIgnoredRecordIds, ignoreModes, props.raceStateLookup)) {
@@ -782,90 +826,100 @@ export const RecentRecords = (props: RecordsProps & {
   });
 
   return <>
-    <div className="recent-records-toolbar">
-      <h2 className="recent-records">Recent Records</h2>
-      <FormControl
-        fullWidth={false}
-        id="recent-records-type-dropdown"
-        sx={{ display: 'inline-block', verticalAlign: 'middle' }}
+    <div
+      className="recent-records-toolbar-anchor"
+      ref={toolbarAnchorRef}
+      style={toolbarDock.isDocked ? { height: toolbarDock.height } : undefined}
+    >
+      <div
+        className={`recent-records-toolbar${toolbarDock.isDocked ? ' docked' : ''}`}
+        ref={toolbarRef}
+        style={toolbarDock.isDocked ? { left: toolbarDock.left, top: 0, width: toolbarDock.width } : undefined}
       >
-        <InputLabel id="show-recent-type-label">Show</InputLabel>
-        <Select
-          id="show-recent-type"
-          value={filterMode}
-          onChange={(event) => setFilterMode(event.target.value as RecentRecordsFilterMode)}
-          label="Record types">
-          <MenuItem value="all">All records</MenuItem>
-          <MenuItem value="category">Only selected category</MenuItem>
-          <MenuItem value="team">Only selected team</MenuItem>
-          <MenuItem value="participant">Only selected rider</MenuItem>
-        </Select>
-      </FormControl>
-      <FormControl
-        fullWidth={false}
-        id="recent-records-time-zone-dropdown"
-        sx={{ display: 'inline-block', verticalAlign: 'middle' }}
-      >
-        <InputLabel id="show-recent-times-in-label">Show times in</InputLabel>
-        <Select
-          id="show-recent-times-in"
-          value={timeDisplayZoneMode}
-          onChange={(event) => props.onTimeDisplayZoneModeChange?.(event.target.value as TimeDisplayZoneMode)}
-          label="Show times in">
-          <MenuItem value="event">Event time-zone</MenuItem>
-          <MenuItem value="system">System time-zone</MenuItem>
-          <MenuItem value="gmt">GMT</MenuItem>
-        </Select>
-      </FormControl>
-      <FormControl
-        fullWidth={false}
-        id="recent-records-ignore-dropdown"
-        sx={{ display: 'inline-block', minWidth: 180, verticalAlign: 'middle' }}
-      >
-        <InputLabel id="show-recent-ignore-label" shrink>Ignore</InputLabel>
-        <Select
-          displayEmpty
-          multiple
-          id="show-recent-ignore"
-          label="Ignore"
-          value={ignoreModes}
-          sx={{ minWidth: 100 }}
-          onChange={(event) => {
-            const value = event.target.value;
-            setIgnoreModes(typeof value === 'string' ? value.split(',') as RecentRecordsIgnoreMode[] : value as RecentRecordsIgnoreMode[]);
-          }}
-          renderValue={(selected) => selected.length > 0
-            ? selected.map((mode) => ignoreModeLabels[mode as RecentRecordsIgnoreMode]).join(', ')
-            : 'None'}>
-          {(Object.keys(ignoreModeLabels) as RecentRecordsIgnoreMode[]).map((mode) => (
-            <MenuItem key={mode} value={mode}>
-              <Checkbox checked={ignoreModes.includes(mode)} />
-              <ListItemText primary={ignoreModeLabels[mode]} />
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-      <FormControl
-        fullWidth={false}
-        id="recent-records-order-dropdown"
-        sx={{ display: 'inline-block', verticalAlign: 'middle' }}
-      >
-        <InputLabel id="show-recent-order-label">Order</InputLabel>
-        <Select
-          id="show-recent-order"
-          defaultValue="oldest"
-          onChange={(e) => {
-            if (e.target.value === 'recent') {
-              setRecentFirst(true);
-            } else {
-              setRecentFirst(false);
-            }
-          }}
-          label="Sort records">
-          <MenuItem value="oldest">Oldest fist</MenuItem>
-          <MenuItem value="recent">Recent first</MenuItem>
-        </Select>
-      </FormControl>
+        <h2 className="recent-records">Recent Records</h2>
+        <FormControl
+          fullWidth={false}
+          id="recent-records-type-dropdown"
+          sx={{ display: 'inline-block', verticalAlign: 'middle' }}
+        >
+          <InputLabel id="show-recent-type-label">Show</InputLabel>
+          <Select
+            id="show-recent-type"
+            value={filterMode}
+            onChange={(event) => setFilterMode(event.target.value as RecentRecordsFilterMode)}
+            label="Record types">
+            <MenuItem value="all">All records</MenuItem>
+            <MenuItem value="category">Only selected category</MenuItem>
+            <MenuItem value="team">Only selected team</MenuItem>
+            <MenuItem value="participant">Only selected rider</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl
+          fullWidth={false}
+          id="recent-records-time-zone-dropdown"
+          sx={{ display: 'inline-block', verticalAlign: 'middle' }}
+        >
+          <InputLabel id="show-recent-times-in-label">Show times in</InputLabel>
+          <Select
+            id="show-recent-times-in"
+            value={timeDisplayZoneMode}
+            onChange={(event) => props.onTimeDisplayZoneModeChange?.(event.target.value as TimeDisplayZoneMode)}
+            label="Show times in">
+            <MenuItem value="event">Event time-zone</MenuItem>
+            <MenuItem value="system">System time-zone</MenuItem>
+            <MenuItem value="gmt">GMT</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl
+          fullWidth={false}
+          id="recent-records-ignore-dropdown"
+          sx={{ display: 'inline-block', minWidth: 180, verticalAlign: 'middle' }}
+        >
+          <InputLabel id="show-recent-ignore-label" shrink>Ignore</InputLabel>
+          <Select
+            displayEmpty
+            multiple
+            id="show-recent-ignore"
+            label="Ignore"
+            value={ignoreModes}
+            sx={{ minWidth: 100 }}
+            onChange={(event) => {
+              const value = event.target.value;
+              setIgnoreModes(typeof value === 'string' ? value.split(',') as RecentRecordsIgnoreMode[] : value as RecentRecordsIgnoreMode[]);
+            }}
+            renderValue={(selected) => selected.length > 0
+              ? selected.map((mode) => ignoreModeLabels[mode as RecentRecordsIgnoreMode]).join(', ')
+              : 'None'}>
+            {(Object.keys(ignoreModeLabels) as RecentRecordsIgnoreMode[]).map((mode) => (
+              <MenuItem key={mode} value={mode}>
+                <Checkbox checked={ignoreModes.includes(mode)} />
+                <ListItemText primary={ignoreModeLabels[mode]} />
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl
+          fullWidth={false}
+          id="recent-records-order-dropdown"
+          sx={{ display: 'inline-block', verticalAlign: 'middle' }}
+        >
+          <InputLabel id="show-recent-order-label">Order</InputLabel>
+          <Select
+            id="show-recent-order"
+            defaultValue="oldest"
+            onChange={(e) => {
+              if (e.target.value === 'recent') {
+                setRecentFirst(true);
+              } else {
+                setRecentFirst(false);
+              }
+            }}
+            label="Sort records">
+            <MenuItem value="oldest">Oldest fist</MenuItem>
+            <MenuItem value="recent">Recent first</MenuItem>
+          </Select>
+        </FormControl>
+      </div>
     </div>
     { warnings?.length > 0 && <Warnings warnings={warnings} />}
     {
