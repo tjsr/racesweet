@@ -3,12 +3,16 @@ import { applyPulledRaceStateToSession, getCategoriesToAdd } from './sourceAppli
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { TimeRecord } from '../model/timerecord.js';
+import { createCategoryId, createEventId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
 import { isFlagRecord } from '../controllers/flag.js';
+
+const EXISTING_CATEGORY_ID = createCategoryId('cat-existing');
+const NEW_CATEGORY_ID = createCategoryId('cat-new');
 
 const existingCategories: EventCategory[] = [
   {
     code: 'EX',
-    id: 'cat-existing',
+    id: EXISTING_CATEGORY_ID,
     name: 'Existing Category',
   },
 ];
@@ -76,7 +80,7 @@ describe('sourceApplication', () => {
     expect(addCategories).toHaveBeenCalledWith([
       {
         code: 'NEW-2',
-        id: 'cat-new',
+        id: NEW_CATEGORY_ID,
         name: 'New Category Duplicate Payload Row',
       },
     ]);
@@ -118,7 +122,7 @@ describe('sourceApplication', () => {
     const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
     const crossing = {
       chipCode: 200306,
-      eventId: '7b83ad1e-54ba-5f00-9712-1c82d3178640',
+      eventId: createEventId('event-a'),
       id: 'crossing-1',
       recordType: 2,
       source: 'test-source',
@@ -145,6 +149,47 @@ describe('sourceApplication', () => {
     expect(records).toHaveLength(2);
     expect(isFlagRecord(records[0]!)).toBe(true);
     expect(records[0]?.time?.toISOString()).toBe('2026-06-07T00:00:00.000Z');
-    expect(records[1]).toBe(crossing);
+    expect(records[1]).toEqual(expect.objectContaining({
+      eventId: createEventId('event-a'),
+      id: createTimeRecordId('crossing-1'),
+      source: createTimeRecordSourceId('test-source'),
+    }));
+  });
+
+  it('rejects pulled race state when participant category parents are unknown', async () => {
+    const addCategories = vi.fn(async (_categories: EventCategory[]) => null);
+    const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
+    const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
+
+    await expect(applyPulledRaceStateToSession(
+      {
+        addCategories,
+        addParticipants,
+        addRecords,
+        categories: existingCategories,
+        records: [],
+      },
+      {
+        categories: [],
+        participants: [
+          {
+            categoryId: 'missing-category',
+            currentResult: undefined,
+            entrantId: 'participant-a',
+            firstname: 'Pat',
+            id: 'participant-a',
+            identifiers: [],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'Rider',
+          },
+        ],
+        records: [],
+      }
+    )).rejects.toThrow(/references missing category/);
+
+    expect(addCategories).not.toHaveBeenCalled();
+    expect(addParticipants).not.toHaveBeenCalled();
+    expect(addRecords).not.toHaveBeenCalled();
   });
 });

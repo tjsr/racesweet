@@ -1,14 +1,15 @@
+import { elapsedTimeMilliseconds, getElapsedTimeStart, millisecondsToTime } from '../app/utils/timeutils.ts';
 import type { EventCategory, EventCategoryId, PlaceholderCategory } from '../model/eventcategory.ts';
 import type { ParticipantPassingRecord, PassingRecordId, TimeRecord } from '../model/timerecord.ts';
-import { elapsedTimeMilliseconds, getElapsedTimeStart, millisecondsToTime } from '../app/utils/timeutils.ts';
 
-import { CategoryCreateError } from '../model/errors/category.ts';
-import { EventId } from '../model/raceevent.ts';
-import type { FlagRecord } from '../model/flag.ts';
-import type { IdType } from "../model/types.js";
 import { v5 as uuidv5 } from 'uuid';
+import { CategoryCreateError } from '../model/errors/category.ts';
+import type { FlagRecord } from '../model/flag.ts';
+import { EventId } from '../model/raceevent.ts';
+import type { IdType } from "../model/types.js";
 
 export type CategoryId = IdType;
+export const TIMING_ERROR_LIST_CATEGORY_NAME = 'Timing Error List';
 
 const categories: Partial<EventCategory>[] = [
   { id: 'cat1', name: 'Test category' },
@@ -93,6 +94,32 @@ export const getElapsedTimeForCategory = (cat: EventCategory, time: Date): strin
 export const isPlaceholderCatgegory = (
   category: EventCategory
 ): category is PlaceholderCategory => (category as PlaceholderCategory).isPlaceholder === true;
+
+const normalizeCategoryLabel = (value: string | undefined): string => (value || '').trim().toLowerCase();
+
+export const isTimingErrorListCategory = (category: Pick<EventCategory, 'code' | 'name'>): boolean => {
+  const timingErrorListName = normalizeCategoryLabel(TIMING_ERROR_LIST_CATEGORY_NAME);
+  return normalizeCategoryLabel(category.name) === timingErrorListName ||
+    normalizeCategoryLabel(category.code) === timingErrorListName;
+};
+
+export const normalizeCategoryResultExclusion = <T extends EventCategory>(category: T): T => {
+  if (category.excludeFromResults !== undefined) {
+    return category;
+  }
+  if (!isTimingErrorListCategory(category)) {
+    return category;
+  }
+
+  return {
+    ...category,
+    excludeFromResults: true,
+  };
+};
+
+export const shouldExcludeCategoryFromResults = (
+  category: EventCategory | undefined
+): boolean => !!category?.excludeFromResults || (!!category && isTimingErrorListCategory(category));
 
 // const addParticipantCrossings = (
 //   allPassingRecords: ParticipantPassingRecord[],

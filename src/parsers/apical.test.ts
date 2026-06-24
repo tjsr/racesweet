@@ -119,4 +119,42 @@ describe('Apical parser', () => {
     ]);
     expect(raceState.records?.map((record) => ('sequence' in record ? record.sequence : undefined))).toEqual([1, 2]);
   });
+
+  it('marks the Apical Timing Error List category as excluded from results', () => {
+    const data: ApicalLapByCategory = [
+      {
+        CategoryName: 'Timing Error List',
+        ParticipantViewModels: [
+          {
+            CategoryName: 'Timing Error List',
+            LapByCategoryViewModels: [
+              {
+                CumulativeLapTimeSpan: '00:01:00.0000000',
+                FullName: 'Timing ERROR',
+                Id: 2241,
+                LapNumber: 1,
+                LapTimeSpan: '00:01:00.0000000',
+                RaceNumber: '999',
+                TimeOfDay: '10:01:00.0000000',
+              },
+            ],
+            NumberOfLaps: 1,
+            Position: 1,
+            RaceNumbers: '999',
+            TeamNameDisplay: 'Timing ERROR',
+            TotalTimeSpan: '00:01:00.0000000',
+          },
+        ],
+      },
+    ];
+
+    const raceState = convertDataToRaceState(eventId, new Date('2026-06-07T00:00:00.000Z'), data, 200000, 'UTC');
+
+    expect(raceState.categories).toEqual([
+      expect.objectContaining({
+        excludeFromResults: true,
+        name: 'Timing Error List',
+      }),
+    ]);
+  });
 });

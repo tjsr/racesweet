@@ -8,6 +8,7 @@ export interface EventCategory extends WithId<EventCategoryId> {
   name: string;
   code?: string;
   description?: string;
+  excludeFromResults?: boolean;
   startTime?: ISO8601DateTime;
   distance?: number;
   duration?: ISO8601Duration;

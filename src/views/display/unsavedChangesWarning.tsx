@@ -24,18 +24,21 @@ interface UseUnsavedChangesWarningResult {
 
 export const useUnsavedChangesWarning = (options: UseUnsavedChangesWarningOptions): UseUnsavedChangesWarningResult => {
   const [pendingNavigation, setPendingNavigation] = React.useState<PendingNavigation | undefined>(undefined);
+  const optionsRef = React.useRef(options);
+  optionsRef.current = options;
 
   const requestExit = React.useCallback((action: () => void | Promise<void>): void => {
-    if (options.hasUnsavedChanges) {
+    const currentOptions = optionsRef.current;
+    if (currentOptions.hasUnsavedChanges) {
       setPendingNavigation({
         action,
-        itemName: options.itemName || options.itemType,
+        itemName: currentOptions.itemName || currentOptions.itemType,
       });
       return;
     }
 
     void action();
-  }, [options.hasUnsavedChanges, options.itemName, options.itemType]);
+  }, []);
 
   React.useEffect(() => {
     options.onUnsavedChangesGuardChange?.(requestExit);
@@ -51,7 +54,7 @@ export const useUnsavedChangesWarning = (options: UseUnsavedChangesWarningOption
 
     let saved = false;
     try {
-      saved = await options.onSave();
+      saved = await optionsRef.current.onSave();
     } catch {
       return;
     }
@@ -72,7 +75,7 @@ export const useUnsavedChangesWarning = (options: UseUnsavedChangesWarningOption
 
     const action = pendingNavigation.action;
     setPendingNavigation(undefined);
-    options.onDiscard?.();
+    optionsRef.current.onDiscard?.();
     void action();
   };
 

@@ -42,10 +42,18 @@
   color: #ff0;
 }
 
-#recent-records-order-dropdown, #recent-records-type-dropdown {
-  float: right;
+.recent-records-toolbar {
+  align-items: center;
+  background: var(--color-bg, #ddd);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.35rem 0 0.6rem;
+  position: sticky;
+  top: 0;
+  z-index: 8;
 }
 
 h2.recent-records {
-  display: inline-block;
+  margin: 0;
 }

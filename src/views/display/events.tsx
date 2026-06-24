@@ -1,12 +1,14 @@
+import React from 'react';
 import {
+  EventCatalogCategory,
   type EventCatalogEvent,
   type EventCatalogState,
+  getCategoriesForEvent,
   getSessionsForEvent,
 } from '../../app/eventCatalog.js';
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
-import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
 import { getSupportedTimeZones, getSystemTimeZone } from '../../app/utils/timeutils.js';
-import React from 'react';
+import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
 
 interface EventsScreenProps {
   catalog: EventCatalogState;
@@ -46,6 +48,7 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
     props.catalog.events.find((event) => event.id === props.catalog.activeEventId) ??
     props.catalog.events[0];
   const selectedEventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
+  const selectedEventCategories = getCategoriesForEvent(props.catalog, selectedEvent?.id);
   const selectedSession = selectedEventSessions.find((session) => session.id === props.selectedSessionId) ?? selectedEventSessions[0];
   const assignedSourceIds = selectedEvent ? getEventAssignedSourceIds(props.config, selectedEvent.id) : [];
   const timeZoneOptions = React.useMemo(() => getSupportedTimeZones(), []);
@@ -185,6 +188,7 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
                   Delete Event
                 </button>
               </div>
+              <span className="event-id-display">Event ID: {selectedEvent.id}</span>
 
               <h2>Sessions</h2>
               <div className="events-session-list" role="listbox" aria-label="Event sessions">
@@ -236,21 +240,37 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
           )}
         </section>
 
-        <section className="events-panel session-detail-panel">
-          <h2>Session Summary</h2>
-          {selectedEventSessions.length > 0 ? (
-            <ul aria-label="Session summary list">
-              {selectedEventSessions.map((session) => (
-                <li key={session.id}>
-                  <strong>{session.name}</strong> - {session.kind} - {session.status} - {session.scheduledStart}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No sessions in this event.</p>
-          )}
-          {selectedSession ? <p>Selected session: {selectedSession.name}</p> : null}
-        </section>
+        <div className="event-summary-column">
+          <section className="events-panel session-detail-panel">
+            <h2>Session Summary</h2>
+            {selectedEventSessions.length > 0 ? (
+              <ul aria-label="Session summary list">
+                {selectedEventSessions.map((session) => (
+                  <li key={session.id}>
+                    <strong>{session.name}</strong> - {session.kind} - {session.status} - {session.scheduledStart}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No sessions in this event.</p>
+            )}
+            {selectedSession ? <p>Selected session: {selectedSession.name}</p> : null}
+          </section>
+          <section className="events-panel category-detail-panel">
+            <h2>Category Summary</h2>
+            {selectedEventCategories.length > 0 ? (
+              <ul aria-label="Category summary list">
+                {selectedEventCategories.map((category: EventCatalogCategory) => (
+                  <li key={category.id}>
+                    <strong>{category.name}</strong> ({category.id})
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No categories in this event.</p>
+            )}
+          </section>
+        </div>
       </div>
     </section>
   );

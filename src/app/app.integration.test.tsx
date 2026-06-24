@@ -1,29 +1,54 @@
 // @vitest-environment jsdom
 
-import { type ApicalSpreadsheetLapsRow, createApicalCatalogEventId, createApicalCatalogSessionId, getCachedApicalExcelFilePath } from './apicalDataSource.js';
-import { type Root, createRoot } from 'react-dom/client';
-import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from '../utils/apical/excelDownload.js';
-import type { ApicalLapByCategory } from '../model/apical.js';
-import { RaceSweetMainApp } from './App.js';
-import React from 'react';
-import XLSX from 'xlsx';
-import { act } from 'react';
-import { convertApicalSpreadsheetRowsToApicalData } from '../controllers/apical/apicalSpreadsheetProcessor.js';
-import { convertDataToRaceState } from '../parsers/apical.js';
-import { createSessionId } from '../model/ids.js';
-import { createSeedEventCatalogLedger } from './eventCatalog.js';
-import path from 'node:path';
 import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import React, { act } from 'react';
+import { type Root, createRoot } from 'react-dom/client';
+import XLSX from 'xlsx';
+import { convertApicalSpreadsheetRowsToApicalData } from '../controllers/apical/apicalSpreadsheetProcessor.js';
+import type { ApicalLapByCategory } from '../model/apical.js';
+import { createSessionId } from '../model/ids.js';
+import { convertDataToRaceState } from '../parsers/apical.js';
 import { useUiConsoleGuards } from '../testing/uiConsoleGuards.js';
+import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from '../utils/apical/excelDownload.js';
+import { type ApicalSpreadsheetLapsRow, createApicalCatalogEventId, createApicalCatalogSessionId, getCachedApicalExcelFilePath } from './apicalDataSource.js';
+import { RaceSweetMainApp } from './App.js';
+import { createSeedEventCatalogLedger } from './createSeedEventCatalogLedger.js';
 
 vi.mock('../views/display/categories', () => ({
-  CategoryList: () => React.createElement('div', null, 'Category List'),
+  CategoryList: (props: { categories?: unknown[] }) => React.createElement(
+    'div',
+    { 'data-timing-categories': JSON.stringify(props.categories || []) },
+    'Category List'
+  ),
+}));
+
+vi.mock('./views/timing/categoryList.js', () => ({
+  CategoryList: (props: { categories?: unknown[] }) => React.createElement(
+    'div',
+    { 'data-timing-categories': JSON.stringify(props.categories || []) },
+    'Category List'
+  ),
 }));
 
 vi.mock('../views/display/recent', () => ({
-  RecentRecords: (props: { records: unknown[] }) => React.createElement(
+  RecentRecords: (props: { raceStateLookup?: { categories?: unknown[] }; records: unknown[] }) => React.createElement(
     'div',
-    { 'data-timing-record-count': props.records.length },
+    {
+      'data-timing-categories': JSON.stringify(props.raceStateLookup?.categories || []),
+      'data-timing-record-count': props.records.length,
+    },
+    `Recent Records (${props.records.length})`
+  ),
+}));
+
+vi.mock('./views/timing/recentRecords', () => ({
+  RecentRecords: (props: { raceStateLookup?: { categories?: unknown[] }; records: unknown[] }) => React.createElement(
+    'div',
+    {
+      'data-timing-categories': JSON.stringify(props.raceStateLookup?.categories || []),
+      'data-timing-record-count': props.records.length,
+    },
     `Recent Records (${props.records.length})`
   ),
 }));
@@ -751,6 +776,101 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Sessions');
     expect(container.querySelector('h1')?.textContent).toBe('Sessions');
     await waitForInputValue(container, 'input[aria-label="Sessions Page Name"]', 'Renderer Regression Session');
+  });
+
+  it('updates Timing category state after saving a category result exclusion', async () => {
+    const writtenFiles: Array<{ content: string; filePath: string }> = [];
+
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer: readFixtureBuffer,
+      requestFileContent: readGeneratedFixture as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async (filePath: string, content: string) => {
+        writtenFiles.push({ content, filePath });
+      },
+    };
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    await clickSectionButton(container, 'Categories');
+    const categoryAButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'A') as HTMLButtonElement | undefined;
+    expect(categoryAButton).toBeDefined();
+    await act(async () => {
+      categoryAButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const excludeFromResultsInput = container.querySelector('input[aria-label="Category Exclude From Results"]') as HTMLInputElement;
+    expect(excludeFromResultsInput).toBeTruthy();
+    expect(excludeFromResultsInput.checked).toBe(false);
+
+    await act(async () => {
+      excludeFromResultsInput.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(excludeFromResultsInput.checked).toBe(true);
+
+    await clickButtonByText(container, 'Save Category');
+
+    let latestCatalogWrite: { content: string; filePath: string } | undefined;
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      latestCatalogWrite = writtenFiles
+        .filter((write) => write.filePath.includes('event-catalog.json'))
+        .at(-1);
+      if (latestCatalogWrite?.content.includes('"excludeFromResults":true')) {
+        break;
+      }
+
+      await act(async () => {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 10);
+        });
+      });
+    }
+
+    expect(latestCatalogWrite).toBeDefined();
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 10);
+      });
+    });
+    expect(JSON.parse(latestCatalogWrite!.content)).toEqual(expect.objectContaining({
+      mutations: expect.arrayContaining([
+        expect.objectContaining({
+          changes: expect.objectContaining({
+            excludeFromResults: true,
+            name: 'A',
+          }),
+          type: 'category-updated',
+        }),
+      ]),
+    }));
+
+    await clickSectionButton(container, 'Timing');
+    if (container.querySelector('h1')?.textContent !== 'Timing') {
+      const promptDiscardButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Discard') as HTMLButtonElement | undefined;
+      expect(promptDiscardButton).toBeDefined();
+      await act(async () => {
+        promptDiscardButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        await Promise.resolve();
+      });
+      await waitForText(container, 'Recent Records');
+    }
+    const timingRecords = container.querySelector('[data-timing-categories]') as HTMLElement | null;
+    expect(timingRecords).toBeTruthy();
+    const timingCategories = JSON.parse(timingRecords!.getAttribute('data-timing-categories') || '[]') as Array<{ excludeFromResults?: boolean; name: string }>;
+    expect(timingCategories).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        excludeFromResults: true,
+        name: 'A',
+      }),
+    ]));
   });
 
   it('supports create and delete operations and still renders correctly after panel switches', async () => {
@@ -1508,6 +1628,54 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Categories');
     expect(container.querySelectorAll('[aria-label="Categories for selected event"] .events-list-item')).toHaveLength(expectedCategoryCount);
     expect(container.textContent).toContain(apicalData[0]!.CategoryName);
+  });
+
+  it('keeps the selected Categories event when saving one of its categories', async () => {
+    const { importedEventId, writtenFiles } = await renderAndFetchApicalImport(root, container);
+
+    await clickSectionButton(container, 'Sessions');
+    const sessionsEventSelect = container.querySelector('select[aria-label="Sessions Event"]') as HTMLSelectElement;
+    expect(sessionsEventSelect).toBeTruthy();
+    const fixtureEventOption = Array.from(sessionsEventSelect.options).find((option) => option.value !== importedEventId);
+    expect(fixtureEventOption).toBeDefined();
+    await act(async () => {
+      sessionsEventSelect.value = fixtureEventOption!.value;
+      sessionsEventSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await waitForInputValue(container, 'select[aria-label="Sessions Event"]', fixtureEventOption!.value);
+
+    await clickSectionButton(container, 'Categories');
+    const categoriesEventSelect = container.querySelector('select[aria-label="Categories Event"]') as HTMLSelectElement;
+    expect(categoriesEventSelect).toBeTruthy();
+    await act(async () => {
+      categoriesEventSelect.value = importedEventId;
+      categoriesEventSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await waitForInputValue(container, 'select[aria-label="Categories Event"]', importedEventId);
+    expect(container.querySelector('input[aria-label="Category Name"]')).toBeTruthy();
+
+    await clickButtonByText(container, 'Save Category');
+
+    let latestCatalogWrite: { content: string; dataType?: string; filePath: string } | undefined;
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      latestCatalogWrite = writtenFiles
+        .filter((write) => write.filePath.includes('event-catalog.json'))
+        .at(-1);
+      if (latestCatalogWrite?.content.includes('"type":"category-updated"')) {
+        break;
+      }
+
+      await act(async () => {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 10);
+        });
+      });
+    }
+
+    expect(latestCatalogWrite).toBeDefined();
+    expect(container.textContent).not.toContain('does not exist');
+    expect((container.querySelector('select[aria-label="Categories Event"]') as HTMLSelectElement).value).toBe(importedEventId);
+    expect(container.querySelector('input[aria-label="Category Name"]')).toBeTruthy();
   });
 
   it('populates timing and results when the imported Apical session is activated', async () => {

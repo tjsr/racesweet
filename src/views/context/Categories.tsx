@@ -1,6 +1,7 @@
 import React from 'react';
 import { parseTeamCompositionRules } from '../../app/categoryRules.js';
 import { type CategoryDistanceRule, getCategoriesForEvent, getSessionsForEvent } from '../../app/eventCatalog.js';
+import { EventCategoryId } from '../../model/eventcategory.js';
 import { SessionId } from '../../model/raceevent.js';
 import { parseInteger } from '../../parsers/parseInteger.js';
 import { CategoriesPageProps, CategoryChanges, CategoryDraft, dedupeCategoriesForDisplay, getCategoryDraft } from '../display/categoriesPage.js';
@@ -12,6 +13,17 @@ export const CategoriesContext = (props: CategoriesContextProps): React.ReactEle
   return <CategoriesPage {...props} />;
 };
 
+const formatCategoryParentEventMismatch = (
+  categoryId: EventCategoryId,
+  event: NonNullable<CategoriesPageProps['catalog']['events'][number]>
+): string => {
+  return [
+    `Category ${categoryId} is displayed for the selected event but is not listed in the parent event ${event.id} categoryIds.`,
+    `Parent event: id=${event.id}, name=${event.name}, date=${event.date}, format=${event.format}.`,
+    `Parent event categoryIds: ${event.categoryIds.length > 0 ? event.categoryIds.join(', ') : '(none)'}.`,
+  ].join(' ');
+};
+
 export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement => {
   const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId) ??
     props.catalog.events.find((event) => event.id === props.catalog.activeEventId) ??
@@ -19,6 +31,10 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
   const eventCategories = dedupeCategoriesForDisplay(getCategoriesForEvent(props.catalog, selectedEvent?.id));
   const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
   const selectedCategory = eventCategories.find((category) => category.id === props.selectedCategoryId) ?? eventCategories[0];
+  const categoryParentEventMismatch = selectedEvent && selectedCategory && !selectedEvent.categoryIds.includes(selectedCategory.id)
+    ? formatCategoryParentEventMismatch(selectedCategory.id.toString(), selectedEvent)
+    : undefined;
+  const loggedParentEventMismatchKeys = React.useRef<Set<string>>(new Set());
 
   const [formError, setFormError] = React.useState<string | undefined>(undefined);
   const [categoryDraft, setCategoryDraft] = React.useState<CategoryDraft>(getCategoryDraft(selectedCategory));
@@ -33,6 +49,20 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
     setSavedCategoryDraft(selectedCategoryDraft);
     setFormError(undefined);
   }, [selectedCategoryDraft]);
+
+  React.useEffect(() => {
+    if (!categoryParentEventMismatch || !selectedEvent || !selectedCategory) {
+      return;
+    }
+
+    const mismatchKey = `${selectedEvent.id}:${selectedCategory.id}`;
+    if (loggedParentEventMismatchKeys.current.has(mismatchKey)) {
+      return;
+    }
+
+    loggedParentEventMismatchKeys.current.add(mismatchKey);
+    props.onDisplayError?.('Categories', new Error(categoryParentEventMismatch));
+  }, [categoryParentEventMismatch, props, selectedCategory, selectedEvent]);
 
   const buildCategoryChanges = (): CategoryChanges => {
     let distanceRule: CategoryDistanceRule;
@@ -70,6 +100,7 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
       code: categoryDraft.code || undefined,
       description: categoryDraft.description || undefined,
       distanceRule,
+      excludeFromResults: categoryDraft.excludeFromResults,
       name: categoryDraft.name,
       sessionAssignments,
       teamRules: {
@@ -87,7 +118,7 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
     }
 
     try {
-      await props.onUpdateCategory(selectedCategory.id.toString(), buildCategoryChanges());
+      await props.onUpdateCategory(selectedCategory.id, buildCategoryChanges());
       setSavedCategoryDraft(categoryDraft);
       setFormError(undefined);
       return true;
@@ -190,6 +221,14 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
                   onChange={(event) => setCategoryDraft((current) => ({ ...current, description: event.target.value }))} />
               </label>
               <label>
+                <input
+                  aria-label="Category Exclude From Results"
+                  type="checkbox"
+                  checked={categoryDraft.excludeFromResults}
+                  onChange={(event) => setCategoryDraft((current) => ({ ...current, excludeFromResults: event.target.checked }))} />
+                Exclude from results
+              </label>
+              <label>
                 Distance Type
                 <select
                   aria-label="Category Distance Rule Type"
@@ -283,6 +322,13 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
                 >
                   Delete Category
                 </button>
+                <span className="category-id-display">Category ID: {selectedCategory.id.toString()}</span>
+                {categoryParentEventMismatch ? (
+                  <div className="error category-parent-event-error" role="alert">
+                    <span className="warning-icon" aria-hidden="true">!</span>
+                    <p>{categoryParentEventMismatch}</p>
+                  </div>
+                ) : null}
               </div>
               {warningModal}
             </>

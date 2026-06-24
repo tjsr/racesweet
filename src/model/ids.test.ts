@@ -103,4 +103,85 @@ describe('rewriteImportedObjectIds', () => {
     expect(value.categories[0]!.id).toBe(existingCategoryId);
     expect(value.selectedCategoryId).toBe(existingCategoryId);
   });
+
+  it('adds rewritten child IDs to their parent event component lists', () => {
+    const { value } = rewriteImportedObjectIds({
+      mutations: [
+        {
+          event: {
+            categoryIds: [],
+            entrantIds: [],
+            id: 'event-a',
+            sessionIds: [],
+          },
+          id: 'mutation-event',
+          type: 'event-created',
+        },
+        {
+          category: {
+            eventId: 'event-a',
+            id: 'cat-a',
+            name: 'Category A',
+          },
+          id: 'mutation-category',
+          type: 'category-created',
+        },
+        {
+          entrant: {
+            eventId: 'event-a',
+            id: 'entrant-a',
+            name: 'Entrant A',
+          },
+          id: 'mutation-entrant',
+          type: 'entrant-created',
+        },
+        {
+          id: 'mutation-session',
+          session: {
+            eventId: 'event-a',
+            id: 'session-a',
+            name: 'Session A',
+          },
+          type: 'session-created',
+        },
+      ],
+    });
+
+    const event = value.mutations[0]!.event!;
+    const category = value.mutations[1]!.category!;
+    const entrant = value.mutations[2]!.entrant!;
+    const session = value.mutations[3]!.session!;
+
+    expect(event.id).toBe(createEventId('event-a'));
+    expect(category.id).toBe(createCategoryId('cat-a'));
+    expect(category.eventId).toBe(event.id);
+    expect(entrant.id).toBe(createEventEntrantId('entrant-a'));
+    expect(entrant.eventId).toBe(event.id);
+    expect(session.id).toBe(createSessionId('session-a'));
+    expect(session.eventId).toBe(event.id);
+    expect(event.categoryIds).toEqual([category.id]);
+    expect(event.entrantIds).toEqual([entrant.id]);
+    expect(event.sessionIds).toEqual([session.id]);
+  });
+
+  it('does not duplicate rewritten child IDs that are already listed on the parent event', () => {
+    const { value } = rewriteImportedObjectIds({
+      events: [
+        {
+          categoryIds: ['cat-a'],
+          entrantIds: [],
+          id: 'event-a',
+          sessionIds: [],
+        },
+      ],
+      categories: [
+        {
+          eventId: 'event-a',
+          id: 'cat-a',
+        },
+      ],
+    });
+
+    expect(value.events[0]!.categoryIds).toEqual([createCategoryId('cat-a')]);
+  });
 });

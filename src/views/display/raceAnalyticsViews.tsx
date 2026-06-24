@@ -6,10 +6,12 @@ import { HandicapView } from './handicap.js';
 import { LapTimesReport } from '../reports/LapTimesReport.js';
 import type { ParticipantPassingRecord } from '../../model/timerecord.js';
 import React from 'react';
+import { shouldExcludeCategoryFromResults } from '../../controllers/category.js';
 import { getParticipantNumber } from '../../controllers/participant.js';
 import { millisecondsToTime } from '../../app/utils/timeutils.js';
 
 interface CategoryOption {
+  excludeFromResults?: boolean;
   id: string;
   name: string;
 }
@@ -78,12 +80,27 @@ type CategoryFilter = 'overall' | string;
 
 const normalizeText = (value: string): string => value.trim().toLowerCase();
 
+const getCategoryByIdSafely = (
+  raceState: Session & RaceStateLookup,
+  categoryId?: string
+): CategoryOption | undefined => {
+  if (!categoryId) {
+    return undefined;
+  }
+
+  try {
+    return raceState.getCategoryById(categoryId);
+  } catch {
+    return undefined;
+  }
+};
+
 const categoryNameFromId = (raceState: Session & RaceStateLookup, categoryId?: string): string => {
   if (!categoryId) {
     return 'Unknown';
   }
 
-  return raceState.getCategoryById(categoryId)?.name || categoryId;
+  return getCategoryByIdSafely(raceState, categoryId)?.name || categoryId;
 };
 
 const categoryKeyFromName = (name: string): string => normalizeText(name);
@@ -101,6 +118,38 @@ const dedupeCategoryOptions = (categories: CategoryOption[]): CategoryOption[] =
     }
   });
   return Array.from(byKey.values());
+};
+
+const getExcludedCategoryKeys = (
+  raceState: Session & RaceStateLookup,
+  categories: CategoryOption[]
+): Set<string> => {
+  const excludedKeys = new Set<string>();
+
+  categories.forEach((category) => {
+    const stateCategory = getCategoryByIdSafely(raceState, category.id);
+    if (category.excludeFromResults || shouldExcludeCategoryFromResults(stateCategory)) {
+      excludedKeys.add(categoryKeyFromName(category.name));
+      excludedKeys.add(_categoryKeyFromId(raceState, category.id));
+    }
+  });
+
+  raceState.categories.forEach((category) => {
+    if (shouldExcludeCategoryFromResults(category)) {
+      excludedKeys.add(categoryKeyFromName(category.name));
+    }
+  });
+
+  return excludedKeys;
+};
+
+const isParticipantExcludedFromResults = (
+  raceState: Session & RaceStateLookup,
+  participant: EventParticipant,
+  excludedCategoryKeys: Set<string>
+): boolean => {
+  const category = getCategoryByIdSafely(raceState, participant.categoryId);
+  return shouldExcludeCategoryFromResults(category) || excludedCategoryKeys.has(_categoryKeyFromId(raceState, participant.categoryId));
 };
 
 const formatDuration = (duration?: number): string => {
@@ -137,6 +186,7 @@ const findEntrantName = (entrantId: string, members: EventParticipant[], catalog
 const buildEntrantRows = (
   raceState: Session & RaceStateLookup,
   catalogEntrants: EventCatalogEntrant[],
+  excludedCategoryKeys: Set<string>,
 ): EntrantSummaryRow[] => {
   const catalogEntrantsById = new Map(catalogEntrants.map((entrant) => [entrant.id, entrant]));
   const participantGroups = new Map<string, EventParticipant[]>();
@@ -151,7 +201,12 @@ const buildEntrantRows = (
   const rows: EntrantSummaryRow[] = [];
 
   participantGroups.forEach((members, entrantId) => {
-    const laps = members
+    const includedMembers = members.filter((member) => !isParticipantExcludedFromResults(raceState, member, excludedCategoryKeys));
+    if (includedMembers.length === 0) {
+      return;
+    }
+
+    const laps = includedMembers
       .flatMap((member) => raceState.getParticipantLaps(member.id) || [])
       .filter(isValidLap)
       .sort((a, b) => {
@@ -173,7 +228,7 @@ const buildEntrantRows = (
       })[0];
 
     const totalTime = laps.length > 0 ? laps[laps.length - 1].elapsedTime || undefined : undefined;
-    const memberDetails = members.map((member) => {
+    const memberDetails = includedMembers.map((member) => {
       const raceNumber = getParticipantNumber(member);
       return {
         categoryName: categoryNameFromId(raceState, member.categoryId?.toString()),
@@ -331,7 +386,10 @@ const EventSessionSelector = (props: {
 };
 
 export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
-  const categories = React.useMemo(() => dedupeCategoryOptions(props.categories), [props.categories]);
+  const excludedCategoryKeys = React.useMemo(() => getExcludedCategoryKeys(props.raceState, props.categories), [props.categories, props.raceState]);
+  const categories = React.useMemo(() => {
+    return dedupeCategoryOptions(props.categories).filter((category) => !excludedCategoryKeys.has(categoryKeyFromName(category.name)));
+  }, [excludedCategoryKeys, props.categories]);
   const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(props.selectedCategoryId || 'overall');
   const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
   const [viewType, setViewType] = React.useState<'results' | 'lap-chart'>('results');
@@ -345,9 +403,15 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
     }
   }, [categories, props.selectedCategoryId]);
 
+  React.useEffect(() => {
+    if (selectedCategory !== 'overall' && !categories.some((category) => category.id === selectedCategory)) {
+      setSelectedCategory('overall');
+    }
+  }, [categories, selectedCategory]);
+
   const allRows = React.useMemo(() => {
-    return buildEntrantRows(props.raceState, props.catalogEntrants);
-  }, [props.catalogEntrants, props.raceState]);
+    return buildEntrantRows(props.raceState, props.catalogEntrants, excludedCategoryKeys);
+  }, [excludedCategoryKeys, props.catalogEntrants, props.raceState]);
 
   const rows = React.useMemo(() => {
     if (selectedCategory === 'overall') {
@@ -474,15 +538,24 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
 };
 
 export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
-  const categories = React.useMemo(() => dedupeCategoryOptions(props.categories), [props.categories]);
+  const excludedCategoryKeys = React.useMemo(() => getExcludedCategoryKeys(props.raceState, props.categories), [props.categories, props.raceState]);
+  const categories = React.useMemo(() => {
+    return dedupeCategoryOptions(props.categories).filter((category) => !excludedCategoryKeys.has(categoryKeyFromName(category.name)));
+  }, [excludedCategoryKeys, props.categories]);
   const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(props.selectedCategoryId || 'overall');
   const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
   const [reportType, setReportType] = React.useState<'fastest-laps' | 'lap-times' | 'lap-chart' | 'handicap-data'>('fastest-laps');
   const [handicapShowFilter, setHandicapShowFilter] = React.useState<'all' | 'event-participants-only'>('all');
 
+  React.useEffect(() => {
+    if (selectedCategory !== 'overall' && !categories.some((category) => category.id === selectedCategory)) {
+      setSelectedCategory('overall');
+    }
+  }, [categories, selectedCategory]);
+
   const allRows = React.useMemo(() => {
-    return buildEntrantRows(props.raceState, props.catalogEntrants);
-  }, [props.catalogEntrants, props.raceState]);
+    return buildEntrantRows(props.raceState, props.catalogEntrants, excludedCategoryKeys);
+  }, [excludedCategoryKeys, props.catalogEntrants, props.raceState]);
 
   const rows = React.useMemo(() => {
     if (selectedCategory === 'overall') {
@@ -496,6 +569,9 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   const passings = React.useMemo(() => {
     const map = new Map<string, ParticipantPassingRecord[]>();
     props.raceState.participants.forEach((participant) => {
+      if (isParticipantExcludedFromResults(props.raceState, participant, excludedCategoryKeys)) {
+        return;
+      }
       const laps = (props.raceState.getParticipantLaps(participant.id) || [])
         .filter(isValidLap)
         .sort((a, b) => {
@@ -507,7 +583,11 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
       map.set(participant.id.toString(), laps);
     });
     return map;
-  }, [props.raceState]);
+  }, [excludedCategoryKeys, props.raceState]);
+
+  const reportParticipants = React.useMemo(() => {
+    return props.raceState.participants.filter((participant) => !isParticipantExcludedFromResults(props.raceState, participant, excludedCategoryKeys));
+  }, [excludedCategoryKeys, props.raceState]);
 
   const lapChart = React.useMemo(() => {
     return buildLapChart(rows);
@@ -530,10 +610,10 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   }, [rows]);
 
   const eventParticipantNames = React.useMemo(() => {
-    return props.raceState.participants.map((participant) =>
+    return reportParticipants.map((participant) =>
       `${participant.firstname || ''} ${participant.surname || ''}`.trim()
     ).filter((name) => name.length > 0);
-  }, [props.raceState]);
+  }, [reportParticipants]);
 
   return (
     <section className="events-screen">
@@ -608,7 +688,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
 
       {reportType === 'lap-times' ? (
         <LapTimesReport
-          participants={props.raceState.participants}
+          participants={reportParticipants}
           categories={categories}
           passings={passings}
         />

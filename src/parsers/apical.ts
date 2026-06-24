@@ -16,6 +16,7 @@ import type { EventTeam } from "../model/eventteam.js";
 import type { RaceState } from "../model/racestate.js";
 import { addToTime, dateAtStartOfDayInTimeZone } from "../app/utils/timeutils.js";
 import { createEventCategoryIdFromCategoryCode } from "../controllers/category.js";
+import { normalizeCategoryResultExclusion } from "../controllers/category.js";
 import { durationStringToMilliseconds, excelTimeToMilliseconds } from "./genericTimeParser.js";
 import { inferTransponderFromRaceNumber } from "../controllers/transponder.js";
 import { split } from "../utils.js";
@@ -337,6 +338,10 @@ export const convertDataToRaceState = (
       categoriesMap.set(categoryId, {
         code: apiCategory.CategoryName,
         description: '',
+        excludeFromResults: normalizeCategoryResultExclusion({
+          id: categoryId,
+          name: apiCategory.CategoryName,
+        } as EventCategory).excludeFromResults,
         id: categoryId,
         name: apiCategory.CategoryName,
       } as EventCategory);

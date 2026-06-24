@@ -1191,10 +1191,11 @@ export const RaceSweetMainApp = () => {
               updateEventCatalogState(catalog, eventId, selectedSessionId, nextCategoryId);
             }).catch((error: unknown) => setErrorState(error as Error));
           }}
+          onDisplayError={logDisplayedError}
           onSelectCategory={setSelectedCategoryId}
           onSelectEvent={selectCategoriesEvent}
           onUnsavedChangesGuardChange={(guard) => setUnsavedChangesGuard('Categories', guard)}
-          onUpdateCategory={(categoryId, changes) => {
+          onUpdateCategory={(categoryId: EventCategoryId, changes) => {
             if (!eventCatalogService) {
               return;
             }
@@ -1205,11 +1206,12 @@ export const RaceSweetMainApp = () => {
                 sessionState.updateCategoryDetails(categoryId, {
                   code: changes.code,
                   description: changes.description,
+                  excludeFromResults: changes.excludeFromResults,
                   name: changes.name,
                 });
                 setRenderTick((tick) => tick + 1);
               }
-              updateEventCatalogState(catalog, selectedSessionsEventId, selectedSessionId, categoryId);
+              updateEventCatalogState(catalog, selectedCategoryEventId, selectedSessionId, categoryId);
             });
           }}
           selectedCategoryId={selectedCategoryId}

@@ -3,7 +3,7 @@
 import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.js';
 import { EventCatalogService } from './eventCatalogService.js';
 import { createDefaultEventCatalogLedger } from './eventCatalog.js';
-import { createEventId } from '../model/ids.js';
+import { createEventId, createId } from '../model/ids.js';
 
 const eventCatalogTestPath = '../../test/generated/event-catalog.test.json';
 
@@ -123,6 +123,8 @@ describe('ElectronJsonEventCatalogPersistence', () => {
       schemaVersion: 1,
     };
     const expectedEventId = createEventId('evt-1');
+    const expectedEventMutationId = createId('mutationId', 'mut-1');
+    const expectedActivationMutationId = createId('mutationId', 'mut-2');
 
     const requestFileContent = vi.fn(async () => JSON.stringify(ledgerData));
 
@@ -146,11 +148,11 @@ describe('ElectronJsonEventCatalogPersistence', () => {
           name: 'Legacy Event',
           sessionIds: [],
         },
-        id: 'mut-1',
+        id: expectedEventMutationId,
         timestamp: '2025-01-01T00:00:00.000Z',
         type: 'event-created',
       },
-      { eventId: expectedEventId, id: 'mut-2', timestamp: '2025-01-01T00:00:00.000Z', type: 'event-activated' },
+      { eventId: expectedEventId, id: expectedActivationMutationId, timestamp: '2025-01-01T00:00:00.000Z', type: 'event-activated' },
     ]);
     expect(loaded.schemaVersion).toBe(1);
   });

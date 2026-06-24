@@ -266,6 +266,7 @@ describe('CategoriesPage integration', () => {
     const maxTeamSizeInput = container.querySelector('input[aria-label="Category Max Team Size"]') as HTMLInputElement;
     const minRiderAgeInput = container.querySelector('input[aria-label="Category Min Rider Age"]') as HTMLInputElement;
     const maxRiderAgeInput = container.querySelector('input[aria-label="Category Max Rider Age"]') as HTMLInputElement;
+    const excludeFromResultsInput = container.querySelector('input[aria-label="Category Exclude From Results"]') as HTMLInputElement;
     const teamGenderRulesInput = container.querySelector('textarea[aria-label="Category Team Gender Rules"]') as HTMLTextAreaElement;
     const sessionAssignmentsInput = container.querySelector('select[aria-label="Category Session Assignments"]') as HTMLSelectElement;
     await act(async () => {
@@ -280,6 +281,7 @@ describe('CategoriesPage integration', () => {
       setInputValue(maxTeamSizeInput, '3');
       setInputValue(minRiderAgeInput, '15');
       setInputValue(maxRiderAgeInput, '55');
+      excludeFromResultsInput.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       setInputValue(teamGenderRulesInput, 'female:1:2; male:1:3');
       setMultiSelectValues(sessionAssignmentsInput, ['session-3']);
     });
@@ -293,6 +295,7 @@ describe('CategoriesPage integration', () => {
 
     expect(onUpdateCategory).toHaveBeenCalledWith('cat-3', expect.objectContaining({
       distanceRule: { kind: 'time', value: '1:30' },
+      excludeFromResults: true,
       name: 'Development Cup',
       sessionAssignments: [{ sessionId: 'session-3', startTime: '2026-07-10T10:30:00.000Z' }],
       teamRules: {
@@ -308,6 +311,7 @@ describe('CategoriesPage integration', () => {
 
     const deleteButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Delete Category');
     expect(deleteButton).toBeDefined();
+    expect(container.textContent).toContain('Category ID: cat-3');
 
     await act(async () => {
       deleteButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -353,6 +357,53 @@ describe('CategoriesPage integration', () => {
     expect(container.textContent).toContain('Category Details');
     expect(container.textContent).toContain('Entrants In Category');
     expect(container.textContent).not.toContain('Error loading content');
+  });
+
+  it('shows and logs parent event details when the displayed category is missing from the parent event category list', async () => {
+    const onDisplayError = vi.fn();
+    const mismatchedCatalog: EventCatalogState = {
+      ...catalog,
+      categories: [
+        ...catalog.categories,
+        {
+          code: 'ORP',
+          distanceRule: { kind: 'unspecified' },
+          eventId: 'event-1',
+          id: 'cat-orphan',
+          name: 'Orphan',
+          sessionAssignments: [],
+          teamRules: { teamCompositionRules: [] },
+        },
+      ],
+    };
+
+    await act(async () => {
+      root.render(
+        <CategoriesPage
+          catalog={mismatchedCatalog}
+          entrants={[]}
+          onCreateCategory={vi.fn()}
+          onDeleteCategory={vi.fn()}
+          onDisplayError={onDisplayError}
+          onSelectCategory={vi.fn()}
+          onSelectEvent={vi.fn()}
+          onUpdateCategory={vi.fn()}
+          selectedCategoryId="cat-orphan"
+          selectedEventId="event-1"
+        />
+      );
+    });
+
+    const parentEventError = container.querySelector('.category-parent-event-error');
+    expect(container.textContent).toContain('Category ID: cat-orphan');
+    expect(parentEventError?.getAttribute('role')).toBe('alert');
+    expect(parentEventError?.textContent).toContain('Category cat-orphan is displayed for the selected event');
+    expect(parentEventError?.textContent).toContain('Parent event: id=event-1, name=Winter Round, date=2026-06-12, format=race-weekend.');
+    expect(parentEventError?.textContent).toContain('Parent event categoryIds: cat-1, cat-2.');
+    expect(onDisplayError).toHaveBeenCalledWith('Categories', expect.any(Error));
+    const loggedError = onDisplayError.mock.calls[0]?.[1] as Error;
+    expect(loggedError.message).toContain('Category cat-orphan is displayed for the selected event');
+    expect(loggedError.message).toContain('Parent event: id=event-1, name=Winter Round, date=2026-06-12, format=race-weekend.');
   });
 
   it('prompts before replacing a dirty category form and handles save discard and cancel', async () => {

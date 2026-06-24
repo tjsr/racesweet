@@ -1,21 +1,27 @@
-import "./recent.css";
-import { Box, FormControl, InputLabel, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
-import { EventCategory, EventCategoryId } from '../../model/eventcategory';
-import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../model';
-import { InvalidCategoryIdError, NoCrossingError, NoParticipantError, ParticipantNotFoundError } from '../../validators/errors.ts';
-import { type MillisecondsDuration, type TimeDisplayZoneMode, millisecondsToTime, resolveDisplayTimeZone, tableTimeString } from '../../app/utils/timeutils.ts';
+import { Box, Checkbox, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import React, { type JSX } from 'react';
-import { categoriesTextFromLookupFn, getElapsedTimeForCategory } from '../../controllers/category.ts';
-import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
-import { EventTeam } from '../../model/eventteam.ts';
-import { FlagRecord } from '../../model/flag';
-import { ParticipantPassingRecord } from '../../model/timerecord.ts';
-import { RaceStateLookup } from '../../model/racestate.ts';
+import { type MillisecondsDuration, type TimeDisplayZoneMode, millisecondsToTime, resolveDisplayTimeZone, tableTimeString } from '../../app/utils/timeutils.ts';
+import { categoriesTextFromLookupFn, getElapsedTimeForCategory, shouldExcludeCategoryFromResults } from '../../controllers/category.ts';
+import { isFlagRecord } from '../../controllers/flag';
 import { getLapTimeCell } from '../../controllers/laps.ts';
 import { getParticipantNumber } from '../../controllers/participant.ts';
-import { isFlagRecord } from '../../controllers/flag';
+import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
+import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../model';
+import { EventCategory, EventCategoryId } from '../../model/eventcategory';
+import { EventTeam } from '../../model/eventteam.ts';
+import { FlagRecord } from '../../model/flag';
+import { RaceStateLookup } from '../../model/racestate.ts';
+import { EVENT_SESSION_END, ParticipantPassingRecord } from '../../model/timerecord.ts';
+import { InvalidCategoryIdError, NoCrossingError, NoParticipantError, ParticipantNotFoundError } from '../../validators/errors.ts';
+import "./recent.css";
 
 type RecentRecordsFilterMode = 'all' | 'category' | 'participant' | 'team';
+type RecentRecordsIgnoreMode = 'outsideEventWindow' | 'unrecognised';
+
+const ignoreModeLabels: Record<RecentRecordsIgnoreMode, string> = {
+  outsideEventWindow: 'Outside event window',
+  unrecognised: 'Unrecognised',
+};
 
 interface RecordsProps {
   eventTimeZone?: string;
@@ -285,7 +291,9 @@ export const PassingRecordRow = (
       }
 
       if (props.selectedCategories?.has(entrant?.categoryId)) {
-        className += ' selected-category';
+        if (!shouldExcludeCategoryFromResults(cat)) {
+          className += ' selected-category';
+        }
       }
     }
   }
@@ -522,7 +530,8 @@ const recordMatchesSelectedCategory = (
   }
 
   const participant = raceStateLookup.getParticipantById(record.participantId);
-  return !!participant?.categoryId && selectedCategories.has(participant.categoryId);
+  const category = participant?.categoryId ? raceStateLookup.getCategoryById(participant.categoryId) : undefined;
+  return !!participant?.categoryId && selectedCategories.has(participant.categoryId) && !shouldExcludeCategoryFromResults(category);
 };
 
 const selectedTeamMemberIds = (
@@ -542,6 +551,183 @@ const recordMatchesSelectedParticipants = (
   return isCrossingRecord(record) && !!record.participantId && selectedParticipants.has(record.participantId);
 };
 
+const getFlagCategoryIds = (flag: FlagRecord): EventCategoryId[] => {
+  const categoryId = (flag as FlagRecord & { categoryId?: EventCategoryId }).categoryId;
+  return [...(flag.categoryIds || []), ...(categoryId ? [categoryId] : [])];
+};
+
+const isStartFlag = (flag: FlagRecord): boolean => {
+  const normalizedFlagType = flag.flagType?.toLowerCase();
+  return normalizedFlagType === 'green' && (flag as FlagRecord & { indicatesRaceStart?: boolean }).indicatesRaceStart !== false;
+};
+
+const isFinishFlag = (flag: FlagRecord): boolean => {
+  const normalizedFlagType = flag.flagType?.toLowerCase();
+  return normalizedFlagType === 'chequered' || normalizedFlagType === 'finish' || (flag.recordType & EVENT_SESSION_END) > 0;
+};
+
+const compareRecordsByTimeAndInputOrder = (
+  left: { index: number; record: EventTimeRecord },
+  right: { index: number; record: EventTimeRecord }
+): number => {
+  const leftTime = left.record.time?.getTime();
+  const rightTime = right.record.time?.getTime();
+
+  if (leftTime === undefined && rightTime === undefined) {
+    return left.index - right.index;
+  }
+  if (leftTime === undefined) {
+    return 1;
+  }
+  if (rightTime === undefined) {
+    return -1;
+  }
+  return leftTime === rightTime ? left.index - right.index : leftTime - rightTime;
+};
+
+const getKnownCategoryIds = (raceStateLookup: RaceStateLookup): EventCategoryId[] => {
+  return ((raceStateLookup as unknown as { categories?: EventCategory[] }).categories || []).map((category) => category.id);
+};
+
+const buildCategoryStartTimes = (
+  records: EventTimeRecord[],
+  raceStateLookup: RaceStateLookup
+): Map<EventCategoryId, Date> => {
+  const categoryStartTimes = new Map<EventCategoryId, Date>();
+  const knownCategoryIds = getKnownCategoryIds(raceStateLookup);
+
+  records.forEach((record) => {
+    if (!isFlagRecord(record) || !isStartFlag(record) || !record.time) {
+      return;
+    }
+
+    const categoryIds = getFlagCategoryIds(record);
+    const affectedCategoryIds = categoryIds.length > 0 ? categoryIds : knownCategoryIds;
+    affectedCategoryIds.forEach((categoryId) => {
+      const existingStartTime = categoryStartTimes.get(categoryId);
+      if (!existingStartTime || existingStartTime.getTime() < record.time!.getTime()) {
+        categoryStartTimes.set(categoryId, record.time!);
+      }
+    });
+  });
+
+  return categoryStartTimes;
+};
+
+const isUnrecognisedCrossing = (
+  record: EventTimeRecord,
+  raceStateLookup: RaceStateLookup
+): boolean => {
+  if (isFlagRecord(record) || !isCrossingRecord(record)) {
+    return false;
+  }
+  if (!record.participantId) {
+    return true;
+  }
+
+  const participant = raceStateLookup.getParticipantById(record.participantId);
+  if (!participant?.categoryId) {
+    return true;
+  }
+  const category = raceStateLookup.getCategoryById(participant.categoryId);
+  return !category || shouldExcludeCategoryFromResults(category);
+};
+
+const getPostFinishAcceptanceKeys = (
+  categoryId: EventCategoryId,
+  entrantKey: string,
+  eventFinished: boolean,
+  finishedCategoryIds: Set<EventCategoryId>
+): string[] => {
+  const acceptanceKeys: string[] = [];
+
+  if (eventFinished) {
+    acceptanceKeys.push(`event:${entrantKey}`);
+  }
+  if (finishedCategoryIds.has(categoryId)) {
+    acceptanceKeys.push(`category:${categoryId}:${entrantKey}`);
+  }
+
+  return acceptanceKeys;
+};
+
+const getEntrantKey = (
+  participant: EventParticipant,
+  raceStateLookup: RaceStateLookup
+): string => {
+  return raceStateLookup.getEntrantIdForParticipant(participant.id)?.toString() ||
+    participant.entrantId?.toString() ||
+    participant.id.toString();
+};
+
+const getOutsideEventWindowIgnoredRecordIds = (
+  records: EventTimeRecord[],
+  raceStateLookup: RaceStateLookup
+): Set<string> => {
+  const ignoredRecordIds = new Set<string>();
+  const categoryStartTimes = buildCategoryStartTimes(records, raceStateLookup);
+  const finishedCategoryIds = new Set<EventCategoryId>();
+  const acceptedPostFinishKeys = new Set<string>();
+  let eventFinished = false;
+
+  records
+    .map((record, index) => ({ index, record }))
+    .sort(compareRecordsByTimeAndInputOrder)
+    .forEach(({ record }) => {
+      if (isFlagRecord(record)) {
+        if (isFinishFlag(record)) {
+          const categoryIds = getFlagCategoryIds(record);
+          if (categoryIds.length === 0) {
+            eventFinished = true;
+          } else {
+            categoryIds.forEach((categoryId) => finishedCategoryIds.add(categoryId));
+          }
+        }
+        return;
+      }
+
+      if (!isCrossingRecord(record) || !record.time || !record.participantId) {
+        return;
+      }
+
+      const participant = raceStateLookup.getParticipantById(record.participantId);
+      const categoryId = participant?.categoryId;
+      if (!participant || !categoryId || !raceStateLookup.getCategoryById(categoryId)) {
+        return;
+      }
+
+      const categoryStartTime = categoryStartTimes.get(categoryId);
+      if (categoryStartTime && record.time.getTime() < categoryStartTime.getTime()) {
+        ignoredRecordIds.add(record.id.toString());
+        return;
+      }
+
+      const entrantKey = getEntrantKey(participant, raceStateLookup);
+      const acceptanceKeys = getPostFinishAcceptanceKeys(categoryId, entrantKey, eventFinished, finishedCategoryIds);
+      if (acceptanceKeys.length > 0) {
+        if (acceptanceKeys.some((key) => acceptedPostFinishKeys.has(key))) {
+          ignoredRecordIds.add(record.id.toString());
+          return;
+        }
+        acceptanceKeys.forEach((key) => acceptedPostFinishKeys.add(key));
+      }
+    });
+
+  return ignoredRecordIds;
+};
+
+const shouldIgnoreRecord = (
+  record: EventTimeRecord,
+  ignoredRecordIds: Set<string>,
+  ignoreModes: RecentRecordsIgnoreMode[],
+  raceStateLookup: RaceStateLookup
+): boolean => {
+  if (ignoreModes.includes('outsideEventWindow') && ignoredRecordIds.has(record.id.toString())) {
+    return true;
+  }
+  return ignoreModes.includes('unrecognised') && isUnrecognisedCrossing(record, raceStateLookup);
+};
+
 // const RecordTable = (props: RecordTableProps) => {
 
 // };
@@ -552,11 +738,15 @@ export const RecentRecords = (props: RecordsProps & {
 }) => {
   const [recentFirst, setRecentFirst] = React.useState<boolean>(false);
   const [filterMode, setFilterMode] = React.useState<RecentRecordsFilterMode>('all');
+  const [ignoreModes, setIgnoreModes] = React.useState<RecentRecordsIgnoreMode[]>([]);
   const timeDisplayZoneMode = props.timeDisplayZoneMode || 'event';
   const displayTimeZone = resolveDisplayTimeZone(timeDisplayZoneMode, props.eventTimeZone);
   const selectedCategories = props.selectedCategories || new Set<EventCategoryId>();
   const selectedParticipants = props.selectedParticipants || new Set<EventParticipantId>();
   const teamMemberIds = selectedTeamMemberIds(props.raceStateLookup, selectedParticipants);
+  const outsideEventWindowIgnoredRecordIds = React.useMemo(() => {
+    return getOutsideEventWindowIgnoredRecordIds(props.records || [], props.raceStateLookup);
+  }, [props.records, props.raceStateLookup]);
   React.useEffect(() => {
     const selectedFilterHasNoTarget =
       (filterMode === 'category' && selectedCategories.size === 0) ||
@@ -569,6 +759,9 @@ export const RecentRecords = (props: RecordsProps & {
   }, [filterMode, selectedCategories, selectedParticipants, teamMemberIds]);
 
   const filteredRecords = (props.records || []).filter((record) => {
+    if (shouldIgnoreRecord(record, outsideEventWindowIgnoredRecordIds, ignoreModes, props.raceStateLookup)) {
+      return false;
+    }
     if (filterMode === 'all') {
       return true;
     }
@@ -589,61 +782,91 @@ export const RecentRecords = (props: RecordsProps & {
   });
 
   return <>
-    <h2 className="recent-records">Recent Records</h2>
-    <FormControl
-      fullWidth={false}
-      id="recent-records-type-dropdown"
-      sx={{ display: 'inline-block', marginLeft: 2, verticalAlign: 'middle' }}
-    >
-      <InputLabel id="show-recent-type-label">Show</InputLabel>
-      <Select
-        id="show-recent-type"
-        value={filterMode}
-        onChange={(event) => setFilterMode(event.target.value as RecentRecordsFilterMode)}
-        label="Record types">
-        <MenuItem value="all">All records</MenuItem>
-        <MenuItem value="category">Only selected category</MenuItem>
-        <MenuItem value="team">Only selected team</MenuItem>
-        <MenuItem value="participant">Only selected rider</MenuItem>
-      </Select>
-    </FormControl>
-    <FormControl
-      fullWidth={false}
-      id="recent-records-time-zone-dropdown"
-      sx={{ display: 'inline-block', marginLeft: 2, verticalAlign: 'middle' }}
-    >
-      <InputLabel id="show-recent-times-in-label">Show times in</InputLabel>
-      <Select
-        id="show-recent-times-in"
-        value={timeDisplayZoneMode}
-        onChange={(event) => props.onTimeDisplayZoneModeChange?.(event.target.value as TimeDisplayZoneMode)}
-        label="Show times in">
-        <MenuItem value="event">Event time-zone</MenuItem>
-        <MenuItem value="system">System time-zone</MenuItem>
-        <MenuItem value="gmt">GMT</MenuItem>
-      </Select>
-    </FormControl>
-    <FormControl
-      fullWidth={false}
-      id="recent-records-order-dropdown"
-      sx={{ display: 'inline-block', marginLeft: 2, verticalAlign: 'middle' }}
-    >
-      <InputLabel id="show-recent-order-label">Order</InputLabel>
-      <Select
-        id="show-recent-order"
-        defaultValue="oldest"
-        onChange={(e) => {
-          if (e.target.value === 'recent') {
-            setRecentFirst(true);
-          } else {
-            setRecentFirst(false);
-          }
-        }}
-        label="Sort records">
-        <MenuItem value="oldest">Oldest fist</MenuItem>
-        <MenuItem value="recent">Recent first</MenuItem>
-      </Select>
-    </FormControl>
+    <div className="recent-records-toolbar">
+      <h2 className="recent-records">Recent Records</h2>
+      <FormControl
+        fullWidth={false}
+        id="recent-records-type-dropdown"
+        sx={{ display: 'inline-block', verticalAlign: 'middle' }}
+      >
+        <InputLabel id="show-recent-type-label">Show</InputLabel>
+        <Select
+          id="show-recent-type"
+          value={filterMode}
+          onChange={(event) => setFilterMode(event.target.value as RecentRecordsFilterMode)}
+          label="Record types">
+          <MenuItem value="all">All records</MenuItem>
+          <MenuItem value="category">Only selected category</MenuItem>
+          <MenuItem value="team">Only selected team</MenuItem>
+          <MenuItem value="participant">Only selected rider</MenuItem>
+        </Select>
+      </FormControl>
+      <FormControl
+        fullWidth={false}
+        id="recent-records-time-zone-dropdown"
+        sx={{ display: 'inline-block', verticalAlign: 'middle' }}
+      >
+        <InputLabel id="show-recent-times-in-label">Show times in</InputLabel>
+        <Select
+          id="show-recent-times-in"
+          value={timeDisplayZoneMode}
+          onChange={(event) => props.onTimeDisplayZoneModeChange?.(event.target.value as TimeDisplayZoneMode)}
+          label="Show times in">
+          <MenuItem value="event">Event time-zone</MenuItem>
+          <MenuItem value="system">System time-zone</MenuItem>
+          <MenuItem value="gmt">GMT</MenuItem>
+        </Select>
+      </FormControl>
+      <FormControl
+        fullWidth={false}
+        id="recent-records-ignore-dropdown"
+        sx={{ display: 'inline-block', minWidth: 180, verticalAlign: 'middle' }}
+      >
+        <InputLabel id="show-recent-ignore-label" shrink>Ignore</InputLabel>
+        <Select
+          displayEmpty
+          multiple
+          id="show-recent-ignore"
+          label="Ignore"
+          value={ignoreModes}
+          sx={{ minWidth: 100 }}
+          onChange={(event) => {
+            const value = event.target.value;
+            setIgnoreModes(typeof value === 'string' ? value.split(',') as RecentRecordsIgnoreMode[] : value as RecentRecordsIgnoreMode[]);
+          }}
+          renderValue={(selected) => selected.length > 0
+            ? selected.map((mode) => ignoreModeLabels[mode as RecentRecordsIgnoreMode]).join(', ')
+            : 'None'}>
+          {(Object.keys(ignoreModeLabels) as RecentRecordsIgnoreMode[]).map((mode) => (
+            <MenuItem key={mode} value={mode}>
+              <Checkbox checked={ignoreModes.includes(mode)} />
+              <ListItemText primary={ignoreModeLabels[mode]} />
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <FormControl
+        fullWidth={false}
+        id="recent-records-order-dropdown"
+        sx={{ display: 'inline-block', verticalAlign: 'middle' }}
+      >
+        <InputLabel id="show-recent-order-label">Order</InputLabel>
+        <Select
+          id="show-recent-order"
+          defaultValue="oldest"
+          onChange={(e) => {
+            if (e.target.value === 'recent') {
+              setRecentFirst(true);
+            } else {
+              setRecentFirst(false);
+            }
+          }}
+          label="Sort records">
+          <MenuItem value="oldest">Oldest fist</MenuItem>
+          <MenuItem value="recent">Recent first</MenuItem>
+        </Select>
+      </FormControl>
+    </div>
     { warnings?.length > 0 && <Warnings warnings={warnings} />}
     {
       !(sortedRecords.length > 0) ? <p>No records available.</p>

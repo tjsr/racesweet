@@ -1,27 +1,30 @@
 import {
+  formatTeamCompositionRules,
+} from '../../app/categoryRules.js';
+import {
   type CategoryDistanceRule,
   type EventCatalogCategory,
   type EventCatalogEntrant,
   type EventCatalogState,
 } from '../../app/eventCatalog.js';
+import { EventCategoryId } from '../../model/eventcategory.js';
+import { EventId } from '../../model/raceevent.js';
 import { type UnsavedChangesGuard } from './unsavedChangesWarning.js';
-import {
-  formatTeamCompositionRules,
-} from '../../app/categoryRules.js';
 
-export type CategoryChanges = Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distanceRule' | 'name' | 'sessionAssignments' | 'teamRules'>>;
+export type CategoryChanges = Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distanceRule' | 'excludeFromResults' | 'name' | 'sessionAssignments' | 'teamRules'>>;
 
 export interface CategoriesPageProps {
   catalog: EventCatalogState;
   entrants: EventCatalogEntrant[];
-  onCreateCategory: (eventId: string) => void | Promise<void>;
-  onDeleteCategory: (eventId: string, categoryId: string) => void | Promise<void>;
-  onSelectCategory: (categoryId: string) => void;
-  onSelectEvent: (eventId: string) => void;
+  onCreateCategory: (eventId: EventId) => void | Promise<void>;
+  onDeleteCategory: (eventId: EventId, categoryId: EventCategoryId) => void | Promise<void>;
+  onDisplayError?: (source: string, error: unknown) => void;
+  onSelectCategory: (categoryId: EventCategoryId) => void;
+  onSelectEvent: (eventId: EventId) => void;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
-  onUpdateCategory: (categoryId: string, changes: CategoryChanges) => void | Promise<void>;
-  selectedCategoryId?: string;
-  selectedEventId?: string;
+  onUpdateCategory: (categoryId: EventCategoryId, changes: CategoryChanges) => void | Promise<void>;
+  selectedCategoryId?: EventCategoryId;
+  selectedEventId?: EventId;
 }
 
 export interface CategoryDraft {
@@ -29,6 +32,7 @@ export interface CategoryDraft {
   description: string;
   distanceRuleKind: CategoryDistanceRule['kind'];
   distanceRuleValue: string;
+  excludeFromResults: boolean;
   maxRiderAge: string;
   maxTeamSize: string;
   minRiderAge: string;
@@ -59,6 +63,7 @@ export const getCategoryDraft = (category: EventCatalogCategory | undefined): Ca
   description: category?.description || '',
   distanceRuleKind: category?.distanceRule?.kind || 'unspecified',
   distanceRuleValue: category?.distanceRule?.kind === 'unspecified' ? '' : category?.distanceRule?.value?.toString() || '',
+  excludeFromResults: category?.excludeFromResults || false,
   maxRiderAge: category?.teamRules?.maxRiderAge?.toString() || '',
   maxTeamSize: category?.teamRules?.maxTeamSize?.toString() || '',
   minRiderAge: category?.teamRules?.minRiderAge?.toString() || '',

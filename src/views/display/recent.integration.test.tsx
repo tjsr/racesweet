@@ -65,6 +65,47 @@ const selectRecentRecordsFilter = async (filterLabel: string): Promise<void> => 
   });
 };
 
+const toggleIgnoreRecordsFilter = async (filterLabel: string): Promise<void> => {
+  const ignoreSelect = document.querySelector('#recent-records-ignore-dropdown [role="combobox"]');
+  expect(ignoreSelect).toBeDefined();
+
+  await act(async () => {
+    ignoreSelect!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  });
+
+  const option = Array.from(document.querySelectorAll('li[role="option"]')).find((element) => {
+    return element.textContent?.includes(filterLabel);
+  });
+  expect(option).toBeDefined();
+
+  await act(async () => {
+    option!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+};
+
+const expectIgnoreRecordsFilterChecked = async (filterLabel: string): Promise<void> => {
+  const ignoreSelect = document.querySelector('#recent-records-ignore-dropdown [role="combobox"]');
+  expect(ignoreSelect).toBeDefined();
+  expect(ignoreSelect!.textContent).toContain(filterLabel);
+
+  let option = Array.from(document.querySelectorAll('li[role="option"]')).find((element) => {
+    return element.textContent?.includes(filterLabel);
+  });
+
+  if (!option) {
+    await act(async () => {
+      ignoreSelect!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+    option = Array.from(document.querySelectorAll('li[role="option"]')).find((element) => {
+      return element.textContent?.includes(filterLabel);
+    });
+  }
+
+  expect(option).toBeDefined();
+  expect(option!.getAttribute('aria-selected')).toBe('true');
+  expect((option!.querySelector('input[type="checkbox"]') as HTMLInputElement | null)?.checked).toBe(true);
+};
+
 describe('RecentRecords integration', () => {
   let container: HTMLDivElement;
   let originalMatchMedia: typeof window.matchMedia | undefined;
@@ -90,6 +131,41 @@ describe('RecentRecords integration', () => {
     } else {
       delete (window as unknown as { matchMedia?: unknown }).matchMedia;
     }
+  });
+
+  it('keeps the recent records heading and controls in one sticky toolbar', async () => {
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: () => undefined,
+      getEntrantIdForParticipant: () => undefined,
+      getParticipantById: () => undefined,
+      getParticipantLaps: () => [],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const toolbar = container.querySelector('.recent-records-toolbar');
+    expect(toolbar).toBeDefined();
+    expect(toolbar?.querySelector('h2.recent-records')?.textContent).toBe('Recent Records');
+    expect(toolbar?.querySelector('#recent-records-type-dropdown')).toBeDefined();
+    expect(toolbar?.querySelector('#recent-records-time-zone-dropdown')).toBeDefined();
+    expect(toolbar?.querySelector('#recent-records-ignore-dropdown')).toBeDefined();
+    expect(toolbar?.querySelector('#recent-records-order-dropdown')).toBeDefined();
   });
 
   it('selects rider/category on row click and emits changed category from context menu', async () => {
@@ -691,6 +767,403 @@ describe('RecentRecords integration', () => {
       expect(getRecentRecordsFilterSelect()?.textContent).toContain('All records');
       expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
     }
+  });
+
+  it('ignores crossings outside the category and event window while keeping flags visible', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const categoryB: EventCategory = { id: '2', name: 'Category B' };
+    const teamMemberOne: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'team-1',
+      firstname: 'Pat',
+      id: '101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'RIDER',
+    };
+    const teamMemberTwo: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'team-1',
+      firstname: 'Quinn',
+      id: '102',
+      identifiers: [{ fromTime: undefined, racePlate: '102', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'RIDER',
+    };
+    const soloRider: EventParticipant = {
+      categoryId: categoryB.id,
+      currentResult: undefined,
+      entrantId: '103',
+      firstname: 'Sam',
+      id: '103',
+      identifiers: [{ fromTime: undefined, racePlate: '103', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'SOLO',
+    };
+    const categoryStartA: FlagRecord = {
+      categoryIds: [categoryA.id],
+      flagType: 'green',
+      flagValue: 'course',
+      id: 'start-a',
+      recordType: 4,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:00:00.000Z'),
+    };
+    const categoryStartB: FlagRecord = {
+      categoryIds: [categoryB.id],
+      flagType: 'green',
+      flagValue: 'course',
+      id: 'start-b',
+      recordType: 4,
+      sequence: 6,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:05:00.000Z'),
+    };
+    const categoryFinishA: FlagRecord = {
+      categoryIds: [categoryA.id],
+      flagType: 'chequered',
+      flagValue: 'course',
+      id: 'finish-a',
+      recordType: 4,
+      sequence: 4,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:02:00.000Z'),
+    };
+    const eventFinish: FlagRecord = {
+      flagType: 'chequered',
+      flagValue: 'course',
+      id: 'finish-event',
+      recordType: 4,
+      sequence: 9,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    };
+    const crossings: ParticipantPassingRecord[] = [
+      { id: 'before-start-a', participantId: teamMemberOne.id, sequence: 0, time: '2026-05-29T09:59:00.000Z' },
+      { id: 'in-window-a', participantId: teamMemberOne.id, sequence: 2, time: '2026-05-29T10:01:00.000Z' },
+      { id: 'first-team-after-finish-a', participantId: teamMemberOne.id, sequence: 5, time: '2026-05-29T10:03:00.000Z' },
+      { id: 'second-team-after-finish-a', participantId: teamMemberTwo.id, sequence: 7, time: '2026-05-29T10:04:00.000Z' },
+      { id: 'before-start-b', participantId: soloRider.id, sequence: 8, time: '2026-05-29T10:04:30.000Z' },
+      { id: 'first-solo-after-event-finish', participantId: soloRider.id, sequence: 10, time: '2026-05-29T10:07:00.000Z' },
+      { id: 'second-solo-after-event-finish', participantId: soloRider.id, sequence: 11, time: '2026-05-29T10:08:00.000Z' },
+    ].map((crossing) => ({
+      chipCode: 100100,
+      id: crossing.id,
+      isValid: true,
+      participantId: crossing.participantId,
+      recordType: RECORD_TX_CROSSING,
+      sequence: crossing.sequence,
+      source: 'test-source',
+      time: new Date(crossing.time),
+    }) as ParticipantPassingRecord);
+    const records = [
+      crossings[0],
+      categoryStartA,
+      crossings[1],
+      categoryFinishA,
+      crossings[2],
+      categoryStartB,
+      crossings[3],
+      crossings[4],
+      eventFinish,
+      crossings[5],
+      crossings[6],
+    ] as Array<ParticipantPassingRecord | FlagRecord>;
+    const participants = new Map<EventParticipant['id'], EventParticipant>([
+      [teamMemberOne.id, teamMemberOne],
+      [teamMemberTwo.id, teamMemberTwo],
+      [soloRider.id, soloRider],
+    ]);
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [categoryA, categoryB],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => [categoryA, categoryB].find((category) => category.id === categoryId),
+      getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+      getParticipantById: (participantId) => participants.get(participantId),
+      getParticipantLaps: (participantId) => crossings.filter((crossing) => crossing.participantId === participantId),
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={records as ParticipantPassingRecord[]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    expect(getDisplayedRecordIds(container)).toEqual([
+      'before-start-a',
+      'start-a',
+      'in-window-a',
+      'finish-a',
+      'first-team-after-finish-a',
+      'second-team-after-finish-a',
+      'before-start-b',
+      'start-b',
+      'finish-event',
+      'first-solo-after-event-finish',
+      'second-solo-after-event-finish',
+    ]);
+
+    await toggleIgnoreRecordsFilter('Outside event window');
+
+    expect(getDisplayedRecordIds(container)).toEqual([
+      'start-a',
+      'in-window-a',
+      'finish-a',
+      'first-team-after-finish-a',
+      'start-b',
+      'finish-event',
+      'first-solo-after-event-finish',
+    ]);
+  });
+
+  it('ignores unrecognised crossings while keeping flag records visible', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const participant: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: '101',
+      firstname: 'Pat',
+      id: '101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const knownCrossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'known-crossing',
+      isValid: true,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:01:00.000Z'),
+    } as ParticipantPassingRecord;
+    const unassignedCrossing: ParticipantPassingRecord = {
+      chipCode: 100102,
+      id: 'unassigned-crossing',
+      isValid: true,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:02:00.000Z'),
+    } as ParticipantPassingRecord;
+    const unknownParticipantCrossing: ParticipantPassingRecord = {
+      chipCode: 100103,
+      id: 'unknown-participant-crossing',
+      isValid: true,
+      participantId: 'missing-participant',
+      recordType: RECORD_TX_CROSSING,
+      sequence: 3,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:03:00.000Z'),
+    } as ParticipantPassingRecord;
+    const unknownCategoryParticipant: EventParticipant = {
+      ...participant,
+      categoryId: 'missing-category',
+      id: '102',
+    };
+    const unknownCategoryCrossing: ParticipantPassingRecord = {
+      chipCode: 100104,
+      id: 'unknown-category-crossing',
+      isValid: true,
+      participantId: unknownCategoryParticipant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 4,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:04:00.000Z'),
+    } as ParticipantPassingRecord;
+    const flag: FlagRecord = {
+      categoryIds: [categoryA.id],
+      flagType: 'chequered',
+      flagValue: 'course',
+      id: 'finish-flag',
+      recordType: 4,
+      sequence: 5,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:05:00.000Z'),
+    };
+    const participants = new Map<EventParticipant['id'], EventParticipant>([
+      [participant.id, participant],
+      [unknownCategoryParticipant.id, unknownCategoryParticipant],
+    ]);
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [categoryA],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+      getParticipantById: (participantId) => participants.get(participantId),
+      getParticipantLaps: () => [knownCrossing],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[
+            knownCrossing,
+            unassignedCrossing,
+            unknownParticipantCrossing,
+            unknownCategoryCrossing,
+            flag as unknown as ParticipantPassingRecord,
+          ]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    expect(getDisplayedRecordIds(container)).toEqual([
+      'known-crossing',
+      'unassigned-crossing',
+      'unknown-participant-crossing',
+      'unknown-category-crossing',
+      'finish-flag',
+    ]);
+
+    await toggleIgnoreRecordsFilter('Unrecognised');
+
+    expect(getDisplayedRecordIds(container)).toEqual([
+      'known-crossing',
+      'finish-flag',
+    ]);
+  });
+
+  it('keeps excluded-result category crossings visible but unrelated to selected category filters', async () => {
+    const timingErrorCategory: EventCategory = { excludeFromResults: true, id: 'error-cat', name: 'Timing Error List' };
+    const participant: EventParticipant = {
+      categoryId: timingErrorCategory.id,
+      currentResult: undefined,
+      entrantId: 'error-entrant',
+      firstname: 'Timing',
+      id: 'error-participant',
+      identifiers: [{ fromTime: undefined, racePlate: '999', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'ERROR',
+    };
+    const crossing: ParticipantPassingRecord = {
+      chipCode: 100999,
+      id: 'timing-error-crossing',
+      isValid: true,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:01:00.000Z'),
+    } as ParticipantPassingRecord;
+    const participants = new Map<EventParticipant['id'], EventParticipant>([[participant.id, participant]]);
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [timingErrorCategory],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === timingErrorCategory.id ? timingErrorCategory : undefined,
+      getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+      getParticipantById: (participantId) => participants.get(participantId),
+      getParticipantLaps: () => [crossing],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[crossing]}
+          selectedCategories={new Set([timingErrorCategory.id])}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    expect(getDisplayedRecordIds(container)).toEqual(['timing-error-crossing']);
+    expect(container.querySelector('tr[data-record-id="timing-error-crossing"]')?.className).not.toContain('selected-category');
+
+    await selectRecentRecordsFilter('Only selected category');
+
+    expect(getDisplayedRecordIds(container)).toEqual([]);
+    expect(container.textContent).toContain('No records available.');
+  });
+
+  it('hides excluded-result category crossings when unrecognised records are ignored', async () => {
+    const timingErrorCategory: EventCategory = { excludeFromResults: true, id: 'error-cat', name: 'Timing Error List' };
+    const participant: EventParticipant = {
+      categoryId: timingErrorCategory.id,
+      currentResult: undefined,
+      entrantId: 'error-entrant',
+      firstname: 'Timing',
+      id: 'error-participant',
+      identifiers: [{ fromTime: undefined, racePlate: '999', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'ERROR',
+    };
+    const crossing: ParticipantPassingRecord = {
+      chipCode: 100999,
+      id: 'timing-error-crossing',
+      isValid: true,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:01:00.000Z'),
+    } as ParticipantPassingRecord;
+    const participants = new Map<EventParticipant['id'], EventParticipant>([[participant.id, participant]]);
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [timingErrorCategory],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === timingErrorCategory.id ? timingErrorCategory : undefined,
+      getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+      getParticipantById: (participantId) => participants.get(participantId),
+      getParticipantLaps: () => [crossing],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[crossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    expect(getDisplayedRecordIds(container)).toEqual(['timing-error-crossing']);
+
+    await toggleIgnoreRecordsFilter('Unrecognised');
+    await expectIgnoreRecordsFilterChecked('Unrecognised');
+
+    expect(getDisplayedRecordIds(container)).toEqual([]);
+    expect(container.textContent).toContain('No records available.');
   });
 
   it('deselects by toggling: select then deselect same participant row', async () => {

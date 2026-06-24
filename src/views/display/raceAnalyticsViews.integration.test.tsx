@@ -40,10 +40,11 @@ const createLap = (
   time: new Date(`2026-06-12T10:00:${String(lapNo).padStart(2, '0')}.000Z`),
 });
 
-const categories: Array<{ id: string; name: string }> = [
+const categories: Array<{ excludeFromResults?: boolean; id: string; name: string }> = [
   { id: 'cat-a', name: 'Category A' },
   { id: 'cat-a-duplicate-id', name: 'Category A' },
   { id: 'cat-b', name: 'Category B' },
+  { excludeFromResults: true, id: 'cat-error', name: 'Timing Error List' },
 ];
 
 const participants: EventParticipant[] = [
@@ -80,6 +81,17 @@ const participants: EventParticipant[] = [
     resultDuration: null,
     surname: 'Rider',
   },
+  {
+    categoryId: 'cat-error',
+    currentResult: undefined,
+    entrantId: 'timing-error-entrant',
+    firstname: 'Timing',
+    id: 'p-error',
+    identifiers: [],
+    lastRecordTime: null,
+    resultDuration: null,
+    surname: 'Error',
+  },
 ];
 
 const catalogEntrants: EventCatalogEntrant[] = [
@@ -99,6 +111,15 @@ const catalogEntrants: EventCatalogEntrant[] = [
     id: 'rider-1',
     memberParticipantIds: ['p-rider-1'],
     name: 'Solo Rider',
+    sessionIds: ['session-1'],
+  },
+  {
+    categoryIds: ['cat-error'],
+    entrantType: 'rider',
+    eventId: 'event-1',
+    id: 'timing-error-entrant',
+    memberParticipantIds: ['p-error'],
+    name: 'Timing Error Entrant',
     sessionIds: ['session-1'],
   },
 ];
@@ -125,11 +146,18 @@ const lapsByParticipant = new Map<string, ParticipantPassingRecord[]>([
       createLap('rider-lap2', 'p-rider-1', 'rider-1', 2, 145000, 75000),
     ],
   ],
+  [
+    'p-error',
+    [
+      createLap('error-lap1', 'p-error', 'timing-error-entrant', 1, 10000, 10000),
+    ],
+  ],
 ]);
 
 const categoryLookup = new Map<string, EventCategory>([
   ['cat-a', { id: 'cat-a', name: 'Category A' }],
   ['cat-b', { id: 'cat-b', name: 'Category B' }],
+  ['cat-error', { excludeFromResults: true, id: 'cat-error', name: 'Timing Error List' }],
 ]);
 
 const raceState = {
@@ -188,6 +216,7 @@ describe('race analytics views integration', () => {
 
     expect(container.textContent).toContain('Team Rocket');
     expect(container.textContent).toContain('Solo Rider');
+    expect(container.textContent).not.toContain('Timing Error Entrant');
     expect(container.textContent).toContain('00:02:12.000');
     expect(container.textContent).toContain('00:02:25.000');
     expect(container.textContent).toContain('00:01:03.000');
@@ -203,6 +232,7 @@ describe('race analytics views integration', () => {
 
     const categoryOptions = Array.from(categorySelect.querySelectorAll('option')).map((option) => option.textContent);
     expect(categoryOptions.filter((text) => text === 'Category A')).toHaveLength(1);
+    expect(categoryOptions).not.toContain('Timing Error List');
 
     await act(async () => {
       setSelectValue(categorySelect, 'cat-a');
@@ -259,8 +289,10 @@ describe('race analytics views integration', () => {
     expect(fastestTable.textContent).toContain('On');
     expect(container.textContent).toContain('Team Rocket');
     expect(container.textContent).toContain('Solo Rider');
+    expect(container.textContent).not.toContain('Timing Error Entrant');
     expect(container.textContent).toContain('00:01:03.000');
     expect(container.textContent).toContain('00:01:10.000');
+    expect(container.textContent).not.toContain('00:00:10.000');
     const fastestRows = Array.from(fastestTable.querySelectorAll('tbody tr'));
     const teamFastestRow = fastestRows.find((row) => row.textContent?.includes('Team Rocket'));
     expect(teamFastestRow).toBeTruthy();

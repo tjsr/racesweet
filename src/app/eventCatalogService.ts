@@ -1,12 +1,13 @@
 import { validate as validateUuid } from 'uuid';
-import { CategoryId } from '../controllers/category.js';
+import { CategoryId, normalizeCategoryResultExclusion } from '../controllers/category.js';
 import { EventEntrantId } from '../model/entrant.js';
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
-import { createCategoryId, createEventEntrantId, createEventId, createSessionId, rewriteImportedObjectIds } from '../model/ids.js';
+import { createCategoryId, createEventEntrantId, createEventId, createId, createSessionId, rewriteImportedObjectIds } from '../model/ids.js';
 import { EventId, SessionId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 import type { TimeRecord } from '../model/timerecord.js';
+import { createSeedEventCatalogLedger } from './createSeedEventCatalogLedger.js';
 import {
   type CategoryDistanceRule,
   type EntrantType,
@@ -16,7 +17,6 @@ import {
   type EventCatalogSession,
   type EventCatalogState,
   applyEventCatalogLedger,
-  createSeedEventCatalogLedger,
   getEntrantsForEvent,
 } from './eventCatalog.js';
 import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
@@ -48,7 +48,7 @@ const assertEventCatalogPersistence = (persistence: EventCatalogPersistence): vo
   }
 };
 
-const createMutationId = (): string => `event-catalog-${Date.now()}-${Math.round(Math.random() * 100000)}`;
+const createMutationId = (): string => createId('mutationId');
 const createTimestamp = (): string => new Date().toISOString();
 
 const reviveDate = (value: Date | string | undefined): Date | undefined => {
@@ -62,6 +62,7 @@ const reviveDate = (value: Date | string | undefined): Date | undefined => {
 const reviveRaceStateDates = (raceState: Partial<RaceState>): Partial<RaceState> => {
   return {
     ...raceState,
+    categories: normalizeCategoriesForResultExclusion(raceState.categories || []),
     eventStartTime: reviveDate(raceState.eventStartTime),
     records: (raceState.records || []).map((record): TimeRecord => ({
       ...record,
@@ -118,10 +119,13 @@ const deriveDistanceRule = (category: EventCategory): CategoryDistanceRule | und
   return undefined;
 };
 
+const normalizeCategoriesForResultExclusion = (categories: EventCategory[]): EventCategory[] =>
+  categories.map((category) => normalizeCategoryResultExclusion(category));
+
 const deriveCategoriesFromEventData = (eventId: EventId, categories: EventCategory[], participants: EventParticipant[]): EventCatalogCategory[] => {
   const byId = new Map<EventId, EventCatalogCategory>();
 
-  categories.forEach((category) => {
+  normalizeCategoriesForResultExclusion(categories).forEach((category) => {
     const id = validateUuid(category.id) ? category.id : createCategoryId(category.id);
     byId.set(id, {
       ...category,
@@ -256,6 +260,160 @@ const normalizeEntrantChanges = (
   };
 };
 
+const hasSameMembers = (left: string[], right: string[]): boolean =>
+  left.length === right.length && left.every((value, index) => value === right[index]);
+
+const assertUuid = (errors: string[], label: string, value: string | undefined): void => {
+  if (!value || !validateUuid(value)) {
+    errors.push(`${label} "${value || ''}" is not a valid UUID.`);
+  }
+};
+
+const validateEventCatalogStateIds = (state: EventCatalogState): void => {
+  const errors: string[] = [];
+  const eventsById = new Map(state.events.map((event) => [event.id, event]));
+  const categoriesById = new Map(state.categories.map((category) => [category.id, category]));
+  const entrantsById = new Map(state.entrants.map((entrant) => [entrant.id, entrant]));
+  const sessionsById = new Map(state.sessions.map((session) => [session.id, session]));
+  const deletedEventIds = new Set(state.deletedEventIds);
+
+  state.events.forEach((event) => {
+    assertUuid(errors, 'event.id', event.id);
+    event.categoryIds.forEach((categoryId) => assertUuid(errors, `event ${event.id} categoryId`, categoryId));
+    event.entrantIds.forEach((entrantId) => assertUuid(errors, `event ${event.id} entrantId`, entrantId));
+    event.sessionIds.forEach((sessionId) => assertUuid(errors, `event ${event.id} sessionId`, sessionId));
+  });
+  state.categories.forEach((category) => {
+    assertUuid(errors, 'category.id', category.id);
+    assertUuid(errors, `category ${category.id} eventId`, category.eventId);
+    if (!eventsById.has(category.eventId) && !deletedEventIds.has(category.eventId)) {
+      errors.push(`category ${category.id} references missing parent event ${category.eventId}.`);
+    }
+  });
+  state.entrants.forEach((entrant) => {
+    assertUuid(errors, 'entrant.id', entrant.id);
+    assertUuid(errors, `entrant ${entrant.id} eventId`, entrant.eventId);
+    entrant.categoryIds.forEach((categoryId) => assertUuid(errors, `entrant ${entrant.id} categoryId`, categoryId));
+    entrant.memberParticipantIds.forEach((participantId) => assertUuid(errors, `entrant ${entrant.id} memberParticipantId`, participantId));
+    entrant.sessionIds.forEach((sessionId) => assertUuid(errors, `entrant ${entrant.id} sessionId`, sessionId));
+    if (!eventsById.has(entrant.eventId) && !deletedEventIds.has(entrant.eventId)) {
+      errors.push(`entrant ${entrant.id} references missing parent event ${entrant.eventId}.`);
+    }
+  });
+  state.sessions.forEach((session) => {
+    assertUuid(errors, 'session.id', session.id);
+    assertUuid(errors, `session ${session.id} eventId`, session.eventId);
+    if (!eventsById.has(session.eventId) && !deletedEventIds.has(session.eventId)) {
+      errors.push(`session ${session.id} references missing parent event ${session.eventId}.`);
+    }
+  });
+  if (state.activeEventId) {
+    assertUuid(errors, 'activeEventId', state.activeEventId);
+    if (!eventsById.has(state.activeEventId)) {
+      errors.push(`activeEventId ${state.activeEventId} does not reference an existing event.`);
+    }
+  }
+  if (state.activeSessionId) {
+    assertUuid(errors, 'activeSessionId', state.activeSessionId);
+    const activeSession = sessionsById.get(state.activeSessionId);
+    if (!activeSession) {
+      errors.push(`activeSessionId ${state.activeSessionId} does not reference an existing session.`);
+    } else if (state.activeEventId && activeSession.eventId !== state.activeEventId) {
+      errors.push(`activeSessionId ${state.activeSessionId} belongs to event ${activeSession.eventId}, not active event ${state.activeEventId}.`);
+    }
+  }
+
+  state.events.forEach((event) => {
+    event.categoryIds.forEach((categoryId) => {
+      const category = categoriesById.get(categoryId);
+      if (!category || category.eventId !== event.id) {
+        errors.push(`event ${event.id} categoryIds contains ${categoryId}, but that category does not belong to the event.`);
+      }
+    });
+    event.entrantIds.forEach((entrantId) => {
+      const entrant = entrantsById.get(entrantId);
+      if (!entrant || entrant.eventId !== event.id) {
+        errors.push(`event ${event.id} entrantIds contains ${entrantId}, but that entrant does not belong to the event.`);
+      }
+    });
+    event.sessionIds.forEach((sessionId) => {
+      const session = sessionsById.get(sessionId);
+      if (!session || session.eventId !== event.id) {
+        errors.push(`event ${event.id} sessionIds contains ${sessionId}, but that session does not belong to the event.`);
+      }
+    });
+  });
+
+  if (errors.length > 0) {
+    throw new Error(`Loaded event catalog ledger contains invalid IDs or parent relationships:\n${errors.join('\n')}`);
+  }
+};
+
+const createLedgerRelationshipRepairMutations = (state: EventCatalogState): EventCatalogLedger['mutations'] => {
+  const categoriesByEventId = new Map<string, string[]>();
+  const entrantsByEventId = new Map<string, string[]>();
+  const sessionsByEventId = new Map<string, string[]>();
+
+  state.categories.forEach((category) => {
+    categoriesByEventId.set(category.eventId, [...(categoriesByEventId.get(category.eventId) || []), category.id]);
+  });
+  state.entrants.forEach((entrant) => {
+    entrantsByEventId.set(entrant.eventId, [...(entrantsByEventId.get(entrant.eventId) || []), entrant.id]);
+  });
+  state.sessions.forEach((session) => {
+    sessionsByEventId.set(session.eventId, [...(sessionsByEventId.get(session.eventId) || []), session.id]);
+  });
+
+  return state.events.flatMap((event) => {
+    const categoryIds = unique([
+      ...event.categoryIds.filter((categoryId) => categoriesByEventId.get(event.id)?.includes(categoryId)),
+      ...(categoriesByEventId.get(event.id) || []),
+    ]);
+    const entrantIds = unique([
+      ...event.entrantIds.filter((entrantId) => entrantsByEventId.get(event.id)?.includes(entrantId)),
+      ...(entrantsByEventId.get(event.id) || []),
+    ]);
+    const sessionIds = unique([
+      ...event.sessionIds.filter((sessionId) => sessionsByEventId.get(event.id)?.includes(sessionId)),
+      ...(sessionsByEventId.get(event.id) || []),
+    ]);
+
+    if (
+      hasSameMembers(event.categoryIds, categoryIds) &&
+      hasSameMembers(event.entrantIds, entrantIds) &&
+      hasSameMembers(event.sessionIds, sessionIds)
+    ) {
+      return [];
+    }
+
+    return [{
+      changes: {
+        categoryIds,
+        entrantIds,
+        sessionIds,
+      },
+      eventId: event.id,
+      id: createMutationId(),
+      timestamp: createTimestamp(),
+      type: 'event-updated' as const,
+    }];
+  });
+};
+
+const repairAndValidateLoadedLedger = (ledger: EventCatalogLedger): EventCatalogLedger => {
+  let repairedLedger = rewriteImportedObjectIds(ledger).value;
+  const repairMutations = createLedgerRelationshipRepairMutations(applyEventCatalogLedger(repairedLedger));
+  if (repairMutations.length > 0) {
+    repairedLedger = {
+      ...repairedLedger,
+      mutations: [...repairedLedger.mutations, ...repairMutations],
+    };
+  }
+
+  validateEventCatalogStateIds(applyEventCatalogLedger(repairedLedger));
+  return repairedLedger;
+};
+
 export class EventCatalogService {
   private ledger: EventCatalogLedger;
   private state: EventCatalogState;
@@ -271,13 +429,24 @@ export class EventCatalogService {
 
   public static async create(persistence: EventCatalogPersistence, options: EventCatalogServiceOptions = {}): Promise<EventCatalogService> {
     assertEventCatalogPersistence(persistence);
-    let ledger = await persistence.load();
+    let ledger: EventCatalogLedger = await persistence.load();
     if (ledger.mutations.length === 0) {
-      ledger = rewriteImportedObjectIds(createSeedEventCatalogLedger()).value;
+      ledger = createSeedEventCatalogLedger();
       await persistence.save(ledger);
       if (options.onPersistedLedger) {
         await options.onPersistedLedger(ledger);
       }
+    } else {
+      // const repairedLedger: EventCatalogLedger = repairAndValidateLoadedLedger(ledger);
+      // if (JSON.stringify(repairedLedger) !== JSON.stringify(ledger)) {
+      // ledger = repairedLedger;
+      await persistence.save(ledger);
+      if (options.onPersistedLedger) {
+        await options.onPersistedLedger(ledger);
+      }
+      // } else {
+      //   ledger = repairedLedger;
+      // }
     }
 
     return new EventCatalogService(persistence, ledger, options);
@@ -382,6 +551,7 @@ export class EventCatalogService {
             distance: category.distance,
             distanceRule: category.distanceRule,
             duration: category.duration,
+            excludeFromResults: category.excludeFromResults,
             name: category.name,
             sessionAssignments: category.sessionAssignments,
             startTime: category.startTime,
@@ -452,6 +622,10 @@ export class EventCatalogService {
 
   public async importApicalRaceState(importData: ApicalCatalogImport, masterProfiles: MasterEntrantProfile[] = []): Promise<EventCatalogState> {
     const normalizedImportData = rewriteImportedObjectIds(importData).value;
+    normalizedImportData.raceState = {
+      ...normalizedImportData.raceState,
+      categories: normalizeCategoriesForResultExclusion(normalizedImportData.raceState.categories || []),
+    };
     const existingEvent = this.state.events.find((event) => event.id === normalizedImportData.eventId);
     const existingSession = this.state.sessions.find((session) => session.id === normalizedImportData.sessionId);
     const sessionIds = Array.from(new Set([...(existingEvent?.sessionIds || []), normalizedImportData.sessionId]));
@@ -707,7 +881,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async updateCategory(categoryId: CategoryId, changes: Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'name' | 'sessionAssignments' | 'startTime' | 'teamRules'>>): Promise<EventCatalogState> {
+  public async updateCategory(categoryId: CategoryId, changes: Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'excludeFromResults' | 'name' | 'sessionAssignments' | 'startTime' | 'teamRules'>>): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         categoryId,
