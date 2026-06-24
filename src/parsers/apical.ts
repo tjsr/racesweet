@@ -13,9 +13,12 @@ import { assignParticipantNumber, assignTransponder, createParticipantIdFromEven
 import { generateTeamId, isEntrantTeam } from "../controllers/eventteam.js";
 import type { ChipCrossingData } from "../model/chipcrossing.js";
 import type { EventTeam } from "../model/eventteam.js";
+import type { GreenFlagRecord } from "../model/flag.js";
 import type { RaceState } from "../model/racestate.js";
 import { addToTime, dateAtStartOfDayInTimeZone } from "../app/utils/timeutils.js";
 import { createEventCategoryIdFromCategoryCode } from "../controllers/category.js";
+import { createGreenFlagEvent } from "../controllers/flag.js";
+import { createTimeRecordId } from "../model/ids.js";
 import { normalizeCategoryResultExclusion } from "../controllers/category.js";
 import { durationStringToMilliseconds, excelTimeToMilliseconds } from "./genericTimeParser.js";
 import { inferTransponderFromRaceNumber } from "../controllers/transponder.js";
@@ -47,6 +50,109 @@ export const apicalTimeOfDayToDate = (sessionDate: Date, timeOfDay: string | num
   return addToTime(sessionMidnight, apicalTimeToMilliseconds(timeOfDay));
 };
 
+const getCumulativeMilliseconds = (lap: ApicalLapByCategoryViewModel): number => {
+  if (hasLapTimeValue(lap.CumulativeSeconds)) {
+    return Number(lap.CumulativeSeconds) * 1000;
+  }
+
+  return apicalTimeToMilliseconds(lap.CumulativeLapTimeSpan);
+};
+
+const getCategoryStartTimeForLap = (
+  lap: ApicalLapByCategoryViewModel,
+  eventStartTime: Date,
+  timeZone?: string
+): Date => {
+  const crossingTime = apicalTimeOfDayToDate(eventStartTime, getTimeOfDayValue(lap), timeZone);
+  return addToTime(crossingTime, -getCumulativeMilliseconds(lap));
+};
+
+export const getCategoryStartTimeMap = (
+  data: ApicalLapByCategory,
+  eventId: EventId,
+  eventStartTime: Date | undefined,
+  timeZone?: string
+): Map<EventCategoryId, Date> => {
+  if (!validateUuid(eventId)) {
+    throw new Error(`Invalid eventId provided: ${eventId}`);
+  }
+
+  const startTimeTotals = new Map<EventCategoryId, { count: number; totalMilliseconds: number }>();
+  data.forEach((apiCategory: ApicalCategoryResult) => {
+    const categoryId = createEventCategoryIdFromCategoryCode(eventId, apiCategory.CategoryName);
+    apiCategory.ParticipantViewModels.forEach((entrant: ApicalParticipantViewModel) => {
+      entrant.LapByCategoryViewModels.forEach((lap: ApicalLapByCategoryViewModel) => {
+        if (!hasLapTimeValue(lap.TimeOfDay)) {
+          return;
+        }
+
+        const startTime = getCategoryStartTimeForLap(lap, eventStartTime || new Date(), timeZone);
+        const current = startTimeTotals.get(categoryId) || { count: 0, totalMilliseconds: 0 };
+        startTimeTotals.set(categoryId, {
+          count: current.count + 1,
+          totalMilliseconds: current.totalMilliseconds + startTime.getTime(),
+        });
+      });
+    });
+  });
+
+  return new Map(Array.from(startTimeTotals.entries()).map(([categoryId, start]) => [
+    categoryId,
+    new Date(start.totalMilliseconds / start.count),
+  ]));
+};
+
+const createCategoryStartFlags = (
+  categoryStartTimes: Map<EventCategoryId, Date>,
+  eventId: EventId,
+  source: uuid
+): GreenFlagRecord[] => {
+  const groupedStartFlags: { categoryIds: EventCategoryId[]; time: Date }[] = [];
+  Array.from(categoryStartTimes.entries())
+    .sort((left, right) => left[1].getTime() - right[1].getTime())
+    .forEach(([categoryId, startTime]) => {
+      const matchingStartFlag = groupedStartFlags.find((flag) => Math.abs(startTime.getTime() - flag.time.getTime()) <= 1000);
+      if (matchingStartFlag) {
+        matchingStartFlag.categoryIds.push(categoryId);
+        return;
+      }
+
+      groupedStartFlags.push({
+        categoryIds: [categoryId],
+        time: startTime,
+      });
+    });
+
+  return groupedStartFlags.map((flag) => {
+    const categoryIds = [...flag.categoryIds].sort();
+    return createGreenFlagEvent({
+      categoryIds,
+      eventId,
+      flagValue: 'course',
+      id: createTimeRecordId(`apical-green-flag:${eventId}:${flag.time.toISOString()}:${categoryIds.join(',')}`),
+      indicatesRaceStart: true,
+      source,
+      time: flag.time,
+    });
+  });
+};
+
+const compareImportedRecords = (left: TimeRecord, right: TimeRecord): number => {
+  const leftTime = left.time?.getTime() ?? Number.MAX_SAFE_INTEGER;
+  const rightTime = right.time?.getTime() ?? Number.MAX_SAFE_INTEGER;
+  if (leftTime !== rightTime) {
+    return leftTime - rightTime;
+  }
+
+  const leftIsCrossing = (left.recordType & RECORD_TX_CROSSING) > 0;
+  const rightIsCrossing = (right.recordType & RECORD_TX_CROSSING) > 0;
+  if (leftIsCrossing !== rightIsCrossing) {
+    return leftIsCrossing ? 1 : -1;
+  }
+
+  return left.id.toString().localeCompare(right.id.toString());
+};
+
 export const createChipCrossingRecord = (
   lap: ApicalLapByCategoryViewModel,
   eventStartTime: Date,
@@ -68,10 +174,19 @@ export const createChipCrossingRecord = (
       ? apicalTimeOfDayToDate(eventStartTime, getTimeOfDayValue(lap), timeZone)
       : addToTime(eventStartTime, apicalTimeToMilliseconds(lap.CumulativeLapTimeSpan));
 
+    const timeRecordSeed = [
+      'apical-crossing',
+      eventId,
+      lap.Id,
+      lap.RaceNumber,
+      lap.LapNumber,
+      txNo,
+      calculatedRecordTime.toISOString(),
+    ].join(':');
     const timeRecord: Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time' | 'eventId'> = {
       chipCode: txNo,
       eventId: eventId,
-      id: lap.Id.toString(),
+      id: createTimeRecordId(timeRecordSeed),
       recordType: RECORD_TX_CROSSING,
       time: calculatedRecordTime,
     };
@@ -321,7 +436,8 @@ export const convertDataToRaceState = (
   assert(data != null);
   assert(eventId);
   const source: uuid = uuidv5(data.toString(), eventId);
-  let sequence = 1;
+  const categoryStartTimes = getCategoryStartTimeMap(data, eventId, eventStartTime, timeZone);
+  records.push(...createCategoryStartFlags(categoryStartTimes, eventId, source));
 
   data.forEach((apiCategory: ApicalCategoryResult) => {
     let categoryId;
@@ -355,7 +471,6 @@ export const convertDataToRaceState = (
       entrant.records?.forEach((record: Partial<ChipCrossingData>) => {
         record.recordType = record.recordType ?? RECORD_TX_CROSSING;
         record.source = source;
-        record.sequence = sequence++;
         records.push(record as ChipCrossingData);
       });
       if (entrant.team) {
@@ -367,6 +482,10 @@ export const convertDataToRaceState = (
   });
 
   const categories = Array.from(categoriesMap.values());
+  records.sort(compareImportedRecords);
+  records.forEach((record, index) => {
+    (record as TimeRecord & { sequence: number }).sequence = index + 1;
+  });
 
   return {
     categories,

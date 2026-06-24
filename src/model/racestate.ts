@@ -2,7 +2,7 @@ import { getOrCacheGreenFlagForCategory, hasCategoryIds, isFlagRecord } from "..
 import { processAllParticipantLaps } from "../controllers/laps.js";
 import { ParticipantNotFoundError, assignParticpantsToCrossings } from "../controllers/participant.js";
 import { addError, compareByTime, isCrossingRecord } from "../controllers/timerecord.js";
-import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError, SessionStateError } from "../validators/errors.js";
+import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError, NoStartFlagError, SessionStateError } from "../validators/errors.js";
 import { FlagReferencesUnknownCategoryError, InvalidFlagRecordError } from "./errors.js";
 import type { EventCategory, EventCategoryId } from "./eventcategory.js";
 import type { EventParticipant, EventParticipantId } from "./eventparticipant.js";
@@ -448,7 +448,7 @@ export class Session implements RaceState, RaceStateLookup {
       try {
         participantCategoryStartFlag = this.__getCategoryGreenFlag(participant.categoryId);
       } catch (error: unknown) {
-        if (error instanceof EventFlagsError) {
+        if (error instanceof EventFlagsError || error instanceof NoStartFlagError) {
           // do nothing - it's okay for participants to not have a start flag when adding.
         } else {
           console.error(`Error processing participant laps for ${participant.firstname} ${participant.surname}:`, error);

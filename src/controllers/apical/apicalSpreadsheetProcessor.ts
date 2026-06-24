@@ -28,6 +28,7 @@ export const convertApicalSpreadsheetRowsToApicalData = (rows: ApicalSpreadsheet
         CategoryName,
         LapByCategoryViewModels: sortedRows.map((row) => ({
           CumulativeLapTimeSpan: row.CumulativeLapTimeSpan,
+          CumulativeSeconds: row.CumulativeSeconds,
           FullName: row.FullName,
           Id: Number(`${apicalSafeNumber(row.RaceNumber)}${String(row.LapNumber).padStart(3, '0')}`),
           LapNumber: Number(row.LapNumber),

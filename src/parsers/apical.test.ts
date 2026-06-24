@@ -1,4 +1,5 @@
 import type { ApicalLapByCategory } from '../model/apical.js';
+import { createTimeRecordId } from '../model/ids.js';
 import { apicalTimeOfDayToDate, apicalTimeToMilliseconds, convertDataToRaceState, createChipCrossingRecord } from './apical.js';
 import { excelTimeToMilliseconds } from './genericTimeParser.js';
 
@@ -23,6 +24,15 @@ describe('Apical parser', () => {
     );
 
     expect(crossing.time!.toISOString()).toBe('2026-06-07T10:15:30.250Z');
+    expect(crossing.id).toBe(createTimeRecordId([
+      'apical-crossing',
+      eventId,
+      1242,
+      '306',
+      2,
+      200306,
+      '2026-06-07T10:15:30.250Z',
+    ].join(':')));
   });
 
   it('converts Excel time fractions to milliseconds', () => {
@@ -60,6 +70,15 @@ describe('Apical parser', () => {
     );
 
     expect(crossing.time!.toISOString()).toBe('2026-06-07T12:00:00.000Z');
+    expect(crossing.id).toBe(createTimeRecordId([
+      'apical-crossing',
+      eventId,
+      1243,
+      '306',
+      1,
+      200306,
+      '2026-06-07T12:00:00.000Z',
+    ].join(':')));
   });
 
   it('converts Apical results into entrants, categories, and ordered crossing times', () => {
@@ -72,6 +91,7 @@ describe('Apical parser', () => {
             LapByCategoryViewModels: [
               {
                 CumulativeLapTimeSpan: '00:01:30.2500000',
+                CumulativeSeconds: 90.25,
                 FullName: 'Robert WOOD',
                 Id: 1241,
                 LapNumber: 1,
@@ -81,6 +101,7 @@ describe('Apical parser', () => {
               },
               {
                 CumulativeLapTimeSpan: '23:03:30.5000000',
+                CumulativeSeconds: 210.5,
                 FullName: 'Robert WOOD',
                 Id: 1242,
                 LapNumber: 2,
@@ -114,10 +135,123 @@ describe('Apical parser', () => {
       }),
     ]);
     expect(raceState.records?.map((record) => record.time!.toISOString())).toEqual([
+      '2026-06-07T10:00:00.000Z',
       '2026-06-07T10:01:30.250Z',
       '2026-06-07T10:03:30.500Z',
     ]);
-    expect(raceState.records?.map((record) => ('sequence' in record ? record.sequence : undefined))).toEqual([1, 2]);
+    expect(raceState.records?.[0]).toEqual(expect.objectContaining({
+      categoryIds: [raceState.categories![0]!.id],
+      flagType: 'green',
+      flagValue: 'course',
+      indicatesRaceStart: true,
+    }));
+    expect(raceState.records?.map((record) => ('sequence' in record ? record.sequence : undefined))).toEqual([1, 2, 3]);
+  });
+
+  it('creates averaged category green flags and groups category starts within one second', () => {
+    const data: ApicalLapByCategory = [
+      {
+        CategoryName: 'A',
+        ParticipantViewModels: [
+          {
+            CategoryName: 'A',
+            LapByCategoryViewModels: [
+              {
+                CumulativeLapTimeSpan: '00:01:30.0000000',
+                CumulativeSeconds: 90,
+                FullName: 'Alice RIDER',
+                Id: 2101,
+                LapNumber: 1,
+                LapTimeSpan: '00:01:30.0000000',
+                RaceNumber: '21',
+                TimeOfDay: '10:01:30.0000000',
+              },
+              {
+                CumulativeLapTimeSpan: '00:03:00.0000000',
+                CumulativeSeconds: 179.5,
+                FullName: 'Alice RIDER',
+                Id: 2102,
+                LapNumber: 2,
+                LapTimeSpan: '00:01:29.5000000',
+                RaceNumber: '21',
+                TimeOfDay: '10:03:00.0000000',
+              },
+            ],
+            NumberOfLaps: 2,
+            Position: 1,
+            RaceNumbers: '21',
+            TeamNameDisplay: 'Alice RIDER',
+            TotalTimeSpan: '00:03:00.0000000',
+          },
+        ],
+      },
+      {
+        CategoryName: 'B',
+        ParticipantViewModels: [
+          {
+            CategoryName: 'B',
+            LapByCategoryViewModels: [
+              {
+                CumulativeLapTimeSpan: '00:01:30.0000000',
+                CumulativeSeconds: 90,
+                FullName: 'Bob RIDER',
+                Id: 2201,
+                LapNumber: 1,
+                LapTimeSpan: '00:01:30.0000000',
+                RaceNumber: '22',
+                TimeOfDay: '10:01:31.0000000',
+              },
+            ],
+            NumberOfLaps: 1,
+            Position: 1,
+            RaceNumbers: '22',
+            TeamNameDisplay: 'Bob RIDER',
+            TotalTimeSpan: '00:01:30.0000000',
+          },
+        ],
+      },
+      {
+        CategoryName: 'C',
+        ParticipantViewModels: [
+          {
+            CategoryName: 'C',
+            LapByCategoryViewModels: [
+              {
+                CumulativeLapTimeSpan: '00:01:30.0000000',
+                CumulativeSeconds: 90,
+                FullName: 'Cam RIDER',
+                Id: 2301,
+                LapNumber: 1,
+                LapTimeSpan: '00:01:30.0000000',
+                RaceNumber: '23',
+                TimeOfDay: '10:01:32.0000000',
+              },
+            ],
+            NumberOfLaps: 1,
+            Position: 1,
+            RaceNumbers: '23',
+            TeamNameDisplay: 'Cam RIDER',
+            TotalTimeSpan: '00:01:30.0000000',
+          },
+        ],
+      },
+    ];
+
+    const raceState = convertDataToRaceState(eventId, new Date('2026-06-07T00:00:00.000Z'), data, 200000, 'UTC');
+    const categoryA = raceState.categories!.find((category) => category.name === 'A')!;
+    const categoryB = raceState.categories!.find((category) => category.name === 'B')!;
+    const categoryC = raceState.categories!.find((category) => category.name === 'C')!;
+    const greenFlags = raceState.records!.filter((record) => 'flagType' in record && record.flagType === 'green');
+
+    expect(greenFlags).toHaveLength(2);
+    expect(greenFlags[0]).toEqual(expect.objectContaining({
+      categoryIds: [categoryA.id, categoryB.id].sort(),
+      time: new Date('2026-06-07T10:00:00.250Z'),
+    }));
+    expect(greenFlags[1]).toEqual(expect.objectContaining({
+      categoryIds: [categoryC.id],
+      time: new Date('2026-06-07T10:00:02.000Z'),
+    }));
   });
 
   it('marks the Apical Timing Error List category as excluded from results', () => {

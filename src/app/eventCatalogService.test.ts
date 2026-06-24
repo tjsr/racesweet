@@ -11,7 +11,7 @@ import {
 } from './eventCatalog.js';
 
 import type { EventParticipant } from '../model/eventparticipant.js';
-import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId } from '../model/ids.js';
+import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
 import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
 import { EventCatalogService } from './eventCatalogService.js';
 
@@ -802,6 +802,140 @@ describe('EventCatalogService', () => {
       ]),
     }));
     expect(seededPersistence.save).toHaveBeenCalledTimes(2);
+  });
+
+  it('overrides Apical import scaffold data on re-fetch while preserving earlier mutations for matching IDs', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+    const importedEventId = '7b83ad1e-54ba-5f00-9712-1c82d3178640';
+    const importedSessionId = createSessionId('session-apical-1001');
+    const importedCategoryId = createCategoryId('cat-apical-a');
+    const importedEntrantId = createEventEntrantId('entrant-apical-301');
+    const importedParticipantId = createEventParticipantId('participant-apical-301');
+    const importedRecordId = createTimeRecordId('passing-apical-301-lap-1');
+    const importedSourceId = createTimeRecordSourceId('apical-source-1001');
+
+    await service.importApicalRaceState({
+      eventDate: '2026-06-07T01:30:00.000Z',
+      eventId: importedEventId,
+      eventName: 'Apical Round 7',
+      raceState: {
+        categories: [
+          {
+            code: 'A',
+            description: '',
+            id: 'cat-apical-a',
+            name: 'A',
+          },
+        ],
+        participants: [
+          {
+            categoryId: 'cat-apical-a',
+            currentResult: undefined,
+            entrantId: 'entrant-apical-301',
+            firstname: 'Robert',
+            id: 'participant-apical-301',
+            identifiers: [],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'WOOD',
+          },
+        ],
+        records: [
+          {
+            id: 'passing-apical-301-lap-1',
+            recordType: 1,
+            source: importedSourceId,
+            time: new Date('2026-06-07T01:45:00.000Z'),
+          },
+        ],
+      },
+      sessionId: 'session-apical-1001',
+      timeZone: 'Australia/Sydney',
+    });
+    await service.updateCategory(importedCategoryId, { name: 'Manual Category Edit' });
+    await service.updateEntrant(importedEntrantId, { firstName: 'Manual', name: 'Manual Rider Edit' });
+
+    await service.importApicalRaceState({
+      eventDate: '2026-06-07T01:30:00.000Z',
+      eventId: importedEventId,
+      eventName: 'Apical Round 7',
+      raceState: {
+        categories: [
+          {
+            code: 'A',
+            description: '',
+            id: 'cat-apical-a',
+            name: 'A Re-imported',
+          },
+        ],
+        participants: [
+          {
+            categoryId: 'cat-apical-a',
+            currentResult: undefined,
+            entrantId: 'entrant-apical-301',
+            firstname: 'Robert',
+            id: 'participant-apical-301',
+            identifiers: [],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'WOOD',
+          },
+        ],
+        records: [
+          {
+            id: 'passing-apical-301-lap-1',
+            recordType: 1,
+            source: importedSourceId,
+            time: new Date('2026-06-07T01:46:00.000Z'),
+          },
+        ],
+      },
+      sessionId: 'session-apical-1001',
+      timeZone: 'Australia/Sydney',
+    });
+
+    const category = service.catalog.categories.find((item) => item.id === importedCategoryId);
+    const entrant = service.catalog.entrants.find((item) => item.id === importedEntrantId);
+    const importedRaceState = service.getImportedRaceState(importedEventId, importedSessionId);
+    const savedLedger = vi.mocked(seededPersistence.save).mock.calls.at(-1)?.[0];
+
+    expect(category).toEqual(expect.objectContaining({
+      id: importedCategoryId,
+      name: 'A Re-imported',
+    }));
+    expect(entrant).toEqual(expect.objectContaining({
+      firstName: 'Robert',
+      id: importedEntrantId,
+      memberParticipantIds: [importedParticipantId],
+      name: 'Robert WOOD',
+    }));
+    expect(importedRaceState?.records).toEqual([
+      expect.objectContaining({
+        id: importedRecordId,
+        time: new Date('2026-06-07T01:46:00.000Z'),
+      }),
+    ]);
+    expect(savedLedger?.mutations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        categoryId: importedCategoryId,
+        changes: expect.objectContaining({ name: 'Manual Category Edit' }),
+        type: 'category-updated',
+      }),
+      expect.objectContaining({
+        changes: expect.objectContaining({ firstName: 'Manual', name: 'Manual Rider Edit' }),
+        entrantId: importedEntrantId,
+        type: 'entrant-updated',
+      }),
+      expect.objectContaining({
+        raceState: expect.objectContaining({
+          categories: [expect.objectContaining({ id: importedCategoryId, name: 'A Re-imported' })],
+          participants: [expect.objectContaining({ entrantId: importedEntrantId, id: importedParticipantId })],
+          records: [expect.objectContaining({ id: importedRecordId })],
+        }),
+        type: 'race-state-imported',
+      }),
+    ]));
   });
 
   it('supports entrant detail edits for rider fields and category updates', async () => {

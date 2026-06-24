@@ -11,6 +11,7 @@ export interface ApicalEventResponseEventData {
 export type ApicalEventListResponse = ApicalEventResponseEventData[];
 
 export interface ApicalLapByCategoryViewModel {
+  CumulativeSeconds?: number | string;
   Id: number;
   FullName: string;
   RaceNumber: string;

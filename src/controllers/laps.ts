@@ -1,19 +1,19 @@
+import { elapsedTimeMilliseconds, millisecondsToTime } from "../app/utils/timeutils.js";
 import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
 import type { FlagRecord, GreenFlagRecord } from "../model/flag.js";
 import type { ParticipantPassingRecord, TimeRecord } from "../model/timerecord.js";
-import { ParticipantStartFlagError, StartFlagHasNoTimeError } from "../validators/errors.js";
-import { calculateParticipantElapsedTimes, getParticipantNumber, getParticipantTransponders, getPassingsForParticipant } from "./participant.js";
-import { elapsedTimeMilliseconds, millisecondsToTime } from "../app/utils/timeutils.js";
+import { EventFlagsError, NoStartFlagError, ParticipantStartFlagError, StartFlagHasNoTimeError } from "../validators/errors.js";
 import { getCategoryFlags, getFlagEvents, getOrCacheGreenFlagForCategory } from "./flag.js";
+import { calculateParticipantElapsedTimes, getParticipantNumber, getParticipantTransponders, getPassingsForParticipant } from "./participant.js";
 import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.js";
 
-import { EVENT_SESSION_END } from "../model/timerecord.js";
-import type { EventCategoryId } from "../model/eventcategory.js";
 import type { EventEntrantId } from "../model/entrant.js";
-import { compareByTime } from './timerecord.js';
-import { entrantHasAnyTx } from "./participantMatch.js";
-import { setCategoryStartForPassings } from "./category.js";
+import type { EventCategoryId } from "../model/eventcategory.js";
+import { EVENT_SESSION_END } from "../model/timerecord.js";
 import { warn } from "../utils.js";
+import { setCategoryStartForPassings } from "./category.js";
+import { entrantHasAnyTx } from "./participantMatch.js";
+import { compareByTime } from './timerecord.js';
 
 const MINIMUM_LAP_TIME_SECONDS = 300;
 
@@ -120,14 +120,24 @@ export const processAllParticipantLaps = (
       return;
     }
 
-    const participantCategoryStartFlag: GreenFlagRecord | null | undefined = eventFlags?.length > 0
-      ? getOrCacheGreenFlagForCategory(
-        participant.categoryId,
-        eventFlags,
-        categoryEventFlags
-      ) : undefined;
+    let participantCategoryStartFlag: GreenFlagRecord | null | undefined;
+    try {
+      participantCategoryStartFlag = eventFlags?.length > 0
+        ? getOrCacheGreenFlagForCategory(
+          participant.categoryId,
+          eventFlags,
+          categoryEventFlags
+        ) : undefined;
+    } catch (err: unknown) {
+      if (err instanceof EventFlagsError || err instanceof NoStartFlagError) {
+        console.debug(`No start flag found for participant ${getParticipantNumber(participant)} category ${participant.categoryId} when processing laps.`, err);
+        return;
+      } else {
+        throw err;
+      }
+    }
 
-    if (eventFlags?.length > 0) {
+    if (eventFlags?.length > 0 && participantCategoryStartFlag) {
       try {
         validateParticipantStartFlag(participantCategoryStartFlag, participant);
         const finishFlag = getFinishFlagForCategory(participant.categoryId);

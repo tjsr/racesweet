@@ -11,7 +11,7 @@ import { EventCategory, EventCategoryId } from '../../model/eventcategory';
 import { EventTeam } from '../../model/eventteam.ts';
 import { FlagRecord } from '../../model/flag';
 import { RaceStateLookup } from '../../model/racestate.ts';
-import { EVENT_SESSION_END, ParticipantPassingRecord } from '../../model/timerecord.ts';
+import { EVENT_SESSION_END, ParticipantPassingRecord, TimeRecordId } from '../../model/timerecord.ts';
 import { InvalidCategoryIdError, NoCrossingError, NoParticipantError, ParticipantNotFoundError } from '../../validators/errors.ts';
 import "./recent.css";
 
@@ -122,7 +122,7 @@ const categoryStringFromParticipantId = (
   categoryLookup: (id: EventCategoryId) => EventCategory | undefined
 ): string => {
   if (!participantId) {
-    throw new NoParticipantError(``);
+    throw new NoParticipantError(`No participant ID provided for lookup.`);
   }
   const participant = participantLookup(participantId);
   if (!participant) {
@@ -167,7 +167,7 @@ const UnknownChipRow = (
     txNo: number | undefined,
     sequenceNumber: number
     passingTime: Date,
-    timeRecordId: string,
+    timeRecordId: TimeRecordId,
     rs: RaceStateLookup,
     identifier: string,
     timeZone?: string,

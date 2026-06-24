@@ -53,6 +53,7 @@ interface ApicalExportToExcelResponse {
 export interface ApicalSpreadsheetLapsRow {
   CategoryName: string;
   CumulativeLapTimeSpan: string | number;
+  CumulativeSeconds?: number | string;
   FullName: string;
   LapNumber: number;
   LapTimeSpan: string | number;

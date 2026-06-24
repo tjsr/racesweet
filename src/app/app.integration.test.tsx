@@ -330,7 +330,7 @@ const waitForText = async (container: HTMLDivElement, text: string): Promise<voi
     });
   }
 
-  throw new Error(`Timed out waiting for text: ${text}`);
+  throw new Error(`Timed out waiting for text: ${text}; current text: ${container.textContent?.slice(0, 1000) || ''}`);
 };
 
 const waitForInputValue = async (container: HTMLDivElement, selector: string, value: string): Promise<void> => {
@@ -409,6 +409,7 @@ interface ApicalImportScenario {
   expectedCategoryCount: number;
   expectedCrossingCount: number;
   expectedEntrantCount: number;
+  expectedRecentRecordCount: number;
   fetchMock: ReturnType<typeof vi.spyOn>;
   importedEventId: string;
   writtenConfig: {
@@ -424,6 +425,7 @@ const createApicalImportExpectations = async (): Promise<{
   expectedCategoryCount: number;
   expectedCrossingCount: number;
   expectedEntrantCount: number;
+  expectedRecentRecordCount: number;
 }> => {
   const apicalData = await readApicalDataFixture();
   const excelApicalData = convertApicalSpreadsheetRowsToApicalData(apicalDataToSpreadsheetRows(apicalData));
@@ -446,12 +448,14 @@ const createApicalImportExpectations = async (): Promise<{
   const expectedCrossingCount = apicalData.reduce((count, category) => {
     return count + category.ParticipantViewModels.reduce((lapCount, entrant) => lapCount + entrant.LapByCategoryViewModels.length, 0);
   }, 0);
+  const expectedRecentRecordCount = (convertedFixture.records || []).length + 1;
 
   return {
     apicalData,
     expectedCategoryCount,
     expectedCrossingCount,
     expectedEntrantCount,
+    expectedRecentRecordCount,
   };
 };
 
@@ -1346,7 +1350,7 @@ describe('RaceSweetMainApp integration', () => {
   });
 
   it('loads imported Apical timing sessions from the event ledger without re-reading the Excel source', async () => {
-    const { expectedCrossingCount, fetchMock, importedEventId } = await renderAndFetchApicalImport(root, container);
+    const { expectedRecentRecordCount, fetchMock, importedEventId } = await renderAndFetchApicalImport(root, container);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
@@ -1359,12 +1363,12 @@ describe('RaceSweetMainApp integration', () => {
       timingEventSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
-    await waitForText(container, `Recent Records (${expectedCrossingCount + 1})`);
+    await waitForText(container, `Recent Records (${expectedRecentRecordCount})`);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('loads selected Timing sessions from imported Apical ledger data for the assigned source before reading cached spreadsheets', async () => {
-    const { apicalData, expectedCrossingCount } = await createApicalImportExpectations();
+    const { apicalData, expectedRecentRecordCount } = await createApicalImportExpectations();
     const importedEventId = createApicalCatalogEventId(1001);
     const importedSessionId = createApicalCatalogSessionId(1001);
     const apicalDataFilePath = getCachedApicalExcelFilePath(1001);
@@ -1477,13 +1481,13 @@ describe('RaceSweetMainApp integration', () => {
       timingSessionSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
-    await waitForText(container, `Recent Records (${expectedCrossingCount + 1})`);
+    await waitForText(container, `Recent Records (${expectedRecentRecordCount})`);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(requestBuffer).not.toHaveBeenCalledWith(apicalDataFilePath);
   });
 
   it('falls back to the cached Apical spreadsheet on disk when timing session ledger data is unavailable', async () => {
-    const { apicalData, expectedCrossingCount } = await createApicalImportExpectations();
+    const { apicalData, expectedRecentRecordCount } = await createApicalImportExpectations();
     const importedEventId = createApicalCatalogEventId(1001);
     const importedSessionId = createApicalCatalogSessionId(1001);
     const cachedWorkbook = await createApicalWorkbookBuffer(apicalData);
@@ -1608,7 +1612,7 @@ describe('RaceSweetMainApp integration', () => {
       timingEventSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
-    await waitForText(container, `Recent Records (${expectedCrossingCount + 1})`);
+    await waitForText(container, `Recent Records (${expectedRecentRecordCount})`);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(writtenFiles).not.toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -1679,7 +1683,7 @@ describe('RaceSweetMainApp integration', () => {
   });
 
   it('populates timing and results when the imported Apical session is activated', async () => {
-    const { expectedCrossingCount, importedEventId } = await renderAndFetchApicalImport(root, container);
+    const { expectedRecentRecordCount, importedEventId } = await renderAndFetchApicalImport(root, container);
 
     await clickSectionButton(container, 'Sessions');
     const sessionsEventSelect = container.querySelector('select[aria-label="Sessions Event"]') as HTMLSelectElement;
@@ -1695,7 +1699,7 @@ describe('RaceSweetMainApp integration', () => {
     await waitForText(container, 'Active Session');
 
     await clickSectionButton(container, 'Timing');
-    await waitForText(container, `Recent Records (${expectedCrossingCount + 1})`);
+    await waitForText(container, `Recent Records (${expectedRecentRecordCount})`);
 
     await clickSectionButton(container, 'Results');
     expect(container.querySelector('select[aria-label="Race View Category"]')).toBeTruthy();

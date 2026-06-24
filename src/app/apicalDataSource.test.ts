@@ -71,6 +71,7 @@ const createLapsRows = () => {
   const exampleRow: ApicalSpreadsheetLapsRow = {
     CategoryName: 'A',
     CumulativeLapTimeSpan: '00:01:30.2500000',
+    CumulativeSeconds: 90.25,
     FullName: 'Robert WOOD',
     LapNumber: 1,
     LapTimeSpan: '00:01:30.2500000',
@@ -84,6 +85,7 @@ const createLapsRows = () => {
   {
     ...exampleRow,
     CumulativeLapTimeSpan: '00:03:30.5000000',
+    CumulativeSeconds: 210.5,
     LapNumber: 2,
     LapTimeSpan: '00:02:00.2500000',
     TimeOfDay: '10:03:30.5000000',
@@ -129,6 +131,7 @@ const expectConvertedLapsPayload = (eventId: EventId): void => {
           LapByCategoryViewModels: [
             expect.objectContaining({
               CumulativeLapTimeSpan: '00:01:30.2500000',
+              CumulativeSeconds: 90.25,
               LapNumber: 1,
               LapTimeSpan: '00:01:30.2500000',
               RaceNumber: '306',
@@ -136,6 +139,7 @@ const expectConvertedLapsPayload = (eventId: EventId): void => {
             }),
             expect.objectContaining({
               CumulativeLapTimeSpan: '00:03:30.5000000',
+              CumulativeSeconds: 210.5,
               LapNumber: 2,
               LapTimeSpan: '00:02:00.2500000',
               RaceNumber: '306',

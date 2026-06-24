@@ -1,9 +1,9 @@
-import type { TimeRecordSourceId, WithId, uuid } from "./types.js";
+import type { IdType, TimeRecordSourceId, WithId } from "./types.js";
 
-import { EventEntrantId } from "./entrant.js";
-import { EventId } from "./raceevent.js";
-import type { EventParticipantId } from "./eventparticipant.js";
 import { v5 as uuidv5 } from "uuid";
+import { EventEntrantId } from "./entrant.js";
+import type { EventParticipantId } from "./eventparticipant.js";
+import { EventId, SessionId } from "./raceevent.js";
 
 export const FILE_PATH_NAMESPACE = uuidv5('fs', '00000000-0000-0000-0000-000000000000');
 
@@ -13,12 +13,12 @@ export const EVENT_FLAG_DISPLAYED = 4;
 export const EVENT_FLAG_RETRACTED = 8;
 export const RECORD_TX_CROSSING = 16; // Indicates a crossing record, used for passing records.
 
-export type TimeRecordId = uuid;
+export type TimeRecordId = IdType;
 export type PassingRecordId = TimeRecordId;
 
 export interface EventTimeRecord extends TimeRecord {
   eventId?: EventId;
-  sessionId?: uuid;
+  sessionId?: SessionId;
   sequence: number;
 }
 
