@@ -31,27 +31,79 @@ vi.mock('./views/timing/categoryList.js', () => ({
   ),
 }));
 
-vi.mock('../views/display/recent', () => ({
-  RecentRecords: (props: { raceStateLookup?: { categories?: unknown[] }; records: unknown[] }) => React.createElement(
-    'div',
-    {
-      'data-timing-categories': JSON.stringify(props.raceStateLookup?.categories || []),
-      'data-timing-record-count': props.records.length,
-    },
-    `Recent Records (${props.records.length})`
-  ),
-}));
+interface MockRecentRecordsProps {
+  onAssignFlagCategory?: (flagId: string, categoryId: string) => void;
+  onMarkFlagDeleted?: (flagId: string, deleted: boolean) => void;
+  onRemoveFlagCategory?: (flagId: string, categoryId: string) => void;
+  raceStateLookup?: { categories?: Array<{ id: string }> };
+  records: Array<{ categoryIds?: string[]; flagType?: string; id: string }>;
+}
 
-vi.mock('./views/timing/recentRecords', () => ({
-  RecentRecords: (props: { raceStateLookup?: { categories?: unknown[] }; records: unknown[] }) => React.createElement(
-    'div',
-    {
-      'data-timing-categories': JSON.stringify(props.raceStateLookup?.categories || []),
-      'data-timing-record-count': props.records.length,
-    },
-    `Recent Records (${props.records.length})`
-  ),
-}));
+vi.mock('../views/display/recent', async () => {
+  const react = await import('react');
+  const MockRecentRecords = (props: MockRecentRecordsProps): React.ReactElement => {
+    const flagRecord = props.records.find((record) => record.flagType);
+    const assignedCategoryId = flagRecord?.categoryIds?.[0];
+    const assignCategoryId = props.raceStateLookup?.categories?.find((category) => category.id !== assignedCategoryId)?.id ||
+      props.raceStateLookup?.categories?.[0]?.id;
+
+    return react.createElement(
+      'div',
+      {
+        'data-timing-categories': JSON.stringify(props.raceStateLookup?.categories || []),
+        'data-timing-record-count': props.records.length,
+      },
+      `Recent Records (${props.records.length})`,
+      flagRecord && react.createElement('button', {
+        'data-action': 'mark-flag-deleted',
+        onClick: () => props.onMarkFlagDeleted?.(flagRecord.id, true),
+      }, 'Mark flag deleted'),
+      flagRecord && assignedCategoryId && react.createElement('button', {
+        'data-action': 'remove-flag-category',
+        onClick: () => props.onRemoveFlagCategory?.(flagRecord.id, assignedCategoryId),
+      }, 'Remove flag category'),
+      flagRecord && assignCategoryId && react.createElement('button', {
+        'data-action': 'assign-flag-category',
+        onClick: () => props.onAssignFlagCategory?.(flagRecord.id, assignCategoryId),
+      }, 'Assign flag category')
+    );
+  };
+
+  return { RecentRecords: MockRecentRecords };
+});
+
+vi.mock('./views/timing/recentRecords', async () => {
+  const react = await import('react');
+  const MockRecentRecords = (props: MockRecentRecordsProps): React.ReactElement => {
+    const flagRecord = props.records.find((record) => record.flagType);
+    const assignedCategoryId = flagRecord?.categoryIds?.[0];
+    const assignCategoryId = props.raceStateLookup?.categories?.find((category) => category.id !== assignedCategoryId)?.id ||
+      props.raceStateLookup?.categories?.[0]?.id;
+
+    return react.createElement(
+      'div',
+      {
+        'data-timing-categories': JSON.stringify(props.raceStateLookup?.categories || []),
+        'data-timing-record-count': props.records.length,
+      },
+      `Recent Records (${props.records.length})`,
+      flagRecord && react.createElement('button', {
+        'data-action': 'mark-flag-deleted',
+        onClick: () => props.onMarkFlagDeleted?.(flagRecord.id, true),
+      }, 'Mark flag deleted'),
+      flagRecord && assignedCategoryId && react.createElement('button', {
+        'data-action': 'remove-flag-category',
+        onClick: () => props.onRemoveFlagCategory?.(flagRecord.id, assignedCategoryId),
+      }, 'Remove flag category'),
+      flagRecord && assignCategoryId && react.createElement('button', {
+        'data-action': 'assign-flag-category',
+        onClick: () => props.onAssignFlagCategory?.(flagRecord.id, assignCategoryId),
+      }, 'Assign flag category')
+    );
+  };
+
+  return { RecentRecords: MockRecentRecords };
+});
 
 const SEED_QUALIFYING_SESSION_ID = createSessionId('session-1-qualifying');
 const UUID_TEXT_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -448,7 +500,7 @@ const createApicalImportExpectations = async (): Promise<{
   const expectedCrossingCount = apicalData.reduce((count, category) => {
     return count + category.ParticipantViewModels.reduce((lapCount, entrant) => lapCount + entrant.LapByCategoryViewModels.length, 0);
   }, 0);
-  const expectedRecentRecordCount = (convertedFixture.records || []).length + 1;
+  const expectedRecentRecordCount = (convertedFixture.records || []).length;
 
   return {
     apicalData,

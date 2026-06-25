@@ -1,7 +1,7 @@
 import { Box, Checkbox, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import React, { type JSX } from 'react';
 import { type MillisecondsDuration, type TimeDisplayZoneMode, millisecondsToTime, resolveDisplayTimeZone, tableTimeString } from '../../app/utils/timeutils.ts';
-import { categoriesTextFromLookupFn, getElapsedTimeForCategory, shouldExcludeCategoryFromResults } from '../../controllers/category.ts';
+import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../controllers/category.ts';
 import { isFlagRecord } from '../../controllers/flag';
 import { getLapTimeCell } from '../../controllers/laps.ts';
 import { getParticipantNumber } from '../../controllers/participant.ts';
@@ -44,8 +44,11 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   selectedParticipants?: Set<EventParticipantId>;
   categorySelected?: ((ids: Set<EventCategoryId>) => void) | undefined;
   participantSelected?: ((participantId: Set<EventParticipantId>) => void) | undefined;
+  onAssignFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
   onExclude?: (crossingId: string, exclude: boolean) => void;
   onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void;
+  onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void;
+  onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
   timeZone?: string;
 }
 
@@ -56,6 +59,10 @@ interface FlagRecordRowProps<FlagType extends FlagRecord> extends RecentRecordRo
 
 export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
   const record: FlagRecord = props.record;
+  const [contextMenu, setContextMenu] = React.useState<{
+    mouseX: number;
+    mouseY: number;
+  } | null>(null);
 
   if (!isFlagRecord(record)) {
     throw new Error('FlagRecord component used with non-flag record');
@@ -69,16 +76,52 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
   if (record.categoryIds?.some((id: EventCategoryId) => props.selectedCategories?.has(id))) {
     flagClass += ' selected-category';
   }
+  if (record.deleted) {
+    flagClass += ' excluded';
+  }
 
   const categoryLookup = props.raceStateLookup.getCategoryById.bind(props.raceStateLookup);
   const categoryText = categoriesTextFromLookupFn(record.categoryIds || [], categoryLookup);
   const elapsedTime = '--:--:--.---';
+  const allCategories = (props.raceStateLookup as unknown as { categories?: EventCategory[] }).categories || [];
+  const assignedCategoryIds = new Set<EventCategoryId>(record.categoryIds || []);
+  const assignedCategories = allCategories.filter((category) => assignedCategoryIds.has(category.id));
+  const unassignedCategories = allCategories.filter((category) => !assignedCategoryIds.has(category.id));
+  const handleContextMenu = (event: React.MouseEvent): void => {
+    event.preventDefault();
+    props.onSelect?.(record);
+    setContextMenu(
+      contextMenu === null
+        ? {
+          mouseX: event.clientX + 2,
+          mouseY: event.clientY - 6,
+        }
+        : null
+    );
+  };
+  const handleClose = (): void => {
+    setContextMenu(null);
+  };
+  const handleMarkDeleted = (): void => {
+    props.onMarkFlagDeleted?.(record.id, !record.deleted);
+    handleClose();
+  };
+  const handleRemoveCategory = (categoryId: EventCategoryId): void => {
+    props.onRemoveFlagCategory?.(record.id, categoryId);
+    handleClose();
+  };
+  const handleAssignCategory = (categoryId: EventCategoryId): void => {
+    props.onAssignFlagCategory?.(record.id, categoryId);
+    handleClose();
+  };
 
   return (<>
     <TableRow
       className={flagClass}
       data-record-id={record.id}
       key={record.id || props.index}
+      onContextMenu={handleContextMenu}
+      style={{ cursor: 'context-menu' }}
       onClick={() => {
         if (props.onSelect) {
           props.onSelect(record);
@@ -89,6 +132,40 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
       <TableCell colSpan={4}>{categoryText}</TableCell>
       <TableCell colSpan={2}>{elapsedTime}</TableCell>
     </TableRow>
+    <Menu
+      open={contextMenu !== null}
+      onClose={handleClose}
+      anchorReference="anchorPosition"
+      anchorPosition={
+        contextMenu !== null
+          ? { left: contextMenu.mouseX, top: contextMenu.mouseY }
+          : undefined
+      }
+    >
+      <MenuItem onClick={handleMarkDeleted}>
+        {record.deleted ? 'Restore flag' : 'Mark deleted'}
+      </MenuItem>
+      <MenuItem disabled sx={{ fontWeight: 'bold', opacity: '1 !important' }}>
+        Remove category
+      </MenuItem>
+      {assignedCategories.length === 0 ? (
+        <MenuItem disabled sx={{ pl: 4 }}>No assigned categories</MenuItem>
+      ) : assignedCategories.map((category) => (
+        <MenuItem key={`remove-${category.id}`} onClick={() => handleRemoveCategory(category.id)} sx={{ pl: 4 }}>
+          {category.name || category.id}
+        </MenuItem>
+      ))}
+      <MenuItem disabled sx={{ fontWeight: 'bold', opacity: '1 !important' }}>
+        Assign category
+      </MenuItem>
+      {unassignedCategories.length === 0 ? (
+        <MenuItem disabled sx={{ pl: 4 }}>No available categories</MenuItem>
+      ) : unassignedCategories.map((category) => (
+        <MenuItem key={`assign-${category.id}`} onClick={() => handleAssignCategory(category.id)} sx={{ pl: 4 }}>
+          {category.name || category.id}
+        </MenuItem>
+      ))}
+    </Menu>
   </>);
 };
 
@@ -284,7 +361,6 @@ export const PassingRecordRow = (
     if (entrant?.categoryId) {
       const cat = rs.getCategoryById(entrant?.categoryId);
       if (cat) {
-        elapsedTime = getElapsedTimeForCategory(cat, passing.time!) || elapsedTime || '00:00:00.000';
         if (cat.name) {
           categoryStr = cat?.name;
         }
@@ -376,6 +452,9 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       index={props.index}
       raceStateLookup={props.raceStateLookup}
       selectedCategories={props.selectedCategories}
+      onAssignFlagCategory={props.onAssignFlagCategory}
+      onMarkFlagDeleted={props.onMarkFlagDeleted}
+      onRemoveFlagCategory={props.onRemoveFlagCategory}
       onSelect={flagRecordSelected}
       timeZone={props.timeZone}
     />;
@@ -561,6 +640,10 @@ const isStartFlag = (flag: FlagRecord): boolean => {
   return normalizedFlagType === 'green' && (flag as FlagRecord & { indicatesRaceStart?: boolean }).indicatesRaceStart !== false;
 };
 
+const isSystemGeneratedFlag = (record: EventTimeRecord): boolean => {
+  return isFlagRecord(record) && record.systemGenerated === true;
+};
+
 const isFinishFlag = (flag: FlagRecord): boolean => {
   const normalizedFlagType = flag.flagType?.toLowerCase();
   return normalizedFlagType === 'chequered' || normalizedFlagType === 'finish' || (flag.recordType & EVENT_SESSION_END) > 0;
@@ -733,8 +816,11 @@ const shouldIgnoreRecord = (
 // };
 
 export const RecentRecords = (props: RecordsProps & { 
+  onAssignFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void,
   onExclude?: (crossingId: string, exclude: boolean) => void,
-  onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void
+  onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void,
+  onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void,
+  onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void
 }) => {
   const [recentFirst, setRecentFirst] = React.useState<boolean>(false);
   const [filterMode, setFilterMode] = React.useState<RecentRecordsFilterMode>('all');
@@ -808,6 +894,9 @@ export const RecentRecords = (props: RecordsProps & {
   }, []);
 
   const filteredRecords = (props.records || []).filter((record) => {
+    if (isSystemGeneratedFlag(record)) {
+      return false;
+    }
     if (shouldIgnoreRecord(record, outsideEventWindowIgnoredRecordIds, ignoreModes, props.raceStateLookup)) {
       return false;
     }
@@ -978,8 +1067,11 @@ export const RecentRecords = (props: RecordsProps & {
                     selectedParticipants={props.selectedParticipants}
                     categorySelected={props.categorySelected}
                     participantSelected={props.participantSelected}
+                    onAssignFlagCategory={props.onAssignFlagCategory}
                     onExclude={props.onExclude}
                     onChangeCategory={props.onChangeCategory}
+                    onMarkFlagDeleted={props.onMarkFlagDeleted}
+                    onRemoveFlagCategory={props.onRemoveFlagCategory}
                     timeZone={displayTimeZone}
                   />
                 ))}

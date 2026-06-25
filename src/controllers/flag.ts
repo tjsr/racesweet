@@ -64,7 +64,7 @@ export const addFlagEvent = (laps: Map<EventParticipantId, TimeRecord[]>, partic
 };
 
 export const getFlagEvents = (timeRecords: TimeRecord[]): FlagRecord[] => {
-  return timeRecords.filter((record): record is FlagRecord => isFlagRecord(record));
+  return timeRecords.filter((record): record is FlagRecord => isFlagRecord(record) && !record.deleted);
 };
 
 const isFlagForCategory = (
@@ -76,7 +76,7 @@ export const getCategoryFlags = (
 ): FlagRecord[] => flagEvents.filter((flag) => isFlagForCategory(flag, categoryId));
 
 const isRetractedFlag = (flag: FlagRecord): boolean =>
-  (flag.recordType & EVENT_FLAG_RETRACTED) > 0;
+  flag.deleted === true || (flag.recordType & EVENT_FLAG_RETRACTED) > 0;
 
 export const isGreenFlag = (
   flag: FlagRecord,
@@ -117,16 +117,31 @@ export const getEventStartFlagForCategory = (
 ): GreenFlagRecord | null => {
   const catFlags = getCategoryFlags(eventFlags, categoryId);
 
-  const green = catFlags.find((flag) => {
-    if (isGreenFlag(flag)) {
-      const greenFlag = flag as GreenFlagRecord;
-      if (greenFlag.indicatesRaceStart === false) {
-        return false;
-      }
-      return true;
+  const green = catFlags.reduce<GreenFlagRecord | undefined>((selectedFlag, flag) => {
+    if (!isGreenFlag(flag)) {
+      return selectedFlag;
     }
-    return false;
-  }) as GreenFlagRecord | undefined;
+    const greenFlag = flag as GreenFlagRecord;
+    if (greenFlag.indicatesRaceStart === false) {
+      return selectedFlag;
+    }
+    if (!selectedFlag) {
+      return greenFlag;
+    }
+    if (!selectedFlag.time) {
+      return greenFlag;
+    }
+    if (!greenFlag.time) {
+      return selectedFlag;
+    }
+    if (greenFlag.time.getTime() > selectedFlag.time.getTime()) {
+      return greenFlag;
+    }
+    if (greenFlag.time.getTime() === selectedFlag.time.getTime() && greenFlag.sequence > selectedFlag.sequence) {
+      return greenFlag;
+    }
+    return selectedFlag;
+  }, undefined);
   return green ?? null;
 };
 

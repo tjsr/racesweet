@@ -6,6 +6,7 @@ import { EventCategoryId } from '../model/eventcategory.ts';
 import { type EventParticipantId } from '../model/eventparticipant.ts';
 import { EventId, SessionId } from '../model/raceevent.ts';
 import { RaceStateLookup, Session } from '../model/racestate.ts';
+import { type TimeRecordId } from '../model/timerecord.ts';
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
 import { TestSession } from '../testdata/testsession.ts';
 import { CategoriesContext } from '../views/context/Categories.tsx';
@@ -760,6 +761,36 @@ export const RaceSweetMainApp = () => {
       .catch((error: unknown) => setTimingErrorState(error as Error));
   };
 
+  const handleMarkFlagDeleted = (flagId: TimeRecordId, deleted: boolean) => {
+    if (!adminService) {
+      return;
+    }
+    const targetRaceState = timingRaceState || sessionState;
+    adminService.markFlagDeletedForSession(targetRaceState, flagId, deleted)
+      .then(() => setRenderTick((tick) => tick + 1))
+      .catch((error: unknown) => setTimingErrorState(error as Error));
+  };
+
+  const handleRemoveFlagCategory = (flagId: TimeRecordId, categoryId: EventCategoryId) => {
+    if (!adminService) {
+      return;
+    }
+    const targetRaceState = timingRaceState || sessionState;
+    adminService.removeFlagCategoryForSession(targetRaceState, flagId, categoryId)
+      .then(() => setRenderTick((tick) => tick + 1))
+      .catch((error: unknown) => setTimingErrorState(error as Error));
+  };
+
+  const handleAssignFlagCategory = (flagId: TimeRecordId, categoryId: EventCategoryId) => {
+    if (!adminService) {
+      return;
+    }
+    const targetRaceState = timingRaceState || sessionState;
+    adminService.assignFlagCategoryForSession(targetRaceState, flagId, categoryId)
+      .then(() => setRenderTick((tick) => tick + 1))
+      .catch((error: unknown) => setTimingErrorState(error as Error));
+  };
+
   const handleChangeCategory = (participantId: string, categoryId: EventCategoryId) => {
     if (!adminService) {
       return;
@@ -856,8 +887,11 @@ export const RaceSweetMainApp = () => {
           categoryListSelected={handleCategoryListSelected}
           eventTimeZone={timingEvent?.timeZone || getSystemTimeZone()}
           events={eventCatalogState.events}
+          onAssignFlagCategory={handleAssignFlagCategory}
           onChangeCategory={handleChangeCategory}
           onExclude={handleExcludeCrossing}
+          onMarkFlagDeleted={handleMarkFlagDeleted}
+          onRemoveFlagCategory={handleRemoveFlagCategory}
           onSelectEvent={selectTimingEvent}
           onSelectSession={selectTimingSession}
           onTimeDisplayZoneModeChange={updateTimingTimeDisplayZoneMode}

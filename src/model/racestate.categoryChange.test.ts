@@ -1,6 +1,8 @@
 import type { EventCategory } from './eventcategory.js';
 import type { EventParticipant } from './eventparticipant.js';
+import type { FlagRecord } from './flag.js';
 import type { ParticipantPassingRecord } from './timerecord.js';
+import { createCategoryId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from './ids.js';
 import { RECORD_TX_CROSSING } from './timerecord.js';
 import { Session } from './racestate.js';
 import { createGreenFlagEvent } from '../controllers/flag.js';
@@ -145,5 +147,257 @@ describe('Session category change regressions', () => {
     expect(rebuiltSession.getParticipantLaps(fixture.participant1Id)).toBeUndefined();
     expect(rebuiltSession.getParticipantLaps(fixture.participant2Id)).toBeUndefined();
     expect(warnSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('reprocesses laps when a flag category is assigned and removed', async () => {
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    const categoryAId = createCategoryId('flag-category-a');
+    const categoryBId = createCategoryId('flag-category-b');
+    const participantId = createEventParticipantId('flag-participant');
+    const editableFlagId = createTimeRecordId('flag-editable-start');
+    const crossingId = createTimeRecordId('flag-crossing');
+    const source = createTimeRecordSourceId('flag-source');
+    const categories: EventCategory[] = [
+      createCategory(categoryAId, 'A'),
+      createCategory(categoryBId, 'B'),
+    ];
+    const participant = createParticipant(participantId, categoryBId, 100303);
+    const editableStart = createGreenFlagEvent({
+      categoryIds: [categoryAId],
+      flagValue: 'course',
+      id: editableFlagId,
+      sequence: 1,
+      source,
+      time: new Date('2026-05-29T10:05:00.000Z'),
+    });
+    const crossing = createChipCrossing(crossingId, 100303, 2, new Date('2026-05-29T10:06:00.000Z'));
+    const session = new Session({
+      categories,
+      participants: [],
+      records: [],
+      teams: [],
+    });
+
+    await session.beginBulkProcess();
+    session.addParticipants([participant]);
+    await session.addRecords([editableStart, crossing]);
+    await session.endBulkProcess();
+
+    expect(session.getParticipantLaps(participantId)).toBeNull();
+
+    session.assignFlagCategory(editableFlagId, categoryBId);
+
+    expect(session.getParticipantLaps(participantId)?.[0].elapsedTime).toBe(60000);
+
+    session.removeFlagCategory(editableFlagId, categoryBId);
+
+    expect(session.getParticipantLaps(participantId)).toBeNull();
+
+    debugSpy.mockRestore();
+  });
+
+  it('reprocesses laps when a start flag is added after crossings already exist', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const categoryId = createCategoryId('added-flag-category');
+    const participantId = createEventParticipantId('added-flag-participant');
+    const flagId = createTimeRecordId('added-flag-start');
+    const crossingId = createTimeRecordId('added-flag-crossing');
+    const source = createTimeRecordSourceId('added-flag-source');
+    const participant = createParticipant(participantId, categoryId, 100606);
+    const crossing = createChipCrossing(crossingId, 100606, 2, new Date('2026-05-29T10:06:00.000Z'));
+    const startFlag = createGreenFlagEvent({
+      categoryIds: [categoryId],
+      flagValue: 'course',
+      id: flagId,
+      sequence: 1,
+      source,
+      time: new Date('2026-05-29T10:05:00.000Z'),
+    });
+    const session = new Session({
+      categories: [createCategory(categoryId, 'A')],
+      participants: [],
+      records: [],
+      teams: [],
+    });
+
+    await session.beginBulkProcess();
+    session.addParticipants([participant]);
+    await session.addRecords([crossing]);
+    await session.endBulkProcess();
+
+    expect(session.getParticipantLaps(participantId)?.[0]).toMatchObject({
+      elapsedTime: undefined,
+      isExcluded: true,
+      isValid: false,
+      lapNo: undefined,
+      lapTime: undefined,
+      participantStartRecordId: undefined,
+    });
+
+    await session.addRecords([startFlag]);
+
+    expect(session.getParticipantLaps(participantId)?.[0]).toMatchObject({
+      elapsedTime: 60000,
+      isExcluded: true,
+      isValid: false,
+      lapNo: 0,
+      lapTime: 60000,
+      participantStartRecordId: flagId,
+    });
+    warnSpy.mockRestore();
+  });
+
+  it('recalculates elapsed time from the latest assigned flag after category assignment changes', async () => {
+    const categoryAId = createCategoryId('latest-flag-category-a');
+    const categoryBId = createCategoryId('latest-flag-category-b');
+    const participantId = createEventParticipantId('latest-flag-participant');
+    const earlyFlagId = createTimeRecordId('latest-flag-early-start');
+    const laterFlagId = createTimeRecordId('latest-flag-later-start');
+    const crossingId = createTimeRecordId('latest-flag-crossing');
+    const source = createTimeRecordSourceId('latest-flag-source');
+    const categories: EventCategory[] = [
+      createCategory(categoryAId, 'A'),
+      createCategory(categoryBId, 'B'),
+    ];
+    const participant = createParticipant(participantId, categoryBId, 100505);
+    const earlyStart = createGreenFlagEvent({
+      categoryIds: [categoryBId],
+      flagValue: 'course',
+      id: earlyFlagId,
+      sequence: 1,
+      source,
+      time: new Date('2026-05-29T10:00:00.000Z'),
+    });
+    const laterStart = createGreenFlagEvent({
+      categoryIds: [categoryAId],
+      flagValue: 'course',
+      id: laterFlagId,
+      sequence: 2,
+      source,
+      time: new Date('2026-05-29T10:05:00.000Z'),
+    });
+    const crossing = createChipCrossing(crossingId, 100505, 3, new Date('2026-05-29T10:06:00.000Z'));
+    const session = new Session({
+      categories,
+      participants: [],
+      records: [],
+      teams: [],
+    });
+
+    await session.beginBulkProcess();
+    session.addParticipants([participant]);
+    await session.addRecords([earlyStart, laterStart, crossing]);
+    await session.endBulkProcess();
+
+    expect(session.getParticipantLaps(participantId)?.[0].elapsedTime).toBe(360000);
+
+    session.assignFlagCategory(laterFlagId, categoryBId);
+
+    expect(session.getParticipantLaps(participantId)?.[0].elapsedTime).toBe(60000);
+    expect(session.getParticipantLaps(participantId)?.[0].participantStartRecordId).toBe(laterFlagId);
+
+    session.removeFlagCategory(laterFlagId, categoryBId);
+
+    expect(session.getParticipantLaps(participantId)?.[0].elapsedTime).toBe(360000);
+    expect(session.getParticipantLaps(participantId)?.[0].participantStartRecordId).toBe(earlyFlagId);
+  });
+
+  it('reprocesses laps when a flag is marked deleted and restored', async () => {
+    const categoryId = createCategoryId('deleted-flag-category');
+    const participantId = createEventParticipantId('deleted-flag-participant');
+    const flagId = createTimeRecordId('deleted-flag-start');
+    const crossingId = createTimeRecordId('deleted-flag-crossing');
+    const source = createTimeRecordSourceId('deleted-flag-source');
+    const participant = createParticipant(participantId, categoryId, 100404);
+    const flag = createGreenFlagEvent({
+      categoryIds: [categoryId],
+      flagValue: 'course',
+      id: flagId,
+      sequence: 1,
+      source,
+      time: new Date('2026-05-29T10:05:00.000Z'),
+    });
+    const crossing = createChipCrossing(crossingId, 100404, 2, new Date('2026-05-29T10:06:00.000Z'));
+    const session = new Session({
+      categories: [createCategory(categoryId, 'A')],
+      participants: [],
+      records: [],
+      teams: [],
+    });
+
+    await session.beginBulkProcess();
+    session.addParticipants([participant]);
+    await session.addRecords([flag, crossing]);
+    await session.endBulkProcess();
+
+    expect(session.getParticipantLaps(participantId)?.[0].elapsedTime).toBe(60000);
+
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+
+    session.markFlagDeleted(flagId, true);
+
+    expect(session.getParticipantLaps(participantId)?.[0]).toMatchObject({
+      elapsedTime: undefined,
+      isExcluded: true,
+      isValid: false,
+      lapNo: undefined,
+      lapTime: undefined,
+      participantStartRecordId: undefined,
+      startingLapRecordId: undefined,
+    });
+    expect((session.records.find((record) => record.id === flagId) as FlagRecord | undefined)?.deleted).toBe(true);
+
+    session.markFlagDeleted(flagId, false);
+
+    expect(session.getParticipantLaps(participantId)?.[0].elapsedTime).toBe(60000);
+    expect((session.records.find((record) => record.id === flagId) as FlagRecord | undefined)?.deleted).toBe(false);
+
+    debugSpy.mockRestore();
+  });
+
+  it('reprocesses laps when a start flag time changes', async () => {
+    const categoryId = createCategoryId('retimed-flag-category');
+    const participantId = createEventParticipantId('retimed-flag-participant');
+    const flagId = createTimeRecordId('retimed-flag-start');
+    const crossingId = createTimeRecordId('retimed-flag-crossing');
+    const source = createTimeRecordSourceId('retimed-flag-source');
+    const participant = createParticipant(participantId, categoryId, 100707);
+    const flag = createGreenFlagEvent({
+      categoryIds: [categoryId],
+      flagValue: 'course',
+      id: flagId,
+      sequence: 1,
+      source,
+      time: new Date('2026-05-29T10:00:00.000Z'),
+    });
+    const crossing = createChipCrossing(crossingId, 100707, 2, new Date('2026-05-29T10:06:00.000Z'));
+    const session = new Session({
+      categories: [createCategory(categoryId, 'A')],
+      participants: [],
+      records: [],
+      teams: [],
+    });
+
+    await session.beginBulkProcess();
+    session.addParticipants([participant]);
+    await session.addRecords([flag, crossing]);
+    await session.endBulkProcess();
+
+    expect(session.getParticipantLaps(participantId)?.[0].elapsedTime).toBe(360000);
+
+    const storedFlag = session.records.find((record) => record.id === flagId) as FlagRecord | undefined;
+    expect(storedFlag).toBeDefined();
+    storedFlag!.time = new Date('2026-05-29T10:05:00.000Z');
+
+    session.markFlagDeleted(flagId, false);
+
+    expect(session.getParticipantLaps(participantId)?.[0]).toMatchObject({
+      elapsedTime: 60000,
+      isExcluded: true,
+      isValid: false,
+      lapNo: 0,
+      lapTime: 60000,
+      participantStartRecordId: flagId,
+    });
   });
 });

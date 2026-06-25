@@ -2,7 +2,6 @@ import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { RaceState } from '../model/racestate.js';
 import type { TimeRecord } from '../model/timerecord.js';
-import { createGreenFlagEvent, isFlagRecord } from '../controllers/flag.js';
 import { normalizeCategoryResultExclusion } from '../controllers/category.js';
 import { rewriteImportedObjectIds } from '../model/ids.js';
 import { validate as validateUuid } from 'uuid';
@@ -209,19 +208,5 @@ export const applyPulledRaceStateToSession = async (
 
   sessionState.addParticipants(normalizedRaceState.participants || []);
   const incomingRecords = (normalizedRaceState.records as TimeRecord[]) || [];
-  const needsStartFlag = incomingRecords.length > 0 &&
-    !!normalizedRaceState.eventStartTime &&
-    !sessionState.records.some((record) => isFlagRecord(record));
-  const recordsToAdd = needsStartFlag
-    ? [
-      createGreenFlagEvent({
-        flagValue: 'course',
-        indicatesRaceStart: true,
-        time: normalizedRaceState.eventStartTime,
-      }),
-      ...incomingRecords,
-    ]
-    : incomingRecords;
-
-  await sessionState.addRecords(recordsToAdd, false);
+  await sessionState.addRecords(incomingRecords, false);
 };

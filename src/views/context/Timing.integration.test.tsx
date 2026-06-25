@@ -133,8 +133,11 @@ describe('TimingContext integration', () => {
           categoryListSelected={setSelectedCategories}
           eventTimeZone="Australia/Sydney"
           events={[event]}
+          onAssignFlagCategory={() => undefined}
           onChangeCategory={() => undefined}
           onExclude={() => undefined}
+          onMarkFlagDeleted={() => undefined}
+          onRemoveFlagCategory={() => undefined}
           onSelectEvent={() => undefined}
           onSelectSession={() => undefined}
           onTimeDisplayZoneModeChange={() => undefined}

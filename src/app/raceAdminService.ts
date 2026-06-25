@@ -6,6 +6,7 @@ import {
 import type { RaceStateLookup, Session } from '../model/racestate.js';
 import type { EventCategoryId } from '../model/eventcategory.js';
 import type { EventEntrantId } from '../model/entrant.js';
+import type { TimeRecordId } from '../model/timerecord.js';
 
 export class RaceAdminService {
   private changes: AdministrativeChanges;
@@ -57,8 +58,44 @@ export class RaceAdminService {
     await this.persistence.save(this.changes);
   }
 
+  public async assignFlagCategoryForSession(session: Session & RaceStateLookup, flagId: TimeRecordId, categoryId: EventCategoryId): Promise<void> {
+    this.assignFlagCategoryInSession(session, flagId, categoryId);
+    this.changes = {
+      ...this.changes,
+      flagCategoryChanges: [
+        ...this.changes.flagCategoryChanges,
+        { action: 'assign', categoryId, flagId },
+      ],
+    };
+    await this.persistence.save(this.changes);
+  }
+
   public applyChangesToSession(session: Session & RaceStateLookup): void {
     this.applyChanges(session);
+  }
+
+  public async markFlagDeletedForSession(session: Session & RaceStateLookup, flagId: TimeRecordId, deleted: boolean): Promise<void> {
+    this.markFlagDeletedInSession(session, flagId, deleted);
+    this.changes = {
+      ...this.changes,
+      flagDeleted: {
+        ...this.changes.flagDeleted,
+        [flagId]: deleted,
+      },
+    };
+    await this.persistence.save(this.changes);
+  }
+
+  public async removeFlagCategoryForSession(session: Session & RaceStateLookup, flagId: TimeRecordId, categoryId: EventCategoryId): Promise<void> {
+    this.removeFlagCategoryInSession(session, flagId, categoryId);
+    this.changes = {
+      ...this.changes,
+      flagCategoryChanges: [
+        ...this.changes.flagCategoryChanges,
+        { action: 'remove', categoryId, flagId },
+      ],
+    };
+    await this.persistence.save(this.changes);
   }
 
   public async updateEntrantCategory(entrantId: EventEntrantId, categoryId: EventCategoryId): Promise<void> {
@@ -88,17 +125,49 @@ export class RaceAdminService {
   private applyChanges(session: Session & RaceStateLookup = this.session): void {
     const changes = this.changes || createDefaultAdministrativeChanges();
 
-    Object.entries(changes.excludedCrossings).forEach(([crossingId, exclude]) => {
-      this.excludeCrossingInSession(session, crossingId, exclude);
+    Object.entries(changes.flagDeleted).forEach(([flagId, deleted]) => {
+      this.applyStoredFlagChange(() => this.markFlagDeletedInSession(session, flagId, deleted));
+    });
+
+    changes.flagCategoryChanges.forEach((change) => {
+      if (change.action === 'assign') {
+        this.applyStoredFlagChange(() => this.assignFlagCategoryInSession(session, change.flagId, change.categoryId));
+      } else {
+        this.applyStoredFlagChange(() => this.removeFlagCategoryInSession(session, change.flagId, change.categoryId));
+      }
     });
 
     Object.entries(changes.entrantCategories).forEach(([entrantId, categoryId]) => {
       this.updateEntrantCategoryInSession(session, entrantId, categoryId);
     });
+
+    Object.entries(changes.excludedCrossings).forEach(([crossingId, exclude]) => {
+      this.excludeCrossingInSession(session, crossingId, exclude);
+    });
+  }
+
+  private assignFlagCategoryInSession(session: Session & RaceStateLookup, flagId: TimeRecordId, categoryId: EventCategoryId): void {
+    session.assignFlagCategory?.(flagId, categoryId);
+  }
+
+  private applyStoredFlagChange(applyChange: () => void): void {
+    try {
+      applyChange();
+    } catch (_error: unknown) {
+      // Saved admin changes are replayed across sessions; ignore flag edits that do not apply to this session.
+    }
   }
 
   private excludeCrossingInSession(session: Session & RaceStateLookup, crossingId: string, exclude: boolean): void {
     session.excludeCrossing(crossingId, exclude);
+  }
+
+  private markFlagDeletedInSession(session: Session & RaceStateLookup, flagId: TimeRecordId, deleted: boolean): void {
+    session.markFlagDeleted?.(flagId, deleted);
+  }
+
+  private removeFlagCategoryInSession(session: Session & RaceStateLookup, flagId: TimeRecordId, categoryId: EventCategoryId): void {
+    session.removeFlagCategory?.(flagId, categoryId);
   }
 
   private updateEntrantCategoryInSession(session: Session & RaceStateLookup, entrantId: EventEntrantId, categoryId: EventCategoryId): void {

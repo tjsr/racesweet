@@ -1,36 +1,40 @@
-import { EVENT_FLAG_DISPLAYED, EVENT_SESSION_START, type TimeRecord } from "../model/timerecord.js";
+import { EVENT_SESSION_START, type TimeRecord } from "../model/timerecord.js";
 import type { FlagRecord, GreenFlagRecord } from "../model/flag.js";
 import type { EventCategoryId } from "../model/eventcategory.js";
 import { compareByTime } from "./timerecord.js";
+import { isFlagRecord, isGreenFlag } from "./flag.js";
 
-export const isStartRecord = (event: TimeRecord): boolean => {
+const flagAppliesToCategory = (flagEvent: FlagRecord, categoryId?: EventCategoryId): boolean => {
+  if (!categoryId) {
+    return true;
+  }
+  if (flagEvent.categoryIds === undefined || flagEvent.categoryIds.length === 0) {
+    return true;
+  }
+  return flagEvent.categoryIds.includes(categoryId);
+};
+
+export const isStartRecord = (event: TimeRecord, categoryId?: EventCategoryId): boolean => {
   if (event.time === undefined) {
     return false;
   }
   if (event.recordType & EVENT_SESSION_START) {
     return true;
   }
-  if (event.recordType & EVENT_FLAG_DISPLAYED) {
-    const flagEvent = event as FlagRecord;
-    if (flagEvent.flagType !== 'green') {
-      return false;
-    }
-    const greenFlagEvent = flagEvent as GreenFlagRecord;
-    return greenFlagEvent.indicatesRaceStart == true;
+  if (!isFlagRecord(event) || !isGreenFlag(event)) {
+    return false;
   }
-  return false;
+
+  const flagEvent = event as GreenFlagRecord;
+  if (flagEvent.indicatesRaceStart === false) {
+    return false;
+  }
+
+  return flagAppliesToCategory(flagEvent, categoryId);
 };
 
 export const isCategoryStartRecord = (event: TimeRecord, categoryId: EventCategoryId): boolean => {
-  const isStart = isStartRecord(event);
-  if (isStart) {
-    const flagEvent = event as FlagRecord;
-    if (flagEvent.categoryIds === undefined || flagEvent.categoryIds.length === 0) {
-      return true;
-    }
-    return flagEvent.categoryIds?.includes(categoryId);
-  }
-  return false;
+  return isStartRecord(event, categoryId);
 };
 
 export const findSessionStartTime = (
@@ -49,12 +53,7 @@ export const findSessionStart = (
     if (event.time === undefined) {
       return false;
     }
-    if (category) {
-      if (isCategoryStartRecord(event, category)) {
-        return true;
-      }
-    }
-    return isStartRecord(event);
+    return category ? isCategoryStartRecord(event, category) : isStartRecord(event);
   });
 
   // The most recent from the unfiltered start records is the start time for this category.

@@ -17,6 +17,16 @@ import { compareByTime } from './timerecord.js';
 
 const MINIMUM_LAP_TIME_SECONDS = 300;
 
+const resetPassingLapState = (passing: ParticipantPassingRecord): void => {
+  passing.elapsedTime = undefined;
+  passing.isExcluded = true;
+  passing.isValid = false;
+  passing.lapNo = undefined;
+  passing.lapTime = undefined;
+  passing.participantStartRecordId = undefined;
+  passing.startingLapRecordId = undefined;
+};
+
 export const validTimeAfterLastLap = (
   passing: ParticipantPassingRecord,
   prevPassing: ParticipantPassingRecord | undefined
@@ -98,6 +108,7 @@ export const processAllParticipantLaps = (
       return;
     }
     const participantPassings = getPassingsForParticipant(participantId, allTimeRecords);
+    participantPassings.forEach(resetPassingLapState);
     if (participantPassings.length === 0) {
       const txpart = entrantHasAnyTx(participant) ? `Tx${getParticipantTransponders(participant)}` : 'no assigned timing devices';
       const msg = `Participant ${getParticipantNumber(participant)} with ${txpart} has no passings.  Has assignParticpantsToCrossings() been called?`;

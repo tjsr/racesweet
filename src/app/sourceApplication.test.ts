@@ -4,7 +4,6 @@ import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { TimeRecord } from '../model/timerecord.js';
 import { createCategoryId, createEventId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
-import { isFlagRecord } from '../controllers/flag.js';
 
 const EXISTING_CATEGORY_ID = createCategoryId('cat-existing');
 const NEW_CATEGORY_ID = createCategoryId('cat-new');
@@ -116,7 +115,7 @@ describe('sourceApplication', () => {
     expect(addRecords).toHaveBeenCalledTimes(1);
   });
 
-  it('adds an event start flag before pulled records when the target session has no flags', async () => {
+  it('does not add a synthetic start flag before pulled records when the target session has no flags', async () => {
     const addCategories = vi.fn(async (_categories: EventCategory[]) => null);
     const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
     const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
@@ -146,10 +145,8 @@ describe('sourceApplication', () => {
     );
 
     const records = addRecords.mock.calls[0]?.[0] || [];
-    expect(records).toHaveLength(2);
-    expect(isFlagRecord(records[0]!)).toBe(true);
-    expect(records[0]?.time?.toISOString()).toBe('2026-06-07T00:00:00.000Z');
-    expect(records[1]).toEqual(expect.objectContaining({
+    expect(records).toHaveLength(1);
+    expect(records[0]).toEqual(expect.objectContaining({
       eventId: createEventId('event-a'),
       id: createTimeRecordId('crossing-1'),
       source: createTimeRecordSourceId('test-source'),

@@ -1,10 +1,19 @@
 import type { EventCategoryId } from '../model/eventcategory.js';
 import type { EventEntrantId } from '../model/entrant.js';
+import type { TimeRecordId } from '../model/timerecord.js';
 import { RendererApiUnavailableError, getRendererApi } from './rendererApi.js';
+
+export interface FlagCategoryChange {
+  action: 'assign' | 'remove';
+  categoryId: EventCategoryId;
+  flagId: TimeRecordId;
+}
 
 export interface AdministrativeChanges {
   entrantCategories: Record<EventEntrantId, EventCategoryId>;
   excludedCrossings: Record<string, boolean>;
+  flagCategoryChanges: FlagCategoryChange[];
+  flagDeleted: Record<TimeRecordId, boolean>;
   schemaVersion: 1;
 }
 
@@ -16,6 +25,8 @@ export interface RaceAdminPersistence {
 export const createDefaultAdministrativeChanges = (): AdministrativeChanges => ({
   entrantCategories: {},
   excludedCrossings: {},
+  flagCategoryChanges: [],
+  flagDeleted: {},
   schemaVersion: 1,
 });
 
@@ -57,6 +68,8 @@ export class ElectronJsonRaceAdminPersistence implements RaceAdminPersistence {
         ...parsed,
         entrantCategories: parsed.entrantCategories || {},
         excludedCrossings: parsed.excludedCrossings || {},
+        flagCategoryChanges: parsed.flagCategoryChanges || [],
+        flagDeleted: parsed.flagDeleted || {},
         schemaVersion: 1,
       };
     } catch (error: unknown) {

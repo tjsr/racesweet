@@ -98,6 +98,8 @@ describe('ElectronJsonRaceAdminPersistence', () => {
     expect(loaded).toEqual({
       entrantCategories: { teamA: 'cat-1' },
       excludedCrossings: { crossing1: true },
+      flagCategoryChanges: [],
+      flagDeleted: {},
       schemaVersion: 1,
     });
   });

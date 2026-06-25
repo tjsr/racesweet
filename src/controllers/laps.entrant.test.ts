@@ -129,6 +129,138 @@ describe('processAllParticipantLaps entrant sequencing', () => {
     expect(riderPassings[1].lapNo).toBe(1);
   });
 
+  it('leaves lap metrics undefined when there are no flag records in the collection', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const participants = new Map<string, EventParticipant>([
+      ['p1', participant('p1', '101', 'team-a')],
+    ]);
+    const crossing = passing('c1', 'p1', 'team-a', 1, '2026-05-30T10:06:00.000Z');
+
+    const processed = processAllParticipantLaps([crossing], participants, 300000, true);
+    const riderPassings = processed.get('p1') || [];
+
+    expect(riderPassings).toHaveLength(1);
+    expect(riderPassings[0]).toMatchObject({
+      elapsedTime: undefined,
+      isExcluded: true,
+      isValid: false,
+      lapNo: undefined,
+      lapTime: undefined,
+      participantStartRecordId: undefined,
+      startingLapRecordId: undefined,
+    });
+    warnSpy.mockRestore();
+  });
+
+  it('skips deleted category green flags when calculating laps', () => {
+    const participants = new Map<string, EventParticipant>([
+      ['p1', participant('p1', '101', 'team-a')],
+    ]);
+
+    const records = [
+      createGreenFlagEvent({
+        categoryIds: [category.id],
+        deleted: true,
+        flagValue: 'course',
+        id: 'flag-deleted',
+        recordType: 4,
+        sequence: 1,
+        source: 'test',
+        time: new Date('2026-05-30T10:00:00.000Z'),
+      }),
+      createGreenFlagEvent({
+        categoryIds: [category.id],
+        flagValue: 'course',
+        id: 'flag-active',
+        recordType: 4,
+        sequence: 2,
+        source: 'test',
+        time: new Date('2026-05-30T10:10:00.000Z'),
+      }),
+      passing('c1', 'p1', 'team-a', 3, '2026-05-30T10:06:00.000Z'),
+      passing('c2', 'p1', 'team-a', 4, '2026-05-30T10:16:00.000Z'),
+    ];
+
+    const processed = processAllParticipantLaps(records, participants, 300000, true);
+    const riderPassings = processed.get('p1') || [];
+
+    expect(riderPassings[0].isValid).toBe(false);
+    expect(riderPassings[0].isExcluded).toBe(true);
+    expect(riderPassings[0].lapNo).toBeUndefined();
+    expect(riderPassings[1].isValid).toBe(true);
+    expect(riderPassings[1].lapNo).toBe(1);
+  });
+
+  it('leaves crossings uncounted when the only start flag for the category is deleted', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const participants = new Map<string, EventParticipant>([
+      ['p1', participant('p1', '101', 'team-a')],
+    ]);
+    const crossing = passing('c1', 'p1', 'team-a', 2, '2026-05-30T10:06:00.000Z');
+    const records = [
+      createGreenFlagEvent({
+        categoryIds: [category.id],
+        deleted: true,
+        flagValue: 'course',
+        id: 'flag-deleted-only',
+        recordType: 4,
+        sequence: 1,
+        source: 'test',
+        time: new Date('2026-05-30T10:00:00.000Z'),
+      }),
+      crossing,
+    ];
+
+    const processed = processAllParticipantLaps(records, participants, 300000, true);
+
+    expect(processed.has('p1')).toBe(true);
+    expect(crossing.elapsedTime).toBeUndefined();
+    expect(crossing.isExcluded).toBe(true);
+    expect(crossing.isValid).toBe(false);
+    expect(crossing.lapNo).toBeUndefined();
+    expect(crossing.lapTime).toBeUndefined();
+    expect(crossing.participantStartRecordId).toBeUndefined();
+    warnSpy.mockRestore();
+  });
+
+  it('uses the latest applicable category green flag when multiple start flags reference the category', () => {
+    const participants = new Map<string, EventParticipant>([
+      ['p1', participant('p1', '101', 'team-a')],
+    ]);
+
+    const records = [
+      createGreenFlagEvent({
+        categoryIds: [category.id],
+        flagValue: 'course',
+        id: 'flag-early',
+        recordType: 4,
+        sequence: 1,
+        source: 'test',
+        time: new Date('2026-05-30T10:00:00.000Z'),
+      }),
+      createGreenFlagEvent({
+        categoryIds: [category.id],
+        flagValue: 'course',
+        id: 'flag-late',
+        recordType: 4,
+        sequence: 2,
+        source: 'test',
+        time: new Date('2026-05-30T10:10:00.000Z'),
+      }),
+      passing('c1', 'p1', 'team-a', 3, '2026-05-30T10:06:00.000Z'),
+      passing('c2', 'p1', 'team-a', 4, '2026-05-30T10:16:00.000Z'),
+    ];
+
+    const processed = processAllParticipantLaps(records, participants, 300000, true);
+    const riderPassings = processed.get('p1') || [];
+
+    expect(riderPassings[0].isValid).toBe(false);
+    expect(riderPassings[0].elapsedTime).toBeUndefined();
+    expect(riderPassings[1].isValid).toBe(true);
+    expect(riderPassings[1].elapsedTime).toBe(360000);
+    expect(riderPassings[1].participantStartRecordId).toBe('flag-late');
+  });
+
   it('counts only the first crossing after a chequered flag for applicable categories', () => {
     const participants = new Map<string, EventParticipant>([
       ['p1', participant('p1', '101', 'team-a')],

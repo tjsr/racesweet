@@ -6,13 +6,38 @@ import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
 import type { EventTeam } from '../../model/eventteam.js';
 import type { FlagRecord } from '../../model/flag.js';
-import type { RaceStateLookup } from '../../model/racestate.js';
+import type { EventTimeRecord } from '../../model/index.js';
+import { type RaceStateLookup, Session } from '../../model/racestate.js';
 import React from 'react';
 import { RecentRecords } from './recent.js';
 import { act } from 'react';
+import { RaceAdminService } from '../../app/raceAdminService.js';
+import { type AdministrativeChanges, type RaceAdminPersistence, createDefaultAdministrativeChanges } from '../../app/raceAdminPersistence.js';
+import { createCategoryId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
+import { createGreenFlagEvent } from '../../controllers/flag.js';
 import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
 import { updateCategorySelectionsForChangedParticipant } from '../../app/categoryChangeState.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
+
+class MemoryRaceAdminPersistence implements RaceAdminPersistence {
+  private changes: AdministrativeChanges;
+
+  public constructor(initial?: AdministrativeChanges) {
+    this.changes = initial || createDefaultAdministrativeChanges();
+  }
+
+  public async load(): Promise<AdministrativeChanges> {
+    return this.changes;
+  }
+
+  public async save(changes: AdministrativeChanges): Promise<void> {
+    this.changes = changes;
+  }
+
+  public get snapshot(): AdministrativeChanges {
+    return this.changes;
+  }
+}
 
 const ensureMatchMedia = (): void => {
   if (!window.matchMedia) {
@@ -423,6 +448,448 @@ describe('RecentRecords integration', () => {
 
     expect(onChangeCategory).toHaveBeenCalledTimes(1);
     expect(onChangeCategory).toHaveBeenCalledWith(participant.id, categoryB.id);
+  });
+
+  it('shows flag context actions for deleting and changing assigned categories', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const categoryB: EventCategory = { id: '2', name: 'Category B' };
+    const flag: FlagRecord = {
+      categoryIds: [categoryA.id],
+      flagType: 'green',
+      flagValue: 'course',
+      id: 'flag-1',
+      recordType: 4,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:00:00.000Z'),
+    };
+    const categories = [categoryA, categoryB];
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories,
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categories.find((category) => category.id === categoryId),
+      getEntrantIdForParticipant: () => undefined,
+      getParticipantById: () => undefined,
+      getParticipantLaps: () => [],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+    const onAssignFlagCategory = vi.fn();
+    const onMarkFlagDeleted = vi.fn();
+    const onRemoveFlagCategory = vi.fn();
+    const getMenuItem = (label: string): Element | undefined => {
+      return Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => {
+        return item.textContent?.trim() === label;
+      });
+    };
+    const openFlagMenu = async (): Promise<void> => {
+      const row = container.querySelector('tr[data-record-id="flag-1"]');
+      expect(row).not.toBeNull();
+
+      await act(async () => {
+        row!.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 60,
+          clientY: 80,
+        }));
+      });
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          onAssignFlagCategory={onAssignFlagCategory}
+          onMarkFlagDeleted={onMarkFlagDeleted}
+          onRemoveFlagCategory={onRemoveFlagCategory}
+          raceStateLookup={raceStateLookup}
+          records={[flag as unknown as ParticipantPassingRecord]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    await openFlagMenu();
+
+    expect(getMenuItem('Mark deleted')).toBeDefined();
+    expect(document.body.textContent).toContain('Remove category');
+    expect(getMenuItem(categoryA.name)).toBeDefined();
+    expect(document.body.textContent).toContain('Assign category');
+    expect(getMenuItem(categoryB.name)).toBeDefined();
+
+    await act(async () => {
+      getMenuItem('Mark deleted')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onMarkFlagDeleted).toHaveBeenCalledWith(flag.id, true);
+
+    await openFlagMenu();
+
+    await act(async () => {
+      getMenuItem(categoryA.name)!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onRemoveFlagCategory).toHaveBeenCalledWith(flag.id, categoryA.id);
+
+    await openFlagMenu();
+
+    await act(async () => {
+      getMenuItem(categoryB.name)!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onAssignFlagCategory).toHaveBeenCalledWith(flag.id, categoryB.id);
+  });
+
+  it('re-renders recalculated crossing times after persisted flag menu actions', async () => {
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    const categoryAId = createCategoryId('recent-flow-category-a');
+    const categoryBId = createCategoryId('recent-flow-category-b');
+    const participantId = createEventParticipantId('recent-flow-participant');
+    const earlyFlagId = createTimeRecordId('recent-flow-early-start');
+    const laterFlagId = createTimeRecordId('recent-flow-later-start');
+    const crossingId = createTimeRecordId('recent-flow-crossing');
+    const source = createTimeRecordSourceId('recent-flow-source');
+    const categories: EventCategory[] = [
+      { id: categoryAId, name: 'Category A', startTime: '2026-05-29T09:00:00.000Z' },
+      { id: categoryBId, name: 'Category B', startTime: '2026-05-29T09:00:00.000Z' },
+    ];
+    const participant: EventParticipant = {
+      categoryId: categoryBId,
+      currentResult: undefined,
+      entrantId: participantId,
+      firstname: 'Pat',
+      id: participantId,
+      identifiers: [{ fromTime: undefined, toTime: undefined, txNo: 100606 }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const earlyFlag = createGreenFlagEvent({
+      categoryIds: [categoryBId],
+      flagValue: 'course',
+      id: earlyFlagId,
+      sequence: 1,
+      source,
+      time: new Date('2026-05-29T10:00:00.000Z'),
+    });
+    const laterFlag = createGreenFlagEvent({
+      categoryIds: [categoryAId],
+      flagValue: 'course',
+      id: laterFlagId,
+      sequence: 2,
+      source,
+      time: new Date('2026-05-29T10:05:00.000Z'),
+    });
+    const crossing: ParticipantPassingRecord = {
+      chipCode: 100606,
+      id: crossingId,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 3,
+      source,
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const session = new Session({
+      categories,
+      participants: [],
+      records: [],
+      teams: [],
+    });
+
+    await session.beginBulkProcess();
+    session.addParticipants([participant]);
+    await session.addRecords([earlyFlag, laterFlag, crossing]);
+    await session.endBulkProcess();
+
+    const persistence = new MemoryRaceAdminPersistence();
+    const service = await RaceAdminService.create(async () => session, persistence);
+    let latestMutation: Promise<void> = Promise.resolve();
+    const getCrossingRow = (): Element | null => container.querySelector(`tr[data-record-id="${crossingId}"]`);
+    const getMenuItem = (label: string): Element | undefined => {
+      return Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => {
+        return item.textContent?.trim() === label;
+      });
+    };
+    const openFlagMenu = async (flagId: string): Promise<void> => {
+      const row = container.querySelector(`tr[data-record-id="${flagId}"]`);
+      expect(row).not.toBeNull();
+
+      await act(async () => {
+        row!.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 60,
+          clientY: 80,
+        }));
+      });
+    };
+    const clickMenuItem = async (label: string): Promise<void> => {
+      const menuItem = getMenuItem(label);
+      expect(menuItem).toBeDefined();
+
+      await act(async () => {
+        menuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        await latestMutation;
+      });
+    };
+    const Harness = (): React.ReactElement => {
+      const [, setRenderVersion] = React.useState(0);
+      const persistMutation = (mutation: Promise<void>): void => {
+        latestMutation = mutation.then(() => {
+          setRenderVersion((value) => value + 1);
+        });
+      };
+
+      return (
+        <RecentRecords
+          onAssignFlagCategory={(flagId, categoryId) => persistMutation(service.assignFlagCategoryForSession(session, flagId, categoryId))}
+          onMarkFlagDeleted={(flagId, deleted) => persistMutation(service.markFlagDeletedForSession(session, flagId, deleted))}
+          onRemoveFlagCategory={(flagId, categoryId) => persistMutation(service.removeFlagCategoryForSession(session, flagId, categoryId))}
+          raceStateLookup={session}
+          records={session.records as EventTimeRecord[]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    expect(getCrossingRow()?.textContent).toContain('00:06:00.000');
+    expect(getCrossingRow()?.textContent).not.toContain('01:06:00.000');
+
+    await openFlagMenu(laterFlagId);
+    await clickMenuItem('Category B');
+
+    expect(persistence.snapshot.flagCategoryChanges).toContainEqual({
+      action: 'assign',
+      categoryId: categoryBId,
+      flagId: laterFlagId,
+    });
+    expect(getCrossingRow()?.textContent).toContain('00:01:00.000');
+
+    await openFlagMenu(laterFlagId);
+    await clickMenuItem('Category B');
+
+    expect(persistence.snapshot.flagCategoryChanges).toContainEqual({
+      action: 'remove',
+      categoryId: categoryBId,
+      flagId: laterFlagId,
+    });
+    expect(getCrossingRow()?.textContent).toContain('00:06:00.000');
+
+    await openFlagMenu(earlyFlagId);
+    await clickMenuItem('Mark deleted');
+
+    expect(persistence.snapshot.flagDeleted[earlyFlagId]).toBe(true);
+    expect(getCrossingRow()?.textContent).toContain('--:--:--.---');
+    expect(getCrossingRow()?.className).toContain('invalid-passing');
+    debugSpy.mockRestore();
+  });
+
+  it('clears displayed lap metrics when the only applicable start flag is removed or deleted', async () => {
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    const categoryAId = createCategoryId('recent-clear-category-a');
+    const categoryBId = createCategoryId('recent-clear-category-b');
+    const participantId = createEventParticipantId('recent-clear-participant');
+    const flagId = createTimeRecordId('recent-clear-start');
+    const crossingId = createTimeRecordId('recent-clear-crossing');
+    const source = createTimeRecordSourceId('recent-clear-source');
+    const categories: EventCategory[] = [
+      { id: categoryAId, name: 'Category A' },
+      { id: categoryBId, name: 'Category B' },
+    ];
+    const participant: EventParticipant = {
+      categoryId: categoryBId,
+      currentResult: undefined,
+      entrantId: participantId,
+      firstname: 'Pat',
+      id: participantId,
+      identifiers: [{ fromTime: undefined, toTime: undefined, txNo: 100808 }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const startFlag = createGreenFlagEvent({
+      categoryIds: [categoryAId, categoryBId],
+      flagValue: 'course',
+      id: flagId,
+      sequence: 1,
+      source,
+      time: new Date('2026-05-29T10:00:00.000Z'),
+    });
+    const crossing: ParticipantPassingRecord = {
+      chipCode: 100808,
+      id: crossingId,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source,
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const session = new Session({
+      categories,
+      participants: [],
+      records: [],
+      teams: [],
+    });
+
+    await session.beginBulkProcess();
+    session.addParticipants([participant]);
+    await session.addRecords([startFlag, crossing]);
+    await session.endBulkProcess();
+
+    const persistence = new MemoryRaceAdminPersistence();
+    const service = await RaceAdminService.create(async () => session, persistence);
+    let latestMutation: Promise<void> = Promise.resolve();
+    const getCrossingCells = (): HTMLTableCellElement[] => {
+      const row = container.querySelector(`tr[data-record-id="${crossingId}"]`);
+      expect(row).not.toBeNull();
+      return Array.from(row!.querySelectorAll('td')) as HTMLTableCellElement[];
+    };
+    const getMenuItem = (label: string): Element | undefined => {
+      return Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => {
+        return item.textContent?.trim() === label;
+      });
+    };
+    const openFlagMenu = async (): Promise<void> => {
+      const row = container.querySelector(`tr[data-record-id="${flagId}"]`);
+      expect(row).not.toBeNull();
+
+      await act(async () => {
+        row!.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 60,
+          clientY: 80,
+        }));
+      });
+    };
+    const clickMenuItem = async (label: string): Promise<void> => {
+      const menuItem = getMenuItem(label);
+      expect(menuItem).toBeDefined();
+
+      await act(async () => {
+        menuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        await latestMutation;
+      });
+    };
+    const Harness = (): React.ReactElement => {
+      const [, setRenderVersion] = React.useState(0);
+      const persistMutation = (mutation: Promise<void>): void => {
+        latestMutation = mutation.then(() => {
+          setRenderVersion((value) => value + 1);
+        });
+      };
+
+      return (
+        <RecentRecords
+          onAssignFlagCategory={(currentFlagId, categoryId) => persistMutation(service.assignFlagCategoryForSession(session, currentFlagId, categoryId))}
+          onMarkFlagDeleted={(currentFlagId, deleted) => persistMutation(service.markFlagDeletedForSession(session, currentFlagId, deleted))}
+          onRemoveFlagCategory={(currentFlagId, categoryId) => persistMutation(service.removeFlagCategoryForSession(session, currentFlagId, categoryId))}
+          raceStateLookup={session}
+          records={session.records as EventTimeRecord[]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    expect(getCrossingCells()[7]?.textContent).toBe('1');
+    expect(getCrossingCells()[8]?.textContent).toBe('00:06:00.000');
+    expect(getCrossingCells()[9]?.textContent).toBe('00:06:00.000');
+
+    await openFlagMenu();
+    await clickMenuItem('Category B');
+
+    expect(persistence.snapshot.flagCategoryChanges).toContainEqual({
+      action: 'remove',
+      categoryId: categoryBId,
+      flagId,
+    });
+    expect(getCrossingCells()[7]?.textContent).toBe('');
+    expect(getCrossingCells()[8]?.textContent).toBe('--:--:--.---');
+    expect(getCrossingCells()[9]?.textContent).toBe('');
+
+    await openFlagMenu();
+    await clickMenuItem('Category B');
+
+    expect(persistence.snapshot.flagCategoryChanges).toContainEqual({
+      action: 'assign',
+      categoryId: categoryBId,
+      flagId,
+    });
+    expect(getCrossingCells()[7]?.textContent).toBe('1');
+    expect(getCrossingCells()[8]?.textContent).toBe('00:06:00.000');
+    expect(getCrossingCells()[9]?.textContent).toBe('00:06:00.000');
+
+    await openFlagMenu();
+    await clickMenuItem('Mark deleted');
+
+    expect(persistence.snapshot.flagDeleted[flagId]).toBe(true);
+    expect(getCrossingCells()[7]?.textContent).toBe('');
+    expect(getCrossingCells()[8]?.textContent).toBe('--:--:--.---');
+    expect(getCrossingCells()[9]?.textContent).toBe('--:--:--.---');
+
+    debugSpy.mockRestore();
+  });
+
+  it('does not render system-generated start flags in the recent records table', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const systemStartFlag: FlagRecord = {
+      flagType: 'green',
+      flagValue: 'course',
+      id: 'system-start-flag',
+      recordType: 4,
+      sequence: 0,
+      source: 'test-source',
+      systemGenerated: true,
+      time: new Date('2026-05-29T00:00:00.000Z'),
+    };
+    const crossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'crossing-1',
+      isValid: true,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [categoryA],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getEntrantIdForParticipant: () => undefined,
+      getParticipantById: () => undefined,
+      getParticipantLaps: () => [],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[systemStartFlag as unknown as ParticipantPassingRecord, crossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    expect(getDisplayedRecordIds(container)).toEqual(['crossing-1']);
+    expect(container.querySelector('tr[data-record-id="system-start-flag"]')).toBeNull();
   });
 
   it('deselects participant and category when clicking the already-selected row', async () => {

@@ -9,6 +9,8 @@ export interface FlagRecord extends EventTimeRecord {
   flagType: string;
   flagValue: string;
   categoryIds?: EventCategoryId[];
+  deleted?: boolean;
+  systemGenerated?: boolean;
 }
 
 export interface GreenFlagRecord extends FlagRecord {

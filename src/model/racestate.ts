@@ -27,6 +27,9 @@ export interface RaceStateLookup {
   countTransponderCrossings(txNo: ChipCrossingData['chipCode'], untilTime?: Date): number;
   getTransponderCrossings(txNo: ChipCrossingData['chipCode'], untilTime?: Date): ChipCrossingData[];
   excludeCrossing(crossingId: TimeRecordId, exclude: boolean): void;
+  assignFlagCategory?(flagId: TimeRecordId, categoryId: EventCategoryId): void;
+  markFlagDeleted?(flagId: TimeRecordId, deleted: boolean): void;
+  removeFlagCategory?(flagId: TimeRecordId, categoryId: EventCategoryId): void;
   updateCategoryDetails(categoryId: EventCategoryId, changes: Partial<Pick<EventCategory, 'code' | 'description' | 'distance' | 'duration' | 'excludeFromResults' | 'name' | 'startTime'>>): void;
   updateEntrantCategory(entrantId: EventEntrantId, categoryId: EventCategoryId): void;
   updateParticipantCategory(participantId: EventParticipantId, categoryId: EventCategoryId): void;
@@ -314,6 +317,28 @@ export class Session implements RaceState, RaceStateLookup {
     }
   }
 
+  public assignFlagCategory(flagId: TimeRecordId, categoryId: EventCategoryId): void {
+    this.validateCategory(categoryId);
+    const flag = this.getFlagById(flagId);
+    const categoryIds = new Set<EventCategoryId>(flag.categoryIds || []);
+    categoryIds.add(categoryId);
+    flag.categoryIds = Array.from(categoryIds);
+    this.__reprocessAfterFlagChange();
+  }
+
+  public markFlagDeleted(flagId: TimeRecordId, deleted: boolean): void {
+    const flag = this.getFlagById(flagId);
+    flag.deleted = deleted;
+    this.__reprocessAfterFlagChange();
+  }
+
+  public removeFlagCategory(flagId: TimeRecordId, categoryId: EventCategoryId): void {
+    this.validateCategory(categoryId);
+    const flag = this.getFlagById(flagId);
+    flag.categoryIds = (flag.categoryIds || []).filter((id) => id !== categoryId);
+    this.__reprocessAfterFlagChange();
+  }
+
   public updateParticipantCategory(participantId: EventParticipantId, categoryId: EventCategoryId): void {
     const participant = this.getParticipantById(participantId);
     if (participant) {
@@ -413,6 +438,22 @@ export class Session implements RaceState, RaceStateLookup {
     this._cachedParticipantLaps = processedLaps;
   }
 
+  private getFlagById(flagId: TimeRecordId): FlagRecord {
+    if (!isValidId(flagId)) {
+      throw new InvalidIdError(`Flag ID ${flagId} is not a valid Id type.`);
+    }
+    const record = this._records.get(flagId.toString());
+    if (!record || !isFlagRecord(record)) {
+      throw new InvalidFlagRecordError(`Record ${flagId} is not a valid FlagRecord.`);
+    }
+    return record;
+  }
+
+  private __reprocessAfterFlagChange(): void {
+    this._categoryGreenFlags = undefined;
+    this.__reprocessAllParticipantLaps();
+  }
+
   private __getCategoryGreenFlag(categoryId: EventCategoryId): GreenFlagRecord | null {
     const flags = this.flags;
     if (this._categoryGreenFlags === undefined) {
@@ -503,7 +544,7 @@ export class Session implements RaceState, RaceStateLookup {
   public get flags(): FlagRecord[] {
     const flags: FlagRecord[] = [];
     this._records.values().forEach((record: TimeRecord) => {
-      if (isFlagRecord(record)) {
+      if (isFlagRecord(record) && !record.deleted) {
         flags.push(record as FlagRecord);
       }
     });

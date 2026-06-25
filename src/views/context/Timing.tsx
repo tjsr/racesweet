@@ -6,7 +6,7 @@ import { type EventCategory, type EventCategoryId } from '../../model/eventcateg
 import { type EventParticipantId } from '../../model/eventparticipant.js';
 import { EventId, SessionId } from '../../model/raceevent.js';
 import { type RaceStateLookup } from '../../model/racestate.js';
-import { type EventTimeRecord } from '../../model/timerecord.js';
+import { type EventTimeRecord, type TimeRecordId } from '../../model/timerecord.js';
 
 type EventCatalogEvent = EventCatalogState['events'][number];
 type EventCatalogSession = EventCatalogState['sessions'][number];
@@ -20,8 +20,11 @@ interface TimingContextProps {
   categoryListSelected: (ids: Set<EventCategoryId>) => void;
   eventTimeZone: string;
   events: EventCatalogEvent[];
+  onAssignFlagCategory: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
   onChangeCategory: (participantId: string, categoryId: EventCategoryId) => void;
   onExclude: (crossingId: string, exclude: boolean) => void;
+  onMarkFlagDeleted: (flagId: TimeRecordId, deleted: boolean) => void;
+  onRemoveFlagCategory: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
   onSelectEvent: (eventId: EventId) => void;
   onSelectSession: (sessionId: SessionId) => void;
   onTimeDisplayZoneModeChange: (mode: TimeDisplayZoneMode) => void;
@@ -74,10 +77,13 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
         selectedParticipants={props.selectedParticipants}
         categorySelected={props.categoryListSelected}
         timeDisplayZoneMode={props.timeDisplayZoneMode}
+        onAssignFlagCategory={props.onAssignFlagCategory}
         onTimeDisplayZoneModeChange={props.onTimeDisplayZoneModeChange}
         participantSelected={props.participantSelected}
         onExclude={props.onExclude}
         onChangeCategory={props.onChangeCategory}
+        onMarkFlagDeleted={props.onMarkFlagDeleted}
+        onRemoveFlagCategory={props.onRemoveFlagCategory}
       />
     </>
   );
