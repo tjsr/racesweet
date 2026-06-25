@@ -1,14 +1,17 @@
 import type { RaceStateLookup, Session } from '../../model/racestate.js';
 
-import type { EventCatalogEntrant } from '../../app/eventCatalog.js';
-import type { EventParticipant } from '../../model/eventparticipant.js';
-import { HandicapView } from './handicap.js';
-import { LapTimesReport } from '../reports/LapTimesReport.js';
-import type { ParticipantPassingRecord } from '../../model/timerecord.js';
 import React from 'react';
+import type { EventCatalogEntrant } from '../../app/eventCatalog.js';
+import { millisecondsToTime } from '../../app/utils/timeutils.js';
 import { shouldExcludeCategoryFromResults } from '../../controllers/category.js';
 import { getParticipantNumber } from '../../controllers/participant.js';
-import { millisecondsToTime } from '../../app/utils/timeutils.js';
+import { EventEntrantId } from '../../model/entrant.js';
+import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
+import { EventCategoryId } from '../../model/index.js';
+import { EventId, SessionId } from '../../model/raceevent.js';
+import type { ParticipantPassingRecord } from '../../model/timerecord.js';
+import { LapTimesReport } from '../reports/LapTimesReport.js';
+import { HandicapView } from './handicap.js';
 
 interface CategoryOption {
   excludeFromResults?: boolean;
@@ -17,9 +20,9 @@ interface CategoryOption {
 }
 
 export interface EventSessionOption {
-  eventId: string;
+  eventId: EventId;
   eventName: string;
-  sessionId?: string;
+  sessionId?: SessionId;
   sessionName?: string;
   value: string;
 }
@@ -27,7 +30,7 @@ export interface EventSessionOption {
 interface EntrantSummaryRow {
   categoryKeys: string[];
   categoryName: string;
-  entrantId: string;
+  entrantId: EventEntrantId;
   entrantName: string;
   fastestLap?: number;
   fastestLapNo?: number;
@@ -35,7 +38,7 @@ interface EntrantSummaryRow {
   laps: ParticipantPassingRecord[];
   memberDetails: Array<{
     categoryName: string;
-    participantId: string;
+    participantId: EventParticipantId;
     participantName: string;
     raceNumber: string;
   }>;
@@ -45,10 +48,11 @@ interface EntrantSummaryRow {
 interface LapChartEntry {
   categoryName: string;
   crossingTime: number;
-  entrantId: string;
+  entrantId: EventEntrantId;
   entrantName: string;
   lapNo: number;
   lapTime?: number;
+  participantId: EventParticipantId;
   participantName: string;
   position: number;
   raceNumber: string;
@@ -69,11 +73,11 @@ interface BaseRaceAnalyticsProps {
 }
 
 interface ResultsPageProps extends BaseRaceAnalyticsProps {
-  selectedCategoryId?: string;
+  selectedCategoryId?: EventCategoryId;
 }
 
 interface ReportsPageProps extends BaseRaceAnalyticsProps {
-  selectedCategoryId?: string;
+  selectedCategoryId?: EventCategoryId;
 }
 
 type CategoryFilter = 'overall' | string;
@@ -82,7 +86,7 @@ const normalizeText = (value: string): string => value.trim().toLowerCase();
 
 const getCategoryByIdSafely = (
   raceState: Session & RaceStateLookup,
-  categoryId?: string
+  categoryId?: EventCategoryId
 ): CategoryOption | undefined => {
   if (!categoryId) {
     return undefined;
@@ -95,7 +99,7 @@ const getCategoryByIdSafely = (
   }
 };
 
-const categoryNameFromId = (raceState: Session & RaceStateLookup, categoryId?: string): string => {
+const categoryNameFromId = (raceState: Session & RaceStateLookup, categoryId?: EventCategoryId): string => {
   if (!categoryId) {
     return 'Unknown';
   }
@@ -105,7 +109,7 @@ const categoryNameFromId = (raceState: Session & RaceStateLookup, categoryId?: s
 
 const categoryKeyFromName = (name: string): string => normalizeText(name);
 
-const _categoryKeyFromId = (raceState: Session & RaceStateLookup, categoryId?: string): string => {
+const _categoryKeyFromId = (raceState: Session & RaceStateLookup, categoryId?: EventCategoryId): string => {
   return categoryKeyFromName(categoryNameFromId(raceState, categoryId));
 };
 
@@ -163,7 +167,7 @@ const isValidLap = (lap: ParticipantPassingRecord): boolean => {
   return (lap.lapNo || 0) > 0 && lap.isExcluded !== true && typeof lap.elapsedTime === 'number' && lap.elapsedTime >= 0;
 };
 
-const findEntrantName = (entrantId: string, members: EventParticipant[], catalogEntrantsById: Map<string, EventCatalogEntrant>): string => {
+const findEntrantName = (entrantId: EventEntrantId, members: EventParticipant[], catalogEntrantsById: Map<EventEntrantId, EventCatalogEntrant>): string => {
   const catalogName = catalogEntrantsById.get(entrantId)?.name?.trim();
   if (catalogName && catalogName.length > 0) {
     return catalogName;
@@ -189,7 +193,7 @@ const buildEntrantRows = (
   excludedCategoryKeys: Set<string>,
 ): EntrantSummaryRow[] => {
   const catalogEntrantsById = new Map(catalogEntrants.map((entrant) => [entrant.id, entrant]));
-  const participantGroups = new Map<string, EventParticipant[]>();
+  const participantGroups = new Map<EventEntrantId, EventParticipant[]>();
 
   raceState.participants.forEach((participant) => {
     const entrantId = participant.entrantId?.toString() || participant.id.toString();
@@ -200,7 +204,7 @@ const buildEntrantRows = (
 
   const rows: EntrantSummaryRow[] = [];
 
-  participantGroups.forEach((members, entrantId) => {
+  participantGroups.forEach((members, entrantId: EventEntrantId) => {
     const includedMembers = members.filter((member) => !isParticipantExcludedFromResults(raceState, member, excludedCategoryKeys));
     if (includedMembers.length === 0) {
       return;
@@ -289,6 +293,7 @@ const buildLapChart = (rows: EntrantSummaryRow[]): LapChartColumn[] => {
         entrantName: row.entrantName,
         lapNo: lap.lapNo,
         lapTime: lap.lapTime || undefined,
+        participantId: lap.participantId,
         participantName: detail.participantName,
         position: 0,
         raceNumber: detail.raceNumber,

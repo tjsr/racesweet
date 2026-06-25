@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   type EntrantType,
   type EventCatalogEntrant,
@@ -6,40 +7,42 @@ import {
   getEntrantsForEvent,
   getSessionsForEvent,
 } from '../../app/eventCatalog.js';
+import { CategoryId } from '../../controllers/category.js';
+import { EventEntrantId } from '../../model/entrant.js';
+import { EventId } from '../../model/raceevent.js';
 import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
-import React from 'react';
 
 interface EntrantsPageProps {
   catalog: EventCatalogState;
-  onCreateEntrant: (eventId: string, entrantType?: EntrantType) => void | Promise<void>;
-  onDeleteEntrant: (eventId: string, entrantId: string) => void | Promise<void>;
-  onSelectEntrant: (entrantId: string) => void;
-  onSelectEvent: (eventId: string) => void;
+  onCreateEntrant: (eventId: EventId, entrantType?: EntrantType) => void | Promise<void>;
+  onDeleteEntrant: (eventId: EventId, entrantId: EventEntrantId) => void | Promise<void>;
+  onSelectEntrant: (entrantId: EventEntrantId) => void;
+  onSelectEvent: (eventId: EventId) => void;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
-  onUpdateEntrant: (entrantId: string, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>>) => void | Promise<void>;
-  selectedEntrantId?: string;
-  selectedEventId?: string;
+  onUpdateEntrant: (entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>>) => void | Promise<void>;
+  selectedEntrantId?: EventEntrantId;
+  selectedEventId?: EventId;
 }
 
 interface EntrantDraft {
-  categoryId: string;
+  categoryId: CategoryId;
   dateOfBirth: string;
   firstName: string;
   gender: string;
   lastName: string;
   name: string;
   notes: string;
-  teamEntrantId: string;
+  teamEntrantId: EventEntrantId;
 }
 
 const UNSPECIFIED_GENDER = 'unspecified';
 
-const getCategoryName = (catalog: EventCatalogState, categoryId?: string): string => {
+const getCategoryName = (catalog: EventCatalogState, categoryId?: CategoryId): string => {
   if (!categoryId) {
     return 'No category';
   }
 
-  return catalog.categories.find((category) => category.id.toString() === categoryId)?.name || categoryId;
+  return catalog.categories.find((category) => category.id === categoryId)?.name || categoryId;
 };
 
 const getEntrantDraft = (entrant: EventCatalogEntrant | undefined): EntrantDraft => ({
@@ -53,7 +56,7 @@ const getEntrantDraft = (entrant: EventCatalogEntrant | undefined): EntrantDraft
   teamEntrantId: entrant?.teamEntrantId || '',
 });
 
-const eventSupportsTeams = (catalog: EventCatalogState, eventId: string | undefined): boolean => {
+const eventSupportsTeams = (catalog: EventCatalogState, eventId: EventId | undefined): boolean => {
   if (!eventId) {
     return false;
   }

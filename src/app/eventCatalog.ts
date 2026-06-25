@@ -1,7 +1,9 @@
 import { CategoryId, normalizeCategoryResultExclusion } from '../controllers/category.js';
+import { EventEntrantId } from '../model/entrant.js';
 import type { EventCategory, EventCategoryId } from '../model/eventcategory.js';
 import { EventId, SessionId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
+import { IdType } from '../model/types.js';
 
 export type EventFormat = 'race-weekend' | 'test-day' | 'track-day' | 'other';
 export type EventSessionKind = 'practice' | 'qualifying' | 'race' | 'warmup' | 'other';
@@ -57,27 +59,27 @@ export interface EventCatalogEntrant {
   eventId: EventId;
   firstName?: string;
   gender?: string;
-  id: string;
+  id: EventEntrantId;
   lastName?: string;
-  memberParticipantIds: string[];
+  memberParticipantIds: EventEntrantId[];
   name: string;
   notes?: string;
   sessionIds: SessionId[];
-  teamEntrantId?: string;
+  teamEntrantId?: EventEntrantId;
   teamMembers?: Array<{
     categoryId?: EventCategoryId;
     dateOfBirth?: string;
     firstName: string;
     gender?: string;
     lastName: string;
-    participantId: string;
+    participantId: EventEntrantId;
   }>;
 }
 
 export interface EventCatalogEvent {
   categoryIds: EventCategoryId[];
   date: string;
-  entrantIds: string[];
+  entrantIds: EventEntrantId[];
   format: EventFormat;
   id: EventId;
   name: string;
@@ -138,7 +140,7 @@ export interface SessionCreatedMutation extends EventCatalogMutationBase {
 
 export interface SessionUpdatedMutation extends EventCatalogMutationBase {
   changes: Partial<Pick<EventCatalogSession, 'eventId' | 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>;
-  sessionId: string;
+  sessionId: SessionId;
   type: 'session-updated';
 }
 
@@ -184,12 +186,12 @@ export interface EntrantCreatedMutation extends EventCatalogMutationBase {
 
 export interface EntrantUpdatedMutation extends EventCatalogMutationBase {
   changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>>;
-  entrantId: string;
+  entrantId: EventEntrantId;
   type: 'entrant-updated';
 }
 
 export interface EntrantDeletedMutation extends EventCatalogMutationBase {
-  entrantId: string;
+  entrantId: EventEntrantId;
   type: 'entrant-deleted';
 }
 
@@ -230,7 +232,7 @@ export const createDefaultEventCatalogState = (): EventCatalogState => ({
   sessions: [],
 });
 
-const removeEntry = (ids: string[], id: string): string[] => ids.filter((entryId) => entryId !== id);
+const removeEntry = (ids: IdType[], id: IdType): IdType[] => ids.filter((entryId) => entryId !== id);
 
 export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalogState => {
   return ledger.mutations.reduce<EventCatalogState>((state, mutation) => {

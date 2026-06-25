@@ -1,16 +1,18 @@
 // @vitest-environment jsdom
 
-import type { RaceStateLookup, Session } from '../../model/racestate.js';
-import { ReportsPage, ResultsPage } from './raceAnalyticsViews.js';
+import { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import type { EventCatalogEntrant } from '../../app/eventCatalog.js';
-import type { EventCategory } from '../../model/eventcategory.js';
-import type { EventParticipant } from '../../model/eventparticipant.js';
-import type { ParticipantPassingRecord } from '../../model/timerecord.js';
-import React from 'react';
-import { act } from 'react';
 import { tableTimeString } from '../../app/utils/timeutils.js';
+import { CategoryId } from '../../controllers/category.js';
+import { EventEntrantId } from '../../model/entrant.js';
+import type { EventCategory } from '../../model/eventcategory.js';
+import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
+import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordSourceId } from '../../model/ids.js';
+import type { RaceStateLookup, Session } from '../../model/racestate.js';
+import type { ParticipantPassingRecord } from '../../model/timerecord.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
+import { ReportsPage, ResultsPage } from './raceAnalyticsViews.js';
 
 const setSelectValue = (select: HTMLSelectElement, value: string): void => {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
@@ -20,8 +22,8 @@ const setSelectValue = (select: HTMLSelectElement, value: string): void => {
 
 const createLap = (
   id: string,
-  participantId: string,
-  entrantId: string,
+  participantId: EventParticipantId,
+  entrantId: EventEntrantId,
   lapNo: number,
   elapsedTime: number,
   lapTime: number,
@@ -36,57 +38,57 @@ const createLap = (
   participantId,
   recordType: 16,
   sequence: lapNo,
-  source: 'source-1',
+  source: createTimeRecordSourceId('source-1'),
   time: new Date(`2026-06-12T10:00:${String(lapNo).padStart(2, '0')}.000Z`),
 });
 
-const categories: Array<{ excludeFromResults?: boolean; id: string; name: string }> = [
-  { id: 'cat-a', name: 'Category A' },
-  { id: 'cat-a-duplicate-id', name: 'Category A' },
-  { id: 'cat-b', name: 'Category B' },
-  { excludeFromResults: true, id: 'cat-error', name: 'Timing Error List' },
+const categories: Array<{ excludeFromResults?: boolean; id: CategoryId; name: string }> = [
+  { id: createCategoryId('cat-a'), name: 'Category A' },
+  { id: createCategoryId('cat-a-duplicate-id'), name: 'Category A' },
+  { id: createCategoryId('cat-b'), name: 'Category B' },
+  { excludeFromResults: true, id: createCategoryId('cat-error'), name: 'Timing Error List' },
 ];
 
 const participants: EventParticipant[] = [
   {
-    categoryId: 'cat-a',
+    categoryId: createCategoryId('cat-a'),
     currentResult: undefined,
-    entrantId: 'team-1',
+    entrantId: createEventEntrantId('team-1'),
     firstname: 'Team',
-    id: 'p-team-1',
+    id: createEventParticipantId('p-team-1'),
     identifiers: [],
     lastRecordTime: null,
     resultDuration: null,
     surname: 'One',
   },
   {
-    categoryId: 'cat-a',
+    categoryId: createCategoryId('cat-a'),
     currentResult: undefined,
-    entrantId: 'team-1',
+    entrantId: createEventEntrantId('team-1'),
     firstname: 'Team',
-    id: 'p-team-2',
+    id: createEventParticipantId('p-team-2'),
     identifiers: [],
     lastRecordTime: null,
     resultDuration: null,
     surname: 'Two',
   },
   {
-    categoryId: 'cat-b',
+    categoryId: createCategoryId('cat-b'),
     currentResult: undefined,
-    entrantId: 'rider-1',
+    entrantId: createEventEntrantId('rider-1'),
     firstname: 'Solo',
-    id: 'p-rider-1',
+    id: createEventParticipantId('p-rider-1'),
     identifiers: [],
     lastRecordTime: null,
     resultDuration: null,
     surname: 'Rider',
   },
   {
-    categoryId: 'cat-error',
+    categoryId: createCategoryId('cat-error'),
     currentResult: undefined,
-    entrantId: 'timing-error-entrant',
+    entrantId: createEventEntrantId('timing-error-entrant'),
     firstname: 'Timing',
-    id: 'p-error',
+    id: createEventParticipantId('p-error'),
     identifiers: [],
     lastRecordTime: null,
     resultDuration: null,
@@ -96,78 +98,78 @@ const participants: EventParticipant[] = [
 
 const catalogEntrants: EventCatalogEntrant[] = [
   {
-    categoryIds: ['cat-a'],
+    categoryIds: [createCategoryId('cat-a')],
     entrantType: 'team',
-    eventId: 'event-1',
-    id: 'team-1',
-    memberParticipantIds: ['p-team-1', 'p-team-2'],
+    eventId: createEventId('event-1'),
+    id: createEventEntrantId('team-1'),
+    memberParticipantIds: [createEventParticipantId('p-team-1'), createEventParticipantId('p-team-2')],
     name: 'Team Rocket',
-    sessionIds: ['session-1'],
+    sessionIds: [createSessionId('session-1')],
   },
   {
-    categoryIds: ['cat-b'],
+    categoryIds: [createCategoryId('cat-b')],
     entrantType: 'rider',
-    eventId: 'event-1',
-    id: 'rider-1',
-    memberParticipantIds: ['p-rider-1'],
+    eventId: createEventId('event-1'),
+    id: createEventEntrantId('rider-1'),
+    memberParticipantIds: [createEventParticipantId('p-rider-1')],
     name: 'Solo Rider',
-    sessionIds: ['session-1'],
+    sessionIds: [createSessionId('session-1')],
   },
   {
-    categoryIds: ['cat-error'],
+    categoryIds: [createCategoryId('cat-error')],
     entrantType: 'rider',
-    eventId: 'event-1',
-    id: 'timing-error-entrant',
-    memberParticipantIds: ['p-error'],
+    eventId: createEventId('event-1'),
+    id: createEventEntrantId('timing-error-entrant'),
+    memberParticipantIds: [createEventParticipantId('p-error')],
     name: 'Timing Error Entrant',
-    sessionIds: ['session-1'],
+    sessionIds: [createSessionId('session-1')],
   },
 ];
 
 const lapsByParticipant = new Map<string, ParticipantPassingRecord[]>([
   [
-    'p-team-1',
+    createEventParticipantId('p-team-1'),
     [
-      createLap('team1-lap1', 'p-team-1', 'team-1', 1, 65000, 65000),
-      createLap('team1-lap2', 'p-team-1', 'team-1', 2, 132000, 67000),
+      createLap('team1-lap1', createEventParticipantId('p-team-1'), createEventEntrantId('team-1'), 1, 65000, 65000),
+      createLap('team1-lap2', createEventParticipantId('p-team-1'), createEventEntrantId('team-1'), 2, 132000, 67000),
     ],
   ],
   [
-    'p-team-2',
+    createEventParticipantId('p-team-2'),
     [
-      createLap('team2-lap1', 'p-team-2', 'team-1', 1, 64000, 64000),
-      createLap('team2-lap2', 'p-team-2', 'team-1', 2, 130000, 63000),
+      createLap('team2-lap1', createEventParticipantId('p-team-2'), createEventEntrantId('team-1'), 1, 64000, 64000),
+      createLap('team2-lap2', createEventParticipantId('p-team-2'), createEventEntrantId('team-1'), 2, 130000, 63000),
     ],
   ],
   [
-    'p-rider-1',
+    createEventParticipantId('p-rider-1'),
     [
-      createLap('rider-lap1', 'p-rider-1', 'rider-1', 1, 70000, 70000),
-      createLap('rider-lap2', 'p-rider-1', 'rider-1', 2, 145000, 75000),
+      createLap('rider-lap1', createEventParticipantId('p-rider-1'), createEventEntrantId('rider-1'), 1, 70000, 70000),
+      createLap('rider-lap2', createEventParticipantId('p-rider-1'), createEventEntrantId('rider-1'), 2, 145000, 75000),
     ],
   ],
   [
-    'p-error',
+    createEventParticipantId('p-error'),
     [
-      createLap('error-lap1', 'p-error', 'timing-error-entrant', 1, 10000, 10000),
+      createLap('error-lap1', createEventParticipantId('p-error'), createEventEntrantId('timing-error-entrant'), 1, 10000, 10000),
     ],
   ],
 ]);
 
 const categoryLookup = new Map<string, EventCategory>([
-  ['cat-a', { id: 'cat-a', name: 'Category A' }],
-  ['cat-b', { id: 'cat-b', name: 'Category B' }],
-  ['cat-error', { excludeFromResults: true, id: 'cat-error', name: 'Timing Error List' }],
+  [createCategoryId('cat-a'), { id: createCategoryId('cat-a'), name: 'Category A' }],
+  [createCategoryId('cat-b'), { id: createCategoryId('cat-b'), name: 'Category B' }],
+  [createCategoryId('cat-error'), { excludeFromResults: true, id: createCategoryId('cat-error'), name: 'Timing Error List' }],
 ]);
 
 const raceState = {
   categories: Array.from(categoryLookup.values()),
   countTransponderCrossings: () => 0,
   excludeCrossing: () => undefined,
-  getCategoryById: (categoryId: string) => categoryLookup.get(categoryId),
-  getEntrantIdForParticipant: (participantId: string) => participants.find((item) => item.id === participantId)?.entrantId,
-  getParticipantById: (participantId: string) => participants.find((item) => item.id === participantId),
-  getParticipantLaps: (participantId: string) => lapsByParticipant.get(participantId) || [],
+  getCategoryById: (categoryId: CategoryId) => categoryLookup.get(categoryId),
+  getEntrantIdForParticipant: (participantId: EventParticipantId) => participants.find((item) => item.id === participantId)?.entrantId,
+  getParticipantById: (participantId: EventParticipantId) => participants.find((item) => item.id === participantId),
+  getParticipantLaps: (participantId: EventParticipantId) => lapsByParticipant.get(participantId) || [],
   getTransponderCrossings: () => [],
   participants,
   records: [],
@@ -203,8 +205,8 @@ describe('race analytics views integration', () => {
           categories={categories}
           catalogEntrants={catalogEntrants}
           eventSessionOptions={[
-            { eventId: 'event-1', eventName: 'Winter Round', value: 'event:event-1' },
-            { eventId: 'event-1', eventName: 'Winter Round', sessionId: 'session-1', sessionName: 'Feature Race', value: 'session:event-1:session-1' },
+            { eventId: createEventId('event-1'), eventName: 'Winter Round', value: 'event:event-1' },
+            { eventId: createEventId('event-1'), eventName: 'Winter Round', sessionId: createSessionId('session-1'), sessionName: 'Feature Race', value: 'session:event-1:session-1' },
           ]}
           onSelectEventSession={vi.fn()}
           raceState={raceState}
@@ -235,14 +237,14 @@ describe('race analytics views integration', () => {
     expect(categoryOptions).not.toContain('Timing Error List');
 
     await act(async () => {
-      setSelectValue(categorySelect, 'cat-a');
+      setSelectValue(categorySelect, createCategoryId('cat-a'));
     });
 
     expect(container.textContent).toContain('Team Rocket');
     expect(container.textContent).not.toContain('Solo Rider');
 
     await act(async () => {
-      setSelectValue(categorySelect, 'cat-b');
+      setSelectValue(categorySelect, createCategoryId('cat-b'));
     });
 
     expect(container.textContent).not.toContain('Team Rocket');
@@ -250,7 +252,7 @@ describe('race analytics views integration', () => {
 
     const viewSelect = container.querySelector('select[aria-label="Results View Type"]') as HTMLSelectElement;
     await act(async () => {
-      setSelectValue(categorySelect, 'cat-a');
+      setSelectValue(categorySelect, createCategoryId('cat-a'));
       setSelectValue(viewSelect, 'lap-chart');
     });
 
@@ -263,7 +265,7 @@ describe('race analytics views integration', () => {
     });
 
     expect(container.querySelector('[aria-label="Lap Entry Details"]')).toBeTruthy();
-    expect(container.textContent).toContain('Entrant: Team Rocket (team-1)');
+    expect(container.textContent).toContain(`Entrant: Team Rocket (${createEventEntrantId('team-1')})`);
   });
 
   it('reports fastest laps and participant lap times correctly for team and individual entrants', async () => {
@@ -273,13 +275,13 @@ describe('race analytics views integration', () => {
           categories={categories}
           catalogEntrants={catalogEntrants}
           eventSessionOptions={[
-            { eventId: 'event-1', eventName: 'Winter Round', value: 'event:event-1' },
-            { eventId: 'event-1', eventName: 'Winter Round', sessionId: 'session-1', sessionName: 'Feature Race', value: 'session:event-1:session-1' },
+            { eventId: createEventId('event-1'), eventName: 'Winter Round', value: `event:${createEventId('event-1')}` },
+            { eventId: createEventId('event-1'), eventName: 'Winter Round', sessionId: createSessionId('session-1'), sessionName: 'Feature Race', value: `session:${createEventId('event-1')}:session:${createSessionId('session-1')}` },
           ]}
           onSelectEventSession={vi.fn()}
           raceState={raceState}
           selectedCategoryId={undefined}
-          selectedEventSessionValue="session:event-1:session-1"
+          selectedEventSessionValue={`session:${createEventId('event-1')}:session:${createSessionId('session-1')}`}
         />,
       );
     });
@@ -309,7 +311,7 @@ describe('race analytics views integration', () => {
     const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
 
     await act(async () => {
-      setSelectValue(categorySelect, 'cat-a');
+      setSelectValue(categorySelect, createCategoryId('cat-a'));
     });
 
     expect(container.textContent).toContain('Team Rocket');
@@ -331,7 +333,7 @@ describe('race analytics views integration', () => {
     expect(Array.from(individualLapTimesTable.querySelectorAll('tbody tr:first-child td')).map((cell) => cell.textContent)).toEqual([
       '1',
       '00:01:05.000',
-      tableTimeString(lapsByParticipant.get('p-team-1')![0].time),
+      tableTimeString(lapsByParticipant.get(createEventParticipantId('p-team-1'))![0].time),
       '00:01:05.000',
     ]);
 
@@ -352,7 +354,7 @@ describe('race analytics views integration', () => {
 
     const categorySelectAfterViewChange = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
     await act(async () => {
-      setSelectValue(categorySelectAfterViewChange, 'cat-b');
+      setSelectValue(categorySelectAfterViewChange, createCategoryId('cat-b'));
     });
 
     expect(container.textContent).toContain('Solo Rider');
@@ -365,3 +367,5 @@ describe('race analytics views integration', () => {
     expect(container.querySelector('table[aria-label="Reports Lap Chart Table"]')).toBeTruthy();
   });
 });
+
+

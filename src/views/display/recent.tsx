@@ -12,6 +12,7 @@ import { EventCategory, EventCategoryId } from '../../model/eventcategory';
 import { EventTeam } from '../../model/eventteam.ts';
 import { FlagRecord } from '../../model/flag';
 import { createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.ts';
+import { EventId, SessionId } from '../../model/raceevent.ts';
 import { RaceStateLookup } from '../../model/racestate.ts';
 import { EVENT_FLAG_DISPLAYED, EVENT_SESSION_END, ParticipantPassingRecord, RECORD_TX_CROSSING, TimeRecordId } from '../../model/timerecord.ts';
 import { InvalidCategoryIdError, NoCrossingError, NoParticipantError, ParticipantNotFoundError } from '../../validators/errors.ts';
@@ -114,8 +115,8 @@ const getParticipantTeamName = (participant: EventParticipant | undefined, raceS
 
 const buildManualFlagRecord = (
   anchorRecord: EventTimeRecord,
-  currentEventId: string | undefined,
-  currentSessionId: string | undefined,
+  currentEventId: EventId | undefined,
+  currentSessionId: SessionId | undefined,
   records: EventTimeRecord[],
   time: Date,
   flagType: AddableFlagType,
@@ -155,8 +156,8 @@ const buildManualFlagRecord = (
 
 const buildManualPassingRecord = (
   anchorRecord: EventTimeRecord,
-  currentEventId: string | undefined,
-  currentSessionId: string | undefined,
+  currentEventId: EventId | undefined,
+  currentSessionId: SessionId | undefined,
   records: EventTimeRecord[],
   time: Date,
   txNo: string,
@@ -216,8 +217,8 @@ const getEditablePassingAntenna = (record: EventTimeRecord): string => {
 };
 
 interface RecordsProps {
-  currentEventId?: string;
-  currentSessionId?: string;
+  currentEventId?: EventId;
+  currentSessionId?: SessionId;
   eventTimeZone?: string;
   onAddRecord?: (record: EventTimeRecord) => void;
   onEditRecord?: (record: EventTimeRecord) => void;
@@ -241,8 +242,8 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   categorySelected?: ((ids: Set<EventCategoryId>) => void) | undefined;
   participantSelected?: ((participantId: Set<EventParticipantId>) => void) | undefined;
   onAssignFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
-  onExclude?: (crossingId: string, exclude: boolean) => void;
-  onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void;
+  onExclude?: (crossingId: TimeRecordId, exclude: boolean) => void;
+  onChangeCategory?: (participantId: EventParticipantId, categoryId: EventCategoryId) => void;
   onOpenAddRecordDialog?: (record: EventTimeRecord) => void;
   onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
   onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void;
@@ -537,8 +538,8 @@ interface PassingRecordRowProps {
   selectedCategories: Set<EventCategoryId> | undefined;
   selectedParticipants: Set<EventParticipantId> | undefined;
   onSelect?: (passingRecord: ParticipantPassingRecord) => void;
-  onExclude?: (crossingId: string, exclude: boolean) => void;
-  onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void;
+  onExclude?: (crossingId: TimeRecordId, exclude: boolean) => void;
+  onChangeCategory?: (participantId: EventParticipantId, categoryId: EventCategoryId) => void;
   onOpenAddRecordDialog?: (record: EventTimeRecord) => void;
   onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
   timeZone?: string;
@@ -1352,8 +1353,8 @@ export const RecentRecords = (props: RecordsProps & {
   onAssignFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void,
   onAddRecord?: (record: EventTimeRecord) => void,
   onEditRecord?: (record: EventTimeRecord) => void,
-  onExclude?: (crossingId: string, exclude: boolean) => void,
-  onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void,
+  onExclude?: (crossingId: TimeRecordId, exclude: boolean) => void,
+  onChangeCategory?: (participantId: EventParticipantId, categoryId: EventCategoryId) => void,
   onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void,
   onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void
 }) => {

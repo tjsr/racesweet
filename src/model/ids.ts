@@ -77,8 +77,8 @@ const eventComponentListKeys: Record<EventComponentIdType, EventComponentListKey
 };
 
 interface EventChildReference {
-  eventId: string;
-  id: string;
+  eventId: EventId;
+  id: EventId;
   idType: EventComponentIdType;
 }
 

@@ -21,18 +21,19 @@ const APICAL_EVENT_ID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 const APICAL_EXCEL_CACHE_DIRECTORY_NAME = 'apical-excel-cache';
 
 type XlsxModule = typeof XlsxNamespace;
+type ApicalEventId = number;
 
 let xlsxModulePromise: Promise<XlsxModule> | undefined;
 
 export interface PulledApicalRaceState {
-  apicalEventId: number;
+  apicalEventId: ApicalEventId;
   apicalDataFilePath: string;
   eventDate?: string;
   eventId: EventId;
   eventName: string;
   raceState: Partial<RaceState>;
   retrievedAt: string;
-  sessionId: string;
+  sessionId: SessionId;
   timeZone: string;
 }
 

@@ -1,25 +1,26 @@
 
+import React from 'react';
+import { formatErrorForDisplay } from '../../app/stackTrace.js';
 import {
   type DataSourceConfig,
   type DataSourceType,
   type SystemConfiguration,
   getDataSourceTypeLabel,
 } from '../../app/systemConfig.js';
-import React from 'react';
-import { formatErrorForDisplay } from '../../app/stackTrace.js';
 import { getRuntimeVersions } from '../../app/versionInfo.js';
+import { TimeRecordSourceId } from '../../model/types.js';
 
 interface SystemPageProps {
   config: SystemConfiguration;
   displayedErrorLog?: string;
   onCreateSource: (type: DataSourceType) => void | Promise<void>;
-  onDeleteSource: (sourceId: string) => void | Promise<void>;
+  onDeleteSource: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onDisplayError?: (source: string, error: unknown) => void;
-  onFetchApicalDataNow: (sourceId: string) => void | Promise<void>;
+  onFetchApicalDataNow: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
-  onLoadApicalEvents: (sourceId: string) => void | Promise<void>;
+  onLoadApicalEvents: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onSaveLocalStorageDirectoryPath: (directoryPath: string) => void | Promise<void>;
-  onSaveSource: (sourceId: string, changes: Partial<DataSourceConfig>) => void | Promise<void>;
+  onSaveSource: (sourceId: TimeRecordSourceId, changes: Partial<DataSourceConfig>) => void | Promise<void>;
   onSelectLocalFile?: () => Promise<string | undefined>;
 }
 
@@ -92,7 +93,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
   const runtimeVersions = getRuntimeVersions();
   const selectedSource = props.config.dataSources.find((source) => source.id === selectedSourceId);
 
-  const handleLoadApicalEvents = async (sourceId: string): Promise<void> => {
+  const handleLoadApicalEvents = async (sourceId: TimeRecordSourceId): Promise<void> => {
     setSourceFetchErrors((current) => {
       const next = { ...current };
       delete next[sourceId];
@@ -115,7 +116,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
     }
   };
 
-  const handleFetchApicalDataNow = async (sourceId: string): Promise<void> => {
+  const handleFetchApicalDataNow = async (sourceId: TimeRecordSourceId): Promise<void> => {
     setSourceFetchErrors((current) => {
       const next = { ...current };
       delete next[sourceId];

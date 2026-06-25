@@ -435,7 +435,7 @@ export const RaceSweetMainApp = () => {
     setSystemConfigState(config);
   };
 
-  const getEventTimeZone = (eventId: string | undefined): string => {
+  const getEventTimeZone = (eventId: EventId | undefined): string => {
     const event = eventCatalogState?.events.find((item) => item.id === eventId);
     return event?.timeZone || getSystemTimeZone();
   };
@@ -465,7 +465,7 @@ export const RaceSweetMainApp = () => {
     setRenderTick((tick) => tick + 1);
   };
 
-  const applyPersistedRaceStateToSession = async (eventId: string, sessionId: string, targetSessionState: Session & RaceStateLookup): Promise<boolean> => {
+  const applyPersistedRaceStateToSession = async (eventId: EventId, sessionId: SessionId, targetSessionState: Session & RaceStateLookup): Promise<boolean> => {
     const raceState = eventCatalogService?.getImportedRaceState(eventId, sessionId);
     if (!raceState) {
       return false;
@@ -600,7 +600,7 @@ export const RaceSweetMainApp = () => {
     }
   };
 
-  const selectTimingSession = (sessionId: string): void => {
+  const selectTimingSession = (sessionId: SessionId): void => {
     if (sessionId === 'active') {
       setTimingSessionSelection('active');
       setSelectedTimingEventId(eventCatalogState?.activeEventId);
@@ -622,7 +622,7 @@ export const RaceSweetMainApp = () => {
     });
   };
 
-  const encodeEventSessionValue = (eventId: string, sessionId?: string): string => {
+  const encodeEventSessionValue = (eventId: EventId, sessionId?: SessionId): string => {
     return sessionId ? `session:${eventId}:${sessionId}` : `event:${eventId}`;
   };
 
@@ -754,7 +754,7 @@ export const RaceSweetMainApp = () => {
     return renderShell(<>Loading...</>);
   }
 
-  const handleExcludeCrossing = (crossingId: string, exclude: boolean) => {
+  const handleExcludeCrossing = (crossingId: TimeRecordId, exclude: boolean) => {
     if (!adminService) {
       return;
     }
@@ -814,7 +814,7 @@ export const RaceSweetMainApp = () => {
       .catch((error: unknown) => setTimingErrorState(error as Error));
   };
 
-  const handleChangeCategory = (participantId: string, categoryId: EventCategoryId) => {
+  const handleChangeCategory = (participantId: EventParticipantId, categoryId: EventCategoryId) => {
     if (!adminService) {
       return;
     }

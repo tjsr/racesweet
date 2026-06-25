@@ -1,3 +1,4 @@
+import { createEventEntrantId, createEventId } from '../model/ids.js';
 import * as systemConfig from './systemConfig.js';
 
 import type { SystemConfigPersistence } from './systemConfigPersistence.js';
@@ -254,7 +255,7 @@ describe('SystemConfigService', () => {
       masterEntrantConfig: {
         profiles: [
           {
-            entrantId: 'team-7',
+            entrantId: createEventEntrantId('team-7'),
             firstName: 'Master',
             lastName: 'Record',
           },
@@ -262,11 +263,11 @@ describe('SystemConfigService', () => {
       },
       name: 'Master Entrants A',
     });
-    await service.assignSourcesToEvent('event-7', [source.id]);
+    await service.assignSourcesToEvent(createEventId('event-7'), [source.id]);
 
-    const profiles = systemConfig.getMasterEntrantProfilesForEvent(service.state, 'event-7');
+    const profiles = systemConfig.getMasterEntrantProfilesForEvent(service.state, createEventId('event-7'));
     expect(profiles).toEqual([
-      expect.objectContaining({ entrantId: 'team-7', firstName: 'Master', lastName: 'Record' }),
+      expect.objectContaining({ entrantId: createEventEntrantId('team-7'), firstName: 'Master', lastName: 'Record' }),
     ]);
   });
 

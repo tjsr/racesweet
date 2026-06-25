@@ -26,10 +26,10 @@ import { getSystemTimeZone } from './utils/timeutils.js';
 interface ApicalCatalogImport {
   apicalDataFilePath?: string;
   eventDate?: string;
-  eventId: string;
+  eventId: EventId;
   eventName: string;
   raceState: Partial<RaceState>;
-  sessionId: string;
+  sessionId: SessionId;
   timeZone?: string;
 }
 
@@ -456,7 +456,7 @@ export class EventCatalogService {
     return this.state;
   }
 
-  public getImportedRaceStateMetadata(eventId: string, sessionId: string): ImportedRaceStateMetadata | undefined {
+  public getImportedRaceStateMetadata(eventId: EventId, sessionId: SessionId): ImportedRaceStateMetadata | undefined {
     const mutation = [...this.ledger.mutations].reverse().find((candidate) => {
       return candidate.type === 'race-state-imported' &&
         candidate.eventId === eventId &&
@@ -473,7 +473,7 @@ export class EventCatalogService {
     };
   }
 
-  public getImportedRaceState(eventId: string, sessionId: string): Partial<RaceState> | undefined {
+  public getImportedRaceState(eventId: EventId, sessionId: SessionId): Partial<RaceState> | undefined {
     return this.getImportedRaceStateMetadata(eventId, sessionId)?.raceState;
   }
 
@@ -714,7 +714,7 @@ export class EventCatalogService {
     );
   }
 
-  public async createSession(eventId: string): Promise<EventCatalogState> {
+  public async createSession(eventId: EventId): Promise<EventCatalogState> {
     const sessionId = createSessionId();
     const session: EventCatalogSession = {
       eventId,
@@ -746,7 +746,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async updateSession(sessionId: string, changes: Partial<Pick<EventCatalogSession, 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>): Promise<EventCatalogState> {
+  public async updateSession(sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes,
@@ -758,7 +758,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async moveSessionToEvent(sessionId: string, nextEventId: string): Promise<EventCatalogState> {
+  public async moveSessionToEvent(sessionId: SessionId, nextEventId: EventId): Promise<EventCatalogState> {
     const session = this.state.sessions.find((item) => item.id === sessionId);
     const nextEvent = this.state.events.find((item) => item.id === nextEventId);
     if (!session || !nextEvent || session.eventId === nextEventId) {

@@ -23,8 +23,8 @@ interface TimingContextProps {
   onAddRecord: (record: EventTimeRecord) => void;
   onEditRecord: (record: EventTimeRecord) => void;
   onAssignFlagCategory: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
-  onChangeCategory: (participantId: string, categoryId: EventCategoryId) => void;
-  onExclude: (crossingId: string, exclude: boolean) => void;
+  onChangeCategory: (participantId: EventParticipantId, categoryId: EventCategoryId) => void;
+  onExclude: (crossingId: TimeRecordId, exclude: boolean) => void;
   onMarkFlagDeleted: (flagId: TimeRecordId, deleted: boolean) => void;
   onRemoveFlagCategory: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
   onSelectEvent: (eventId: EventId) => void;

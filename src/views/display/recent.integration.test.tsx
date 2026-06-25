@@ -1,23 +1,22 @@
 // @vitest-environment jsdom
 
-import { type ParticipantPassingRecord, RECORD_TX_CROSSING } from '../../model/timerecord.js';
+import React, { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
+import { updateCategorySelectionsForChangedParticipant } from '../../app/categoryChangeState.js';
+import { type AdministrativeChanges, type RaceAdminPersistence, createDefaultAdministrativeChanges } from '../../app/raceAdminPersistence.js';
+import { RaceAdminService } from '../../app/raceAdminService.js';
+import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
+import { createGreenFlagEvent } from '../../controllers/flag.js';
 import type { EventCategory } from '../../model/eventcategory.js';
-import type { EventParticipant } from '../../model/eventparticipant.js';
+import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
 import type { EventTeam } from '../../model/eventteam.js';
 import type { FlagRecord } from '../../model/flag.js';
+import { createCategoryId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
 import type { EventTimeRecord } from '../../model/index.js';
 import { type RaceStateLookup, Session } from '../../model/racestate.js';
-import React from 'react';
-import { RecentRecords } from './recent.js';
-import { act } from 'react';
-import { RaceAdminService } from '../../app/raceAdminService.js';
-import { type AdministrativeChanges, type RaceAdminPersistence, createDefaultAdministrativeChanges } from '../../app/raceAdminPersistence.js';
-import { createCategoryId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
-import { createGreenFlagEvent } from '../../controllers/flag.js';
-import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
-import { updateCategorySelectionsForChangedParticipant } from '../../app/categoryChangeState.js';
+import { type ParticipantPassingRecord, RECORD_TX_CROSSING, TimeRecordId } from '../../model/timerecord.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
+import { RecentRecords } from './recent.js';
 
 class MemoryRaceAdminPersistence implements RaceAdminPersistence {
   private changes: AdministrativeChanges;
@@ -627,7 +626,7 @@ describe('RecentRecords integration', () => {
         return item.textContent?.trim() === label;
       });
     };
-    const openFlagMenu = async (flagId: string): Promise<void> => {
+    const openFlagMenu = async (flagId: TimeRecordId): Promise<void> => {
       const row = container.querySelector(`tr[data-record-id="${flagId}"]`);
       expect(row).not.toBeNull();
 
@@ -1985,7 +1984,7 @@ describe('RecentRecords integration', () => {
         setRecordSelectedCategories(participantCategories);
       };
 
-      const handleChangeCategory = (participantId: string, categoryId: EventCategory['id']) => {
+      const handleChangeCategory = (participantId: EventParticipantId, categoryId: EventCategory['id']) => {
         const updatedSelections = updateCategorySelectionsForChangedParticipant(
           {
             categoryId,

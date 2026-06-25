@@ -1,7 +1,7 @@
 import './runtimeSourceMaps.ts';
 
 import { BrowserWindow, app, dialog, ipcMain, session, shell } from 'electron';
-import type { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileWriteDataType, SelectLocalFileOptions } from './window';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
@@ -15,11 +15,13 @@ import {
 } from '../model/electronIpc';
 import { buildContentSecurityPolicy, injectContentSecurityPolicyHeader } from './contentSecurityPolicy';
 import { injectCorsHeaders, isAllowedCorsDownloadUrl } from './electron/corsHeaders';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { waitForContentServer, waitForWindowContentLoad } from './startupContentServer';
+import type { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileWriteDataType, SelectLocalFileOptions } from './window';
 
-import { fetchExternalHttpProxy } from './externalHttpProxy';
 import path from 'node:path';
+import { fetchExternalHttpProxy } from './externalHttpProxy';
+
+export type IPCEventId = string;
 
 const __dirname = path.dirname(__filename);
 
@@ -137,7 +139,7 @@ app.on('activate', (): void => {
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
 
-ipcMain.on(RequestReadIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: string, dataType?: string): void => {
+ipcMain.on(RequestReadIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: IPCEventId, dataType?: string): void => {
   // const fs = require('fs');
   // const path = require('path');
   const filePath = resolveAppFilePath(filename);
@@ -197,7 +199,7 @@ ipcMain.handle(RequestOpenLocalFileIpcInvokeChannel, async (_event: Electron.Ipc
   }
 });
 
-ipcMain.on(RequestWriteIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: string, contents: string, dataType: FileWriteDataType = 'utf8') => {
+ipcMain.on(RequestWriteIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: IPCEventId, contents: string, dataType: FileWriteDataType = 'utf8') => {
   // Use __dirname if you're trying to restrict where things can be written to.
   // You need to handle permissions and security based on what you want to allow to be written.
   // I'd probably re-write this to take PathLike.

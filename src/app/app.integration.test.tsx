@@ -6,8 +6,11 @@ import React, { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import XLSX from 'xlsx';
 import { convertApicalSpreadsheetRowsToApicalData } from '../controllers/apical/apicalSpreadsheetProcessor.js';
+import { CategoryId } from '../controllers/category.js';
 import type { ApicalLapByCategory } from '../model/apical.js';
 import { createSessionId } from '../model/ids.js';
+import { EventId, SessionId } from '../model/raceevent.js';
+import { TimeRecordId } from '../model/timerecord.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
 import { useUiConsoleGuards } from '../testing/uiConsoleGuards.js';
 import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from '../utils/apical/excelDownload.js';
@@ -32,12 +35,12 @@ vi.mock('./views/timing/categoryList.js', () => ({
 }));
 
 interface MockRecentRecordsProps {
-  onAddRecord?: (record: { id: string; recordType: number; sequence: number; sessionId: string; source: string }) => void;
-  onAssignFlagCategory?: (flagId: string, categoryId: string) => void;
-  onMarkFlagDeleted?: (flagId: string, deleted: boolean) => void;
-  onRemoveFlagCategory?: (flagId: string, categoryId: string) => void;
-  raceStateLookup?: { categories?: Array<{ id: string }> };
-  records: Array<{ categoryIds?: string[]; flagType?: string; id: string }>;
+  onAddRecord?: (record: { id: TimeRecordId; recordType: number; sequence: number; sessionId: SessionId; source: string }) => void;
+  onAssignFlagCategory?: (flagId: TimeRecordId, categoryId: CategoryId) => void;
+  onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void;
+  onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: CategoryId) => void;
+  raceStateLookup?: { categories?: Array<{ id: CategoryId }> };
+  records: Array<{ categoryIds?: CategoryId[]; flagType?: string; id: TimeRecordId }>;
 }
 
 vi.mock('../views/display/recent', async () => {
@@ -484,7 +487,7 @@ interface ApicalImportScenario {
   expectedEntrantCount: number;
   expectedRecentRecordCount: number;
   fetchMock: ReturnType<typeof vi.spyOn>;
-  importedEventId: string;
+  importedEventId: EventId;
   writtenConfig: {
     dataSources: Array<{ apicalDataFilePath?: string; dataLastRetrieved?: string }>;
     eventSourceAssignments: Record<string, string[]>;

@@ -1,3 +1,5 @@
+import { EventId, SessionId } from '../model/raceevent.js';
+import { TimeRecordSourceId } from '../model/types.js';
 import {
   type DataSourceConfig,
   type DataSourceType,
@@ -5,9 +7,9 @@ import {
   type SystemConfiguration,
   createDefaultSystemConfiguration,
   getDataSourceTypeLabel,
+  normalizeOptionalSystemFilePath,
   normalizeSystemConfiguration,
   normalizeSystemDirectoryPath,
-  normalizeOptionalSystemFilePath,
 } from './systemConfig.js';
 import type { SystemConfigPersistence } from './systemConfigPersistence.js';
 
@@ -93,7 +95,7 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async updateSource(sourceId: string, changes: Partial<DataSourceConfig>): Promise<SystemConfiguration> {
+  public async updateSource(sourceId: TimeRecordSourceId, changes: Partial<DataSourceConfig>): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
       dataSources: this.config.dataSources.map((source) => {
@@ -111,7 +113,7 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async deleteSource(sourceId: string): Promise<SystemConfiguration> {
+  public async deleteSource(sourceId: TimeRecordSourceId): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
       dataSources: this.config.dataSources.filter((source) => source.id !== sourceId),
@@ -135,7 +137,7 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async assignSourcesToEvent(eventId: string, sourceIds: string[]): Promise<SystemConfiguration> {
+  public async assignSourcesToEvent(eventId: EventId, sourceIds: TimeRecordSourceId[]): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
       eventSourceAssignments: {
@@ -147,7 +149,7 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async assignSourcesToSession(sessionId: string, assignment: SessionSourceAssignment): Promise<SystemConfiguration> {
+  public async assignSourcesToSession(sessionId: SessionId, assignment: SessionSourceAssignment): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
       sessionSourceAssignments: {
@@ -159,7 +161,7 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async updateEventOptions(eventId: string, changes: SystemConfiguration['eventOptions'][string]): Promise<SystemConfiguration> {
+  public async updateEventOptions(eventId: EventId, changes: SystemConfiguration['eventOptions'][string]): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
       eventOptions: {
@@ -183,7 +185,7 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async persistListedApicalEvents(sourceId: string, listedEvents: DataSourceConfig['listedEvents']): Promise<SystemConfiguration> {
+  public async persistListedApicalEvents(sourceId: TimeRecordSourceId, listedEvents: DataSourceConfig['listedEvents']): Promise<SystemConfiguration> {
     const source = this.config.dataSources.find((item) => item.id === sourceId);
     if (source?.type !== 'api-apical-data-file' || !source.apiConfig) {
       return this.updateSource(sourceId, { listedEvents });
@@ -202,7 +204,7 @@ export class SystemConfigService {
     });
   }
 
-  public async persistApicalDataFetch(sourceId: string, eventId: string, sessionId: string, retrievedAt: string, apicalDataFilePath?: string): Promise<SystemConfiguration> {
+  public async persistApicalDataFetch(sourceId: TimeRecordSourceId, eventId: EventId, sessionId: SessionId, retrievedAt: string, apicalDataFilePath?: string): Promise<SystemConfiguration> {
     const assignedEventSources = this.config.eventSourceAssignments[eventId] || [];
     const normalizedApicalDataFilePath = normalizeOptionalSystemFilePath(apicalDataFilePath);
     this.config = {

@@ -1,15 +1,15 @@
+import type { EventEntrantId } from '../model/entrant.js';
+import type { EventCategoryId } from '../model/eventcategory.js';
+import type { SessionId } from '../model/raceevent.js';
+import type { RaceStateLookup, Session } from '../model/racestate.js';
+import type { EventTimeRecord, TimeRecordId } from '../model/timerecord.js';
 import {
-  type AdministrativeChanges,
   type AddedSessionRecord,
+  type AdministrativeChanges,
   type RaceAdminPersistence,
   type UpdatedSessionRecord,
   createDefaultAdministrativeChanges,
 } from './raceAdminPersistence.js';
-import type { RaceStateLookup, Session } from '../model/racestate.js';
-import type { EventCategoryId } from '../model/eventcategory.js';
-import type { EventEntrantId } from '../model/entrant.js';
-import type { SessionId } from '../model/raceevent.js';
-import type { EventTimeRecord, TimeRecordId } from '../model/timerecord.js';
 
 export class RaceAdminService {
   private changes: AdministrativeChanges;
@@ -45,7 +45,7 @@ export class RaceAdminService {
     return this.session;
   }
 
-  public async excludeCrossing(crossingId: string, exclude: boolean): Promise<void> {
+  public async excludeCrossing(crossingId: TimeRecordId, exclude: boolean): Promise<void> {
     this.excludeCrossingInSession(this.session, crossingId, exclude);
     this.changes = {
       ...this.changes,
@@ -57,7 +57,7 @@ export class RaceAdminService {
     await this.persistence.save(this.changes);
   }
 
-  public async excludeCrossingForSession(session: Session & RaceStateLookup, crossingId: string, exclude: boolean): Promise<void> {
+  public async excludeCrossingForSession(session: Session & RaceStateLookup, crossingId: TimeRecordId, exclude: boolean): Promise<void> {
     this.excludeCrossingInSession(session, crossingId, exclude);
     this.changes = {
       ...this.changes,
@@ -231,7 +231,7 @@ export class RaceAdminService {
     }
   }
 
-  private excludeCrossingInSession(session: Session & RaceStateLookup, crossingId: string, exclude: boolean): void {
+  private excludeCrossingInSession(session: Session & RaceStateLookup, crossingId: TimeRecordId, exclude: boolean): void {
     session.excludeCrossing(crossingId, exclude);
   }
 

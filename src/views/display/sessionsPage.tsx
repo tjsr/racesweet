@@ -1,28 +1,29 @@
 
+import React from 'react';
 import {
   type EventCatalogSession,
   type EventCatalogState,
   getSessionsForEvent,
 } from '../../app/eventCatalog.js';
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
+import { EventId, SessionId } from '../../model/raceevent.js';
 import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
-import React from 'react';
 
 interface SessionsPageProps {
   catalog: EventCatalogState;
   config: SystemConfiguration;
-  onApplySessionSources: (eventId: string, sessionId: string) => void | Promise<void>;
-  onCreateSession: (eventId: string) => void | Promise<void>;
-  onDeleteSession: (eventId: string, sessionId: string) => void | Promise<void>;
-  onMakeSessionActive: (eventId: string, sessionId: string) => void | Promise<void>;
-  onMoveSessionToEvent?: (sessionId: string, eventId: string) => void | Promise<void>;
-  onSelectEvent: (eventId: string) => void;
-  onSaveSessionAssignment: (sessionId: string, mode: 'default' | 'specific', sourceIds: string[]) => void | Promise<void>;
-  onSelectSession: (sessionId: string) => void;
+  onApplySessionSources: (eventId: EventId, sessionId: SessionId) => void | Promise<void>;
+  onCreateSession: (eventId: EventId) => void | Promise<void>;
+  onDeleteSession: (eventId: EventId, sessionId: SessionId) => void | Promise<void>;
+  onMakeSessionActive: (eventId: EventId, sessionId: SessionId) => void | Promise<void>;
+  onMoveSessionToEvent?: (sessionId: SessionId, eventId: EventId) => void | Promise<void>;
+  onSelectEvent: (eventId: EventId) => void;
+  onSaveSessionAssignment: (sessionId: SessionId, mode: 'default' | 'specific', sourceIds: string[]) => void | Promise<void>;
+  onSelectSession: (sessionId: SessionId) => void;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
-  onUpdateSession: (sessionId: string, changes: Partial<Pick<EventCatalogSession, 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>) => void | Promise<void>;
-  selectedEventId?: string;
-  selectedSessionId?: string;
+  onUpdateSession: (sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>) => void | Promise<void>;
+  selectedEventId?: EventId;
+  selectedSessionId?: SessionId;
 }
 
 const toggleInList = (values: string[], value: string): string[] => {

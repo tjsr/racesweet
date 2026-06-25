@@ -8,21 +8,22 @@ import {
 } from '../../app/eventCatalog.js';
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
 import { getSupportedTimeZones, getSystemTimeZone } from '../../app/utils/timeutils.js';
+import { EventId, SessionId } from '../../model/raceevent.js';
 import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
 
 interface EventsScreenProps {
   catalog: EventCatalogState;
   config: SystemConfiguration;
-  onActivateEvent: (eventId: string) => void | Promise<void>;
+  onActivateEvent: (eventId: EventId) => void | Promise<void>;
   onCreateEvent: () => void | Promise<void>;
-  onDeleteEvent: (eventId: string) => void | Promise<void>;
-  onSaveEventAssignment: (eventId: string, sourceIds: string[]) => void | Promise<void>;
-  onSelectEvent: (eventId: string) => void;
-  onSelectSession: (sessionId: string) => void;
+  onDeleteEvent: (eventId: EventId) => void | Promise<void>;
+  onSaveEventAssignment: (eventId: EventId, sourceIds: string[]) => void | Promise<void>;
+  onSelectEvent: (eventId: EventId) => void;
+  onSelectSession: (sessionId: SessionId) => void;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
-  onUpdateEvent: (eventId: string, changes: { date?: string; format?: EventCatalogEvent['format']; name?: string; timeZone?: string }) => void | Promise<void>;
-  selectedEventId?: string;
-  selectedSessionId?: string;
+  onUpdateEvent: (eventId: EventId, changes: { date?: string; format?: EventCatalogEvent['format']; name?: string; timeZone?: string }) => void | Promise<void>;
+  selectedEventId?: EventId;
+  selectedSessionId?: SessionId;
 }
 
 const toggleInList = (values: string[], value: string): string[] => {

@@ -21,6 +21,8 @@ import { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileReadDataType, 
 import { assertRendererApi } from './rendererApi.ts';
 import { getRaceSweetServerPort } from './serverPort.ts';
 
+export type IPCEventId = string;
+
 // See the Electron documentation for details on how to use preload scripts:
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
 
@@ -42,7 +44,7 @@ window.actualPort = getRaceSweetServerPort();
 const eventCalls: Record<string, [(data: (never | PromiseLike<never>)) => void, (reason?: string|Error) => void]> = {};
 
 ipcRenderer.on(ReadContentIpcReceiveChannel,
-  (event: IpcRendererEvent, eventId: string, data: unknown): void => {
+  (event: IpcRendererEvent, eventId: IPCEventId, data: unknown): void => {
     if (eventCalls[eventId] !== undefined) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       eventCalls[eventId][0](data as any);
@@ -51,7 +53,7 @@ ipcRenderer.on(ReadContentIpcReceiveChannel,
   });
 
 ipcRenderer.on(ReadContentErrorIpcReceiveChannel,
-  (event: IpcRendererEvent, eventId: string, error?: string|Error): void => {
+  (event: IpcRendererEvent, eventId: IPCEventId, error?: string|Error): void => {
     if (eventCalls[eventId] !== undefined) {
       eventCalls[eventId][1](error);
       delete eventCalls[eventId];
@@ -59,7 +61,7 @@ ipcRenderer.on(ReadContentErrorIpcReceiveChannel,
   });
 
 ipcRenderer.on(WriteContentIpcReceiveChannel,
-  (event: IpcRendererEvent, eventId: string): void => {
+  (event: IpcRendererEvent, eventId: IPCEventId): void => {
     if (eventCalls[eventId] !== undefined) {
       eventCalls[eventId][0](undefined as never);
       delete eventCalls[eventId];
@@ -67,7 +69,7 @@ ipcRenderer.on(WriteContentIpcReceiveChannel,
   });
 
 ipcRenderer.on(WriteContentErrorIpcReceiveChannel,
-  (event: IpcRendererEvent, eventId: string, error?: string|Error): void => {
+  (event: IpcRendererEvent, eventId: IPCEventId, error?: string|Error): void => {
     if (eventCalls[eventId] !== undefined) {
       eventCalls[eventId][1](error);
       delete eventCalls[eventId];
