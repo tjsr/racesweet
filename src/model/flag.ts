@@ -38,6 +38,11 @@ export interface YellowFlagRecord extends FlagRecord {
   point?: CheckpointId;
 }
 
+export interface RedFlagRecord extends FlagRecord {
+  flagType: "red";
+  flagValue: "course" | "stop";
+}
+
 export interface BlueFlagRecord extends FlagRecord {
   flagType: "blue";
   flagValue: "pass" | "slow" | "caution";

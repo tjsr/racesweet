@@ -1,17 +1,19 @@
-import { Box, Checkbox, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import { Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField } from '@mui/material';
 import React, { type JSX } from 'react';
 import { type MillisecondsDuration, type TimeDisplayZoneMode, millisecondsToTime, resolveDisplayTimeZone, tableTimeString } from '../../app/utils/timeutils.ts';
 import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../controllers/category.ts';
-import { isFlagRecord } from '../../controllers/flag';
+import { createGreenFlagEvent, createRedFlagEvent, isFlagRecord } from '../../controllers/flag';
 import { getLapTimeCell } from '../../controllers/laps.ts';
-import { getParticipantNumber } from '../../controllers/participant.ts';
+import { getParticipantNumber, getParticipantTransponders } from '../../controllers/participant.ts';
+import { findEntrantByChipCode, findEntrantByPlateNumber } from '../../controllers/participantSearch.ts';
 import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
 import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../model';
 import { EventCategory, EventCategoryId } from '../../model/eventcategory';
 import { EventTeam } from '../../model/eventteam.ts';
 import { FlagRecord } from '../../model/flag';
+import { createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.ts';
 import { RaceStateLookup } from '../../model/racestate.ts';
-import { EVENT_SESSION_END, ParticipantPassingRecord, TimeRecordId } from '../../model/timerecord.ts';
+import { EVENT_FLAG_DISPLAYED, EVENT_SESSION_END, ParticipantPassingRecord, RECORD_TX_CROSSING, TimeRecordId } from '../../model/timerecord.ts';
 import { InvalidCategoryIdError, NoCrossingError, NoParticipantError, ParticipantNotFoundError } from '../../validators/errors.ts';
 import "./recent.css";
 
@@ -23,8 +25,202 @@ const ignoreModeLabels: Record<RecentRecordsIgnoreMode, string> = {
   unrecognised: 'Unrecognised',
 };
 
+type AddableRecordType = 'passing' | 'flag';
+type AddableFlagType = 'green' | 'yellow' | 'white' | 'red' | 'chequered';
+
+type RecordDialogMode = 'add' | 'edit';
+
+interface AddRecordDialogState {
+  anchorRecord: EventTimeRecord;
+  existingRecord?: EventTimeRecord;
+  mode: RecordDialogMode;
+}
+
+const MANUAL_RECORD_SOURCE_ID = createTimeRecordSourceId('manual-entry');
+const manualFlagLabelByType: Record<AddableFlagType, string> = {
+  chequered: 'Checquered',
+  green: 'Green',
+  red: 'Red',
+  white: 'White',
+  yellow: 'Yellow',
+};
+
+const formatManualTimeOfDay = (time: Date | undefined): string => {
+  if (!time) {
+    return '';
+  }
+  const hours = `${time.getUTCHours()}`.padStart(2, '0');
+  const minutes = `${time.getUTCMinutes()}`.padStart(2, '0');
+  const seconds = `${time.getUTCSeconds()}`.padStart(2, '0');
+  const milliseconds = `${time.getUTCMilliseconds()}`.padStart(3, '0');
+  return `${hours}:${minutes}:${seconds}.${milliseconds}`;
+};
+
+const parseManualTimeOfDay = (anchorTime: Date | undefined, value: string): Date | undefined => {
+  if (!anchorTime) {
+    return undefined;
+  }
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/);
+  if (!match) {
+    return undefined;
+  }
+  const [, hoursText, minutesText, secondsText = '0', millisecondsText = '0'] = match;
+  const parsedTime = new Date(anchorTime);
+  parsedTime.setUTCHours(
+    Number(hoursText),
+    Number(minutesText),
+    Number(secondsText),
+    Number(millisecondsText.padEnd(3, '0'))
+  );
+  return parsedTime;
+};
+
+const participantArrayFromLookup = (raceStateLookup: RaceStateLookup): EventParticipant[] => {
+  return (raceStateLookup as unknown as { participants?: EventParticipant[] }).participants || [];
+};
+
+const participantMapFromLookup = (raceStateLookup: RaceStateLookup): Map<EventParticipantId, EventParticipant> => {
+  return new Map(participantArrayFromLookup(raceStateLookup).map((participant) => [participant.id, participant]));
+};
+
+const resolveParticipantForManualEntry = (
+  participantMap: Map<EventParticipantId, EventParticipant>,
+  txNo: string,
+  plate: string
+): EventParticipant | undefined => {
+  const normalizedTx = txNo.trim();
+  if (normalizedTx.length > 0 && !Number.isNaN(Number(normalizedTx))) {
+    const txMatch = findEntrantByChipCode(participantMap, Number(normalizedTx));
+    if (txMatch) {
+      return txMatch;
+    }
+  }
+  const normalizedPlate = plate.trim();
+  if (normalizedPlate.length > 0) {
+    return findEntrantByPlateNumber(participantMap, normalizedPlate) || undefined;
+  }
+  return undefined;
+};
+
+const getParticipantTeamName = (participant: EventParticipant | undefined, raceStateLookup: RaceStateLookup): string => {
+  if (!participant) {
+    return '';
+  }
+  const participantName = `${participant.firstname || ''} ${participant.surname || ''}`.trim();
+  const teams = (raceStateLookup as unknown as { teams?: EventTeam[] }).teams || [];
+  const team = teams.find((candidate) => candidate.members.includes(participant.id) && candidate.name !== participantName);
+  return team?.name || '';
+};
+
+const buildManualFlagRecord = (
+  anchorRecord: EventTimeRecord,
+  currentEventId: string | undefined,
+  currentSessionId: string | undefined,
+  records: EventTimeRecord[],
+  time: Date,
+  flagType: AddableFlagType,
+  categoryIds: EventCategoryId[],
+  existingRecord?: EventTimeRecord
+): FlagRecord => {
+  const baseRecord = {
+    eventId: currentEventId || existingRecord?.eventId || anchorRecord.eventId,
+    id: existingRecord?.id || createTimeRecordId(),
+    recordType: EVENT_FLAG_DISPLAYED,
+    sequence: existingRecord?.sequence || Math.max(...records.map((record) => record.sequence), 0) + 1,
+    sessionId: currentSessionId || existingRecord?.sessionId || anchorRecord.sessionId,
+    source: existingRecord?.source || MANUAL_RECORD_SOURCE_ID,
+    time,
+  };
+
+  if (flagType === 'green') {
+    return createGreenFlagEvent({
+      ...baseRecord,
+      categoryIds: categoryIds.length > 0 ? categoryIds : undefined,
+      indicatesRaceStart: true,
+    });
+  }
+  if (flagType === 'red') {
+    return createRedFlagEvent({
+      ...baseRecord,
+      categoryIds: categoryIds.length > 0 ? categoryIds : undefined,
+    });
+  }
+  return {
+    ...baseRecord,
+    categoryIds: categoryIds.length > 0 ? categoryIds : undefined,
+    flagType,
+    flagValue: flagType === 'yellow' ? 'caution' : 'course',
+  } as FlagRecord;
+};
+
+const buildManualPassingRecord = (
+  anchorRecord: EventTimeRecord,
+  currentEventId: string | undefined,
+  currentSessionId: string | undefined,
+  records: EventTimeRecord[],
+  time: Date,
+  txNo: string,
+  plate: string,
+  antenna: string,
+  existingRecord?: EventTimeRecord
+): ParticipantPassingRecord => {
+  const trimmedTxNo = txNo.trim();
+  const trimmedPlate = plate.trim();
+  const record: ParticipantPassingRecord & { antenna?: string; chipCode?: number; plateNumber?: string } = {
+    eventId: currentEventId || existingRecord?.eventId || anchorRecord.eventId,
+    id: existingRecord?.id || createTimeRecordId(),
+    recordType: RECORD_TX_CROSSING,
+    sequence: existingRecord?.sequence || Math.max(...records.map((entry) => entry.sequence), 0) + 1,
+    sessionId: currentSessionId || existingRecord?.sessionId || anchorRecord.sessionId,
+    source: existingRecord?.source || MANUAL_RECORD_SOURCE_ID,
+    time,
+  };
+
+  if (trimmedTxNo.length > 0 && !Number.isNaN(Number(trimmedTxNo))) {
+    record.chipCode = Number(trimmedTxNo);
+  }
+  if (trimmedPlate.length > 0) {
+    record.plateNumber = trimmedPlate;
+  }
+  if (antenna.trim().length > 0) {
+    record.antenna = antenna.trim();
+  }
+
+  return record;
+};
+
+const getEditableFlagCategoryIds = (record: EventTimeRecord): EventCategoryId[] => {
+  if (!isFlagRecord(record)) {
+    return [];
+  }
+  return [...(record.categoryIds || [])];
+};
+
+const getEditablePassingTxNo = (record: EventTimeRecord): string => {
+  const txNo = getAutomaticIdentifier(record);
+  return txNo !== undefined ? txNo.toString() : '';
+};
+
+const getEditablePassingPlate = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): string => {
+  const passingRecord = record as ParticipantPassingRecord & { plateNumber?: string | number };
+  if (passingRecord.plateNumber !== undefined) {
+    return passingRecord.plateNumber.toString();
+  }
+  const participant = passingRecord.participantId ? raceStateLookup.getParticipantById(passingRecord.participantId) : undefined;
+  const plateNumber = participant ? getParticipantNumber(participant) : undefined;
+  return plateNumber !== undefined ? plateNumber.toString() : '';
+};
+
+const getEditablePassingAntenna = (record: EventTimeRecord): string => {
+  return ((record as ParticipantPassingRecord & { antenna?: string }).antenna || '').toString();
+};
+
 interface RecordsProps {
+  currentEventId?: string;
+  currentSessionId?: string;
   eventTimeZone?: string;
+  onAddRecord?: (record: EventTimeRecord) => void;
+  onEditRecord?: (record: EventTimeRecord) => void;
   onTimeDisplayZoneModeChange?: (mode: TimeDisplayZoneMode) => void;
   records: EventTimeRecord[];
   raceStateLookup: RaceStateLookup;
@@ -47,6 +243,8 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   onAssignFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
   onExclude?: (crossingId: string, exclude: boolean) => void;
   onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void;
+  onOpenAddRecordDialog?: (record: EventTimeRecord) => void;
+  onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
   onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void;
   onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
   timeZone?: string;
@@ -114,6 +312,14 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
     props.onAssignFlagCategory?.(record.id, categoryId);
     handleClose();
   };
+  const handleAddRecord = (): void => {
+    props.onOpenAddRecordDialog?.(record);
+    handleClose();
+  };
+  const handleEditRecord = (): void => {
+    props.onOpenEditRecordDialog?.(record);
+    handleClose();
+  };
 
   return (<>
     <TableRow
@@ -142,6 +348,12 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
           : undefined
       }
     >
+      <MenuItem onClick={handleAddRecord}>
+        Add record
+      </MenuItem>
+      <MenuItem onClick={handleEditRecord}>
+        Edit record
+      </MenuItem>
       <MenuItem onClick={handleMarkDeleted}>
         {record.deleted ? 'Restore flag' : 'Mark deleted'}
       </MenuItem>
@@ -239,8 +451,11 @@ interface _CompletedLapProps {
 }
 
 const UnknownChipRow = (
-  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae, timeZone }: {
+  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae, onOpenAddRecordDialog, onOpenEditRecordDialog, record, timeZone }: {
     antennae: string
+    onOpenAddRecordDialog?: (record: EventTimeRecord) => void,
+    onOpenEditRecordDialog?: (record: EventTimeRecord) => void,
+    record: EventTimeRecord,
     txNo: number | undefined,
     sequenceNumber: number
     passingTime: Date,
@@ -250,19 +465,69 @@ const UnknownChipRow = (
     timeZone?: string,
   }
 ): JSX.Element => {
+  const [contextMenu, setContextMenu] = React.useState<{
+    mouseX: number;
+    mouseY: number;
+  } | null>(null);
   const txCount = txNo !== undefined ? rs.countTransponderCrossings(txNo, passingTime) : undefined;
   const content = `Unknown transponder ${identifier} (${txCount})`;
   const timeString = tableTimeString(passingTime, timeZone);
+  const handleContextMenu = (event: React.MouseEvent): void => {
+    event.preventDefault();
+    setContextMenu(
+      contextMenu === null
+        ? {
+          mouseX: event.clientX + 2,
+          mouseY: event.clientY - 6,
+        }
+        : null
+    );
+  };
+  const handleClose = (): void => {
+    setContextMenu(null);
+  };
+  const handleAddRecord = (): void => {
+    onOpenAddRecordDialog?.(record);
+    handleClose();
+  };
+  const handleEditRecord = (): void => {
+    onOpenEditRecordDialog?.(record);
+    handleClose();
+  };
 
   return (
-    <TableRow key={timeRecordId} data-record-id={timeRecordId}>
-      <TableCell>{sequenceNumber}</TableCell>
-      <TableCell>{antennae}</TableCell>
-      <TableCell>{txNo}</TableCell>
-      <TableCell>{timeString}</TableCell>
-      <TableCell>{identifier}</TableCell>
-      <TableCell colSpan={6}>{content}</TableCell>
-    </TableRow>
+    <>
+      <TableRow
+        key={timeRecordId}
+        data-record-id={timeRecordId}
+        onContextMenu={handleContextMenu}
+        style={{ cursor: 'context-menu' }}
+      >
+        <TableCell>{sequenceNumber}</TableCell>
+        <TableCell>{antennae}</TableCell>
+        <TableCell>{txNo}</TableCell>
+        <TableCell>{timeString}</TableCell>
+        <TableCell>{identifier}</TableCell>
+        <TableCell colSpan={6}>{content}</TableCell>
+      </TableRow>
+      <Menu
+        open={contextMenu !== null}
+        onClose={handleClose}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu !== null
+            ? { left: contextMenu.mouseX, top: contextMenu.mouseY }
+            : undefined
+        }
+      >
+        <MenuItem onClick={handleAddRecord}>
+          Add record
+        </MenuItem>
+        <MenuItem onClick={handleEditRecord}>
+          Edit record
+        </MenuItem>
+      </Menu>
+    </>
   );
 };
 
@@ -274,6 +539,8 @@ interface PassingRecordRowProps {
   onSelect?: (passingRecord: ParticipantPassingRecord) => void;
   onExclude?: (crossingId: string, exclude: boolean) => void;
   onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void;
+  onOpenAddRecordDialog?: (record: EventTimeRecord) => void;
+  onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
   timeZone?: string;
 }
 
@@ -322,10 +589,19 @@ export const PassingRecordRow = (
     }
     handleClose();
   };
+  const handleAddRecord = (): void => {
+    props.onOpenAddRecordDialog?.(passing);
+    handleClose();
+  };
+  const handleEditRecord = (): void => {
+    props.onOpenEditRecordDialog?.(passing);
+    handleClose();
+  };
 
   let categoryStr = undefined;
   const timeString = tableTimeString(passing.time, props.timeZone);
   const identifier: string = getTimeRecordIdentifier(passing, true);
+  const antenna = (passing as ParticipantPassingRecord & { antenna?: string }).antenna || '';
   const entrant = passing.participantId ? rs.getParticipantById(passing.participantId) : undefined;
   let plateNumber: string | number | undefined = undefined;
   let entrantName: string | undefined = undefined;
@@ -394,7 +670,7 @@ export const PassingRecordRow = (
           }
         }}>
         <TableCell className={cellClasses}>{passing.sequence}</TableCell>
-        <TableCell className={cellClasses}></TableCell>
+        <TableCell className={cellClasses}>{antenna}</TableCell>
         <TableCell className={cellClasses}>{identifier}</TableCell>
         <TableCell className={cellClasses}>{timeString}</TableCell>
         <TableCell className={cellClasses}>{plateNumber || '?'}</TableCell>
@@ -414,6 +690,12 @@ export const PassingRecordRow = (
             : undefined
         }
       >
+        <MenuItem onClick={handleAddRecord}>
+          Add record
+        </MenuItem>
+        <MenuItem onClick={handleEditRecord}>
+          Edit record
+        </MenuItem>
         <MenuItem onClick={handleExclude}>
           {passing.isExcluded ? 'Include crossing' : 'Exclude crossing'}
         </MenuItem>
@@ -454,6 +736,8 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       selectedCategories={props.selectedCategories}
       onAssignFlagCategory={props.onAssignFlagCategory}
       onMarkFlagDeleted={props.onMarkFlagDeleted}
+      onOpenAddRecordDialog={props.onOpenAddRecordDialog}
+      onOpenEditRecordDialog={props.onOpenEditRecordDialog}
       onRemoveFlagCategory={props.onRemoveFlagCategory}
       onSelect={flagRecordSelected}
       timeZone={props.timeZone}
@@ -505,6 +789,8 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       onSelect={passingRecordSelected}
       onExclude={props.onExclude}
       onChangeCategory={props.onChangeCategory}
+      onOpenAddRecordDialog={props.onOpenAddRecordDialog}
+      onOpenEditRecordDialog={props.onOpenEditRecordDialog}
       timeZone={props.timeZone}
     />;
   }
@@ -516,7 +802,10 @@ export const RecordRow = (props: RecentRecordRowProps) => {
     sequenceNumber={record.sequence}
     timeRecordId={record.id}
     antennae='?'
+    onOpenAddRecordDialog={props.onOpenAddRecordDialog}
+    onOpenEditRecordDialog={props.onOpenEditRecordDialog}
     passingTime={record.time!}
+    record={record}
     txNo={txNo}
     identifier={identifier}
     rs={props.raceStateLookup}
@@ -811,17 +1100,264 @@ const shouldIgnoreRecord = (
   return ignoreModes.includes('unrecognised') && isUnrecognisedCrossing(record, raceStateLookup);
 };
 
+interface AddRecordDialogProps {
+  currentEventId?: string;
+  currentSessionId?: string;
+  onClose: () => void;
+  onSave: (record: EventTimeRecord, mode: RecordDialogMode) => void;
+  openState: AddRecordDialogState | null;
+  raceStateLookup: RaceStateLookup;
+  records: EventTimeRecord[];
+}
+
+const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
+  const anchorRecord = props.openState?.anchorRecord;
+  const dialogMode = props.openState?.mode || 'add';
+  const editingRecord = props.openState?.existingRecord;
+  const categories = (props.raceStateLookup as unknown as { categories?: EventCategory[] }).categories || [];
+  const participantMap = React.useMemo(() => participantMapFromLookup(props.raceStateLookup), [props.raceStateLookup]);
+  const participants = React.useMemo(() => participantArrayFromLookup(props.raceStateLookup), [props.raceStateLookup]);
+  const [timeOfDay, setTimeOfDay] = React.useState<string>('');
+  const [recordType, setRecordType] = React.useState<AddableRecordType>('passing');
+  const [flagType, setFlagType] = React.useState<AddableFlagType>('green');
+  const [selectedFlagCategoryIds, setSelectedFlagCategoryIds] = React.useState<EventCategoryId[]>([]);
+  const [passingTxNo, setPassingTxNo] = React.useState<string>('');
+  const [passingPlate, setPassingPlate] = React.useState<string>('');
+  const [passingAntenna, setPassingAntenna] = React.useState<string>('');
+  const [timeError, setTimeError] = React.useState<string>('');
+
+  React.useEffect(() => {
+    if (!anchorRecord) {
+      return;
+    }
+    if (dialogMode === 'edit' && editingRecord) {
+      setTimeOfDay(formatManualTimeOfDay(editingRecord.time));
+      setRecordType(isFlagRecord(editingRecord) ? 'flag' : 'passing');
+      setFlagType(isFlagRecord(editingRecord) ? editingRecord.flagType as AddableFlagType : 'green');
+      setSelectedFlagCategoryIds(getEditableFlagCategoryIds(editingRecord));
+      setPassingTxNo(getEditablePassingTxNo(editingRecord));
+      setPassingPlate(getEditablePassingPlate(editingRecord, props.raceStateLookup));
+      setPassingAntenna(getEditablePassingAntenna(editingRecord));
+    } else {
+      setTimeOfDay(formatManualTimeOfDay(anchorRecord.time));
+      setRecordType('passing');
+      setFlagType('green');
+      setSelectedFlagCategoryIds([]);
+      setPassingTxNo('');
+      setPassingPlate('');
+      setPassingAntenna('');
+    }
+    setTimeError('');
+  }, [anchorRecord, dialogMode, editingRecord, props.raceStateLookup]);
+
+  const txOptions = React.useMemo(() => {
+    return participants
+      .flatMap((participant) => getParticipantTransponders(participant))
+      .map((identifier) => identifier.toString())
+      .filter((value, index, array) => value.length > 0 && array.indexOf(value) === index)
+      .sort();
+  }, [participants]);
+
+  const plateOptions = React.useMemo(() => {
+    return participants
+      .map((participant) => getParticipantNumber(participant))
+      .filter((value): value is string | number => value !== undefined)
+      .map((value) => value.toString())
+      .filter((value, index, array) => value.length > 0 && array.indexOf(value) === index)
+      .sort();
+  }, [participants]);
+
+  const resolvedParticipant = React.useMemo(() => {
+    return resolveParticipantForManualEntry(participantMap, passingTxNo, passingPlate);
+  }, [participantMap, passingPlate, passingTxNo]);
+
+  const resolvedCategory = resolvedParticipant?.categoryId ? props.raceStateLookup.getCategoryById(resolvedParticipant.categoryId) : undefined;
+  const resolvedEntrantName = resolvedParticipant ? `${resolvedParticipant.firstname || ''} ${resolvedParticipant.surname || ''}`.trim() : '';
+  const resolvedTeamName = getParticipantTeamName(resolvedParticipant, props.raceStateLookup);
+  const resolvedCategoryName = resolvedCategory?.name || '';
+
+  const handleTxNoChange = (value: string): void => {
+    setPassingTxNo(value);
+    const matchedParticipant = resolveParticipantForManualEntry(participantMap, value, '');
+    const matchedPlate = matchedParticipant ? getParticipantNumber(matchedParticipant) : undefined;
+    if (matchedPlate !== undefined) {
+      setPassingPlate(matchedPlate.toString());
+    }
+  };
+
+  const handleSave = (): void => {
+    if (!anchorRecord) {
+      return;
+    }
+    const parsedTime = parseManualTimeOfDay(anchorRecord.time, timeOfDay);
+    if (!parsedTime) {
+      setTimeError('Enter a valid time of day like 09:15:03.250');
+      return;
+    }
+    setTimeError('');
+    if (recordType === 'passing' && passingTxNo.trim().length === 0 && passingPlate.trim().length === 0) {
+      setTimeError('Enter a TxNo or Plate for a passing record');
+      return;
+    }
+    const record = recordType === 'flag'
+      ? buildManualFlagRecord(
+        anchorRecord,
+        props.currentEventId,
+        props.currentSessionId,
+        props.records,
+        parsedTime,
+        flagType,
+        selectedFlagCategoryIds,
+        editingRecord
+      )
+      : buildManualPassingRecord(
+        anchorRecord,
+        props.currentEventId,
+        props.currentSessionId,
+        props.records,
+        parsedTime,
+        passingTxNo,
+        passingPlate,
+        passingAntenna,
+        editingRecord
+      );
+    props.onSave(record, dialogMode);
+    props.onClose();
+  };
+
+  return (
+    <Dialog fullWidth maxWidth="md" onClose={props.onClose} open={props.openState !== null}>
+      <DialogTitle>{dialogMode === 'edit' ? 'Edit record' : 'Add record'}</DialogTitle>
+      <DialogContent>
+        <div className="event-details-form-grid">
+          <TextField
+            autoFocus
+            error={timeError.length > 0}
+            helperText={timeError || ' '}
+            label="Time of day"
+            margin="dense"
+            onChange={(event) => setTimeOfDay(event.target.value)}
+            slotProps={{ htmlInput: { 'aria-label': 'Time of day' } }}
+            value={timeOfDay}
+          />
+          <div className="event-details-form-row">
+            <label className="page-filter-label">
+              Record type
+              <select
+                aria-label="Record type"
+                onChange={(event) => setRecordType(event.target.value as AddableRecordType)}
+                value={recordType}
+              >
+                <option value="passing">Passing</option>
+                <option value="flag">Flag</option>
+              </select>
+            </label>
+            {recordType === 'flag' ? (
+              <label className="page-filter-label">
+                Flag type
+                <select
+                  aria-label="Flag type"
+                  onChange={(event) => setFlagType(event.target.value as AddableFlagType)}
+                  value={flagType}
+                >
+                  {(Object.keys(manualFlagLabelByType) as AddableFlagType[]).map((value) => (
+                    <option key={value} value={value}>{manualFlagLabelByType[value]}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+          </div>
+          {recordType === 'flag' ? (
+            <FormControl fullWidth margin="dense">
+              <InputLabel id="manual-record-categories-label" shrink>For category</InputLabel>
+              <Select
+                displayEmpty
+                id="manual-record-categories"
+                label="For category"
+                labelId="manual-record-categories-label"
+                multiple
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setSelectedFlagCategoryIds(typeof value === 'string' ? value.split(',') as EventCategoryId[] : value as EventCategoryId[]);
+                }}
+                renderValue={(selected) => (selected as string[]).length > 0
+                  ? categories
+                    .filter((category) => (selected as string[]).includes(category.id))
+                    .map((category) => category.name || category.id)
+                    .join(', ')
+                  : 'All'}
+                value={selectedFlagCategoryIds}
+              >
+                {categories.map((category) => (
+                  <MenuItem key={category.id} value={category.id}>
+                    <Checkbox checked={selectedFlagCategoryIds.includes(category.id)} />
+                    <ListItemText primary={category.name || category.id} />
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          ) : (
+            <>
+              <div className="event-details-form-row">
+                <TextField
+                  label="TxNo"
+                  margin="dense"
+                  onChange={(event) => handleTxNoChange(event.target.value)}
+                  slotProps={{ htmlInput: { 'aria-label': 'TxNo', list: 'manual-record-tx-options' } }}
+                  value={passingTxNo}
+                />
+                <TextField
+                  label="Plate"
+                  margin="dense"
+                  onChange={(event) => setPassingPlate(event.target.value)}
+                  slotProps={{ htmlInput: { 'aria-label': 'Plate', list: 'manual-record-plate-options' } }}
+                  value={passingPlate}
+                />
+                <TextField
+                  label="Antenna"
+                  margin="dense"
+                  onChange={(event) => setPassingAntenna(event.target.value)}
+                  slotProps={{ htmlInput: { 'aria-label': 'Antenna' } }}
+                  value={passingAntenna}
+                />
+              </div>
+              <datalist id="manual-record-tx-options">
+                {txOptions.map((option) => <option key={option} value={option} />)}
+              </datalist>
+              <datalist id="manual-record-plate-options">
+                {plateOptions.map((option) => <option key={option} value={option} />)}
+              </datalist>
+              <div className="event-details-form-row">
+                <TextField disabled label="Entrant name" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Entrant name' } }} value={resolvedEntrantName} />
+                <TextField disabled label="Team name" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Team name' } }} value={resolvedTeamName} />
+                <TextField disabled label="Category name" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Category name' } }} value={resolvedCategoryName} />
+              </div>
+            </>
+          )}
+        </div>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={props.onClose}>Cancel</Button>
+        <Button onClick={handleSave} variant="contained">{dialogMode === 'edit' ? 'Save record' : 'Add record'}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 // const RecordTable = (props: RecordTableProps) => {
 
 // };
 
 export const RecentRecords = (props: RecordsProps & { 
   onAssignFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void,
+  onAddRecord?: (record: EventTimeRecord) => void,
+  onEditRecord?: (record: EventTimeRecord) => void,
   onExclude?: (crossingId: string, exclude: boolean) => void,
   onChangeCategory?: (participantId: string, categoryId: EventCategoryId) => void,
   onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void,
   onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void
 }) => {
+  const [addRecordDialogState, setAddRecordDialogState] = React.useState<AddRecordDialogState | null>(null);
   const [recentFirst, setRecentFirst] = React.useState<boolean>(false);
   const [filterMode, setFilterMode] = React.useState<RecentRecordsFilterMode>('all');
   const [ignoreModes, setIgnoreModes] = React.useState<RecentRecordsIgnoreMode[]>([]);
@@ -921,8 +1457,29 @@ export const RecentRecords = (props: RecordsProps & {
   const tableContainerStyle = {
     '--recent-records-table-header-top': toolbarDock.isDocked ? `${toolbarDock.height}px` : '0px',
   } as React.CSSProperties;
+  const openAddRecordDialog = (record: EventTimeRecord): void => {
+    setAddRecordDialogState({ anchorRecord: record, mode: 'add' });
+  };
+  const openEditRecordDialog = (record: EventTimeRecord): void => {
+    setAddRecordDialogState({ anchorRecord: record, existingRecord: record, mode: 'edit' });
+  };
 
   return <>
+    <AddRecordDialog
+      currentEventId={props.currentEventId}
+      currentSessionId={props.currentSessionId}
+      onClose={() => setAddRecordDialogState(null)}
+      onSave={(record, mode) => {
+        if (mode === 'edit') {
+          props.onEditRecord?.(record);
+          return;
+        }
+        props.onAddRecord?.(record);
+      }}
+      openState={addRecordDialogState}
+      raceStateLookup={props.raceStateLookup}
+      records={props.records}
+    />
     <div
       className="recent-records-toolbar-anchor"
       ref={toolbarAnchorRef}
@@ -1068,6 +1625,8 @@ export const RecentRecords = (props: RecordsProps & {
                     categorySelected={props.categorySelected}
                     participantSelected={props.participantSelected}
                     onAssignFlagCategory={props.onAssignFlagCategory}
+                    onOpenAddRecordDialog={openAddRecordDialog}
+                    onOpenEditRecordDialog={openEditRecordDialog}
                     onExclude={props.onExclude}
                     onChangeCategory={props.onChangeCategory}
                     onMarkFlagDeleted={props.onMarkFlagDeleted}

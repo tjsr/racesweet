@@ -108,6 +108,20 @@ const toggleIgnoreRecordsFilter = async (filterLabel: string): Promise<void> => 
   });
 };
 
+const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: string): void => {
+  const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+  descriptor?.set?.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+};
+
+const setSelectValue = (select: HTMLSelectElement, value: string): void => {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+  descriptor?.set?.call(select, value);
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+};
+
 const expectIgnoreRecordsFilterChecked = async (filterLabel: string): Promise<void> => {
   const ignoreSelect = document.querySelector('#recent-records-ignore-dropdown [role="combobox"]');
   expect(ignoreSelect).toBeDefined();
@@ -2142,5 +2156,343 @@ describe('RecentRecords integration', () => {
 
     const flagRow = container.querySelector('tr[data-record-id="flag-1"]');
     expect(flagRow?.textContent).toContain('Chequered flag');
+  });
+
+  it('opens the add-record dialog from a passing row and builds a passing record with looked-up entrant details', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const participant: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'entrant-101',
+      firstname: 'Pat',
+      id: 'participant-101',
+      identifiers: [
+        { fromTime: undefined, racePlate: '101', toTime: undefined },
+        { fromTime: undefined, toTime: undefined, txNo: 100101 },
+      ] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const team: EventTeam = {
+      categoryId: categoryA.id,
+      description: '',
+      id: 'team-1',
+      members: [participant.id],
+      name: 'Fast Team',
+    };
+    const crossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'crossing-1',
+      isValid: true,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[]; teams: EventTeam[] } = {
+      categories: [categoryA],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantLaps: () => [crossing],
+      getTransponderCrossings: () => [],
+      participants: [participant],
+      teams: [team],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+    const onAddRecord = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          currentEventId="event-1"
+          currentSessionId="session-1"
+          onAddRecord={onAddRecord}
+          raceStateLookup={raceStateLookup}
+          records={[crossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const row = container.querySelector('tr[data-record-id="crossing-1"]');
+    expect(row).not.toBeNull();
+
+    await act(async () => {
+      row!.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 80,
+        clientY: 80,
+      }));
+    });
+
+    const addRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Add record');
+    expect(addRecordMenuItem).toBeDefined();
+
+    await act(async () => {
+      addRecordMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const timeInput = document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement | null;
+    const txInput = document.querySelector('input[aria-label="TxNo"]') as HTMLInputElement | null;
+    const antennaInput = document.querySelector('input[aria-label="Antenna"]') as HTMLInputElement | null;
+    expect(timeInput).toBeTruthy();
+    expect(txInput).toBeTruthy();
+    expect(antennaInput).toBeTruthy();
+
+    await act(async () => {
+      setInputValue(timeInput!, '10:07:30.250');
+      setInputValue(txInput!, '100101');
+      setInputValue(antennaInput!, 'Loop A');
+    });
+
+    expect((document.querySelector('input[aria-label="Plate"]') as HTMLInputElement).value).toBe('101');
+    expect((document.querySelector('input[aria-label="Entrant name"]') as HTMLInputElement).value).toBe('Pat Rider');
+    expect((document.querySelector('input[aria-label="Team name"]') as HTMLInputElement).value).toBe('Fast Team');
+    expect((document.querySelector('input[aria-label="Category name"]') as HTMLInputElement).value).toBe('Category A');
+
+    const addButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Add record');
+    expect(addButton).toBeDefined();
+
+    await act(async () => {
+      addButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onAddRecord).toHaveBeenCalledTimes(1);
+    expect(onAddRecord).toHaveBeenCalledWith(expect.objectContaining({
+      antenna: 'Loop A',
+      chipCode: 100101,
+      eventId: 'event-1',
+      plateNumber: '101',
+      recordType: RECORD_TX_CROSSING,
+      sessionId: 'session-1',
+      source: expect.any(String),
+    }));
+    expect((onAddRecord.mock.calls[0]?.[0] as ParticipantPassingRecord & { time?: Date }).time?.toISOString()).toBe('2026-05-29T10:07:30.250Z');
+  });
+
+  it('opens the add-record dialog from a flag row and builds a category-scoped flag record', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const categoryB: EventCategory = { id: '2', name: 'Category B' };
+    const flag: FlagRecord = {
+      categoryIds: [categoryA.id],
+      flagType: 'green',
+      flagValue: 'course',
+      id: 'flag-1',
+      recordType: 4,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:00:00.000Z'),
+    };
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [categoryA, categoryB],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => [categoryA, categoryB].find((category) => category.id === categoryId),
+      getEntrantIdForParticipant: () => undefined,
+      getParticipantById: () => undefined,
+      getParticipantLaps: () => [],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+    const onAddRecord = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          currentEventId="event-1"
+          currentSessionId="session-1"
+          onAddRecord={onAddRecord}
+          raceStateLookup={raceStateLookup}
+          records={[flag as unknown as ParticipantPassingRecord]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const row = container.querySelector('tr[data-record-id="flag-1"]');
+    expect(row).not.toBeNull();
+
+    await act(async () => {
+      row!.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 90,
+        clientY: 90,
+      }));
+    });
+
+    const addRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Add record');
+    expect(addRecordMenuItem).toBeDefined();
+
+    await act(async () => {
+      addRecordMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const recordTypeSelect = document.querySelector('select[aria-label="Record type"]') as HTMLSelectElement | null;
+    expect(recordTypeSelect).toBeTruthy();
+
+    await act(async () => {
+      setSelectValue(recordTypeSelect!, 'flag');
+    });
+
+    const flagTypeSelect = document.querySelector('select[aria-label="Flag type"]') as HTMLSelectElement | null;
+    expect(flagTypeSelect).toBeTruthy();
+
+    await act(async () => {
+      setSelectValue(flagTypeSelect!, 'red');
+    });
+
+    const categorySelect = document.querySelector('#manual-record-categories') as HTMLElement | null;
+    expect(categorySelect).toBeTruthy();
+
+    await act(async () => {
+      categorySelect!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+
+    const categoryBOption = Array.from(document.querySelectorAll('li[role="option"]')).find((option) => option.textContent?.includes(categoryB.name));
+    expect(categoryBOption).toBeDefined();
+
+    await act(async () => {
+      categoryBOption!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const addButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Add record');
+    expect(addButton).toBeDefined();
+
+    await act(async () => {
+      addButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onAddRecord).toHaveBeenCalledWith(expect.objectContaining({
+      categoryIds: [categoryB.id],
+      eventId: 'event-1',
+      flagType: 'red',
+      flagValue: 'course',
+      sessionId: 'session-1',
+      source: expect.any(String),
+    }));
+  });
+
+  it('opens the edit-record dialog with existing values populated and saves through the edit callback', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const participant: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'entrant-101',
+      firstname: 'Pat',
+      id: 'participant-101',
+      identifiers: [
+        { fromTime: undefined, racePlate: '101', toTime: undefined },
+        { fromTime: undefined, toTime: undefined, txNo: 100101 },
+      ] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const crossing = {
+      antenna: 'Loop A',
+      chipCode: 100101,
+      id: 'crossing-1',
+      isValid: true,
+      participantId: participant.id,
+      plateNumber: '101',
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord & { antenna: string; plateNumber: string };
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
+      categories: [categoryA],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantLaps: () => [crossing],
+      getTransponderCrossings: () => [],
+      participants: [participant],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+    const onAddRecord = vi.fn();
+    const onEditRecord = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          currentEventId="event-1"
+          currentSessionId="session-1"
+          onAddRecord={onAddRecord}
+          onEditRecord={onEditRecord}
+          raceStateLookup={raceStateLookup}
+          records={[crossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const row = container.querySelector('tr[data-record-id="crossing-1"]');
+    expect(row).not.toBeNull();
+
+    await act(async () => {
+      row!.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 100,
+        clientY: 100,
+      }));
+    });
+
+    const editRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Edit record');
+    expect(editRecordMenuItem).toBeDefined();
+
+    await act(async () => {
+      editRecordMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(document.body.textContent).toContain('Edit record');
+    expect((document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement).value).toBe('10:06:00.000');
+    expect((document.querySelector('input[aria-label="TxNo"]') as HTMLInputElement).value).toBe('100101');
+    expect((document.querySelector('input[aria-label="Plate"]') as HTMLInputElement).value).toBe('101');
+    expect((document.querySelector('input[aria-label="Antenna"]') as HTMLInputElement).value).toBe('Loop A');
+
+    await act(async () => {
+      setInputValue(document.querySelector('input[aria-label="Antenna"]') as HTMLInputElement, 'Loop B');
+      setInputValue(document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement, '10:06:30.500');
+    });
+
+    const saveButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Save record');
+    expect(saveButton).toBeDefined();
+
+    await act(async () => {
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onAddRecord).not.toHaveBeenCalled();
+    expect(onEditRecord).toHaveBeenCalledTimes(1);
+    expect(onEditRecord).toHaveBeenCalledWith(expect.objectContaining({
+      antenna: 'Loop B',
+      chipCode: 100101,
+      id: 'crossing-1',
+      plateNumber: '101',
+      sequence: 1,
+      sessionId: 'session-1',
+      source: 'test-source',
+    }));
+    expect((onEditRecord.mock.calls[0]?.[0] as ParticipantPassingRecord & { time?: Date }).time?.toISOString()).toBe('2026-05-29T10:06:30.500Z');
   });
 });

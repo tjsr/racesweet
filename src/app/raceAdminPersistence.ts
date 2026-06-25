@@ -1,5 +1,7 @@
 import type { EventCategoryId } from '../model/eventcategory.js';
 import type { EventEntrantId } from '../model/entrant.js';
+import type { SessionId } from '../model/raceevent.js';
+import type { EventTimeRecord } from '../model/timerecord.js';
 import type { TimeRecordId } from '../model/timerecord.js';
 import { RendererApiUnavailableError, getRendererApi } from './rendererApi.js';
 
@@ -9,12 +11,24 @@ export interface FlagCategoryChange {
   flagId: TimeRecordId;
 }
 
+export interface AddedSessionRecord {
+  record: EventTimeRecord;
+  sessionId: SessionId;
+}
+
+export interface UpdatedSessionRecord {
+  record: EventTimeRecord;
+  sessionId: SessionId;
+}
+
 export interface AdministrativeChanges {
+  addedRecords: AddedSessionRecord[];
   entrantCategories: Record<EventEntrantId, EventCategoryId>;
   excludedCrossings: Record<string, boolean>;
   flagCategoryChanges: FlagCategoryChange[];
   flagDeleted: Record<TimeRecordId, boolean>;
   schemaVersion: 1;
+  updatedRecords: UpdatedSessionRecord[];
 }
 
 export interface RaceAdminPersistence {
@@ -23,12 +37,36 @@ export interface RaceAdminPersistence {
 }
 
 export const createDefaultAdministrativeChanges = (): AdministrativeChanges => ({
+  addedRecords: [],
   entrantCategories: {},
   excludedCrossings: {},
   flagCategoryChanges: [],
   flagDeleted: {},
   schemaVersion: 1,
+  updatedRecords: [],
 });
+
+const reviveAddedSessionRecord = (entry: AddedSessionRecord): AddedSessionRecord => {
+  const recordTime = entry.record?.time;
+  return {
+    ...entry,
+    record: {
+      ...entry.record,
+      time: typeof recordTime === 'string' ? new Date(recordTime) : recordTime,
+    },
+  };
+};
+
+const reviveUpdatedSessionRecord = (entry: UpdatedSessionRecord): UpdatedSessionRecord => {
+  const recordTime = entry.record?.time;
+  return {
+    ...entry,
+    record: {
+      ...entry.record,
+      time: typeof recordTime === 'string' ? new Date(recordTime) : recordTime,
+    },
+  };
+};
 
 const isFileNotFoundError = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error);
@@ -66,11 +104,13 @@ export class ElectronJsonRaceAdminPersistence implements RaceAdminPersistence {
       return {
         ...createDefaultAdministrativeChanges(),
         ...parsed,
+        addedRecords: (parsed.addedRecords || []).map(reviveAddedSessionRecord),
         entrantCategories: parsed.entrantCategories || {},
         excludedCrossings: parsed.excludedCrossings || {},
         flagCategoryChanges: parsed.flagCategoryChanges || [],
         flagDeleted: parsed.flagDeleted || {},
         schemaVersion: 1,
+        updatedRecords: (parsed.updatedRecords || []).map(reviveUpdatedSessionRecord),
       };
     } catch (error: unknown) {
       if (error instanceof RendererApiUnavailableError) {

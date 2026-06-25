@@ -133,6 +133,8 @@ describe('TimingContext integration', () => {
           categoryListSelected={setSelectedCategories}
           eventTimeZone="Australia/Sydney"
           events={[event]}
+          onAddRecord={() => undefined}
+          onEditRecord={() => undefined}
           onAssignFlagCategory={() => undefined}
           onChangeCategory={() => undefined}
           onExclude={() => undefined}

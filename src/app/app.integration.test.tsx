@@ -32,6 +32,7 @@ vi.mock('./views/timing/categoryList.js', () => ({
 }));
 
 interface MockRecentRecordsProps {
+  onAddRecord?: (record: { id: string; recordType: number; sequence: number; sessionId: string; source: string }) => void;
   onAssignFlagCategory?: (flagId: string, categoryId: string) => void;
   onMarkFlagDeleted?: (flagId: string, deleted: boolean) => void;
   onRemoveFlagCategory?: (flagId: string, categoryId: string) => void;
@@ -54,6 +55,16 @@ vi.mock('../views/display/recent', async () => {
         'data-timing-record-count': props.records.length,
       },
       `Recent Records (${props.records.length})`,
+      react.createElement('button', {
+        'data-action': 'add-record',
+        onClick: () => props.onAddRecord?.({
+          id: 'manual-record-1',
+          recordType: 16,
+          sequence: 999,
+          sessionId: '1b6f4b9f-5b0a-4d3f-9d5d-5f0c7c77f111',
+          source: 'manual-source',
+        }),
+      }, 'Add record'),
       flagRecord && react.createElement('button', {
         'data-action': 'mark-flag-deleted',
         onClick: () => props.onMarkFlagDeleted?.(flagRecord.id, true),
@@ -87,6 +98,16 @@ vi.mock('./views/timing/recentRecords', async () => {
         'data-timing-record-count': props.records.length,
       },
       `Recent Records (${props.records.length})`,
+      react.createElement('button', {
+        'data-action': 'add-record',
+        onClick: () => props.onAddRecord?.({
+          id: 'manual-record-1',
+          recordType: 16,
+          sequence: 999,
+          sessionId: '1b6f4b9f-5b0a-4d3f-9d5d-5f0c7c77f111',
+          source: 'manual-source',
+        }),
+      }, 'Add record'),
       flagRecord && react.createElement('button', {
         'data-action': 'mark-flag-deleted',
         onClick: () => props.onMarkFlagDeleted?.(flagRecord.id, true),

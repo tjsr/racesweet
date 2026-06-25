@@ -28,7 +28,7 @@ export const entrantHasPlate = (
   plateNumber: PlateNumberType,
   entrant: EventParticipant,
   lookupTime: Date = new Date()
-): boolean => matchParticipantToIdentifier(entrant, plateNumber, 'plateNumber', lookupTime) != null;
+): boolean => matchParticipantToIdentifier(entrant, plateNumber, 'racePlate', lookupTime) != null;
 
 export const entrantHasTransponder = (
   transponder: string | number,

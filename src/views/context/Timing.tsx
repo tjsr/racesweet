@@ -20,6 +20,8 @@ interface TimingContextProps {
   categoryListSelected: (ids: Set<EventCategoryId>) => void;
   eventTimeZone: string;
   events: EventCatalogEvent[];
+  onAddRecord: (record: EventTimeRecord) => void;
+  onEditRecord: (record: EventTimeRecord) => void;
   onAssignFlagCategory: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
   onChangeCategory: (participantId: string, categoryId: EventCategoryId) => void;
   onExclude: (crossingId: string, exclude: boolean) => void;
@@ -70,7 +72,11 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
         </label>
       </div>
       <RecentRecords
+        currentEventId={props.timingEvent?.id}
+        currentSessionId={props.timingSessionValue === 'active' ? props.activeSession?.id : props.timingSessionValue}
         eventTimeZone={props.eventTimeZone}
+        onAddRecord={props.onAddRecord}
+        onEditRecord={props.onEditRecord}
         records={(props.raceState.records as EventTimeRecord[]) || []}
         raceStateLookup={props.raceState}
         selectedCategories={props.selectedCategories}

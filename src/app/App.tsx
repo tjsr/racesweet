@@ -6,7 +6,7 @@ import { EventCategoryId } from '../model/eventcategory.ts';
 import { type EventParticipantId } from '../model/eventparticipant.ts';
 import { EventId, SessionId } from '../model/raceevent.ts';
 import { RaceStateLookup, Session } from '../model/racestate.ts';
-import { type TimeRecordId } from '../model/timerecord.ts';
+import { type EventTimeRecord, type TimeRecordId } from '../model/timerecord.ts';
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
 import { TestSession } from '../testdata/testsession.ts';
 import { CategoriesContext } from '../views/context/Categories.tsx';
@@ -326,6 +326,9 @@ export const RaceSweetMainApp = () => {
           const entrantList = getEntrantsForEvent(catalog, initialEventId);
           const initialSessionId = sessionList.find((session) => session.id === catalog.activeSessionId)?.id || sessionList[0]?.id;
 
+          if (initialSessionId) {
+            raceService.applyChangesToSessionById(session, initialSessionId);
+          }
           setAdminService(raceService);
           setEventCatalogService(catalogService);
           setSystemConfigService(systemService);
@@ -526,7 +529,7 @@ export const RaceSweetMainApp = () => {
       const loadedPersistedState = await applyPersistedRaceStateToSession(eventId, sessionId, targetSessionState);
       if (loadedPersistedState) {
         if (adminService) {
-          adminService.applyChangesToSession(targetSessionState);
+          adminService.applyChangesToSessionById(targetSessionState, sessionId);
         }
         return targetSessionState;
       }
@@ -535,7 +538,7 @@ export const RaceSweetMainApp = () => {
         const loadedSourcePersistedState = await applyPersistedRaceStateForSourceToSession(source, targetSessionState);
         if (loadedSourcePersistedState) {
           if (adminService) {
-            adminService.applyChangesToSession(targetSessionState);
+            adminService.applyChangesToSessionById(targetSessionState, sessionId);
           }
           return targetSessionState;
         }
@@ -550,7 +553,7 @@ export const RaceSweetMainApp = () => {
     }
 
     if (targetSessionState && adminService) {
-      adminService.applyChangesToSession(targetSessionState);
+      adminService.applyChangesToSessionById(targetSessionState, sessionId);
     }
 
     return targetSessionState;
@@ -791,6 +794,26 @@ export const RaceSweetMainApp = () => {
       .catch((error: unknown) => setTimingErrorState(error as Error));
   };
 
+  const handleAddTimingRecord = (record: EventTimeRecord) => {
+    if (!adminService || !record.sessionId) {
+      return;
+    }
+    const targetRaceState = timingRaceState || sessionState;
+    adminService.addRecordForSession(targetRaceState, record.sessionId, record)
+      .then(() => setRenderTick((tick) => tick + 1))
+      .catch((error: unknown) => setTimingErrorState(error as Error));
+  };
+
+  const handleEditTimingRecord = (record: EventTimeRecord) => {
+    if (!adminService || !record.sessionId) {
+      return;
+    }
+    const targetRaceState = timingRaceState || sessionState;
+    adminService.updateRecordForSession(targetRaceState, record.sessionId, record)
+      .then(() => setRenderTick((tick) => tick + 1))
+      .catch((error: unknown) => setTimingErrorState(error as Error));
+  };
+
   const handleChangeCategory = (participantId: string, categoryId: EventCategoryId) => {
     if (!adminService) {
       return;
@@ -887,6 +910,8 @@ export const RaceSweetMainApp = () => {
           categoryListSelected={handleCategoryListSelected}
           eventTimeZone={timingEvent?.timeZone || getSystemTimeZone()}
           events={eventCatalogState.events}
+          onAddRecord={handleAddTimingRecord}
+          onEditRecord={handleEditTimingRecord}
           onAssignFlagCategory={handleAssignFlagCategory}
           onChangeCategory={handleChangeCategory}
           onExclude={handleExcludeCrossing}

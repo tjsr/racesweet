@@ -4,7 +4,7 @@ import {
   EVENT_SESSION_END,
   EVENT_SESSION_START
 } from "../model/timerecord.ts";
-import type { FlagRecord, GreenFlagRecord } from '../model/flag.ts';
+import type { FlagRecord, GreenFlagRecord, RedFlagRecord } from '../model/flag.ts';
 import { NoEventFlagsError, NoStartFlagError } from "../validators/errors.js";
 import type { TimeRecord, TimeRecordId } from "../model/timerecord.js";
 import { getTimeRecordIdentifier, isNotRecordType } from './timerecord.ts';
@@ -37,6 +37,15 @@ export const createGreenFlagEvent = (event: Partial<GreenFlagRecord>): GreenFlag
   };
 
   return green as GreenFlagRecord;
+};
+
+export const createRedFlagEvent = (event: Partial<RedFlagRecord>): RedFlagRecord => {
+  const flag = createFlagEvent(event);
+  return {
+    ...flag,
+    flagType: 'red',
+    flagValue: event.flagValue || 'course',
+  } as RedFlagRecord;
 };
 //   const newFlagEvent = createFlagEvent(event);
 //   const flagEventId = newFlagEvent.id;

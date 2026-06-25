@@ -42,6 +42,9 @@ export const assignEntrantToTime = (
   if (Object.prototype.hasOwnProperty.call(record, 'chipCode')) {
     const crossing = record as ChipCrossingData;
     assignEntrantToChipCrossing(entrants, crossing, createUnknownEntrants, categoryList);
+    if (!crossing.participantId && Object.prototype.hasOwnProperty.call(record, 'plateNumber')) {
+      assignEntrantToPlateCrossing(entrants, record as PlateCrossingData, createUnknownEntrants);
+    }
   } else if (Object.prototype.hasOwnProperty.call(record, 'plateNumber')) {
     const crossing = record as PlateCrossingData;
     const plateNumber = crossing.plateNumber;

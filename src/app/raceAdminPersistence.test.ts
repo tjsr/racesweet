@@ -79,6 +79,10 @@ describe('ElectronJsonRaceAdminPersistence', () => {
 
   it('returns parsed admin changes when file exists', async () => {
     const requestFileContent = vi.fn(async () => JSON.stringify({
+      addedRecords: [{
+        record: { id: 'record-1', recordType: 16, sequence: 1, sessionId: 'session-a', source: 'manual-source' },
+        sessionId: 'session-a',
+      }],
       entrantCategories: { teamA: 'cat-1' },
       excludedCrossings: { crossing1: true },
       schemaVersion: 1,
@@ -96,11 +100,16 @@ describe('ElectronJsonRaceAdminPersistence', () => {
     const loaded = await persistence.load();
 
     expect(loaded).toEqual({
+      addedRecords: [{
+        record: { id: 'record-1', recordType: 16, sequence: 1, sessionId: 'session-a', source: 'manual-source' },
+        sessionId: 'session-a',
+      }],
       entrantCategories: { teamA: 'cat-1' },
       excludedCrossings: { crossing1: true },
       flagCategoryChanges: [],
       flagDeleted: {},
       schemaVersion: 1,
+      updatedRecords: [],
     });
   });
 

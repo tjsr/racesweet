@@ -7,7 +7,7 @@ import { FlagReferencesUnknownCategoryError, InvalidFlagRecordError } from "./er
 import type { EventCategory, EventCategoryId } from "./eventcategory.js";
 import type { EventParticipant, EventParticipantId } from "./eventparticipant.js";
 import type { FlagRecord, GreenFlagRecord } from "./flag.js";
-import type { ParticipantPassingRecord, TimeRecord, TimeRecordId, Validated } from "./timerecord.js";
+import type { EventTimeRecord, ParticipantPassingRecord, TimeRecord, TimeRecordId, Validated } from "./timerecord.js";
 
 import { isPlaceholderCatgegory } from "../controllers/category.js";
 import { isParsedChipCrossing } from "../controllers/chipCrossing.js";
@@ -30,6 +30,7 @@ export interface RaceStateLookup {
   assignFlagCategory?(flagId: TimeRecordId, categoryId: EventCategoryId): void;
   markFlagDeleted?(flagId: TimeRecordId, deleted: boolean): void;
   removeFlagCategory?(flagId: TimeRecordId, categoryId: EventCategoryId): void;
+  updateRecord?(record: EventTimeRecord): void;
   updateCategoryDetails(categoryId: EventCategoryId, changes: Partial<Pick<EventCategory, 'code' | 'description' | 'distance' | 'duration' | 'excludeFromResults' | 'name' | 'startTime'>>): void;
   updateEntrantCategory(entrantId: EventEntrantId, categoryId: EventCategoryId): void;
   updateParticipantCategory(participantId: EventParticipantId, categoryId: EventCategoryId): void;
@@ -292,6 +293,37 @@ export class Session implements RaceState, RaceStateLookup {
         this._processRecord(record);
       }
     });
+  }
+
+  public updateRecord(record: EventTimeRecord): void {
+    if (!isValidId(record.id)) {
+      throw new InvalidIdError(`Record ID ${record.id} is not a valid Id type.`);
+    }
+    if (!this._records.has(record.id.toString())) {
+      throw new Error(`Record ${record.id} does not exist in this session.`);
+    }
+
+    this._validateRecords([record]);
+    const updatedRecord = { ...record } as EventTimeRecord;
+    if (isCrossingRecord(updatedRecord)) {
+      const crossing = updatedRecord as ParticipantPassingRecord;
+      crossing.entrantId = undefined;
+      crossing.elapsedTime = undefined;
+      crossing.lapNo = undefined;
+      crossing.lapTime = undefined;
+      crossing.participantId = undefined;
+      crossing.participantStartRecordId = undefined;
+      crossing.startingLapRecordId = undefined;
+    }
+
+    this._records.set(updatedRecord.id.toString(), updatedRecord);
+    this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
+    this._categoryGreenFlags = undefined;
+
+    if (isCrossingRecord(updatedRecord)) {
+      assignParticpantsToCrossings(this._participants, [updatedRecord]);
+    }
+    this.__reprocessAllParticipantLaps();
   }
 
   public getParticipantLaps(participantId: EventParticipantId): ParticipantPassingRecord[] | null | undefined {
