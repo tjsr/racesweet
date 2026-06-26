@@ -237,6 +237,7 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   record: RecordType;
   index: number;
   raceStateLookup: RaceStateLookup;
+  selectedRecordId?: TimeRecordId;
   selectedCategories?: Set<EventCategoryId>;
   selectedParticipants?: Set<EventParticipantId>;
   categorySelected?: ((ids: Set<EventCategoryId>) => void) | undefined;
@@ -248,6 +249,7 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
   onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void;
   onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
+  onSelectRecord?: (recordId: TimeRecordId) => void;
   timeZone?: string;
 }
 
@@ -275,6 +277,9 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
   if (record.categoryIds?.some((id: EventCategoryId) => props.selectedCategories?.has(id))) {
     flagClass += ' selected-category';
   }
+  if (record.id === props.selectedRecordId) {
+    flagClass += ' selected-row';
+  }
   if (record.deleted) {
     flagClass += ' excluded';
   }
@@ -288,6 +293,7 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
   const unassignedCategories = allCategories.filter((category) => !assignedCategoryIds.has(category.id));
   const handleContextMenu = (event: React.MouseEvent): void => {
     event.preventDefault();
+    props.onSelectRecord?.(record.id);
     props.onSelect?.(record);
     setContextMenu(
       contextMenu === null
@@ -330,6 +336,7 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
       onContextMenu={handleContextMenu}
       style={{ cursor: 'context-menu' }}
       onClick={() => {
+        props.onSelectRecord?.(record.id);
         if (props.onSelect) {
           props.onSelect(record);
         }
@@ -452,11 +459,13 @@ interface _CompletedLapProps {
 }
 
 const UnknownChipRow = (
-  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae, onOpenAddRecordDialog, onOpenEditRecordDialog, record, timeZone }: {
+  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae, onOpenAddRecordDialog, onOpenEditRecordDialog, onSelectRecord, record, selectedRecordId, timeZone }: {
     antennae: string
     onOpenAddRecordDialog?: (record: EventTimeRecord) => void,
     onOpenEditRecordDialog?: (record: EventTimeRecord) => void,
+    onSelectRecord?: (recordId: TimeRecordId) => void,
     record: EventTimeRecord,
+    selectedRecordId?: TimeRecordId,
     txNo: number | undefined,
     sequenceNumber: number
     passingTime: Date,
@@ -475,6 +484,7 @@ const UnknownChipRow = (
   const timeString = tableTimeString(passingTime, timeZone);
   const handleContextMenu = (event: React.MouseEvent): void => {
     event.preventDefault();
+    onSelectRecord?.(timeRecordId);
     setContextMenu(
       contextMenu === null
         ? {
@@ -499,9 +509,11 @@ const UnknownChipRow = (
   return (
     <>
       <TableRow
+        className={timeRecordId === selectedRecordId ? 'selected-row' : undefined}
         key={timeRecordId}
         data-record-id={timeRecordId}
         onContextMenu={handleContextMenu}
+        onClick={() => onSelectRecord?.(timeRecordId)}
         style={{ cursor: 'context-menu' }}
       >
         <TableCell>{sequenceNumber}</TableCell>
@@ -542,6 +554,8 @@ interface PassingRecordRowProps {
   onChangeCategory?: (participantId: EventParticipantId, categoryId: EventCategoryId) => void;
   onOpenAddRecordDialog?: (record: EventTimeRecord) => void;
   onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
+  onSelectRecord?: (recordId: TimeRecordId) => void;
+  selectedRecordId?: TimeRecordId;
   timeZone?: string;
 }
 
@@ -558,6 +572,7 @@ export const PassingRecordRow = (
 
   const handleContextMenu = (event: React.MouseEvent) => {
     event.preventDefault();
+    props.onSelectRecord?.(passing.id);
     
     if (props.onSelect && passing) {
       props.onSelect(passing);
@@ -654,6 +669,9 @@ export const PassingRecordRow = (
   if (passing.isExcluded) {
     className += ' excluded';
   }
+  if (passing.id === props.selectedRecordId) {
+    className += ' selected-row';
+  }
 
   const allCategories = (rs as unknown as { categories: EventCategory[] }).categories || [];
 
@@ -666,6 +684,7 @@ export const PassingRecordRow = (
         onContextMenu={handleContextMenu}
         style={{ cursor: 'context-menu' }}
         onClick={(_event: React.MouseEvent<HTMLTableRowElement, MouseEvent>) => {
+          props.onSelectRecord?.(passing.id);
           if (props.onSelect) {
             props.onSelect(passing);
           }
@@ -735,11 +754,13 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       index={props.index}
       raceStateLookup={props.raceStateLookup}
       selectedCategories={props.selectedCategories}
+      selectedRecordId={props.selectedRecordId}
       onAssignFlagCategory={props.onAssignFlagCategory}
       onMarkFlagDeleted={props.onMarkFlagDeleted}
       onOpenAddRecordDialog={props.onOpenAddRecordDialog}
       onOpenEditRecordDialog={props.onOpenEditRecordDialog}
       onRemoveFlagCategory={props.onRemoveFlagCategory}
+      onSelectRecord={props.onSelectRecord}
       onSelect={flagRecordSelected}
       timeZone={props.timeZone}
     />;
@@ -787,11 +808,13 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       passing={passing}
       selectedCategories={props.selectedCategories}
       selectedParticipants={props.selectedParticipants}
+      selectedRecordId={props.selectedRecordId}
       onSelect={passingRecordSelected}
       onExclude={props.onExclude}
       onChangeCategory={props.onChangeCategory}
       onOpenAddRecordDialog={props.onOpenAddRecordDialog}
       onOpenEditRecordDialog={props.onOpenEditRecordDialog}
+      onSelectRecord={props.onSelectRecord}
       timeZone={props.timeZone}
     />;
   }
@@ -805,8 +828,10 @@ export const RecordRow = (props: RecentRecordRowProps) => {
     antennae='?'
     onOpenAddRecordDialog={props.onOpenAddRecordDialog}
     onOpenEditRecordDialog={props.onOpenEditRecordDialog}
+    onSelectRecord={props.onSelectRecord}
     passingTime={record.time!}
     record={record}
+    selectedRecordId={props.selectedRecordId}
     txNo={txNo}
     identifier={identifier}
     rs={props.raceStateLookup}
@@ -1362,6 +1387,7 @@ export const RecentRecords = (props: RecordsProps & {
   const [recentFirst, setRecentFirst] = React.useState<boolean>(false);
   const [filterMode, setFilterMode] = React.useState<RecentRecordsFilterMode>('all');
   const [ignoreModes, setIgnoreModes] = React.useState<RecentRecordsIgnoreMode[]>([]);
+  const [selectedRecordId, setSelectedRecordId] = React.useState<TimeRecordId | undefined>(undefined);
   const toolbarAnchorRef = React.useRef<HTMLDivElement>(null);
   const toolbarRef = React.useRef<HTMLDivElement>(null);
   const [toolbarDock, setToolbarDock] = React.useState({
@@ -1621,6 +1647,7 @@ export const RecentRecords = (props: RecordsProps & {
                     record={record}
                     index={index}
                     raceStateLookup={props.raceStateLookup}
+                    selectedRecordId={selectedRecordId}
                     selectedCategories={props.selectedCategories}
                     selectedParticipants={props.selectedParticipants}
                     categorySelected={props.categorySelected}
@@ -1632,6 +1659,7 @@ export const RecentRecords = (props: RecordsProps & {
                     onChangeCategory={props.onChangeCategory}
                     onMarkFlagDeleted={props.onMarkFlagDeleted}
                     onRemoveFlagCategory={props.onRemoveFlagCategory}
+                    onSelectRecord={setSelectedRecordId}
                     timeZone={displayTimeZone}
                   />
                 ))}

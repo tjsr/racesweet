@@ -3,6 +3,7 @@ import { CategoryId, normalizeCategoryResultExclusion } from '../controllers/cat
 import { EventEntrantId } from '../model/entrant.js';
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
+import type { EventTeam } from '../model/eventteam.js';
 import { createCategoryId, createEventEntrantId, createEventId, createId, createSessionId, rewriteImportedObjectIds } from '../model/ids.js';
 import { EventId, SessionId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
@@ -10,6 +11,7 @@ import type { TimeRecord } from '../model/timerecord.js';
 import { createSeedEventCatalogLedger } from './createSeedEventCatalogLedger.js';
 import {
   type CategoryDistanceRule,
+  type CategoryTeamRules,
   type EntrantType,
   type EventCatalogCategory,
   type EventCatalogEntrant,
@@ -122,8 +124,41 @@ const deriveDistanceRule = (category: EventCategory): CategoryDistanceRule | und
 const normalizeCategoriesForResultExclusion = (categories: EventCategory[]): EventCategory[] =>
   categories.map((category) => normalizeCategoryResultExclusion(category));
 
-const deriveCategoriesFromEventData = (eventId: EventId, categories: EventCategory[], participants: EventParticipant[]): EventCatalogCategory[] => {
+const deriveMaxTeamSizesByCategory = (teams: EventTeam[], participants: EventParticipant[]): Map<string, number> => {
+  const participantById = new Map(participants.map((participant) => [participant.id.toString(), participant]));
+  const maxTeamSizeByCategory = new Map<string, number>();
+
+  teams.forEach((team) => {
+    if (team.members.length <= 1) {
+      return;
+    }
+
+    const categoryIds = unique([
+      team.categoryId?.toString() || '',
+      ...team.members.map((memberId) => participantById.get(memberId.toString())?.categoryId.toString() || ''),
+    ]);
+
+    categoryIds.forEach((categoryId) => {
+      const currentMaxTeamSize = maxTeamSizeByCategory.get(categoryId) || 0;
+      maxTeamSizeByCategory.set(categoryId, Math.max(currentMaxTeamSize, team.members.length));
+    });
+  });
+
+  return maxTeamSizeByCategory;
+};
+
+const createCategoryTeamRules = (categoryId: string, maxTeamSizeByCategory: Map<string, number>): CategoryTeamRules => {
+  const maxTeamSize = maxTeamSizeByCategory.get(categoryId);
+
+  return {
+    ...(maxTeamSize && maxTeamSize > 1 ? { maxTeamSize } : {}),
+    teamCompositionRules: [],
+  };
+};
+
+const deriveCategoriesFromEventData = (eventId: EventId, categories: EventCategory[], participants: EventParticipant[], teams: EventTeam[] = []): EventCatalogCategory[] => {
   const byId = new Map<EventId, EventCatalogCategory>();
+  const maxTeamSizeByCategory = deriveMaxTeamSizesByCategory(teams, participants);
 
   normalizeCategoriesForResultExclusion(categories).forEach((category) => {
     const id = validateUuid(category.id) ? category.id : createCategoryId(category.id);
@@ -139,9 +174,7 @@ const deriveCategoriesFromEventData = (eventId: EventId, categories: EventCatego
           },
         ]
         : [],
-      teamRules: {
-        teamCompositionRules: [],
-      },
+      teamRules: createCategoryTeamRules(id.toString(), maxTeamSizeByCategory),
     });
   });
 
@@ -157,9 +190,7 @@ const deriveCategoriesFromEventData = (eventId: EventId, categories: EventCatego
         id: categoryId,
         name: `Category ${categoryId}`,
         sessionAssignments: [],
-        teamRules: {
-          teamCompositionRules: [],
-        },
+        teamRules: createCategoryTeamRules(categoryId, maxTeamSizeByCategory),
       });
     }
   });
@@ -171,9 +202,11 @@ const deriveEntrantsFromParticipants = (
   eventId: EventId,
   participants: EventParticipant[],
   defaultSessionIds: string[],
-  masterProfiles: MasterEntrantProfile[] = []
+  masterProfiles: MasterEntrantProfile[] = [],
+  teams: EventTeam[] = []
 ): EventCatalogEntrant[] => {
   const groups = new Map<string, EventParticipant[]>();
+  const teamsById = new Map<string, EventTeam>(teams.map((team) => [team.id.toString(), team]));
   participants.forEach((participant) => {
     const entrantId = nonEmpty(participant.entrantId?.toString()) || participant.id.toString();
     const existing = groups.get(entrantId) || [];
@@ -182,6 +215,7 @@ const deriveEntrantsFromParticipants = (
   });
 
   return Array.from(groups.entries()).flatMap(([entrantId, members]) => {
+    const importedTeam = teamsById.get(entrantId);
     const enrichedMembers = members.map((member) => {
       const profile = findProfileForParticipant(member, masterProfiles);
       const fallbackCategoryId = nonEmpty(profile?.categoryId);
@@ -196,9 +230,13 @@ const deriveEntrantsFromParticipants = (
       };
     });
 
-    const categoryIds = unique(enrichedMembers.map((member) => member.categoryId || ''));
+    const importedTeamCategoryId = nonEmpty((importedTeam as EventTeam & { categoryId?: string } | undefined)?.categoryId);
+    const categoryIds = unique([
+      importedTeamCategoryId || '',
+      ...enrichedMembers.map((member) => member.categoryId || ''),
+    ]);
     const memberParticipantIds = unique(enrichedMembers.map((member) => member.participantId));
-    const entrantType = members.length > 1 ? 'team' : 'rider';
+    const entrantType = importedTeam ? 'team' : members.length > 1 ? 'team' : 'rider';
     const riderEntries = members.map((member) => {
       const profile = findProfileForParticipant(member, masterProfiles);
       const riderFirstName = nonEmpty(member.firstname) || nonEmpty(profile?.firstName);
@@ -236,7 +274,7 @@ const deriveEntrantsFromParticipants = (
         eventId,
         id: entrantId,
         memberParticipantIds,
-        name: entrantNameFromMembers(members),
+        name: nonEmpty(importedTeam?.name) || entrantNameFromMembers(members),
         sessionIds: [...defaultSessionIds],
         teamMembers: enrichedMembers,
       },
@@ -532,13 +570,13 @@ export class EventCatalogService {
     ]);
   }
 
-  public async syncEventScaffold(eventId: EventId, categories: EventCategory[], participants: EventParticipant[], masterProfiles: MasterEntrantProfile[] = []): Promise<EventCatalogState> {
+  public async syncEventScaffold(eventId: EventId, categories: EventCategory[], participants: EventParticipant[], masterProfiles: MasterEntrantProfile[] = [], teams: EventTeam[] = []): Promise<EventCatalogState> {
     const event = this.state.events.find((item) => item.id === eventId);
     const sessionIds = event?.sessionIds || this.state.sessions.filter((session) => session.eventId === eventId).map((session) => session.id.toString());
 
-    const scaffoldCategories = deriveCategoriesFromEventData(eventId, categories, participants);
+    const scaffoldCategories = deriveCategoriesFromEventData(eventId, categories, participants, teams);
     const categoryIds = scaffoldCategories.map((category) => category.id.toString());
-    const entrants = deriveEntrantsFromParticipants(eventId, participants, sessionIds, masterProfiles);
+    const entrants = deriveEntrantsFromParticipants(eventId, participants, sessionIds, masterProfiles, teams);
 
     const existingCategoryIds = new Set(this.state.categories.filter((category) => category.eventId === eventId).map((category) => category.id.toString()));
     const categoryMutations = scaffoldCategories.map((category) => {
@@ -710,8 +748,30 @@ export class EventCatalogService {
       normalizedImportData.eventId,
       normalizedImportData.raceState.categories || [],
       normalizedImportData.raceState.participants || [],
-      masterProfiles
+      masterProfiles,
+      normalizedImportData.raceState.teams || []
     );
+  }
+
+  public async updateImportedRaceState(
+    eventId: EventId,
+    sessionId: SessionId,
+    raceState: Partial<RaceState>,
+    apicalDataFilePath?: string
+  ): Promise<EventCatalogState> {
+    const existingMetadata = this.getImportedRaceStateMetadata(eventId, sessionId);
+
+    return this.appendMutations([
+      {
+        apicalDataFilePath: apicalDataFilePath ?? existingMetadata?.apicalDataFilePath,
+        eventId,
+        id: createMutationId(),
+        raceState,
+        sessionId,
+        timestamp: createTimestamp(),
+        type: 'race-state-imported',
+      },
+    ]);
   }
 
   public async createSession(eventId: EventId): Promise<EventCatalogState> {

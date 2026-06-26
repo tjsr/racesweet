@@ -1,5 +1,6 @@
 import type { ApicalLapByCategory } from '../model/apical.js';
 import { createTimeRecordId } from '../model/ids.js';
+import { processAllParticipantLaps } from '../controllers/laps.js';
 import { apicalTimeOfDayToDate, apicalTimeToMilliseconds, convertDataToRaceState, createChipCrossingRecord } from './apical.js';
 import { excelTimeToMilliseconds } from './genericTimeParser.js';
 
@@ -290,5 +291,81 @@ describe('Apical parser', () => {
         name: 'Timing Error List',
       }),
     ]);
+  });
+
+  it('imports Results sheet team entrants and calculates cumulative team laps from state records', () => {
+    const expectedTeamLapCount = 3;
+    const data: ApicalLapByCategory = [
+      {
+        CategoryName: 'Teams A',
+        ParticipantViewModels: [
+          {
+            CategoryName: 'Teams A',
+            IsTeamEntrant: true,
+            LapByCategoryViewModels: [
+              {
+                CumulativeLapTimeSpan: '00:06:00.0000000',
+                CumulativeSeconds: 360,
+                FullName: 'Alice RIDER',
+                Id: 101001,
+                LapNumber: 1,
+                LapTimeSpan: '00:06:00.0000000',
+                RaceNumber: '101',
+                TimeOfDay: '10:06:00.0000000',
+              },
+              {
+                CumulativeLapTimeSpan: '00:12:00.0000000',
+                CumulativeSeconds: 720,
+                FullName: 'Bob RIDER',
+                Id: 102001,
+                LapNumber: 1,
+                LapTimeSpan: '00:06:00.0000000',
+                RaceNumber: '102',
+                TimeOfDay: '10:12:00.0000000',
+              },
+              {
+                CumulativeLapTimeSpan: '00:18:00.0000000',
+                CumulativeSeconds: 1080,
+                FullName: 'Alice RIDER',
+                Id: 101002,
+                LapNumber: 2,
+                LapTimeSpan: '00:06:00.0000000',
+                RaceNumber: '101',
+                TimeOfDay: '10:18:00.0000000',
+              },
+            ],
+            NumberOfLaps: expectedTeamLapCount,
+            Position: 1,
+            RaceNumbers: '101, 102',
+            TeamDisplayName: 'Fast Friends',
+            TeamNameDisplay: 'Fast Friends',
+            TotalTimeSpan: '00:18:00.0000000',
+          },
+        ],
+      },
+    ];
+
+    const raceState = convertDataToRaceState(eventId, new Date('2026-06-07T00:00:00.000Z'), data, 200000, 'UTC');
+    const team = raceState.teams?.find((candidate) => candidate.name === 'Fast Friends');
+    const category = raceState.categories?.find((candidate) => candidate.name === 'Teams A');
+
+    expect(team).toEqual(expect.objectContaining({
+      categoryId: category?.id,
+      members: expect.arrayContaining(raceState.participants!.map((participant) => participant.id)),
+      name: 'Fast Friends',
+    }));
+    expect(raceState.participants).toHaveLength(2);
+    expect(raceState.participants?.map((participant) => participant.entrantId)).toEqual([
+      team?.id,
+      team?.id,
+    ]);
+
+    const participantsById = new Map(raceState.participants!.map((participant) => [participant.id, participant]));
+    const calculatedLaps = processAllParticipantLaps(raceState.records || [], participantsById, 60000, true);
+    const totalTeamLaps = raceState.participants!
+      .flatMap((participant) => calculatedLaps.get(participant.id) || [])
+      .filter((lap) => !lap.isExcluded && lap.lapNo !== undefined).length;
+
+    expect(totalTeamLaps).toBe(expectedTeamLapCount);
   });
 });

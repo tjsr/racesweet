@@ -1,4 +1,8 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { validate as validateUuid } from 'uuid';
+import { readApicalExcelBuffer } from '../controllers/apical/apicalSpreadsheetProcessor.js';
+import { convertDataToRaceState } from '../parsers/apical.js';
 import { createSeedEventCatalogLedger } from './createSeedEventCatalogLedger.js';
 import {
     applyEventCatalogLedger,
@@ -6,8 +10,10 @@ import {
     type EventCatalogLedger,
     type EventCatalogState,
     getCategoriesForEvent,
+    getEntrantsForCategory,
     getEntrantsForEvent,
     getSessionsForEvent,
+    getTeamsForParticipant,
 } from './eventCatalog.js';
 
 import type { EventParticipant } from '../model/eventparticipant.js';
@@ -37,6 +43,14 @@ const TEST_CATEGORY_ID = createCategoryId('event-2026-test-day-category');
 const TEST_ENTRANT_ID = createEventEntrantId('event-2026-test-day-entrant');
 const TEST_EVENT_ID = createEventId('event-2026-test-day');
 const TEST_SESSION_ID = createSessionId('event-2026-test-day-session');
+
+const getParticipantRacePlate = (participant: EventParticipant): string | undefined => {
+  const racePlateIdentifier = participant.identifiers.find((identifier) => {
+    return 'racePlate' in identifier && typeof identifier.racePlate === 'string';
+  }) as { racePlate?: string } | undefined;
+
+  return racePlateIdentifier?.racePlate;
+};
 
 const expectCatalogStateIdsToBeValid = (state: EventCatalogState): void => {
   const eventsById = new Map(state.events.map((event) => [event.id, event]));
@@ -158,6 +172,104 @@ describe('EventCatalogService', () => {
     expect(state.sessions.map((session) => session.eventId)).toEqual([SEED_EVENT_ID, SEED_EVENT_ID, SEED_EVENT_ID]);
     expect(seedEntrant?.categoryIds).toEqual([SEED_PREMIER_CATEGORY_ID]);
     expect(seedEntrant?.sessionIds).toEqual([SEED_PRACTICE_SESSION_ID, SEED_QUALIFYING_SESSION_ID, SEED_RACE_SESSION_ID]);
+  });
+
+  it('persists imported participant identifier updates to the ledger and reloads them', async () => {
+    const persistence = createPersistence(createSeedEventCatalogLedger());
+    const onPersistedLedger = vi.fn();
+    const service = await EventCatalogService.create(persistence, { onPersistedLedger });
+    const participantId = createEventParticipantId('identifier-update-participant');
+    const raceState = {
+      categories: [],
+      participants: [
+        {
+          categoryId: TEST_CATEGORY_ID,
+          currentResult: undefined,
+          entrantId: TEST_ENTRANT_ID,
+          firstname: 'Identifier',
+          id: participantId,
+          identifiers: [
+            { fromTime: undefined, racePlate: '822', toTime: undefined },
+            { fromTime: undefined, txNo: '10000223', toTime: undefined },
+          ],
+          lastRecordTime: null,
+          resultDuration: null,
+          surname: 'Rider',
+        },
+      ],
+      records: [],
+      teams: [],
+    };
+
+    await service.updateImportedRaceState(TEST_EVENT_ID, TEST_SESSION_ID, raceState);
+
+    expect(onPersistedLedger).toHaveBeenCalled();
+    const savedLedger = (persistence.save as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as EventCatalogLedger;
+    const savedMutation = savedLedger.mutations.at(-1);
+    expect(savedMutation?.type).toBe('race-state-imported');
+    expect(savedMutation && savedMutation.type === 'race-state-imported' ? savedMutation.raceState.participants?.[0].identifiers : [])
+      .toEqual(raceState.participants[0].identifiers);
+
+    const reloaded = await EventCatalogService.create(createPersistence(savedLedger));
+    const reloadedRaceState = reloaded.getImportedRaceState(TEST_EVENT_ID, TEST_SESSION_ID);
+    expect(reloadedRaceState?.participants?.[0].identifiers).toEqual(raceState.participants[0].identifiers);
+  });
+
+  it('returns team members with their team when selecting entrants for a team category', () => {
+    const categoryId = createCategoryId('selector-team-category');
+    const eventId = createEventId('selector-team-event');
+    const teamId = createEventEntrantId('selector-team');
+    const memberId = createEventEntrantId('selector-team-member');
+    const state: EventCatalogState = {
+      ...applyEventCatalogLedger(createDefaultEventCatalogLedger()),
+      categories: [
+        {
+          eventId,
+          id: categoryId,
+          name: 'Teams A',
+          teamRules: { teamCompositionRules: [] },
+        },
+      ],
+      entrants: [
+        {
+          categoryId,
+          categoryIds: [categoryId],
+          entrantType: 'team',
+          eventId,
+          id: teamId,
+          memberParticipantIds: [memberId],
+          name: 'Fast Friends',
+          sessionIds: [],
+        },
+        {
+          categoryIds: [],
+          entrantType: 'rider',
+          eventId,
+          id: memberId,
+          memberParticipantIds: [memberId],
+          name: 'Alice RIDER',
+          sessionIds: [],
+          teamEntrantId: teamId,
+        },
+      ],
+      events: [
+        {
+          categoryIds: [categoryId],
+          date: '2026-06-07',
+          entrantIds: [teamId, memberId],
+          format: 'race-weekend',
+          id: eventId,
+          name: 'Team Event',
+          sessionIds: [],
+        },
+      ],
+      sessions: [],
+    };
+
+    expect(getEntrantsForCategory(state, eventId, categoryId).map((entrant) => entrant.name)).toEqual([
+      'Fast Friends',
+      'Alice RIDER',
+    ]);
   });
 
   it('validates seed data through load, save, callback, and service state phases', async () => {
@@ -802,6 +914,223 @@ describe('EventCatalogService', () => {
       ]),
     }));
     expect(seededPersistence.save).toHaveBeenCalledTimes(2);
+  });
+
+  it('scaffolds imported Apical teams using the imported team name and category', async () => {
+    const seededPersistence = createPersistence(createDefaultEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+    const importedEventId = createEventId('apical-team-event');
+    const importedSessionId = createSessionId('apical-team-session');
+    const importedCategoryId = createCategoryId('apical-team-category');
+    const importedTeamId = createEventEntrantId('apical-team-fast-friends');
+    const riderOneId = createEventParticipantId('apical-team-rider-101');
+    const riderTwoId = createEventParticipantId('apical-team-rider-102');
+
+    await service.importApicalRaceState({
+      eventDate: '2026-06-07T01:30:00.000Z',
+      eventId: importedEventId,
+      eventName: 'Apical Teams Round',
+      raceState: {
+        categories: [
+          {
+            id: importedCategoryId,
+            name: 'Teams A',
+          },
+        ],
+        participants: [
+          {
+            categoryId: importedCategoryId,
+            currentResult: undefined,
+            entrantId: importedTeamId,
+            firstname: 'Alice',
+            id: riderOneId,
+            identifiers: [],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'RIDER',
+          },
+          {
+            categoryId: importedCategoryId,
+            currentResult: undefined,
+            entrantId: importedTeamId,
+            firstname: 'Bob',
+            id: riderTwoId,
+            identifiers: [],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'RIDER',
+          },
+        ],
+        teams: [
+          {
+            categoryId: importedCategoryId,
+            description: '',
+            id: importedTeamId,
+            members: [riderOneId, riderTwoId],
+            name: 'Fast Friends',
+          } as never,
+        ],
+      },
+      sessionId: importedSessionId,
+      timeZone: 'Australia/Sydney',
+    });
+
+    const teamEntrant = service.catalog.entrants.find((entrant) => entrant.id === importedTeamId);
+    const memberEntrants = service.catalog.entrants.filter((entrant) => entrant.teamEntrantId === importedTeamId);
+    const importedCategory = service.catalog.categories.find((category) => category.id === importedCategoryId);
+
+    expect(teamEntrant).toEqual(expect.objectContaining({
+      categoryId: importedCategoryId,
+      categoryIds: [importedCategoryId],
+      entrantType: 'team',
+      memberParticipantIds: [riderOneId, riderTwoId],
+      name: 'Fast Friends',
+      sessionIds: [importedSessionId],
+    }));
+    expect(memberEntrants).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: riderOneId,
+        name: 'Alice RIDER',
+        teamEntrantId: importedTeamId,
+      }),
+      expect.objectContaining({
+        id: riderTwoId,
+        name: 'Bob RIDER',
+        teamEntrantId: importedTeamId,
+      }),
+    ]));
+    expect(importedCategory?.teamRules?.maxTeamSize).toBe(2);
+  });
+
+  it('imports real Apical Results team rows into catalog state, persisted ledger, reloads, and team selectors', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const onPersistedLedger = vi.fn(async (_ledger: EventCatalogLedger) => undefined);
+    const service = await EventCatalogService.create(seededPersistence, { onPersistedLedger });
+    const importedEventId = createEventId('apical-event-68-real-ledger-event');
+    const importedSessionId = createSessionId('apical-event-68-real-ledger-session');
+    const workbook = await readFile(path.join(process.cwd(), 'src', 'generated', 'apical-excel-cache', 'apical-event-68.xlsx'));
+    const apicalData = await readApicalExcelBuffer(workbook.buffer.slice(workbook.byteOffset, workbook.byteOffset + workbook.byteLength));
+    const teamResult = apicalData
+      .flatMap((category) => category.ParticipantViewModels)
+      .find((entrant) => entrant.TeamNameDisplay === 'The Evereadys');
+    const expectedRaceNumbers = teamResult?.RaceNumbers.split(',').map((raceNumber) => raceNumber.trim()) || [];
+    const raceState = convertDataToRaceState(
+      importedEventId,
+      new Date('2026-06-01T00:00:00.000Z'),
+      apicalData,
+      200000,
+      'Australia/Sydney'
+    );
+    const raceStateTeam = raceState.teams?.find((team) => team.name === 'The Evereadys');
+    const expectedMemberParticipants = expectedRaceNumbers.map((raceNumber) => {
+      return raceState.participants?.find((participant) => getParticipantRacePlate(participant) === raceNumber);
+    });
+
+    expect(teamResult).toEqual(expect.objectContaining({
+      IsTeamEntrant: true,
+      RaceNumbers: '67, 62, 989',
+      TeamNameDisplay: 'The Evereadys',
+    }));
+    expect(raceStateTeam).toBeDefined();
+    expect(expectedMemberParticipants.every(Boolean)).toBe(true);
+    expect([...raceStateTeam!.members].sort()).toEqual(expectedMemberParticipants.map((participant) => participant!.id).sort());
+
+    onPersistedLedger.mockClear();
+    vi.mocked(seededPersistence.save).mockClear();
+
+    await service.importApicalRaceState({
+      apicalDataFilePath: path.join(process.cwd(), 'src', 'generated', 'apical-excel-cache', 'apical-event-68.xlsx'),
+      eventDate: '2026-06-01T00:00:00.000Z',
+      eventId: importedEventId,
+      eventName: 'Crazy 6 2026',
+      raceState,
+      sessionId: importedSessionId,
+      timeZone: 'Australia/Sydney',
+    });
+
+    const eventEntrants = getEntrantsForEvent(service.catalog, importedEventId);
+    const category = getCategoriesForEvent(service.catalog, importedEventId).find((item) => item.name === 'EBIKE_TEAM');
+    const teamEntrant = eventEntrants.find((entrant) => entrant.name === 'The Evereadys');
+    const memberEntrants = expectedMemberParticipants.map((participant) => {
+      return eventEntrants.find((entrant) => entrant.id === participant!.id);
+    });
+    const importedEvent = service.catalog.events.find((event) => event.id === importedEventId);
+    const latestPersistedLedger = vi.mocked(seededPersistence.save).mock.calls.at(-1)?.[0];
+    const latestPushedLedger = vi.mocked(onPersistedLedger).mock.calls.at(-1)?.[0];
+
+    expect(category).toBeDefined();
+    expect(teamEntrant).toEqual(expect.objectContaining({
+      categoryId: category!.id,
+      categoryIds: [category!.id],
+      entrantType: 'team',
+      id: raceStateTeam!.id,
+      name: 'The Evereadys',
+      sessionIds: [importedSessionId],
+    }));
+    expect([...teamEntrant!.memberParticipantIds].sort()).toEqual(expectedMemberParticipants.map((participant) => participant!.id).sort());
+    expect(memberEntrants.every(Boolean)).toBe(true);
+    memberEntrants.forEach((memberEntrant) => {
+      expect(memberEntrant).toEqual(expect.objectContaining({
+        categoryId: category!.id,
+        entrantType: 'rider',
+        eventId: importedEventId,
+        teamEntrantId: teamEntrant!.id,
+      }));
+    });
+    expect(importedEvent?.categoryIds).toContain(category!.id);
+    expect(importedEvent?.entrantIds).toEqual(expect.arrayContaining([
+      teamEntrant!.id,
+      ...expectedMemberParticipants.map((participant) => participant!.id),
+    ]));
+    expect(getEntrantsForCategory(service.catalog, importedEventId, category!.id).map((entrant) => entrant.id)).toEqual(expect.arrayContaining([
+      teamEntrant!.id,
+      ...expectedMemberParticipants.map((participant) => participant!.id),
+    ]));
+    expect(getTeamsForParticipant(service.catalog, importedEventId, expectedMemberParticipants[0]!.id)).toEqual([teamEntrant]);
+
+    expect(latestPersistedLedger).toBeDefined();
+    expect(latestPushedLedger).toBeDefined();
+    expect(latestPushedLedger?.mutations).toHaveLength(latestPersistedLedger!.mutations.length);
+    expect(latestPersistedLedger!.mutations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'race-state-imported' }),
+      expect.objectContaining({ category: expect.objectContaining({ id: category!.id }), type: 'category-created' }),
+      expect.objectContaining({ entrant: expect.objectContaining({ id: teamEntrant!.id, entrantType: 'team' }), type: 'entrant-created' }),
+      expect.objectContaining({ changes: expect.objectContaining({ entrantIds: expect.arrayContaining([teamEntrant!.id]) }), type: 'event-updated' }),
+    ]));
+
+    const reloadedService = await EventCatalogService.create(createPersistence(latestPersistedLedger));
+    const reloadedTeamEntrant = getEntrantsForEvent(reloadedService.catalog, importedEventId).find((entrant) => entrant.id === teamEntrant!.id);
+    expect(reloadedTeamEntrant).toEqual(teamEntrant);
+    expect(getTeamsForParticipant(reloadedService.catalog, importedEventId, expectedMemberParticipants[1]!.id)).toEqual([teamEntrant]);
+
+    const addedParticipantId = createEventParticipantId('apical-event-68-real-ledger-added-member');
+    const updatedLedger: EventCatalogLedger = {
+      ...latestPersistedLedger!,
+      mutations: [
+        ...latestPersistedLedger!.mutations,
+        {
+          changes: {
+            memberParticipantIds: [...teamEntrant!.memberParticipantIds, addedParticipantId],
+            teamMembers: [
+              ...(teamEntrant!.teamMembers || []),
+              {
+                categoryId: category!.id,
+                firstName: 'Added',
+                lastName: 'Member',
+                participantId: addedParticipantId,
+              },
+            ],
+          },
+          entrantId: teamEntrant!.id,
+          id: 'mutation-add-team-member',
+          timestamp: '2026-06-01T01:00:00.000Z',
+          type: 'entrant-updated',
+        },
+      ],
+    };
+    const updatedState = applyEventCatalogLedger(updatedLedger);
+
+    expect(getTeamsForParticipant(updatedState, importedEventId, addedParticipantId).map((entrant) => entrant.id)).toEqual([teamEntrant!.id]);
   });
 
   it('overrides Apical import scaffold data on re-fetch while preserving earlier mutations for matching IDs', async () => {

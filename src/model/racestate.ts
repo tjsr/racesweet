@@ -5,7 +5,7 @@ import { addError, compareByTime, isCrossingRecord } from "../controllers/timere
 import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError, NoStartFlagError, SessionStateError } from "../validators/errors.js";
 import { FlagReferencesUnknownCategoryError, InvalidFlagRecordError } from "./errors.js";
 import type { EventCategory, EventCategoryId } from "./eventcategory.js";
-import type { EventParticipant, EventParticipantId } from "./eventparticipant.js";
+import type { EventParticipant, EventParticipantId, ParticipantIdentifier } from "./eventparticipant.js";
 import type { FlagRecord, GreenFlagRecord } from "./flag.js";
 import type { EventTimeRecord, ParticipantPassingRecord, TimeRecord, TimeRecordId, Validated } from "./timerecord.js";
 
@@ -34,6 +34,7 @@ export interface RaceStateLookup {
   updateCategoryDetails(categoryId: EventCategoryId, changes: Partial<Pick<EventCategory, 'code' | 'description' | 'distance' | 'duration' | 'excludeFromResults' | 'name' | 'startTime'>>): void;
   updateEntrantCategory(entrantId: EventEntrantId, categoryId: EventCategoryId): void;
   updateParticipantCategory(participantId: EventParticipantId, categoryId: EventCategoryId): void;
+  updateParticipantIdentifiers?(participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: Array<string | number>): void;
 }
 
 export interface RaceState {
@@ -470,6 +471,43 @@ export class Session implements RaceState, RaceStateLookup {
     this._cachedParticipantLaps = processedLaps;
   }
 
+  public updateParticipantIdentifiers(
+    participantId: EventParticipantId,
+    identifierType: 'racePlate' | 'txNo',
+    values: Array<string | number>
+  ): void {
+    const participant = this.getParticipantById(participantId);
+    if (!participant) {
+      throw new ParticipantNotFoundError(`Participant with ID ${participantId} not found. Cannot update identifiers.`);
+    }
+
+    const normalizedValues = Array.from(new Set(values.map((value) => value.toString().trim()).filter((value) => value.length > 0)));
+    const retainedIdentifiers = participant.identifiers.filter((identifier) => !(identifierType in identifier));
+    const nextIdentifiers = normalizedValues.map((value): ParticipantIdentifier => ({
+      fromTime: undefined,
+      [identifierType]: identifierType === 'txNo' && /^\d+$/.test(value) ? Number(value) : value,
+      toTime: undefined,
+    } as ParticipantIdentifier));
+    participant.identifiers = [...retainedIdentifiers, ...nextIdentifiers];
+
+    this.records
+      .filter((record) => isCrossingRecord(record))
+      .forEach((record) => {
+        const crossing = record as ParticipantPassingRecord;
+        crossing.entrantId = undefined;
+        crossing.elapsedTime = undefined;
+        crossing.lapNo = undefined;
+        crossing.lapTime = undefined;
+        crossing.participantId = undefined;
+        crossing.participantStartRecordId = undefined;
+        crossing.startingLapRecordId = undefined;
+      });
+    this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
+    this._categoryGreenFlags = undefined;
+    assignParticpantsToCrossings(this._participants, this.records);
+    this.__reprocessAllParticipantLaps();
+  }
+
   private getFlagById(flagId: TimeRecordId): FlagRecord {
     if (!isValidId(flagId)) {
       throw new InvalidIdError(`Flag ID ${flagId} is not a valid Id type.`);
@@ -571,6 +609,16 @@ export class Session implements RaceState, RaceStateLookup {
     if (!this._bulkProcess) {
       this.__reprocessAllParticipantLaps();
     }
+  }
+
+  public addTeams(teams: EventTeam[]): void {
+    teams.forEach((team) => {
+      if (this._teams.has(team.id)) {
+        console.warn(`Team with ID ${team.id} already exists. Skipping duplicate.`);
+        return;
+      }
+      this._teams.set(team.id.toString(), team);
+    });
   }
 
   public get flags(): FlagRecord[] {

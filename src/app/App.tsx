@@ -5,7 +5,7 @@ import { CategoryId } from '../controllers/category.ts';
 import { EventCategoryId } from '../model/eventcategory.ts';
 import { type EventParticipantId } from '../model/eventparticipant.ts';
 import { EventId, SessionId } from '../model/raceevent.ts';
-import { RaceStateLookup, Session } from '../model/racestate.ts';
+import { type RaceState, RaceStateLookup, Session } from '../model/racestate.ts';
 import { type EventTimeRecord, type TimeRecordId } from '../model/timerecord.ts';
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
 import { TestSession } from '../testdata/testsession.ts';
@@ -200,6 +200,22 @@ const loadSystemConfigWithImportedApicalPaths = async (
 
   return systemConfigService.persistApicalDataFilePaths(sourceFilePaths);
 };
+
+const raceStateSnapshot = (raceState: RaceState): RaceState => ({
+  categories: [...raceState.categories],
+  eventStartTime: raceState.eventStartTime,
+  participants: [...raceState.participants],
+  records: [...raceState.records],
+  teams: [...raceState.teams],
+});
+
+const sessionFromPartialRaceState = (raceState: Partial<RaceState>): Session => new Session({
+  categories: raceState.categories || [],
+  eventStartTime: raceState.eventStartTime,
+  participants: raceState.participants || [],
+  records: raceState.records || [],
+  teams: raceState.teams || [],
+});
 
 export const RaceSweetMainApp = () => {
   const [activeSection, setActiveSection] = useState<AppSection>('System');
@@ -939,6 +955,19 @@ export const RaceSweetMainApp = () => {
   const activeEventSessions = getSessionsForEvent(eventCatalogState, activeEvent?.id);
   const selectedCategoryEventId = selectedCategoriesEventId || eventCatalogState.activeEventId || eventCatalogState.events[0]?.id;
   const selectedCategoryEntrants = getEntrantsForCategory(eventCatalogState, selectedCategoryEventId, selectedCategoryId);
+  const selectedEntrantsResolvedEventId = selectedEntrantsEventId || eventCatalogState.activeEventId || eventCatalogState.events[0]?.id;
+  const selectedEntrantsResolvedSessionId = selectedEntrantsResolvedEventId
+    ? eventCatalogState.activeEventId === selectedEntrantsResolvedEventId
+      ? eventCatalogState.activeSessionId || getSessionsForEvent(eventCatalogState, selectedEntrantsResolvedEventId)[0]?.id
+      : getSessionsForEvent(eventCatalogState, selectedEntrantsResolvedEventId)[0]?.id
+    : undefined;
+  const selectedEntrantsImportedRaceState = eventCatalogService && selectedEntrantsResolvedEventId && selectedEntrantsResolvedSessionId
+    ? eventCatalogService.getImportedRaceState(selectedEntrantsResolvedEventId, selectedEntrantsResolvedSessionId)
+    : undefined;
+  const displayedEntrantsRaceState = selectedEntrantsResolvedEventId === eventCatalogState.activeEventId &&
+    selectedEntrantsResolvedSessionId === eventCatalogState.activeSessionId
+    ? sessionState
+    : selectedEntrantsImportedRaceState;
   const selectedResultsEventId = selectedAnalyticsEventId || eventCatalogState.activeEventId || eventCatalogState.events[0]?.id;
   const selectedResultsSessionId = selectedAnalyticsSessionId || eventCatalogState.activeSessionId || getSessionsForEvent(eventCatalogState, selectedResultsEventId)[0]?.id;
   const displayedAnalyticsRaceState = analyticsRaceState || sessionState;
@@ -1044,6 +1073,28 @@ export const RaceSweetMainApp = () => {
                 );
               })
               .then(updateSystemConfigState);
+          }}
+          onReprocessApicalData={(sourceId) => {
+            if (!eventCatalogService || !systemConfigService) {
+              return;
+            }
+            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+            if (!source || !source.apicalDataFilePath) {
+              return;
+            }
+
+            const apicalEventId = source.apiConfig?.selectedEventIds[0] || source.apiConfig?.apicalEventId;
+            const importEventId = apicalEventId ? createApicalCatalogEventId(apicalEventId) : undefined;
+            return fetchApicalRaceStateNow(source, {
+              cachedSpreadsheetOnly: true,
+              localStorageDirectoryPath: systemConfigState.localStorageDirectoryPath,
+              preferCachedSpreadsheet: true,
+              timeZone: getEventTimeZone(importEventId),
+            })
+              .then(async (importData: PulledApicalRaceState) => {
+                const catalog = await eventCatalogService.importApicalRaceState(importData);
+                updateEventCatalogState(catalog, importData.eventId, importData.sessionId);
+              });
           }}
           onLoadApicalEvents={(sourceId) => {
             if (!systemConfigService) {
@@ -1313,6 +1364,40 @@ export const RaceSweetMainApp = () => {
           onSelectEntrant={setSelectedEntrantId}
           onSelectEvent={selectEntrantsEvent}
           onUnsavedChangesGuardChange={(guard) => setUnsavedChangesGuard('Entrants', guard)}
+          onUpdateParticipantIdentifiers={(participantId, identifierType, values) => {
+            if (!eventCatalogService || !selectedEntrantsResolvedEventId || !selectedEntrantsResolvedSessionId) {
+              return;
+            }
+
+            const isActiveSession = selectedEntrantsResolvedEventId === eventCatalogState.activeEventId &&
+              selectedEntrantsResolvedSessionId === eventCatalogState.activeSessionId;
+            const raceStateForUpdate = isActiveSession && sessionState
+              ? sessionState
+              : selectedEntrantsImportedRaceState
+                ? sessionFromPartialRaceState(selectedEntrantsImportedRaceState)
+                : undefined;
+            if (!raceStateForUpdate) {
+              return;
+            }
+
+            raceStateForUpdate.updateParticipantIdentifiers(participantId, identifierType, values);
+            const nextRaceState = raceStateSnapshot(raceStateForUpdate);
+
+            return eventCatalogService.updateImportedRaceState(
+              selectedEntrantsResolvedEventId,
+              selectedEntrantsResolvedSessionId,
+              nextRaceState,
+            ).then((catalog) => {
+              if (isActiveSession) {
+                setSessionState(raceStateForUpdate);
+              }
+              updateEventCatalogState(catalog, selectedEntrantsResolvedEventId, selectedEntrantsResolvedSessionId, selectedCategoryId);
+              setRenderTick((tick) => tick + 1);
+            }).catch((error: unknown) => {
+              setErrorState(error as Error);
+              throw error;
+            });
+          }}
           onUpdateEntrant={(entrantId, changes) => {
             if (!eventCatalogService) {
               return;
@@ -1325,8 +1410,9 @@ export const RaceSweetMainApp = () => {
               throw error;
             });
           }}
+          raceState={displayedEntrantsRaceState}
           selectedEntrantId={selectedEntrantId}
-          selectedEventId={selectedEntrantsEventId}
+          selectedEventId={selectedEntrantsResolvedEventId}
         />
       );
     }

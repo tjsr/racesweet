@@ -28,6 +28,7 @@ export interface EventSessionOption {
 }
 
 interface EntrantSummaryRow {
+  categoryIds: string[];
   categoryKeys: string[];
   categoryName: string;
   entrantId: EventEntrantId;
@@ -235,16 +236,19 @@ const buildEntrantRows = (
     const memberDetails = includedMembers.map((member) => {
       const raceNumber = getParticipantNumber(member);
       return {
+        categoryId: member.categoryId?.toString(),
         categoryName: categoryNameFromId(raceState, member.categoryId?.toString()),
         participantId: member.id.toString(),
         participantName: `${member.firstname || ''} ${member.surname || ''}`.trim() || member.id.toString(),
         raceNumber: raceNumber ? raceNumber.toString() : member.id.toString(),
       };
     });
+    const categoryIds = Array.from(new Set(memberDetails.map((member) => member.categoryId).filter((categoryId): categoryId is string => !!categoryId)));
     const categoryKeys = Array.from(new Set(memberDetails.map((member) => categoryKeyFromName(member.categoryName))));
     const categoryName = memberDetails.map((member) => member.categoryName).filter((value, index, values) => values.indexOf(value) === index).join(', ');
 
     rows.push({
+      categoryIds,
       categoryKeys,
       categoryName,
       entrantId,
@@ -571,28 +575,19 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     return allRows.filter((row) => row.categoryKeys.includes(categoryKey));
   }, [allRows, categories, selectedCategory]);
 
-  const passings = React.useMemo(() => {
+  const lapTimePassings = React.useMemo(() => {
     const map = new Map<string, ParticipantPassingRecord[]>();
-    props.raceState.participants.forEach((participant) => {
-      if (isParticipantExcludedFromResults(props.raceState, participant, excludedCategoryKeys)) {
-        return;
-      }
-      const laps = (props.raceState.getParticipantLaps(participant.id) || [])
-        .filter(isValidLap)
-        .sort((a, b) => {
-          if ((a.lapNo || 0) !== (b.lapNo || 0)) {
-            return (a.lapNo || 0) - (b.lapNo || 0);
-          }
-          return (a.elapsedTime || 0) - (b.elapsedTime || 0);
-        });
-      map.set(participant.id.toString(), laps);
+    rows.forEach((row) => {
+      map.set(row.entrantId, row.laps);
     });
     return map;
-  }, [excludedCategoryKeys, props.raceState]);
+  }, [rows]);
 
-  const reportParticipants = React.useMemo(() => {
-    return props.raceState.participants.filter((participant) => !isParticipantExcludedFromResults(props.raceState, participant, excludedCategoryKeys));
-  }, [excludedCategoryKeys, props.raceState]);
+  const reportParticipants = React.useMemo(() => rows.map((row) => ({
+    categoryIds: row.categoryIds,
+    id: row.entrantId,
+    name: row.entrantName,
+  })), [rows]);
 
   const lapChart = React.useMemo(() => {
     return buildLapChart(rows);
@@ -615,9 +610,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   }, [rows]);
 
   const eventParticipantNames = React.useMemo(() => {
-    return reportParticipants.map((participant) =>
-      `${participant.firstname || ''} ${participant.surname || ''}`.trim()
-    ).filter((name) => name.length > 0);
+    return reportParticipants.map((participant) => participant.name).filter((name) => name.length > 0);
   }, [reportParticipants]);
 
   return (
@@ -695,7 +688,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
         <LapTimesReport
           participants={reportParticipants}
           categories={categories}
-          passings={passings}
+          passings={lapTimePassings}
         />
       ) : null}
 

@@ -19,6 +19,7 @@ interface SystemPageProps {
   onFetchApicalDataNow: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: TimeRecordSourceId) => void | Promise<void>;
+  onReprocessApicalData: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onSaveLocalStorageDirectoryPath: (directoryPath: string) => void | Promise<void>;
   onSaveSource: (sourceId: TimeRecordSourceId, changes: Partial<DataSourceConfig>) => void | Promise<void>;
   onSelectLocalFile?: () => Promise<string | undefined>;
@@ -134,6 +135,29 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         [sourceId]: {
           details: formattedError,
           title: 'Failed to fetch Apical event data',
+        },
+      }));
+    }
+  };
+
+  const handleReprocessApicalData = async (sourceId: TimeRecordSourceId): Promise<void> => {
+    setSourceFetchErrors((current) => {
+      const next = { ...current };
+      delete next[sourceId];
+      return next;
+    });
+
+    try {
+      await props.onReprocessApicalData(sourceId);
+    } catch (error: unknown) {
+      const formattedError = formatErrorForDisplay(error);
+      console.error(`Failed to reprocess cached Apical event data for source ${sourceId}:\n${formattedError}`);
+      props.onDisplayError?.('System', error);
+      setSourceFetchErrors((current) => ({
+        ...current,
+        [sourceId]: {
+          details: formattedError,
+          title: 'Failed to reprocess Apical event data',
         },
       }));
     }
@@ -405,7 +429,16 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
                             Fetch Apical Events
                           </button>
                         </div>
-                        <p>Data last retrieved: {source.dataLastRetrieved || 'Never'}</p>
+                        <p>
+                          Data last retrieved: {source.dataLastRetrieved || 'Never'}{' '}
+                          <button
+                            type="button"
+                            onClick={() => handleReprocessApicalData(source.id)}
+                            disabled={!source.apicalDataFilePath}
+                          >
+                            Reprocess data
+                          </button>
+                        </p>
                         {source.apicalDataFilePath ? (
                           <p>
                             <a

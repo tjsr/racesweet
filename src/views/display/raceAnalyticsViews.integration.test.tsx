@@ -322,6 +322,7 @@ describe('race analytics views integration', () => {
     });
 
     expect(container.textContent).toContain('Lap Times Report');
+    expect(container.textContent).toContain('Team Rocket');
     const individualLapTimesTable = container.querySelector('table[aria-label="Lap Times Report Table"]') as HTMLTableElement;
     expect(individualLapTimesTable).toBeTruthy();
     expect(Array.from(individualLapTimesTable.querySelectorAll('thead th')).map((cell) => cell.textContent)).toEqual([
@@ -332,9 +333,9 @@ describe('race analytics views integration', () => {
     ]);
     expect(Array.from(individualLapTimesTable.querySelectorAll('tbody tr:first-child td')).map((cell) => cell.textContent)).toEqual([
       '1',
-      '00:01:05.000',
-      tableTimeString(lapsByParticipant.get(createEventParticipantId('p-team-1'))![0].time),
-      '00:01:05.000',
+      '00:01:04.000',
+      tableTimeString(lapsByParticipant.get(createEventParticipantId('p-team-2'))![0].time),
+      '00:01:04.000',
     ]);
 
     const lapTimesModeSelect = container.querySelector('.lap-times-report__toolbar select') as HTMLSelectElement;

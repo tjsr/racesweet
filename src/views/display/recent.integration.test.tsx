@@ -3,6 +3,7 @@
 import React, { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import { updateCategorySelectionsForChangedParticipant } from '../../app/categoryChangeState.js';
+import { applyPulledRaceStateToSession } from '../../app/sourceApplication.js';
 import { type AdministrativeChanges, type RaceAdminPersistence, createDefaultAdministrativeChanges } from '../../app/raceAdminPersistence.js';
 import { RaceAdminService } from '../../app/raceAdminService.js';
 import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
@@ -11,7 +12,7 @@ import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
 import type { EventTeam } from '../../model/eventteam.js';
 import type { FlagRecord } from '../../model/flag.js';
-import { createCategoryId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
+import { createCategoryId, createEventEntrantId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
 import type { EventTimeRecord } from '../../model/index.js';
 import { type RaceStateLookup, Session } from '../../model/racestate.js';
 import { type ParticipantPassingRecord, RECORD_TX_CROSSING, TimeRecordId } from '../../model/timerecord.js';
@@ -461,6 +462,112 @@ describe('RecentRecords integration', () => {
 
     expect(onChangeCategory).toHaveBeenCalledTimes(1);
     expect(onChangeCategory).toHaveBeenCalledWith(participant.id, categoryB.id);
+  });
+
+  it('highlights the selected timing row without clearing category highlights', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const participant1: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: '101',
+      firstname: 'Pat',
+      id: '101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const participant2: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: '102',
+      firstname: 'Quinn',
+      id: '102',
+      identifiers: [{ fromTime: undefined, racePlate: '102', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const crossing1: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: '2001',
+      isValid: true,
+      participantId: participant1.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const crossing2: ParticipantPassingRecord = {
+      chipCode: 100102,
+      id: '2002',
+      isValid: true,
+      participantId: participant2.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:07:00.000Z'),
+    } as ParticipantPassingRecord;
+    const categories = [categoryA];
+    const participants = new Map<EventParticipant['id'], EventParticipant>([
+      [participant1.id, participant1],
+      [participant2.id, participant2],
+    ]);
+    const records = [crossing1, crossing2];
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories,
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categories.find((category) => category.id === categoryId),
+      getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+      getParticipantById: (participantId) => participants.get(participantId),
+      getParticipantLaps: () => records,
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={records}
+          selectedCategories={new Set([categoryA.id])}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const firstRow = container.querySelector('tr[data-record-id="2001"]');
+    const secondRow = container.querySelector('tr[data-record-id="2002"]');
+    expect(firstRow).not.toBeNull();
+    expect(secondRow).not.toBeNull();
+    expect(firstRow!.className).toContain('selected-category');
+    expect(secondRow!.className).toContain('selected-category');
+
+    await act(async () => {
+      firstRow!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(firstRow!.className).toContain('selected-row');
+    expect(firstRow!.className).toContain('selected-category');
+    expect(secondRow!.className).not.toContain('selected-row');
+    expect(secondRow!.className).toContain('selected-category');
+
+    await act(async () => {
+      secondRow!.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 60,
+        clientY: 80,
+      }));
+    });
+
+    expect(firstRow!.className).not.toContain('selected-row');
+    expect(firstRow!.className).toContain('selected-category');
+    expect(secondRow!.className).toContain('selected-row');
+    expect(secondRow!.className).toContain('selected-category');
   });
 
   it('shows flag context actions for deleting and changing assigned categories', async () => {
@@ -1158,6 +1265,69 @@ describe('RecentRecords integration', () => {
     expect(container.querySelector('tr[data-record-id="2001"]')?.textContent).toContain('Pat RIDER (Rocket Squad)');
     expect(container.querySelector('tr[data-record-id="2002"]')?.textContent).toContain('Quinn SOLO');
     expect(container.querySelector('tr[data-record-id="2002"]')?.textContent).not.toContain('(Rocket Squad)');
+  });
+
+  it('shows the team name for crossings after imported race state teams are applied to the Timing session', async () => {
+    const category: EventCategory = { id: createCategoryId('imported-team-category'), name: 'Imported Teams' };
+    const teamId = createEventEntrantId('imported-team-rocket-squad');
+    const participantId = createEventParticipantId('imported-team-pat-rider');
+    const recordId = createTimeRecordId('imported-team-crossing');
+    const sourceId = createTimeRecordSourceId('imported-team-source');
+    const participant: EventParticipant = {
+      categoryId: category.id,
+      currentResult: undefined,
+      entrantId: teamId,
+      firstname: 'Pat',
+      id: participantId,
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'RIDER',
+    };
+    const team: EventTeam = {
+      categoryId: category.id,
+      description: '',
+      id: teamId,
+      members: [participantId],
+      name: 'Rocket Squad',
+    };
+    const crossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: recordId,
+      isValid: true,
+      participantId,
+      plateNumber: '101',
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: sourceId,
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const session = new Session({
+      categories: [],
+      participants: [],
+      records: [],
+      teams: [],
+    });
+
+    await applyPulledRaceStateToSession(session, {
+      categories: [category],
+      participants: [participant],
+      records: [crossing],
+      teams: [team],
+    });
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={session}
+          records={session.records as EventTimeRecord[]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    expect(container.querySelector(`tr[data-record-id="${recordId}"]`)?.textContent).toContain('Pat RIDER (Rocket Squad)');
   });
 
   it('filters records by selected category, rider, and team then restores all records', async () => {

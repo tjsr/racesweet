@@ -25,6 +25,12 @@
   font-weight: bold;
 }
 
+.selected-row {
+  outline: 3px solid #1c5f8f;
+  outline-offset: -3px;
+  box-shadow: inset 0.35rem 0 0 #1c5f8f;
+}
+
 .lap-time-session-fastest {
   color: #a0f;
   font-weight: bold;

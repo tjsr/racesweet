@@ -1,5 +1,6 @@
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
+import type { EventTeam } from '../model/eventteam.js';
 import type { RaceState } from '../model/racestate.js';
 import type { TimeRecord } from '../model/timerecord.js';
 import { normalizeCategoryResultExclusion } from '../controllers/category.js';
@@ -10,6 +11,7 @@ interface SessionSourceSink {
   addCategories(categories: EventCategory[]): Promise<unknown>;
   addParticipants(participants: EventParticipant[]): void;
   addRecords(records: TimeRecord[], validate?: boolean): Promise<void>;
+  addTeams?(teams: EventTeam[]): void;
   categories: EventCategory[];
   records: TimeRecord[];
 }
@@ -207,6 +209,7 @@ export const applyPulledRaceStateToSession = async (
   }
 
   sessionState.addParticipants(normalizedRaceState.participants || []);
+  sessionState.addTeams?.(normalizedRaceState.teams || []);
   const incomingRecords = (normalizedRaceState.records as TimeRecord[]) || [];
   await sessionState.addRecords(incomingRecords, false);
 };

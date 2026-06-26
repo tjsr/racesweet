@@ -381,7 +381,7 @@ export const apiParticipantEntrantToEntrantData = (
   if (!validateUuid(categoryId)) {
     throw new Error(`Invalid categoryId provided: ${categoryId}`);
   }
-  const teamName = entrant.TeamNameDisplay || '';
+  const teamName = entrant.TeamDisplayName || entrant.TeamNameDisplay || '';
 
   let team: EventTeam | undefined;
   if (isEntrantTeam(entrant)) {

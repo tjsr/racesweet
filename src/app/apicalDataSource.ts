@@ -65,6 +65,16 @@ export interface ApicalSpreadsheetLapsRow {
   TotalTimeSpan?: string | number;
 }
 
+export interface ApicalSpreadsheetResultsRow {
+  CategoryName: string;
+  NumberOfLaps: number | string;
+  Position?: number | string;
+  RaceNumbers: number | string;
+  TeamDisplayName?: string;
+  TeamNameDisplay?: string;
+  TotalTimeSpan?: string | number;
+}
+
 const resolveXlsxModule = (module: Partial<XlsxModule> & { default?: unknown }): XlsxModule => {
   const defaultModule = module.default as Partial<XlsxModule> | undefined;
   const candidate = typeof module.read === 'function' ? module : defaultModule;

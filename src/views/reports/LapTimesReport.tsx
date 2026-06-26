@@ -1,6 +1,5 @@
 import './LapTimesReport.css';
 
-import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.ts';
 import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -9,10 +8,16 @@ import type { ParticipantPassingRecord } from '../../model/timerecord.ts';
 
 export type ShowAs = 'individual' | 'table';
 
+export interface LapTimesReportEntry {
+  categoryIds: string[];
+  id: string;
+  name: string;
+}
+
 export interface LapTimesReportProps {
-  participants: EventParticipant[];
+  participants: LapTimesReportEntry[];
   categories: EventCategory[];
-  passings: Map<EventParticipantId, ParticipantPassingRecord[]>;
+  passings: Map<string, ParticipantPassingRecord[]>;
   title?: string;
 }
 
@@ -30,7 +35,7 @@ const formatMs = (ms: number | null | undefined): string =>
 // ─── Individual view ──────────────────────────────────────────────────────────
 
 interface IndividualViewProps {
-  participant: EventParticipant;
+  participant: LapTimesReportEntry;
   laps: ParticipantPassingRecord[];
 }
 
@@ -40,7 +45,7 @@ const IndividualView = ({ participant, laps }: IndividualViewProps) => {
   return (
     <div className="lap-times-individual">
       <h3>
-        {participant.firstname} {participant.surname}
+        {participant.name}
       </h3>
       {validLaps.length === 0 ? (
         <p className="lap-times-report__empty">No lap times recorded.</p>
@@ -76,8 +81,8 @@ const IndividualView = ({ participant, laps }: IndividualViewProps) => {
 // ─── Table view ───────────────────────────────────────────────────────────────
 
 interface TableViewProps {
-  participants: EventParticipant[];
-  passings: Map<EventParticipantId, ParticipantPassingRecord[]>;
+  participants: LapTimesReportEntry[];
+  passings: Map<string, ParticipantPassingRecord[]>;
   lapsPerBlock: number;
 }
 
@@ -138,7 +143,7 @@ const TableView = ({ participants, passings, lapsPerBlock }: TableViewProps) => 
                         {p.id}
                       </td>
                       <td className="participant-name">
-                        {p.firstname} {p.surname}
+                        {p.name}
                       </td>
                       {rowLaps.map((lap, idx) => (
                         <td
@@ -195,7 +200,7 @@ export const LapTimesReport = ({
   const filteredParticipants =
     selectedCategoryId === ALL_CATEGORIES
       ? participants
-      : participants.filter((p) => p.categoryId === selectedCategoryId);
+      : participants.filter((p) => p.categoryIds.includes(selectedCategoryId));
 
   // Auto-select first participant when filter changes
   useEffect(() => {
@@ -260,7 +265,7 @@ export const LapTimesReport = ({
               <option value="">— select —</option>
               {filteredParticipants.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.firstname} {p.surname}
+                  {p.name}
                 </option>
               ))}
             </select>

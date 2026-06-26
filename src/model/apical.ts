@@ -22,7 +22,9 @@ export interface ApicalLapByCategoryViewModel {
 }
 
 export interface ApicalParticipantViewModel {
+  IsTeamEntrant?: boolean;
   LapByCategoryViewModels: ApicalLapByCategoryViewModel[];
+  TeamDisplayName?: string;
   TeamNameDisplay: string;
   CategoryName: string;
   RaceNumbers: string;

@@ -2,8 +2,9 @@ import { applyPulledRaceStateToSession, getCategoriesToAdd } from './sourceAppli
 
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
+import type { EventTeam } from '../model/eventteam.js';
 import type { TimeRecord } from '../model/timerecord.js';
-import { createCategoryId, createEventId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
+import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
 
 const EXISTING_CATEGORY_ID = createCategoryId('cat-existing');
 const NEW_CATEGORY_ID = createCategoryId('cat-new');
@@ -59,12 +60,14 @@ describe('sourceApplication', () => {
     const addCategories = vi.fn(async (_categories: EventCategory[]) => null);
     const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
     const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
+    const addTeams = vi.fn((_teams: EventTeam[]) => undefined);
 
     await applyPulledRaceStateToSession(
       {
         addCategories,
         addParticipants,
         addRecords,
+        addTeams,
         categories: existingCategories,
         records: [],
       },
@@ -84,7 +87,56 @@ describe('sourceApplication', () => {
       },
     ]);
     expect(addParticipants).toHaveBeenCalledTimes(1);
+    expect(addTeams).toHaveBeenCalledTimes(1);
+    expect(addTeams).toHaveBeenCalledWith([]);
     expect(addRecords).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies pulled teams into the target session state sink', async () => {
+    const addCategories = vi.fn(async (_categories: EventCategory[]) => null);
+    const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
+    const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
+    const addTeams = vi.fn((_teams: EventTeam[]) => undefined);
+    const teamId = createEventEntrantId('team-relay');
+    const participantId = createEventParticipantId('team-relay-member');
+    const team: EventTeam = {
+      categoryId: EXISTING_CATEGORY_ID,
+      description: '',
+      id: teamId,
+      members: [participantId],
+      name: 'Rocket Squad',
+    };
+
+    await applyPulledRaceStateToSession(
+      {
+        addCategories,
+        addParticipants,
+        addRecords,
+        addTeams,
+        categories: existingCategories,
+        records: [],
+      },
+      {
+        categories: [],
+        participants: [
+          {
+            categoryId: EXISTING_CATEGORY_ID,
+            currentResult: undefined,
+            entrantId: teamId,
+            firstname: 'Pat',
+            id: participantId,
+            identifiers: [],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'Rider',
+          },
+        ],
+        records: [],
+        teams: [team],
+      }
+    );
+
+    expect(addTeams).toHaveBeenCalledWith([team]);
   });
 
   it('continues participant and record merge when category add collides with existing data', async () => {

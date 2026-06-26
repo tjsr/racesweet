@@ -232,6 +232,9 @@ describe('CategoriesPage integration', () => {
     expect(eventSelect.value).toBe('event-1');
     expect(container.textContent).toContain('Pat Rider');
     expect(container.textContent).toContain('Quinn Rider');
+    expect(container.textContent).toContain('Team Red');
+    expect(container.textContent).toContain('Teams');
+    expect(container.textContent).not.toContain('Individual Entrants');
 
     const clubmanButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Clubman'));
     expect(clubmanButton).toBeDefined();

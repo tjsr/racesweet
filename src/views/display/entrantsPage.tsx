@@ -8,7 +8,14 @@ import {
   getSessionsForEvent,
 } from '../../app/eventCatalog.js';
 import { CategoryId } from '../../controllers/category.js';
+import { getParticipantNumber, getParticipantTransponders } from '../../controllers/participant.js';
+import { EntrantListCard } from '../../controls/entrantListCard.js';
+import { LicencesControl } from '../../controls/licencesControl.js';
+import { RaceNumbersControl } from '../../controls/raceNumbersControl.js';
+import { TimingDevicesControl } from '../../controls/timingDevicesControl.js';
 import { EventEntrantId } from '../../model/entrant.js';
+import { type EventParticipant, type EventParticipantId } from '../../model/eventparticipant.js';
+import { type RaceState } from '../../model/racestate.js';
 import { EventId } from '../../model/raceevent.js';
 import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
 
@@ -19,7 +26,9 @@ interface EntrantsPageProps {
   onSelectEntrant: (entrantId: EventEntrantId) => void;
   onSelectEvent: (eventId: EventId) => void;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
+  onUpdateParticipantIdentifiers?: (participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: Array<string | number>) => void | Promise<void>;
   onUpdateEntrant: (entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>>) => void | Promise<void>;
+  raceState?: Partial<RaceState>;
   selectedEntrantId?: EventEntrantId;
   selectedEventId?: EventId;
 }
@@ -36,6 +45,8 @@ interface EntrantDraft {
 }
 
 const UNSPECIFIED_GENDER = 'unspecified';
+const CATEGORY_FILTER_ALL = 'all';
+const CATEGORY_FILTER_UNASSIGNED = 'unassigned';
 
 const getCategoryName = (catalog: EventCatalogState, categoryId?: CategoryId): string => {
   if (!categoryId) {
@@ -65,6 +76,24 @@ const eventSupportsTeams = (catalog: EventCatalogState, eventId: EventId | undef
     getEntrantsForEvent(catalog, eventId).some((entrant) => entrant.entrantType === 'team');
 };
 
+const getParticipantsForEntrant = (
+  entrant: EventCatalogEntrant | undefined,
+  participants: EventParticipant[]
+): EventParticipant[] => {
+  if (!entrant) {
+    return [];
+  }
+
+  const participantIds = new Set([
+    entrant.id.toString(),
+    ...entrant.memberParticipantIds.map((participantId) => participantId.toString()),
+  ]);
+
+  return participants.filter((participant) => {
+    return participantIds.has(participant.id.toString()) || participant.entrantId?.toString() === entrant.id.toString();
+  });
+};
+
 const ReadOnlyList = (props: { emptyText: string; items: string[] }): React.ReactElement => {
   if (props.items.length === 0) {
     return <p className="readonly-summary">{props.emptyText}</p>;
@@ -86,10 +115,61 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   const eventEntrants = getEntrantsForEvent(props.catalog, selectedEvent?.id);
   const eventCategories = getCategoriesForEvent(props.catalog, selectedEvent?.id);
   const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
+  const raceStateParticipants = props.raceState?.participants || [];
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = React.useState<string>(CATEGORY_FILTER_ALL);
   const teamEntrants = eventEntrants.filter((entrant) => entrant.entrantType === 'team');
-  const riderEntrants = eventEntrants.filter((entrant) => entrant.entrantType === 'rider');
+  const teamEntrantById = new Map(teamEntrants.map((entrant) => [entrant.id.toString(), entrant]));
+  const eventCategoryIds = new Set(eventCategories.map((category) => category.id.toString()));
+  const eventCategoryKey = eventCategories.map((category) => category.id.toString()).join('|');
+
+  React.useEffect(() => {
+    const validCategoryIds = new Set(eventCategoryKey.split('|').filter((categoryId) => categoryId.length > 0));
+
+    if (
+      selectedCategoryFilter !== CATEGORY_FILTER_ALL &&
+      selectedCategoryFilter !== CATEGORY_FILTER_UNASSIGNED &&
+      !validCategoryIds.has(selectedCategoryFilter)
+    ) {
+      setSelectedCategoryFilter(CATEGORY_FILTER_ALL);
+    }
+  }, [eventCategoryKey, selectedCategoryFilter]);
+
+  const getEntrantCategoryIds = (entrant: EventCatalogEntrant): string[] => {
+    const ids = [
+      entrant.categoryId?.toString() || '',
+      ...entrant.categoryIds.map((categoryId) => categoryId.toString()),
+    ];
+
+    if (entrant.teamEntrantId) {
+      const team = teamEntrantById.get(entrant.teamEntrantId.toString());
+      if (team) {
+        ids.push(team.categoryId?.toString() || '');
+        ids.push(...team.categoryIds.map((categoryId) => categoryId.toString()));
+      }
+    }
+
+    return Array.from(new Set(ids.filter((categoryId) => eventCategoryIds.has(categoryId))));
+  };
+
+  const entrantMatchesCategoryFilter = (entrant: EventCatalogEntrant): boolean => {
+    if (selectedCategoryFilter === CATEGORY_FILTER_ALL) {
+      return true;
+    }
+
+    const validCategoryIds = getEntrantCategoryIds(entrant);
+    if (selectedCategoryFilter === CATEGORY_FILTER_UNASSIGNED) {
+      return validCategoryIds.length === 0;
+    }
+
+    return validCategoryIds.includes(selectedCategoryFilter);
+  };
+
+  const filteredEventEntrants = eventEntrants.filter((entrant) => entrantMatchesCategoryFilter(entrant));
+  const riderEntrants = filteredEventEntrants.filter((entrant) => entrant.entrantType === 'rider');
+  const filteredTeamEntrants = filteredEventEntrants.filter((entrant) => entrant.entrantType === 'team');
   const teamsEnabled = eventSupportsTeams(props.catalog, selectedEvent?.id);
-  const selectedEntrant = eventEntrants.find((entrant) => entrant.id === props.selectedEntrantId) ?? eventEntrants[0];
+  const selectedEntrant = filteredEventEntrants.find((entrant) => entrant.id === props.selectedEntrantId) ?? filteredEventEntrants[0];
+  const selectedParticipants = getParticipantsForEntrant(selectedEntrant, raceStateParticipants);
   const selectedEntrantDraft = React.useMemo(() => getEntrantDraft(selectedEntrant), [selectedEntrant]);
   const [createKind, setCreateKind] = React.useState<EntrantType>('rider');
   const [entrantDraft, setEntrantDraft] = React.useState<EntrantDraft>(selectedEntrantDraft);
@@ -149,37 +229,6 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
     onUnsavedChangesGuardChange: props.onUnsavedChangesGuardChange,
   });
 
-  const renderEntrantButton = (entrant: EventCatalogEntrant): React.ReactElement => {
-    const isSelected = entrant.id === selectedEntrant?.id;
-    const categoryId = entrant.categoryId || entrant.categoryIds[0];
-    const teamName = entrant.teamEntrantId
-      ? teamEntrants.find((team) => team.id === entrant.teamEntrantId)?.name
-      : undefined;
-
-    return (
-      <button
-        key={entrant.id}
-        type="button"
-        className={`events-list-item${isSelected ? ' selected' : ''}`}
-        onClick={() => {
-          if (!isSelected) {
-            requestFormExit(() => props.onSelectEntrant(entrant.id));
-          }
-        }}
-        aria-selected={isSelected}
-      >
-        <strong>{entrant.name}</strong>
-        {entrant.entrantType === 'rider' ? (
-          <span className="entrant-category-chip">{getCategoryName(props.catalog, categoryId)}</span>
-        ) : null}
-        <span className="entrant-list-type">{entrant.entrantType}</span>
-        {teamName ? (
-          <span className="entrantTeam">Team: {teamName}</span>
-        ) : null}
-      </button>
-    );
-  };
-
   return (
     <section className="events-screen">
       <h1>Entrants</h1>
@@ -198,7 +247,21 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           ))}
         </select>
       </label>
-      <div className="events-layout two-panel">
+      <label className="page-filter-label">
+        Category
+        <select
+          aria-label="Entrants Category"
+          value={selectedCategoryFilter}
+          onChange={(event) => setSelectedCategoryFilter(event.target.value)}
+        >
+          <option value={CATEGORY_FILTER_ALL}>All</option>
+          <option value={CATEGORY_FILTER_UNASSIGNED}>Unassigned</option>
+          {eventCategories.map((category) => (
+            <option key={category.id} value={category.id}>{category.name}</option>
+          ))}
+        </select>
+      </label>
+      <div className="events-layout">
         <section className="events-panel">
           <h2>Entrant List</h2>
           <div className="events-actions">
@@ -220,16 +283,48 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
             </button>
           </div>
           <div className="events-list" role="listbox" aria-label="Entrants for selected event">
-            {teamsEnabled && teamEntrants.length > 0 ? (
-              <>
-                <h3 className="events-list-subheading">Teams</h3>
-                {teamEntrants.map(renderEntrantButton)}
-              </>
-            ) : null}
             {riderEntrants.length > 0 ? (
               <>
-                {teamsEnabled ? <h3 className="events-list-subheading">Riders</h3> : null}
-                {riderEntrants.map(renderEntrantButton)}
+                {teamsEnabled ? <h3 className="events-list-subheading">Individual Entrants</h3> : null}
+                {riderEntrants.map((entrant) => {
+                  const participant = getParticipantsForEntrant(entrant, raceStateParticipants)[0];
+                  const teamName = entrant.teamEntrantId
+                    ? teamEntrants.find((team) => team.id === entrant.teamEntrantId)?.name
+                    : undefined;
+                  const categoryId = entrant.categoryId || entrant.categoryIds[0];
+
+                  return (
+                    <EntrantListCard
+                      key={entrant.id}
+                      entrant={entrant}
+                      categoryName={getCategoryName(props.catalog, categoryId)}
+                      isSelected={entrant.id === selectedEntrant?.id}
+                      raceNumber={participant ? getParticipantNumber(participant) : undefined}
+                      onSelect={() => requestFormExit(() => props.onSelectEntrant(entrant.id))}
+                      timingDevices={participant ? getParticipantTransponders(participant) : undefined}
+                      teamName={teamName}
+                    />
+                  );
+                })}
+              </>
+            ) : null}
+            {teamsEnabled && filteredTeamEntrants.length > 0 ? (
+              <>
+                <h3 className="events-list-subheading">Teams</h3>
+                {filteredTeamEntrants.map((entrant) => {
+                  const participant = getParticipantsForEntrant(entrant, raceStateParticipants)[0];
+
+                  return (
+                    <EntrantListCard
+                      key={entrant.id}
+                      entrant={entrant}
+                      isSelected={entrant.id === selectedEntrant?.id}
+                      onSelect={() => requestFormExit(() => props.onSelectEntrant(entrant.id))}
+                      raceNumber={participant ? getParticipantNumber(participant) : undefined}
+                      timingDevices={participant ? getParticipantTransponders(participant) : undefined}
+                    />
+                  );
+                })}
               </>
             ) : null}
           </div>
@@ -356,6 +451,18 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           ) : (
             <p>No entrants are defined for this event.</p>
           )}
+        </section>
+        <section className="events-panel">
+          <h2>Identification</h2>
+          <RaceNumbersControl
+            participants={selectedParticipants}
+            onUpdateRaceNumbers={(participantId, raceNumbers) => props.onUpdateParticipantIdentifiers?.(participantId, 'racePlate', raceNumbers)}
+          />
+          <TimingDevicesControl
+            participants={selectedParticipants}
+            onUpdateTimingDevices={(participantId, timingDevices) => props.onUpdateParticipantIdentifiers?.(participantId, 'txNo', timingDevices)}
+          />
+          <LicencesControl />
         </section>
       </div>
     </section>

@@ -575,7 +575,14 @@ const renderAndFetchApicalImport = async (
       writeFileContent: (filePath: string, content: string, dataType?: string) => Promise<void>;
     };
   }).api = {
-    requestBuffer: readFixtureBuffer,
+    requestBuffer: async (filePath: string): Promise<Buffer> => {
+      const writtenFile = writtenFiles.find((write) => write.filePath === filePath && write.dataType === 'base64');
+      if (writtenFile) {
+        return Buffer.from(writtenFile.content, 'base64');
+      }
+
+      return readFixtureBuffer(filePath);
+    },
     requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
     writeFileContent: async (filePath: string, content: string, dataType?: string) => {
       writtenFiles.push({ content, dataType, filePath });
@@ -1288,6 +1295,27 @@ describe('RaceSweetMainApp integration', () => {
         filePath: getCachedApicalExcelFilePath(1001),
       }),
     ]));
+
+    const catalogWriteCountBeforeReprocess = writtenFiles.filter((write) => write.filePath.includes('event-catalog.json')).length;
+    fetchMock.mockClear();
+
+    await clickButtonByText(container, 'Reprocess data');
+
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const catalogWriteCount = writtenFiles.filter((write) => write.filePath.includes('event-catalog.json')).length;
+      if (catalogWriteCount > catalogWriteCountBeforeReprocess) {
+        break;
+      }
+
+      await act(async () => {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 10);
+        });
+      });
+    }
+
+    expect(writtenFiles.filter((write) => write.filePath.includes('event-catalog.json')).length).toBeGreaterThan(catalogWriteCountBeforeReprocess);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('renames a default Apical source to the fetched event name when event data is retrieved', async () => {

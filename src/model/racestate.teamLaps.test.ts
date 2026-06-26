@@ -2,6 +2,7 @@ import type { ChipCrossingData } from './chipcrossing.js';
 import type { EventCategory } from './eventcategory.js';
 import type { EventParticipant } from './eventparticipant.js';
 import { Session } from './racestate.js';
+import { type ParticipantPassingRecord } from './timerecord.js';
 import { createGreenFlagEvent } from '../controllers/flag.js';
 
 const category: EventCategory = { id: '1', name: 'Team Category' };
@@ -107,5 +108,33 @@ describe('Session team lap processing', () => {
     expect(riderTwoLaps[0].isValid).toBe(true);
     expect(riderTwoLaps[0].lapNo).toBe(1);
     expect(riderTwoLaps[0].lapTime).toBe(360000);
+  });
+
+  it('reassigns unmatched crossings and recalculates laps when participant identifiers change', async () => {
+    const session = new Session({
+      categories: [category],
+      participants: [participant('101', '11', 1001)],
+      records: [
+        createGreenFlagEvent({
+        categoryIds: [category.id],
+        flagValue: 'course',
+        id: '1',
+        recordType: 4,
+        sequence: 1,
+        source: 'test',
+        time: new Date('2026-05-30T10:00:00.000Z'),
+      }),
+        chipCrossing('1001', 2002, 2, '2026-05-30T10:06:00.000Z'),
+      ],
+      teams: [],
+    });
+
+    expect((session.records.find((record) => record.id === '1001') as ParticipantPassingRecord | undefined)?.participantId).toBeUndefined();
+
+    session.updateParticipantIdentifiers('101', 'txNo', ['2002']);
+
+    const updatedCrossing = session.records.find((record) => record.id === '1001') as ParticipantPassingRecord | undefined;
+    expect(updatedCrossing?.participantId).toBe('101');
+    expect(session.getParticipantLaps('101')?.[0].lapNo).toBe(1);
   });
 });

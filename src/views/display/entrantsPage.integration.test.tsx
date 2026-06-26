@@ -2,7 +2,9 @@
 
 import { type Root, createRoot } from 'react-dom/client';
 import { EntrantsPage } from './entrantsPage.js';
-import type { EventCatalogState } from '../../app/eventCatalog.js';
+import { type EventCatalogLedger, type EventCatalogState, applyEventCatalogLedger, createDefaultEventCatalogLedger } from '../../app/eventCatalog.js';
+import { type EventParticipant } from '../../model/eventparticipant.js';
+import { type RaceState } from '../../model/racestate.js';
 import React from 'react';
 import { act } from 'react';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
@@ -81,6 +83,43 @@ const catalog: EventCatalogState = {
         },
       ],
     },
+    {
+      categoryId: 'cat-2',
+      categoryIds: ['cat-2'],
+      entrantType: 'rider',
+      eventId: 'event-2',
+      firstName: 'Blue',
+      id: 'p-2',
+      lastName: 'One',
+      memberParticipantIds: ['p-2'],
+      name: 'Blue One',
+      sessionIds: ['session-2'],
+      teamEntrantId: 'ent-2',
+    },
+    {
+      categoryId: 'cat-pro',
+      categoryIds: ['cat-pro'],
+      entrantType: 'rider',
+      eventId: 'event-2',
+      firstName: 'Blue',
+      id: 'p-3',
+      lastName: 'Two',
+      memberParticipantIds: ['p-3'],
+      name: 'Blue Two',
+      sessionIds: ['session-2'],
+      teamEntrantId: 'ent-2',
+    },
+    {
+      categoryIds: [],
+      entrantType: 'rider',
+      eventId: 'event-2',
+      firstName: 'No',
+      id: 'ent-unassigned',
+      lastName: 'Category',
+      memberParticipantIds: ['ent-unassigned'],
+      name: 'No Category',
+      sessionIds: ['session-2'],
+    },
   ],
   events: [
     {
@@ -120,6 +159,28 @@ const catalog: EventCatalogState = {
       status: 'scheduled',
     },
   ],
+};
+
+const raceState: Partial<RaceState> = {
+  categories: [],
+  participants: [
+    {
+      categoryId: 'cat-1',
+      currentResult: undefined,
+      entrantId: 'ent-1',
+      firstname: 'Pat',
+      id: 'ent-1',
+      identifiers: [
+        { fromTime: undefined, racePlate: '73', toTime: undefined },
+        { fromTime: undefined, toTime: undefined, txNo: '1234' },
+      ] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    },
+  ],
+  records: [],
+  teams: [],
 };
 
 describe('EntrantsPage integration', () => {
@@ -185,6 +246,44 @@ describe('EntrantsPage integration', () => {
     });
 
     expect(container.textContent).toContain('Team Blue');
+    const switchedEntrantList = container.querySelector('[aria-label="Entrants for selected event"]');
+    expect(switchedEntrantList?.textContent).toContain('Individual Entrants');
+    expect(switchedEntrantList?.textContent).toContain('Teams');
+    expect(switchedEntrantList?.textContent).toContain('Blue One');
+    expect(switchedEntrantList?.textContent).toContain('Team: Team Blue');
+    expect(switchedEntrantList?.textContent?.indexOf('Individual Entrants')).toBeLessThan(switchedEntrantList?.textContent?.indexOf('Teams') ?? 0);
+    expect(switchedEntrantList?.textContent?.indexOf('Blue One')).toBeLessThan(switchedEntrantList?.textContent?.indexOf('Team Blue') ?? 0);
+
+    const categoryFilter = container.querySelector('select[aria-label="Entrants Category"]') as HTMLSelectElement;
+    expect(Array.from(categoryFilter.options).map((option) => option.textContent)).toEqual(['All', 'Unassigned', 'Teams', 'Pro']);
+
+    await act(async () => {
+      setSelectValue(categoryFilter, 'cat-2');
+    });
+
+    expect(switchedEntrantList?.textContent).toContain('Team Blue');
+    expect(switchedEntrantList?.textContent).toContain('Blue One');
+    expect(switchedEntrantList?.textContent).toContain('Blue Two');
+    expect(switchedEntrantList?.textContent).not.toContain('No Category');
+
+    await act(async () => {
+      setSelectValue(categoryFilter, 'cat-pro');
+    });
+
+    expect(switchedEntrantList?.textContent).toContain('Blue Two');
+    expect(switchedEntrantList?.textContent).not.toContain('Blue One');
+    expect(Array.from(switchedEntrantList?.querySelectorAll('button') || []).map((button) => button.querySelector('strong')?.textContent)).toEqual(['Blue Two']);
+
+    await act(async () => {
+      setSelectValue(categoryFilter, 'unassigned');
+    });
+
+    expect(switchedEntrantList?.textContent).toContain('No Category');
+    expect(Array.from(switchedEntrantList?.querySelectorAll('button') || []).map((button) => button.querySelector('strong')?.textContent)).toEqual(['No Category']);
+
+    await act(async () => {
+      setSelectValue(categoryFilter, 'all');
+    });
 
     const createButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Create Entrant');
     expect(createButton).toBeDefined();
@@ -295,6 +394,54 @@ describe('EntrantsPage integration', () => {
     }));
   });
 
+  it('shows and edits selected participant identification values', async () => {
+    const onUpdateParticipantIdentifiers = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <EntrantsPage
+          catalog={catalog}
+          onCreateEntrant={() => undefined}
+          onDeleteEntrant={() => undefined}
+          onSelectEntrant={() => undefined}
+          onSelectEvent={() => undefined}
+          onUpdateEntrant={() => undefined}
+          onUpdateParticipantIdentifiers={onUpdateParticipantIdentifiers}
+          raceState={raceState}
+          selectedEntrantId="ent-1"
+          selectedEventId="event-1"
+        />,
+      );
+    });
+
+    const entrantList = container.querySelector('[aria-label="Entrants for selected event"]');
+    expect(entrantList?.textContent).toContain('#73');
+    expect(entrantList?.textContent).toContain('Tx1234');
+    expect(container.textContent).toContain('Identification');
+    expect(container.textContent).toContain('Race Numbers');
+    expect(container.textContent).toContain('Timing devices');
+    expect(container.textContent).toContain('Licences');
+
+    const raceNumbersInput = container.querySelector('input[aria-label="Race Numbers Pat Rider"]') as HTMLInputElement;
+    const timingDevicesInput = container.querySelector('input[aria-label="Timing Devices Pat Rider"]') as HTMLInputElement;
+
+    await act(async () => {
+      setInputValue(raceNumbersInput, '#822, #73');
+      Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Race Numbers')!
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onUpdateParticipantIdentifiers).toHaveBeenCalledWith('ent-1', 'racePlate', ['822', '73']);
+
+    await act(async () => {
+      setInputValue(timingDevicesInput, 'Tx1234, Tx10000223');
+      Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Timing Devices')!
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onUpdateParticipantIdentifiers).toHaveBeenCalledWith('ent-1', 'txNo', ['1234', '10000223']);
+  });
+
   it('prompts before replacing a dirty entrant form and saves before continuing', async () => {
     const onUpdateEntrant = vi.fn().mockResolvedValue(undefined);
 
@@ -346,5 +493,142 @@ describe('EntrantsPage integration', () => {
 
     expect(onUpdateEntrant).toHaveBeenCalledWith('ent-1', expect.objectContaining({ name: 'Pat Edited' }));
     expect((container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement).value).toBe('Team Blue');
+  });
+
+  it('updates entrant lists when catalog state receives team creation and membership update events', async () => {
+    const eventId = 'event-live-team';
+    const categoryId = 'cat-live-team';
+    const teamId = 'team-live-relay';
+    const participantId = 'participant-live-rider';
+    const baseMutations: EventCatalogLedger['mutations'] = [
+      {
+        event: {
+          categoryIds: [categoryId],
+          date: '2026-06-26',
+          entrantIds: [participantId],
+          format: 'race-weekend',
+          id: eventId,
+          name: 'Live Team Event',
+          sessionIds: [],
+        },
+        id: 'mutation-event-created',
+        timestamp: '2026-06-26T00:00:00.000Z',
+        type: 'event-created',
+      },
+      {
+        category: {
+          eventId,
+          id: categoryId,
+          name: 'Team Category',
+          teamRules: { maxTeamSize: 3, teamCompositionRules: [] },
+        },
+        id: 'mutation-category-created',
+        timestamp: '2026-06-26T00:00:01.000Z',
+        type: 'category-created',
+      },
+      {
+        entrant: {
+          categoryId,
+          categoryIds: [categoryId],
+          entrantType: 'rider',
+          eventId,
+          firstName: 'Live',
+          id: participantId,
+          lastName: 'Rider',
+          memberParticipantIds: [participantId],
+          name: 'Live Rider',
+          sessionIds: [],
+        },
+        id: 'mutation-participant-created',
+        timestamp: '2026-06-26T00:00:02.000Z',
+        type: 'entrant-created',
+      },
+    ];
+    const createLedger = (mutations: EventCatalogLedger['mutations']): EventCatalogLedger => ({
+      ...createDefaultEventCatalogLedger(),
+      mutations,
+    });
+    const renderCatalog = async (catalog: EventCatalogState): Promise<void> => {
+      await act(async () => {
+        root.render(
+          <EntrantsPage
+            catalog={catalog}
+            onCreateEntrant={() => undefined}
+            onDeleteEntrant={() => undefined}
+            onSelectEntrant={() => undefined}
+            onSelectEvent={() => undefined}
+            onUpdateEntrant={() => undefined}
+            selectedEventId={eventId}
+          />,
+        );
+      });
+    };
+
+    await renderCatalog(applyEventCatalogLedger(createLedger(baseMutations)));
+    let entrantList = container.querySelector('[aria-label="Entrants for selected event"]');
+    expect(entrantList?.textContent).toContain('Live Rider');
+    expect(entrantList?.textContent).not.toContain('Team Relay');
+
+    const createdTeamMutations: EventCatalogLedger['mutations'] = [
+      ...baseMutations,
+      {
+        entrant: {
+          categoryId,
+          categoryIds: [categoryId],
+          entrantType: 'team',
+          eventId,
+          id: teamId,
+          memberParticipantIds: [],
+          name: 'Team Relay',
+          sessionIds: [],
+          teamMembers: [],
+        },
+        id: 'mutation-team-created',
+        timestamp: '2026-06-26T00:00:03.000Z',
+        type: 'entrant-created',
+      },
+      {
+        changes: {
+          entrantIds: [participantId, teamId],
+        },
+        eventId,
+        id: 'mutation-event-entrant-list-updated',
+        timestamp: '2026-06-26T00:00:04.000Z',
+        type: 'event-updated',
+      },
+    ];
+
+    await renderCatalog(applyEventCatalogLedger(createLedger(createdTeamMutations)));
+    entrantList = container.querySelector('[aria-label="Entrants for selected event"]');
+    expect(entrantList?.textContent).toContain('Live Rider');
+    expect(entrantList?.textContent).toContain('Teams');
+    expect(entrantList?.textContent).toContain('Team Relay');
+
+    const membershipUpdatedMutations: EventCatalogLedger['mutations'] = [
+      ...createdTeamMutations,
+      {
+        changes: {
+          memberParticipantIds: [participantId],
+          teamMembers: [{ categoryId, firstName: 'Live', lastName: 'Rider', participantId }],
+        },
+        entrantId: teamId,
+        id: 'mutation-team-member-added',
+        timestamp: '2026-06-26T00:00:05.000Z',
+        type: 'entrant-updated',
+      },
+      {
+        changes: {
+          teamEntrantId: teamId,
+        },
+        entrantId: participantId,
+        id: 'mutation-participant-team-linked',
+        timestamp: '2026-06-26T00:00:06.000Z',
+        type: 'entrant-updated',
+      },
+    ];
+
+    await renderCatalog(applyEventCatalogLedger(createLedger(membershipUpdatedMutations)));
+    entrantList = container.querySelector('[aria-label="Entrants for selected event"]');
+    expect(entrantList?.textContent).toContain('Team: Team Relay');
   });
 });

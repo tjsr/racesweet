@@ -465,7 +465,31 @@ export const getEntrantsForCategory = (
     return [];
   }
 
-  return getEntrantsForEvent(state, eventId).filter((entrant) => {
+  const eventEntrants = getEntrantsForEvent(state, eventId);
+  const categoryTeamIds = new Set(eventEntrants
+    .filter((entrant) => entrant.entrantType === 'team')
+    .filter((entrant) => entrant.categoryId === categoryId || entrant.categoryIds.includes(categoryId))
+    .map((entrant) => entrant.id));
+
+  return eventEntrants.filter((entrant) => {
+    if (entrant.teamEntrantId && categoryTeamIds.has(entrant.teamEntrantId)) {
+      return true;
+    }
+
     return entrant.categoryId === categoryId || entrant.categoryIds.includes(categoryId);
   });
+};
+
+export const getTeamsForParticipant = (
+  state: EventCatalogState,
+  eventId: EventId | undefined,
+  participantId: IdType | undefined
+): EventCatalogEntrant[] => {
+  if (!participantId) {
+    return [];
+  }
+
+  return getEntrantsForEvent(state, eventId)
+    .filter((entrant) => entrant.entrantType === 'team')
+    .filter((entrant) => entrant.memberParticipantIds.includes(participantId));
 };

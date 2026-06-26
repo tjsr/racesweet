@@ -110,6 +110,7 @@ describe('SystemPage integration', () => {
           onDeleteSource={onDeleteSource}
           onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
+          onReprocessApicalData={vi.fn()}
           onSaveLocalStorageDirectoryPath={onSaveLocalStorageDirectoryPath}
           onSaveSource={onSaveSource}
         />,
@@ -145,6 +146,8 @@ describe('SystemPage integration', () => {
 
     const fetchDataButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Fetch event data now');
     expect(fetchDataButton).toBeDefined();
+    const disabledReprocessButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Reprocess data') as HTMLButtonElement | undefined;
+    expect(disabledReprocessButton?.disabled).toBe(true);
 
     expect(container.textContent).toContain('Local storage location');
     expect(container.textContent).toContain('Storage Directory');
@@ -181,6 +184,7 @@ describe('SystemPage integration', () => {
           onDeleteSource={vi.fn()}
           onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={vi.fn()}
+          onReprocessApicalData={vi.fn()}
           onSaveLocalStorageDirectoryPath={vi.fn()}
           onSaveSource={vi.fn()}
         />,
@@ -209,6 +213,7 @@ describe('SystemPage integration', () => {
     const onFetchApicalDataNow = vi.fn();
     const onLoadApicalEvents = vi.fn();
     const onOpenLocalFile = vi.fn();
+    const onReprocessApicalData = vi.fn();
     const onSaveSource = vi.fn();
     const retrievedConfig: SystemConfiguration = {
       ...config,
@@ -231,6 +236,7 @@ describe('SystemPage integration', () => {
           onFetchApicalDataNow={onFetchApicalDataNow}
           onLoadApicalEvents={onLoadApicalEvents}
           onOpenLocalFile={onOpenLocalFile}
+          onReprocessApicalData={onReprocessApicalData}
           onSaveLocalStorageDirectoryPath={vi.fn()}
           onSaveSource={onSaveSource}
         />,
@@ -257,6 +263,16 @@ describe('SystemPage integration', () => {
     });
 
     expect(onFetchApicalDataNow).toHaveBeenCalledWith('source-apical');
+
+    const reprocessButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Reprocess data');
+    expect(reprocessButton).toBeDefined();
+    expect((reprocessButton as HTMLButtonElement).disabled).toBe(false);
+
+    await act(async () => {
+      reprocessButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onReprocessApicalData).toHaveBeenCalledWith('source-apical');
   });
 
   it('shows fetched Apical events in dropdown and saves selected event id', async () => {
@@ -273,6 +289,7 @@ describe('SystemPage integration', () => {
           onDeleteSource={onDeleteSource}
           onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
+          onReprocessApicalData={vi.fn()}
           onSaveLocalStorageDirectoryPath={vi.fn()}
           onSaveSource={onSaveSource}
         />,
@@ -328,6 +345,7 @@ describe('SystemPage integration', () => {
           onDisplayError={onDisplayError}
           onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
+          onReprocessApicalData={vi.fn()}
           onSaveLocalStorageDirectoryPath={vi.fn()}
           onSaveSource={onSaveSource}
         />,
@@ -384,6 +402,7 @@ describe('SystemPage integration', () => {
           onDeleteSource={onDeleteSource}
           onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
+          onReprocessApicalData={vi.fn()}
           onSaveLocalStorageDirectoryPath={vi.fn()}
           onSaveSource={onSaveSource}
         />,
@@ -452,6 +471,7 @@ describe('SystemPage integration', () => {
           onDeleteSource={onDeleteSource}
           onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={onLoadApicalEvents}
+          onReprocessApicalData={vi.fn()}
           onSaveLocalStorageDirectoryPath={vi.fn()}
           onSaveSource={onSaveSource}
           onSelectLocalFile={onSelectLocalFile}
