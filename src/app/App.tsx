@@ -191,7 +191,7 @@ const loadSystemConfigWithImportedApicalPaths = async (
   const sourceFilePaths: Record<string, string | undefined> = {};
 
   systemConfigService.state.dataSources.forEach((source) => {
-    if (source.type !== 'api-apical-excel-file' || source.apicalDataFilePath || !source.dataLastRetrieved) {
+    if ((source.type !== 'api-apical-data-file' && source.type !== 'api-apical-excel-file') || source.apicalDataFilePath || !source.dataLastRetrieved) {
       return;
     }
 
@@ -451,7 +451,7 @@ export const RaceSweetMainApp = () => {
     }
     const sessionTarget = targetSessionState || sessionState;
     
-    if (source.type !== 'api-apical-excel-file' || !sessionTarget) {
+    if ((source.type !== 'api-apical-data-file' && source.type !== 'api-apical-excel-file') || !sessionTarget) {
       return;
     }
 
@@ -476,7 +476,7 @@ export const RaceSweetMainApp = () => {
   };
 
   const applyPersistedRaceStateForSourceToSession = async (source: DataSourceConfig, targetSessionState: Session & RaceStateLookup): Promise<boolean> => {
-    if (source.type !== 'api-apical-excel-file') {
+    if (source.type !== 'api-apical-data-file' && source.type !== 'api-apical-excel-file') {
       return false;
     }
 
@@ -689,7 +689,7 @@ export const RaceSweetMainApp = () => {
     const liveSources = systemConfigState.dataSources.filter((source) => {
       return sourceIds.includes(source.id) &&
         source.enabled &&
-        source.type === 'api-apical-excel-file' &&
+        (source.type === 'api-apical-data-file' || source.type === 'api-apical-excel-file') &&
         !!source.apiConfig?.live;
     });
 

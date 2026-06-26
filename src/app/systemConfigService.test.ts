@@ -102,6 +102,7 @@ describe('SystemConfigService', () => {
 
     await service.createSource('api-apical-data-file');
     const sourceId = service.state.dataSources[0]!.id;
+    await service.updateSource(sourceId, { name: systemConfig.APICAL_DEFAULT_SOURCE_NAME });
     const expectedApicalDataFilePath = systemConfig.normalizeOptionalSystemFilePath('../../src/generated/apical-excel-cache/apical-event-1001.xlsx');
 
     await service.assignSourcesToEvent('event-existing', [sourceId]);
@@ -272,8 +273,83 @@ describe('SystemConfigService', () => {
     await service.persistListedApicalEvents(source.id, [{ id: 1002, name: 'Round 2' }]);
 
     expect(service.state.dataSources[0]?.listedEvents).toEqual([{ id: 1002, name: 'Round 2' }]);
+    expect(service.state.apicalListedEvents).toEqual([{ id: 1002, name: 'Round 2' }]);
     expect(service.state.dataSources[0]?.apiConfig?.apicalEventId).toBeUndefined();
     expect(service.state.dataSources[0]?.apiConfig?.selectedEventIds).toEqual([]);
+  });
+
+  it('hydrates Apical sources from a persisted shared event list on reload', async () => {
+    const persistence = createPersistence({
+      ...systemConfig.createDefaultSystemConfiguration(),
+      apicalListedEvents: [
+        { id: 1001, name: 'Round 1' },
+        { id: 1002, name: 'Round 2' },
+      ],
+      dataSources: [
+        {
+          apiConfig: {
+            authHeaderName: 'Authorization',
+            authHeaderValue: '',
+            baseUrl: 'https://apical.example.com',
+            companyId: 2,
+            httpTimeoutSeconds: 30,
+            live: false,
+            pollIntervalSeconds: 30,
+            selectedEventIds: [1001],
+          },
+          enabled: true,
+          id: 'source-apical',
+          name: 'Apical Data file endpoint',
+          type: 'api-apical-data-file',
+        },
+      ],
+    });
+
+    const service = await SystemConfigService.create(persistence);
+
+    expect(service.state.apicalListedEvents).toEqual([
+      { id: 1001, name: 'Round 1' },
+      { id: 1002, name: 'Round 2' },
+    ]);
+    expect(service.state.dataSources[0]?.listedEvents).toEqual([
+      { id: 1001, name: 'Round 1' },
+      { id: 1002, name: 'Round 2' },
+    ]);
+  });
+
+  it('shares fetched Apical listed events across existing and newly created Apical sources', async () => {
+    const persistence = createPersistence();
+    const service = await SystemConfigService.create(persistence);
+
+    await service.createSource('api-apical-data-file');
+    const firstSource = service.state.dataSources[0]!;
+    await service.updateSource(firstSource.id, {
+      apiConfig: {
+        ...firstSource.apiConfig!,
+        selectedEventIds: [1001],
+      },
+    });
+
+    await service.persistListedApicalEvents(firstSource.id, [
+      { id: 1001, name: 'Round 1' },
+      { id: 1002, name: 'Round 2' },
+    ]);
+
+    await service.createSource('api-apical-data-file');
+
+    expect(service.state.apicalListedEvents).toEqual([
+      { id: 1001, name: 'Round 1' },
+      { id: 1002, name: 'Round 2' },
+    ]);
+    expect(service.state.dataSources[0]?.listedEvents).toEqual([
+      { id: 1001, name: 'Round 1' },
+      { id: 1002, name: 'Round 2' },
+    ]);
+    expect(service.state.dataSources[1]?.listedEvents).toEqual([
+      { id: 1001, name: 'Round 1' },
+      { id: 1002, name: 'Round 2' },
+    ]);
+    expect(persistence.save).toHaveBeenCalled();
   });
 
   it('supports master entrant profile sources assigned to events', async () => {

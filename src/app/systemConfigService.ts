@@ -29,7 +29,7 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
     type,
   };
 
-  if (type === 'api-apical-excel-file') {
+  if (type === 'api-apical-data-file' || type === 'api-apical-excel-file') {
     return {
       ...base,
       apiConfig: {
@@ -68,6 +68,10 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
   return base;
 };
 
+const isApicalDataSource = (source: Pick<DataSourceConfig, 'type'>): boolean => {
+  return source.type === 'api-apical-data-file' || source.type === 'api-apical-excel-file';
+};
+
 export class SystemConfigService {
   private config: SystemConfiguration;
   private readonly options: SystemConfigServiceOptions;
@@ -89,9 +93,18 @@ export class SystemConfigService {
   }
 
   public async createSource(type: DataSourceType): Promise<SystemConfiguration> {
+    const source = createDefaultSource(type);
     this.config = {
       ...this.config,
-      dataSources: [...this.config.dataSources, createDefaultSource(type)],
+      dataSources: [
+        ...this.config.dataSources,
+        isApicalDataSource(source) && (this.config.apicalListedEvents || []).length > 0
+          ? {
+              ...source,
+              listedEvents: (this.config.apicalListedEvents || []).map((event) => ({ ...event })),
+            }
+          : source,
+      ],
     };
     await this.persist();
     return this.config;
@@ -189,21 +202,38 @@ export class SystemConfigService {
 
   public async persistListedApicalEvents(sourceId: TimeRecordSourceId, listedEvents: DataSourceConfig['listedEvents']): Promise<SystemConfiguration> {
     const source = this.config.dataSources.find((item) => item.id === sourceId);
-    if (source?.type !== 'api-apical-excel-file' || !source.apiConfig) {
+    if (!source || !isApicalDataSource(source) || !source.apiConfig) {
       return this.updateSource(sourceId, { listedEvents });
     }
 
     const listedEventIds = new Set((listedEvents || []).map((eventItem) => eventItem.id));
     const selectedEventIds = (source.apiConfig.selectedEventIds || []).filter((eventId) => listedEventIds.has(eventId));
+    this.config = {
+      ...this.config,
+      apicalListedEvents: (listedEvents || []).map((eventItem) => ({ ...eventItem })),
+      dataSources: this.config.dataSources.map((item) => {
+        if (!isApicalDataSource(item)) {
+          return item;
+        }
 
-    return this.updateSource(sourceId, {
-      apiConfig: {
-        ...source.apiConfig,
-        apicalEventId: selectedEventIds[0],
-        selectedEventIds,
-      },
-      listedEvents,
-    });
+        const nextApiConfig = item.id === sourceId && item.apiConfig
+          ? {
+              ...item.apiConfig,
+              apicalEventId: selectedEventIds[0],
+              selectedEventIds,
+            }
+          : item.apiConfig;
+
+        return {
+          ...item,
+          apiConfig: nextApiConfig,
+          listedEvents: (listedEvents || []).map((eventItem) => ({ ...eventItem })),
+        };
+      }),
+    };
+
+    await this.persist();
+    return this.config;
   }
 
   public async persistApicalDataFetch(

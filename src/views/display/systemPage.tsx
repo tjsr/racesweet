@@ -2,10 +2,10 @@
 import React from 'react';
 import { formatErrorForDisplay } from '../../app/stackTrace.js';
 import {
-    type DataSourceConfig,
-    type DataSourceType,
-    type SystemConfiguration,
-    getDataSourceTypeLabel,
+  type DataSourceConfig,
+  type DataSourceType,
+  type SystemConfiguration,
+  getDataSourceTypeLabel,
 } from '../../app/systemConfig.js';
 import { getRuntimeVersions } from '../../app/versionInfo.js';
 import { TimeRecordSourceId } from '../../model/types.js';

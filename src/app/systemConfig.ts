@@ -11,6 +11,7 @@ export type DataSourceType =
   | 'api-aws-sqs'
   | 'api-http-request'
   | 'api-apical-excel-file'
+  | 'api-apical-data-file'
   | 'master-entrant-profiles';
 
 export interface MasterEntrantProfile {
@@ -82,6 +83,7 @@ export interface EventOptionsConfig {
 }
 
 export interface SystemConfiguration {
+  apicalListedEvents?: ApicalListedEvent[];
   dataSources: DataSourceConfig[];
   eventOptions: Record<string, EventOptionsConfig>;
   eventSourceAssignments: Record<string, string[]>;
@@ -104,6 +106,7 @@ export const normalizeOptionalSystemFilePath = (filePath: string | undefined): s
 };
 
 export const createDefaultSystemConfiguration = (): SystemConfiguration => ({
+  apicalListedEvents: [],
   dataSources: [],
   eventOptions: {},
   eventSourceAssignments: {},
@@ -126,8 +129,16 @@ const normalizeLocalStorageDirectoryPath = (
     : normalizedLegacyPath;
 };
 
-export const normalizeDataSourceConfig = (source: DataSourceConfig): DataSourceConfig => {
-  if (source.type !== 'api-apical-excel-file' || !source.apiConfig) {
+const isApicalDataSource = (source: Pick<DataSourceConfig, 'type'>): boolean => {
+  return source.type === 'api-apical-data-file' || source.type === 'api-apical-excel-file';
+};
+
+const normalizeApicalListedEvents = (listedEvents: ApicalListedEvent[] | undefined): ApicalListedEvent[] => {
+  return (listedEvents || []).map((event) => ({ ...event }));
+};
+
+export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListedEvents: ApicalListedEvent[] = []): DataSourceConfig => {
+  if (!isApicalDataSource(source) || !source.apiConfig) {
     return source;
   }
 
@@ -140,6 +151,11 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig): DataSourceC
   return {
     ...source,
     apicalDataFilePath: normalizeOptionalSystemFilePath(source.apicalDataFilePath),
+    ...(source.listedEvents && source.listedEvents.length > 0
+      ? { listedEvents: normalizeApicalListedEvents(source.listedEvents) }
+      : apicalListedEvents.length > 0
+        ? { listedEvents: normalizeApicalListedEvents(apicalListedEvents) }
+        : {}),
     apiConfig: {
       ...source.apiConfig,
       apicalEventId: selectedEventIds[0],
@@ -155,11 +171,21 @@ export const normalizeSystemConfiguration = (
     apicalExcelCacheDirectoryPath: _legacyApicalExcelCacheDirectoryPath,
     ...currentConfig
   } = config;
+  const normalizedApicalListedEvents = normalizeApicalListedEvents(config.apicalListedEvents);
+  const normalizedDataSources = (config.dataSources || []).map((source) => normalizeDataSourceConfig(source, normalizedApicalListedEvents));
+  const derivedApicalListedEvents = normalizedApicalListedEvents.length > 0
+    ? normalizedApicalListedEvents
+    : normalizedDataSources.find((source) => isApicalDataSource(source) && (source.listedEvents || []).length > 0)?.listedEvents || [];
 
   return {
     ...createDefaultSystemConfiguration(),
     ...currentConfig,
-    dataSources: (config.dataSources || []).map(normalizeDataSourceConfig),
+    apicalListedEvents: derivedApicalListedEvents,
+    dataSources: normalizedDataSources.map((source) => (
+      isApicalDataSource(source) && derivedApicalListedEvents.length > 0 && (!source.listedEvents || source.listedEvents.length === 0)
+        ? { ...source, listedEvents: derivedApicalListedEvents }
+        : source
+    )),
     eventOptions: config.eventOptions || {},
     eventSourceAssignments: config.eventSourceAssignments || {},
     localStorageDirectoryPath: normalizeLocalStorageDirectoryPath(config.localStorageDirectoryPath, config.apicalExcelCacheDirectoryPath),

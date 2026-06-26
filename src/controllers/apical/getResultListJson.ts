@@ -47,7 +47,7 @@ const authenticateSession = async (source: DataSourceConfig): Promise<string | u
 };
 
 export const fetchApicalEvents = async (source: DataSourceConfig): Promise<ApicalListedEvent[]> => {
-  if (source.type !== 'api-apical-excel-file' || !source.apiConfig) {
+  if ((source.type !== 'api-apical-data-file' && source.type !== 'api-apical-excel-file') || !source.apiConfig) {
     return [];
   }
 
