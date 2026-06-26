@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 
-import * as EventCatalog from '../../app/eventCatalog.js';
 import * as ReactDomClient from 'react-dom/client';
+import * as EventCatalog from '../../app/eventCatalog.js';
 import * as SystemConfig from '../../app/systemConfig.js';
 
 import React, { act } from 'react';
 
-import { SessionsPage } from './sessionsPage.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
+import { SessionsPage } from './sessionsPage.js';
 
 type EventCatalogState = EventCatalog.EventCatalogState;
 type Root = ReturnType<typeof ReactDomClient.createRoot>;
@@ -84,7 +84,7 @@ const config: SystemConfiguration = {
       enabled: true,
       id: 'source-a',
       name: 'Apical Source A',
-      type: 'api-apical-data-file',
+      type: 'api-apical-excel-file',
     },
     {
       enabled: true,

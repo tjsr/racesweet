@@ -2,13 +2,12 @@
 
 import { Root, createRoot } from 'react-dom/client';
 
-import React from 'react';
-import type { SystemConfiguration } from '../../app/systemConfig.js';
-import { SystemPage } from './systemPage.js';
-import { act } from 'react';
-import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
 import path from 'node:path';
+import { act } from 'react';
+import type { SystemConfiguration } from '../../app/systemConfig.js';
+import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
+import { SystemPage } from './systemPage.js';
 
 vi.mock('../../app/stackTrace.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../app/stackTrace.js')>();
@@ -47,7 +46,7 @@ const config: SystemConfiguration = {
         { id: 1002, name: 'Round 2' },
       ],
       name: 'Apical Source',
-      type: 'api-apical-data-file',
+      type: 'api-apical-excel-file',
     },
     {
       enabled: true,

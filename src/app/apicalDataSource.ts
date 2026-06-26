@@ -443,7 +443,7 @@ const cacheApicalExcelPayload = async (apicalEventId: number, buffer: ArrayBuffe
 
 const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventId: number, cacheDirectoryPath: string): Promise<ApicalLapByCategory> => {
   if (!source.apiConfig) {
-    throw new Error('Apical API config is missing');
+    throw new Error('Apical Excel config is missing');
   }
 
   const exportHeaders = createAuthenticatedHeaders(source);
@@ -520,7 +520,7 @@ export const pullApicalRaceState = async (source: DataSourceConfig, eventId: Eve
   if (!validateUuid(eventId)) {
     throw new Error(`Invalid eventId provided: ${eventId}`);
   }
-  if (source.type !== 'api-apical-data-file' || !source.apiConfig) {
+  if (source.type !== 'api-apical-excel-file' || !source.apiConfig) {
     throw new Error(`Unsupported source type for live pull: ${source.type}`);
   }
 
@@ -535,7 +535,7 @@ export const pullApicalRaceState = async (source: DataSourceConfig, eventId: Eve
 };
 
 export const fetchApicalRaceStateNow = async (source: DataSourceConfig, options: ApicalRaceStateOptions = {}): Promise<PulledApicalRaceState> => {
-  if (source.type !== 'api-apical-data-file' || !source.apiConfig) {
+  if (source.type !== 'api-apical-excel-file' || !source.apiConfig) {
     throw new Error(`Unsupported source type for Apical data fetch: ${source.type}`);
   }
 

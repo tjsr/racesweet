@@ -1,6 +1,6 @@
-import { trimSlash } from "../../utils.ts";
 import { createAuthenticatedHeaders, fetchApicalResponse, getConfiguredApicalEventId } from "../../app/apicalDataSource.ts";
-import type { DataSourceConfig, ApicalListedEvent } from "../../app/systemConfig.ts";
+import type { ApicalListedEvent, DataSourceConfig } from "../../app/systemConfig.ts";
+import { trimSlash } from "../../utils.ts";
 
 const getExcelExportUrl = (baseUrl: string, eventId: number): string => `${trimSlash(baseUrl)}/RaceResult/Event/ExportToExcel?eventId=${eventId}&_=${Date.now()}`;
 const getEventListUrl = (baseUrl: string, companyId: number): string => `${trimSlash(baseUrl)}/raceresult/event/getall?companyId=${companyId}&_=${Date.now()}`;
@@ -47,7 +47,7 @@ const authenticateSession = async (source: DataSourceConfig): Promise<string | u
 };
 
 export const fetchApicalEvents = async (source: DataSourceConfig): Promise<ApicalListedEvent[]> => {
-  if (source.type !== 'api-apical-data-file' || !source.apiConfig) {
+  if (source.type !== 'api-apical-excel-file' || !source.apiConfig) {
     return [];
   }
 

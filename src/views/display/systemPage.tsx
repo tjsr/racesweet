@@ -2,10 +2,10 @@
 import React from 'react';
 import { formatErrorForDisplay } from '../../app/stackTrace.js';
 import {
-  type DataSourceConfig,
-  type DataSourceType,
-  type SystemConfiguration,
-  getDataSourceTypeLabel,
+    type DataSourceConfig,
+    type DataSourceType,
+    type SystemConfiguration,
+    getDataSourceTypeLabel,
 } from '../../app/systemConfig.js';
 import { getRuntimeVersions } from '../../app/versionInfo.js';
 import { TimeRecordSourceId } from '../../model/types.js';
@@ -33,7 +33,7 @@ const sourceTypeOptions: DataSourceType[] = [
   'file-racesweet-ledger',
   'api-aws-sqs',
   'api-http-request',
-  'api-apical-data-file',
+  'api-apical-excel-file',
   'master-entrant-profiles',
 ];
 
@@ -252,7 +252,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
             {selectedSource ? (
               (() => {
                 const source = selectedSource;
-                const isApicalApi = source.type === 'api-apical-data-file';
+                const isApicalApi = source.type === 'api-apical-excel-file';
                 const listedEvents = source.listedEvents || [];
                 const selectedEventIds = source.apiConfig?.selectedEventIds || [];
                 const selectedApicalEventId = selectedEventIds[0];

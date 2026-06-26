@@ -16,6 +16,15 @@ const createPersistence = (initial = systemConfig.createDefaultSystemConfigurati
 };
 
 describe('SystemConfigService', () => {
+  it('recognizes when an Apical source name should be replaced by the fetched event name', () => {
+    expect(systemConfig.shouldRenameApicalSourceForFetchedEvent(undefined)).toBe(true);
+    expect(systemConfig.shouldRenameApicalSourceForFetchedEvent(null)).toBe(true);
+    expect(systemConfig.shouldRenameApicalSourceForFetchedEvent('')).toBe(true);
+    expect(systemConfig.shouldRenameApicalSourceForFetchedEvent('   ')).toBe(true);
+    expect(systemConfig.shouldRenameApicalSourceForFetchedEvent(systemConfig.APICAL_DEFAULT_SOURCE_NAME)).toBe(true);
+    expect(systemConfig.shouldRenameApicalSourceForFetchedEvent('Apical Live Feed')).toBe(false);
+  });
+
   it('creates and updates apical API data source config and persists assignments', async () => {
     const persistence = createPersistence();
     const service = await SystemConfigService.create(persistence);
@@ -101,11 +110,13 @@ describe('SystemConfigService', () => {
       'event-apical-1001',
       'session-apical-1001',
       '2026-06-08T09:10:11.123Z',
-      '../../src/generated/apical-excel-cache/apical-event-1001.xlsx'
+      '../../src/generated/apical-excel-cache/apical-event-1001.xlsx',
+      'Round 1'
     );
 
     expect(service.state.dataSources[0]?.apicalDataFilePath).toBe(expectedApicalDataFilePath);
     expect(service.state.dataSources[0]?.dataLastRetrieved).toBe('2026-06-08T09:10:11.123Z');
+    expect(service.state.dataSources[0]?.name).toBe('Round 1');
     expect(service.state.eventSourceAssignments['event-apical-1001']).toEqual([sourceId]);
     expect(service.state.sessionSourceAssignments['session-apical-1001']).toEqual({
       mode: 'specific',
@@ -118,6 +129,7 @@ describe('SystemConfigService', () => {
           apicalDataFilePath: expectedApicalDataFilePath,
           dataLastRetrieved: '2026-06-08T09:10:11.123Z',
           id: sourceId,
+          name: 'Round 1',
         }),
       ],
       eventSourceAssignments: expect.objectContaining({
@@ -129,7 +141,27 @@ describe('SystemConfigService', () => {
           sourceIds: [sourceId],
         },
       }),
-    }));
+    }));  
+  });
+
+  it('preserves a custom Apical source name when fetching event data', async () => {
+    const persistence = createPersistence();
+    const service = await SystemConfigService.create(persistence);
+
+    await service.createSource('api-apical-data-file');
+    const sourceId = service.state.dataSources[0]!.id;
+    await service.updateSource(sourceId, { name: 'Custom Apical Feed' });
+
+    await service.persistApicalDataFetch(
+      sourceId,
+      'event-apical-1001',
+      'session-apical-1001',
+      '2026-06-08T09:10:11.123Z',
+      undefined,
+      'Round 1'
+    );
+
+    expect(service.state.dataSources[0]?.name).toBe('Custom Apical Feed');
   });
 
   it('backfills persisted Apical cache paths recovered from event data', async () => {

@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 
+import React, { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import type { EventCatalogState } from '../../app/eventCatalog.js';
-import { EventsScreen } from './events.js';
-import React from 'react';
 import type { SystemConfiguration } from '../../app/systemConfig.js';
-import { act } from 'react';
 import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
+import { EventsScreen } from './events.js';
 
 const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: string): void => {
   const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -90,7 +89,7 @@ const config: SystemConfiguration = {
       enabled: true,
       id: 'source-a',
       name: 'Apical Source A',
-      type: 'api-apical-data-file',
+      type: 'api-apical-excel-file',
     },
   ],
   eventSourceAssignments: {

@@ -1,15 +1,17 @@
 import { EventId, SessionId } from '../model/raceevent.js';
 import { TimeRecordSourceId } from '../model/types.js';
 import {
-  type DataSourceConfig,
-  type DataSourceType,
-  type SessionSourceAssignment,
-  type SystemConfiguration,
-  createDefaultSystemConfiguration,
-  getDataSourceTypeLabel,
-  normalizeOptionalSystemFilePath,
-  normalizeSystemConfiguration,
-  normalizeSystemDirectoryPath,
+    APICAL_DEFAULT_SOURCE_NAME,
+    type DataSourceConfig,
+    type DataSourceType,
+    type SessionSourceAssignment,
+    type SystemConfiguration,
+    createDefaultSystemConfiguration,
+    getDataSourceTypeLabel,
+    normalizeOptionalSystemFilePath,
+    normalizeSystemConfiguration,
+    normalizeSystemDirectoryPath,
+    shouldRenameApicalSourceForFetchedEvent,
 } from './systemConfig.js';
 import type { SystemConfigPersistence } from './systemConfigPersistence.js';
 
@@ -27,7 +29,7 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
     type,
   };
 
-  if (type === 'api-apical-data-file') {
+  if (type === 'api-apical-excel-file') {
     return {
       ...base,
       apiConfig: {
@@ -41,7 +43,7 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
         selectedEventIds: [],
       },
       listedEvents: [],
-      name: 'Apical Data file endpoint',
+      name: APICAL_DEFAULT_SOURCE_NAME,
     };
   }
 
@@ -187,7 +189,7 @@ export class SystemConfigService {
 
   public async persistListedApicalEvents(sourceId: TimeRecordSourceId, listedEvents: DataSourceConfig['listedEvents']): Promise<SystemConfiguration> {
     const source = this.config.dataSources.find((item) => item.id === sourceId);
-    if (source?.type !== 'api-apical-data-file' || !source.apiConfig) {
+    if (source?.type !== 'api-apical-excel-file' || !source.apiConfig) {
       return this.updateSource(sourceId, { listedEvents });
     }
 
@@ -204,7 +206,14 @@ export class SystemConfigService {
     });
   }
 
-  public async persistApicalDataFetch(sourceId: TimeRecordSourceId, eventId: EventId, sessionId: SessionId, retrievedAt: string, apicalDataFilePath?: string): Promise<SystemConfiguration> {
+  public async persistApicalDataFetch(
+    sourceId: TimeRecordSourceId,
+    eventId: EventId,
+    sessionId: SessionId,
+    retrievedAt: string,
+    apicalDataFilePath?: string,
+    eventName?: string
+  ): Promise<SystemConfiguration> {
     const assignedEventSources = this.config.eventSourceAssignments[eventId] || [];
     const normalizedApicalDataFilePath = normalizeOptionalSystemFilePath(apicalDataFilePath);
     this.config = {
@@ -218,6 +227,7 @@ export class SystemConfigService {
           ...source,
           apicalDataFilePath: normalizedApicalDataFilePath,
           dataLastRetrieved: retrievedAt,
+          name: eventName && shouldRenameApicalSourceForFetchedEvent(source.name) ? eventName : source.name,
         };
       }),
       eventSourceAssignments: {

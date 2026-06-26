@@ -17,6 +17,7 @@ import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from '../utils/apical/excelDownlo
 import { type ApicalSpreadsheetLapsRow, createApicalCatalogEventId, createApicalCatalogSessionId, getCachedApicalExcelFilePath } from './apicalDataSource.js';
 import { RaceSweetMainApp } from './App.js';
 import { createSeedEventCatalogLedger } from './createSeedEventCatalogLedger.js';
+import { APICAL_DEFAULT_SOURCE_NAME } from './systemConfig.js';
 
 vi.mock('../views/display/categories', () => ({
   CategoryList: (props: { categories?: unknown[] }) => React.createElement(
@@ -183,7 +184,7 @@ const readGeneratedFixtureWithConfiguredApicalSource = async (filePath: string):
           id: 'source-apical',
           listedEvents: [],
           name: 'Apical Source',
-          type: 'api-apical-data-file',
+          type: 'api-apical-excel-file',
         },
       ],
       eventSourceAssignments: {},
@@ -223,7 +224,7 @@ const readGeneratedFixtureWithTimingAssignedApicalSource = async (filePath: stri
           id: 'source-apical',
           listedEvents: [],
           name: 'Apical Source',
-          type: 'api-apical-data-file',
+          type: 'api-apical-excel-file',
         },
       ],
       eventSourceAssignments: {},
@@ -244,7 +245,7 @@ const readGeneratedFixtureWithTimingAssignedApicalSource = async (filePath: stri
   throw new Error(`Unknown generated file requested: ${filePath}`);
 };
 
-const readGeneratedFixtureWithListedApicalSource = async (filePath: string): Promise<string> => {
+const readGeneratedFixtureWithListedApicalSource = (sourceName: string) => async (filePath: string): Promise<string> => {
   if (filePath.includes('event-catalog.json')) {
     return JSON.stringify({ mutations: [], schemaVersion: 1 });
   }
@@ -273,8 +274,8 @@ const readGeneratedFixtureWithListedApicalSource = async (filePath: string): Pro
               name: 'Apical Downloaded Round',
             },
           ],
-          name: 'Apical Source',
-          type: 'api-apical-data-file',
+          name: sourceName,
+          type: 'api-apical-excel-file',
         },
       ],
       eventSourceAssignments: {},
@@ -489,7 +490,7 @@ interface ApicalImportScenario {
   fetchMock: ReturnType<typeof vi.spyOn>;
   importedEventId: EventId;
   writtenConfig: {
-    dataSources: Array<{ apicalDataFilePath?: string; dataLastRetrieved?: string }>;
+    dataSources: Array<{ apicalDataFilePath?: string; dataLastRetrieved?: string; name?: string }>;
     eventSourceAssignments: Record<string, string[]>;
     sessionSourceAssignments: Record<string, { mode: string; sourceIds: string[] }>;
   };
@@ -559,7 +560,11 @@ const mockApicalExcelFetch = (apicalData: ApicalLapByCategory): ReturnType<typeo
     });
 };
 
-const renderAndFetchApicalImport = async (root: Root, container: HTMLDivElement): Promise<ApicalImportScenario> => {
+const renderAndFetchApicalImport = async (
+  root: Root,
+  container: HTMLDivElement,
+  requestFileContent = readGeneratedFixtureWithListedApicalSource('Apical Source')
+): Promise<ApicalImportScenario> => {
   const writtenFiles: Array<{ content: string; dataType?: string; filePath: string }> = [];
   const expectations = await createApicalImportExpectations();
 
@@ -571,7 +576,7 @@ const renderAndFetchApicalImport = async (root: Root, container: HTMLDivElement)
     };
   }).api = {
     requestBuffer: readFixtureBuffer,
-    requestFileContent: readGeneratedFixtureWithListedApicalSource as <T>(filePath: string, dataType: string) => Promise<T>,
+    requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
     writeFileContent: async (filePath: string, content: string, dataType?: string) => {
       writtenFiles.push({ content, dataType, filePath });
     },
@@ -1285,6 +1290,16 @@ describe('RaceSweetMainApp integration', () => {
     ]));
   });
 
+  it('renames a default Apical source to the fetched event name when event data is retrieved', async () => {
+    const { writtenConfig } = await renderAndFetchApicalImport(
+      root,
+      container,
+      readGeneratedFixtureWithListedApicalSource(APICAL_DEFAULT_SOURCE_NAME)
+    );
+
+    expect(writtenConfig.dataSources[0]?.name).toBe('Apical Downloaded Round');
+  });
+
   it('loads Apical cache paths from event data and shows them with the retrieval timestamp', async () => {
     const importedEventId = createApicalCatalogEventId(1001);
     const importedSessionId = createApicalCatalogSessionId(1001);
@@ -1363,7 +1378,7 @@ describe('RaceSweetMainApp integration', () => {
                 },
               ],
               name: 'Apical Source',
-              type: 'api-apical-data-file',
+              type: 'api-apical-excel-file',
             },
           ],
           eventSourceAssignments: {
@@ -1509,7 +1524,7 @@ describe('RaceSweetMainApp integration', () => {
                 },
               ],
               name: 'Apical Source',
-              type: 'api-apical-data-file',
+              type: 'api-apical-excel-file',
             },
           ],
           eventSourceAssignments: {},
@@ -1631,7 +1646,7 @@ describe('RaceSweetMainApp integration', () => {
                 },
               ],
               name: 'Apical Source',
-              type: 'api-apical-data-file',
+              type: 'api-apical-excel-file',
             },
           ],
           eventSourceAssignments: {

@@ -10,7 +10,7 @@ export type DataSourceType =
   | 'file-racesweet-ledger'
   | 'api-aws-sqs'
   | 'api-http-request'
-  | 'api-apical-data-file'
+  | 'api-apical-excel-file'
   | 'master-entrant-profiles';
 
 export interface MasterEntrantProfile {
@@ -37,6 +37,13 @@ export interface ApicalListedEvent {
   id: number;
   name: string;
 }
+
+export const APICAL_DEFAULT_SOURCE_NAME = 'Apical Data file endpoint';
+
+export const shouldRenameApicalSourceForFetchedEvent = (sourceName: string | null | undefined): boolean => {
+  const trimmedSourceName = sourceName?.trim();
+  return !trimmedSourceName || trimmedSourceName === APICAL_DEFAULT_SOURCE_NAME;
+};
 
 export interface ApicalApiSourceConfig {
   apicalEventId?: number;
@@ -120,7 +127,7 @@ const normalizeLocalStorageDirectoryPath = (
 };
 
 export const normalizeDataSourceConfig = (source: DataSourceConfig): DataSourceConfig => {
-  if (source.type !== 'api-apical-data-file' || !source.apiConfig) {
+  if (source.type !== 'api-apical-excel-file' || !source.apiConfig) {
     return source;
   }
 
@@ -179,8 +186,8 @@ export const getDataSourceTypeLabel = (type: DataSourceType): string => {
     return 'AWS SQS';
   case 'api-http-request':
     return 'HTTP Request';
-  case 'api-apical-data-file':
-    return 'Apical API data';
+  case 'api-apical-excel-file':
+    return 'Apical Excel data';
   case 'master-entrant-profiles':
     return 'Master Entrant Profiles';
   default:
