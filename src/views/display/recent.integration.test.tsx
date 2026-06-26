@@ -2151,6 +2151,7 @@ describe('RecentRecords integration', () => {
     expect(state.selectedCategories).toEqual([categoryA.id]);
     expect(row!.className).toContain('selected-participant');
     expect(row!.className).toContain('selected-category');
+    expect(row!.className).toContain('selected-row');
 
     await act(async () => {
       row!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -2161,6 +2162,239 @@ describe('RecentRecords integration', () => {
     expect(state.selectedCategories).toEqual([]);
     expect(row!.className).not.toContain('selected-participant');
     expect(row!.className).not.toContain('selected-category');
+    expect(row!.className).not.toContain('selected-row');
+  });
+
+  it('highlights category rows and same-team participant rows with separate classes', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const participant1: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'team-a',
+      firstname: 'Pat',
+      id: '101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'One',
+    };
+    const participant2: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'team-a',
+      firstname: 'Quinn',
+      id: '102',
+      identifiers: [{ fromTime: undefined, racePlate: '102', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Two',
+    };
+    const participant3: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'solo-entrant',
+      firstname: 'Rae',
+      id: '103',
+      identifiers: [{ fromTime: undefined, racePlate: '103', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Three',
+    };
+    const crossing1: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: '2001',
+      isValid: true,
+      participantId: participant1.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const crossing2: ParticipantPassingRecord = {
+      chipCode: 100102,
+      id: '2002',
+      isValid: true,
+      participantId: participant2.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:07:00.000Z'),
+    } as ParticipantPassingRecord;
+    const crossing3: ParticipantPassingRecord = {
+      chipCode: 100103,
+      id: '2003',
+      isValid: true,
+      participantId: participant3.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 3,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:08:00.000Z'),
+    } as ParticipantPassingRecord;
+    const team: EventTeam = {
+      categoryId: categoryA.id,
+      description: '',
+      id: 'team-a',
+      members: [participant1.id, participant2.id],
+      name: 'Team A',
+    };
+    const categories = [categoryA];
+    const participants = new Map<EventParticipant['id'], EventParticipant>([
+      [participant1.id, participant1],
+      [participant2.id, participant2],
+      [participant3.id, participant3],
+    ]);
+    const records = [crossing1, crossing2, crossing3];
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; teams: EventTeam[] } = {
+      categories,
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categories.find((category) => category.id === categoryId),
+      getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+      getParticipantById: (participantId) => participants.get(participantId),
+      getParticipantLaps: () => records,
+      getTransponderCrossings: () => [],
+      teams: [team],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    const Harness = (): React.ReactElement => {
+      const [selectedCategories, setSelectedCategories] = React.useState<Set<EventCategory['id']>>(new Set());
+      const [recordSelectedParticipants, setRecordSelectedParticipants] = React.useState<Set<EventParticipant['id']>>(new Set());
+
+      const handleParticipantSelected = (participantIds: Set<EventParticipant['id']>): void => {
+        const participantCategories = selectedCategoriesForParticipants(participantIds, raceStateLookup.getParticipantById);
+        setRecordSelectedParticipants(participantIds);
+        setSelectedCategories(participantCategories);
+      };
+
+      return (
+        <RecentRecords
+          categorySelected={setSelectedCategories}
+          participantSelected={handleParticipantSelected}
+          raceStateLookup={raceStateLookup}
+          records={records}
+          selectedCategories={selectedCategories}
+          selectedParticipants={recordSelectedParticipants}
+        />
+      );
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    const firstRow = container.querySelector('tr[data-record-id="2001"]');
+    const teammateRow = container.querySelector('tr[data-record-id="2002"]');
+    const categoryOnlyRow = container.querySelector('tr[data-record-id="2003"]');
+    expect(firstRow).not.toBeNull();
+    expect(teammateRow).not.toBeNull();
+    expect(categoryOnlyRow).not.toBeNull();
+
+    await act(async () => {
+      firstRow!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(firstRow!.className).toContain('selected-participant');
+    expect(firstRow!.className).toContain('selected-category');
+    expect(teammateRow!.className).toContain('selected-participant');
+    expect(teammateRow!.className).toContain('selected-category');
+    expect(categoryOnlyRow!.className).not.toContain('selected-participant');
+    expect(categoryOnlyRow!.className).toContain('selected-category');
+  });
+
+  it('highlights selected participant rows immediately even before selectedParticipants props are refreshed', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const participant1: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'team-a',
+      firstname: 'Pat',
+      id: '101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'One',
+    };
+    const participant2: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'team-a',
+      firstname: 'Quinn',
+      id: '102',
+      identifiers: [{ fromTime: undefined, racePlate: '102', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Two',
+    };
+    const crossing1: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: '2001',
+      isValid: true,
+      participantId: participant1.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const crossing2: ParticipantPassingRecord = {
+      chipCode: 100102,
+      id: '2002',
+      isValid: true,
+      participantId: participant2.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:07:00.000Z'),
+    } as ParticipantPassingRecord;
+    const categories = [categoryA];
+    const participants = new Map<EventParticipant['id'], EventParticipant>([
+      [participant1.id, participant1],
+      [participant2.id, participant2],
+    ]);
+    const records = [crossing1, crossing2];
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; teams: EventTeam[] } = {
+      categories,
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categories.find((category) => category.id === categoryId),
+      getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+      getParticipantById: (participantId) => participants.get(participantId),
+      getParticipantLaps: () => records,
+      getTransponderCrossings: () => [],
+      teams: [{ categoryId: categoryA.id, description: '', id: 'team-a', members: [participant1.id, participant2.id], name: 'Team A' }],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+    const participantSelected = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          participantSelected={participantSelected}
+          raceStateLookup={raceStateLookup}
+          records={records}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const selectedRow = container.querySelector('tr[data-record-id="2001"]');
+    const teammateRow = container.querySelector('tr[data-record-id="2002"]');
+    expect(selectedRow).not.toBeNull();
+    expect(teammateRow).not.toBeNull();
+
+    await act(async () => {
+      selectedRow!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(participantSelected).toHaveBeenCalledTimes(1);
+    expect((participantSelected.mock.calls[0][0] as Set<EventParticipantId>).has(participant1.id)).toBe(true);
+    expect(selectedRow!.className).toContain('selected-participant');
+    expect(teammateRow!.className).toContain('selected-participant');
   });
 
   it('replaces the previous row highlight when the user clicks another row after a category change', async () => {

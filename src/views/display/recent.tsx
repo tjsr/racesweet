@@ -249,7 +249,7 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
   onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void;
   onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
-  onSelectRecord?: (recordId: TimeRecordId) => void;
+  onSelectRecord?: (recordId: TimeRecordId | undefined) => void;
   timeZone?: string;
 }
 
@@ -463,7 +463,7 @@ const UnknownChipRow = (
     antennae: string
     onOpenAddRecordDialog?: (record: EventTimeRecord) => void,
     onOpenEditRecordDialog?: (record: EventTimeRecord) => void,
-    onSelectRecord?: (recordId: TimeRecordId) => void,
+    onSelectRecord?: (recordId: TimeRecordId | undefined) => void,
     record: EventTimeRecord,
     selectedRecordId?: TimeRecordId,
     txNo: number | undefined,
@@ -554,7 +554,7 @@ interface PassingRecordRowProps {
   onChangeCategory?: (participantId: EventParticipantId, categoryId: EventCategoryId) => void;
   onOpenAddRecordDialog?: (record: EventTimeRecord) => void;
   onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
-  onSelectRecord?: (recordId: TimeRecordId) => void;
+  onSelectRecord?: (recordId: TimeRecordId | undefined) => void;
   selectedRecordId?: TimeRecordId;
   timeZone?: string;
 }
@@ -625,16 +625,20 @@ export const PassingRecordRow = (
   let elapsedTime = '--:--:--.---';
   let lapTime = '';
 
+  let className = passing.isValid ? 'passing' : 'invalid-passing';
+  let cellClasses = '';
+
   if (passing.participantId) {
     const participant = props.raceStateLookup.getParticipantById(passing.participantId);
     const categoryLookup = props.raceStateLookup.getCategoryById.bind(props.raceStateLookup);
     categoryStr = participant ? categoryStringFromParticipant(participant, categoryLookup) : undefined;
   }
 
-  let className = passing.isValid ? 'passing' : 'invalid-passing';
-  let cellClasses = '';
-
   if (entrant) {
+    if (props.selectedParticipants?.has(entrant.id)) {
+      className += ' selected-participant';
+      cellClasses += ' selected-participant';
+    }
     plateNumber = getParticipantNumber(entrant);
     entrantName = getPassingEntrantName(entrant, rs);
     const entrantLaps: ParticipantPassingRecord[] | undefined |null = rs.getParticipantLaps(entrant.id);
@@ -643,11 +647,6 @@ export const PassingRecordRow = (
       lapNo = passing.isValid ? passing?.lapNo?.toString() || '' : '';
       elapsedTime = passing?.elapsedTime ? millisecondsToTime(passing.elapsedTime) : '--:--:--.---';
       lapTime = getLapTimeCell(passing);
-    }
-
-    if (props.selectedParticipants?.has(entrant.id)) {
-      className += ' selected-participant';
-      cellClasses = 'selected-participant';
     }
 
     if (entrant?.categoryId) {
@@ -684,7 +683,6 @@ export const PassingRecordRow = (
         onContextMenu={handleContextMenu}
         style={{ cursor: 'context-menu' }}
         onClick={(_event: React.MouseEvent<HTMLTableRowElement, MouseEvent>) => {
-          props.onSelectRecord?.(passing.id);
           if (props.onSelect) {
             props.onSelect(passing);
           }
@@ -781,6 +779,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       }
 
       if (props.selectedParticipants?.has(selectionParticipant.id)) {
+        props.onSelectRecord?.(undefined);
         if (props.participantSelected !== undefined) {
           props.participantSelected(new Set<EventParticipantId>());
         }
@@ -790,6 +789,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
         return;
       }
 
+      props.onSelectRecord?.(passingRecord.id);
       if (props.participantSelected !== undefined) {
         const selectedEntrants: Set<EventParticipantId> = new Set<EventParticipantId>();
         selectedEntrants.add(selectionParticipant.id);
@@ -1399,8 +1399,21 @@ export const RecentRecords = (props: RecordsProps & {
   const timeDisplayZoneMode = props.timeDisplayZoneMode || 'event';
   const displayTimeZone = resolveDisplayTimeZone(timeDisplayZoneMode, props.eventTimeZone);
   const selectedCategories = props.selectedCategories || new Set<EventCategoryId>();
-  const selectedParticipants = props.selectedParticipants || new Set<EventParticipantId>();
+  const emptySelectedParticipants = React.useMemo(() => new Set<EventParticipantId>(), []);
+  const propSelectedParticipants = props.selectedParticipants || emptySelectedParticipants;
+  const propSelectedParticipantKey = Array.from(propSelectedParticipants).sort().join('\0');
+  const [localSelectedParticipants, setLocalSelectedParticipants] = React.useState<Set<EventParticipantId>>(
+    () => new Set<EventParticipantId>(propSelectedParticipants)
+  );
+  React.useEffect(() => {
+    setLocalSelectedParticipants(new Set<EventParticipantId>(propSelectedParticipants));
+  }, [propSelectedParticipantKey]);
+  const selectedParticipants = localSelectedParticipants;
   const teamMemberIds = selectedTeamMemberIds(props.raceStateLookup, selectedParticipants);
+  const highlightedParticipantIds = new Set<EventParticipantId>([
+    ...selectedParticipants,
+    ...teamMemberIds,
+  ]);
   const selectableCategories = (props.raceStateLookup as unknown as { categories?: EventCategory[] }).categories || [];
   const selectedCategoryIds = Array.from(selectedCategories);
   const selectedCategoryNames = selectedCategoryIds.map((categoryId) => {
@@ -1490,6 +1503,10 @@ export const RecentRecords = (props: RecordsProps & {
   const openEditRecordDialog = (record: EventTimeRecord): void => {
     setAddRecordDialogState({ anchorRecord: record, existingRecord: record, mode: 'edit' });
   };
+  const handleParticipantSelected = (participantIds: Set<EventParticipantId>): void => {
+    setLocalSelectedParticipants(new Set<EventParticipantId>(participantIds));
+    props.participantSelected?.(participantIds);
+  };
 
   return <>
     <AddRecordDialog
@@ -1534,6 +1551,7 @@ export const RecentRecords = (props: RecordsProps & {
             onChange={(event) => {
               const value = event.target.value;
               const categoryIds = typeof value === 'string' ? value.split(',') : value;
+              setLocalSelectedParticipants(new Set<EventParticipantId>());
               props.categorySelected?.(new Set<EventCategoryId>(categoryIds as EventCategoryId[]));
             }}
             renderValue={() => selectedCategoryNames.length > 0 ? selectedCategoryNames.join(', ') : 'All categories'}>
@@ -1649,9 +1667,9 @@ export const RecentRecords = (props: RecordsProps & {
                     raceStateLookup={props.raceStateLookup}
                     selectedRecordId={selectedRecordId}
                     selectedCategories={props.selectedCategories}
-                    selectedParticipants={props.selectedParticipants}
+                    selectedParticipants={highlightedParticipantIds}
                     categorySelected={props.categorySelected}
-                    participantSelected={props.participantSelected}
+                    participantSelected={handleParticipantSelected}
                     onAssignFlagCategory={props.onAssignFlagCategory}
                     onOpenAddRecordDialog={openAddRecordDialog}
                     onOpenEditRecordDialog={openEditRecordDialog}
