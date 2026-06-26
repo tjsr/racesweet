@@ -570,6 +570,97 @@ describe('RecentRecords integration', () => {
     expect(secondRow!.className).toContain('selected-category');
   });
 
+  it('toggles crossing exclusion from the row context menu while keeping the crossing visible', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const participant: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: '101',
+      firstname: 'Pat',
+      id: '101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const crossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: '2001',
+      isValid: true,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [categoryA],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantLaps: () => [crossing],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+    const onExclude = vi.fn();
+    const renderRecords = async (): Promise<void> => {
+      await act(async () => {
+        root.render(
+          <RecentRecords
+            onExclude={onExclude}
+            raceStateLookup={raceStateLookup}
+            records={[crossing]}
+            selectedCategories={new Set()}
+            selectedParticipants={new Set()}
+          />
+        );
+      });
+    };
+    const openMenu = async (): Promise<void> => {
+      const row = container.querySelector('tr[data-record-id="2001"]');
+      expect(row).not.toBeNull();
+
+      await act(async () => {
+        row!.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 60,
+          clientY: 80,
+        }));
+      });
+    };
+    const clickMenuItem = async (label: string): Promise<void> => {
+      const menuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => {
+        return item.textContent?.trim() === label;
+      });
+      expect(menuItem).toBeDefined();
+
+      await act(async () => {
+        menuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+    };
+
+    await renderRecords();
+    await openMenu();
+    await clickMenuItem('Exclude crossing');
+
+    expect(onExclude).toHaveBeenCalledWith(crossing.id, true);
+    expect(container.querySelector('tr[data-record-id="2001"]')).not.toBeNull();
+
+    crossing.isExcluded = true;
+    crossing.isManuallyExcluded = true;
+    await renderRecords();
+    await openMenu();
+    await clickMenuItem('Include crossing');
+
+    expect(onExclude).toHaveBeenLastCalledWith(crossing.id, false);
+    expect(container.querySelector('tr[data-record-id="2001"]')).not.toBeNull();
+  });
+
   it('shows flag context actions for deleting and changing assigned categories', async () => {
     const categoryA: EventCategory = { id: '1', name: 'Category A' };
     const categoryB: EventCategory = { id: '2', name: 'Category B' };

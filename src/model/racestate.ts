@@ -341,7 +341,9 @@ export class Session implements RaceState, RaceStateLookup {
   public excludeCrossing(crossingId: TimeRecordId, exclude: boolean): void {
     const record = this._records.get(crossingId.toString());
     if (record && isCrossingRecord(record)) {
-      (record as ParticipantPassingRecord).isExcluded = exclude;
+      const crossing = record as ParticipantPassingRecord;
+      crossing.isExcluded = exclude;
+      crossing.isManuallyExcluded = exclude;
       if (record.participantId) {
         this.__reprocessParticipantLaps(record.participantId);
       } else {

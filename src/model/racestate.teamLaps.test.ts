@@ -110,6 +110,43 @@ describe('Session team lap processing', () => {
     expect(riderTwoLaps[0].lapTime).toBe(360000);
   });
 
+  it('toggles manually excluded crossings out of and back into lap calculations', async () => {
+    const session = new Session({
+      categories: [category],
+      participants: [participant('101', '11', 1001)],
+      records: [],
+      teams: [],
+    });
+
+    await session.addRecords([
+      createGreenFlagEvent({
+        categoryIds: [category.id],
+        flagValue: 'course',
+        id: '1',
+        recordType: 4,
+        sequence: 1,
+        source: 'test',
+        time: new Date('2026-05-30T10:00:00.000Z'),
+      }),
+      chipCrossing('1001', 1001, 2, '2026-05-30T10:06:00.000Z'),
+      chipCrossing('1002', 1001, 3, '2026-05-30T10:12:00.000Z'),
+      chipCrossing('1003', 1001, 4, '2026-05-30T10:18:00.000Z'),
+    ]);
+
+    session.excludeCrossing('1002', true);
+
+    let laps = session.getParticipantLaps('101') || [];
+    expect(laps.map((record) => record.id)).toEqual(['1001', '1002', '1003']);
+    expect(laps[1]).toMatchObject({ isExcluded: true, isManuallyExcluded: true, isValid: false, lapNo: undefined });
+    expect(laps[2]).toMatchObject({ isExcluded: false, isValid: true, lapNo: 2, lapTime: 720000, startingLapRecordId: '1001' });
+
+    session.excludeCrossing('1002', false);
+
+    laps = session.getParticipantLaps('101') || [];
+    expect(laps[1]).toMatchObject({ isExcluded: false, isManuallyExcluded: false, isValid: true, lapNo: 2, lapTime: 360000, startingLapRecordId: '1001' });
+    expect(laps[2]).toMatchObject({ isExcluded: false, isValid: true, lapNo: 3, lapTime: 360000, startingLapRecordId: '1002' });
+  });
+
   it('reassigns unmatched crossings and recalculates laps when participant identifiers change', async () => {
     const session = new Session({
       categories: [category],

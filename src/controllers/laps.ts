@@ -27,6 +27,21 @@ const resetPassingLapState = (passing: ParticipantPassingRecord): void => {
   passing.startingLapRecordId = undefined;
 };
 
+const keepManuallyExcludedPassingOutOfResults = (passing: ParticipantPassingRecord): boolean => {
+  if (!passing.isManuallyExcluded) {
+    return false;
+  }
+
+  passing.elapsedTime = undefined;
+  passing.isExcluded = true;
+  passing.isValid = false;
+  passing.lapNo = undefined;
+  passing.lapTime = undefined;
+  passing.participantStartRecordId = undefined;
+  passing.startingLapRecordId = undefined;
+  return true;
+};
+
 export const validTimeAfterLastLap = (
   passing: ParticipantPassingRecord,
   prevPassing: ParticipantPassingRecord | undefined
@@ -185,6 +200,10 @@ const processEntrantLaps = (
   let lapNo = 0;
 
   orderedPassings.forEach((passing) => {
+    if (keepManuallyExcludedPassingOutOfResults(passing)) {
+      return;
+    }
+
     if (passing.time === undefined) {
       return;
     }
@@ -271,6 +290,10 @@ export const calculateParticipantLapTimes = (
   let prevPassing: ParticipantPassingRecord | undefined = undefined;
   let onLapNumber = 0;
   passings.forEach((passing) => {
+    if (keepManuallyExcludedPassingOutOfResults(passing)) {
+      return;
+    }
+
     if (passing.time === undefined) {
       console.error(calculateParticipantLapTimes.name, `Passing for ${getTimeRecordIdentifier(passing)} has no time`);
       return;

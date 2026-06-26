@@ -52,6 +52,7 @@ export interface ParticipantPassingRecord extends EventTimeRecord {
   // lapStart?: TimeRecordId | null | undefined;
   lapNo?: number | null | undefined;
   isExcluded?: boolean | null | undefined;
+  isManuallyExcluded?: boolean | null | undefined;
   overallTrackPosition?: number | null | undefined;
   positionInClass?: number | null | undefined;
   isValid?: boolean | null | undefined; // Indicates if the record is valid
