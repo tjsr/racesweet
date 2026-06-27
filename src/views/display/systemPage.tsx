@@ -9,6 +9,8 @@ import {
 } from '../../app/systemConfig.js';
 import { getRuntimeVersions } from '../../app/versionInfo.js';
 import { TimeRecordSourceId } from '../../model/types.js';
+import { RuntimeInformationPanel } from '../panels/runtimeInformation.js';
+import { LocalStorageLocationPanel } from '../panels/localStorageLocation.js';
 
 interface SystemPageProps {
   config: SystemConfiguration;
@@ -38,16 +40,16 @@ const sourceTypeOptions: DataSourceType[] = [
   'master-entrant-profiles',
 ];
 
+interface SourceFetchError {
+  details: string;
+  title: string;
+}
+
 interface DraftInputProps {
   ariaLabel: string;
   onCommit: (value: string) => void | Promise<void>;
   type?: 'number' | 'text';
   value: string;
-}
-
-interface SourceFetchError {
-  details: string;
-  title: string;
 }
 
 const DraftInput = (props: DraftInputProps): React.ReactElement => {
@@ -66,10 +68,10 @@ const DraftInput = (props: DraftInputProps): React.ReactElement => {
   return (
     <input
       aria-label={props.ariaLabel}
-      type={props.type || 'text'}
-      value={draft}
       onBlur={commit}
       onChange={(event) => setDraft(event.target.value)}
+      type={props.type || 'text'}
+      value={draft}
     />
   );
 };
@@ -194,26 +196,12 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
       <h1>System</h1>
       <p>Configure global data-source definitions and source connection settings.</p>
 
-      <section className="events-panel">
-        <h2>Runtime Information</h2>
-        <ul>
-          <li>Electron: {runtimeVersions.electron}</li>
-          <li>Node.js: {runtimeVersions.node}</li>
-          <li>Chromium: {runtimeVersions.chromium}</li>
-        </ul>
-      </section>
+      <RuntimeInformationPanel runtimeVersions={runtimeVersions} />
 
-      <section className="events-panel">
-        <h2>Local storage location</h2>
-        <label>
-          Storage Directory
-          <DraftInput
-            ariaLabel="Local Storage Directory"
-            value={props.config.localStorageDirectoryPath}
-            onCommit={props.onSaveLocalStorageDirectoryPath}
-          />
-        </label>
-      </section>
+      <LocalStorageLocationPanel
+        localStorageDirectoryPath={props.config.localStorageDirectoryPath}
+        onSaveLocalStorageDirectoryPath={props.onSaveLocalStorageDirectoryPath}
+      />
 
       <section className="events-panel">
         <h2>Data Source Types</h2>
