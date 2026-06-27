@@ -33,26 +33,28 @@ export const EntrantListCard = (props: EntrantListCartProps): React.ReactElement
       }}
       aria-selected={props.isSelected}
     >
-      {raceNumberText || timingDeviceText ? (
-        <div className="entrant-list-card-meta">
-          {raceNumberText ? <span className="entrant-race-number">{raceNumberText}</span> : null}
-          {timingDeviceText ? <span className="entrant-timing-devices">{timingDeviceText}</span> : null}
-        </div>
-      ) : null}
-      <strong>{props.entrant.name}</strong>
+      <div className="entrant-list-card-header">
+        <strong className="entrant-list-name">{props.entrant.name}</strong>
+        {raceNumberText || timingDeviceText ? (
+          <div className="entrant-list-card-identifiers">
+            {raceNumberText ? <span className="entrant-race-number">{raceNumberText}</span> : null}
+            {timingDeviceText ? <span className="entrant-timing-devices">{timingDeviceText}</span> : null}
+          </div>
+        ) : null}
+      </div>
       {props.entrant.entrantType === 'rider' ? (
-        <>
-          <span className="entrant-category-chip">
-            {props.categoryName || 'No category'}
-          </span>
-          {props.teamName ? (
-            <span className="entrant-team-chip">
-              Team: {props.teamName}
-            </span>
-          ) : null}
-        </>
+        <span className="entrant-category-chip">
+          {props.categoryName || 'No category'}
+        </span>
       ) : null}
-      <span className="entrant-list-type">{props.entrant.entrantType}</span>
+      <div className="entrant-list-team-row">
+        {props.entrant.entrantType === 'rider' && props.teamName ? (
+          <span className="entrant-team-chip">
+            Team: {props.teamName}
+          </span>
+        ) : null}
+        <span className="entrant-list-type">{props.entrant.entrantType}</span>
+      </div>
     </button>
   );
 };

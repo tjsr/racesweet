@@ -41,13 +41,28 @@ describe('EntrantListCard', () => {
           onSelect={() => undefined}
           raceNumber={73}
           timingDevices={['1234', 'Tx10000223']}
+          teamName="Fast Friends"
         />
       );
     });
 
-    expect(container.textContent).toContain('#73');
-    expect(container.textContent).toContain('Tx1234, Tx10000223');
-    expect(container.querySelector('.entrant-race-number')).not.toBeNull();
-    expect(container.querySelector('.entrant-timing-devices')).not.toBeNull();
+    const header = container.querySelector('.entrant-list-card-header');
+    const identifiers = container.querySelector('.entrant-list-card-identifiers');
+    const raceNumber = container.querySelector('.entrant-race-number');
+    const timingDevices = container.querySelector('.entrant-timing-devices');
+    const teamRow = container.querySelector('.entrant-list-team-row');
+    const teamName = container.querySelector('.entrant-team-chip');
+    const entrantType = container.querySelector('.entrant-list-type');
+
+    expect(header?.firstElementChild?.classList.contains('entrant-list-name')).toBe(true);
+    expect(header?.lastElementChild).toBe(identifiers);
+    expect(identifiers?.children[0]).toBe(raceNumber);
+    expect(identifiers?.children[1]).toBe(timingDevices);
+    expect(raceNumber?.textContent).toBe('#73');
+    expect(timingDevices?.textContent).toBe('Tx1234, Tx10000223');
+    expect(teamRow?.children[0]).toBe(teamName);
+    expect(teamRow?.children[1]).toBe(entrantType);
+    expect(teamName?.textContent).toBe('Team: Fast Friends');
+    expect(entrantType?.textContent).toBe('rider');
   });
 });
