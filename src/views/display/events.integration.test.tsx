@@ -165,7 +165,7 @@ describe('EventsScreen integration', () => {
     expect(container.querySelector('h1')?.textContent).toBe('Events');
     expect(container.textContent).toContain('Event Details');
     expect(container.textContent).toContain('Sessions');
-    expect(container.textContent).toContain('Session Summary');
+    expect(container.textContent).toContain('Event Data Sources');
     expect(container.textContent).toContain('Winter Round');
     expect(container.textContent).toContain('Friday Practice');
     const summaryColumn = container.querySelector('.event-summary-column');
@@ -174,8 +174,11 @@ describe('EventsScreen integration', () => {
     expect(summarySections).toHaveLength(2);
     expect(summarySections[0]?.classList.contains('session-detail-panel')).toBe(true);
     expect(summarySections[1]?.classList.contains('category-detail-panel')).toBe(true);
-    expect(summarySections[0]?.textContent).toContain('Session Summary');
+    expect(summarySections[0]?.textContent).toContain('Sessions');
     expect(summarySections[1]?.textContent).toContain('Category Summary');
+    const detailColumn = container.querySelector('.event-detail-column');
+    expect(detailColumn).toBeTruthy();
+    expect(detailColumn?.children).toHaveLength(2);
 
     const springTestButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Spring Test'));
     expect(springTestButton).toBeDefined();

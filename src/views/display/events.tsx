@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  EventCatalogCategory,
   type EventCatalogEvent,
   type EventCatalogState,
   getCategoriesForEvent,
@@ -8,8 +7,13 @@ import {
 } from '../../app/eventCatalog.js';
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
 import { getSupportedTimeZones, getSystemTimeZone } from '../../app/utils/timeutils.js';
-import { EventId, SessionId } from '../../model/raceevent.js';
+import { type EventId, type SessionId } from '../../model/raceevent.js';
 import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
+import { CategorySummaryPanel } from '../panels/categorySummary.js';
+import { EventDataSourcesPanel } from '../panels/eventDataSources.js';
+import { EventDetailsPanel } from '../panels/eventDetails.js';
+import { EventListPanel } from '../panels/eventList.js';
+import { SessionsPanel } from '../panels/sessions.js';
 
 interface EventsScreenProps {
   catalog: EventCatalogState;
@@ -25,12 +29,6 @@ interface EventsScreenProps {
   selectedEventId?: EventId;
   selectedSessionId?: SessionId;
 }
-
-const toggleInList = (values: string[], value: string): string[] => {
-  return values.includes(value)
-    ? values.filter((item) => item !== value)
-    : [...values, value];
-};
 
 const getEventDraft = (event: EventCatalogEvent | undefined, systemTimeZone: string): {
   date: string;
@@ -85,192 +83,71 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
     onUnsavedChangesGuardChange: props.onUnsavedChangesGuardChange,
   });
 
+  const handleCreateEvent = (): void => {
+    requestFormExit(() => props.onCreateEvent());
+  };
+
+  const handleSelectEvent = (eventId: EventId): void => {
+    if (eventId === selectedEvent?.id) {
+      return;
+    }
+
+    requestFormExit(() => props.onSelectEvent(eventId));
+  };
+
+  const handleDeleteEvent = (): void => {
+    if (!selectedEvent) {
+      return;
+    }
+
+    requestFormExit(() => props.onDeleteEvent(selectedEvent.id));
+  };
+
   return (
     <section className="events-screen">
       <h1>Events</h1>
       <div className="events-layout">
-        <section className="events-panel events-list-panel">
-          <div className="events-actions">
-            <h2>Event List</h2>
-            <button type="button" onClick={() => requestFormExit(() => props.onCreateEvent())}>
-              New
-            </button>
-          </div>
-          <div className="events-list" role="listbox" aria-label="Defined events">
-            {props.catalog.events.map((event) => {
-              const isSelected = event.id === selectedEvent?.id;
-              const isActive = event.id === props.catalog.activeEventId;
+        <EventListPanel
+          activeEventId={props.catalog.activeEventId}
+          events={props.catalog.events}
+          onCreateEvent={handleCreateEvent}
+          onSelectEvent={handleSelectEvent}
+          selectedEventId={selectedEvent?.id}
+        />
 
-              return (
-                <button
-                  key={event.id}
-                  type="button"
-                  className={`events-list-item${isSelected ? ' selected' : ''}`}
-                  onClick={() => {
-                    if (!isSelected) {
-                      requestFormExit(() => props.onSelectEvent(event.id));
-                    }
-                  }}
-                  aria-selected={isSelected}
-                >
-                  <strong>{event.name}</strong>
-                  <span>{event.date}</span>
-                  <span>{event.format}</span>
-                  {isActive ? <span className="events-badge">Active</span> : null}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+        <div
+          className="event-detail-column"
+          style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: 0 }}
+        >
+          <EventDetailsPanel
+            activeEventId={props.catalog.activeEventId}
+            eventDraft={eventDraft}
+            onActivateEvent={selectedEvent ? () => props.onActivateEvent(selectedEvent.id) : undefined}
+            onDeleteEvent={handleDeleteEvent}
+            onSaveEventDetails={() => {
+              void saveEvent();
+            }}
+            onUpdateEventDraft={setEventDraft}
+            selectedEvent={selectedEvent}
+            timeZoneOptions={timeZoneOptions}
+            warningModal={warningModal}
+          />
 
-        <section className="events-panel event-detail-panel">
-          <h2>Event Details</h2>
-          {selectedEvent ? (
-            <>
-              <label>
-                Event Name
-                <input
-                  aria-label="Event Name"
-                  type="text"
-                  value={eventDraft.name}
-                  onChange={(event) => setEventDraft((current) => ({ ...current, name: event.target.value }))}
-                />
-              </label>
-              <label>
-                Event Format
-                <select
-                  aria-label="Event Format"
-                  value={eventDraft.format}
-                  onChange={(event) => setEventDraft((current) => ({ ...current, format: event.target.value as EventCatalogEvent['format'] }))}
-                >
-                  <option value="race-weekend">Race weekend</option>
-                  <option value="test-day">Test day</option>
-                  <option value="track-day">Track day</option>
-                  <option value="other">Other</option>
-                </select>
-              </label>
-              <label>
-                Event Date
-                <input
-                  aria-label="Event Date"
-                  type="date"
-                  value={eventDraft.date}
-                  onChange={(event) => setEventDraft((current) => ({ ...current, date: event.target.value }))}
-                />
-              </label>
-              <label>
-                Event Time Zone
-                <select
-                  aria-label="Event Time Zone"
-                  value={eventDraft.timeZone}
-                  onChange={(event) => setEventDraft((current) => ({ ...current, timeZone: event.target.value }))}
-                >
-                  {timeZoneOptions.map((timeZone) => (
-                    <option key={timeZone} value={timeZone}>
-                      {timeZone}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="events-actions">
-                <button type="button" onClick={() => {
-                  void saveEvent();
-                }}>
-                  Save Event Details
-                </button>
-                <button
-                  type="button"
-                  onClick={() => props.onActivateEvent(selectedEvent.id)}
-                  disabled={selectedEvent.id === props.catalog.activeEventId}
-                >
-                  {selectedEvent.id === props.catalog.activeEventId ? 'Active Event' : 'Mark Active'}
-                </button>
-                <button type="button" onClick={() => requestFormExit(() => props.onDeleteEvent(selectedEvent.id))}>
-                  Delete Event
-                </button>
-              </div>
-              <span className="event-id-display">Event ID: {selectedEvent.id}</span>
-
-              <h2>Sessions</h2>
-              <div className="events-session-list" role="listbox" aria-label="Event sessions">
-                {selectedEventSessions.map((session) => {
-                  const isSelected = session.id === selectedSession?.id;
-                  return (
-                    <button
-                      key={session.id}
-                      type="button"
-                      className={`events-list-item${isSelected ? ' selected' : ''}`}
-                      onClick={() => props.onSelectSession(session.id)}
-                      aria-selected={isSelected}
-                    >
-                      <strong>{session.name}</strong>
-                      <span>{session.kind}</span>
-                      <span>{session.status}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <h2>Event Data Sources</h2>
-              {props.config.dataSources.length === 0 ? (
-                <p>No configured data sources are available yet. Add and configure them in System.</p>
-              ) : (
-                <ul>
-                  {props.config.dataSources.map((source) => {
-                    const checked = assignedSourceIds.includes(source.id);
-                    return (
-                      <li key={`event-source-${source.id}`}>
-                        <label>
-                          <input
-                            aria-label={`Event Source ${selectedEvent.id} ${source.id}`}
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => props.onSaveEventAssignment(selectedEvent.id, toggleInList(assignedSourceIds, source.id))}
-                          />
-                          {source.name}
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-              {warningModal}
-            </>
-          ) : (
-            <p>No events are defined.</p>
-          )}
-        </section>
+          <EventDataSourcesPanel
+            assignedSourceIds={assignedSourceIds}
+            dataSources={props.config.dataSources}
+            onSaveEventAssignment={props.onSaveEventAssignment}
+            selectedEvent={selectedEvent}
+          />
+        </div>
 
         <div className="event-summary-column">
-          <section className="events-panel session-detail-panel">
-            <h2>Session Summary</h2>
-            {selectedEventSessions.length > 0 ? (
-              <ul aria-label="Session summary list">
-                {selectedEventSessions.map((session) => (
-                  <li key={session.id}>
-                    <strong>{session.name}</strong> - {session.kind} - {session.status} - {session.scheduledStart}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>No sessions in this event.</p>
-            )}
-            {selectedSession ? <p>Selected session: {selectedSession.name}</p> : null}
-          </section>
-          <section className="events-panel category-detail-panel">
-            <h2>Category Summary</h2>
-            {selectedEventCategories.length > 0 ? (
-              <ul aria-label="Category summary list">
-                {selectedEventCategories.map((category: EventCatalogCategory) => (
-                  <li key={category.id}>
-                    <strong>{category.name}</strong> ({category.id})
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>No categories in this event.</p>
-            )}
-          </section>
+          <SessionsPanel
+            onSelectSession={props.onSelectSession}
+            selectedSession={selectedSession}
+            sessions={selectedEventSessions}
+          />
+          <CategorySummaryPanel categories={selectedEventCategories} />
         </div>
       </div>
     </section>
