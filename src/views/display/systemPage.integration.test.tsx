@@ -119,9 +119,11 @@ describe('SystemPage integration', () => {
 
     expect(container.textContent).toContain('System');
     expect(container.textContent).toContain('Apical Source');
-
     const sourceTypeSelect = container.querySelector('select[aria-label="New Data Source Type"]') as HTMLSelectElement;
     expect(sourceTypeSelect).toBeDefined();
+    const configuredSourcesTable = container.querySelector('table[aria-label="Configured data sources table"]');
+    expect(configuredSourcesTable).toBeTruthy();
+    expect(sourceTypeSelect.compareDocumentPosition(configuredSourcesTable!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     await act(async () => {
       sourceTypeSelect.value = 'timing-mylaps-decoder';

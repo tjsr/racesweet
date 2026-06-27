@@ -9,8 +9,9 @@ import {
 } from '../../app/systemConfig.js';
 import { getRuntimeVersions } from '../../app/versionInfo.js';
 import { TimeRecordSourceId } from '../../model/types.js';
-import { RuntimeInformationPanel } from '../panels/runtimeInformation.js';
+import { DataSourceTypesPanel } from '../panels/dataSourceTypes.js';
 import { LocalStorageLocationPanel } from '../panels/localStorageLocation.js';
+import { RuntimeInformationPanel } from '../panels/runtimeInformation.js';
 
 interface SystemPageProps {
   config: SystemConfiguration;
@@ -26,19 +27,6 @@ interface SystemPageProps {
   onSaveSource: (sourceId: TimeRecordSourceId, changes: Partial<DataSourceConfig>) => void | Promise<void>;
   onSelectLocalFile?: () => Promise<string | undefined>;
 }
-
-const sourceTypeOptions: DataSourceType[] = [
-  'timing-rfid-decoder',
-  'timing-mylaps-decoder',
-  'timing-dorian-data1-supernode',
-  'file-rfid-timing-csv',
-  'file-apical-data-file',
-  'file-racesweet-ledger',
-  'api-aws-sqs',
-  'api-http-request',
-  'api-apical-excel-file',
-  'master-entrant-profiles',
-];
 
 interface SourceFetchError {
   details: string;
@@ -77,7 +65,7 @@ const DraftInput = (props: DraftInputProps): React.ReactElement => {
 };
 
 export const SystemPage = (props: SystemPageProps): React.ReactElement => {
-  const [newSourceType, setNewSourceType] = React.useState<DataSourceType>(sourceTypeOptions[0]);
+  const [newSourceType, setNewSourceType] = React.useState<DataSourceType>('timing-rfid-decoder');
   const [selectedSourceId, setSelectedSourceId] = React.useState<string | undefined>(props.config.dataSources[0]?.id);
   const [sourceFetchErrors, setSourceFetchErrors] = React.useState<Record<string, SourceFetchError>>({});
   const [masterProfileDraftErrors, setMasterProfileDraftErrors] = React.useState<Record<string, string>>({});
@@ -204,30 +192,14 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
       />
 
       <section className="events-panel">
-        <h2>Data Source Types</h2>
-        <div className="events-actions">
-          <label>
-            Data Source Type
-            <select
-              aria-label="New Data Source Type"
-              value={newSourceType}
-              onChange={(event) => setNewSourceType(event.target.value as DataSourceType)}
-            >
-              {sourceTypeOptions.map((type) => (
-                <option key={type} value={type}>{getDataSourceTypeLabel(type)}</option>
-              ))}
-            </select>
-          </label>
-          <button type="button" onClick={() => props.onCreateSource(newSourceType)}>
-            Add Data Source
-          </button>
-        </div>
-      </section>
-
-      <section className="events-panel">
         <h2>Configured Data Sources</h2>
         <div className="events-layout two-panel">
           <section className="events-panel">
+            <DataSourceTypesPanel
+              newSourceType={newSourceType}
+              onChangeNewSourceType={setNewSourceType}
+              onCreateSource={props.onCreateSource}
+            />
             {props.config.dataSources.length === 0 ? (
               <p>No data sources configured yet.</p>
             ) : (
