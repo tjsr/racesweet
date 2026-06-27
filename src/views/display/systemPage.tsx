@@ -4,6 +4,7 @@ import { getRuntimeVersions } from '../../app/versionInfo.js';
 import { TimeRecordSourceId } from '../../model/types.js';
 import { DataSourcesPanel } from '../panels/dataSources.js';
 import { LocalStorageLocationPanel } from '../panels/localStorageLocation.js';
+import { LogPanel } from '../panels/log.js';
 import { RuntimeInformationPanel } from '../panels/runtimeInformation.js';
 
 interface SystemPageProps {
@@ -49,17 +50,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         onSelectLocalFile={props.onSelectLocalFile}
       />
 
-      <section className="events-panel">
-        <h2>Log</h2>
-        <label>
-          Error Log
-          <textarea
-            aria-label="Application Error Log"
-            readOnly
-            value={props.displayedErrorLog || ''}
-          />
-        </label>
-      </section>
+      <LogPanel displayedErrorLog={props.displayedErrorLog} />
     </section>
   );
 };
