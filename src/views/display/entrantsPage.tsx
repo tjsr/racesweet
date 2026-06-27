@@ -7,15 +7,13 @@ import {
   getEntrantsForEvent,
   getSessionsForEvent,
 } from '../../app/eventCatalog.js';
-import { LicencesControl } from '../../controls/licencesControl.js';
-import { RaceNumbersControl } from '../../controls/raceNumbersControl.js';
-import { TimingDevicesControl } from '../../controls/timingDevicesControl.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import { type EventParticipantId } from '../../model/eventparticipant.js';
 import { EventId } from '../../model/raceevent.js';
 import { type RaceState } from '../../model/racestate.js';
 import { EntrantListPanel, getParticipantsForEntrant } from '../panels/entrantList.js';
 import { EntrantDetailsPanel, type EntrantDraft } from '../panels/entrantDetailsPanel.js';
+import { IdentificationPanel } from '../panels/identificationPanel.js';
 import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
 
 interface EntrantsPageProps {
@@ -253,18 +251,10 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           teamMembers={selectedTeamMembers}
           warningModal={warningModal}
         />
-        <section className="events-panel">
-          <h2>Identification</h2>
-          <RaceNumbersControl
-            participants={selectedParticipants}
-            onUpdateRaceNumbers={(participantId, raceNumbers) => props.onUpdateParticipantIdentifiers?.(participantId, 'racePlate', raceNumbers)}
-          />
-          <TimingDevicesControl
-            participants={selectedParticipants}
-            onUpdateTimingDevices={(participantId, timingDevices) => props.onUpdateParticipantIdentifiers?.(participantId, 'txNo', timingDevices)}
-          />
-          <LicencesControl />
-        </section>
+        <IdentificationPanel
+          onUpdateParticipantIdentifiers={props.onUpdateParticipantIdentifiers}
+          participants={selectedParticipants}
+        />
       </div>
     </section>
   );
