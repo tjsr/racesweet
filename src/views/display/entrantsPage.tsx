@@ -8,7 +8,7 @@ import {
   getSessionsForEvent,
 } from '../../app/eventCatalog.js';
 import { EventEntrantId } from '../../model/entrant.js';
-import { type EventParticipantId } from '../../model/eventparticipant.js';
+import { type EventParticipant, type EventParticipantId, type ParticipantIdentifierUpdate } from '../../model/eventparticipant.js';
 import { EventId } from '../../model/raceevent.js';
 import { type RaceState } from '../../model/racestate.js';
 import { EntrantListPanel, getParticipantsForEntrant } from '../panels/entrantList.js';
@@ -18,12 +18,13 @@ import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedCha
 
 interface EntrantsPageProps {
   catalog: EventCatalogState;
+  enableMultiplePlates?: boolean;
   onCreateEntrant: (eventId: EventId, entrantType?: EntrantType) => void | Promise<void>;
   onDeleteEntrant: (eventId: EventId, entrantId: EventEntrantId) => void | Promise<void>;
   onSelectEntrant: (entrantId: EventEntrantId) => void;
   onSelectEvent: (eventId: EventId) => void;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
-  onUpdateParticipantIdentifiers?: (participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: Array<string | number>) => void | Promise<void>;
+  onUpdateParticipantIdentifiers?: (participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: ParticipantIdentifierUpdate[]) => void | Promise<void>;
   onUpdateEntrant: (entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>>) => void | Promise<void>;
   raceState?: Partial<RaceState>;
   selectedEntrantId?: EventEntrantId;
@@ -52,6 +53,26 @@ const eventSupportsTeams = (catalog: EventCatalogState, eventId: EventId | undef
 
   return getCategoriesForEvent(catalog, eventId).some((category) => (category.teamRules?.maxTeamSize || 0) > 1) ||
     getEntrantsForEvent(catalog, eventId).some((entrant) => entrant.entrantType === 'team');
+};
+
+const getFallbackParticipantForEntrant = (entrant: EventCatalogEntrant | undefined): EventParticipant | undefined => {
+  if (!entrant || entrant.entrantType !== 'rider') {
+    return undefined;
+  }
+
+  const participantId = entrant.memberParticipantIds[0] || entrant.id;
+
+  return {
+    categoryId: entrant.categoryId || entrant.categoryIds[0] || '',
+    currentResult: undefined,
+    entrantId: entrant.id,
+    firstname: entrant.firstName || entrant.name,
+    id: participantId,
+    identifiers: [],
+    lastRecordTime: null,
+    resultDuration: null,
+    surname: entrant.lastName || '',
+  };
 };
 
 export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
@@ -115,7 +136,13 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   const filteredTeamEntrants = filteredEventEntrants.filter((entrant) => entrant.entrantType === 'team');
   const teamsEnabled = eventSupportsTeams(props.catalog, selectedEvent?.id);
   const selectedEntrant = filteredEventEntrants.find((entrant) => entrant.id === props.selectedEntrantId) ?? filteredEventEntrants[0];
-  const selectedParticipants = getParticipantsForEntrant(selectedEntrant, raceStateParticipants);
+  const selectedParticipants = getParticipantsForEntrant(selectedEntrant, raceStateParticipants, eventEntrants);
+  const selectedIdentificationParticipant = selectedParticipants[0] || getFallbackParticipantForEntrant(selectedEntrant);
+  const identificationParticipants = selectedParticipants.length > 0
+    ? selectedParticipants
+    : selectedIdentificationParticipant
+      ? [selectedIdentificationParticipant]
+      : [];
   const selectedEntrantDraft = React.useMemo(() => getEntrantDraft(selectedEntrant), [selectedEntrant]);
   const [createKind, setCreateKind] = React.useState<EntrantType>('rider');
   const [entrantDraft, setEntrantDraft] = React.useState<EntrantDraft>(selectedEntrantDraft);
@@ -252,8 +279,10 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           warningModal={warningModal}
         />
         <IdentificationPanel
+          enableMultiplePlates={props.enableMultiplePlates}
           onUpdateParticipantIdentifiers={props.onUpdateParticipantIdentifiers}
-          participants={selectedParticipants}
+          participants={identificationParticipants}
+          selectedParticipant={selectedIdentificationParticipant}
         />
       </div>
     </section>

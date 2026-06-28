@@ -124,10 +124,10 @@ const getParticipantIdentifier = (
     return undefined;
   }
   ids = ids.filter((identifier) => {
-    if (identifier.fromTime && lookupTime && identifier.fromTime < lookupTime) {
+    if (identifier.fromTime && lookupTime && lookupTime < identifier.fromTime) {
       return false;
     }
-    if (identifier.toTime && lookupTime && identifier.toTime > lookupTime) {
+    if (identifier.toTime && lookupTime && lookupTime > identifier.toTime) {
       return false;
     }
     return true;
@@ -158,10 +158,10 @@ export const getParticipantIdentifiers = (
     return [];
   }
   ids = ids.filter((identifier) => {
-    if (identifier.fromTime && lookupTime && identifier.fromTime < lookupTime) {
+    if (identifier.fromTime && lookupTime && lookupTime < identifier.fromTime) {
       return false;
     }
-    if (identifier.toTime && lookupTime && identifier.toTime > lookupTime) {
+    if (identifier.toTime && lookupTime && lookupTime > identifier.toTime) {
       return false;
     }
     return true;

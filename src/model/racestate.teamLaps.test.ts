@@ -22,6 +22,26 @@ const participant = (id: string, racePlate: string, txNo: number): EventParticip
   surname: 'Team',
 });
 
+const participantWithAssignedTransponder = (
+  id: string,
+  racePlate: string,
+  txNo: number,
+  fromTime?: Date
+): EventParticipant => ({
+  categoryId: category.id,
+  currentResult: undefined,
+  entrantId: '201',
+  firstname: `Rider ${racePlate}`,
+  id,
+  identifiers: [
+    { fromTime: undefined, racePlate, toTime: undefined },
+    { fromTime, toTime: undefined, txNo },
+  ] as unknown as EventParticipant['identifiers'],
+  lastRecordTime: null,
+  resultDuration: null,
+  surname: 'Team',
+});
+
 const chipCrossing = (
   id: string,
   chipCode: number,
@@ -173,5 +193,62 @@ describe('Session team lap processing', () => {
     const updatedCrossing = session.records.find((record) => record.id === '1001') as ParticipantPassingRecord | undefined;
     expect(updatedCrossing?.participantId).toBe('101');
     expect(session.getParticipantLaps('101')?.[0].lapNo).toBe(1);
+  });
+
+  it('does not count transponder crossings before the assignment time', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const session = new Session({
+      categories: [category],
+      participants: [participantWithAssignedTransponder('101', '11', 1001, new Date('2026-05-30T10:10:00.000Z'))],
+      records: [],
+      teams: [],
+    });
+
+    await session.addRecords([
+      createGreenFlagEvent({
+        categoryIds: [category.id],
+        flagValue: 'course',
+        id: '1',
+        recordType: 4,
+        sequence: 1,
+        source: 'test',
+        time: new Date('2026-05-30T10:00:00.000Z'),
+      }),
+      chipCrossing('1001', 1001, 2, '2026-05-30T10:06:00.000Z'),
+      chipCrossing('1002', 1001, 3, '2026-05-30T10:12:00.000Z'),
+    ]);
+
+    const earlyCrossing = session.records.find((record) => record.id === '1001') as ParticipantPassingRecord | undefined;
+    const assignedCrossing = session.records.find((record) => record.id === '1002') as ParticipantPassingRecord | undefined;
+    expect(earlyCrossing?.participantId).toBeUndefined();
+    expect(assignedCrossing?.participantId).toBe('101');
+    expect(session.getParticipantLaps('101')?.map((record) => record.id)).toEqual(['1002']);
+    warnSpy.mockRestore();
+  });
+
+  it('counts transponder crossings when no assignment time is present', async () => {
+    const session = new Session({
+      categories: [category],
+      participants: [participantWithAssignedTransponder('101', '11', 1001, undefined)],
+      records: [],
+      teams: [],
+    });
+
+    await session.addRecords([
+      createGreenFlagEvent({
+        categoryIds: [category.id],
+        flagValue: 'course',
+        id: '1',
+        recordType: 4,
+        sequence: 1,
+        source: 'test',
+        time: new Date('2026-05-30T10:00:00.000Z'),
+      }),
+      chipCrossing('1001', 1001, 2, '2026-05-30T10:06:00.000Z'),
+    ]);
+
+    const crossing = session.records.find((record) => record.id === '1001') as ParticipantPassingRecord | undefined;
+    expect(crossing?.participantId).toBe('101');
+    expect(session.getParticipantLaps('101')?.map((record) => record.id)).toEqual(['1001']);
   });
 });

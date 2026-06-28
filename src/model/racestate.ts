@@ -5,7 +5,7 @@ import { addError, compareByTime, isCrossingRecord } from "../controllers/timere
 import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError, NoStartFlagError, SessionStateError } from "../validators/errors.js";
 import { FlagReferencesUnknownCategoryError, InvalidFlagRecordError } from "./errors.js";
 import type { EventCategory, EventCategoryId } from "./eventcategory.js";
-import type { EventParticipant, EventParticipantId, ParticipantIdentifier } from "./eventparticipant.js";
+import type { EventParticipant, EventParticipantId, ParticipantIdentifier, ParticipantIdentifierUpdate } from "./eventparticipant.js";
 import type { FlagRecord, GreenFlagRecord } from "./flag.js";
 import type { EventTimeRecord, ParticipantPassingRecord, TimeRecord, TimeRecordId, Validated } from "./timerecord.js";
 
@@ -34,7 +34,7 @@ export interface RaceStateLookup {
   updateCategoryDetails(categoryId: EventCategoryId, changes: Partial<Pick<EventCategory, 'code' | 'description' | 'distance' | 'duration' | 'excludeFromResults' | 'name' | 'startTime'>>): void;
   updateEntrantCategory(entrantId: EventEntrantId, categoryId: EventCategoryId): void;
   updateParticipantCategory(participantId: EventParticipantId, categoryId: EventCategoryId): void;
-  updateParticipantIdentifiers?(participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: Array<string | number>): void;
+  updateParticipantIdentifiers?(participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: ParticipantIdentifierUpdate[]): void;
 }
 
 export interface RaceState {
@@ -476,19 +476,55 @@ export class Session implements RaceState, RaceStateLookup {
   public updateParticipantIdentifiers(
     participantId: EventParticipantId,
     identifierType: 'racePlate' | 'txNo',
-    values: Array<string | number>
+    values: ParticipantIdentifierUpdate[]
   ): void {
     const participant = this.getParticipantById(participantId);
     if (!participant) {
       throw new ParticipantNotFoundError(`Participant with ID ${participantId} not found. Cannot update identifiers.`);
     }
 
-    const normalizedValues = Array.from(new Set(values.map((value) => value.toString().trim()).filter((value) => value.length > 0)));
+    const normalizedValues = values
+      .map((value) => {
+        if (typeof value === 'object') {
+          const valueRecord = value as unknown as Record<string, string | number | Date | undefined>;
+          const identifierValue = valueRecord[identifierType];
+          const normalizedValue = identifierValue?.toString().trim();
+          if (!normalizedValue) {
+            return undefined;
+          }
+
+          return {
+            fromTime: value.fromTime,
+            toTime: value.toTime,
+            value: normalizedValue,
+          };
+        }
+
+        const normalizedValue = value.toString().trim();
+        return normalizedValue.length > 0
+          ? {
+            fromTime: undefined,
+            toTime: undefined,
+            value: normalizedValue,
+          }
+          : undefined;
+      })
+      .filter((value): value is { fromTime: Date | undefined; toTime: Date | undefined; value: string } => value !== undefined);
+    const seenValues = new Set<string>();
+    const uniqueValues = normalizedValues.filter((value) => {
+      const key = `${value.value}|${value.fromTime?.toISOString() || ''}|${value.toTime?.toISOString() || ''}`;
+      if (seenValues.has(key)) {
+        return false;
+      }
+
+      seenValues.add(key);
+      return true;
+    });
     const retainedIdentifiers = participant.identifiers.filter((identifier) => !(identifierType in identifier));
-    const nextIdentifiers = normalizedValues.map((value): ParticipantIdentifier => ({
-      fromTime: undefined,
-      [identifierType]: identifierType === 'txNo' && /^\d+$/.test(value) ? Number(value) : value,
-      toTime: undefined,
+    const nextIdentifiers = uniqueValues.map((value): ParticipantIdentifier => ({
+      fromTime: value.fromTime,
+      [identifierType]: identifierType === 'txNo' && /^\d+$/.test(value.value) ? Number(value.value) : value.value,
+      toTime: value.toTime,
     } as ParticipantIdentifier));
     participant.identifiers = [...retainedIdentifiers, ...nextIdentifiers];
 

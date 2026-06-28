@@ -3,7 +3,7 @@ import { validate as validateUuid } from 'uuid';
 import { fetchApicalEvents } from '../controllers/apical/getResultListJson.ts';
 import { CategoryId } from '../controllers/category.ts';
 import { EventCategoryId } from '../model/eventcategory.ts';
-import { type EventParticipantId } from '../model/eventparticipant.ts';
+import { type EventParticipant, type EventParticipantId } from '../model/eventparticipant.ts';
 import { EventId, SessionId } from '../model/raceevent.ts';
 import { type RaceState, RaceStateLookup, Session } from '../model/racestate.ts';
 import { type EventTimeRecord, type TimeRecordId } from '../model/timerecord.ts';
@@ -20,7 +20,7 @@ import { TimingContext } from '../views/context/Timing.tsx';
 import { type UnsavedChangesGuard } from '../views/display/unsavedChangesWarning.tsx';
 import { PulledApicalRaceState, createApicalCatalogEventId, createApicalCatalogSessionId, fetchApicalRaceStateNow, getConfiguredApicalEventId, pullApicalRaceState } from './apicalDataSource.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
-import { type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
+import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
 import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.ts';
 import { EventCatalogService } from './eventCatalogService.ts';
 import './index.css';
@@ -215,6 +215,21 @@ const sessionFromPartialRaceState = (raceState: Partial<RaceState>): Session => 
   participants: raceState.participants || [],
   records: raceState.records || [],
   teams: raceState.teams || [],
+});
+
+const createParticipantFromEntrant = (
+  entrant: EventCatalogEntrant,
+  participantId: EventParticipantId
+): EventParticipant => ({
+  categoryId: entrant.categoryId || entrant.categoryIds[0] || '',
+  currentResult: undefined,
+  entrantId: entrant.id,
+  firstname: entrant.firstName || entrant.name,
+  id: participantId,
+  identifiers: [],
+  lastRecordTime: null,
+  resultDuration: null,
+  surname: entrant.lastName || '',
 });
 
 const getSessionAssignedCategoryIds = (
@@ -1453,6 +1468,15 @@ export const RaceSweetMainApp = () => {
               return;
             }
 
+            if (!raceStateForUpdate.getParticipantById(participantId)) {
+              const selectedEntrant = getEntrantsForEvent(eventCatalogState, selectedEntrantsResolvedEventId)
+                .find((entrant) => entrant.id === selectedEntrantId || entrant.memberParticipantIds.includes(participantId));
+              if (!selectedEntrant || selectedEntrant.entrantType !== 'rider') {
+                return;
+              }
+
+              raceStateForUpdate.addParticipants([createParticipantFromEntrant(selectedEntrant, participantId)]);
+            }
             raceStateForUpdate.updateParticipantIdentifiers(participantId, identifierType, values);
             const nextRaceState = raceStateSnapshot(raceStateForUpdate);
 

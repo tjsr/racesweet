@@ -140,4 +140,48 @@ describe('EntrantListPanel', () => {
     expect(requestFormExit).toHaveBeenCalledTimes(2);
     expect(onSelectEntrant).toHaveBeenCalledWith('team-1');
   });
+
+  it('sends individual entrant card selections through the global selection listener', () => {
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+    const onSelectEntrant = vi.fn();
+    const requestFormExit = vi.fn((action: () => void | Promise<void>) => {
+      void action();
+    });
+
+    const Harness = (): React.ReactElement => {
+      const [createKind, setCreateKind] = React.useState<EntrantType>('rider');
+
+      return (
+        <EntrantListPanel
+          catalog={catalog}
+          createKind={createKind}
+          filteredTeamEntrants={[teamEntrant]}
+          onCreateEntrant={() => undefined}
+          onSelectEntrant={onSelectEntrant}
+          raceStateParticipants={[participant]}
+          requestFormExit={requestFormExit}
+          riderEntrants={[riderEntrant]}
+          selectedEntrant={teamEntrant}
+          selectedEventId="event-1"
+          setCreateKind={setCreateKind}
+          teamEntrants={[teamEntrant]}
+          teamsEnabled={true}
+        />
+      );
+    };
+
+    flushSync(() => {
+      root?.render(<Harness />);
+    });
+
+    const riderCard = Array.from(container.querySelectorAll<HTMLButtonElement>('button.events-list-item'))
+      .find((button) => button.querySelector('.entrant-list-type')?.textContent === 'rider');
+    expect(riderCard).not.toBeUndefined();
+    riderCard!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(requestFormExit).toHaveBeenCalledTimes(1);
+    expect(onSelectEntrant).toHaveBeenCalledWith('rider-1');
+  });
 });

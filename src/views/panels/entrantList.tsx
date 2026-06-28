@@ -33,7 +33,8 @@ const getCategoryName = (catalog: EventCatalogState, categoryId?: CategoryId): s
 
 export const getParticipantsForEntrant = (
   entrant: EventCatalogEntrant | undefined,
-  participants: EventParticipant[]
+  participants: EventParticipant[],
+  eventEntrants: EventCatalogEntrant[] = []
 ): EventParticipant[] => {
   if (!entrant) {
     return [];
@@ -43,6 +44,24 @@ export const getParticipantsForEntrant = (
     entrant.id.toString(),
     ...entrant.memberParticipantIds.map((participantId) => participantId.toString()),
   ]);
+  entrant.teamMembers?.forEach((teamMember) => participantIds.add(teamMember.participantId.toString()));
+
+  if (entrant.entrantType === 'rider' && entrant.teamEntrantId) {
+    const teamEntrant = eventEntrants.find((candidate) => candidate.id === entrant.teamEntrantId);
+    const matchingTeamMember = teamEntrant?.teamMembers?.find((teamMember) => {
+      if (teamMember.participantId === entrant.id || entrant.memberParticipantIds.includes(teamMember.participantId)) {
+        return true;
+      }
+
+      const memberName = `${teamMember.firstName} ${teamMember.lastName}`.trim();
+      const entrantName = `${entrant.firstName || ''} ${entrant.lastName || ''}`.trim();
+      return memberName.length > 0 && (memberName === entrantName || memberName === entrant.name);
+    });
+
+    if (matchingTeamMember) {
+      participantIds.add(matchingTeamMember.participantId.toString());
+    }
+  }
 
   return participants.filter((participant) => {
     return participantIds.has(participant.id.toString()) || participant.entrantId?.toString() === entrant.id.toString();
@@ -89,7 +108,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
         <>
           {props.teamsEnabled ? <h3 className="events-list-subheading">Individual Entrants</h3> : null}
           {props.riderEntrants.map((entrant) => {
-            const participant = getParticipantsForEntrant(entrant, props.raceStateParticipants)[0];
+            const participant = getParticipantsForEntrant(entrant, props.raceStateParticipants, props.teamEntrants)[0];
             const teamName = entrant.teamEntrantId
               ? props.teamEntrants.find((team) => team.id === entrant.teamEntrantId)?.name
               : undefined;
@@ -114,7 +133,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
         <>
           <h3 className="events-list-subheading">Teams</h3>
           {props.filteredTeamEntrants.map((entrant) => {
-            const participant = getParticipantsForEntrant(entrant, props.raceStateParticipants)[0];
+            const participant = getParticipantsForEntrant(entrant, props.raceStateParticipants, props.teamEntrants)[0];
 
             return (
               <EntrantListCard

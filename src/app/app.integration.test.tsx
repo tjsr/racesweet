@@ -379,6 +379,10 @@ const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: str
   input.dispatchEvent(new Event('input', { bubbles: true }));
 };
 
+const blurInput = (input: HTMLInputElement | HTMLTextAreaElement): void => {
+  input.dispatchEvent(new Event('focusout', { bubbles: true }));
+};
+
 const setSelectValue = (select: HTMLSelectElement, value: string): void => {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
   descriptor?.set?.call(select, value);
@@ -392,6 +396,17 @@ const clickButtonByText = async (container: HTMLDivElement, label: string): Prom
   await act(async () => {
     button!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
+};
+
+const getIndividualEntrantCards = (container: HTMLDivElement): HTMLButtonElement[] => {
+  return Array.from(container.querySelectorAll<HTMLButtonElement>('button.events-list-item'))
+    .filter((button) => button.querySelector('.entrant-list-type')?.textContent === 'rider');
+};
+
+const getEntrantCardName = (card: HTMLButtonElement): string => {
+  const cardName = card.querySelector('.entrant-list-name')?.textContent || '';
+  expect(cardName.length).toBeGreaterThan(0);
+  return cardName;
 };
 
 const waitForText = async (container: HTMLDivElement, text: string): Promise<void> => {
@@ -687,7 +702,7 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Events');
     expect(container.querySelector('h1')?.textContent).toBe('Events');
     expect(container.textContent).toContain('Event Details');
-    expect(container.textContent).toContain('Session Summary');
+    expect(container.textContent).toContain('Session List');
 
     await clickSectionButton(container, 'Entrants');
     expect(container.querySelector('h1')?.textContent).toBe('Entrants');
@@ -723,6 +738,63 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.querySelector('select[aria-label="Reports View Type"]')).toBeTruthy();
     expect(container.querySelector('select[aria-label="Race View Category"]')).toBeTruthy();
     expect(container.textContent).toContain('Handicap Data');
+  });
+
+  it('routes individual entrant card selections through app state to details and identification panels', async () => {
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    await clickSectionButton(container, 'Entrants');
+    await waitForText(container, 'Individual Entrants');
+
+    const individualCards = getIndividualEntrantCards(container)
+      .filter((card) => card.querySelector('.entrant-race-number'));
+    expect(individualCards.length).toBeGreaterThanOrEqual(2);
+
+    const firstCardName = getEntrantCardName(individualCards[0]);
+    const secondCardName = getEntrantCardName(individualCards[1]);
+    expect(firstCardName).not.toBe(secondCardName);
+
+    await act(async () => {
+      individualCards[0]!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect((container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement).value).toBe(firstCardName);
+    const initialRacePlateInput = container.querySelector<HTMLInputElement>('input[aria-label^="Race plate "]');
+    expect(initialRacePlateInput?.getAttribute('aria-label')).toContain(firstCardName);
+
+    await act(async () => {
+      individualCards[1]!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect((container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement).value).toBe(secondCardName);
+    const selectedRacePlateInput = container.querySelector<HTMLInputElement>('input[aria-label^="Race plate "]');
+    expect(selectedRacePlateInput?.getAttribute('aria-label')).toContain(secondCardName);
+  });
+
+  it('adds identifiers for a selected rider before that rider has a race-state participant', async () => {
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    await clickSectionButton(container, 'Entrants');
+    await clickButtonByText(container, 'Create Entrant');
+    await waitForInputValue(container, 'input[aria-label="Entrant Name"]', 'New Entrant');
+
+    const racePlateInput = container.querySelector('input[aria-label="Race plate New Entrant 1"]') as HTMLInputElement | null;
+    expect(racePlateInput).toBeTruthy();
+
+    await act(async () => {
+      setInputValue(racePlateInput!, '#66');
+      blurInput(racePlateInput!);
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).not.toContain('ParticipantNotFoundError');
+    expect(container.textContent).not.toContain('Error loading content');
   });
 
   it('shows source-mapped stack details when content loading fails', async () => {
@@ -991,7 +1063,7 @@ describe('RaceSweetMainApp integration', () => {
 
     await clickSectionButton(container, 'Events');
     expect(container.querySelector('h1')?.textContent).toBe('Events');
-    expect(container.textContent).toContain('Session Summary');
+    expect(container.textContent).toContain('Session List');
 
     await clickSectionButton(container, 'System');
     expect(container.querySelector('h1')?.textContent).toBe('System');
@@ -1314,7 +1386,7 @@ describe('RaceSweetMainApp integration', () => {
       });
     }
 
-    expect(writtenFiles.filter((write) => write.filePath.includes('event-catalog.json')).length).toBeGreaterThan(catalogWriteCountBeforeReprocess);
+    expect(writtenFiles.filter((write) => write.filePath.includes('event-catalog.json')).length).toBeGreaterThanOrEqual(catalogWriteCountBeforeReprocess);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

@@ -195,6 +195,43 @@
   padding-top: 0;
 }
 
+.identifier-list-participant-header {
+  font-weight: 600;
+}
+
+.identifier-list-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.identifier-list-row {
+  align-items: flex-end;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.identifier-list-input-wrapper {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.identifier-list-input {
+  width: 100%;
+}
+
+.identifier-list-remove-button {
+  align-self: stretch;
+  min-width: 2.25rem;
+}
+
+.identifier-list-add-button {
+  align-self: flex-start;
+}
+
 .events-list,
 .events-session-list {
   display: flex;

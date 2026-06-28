@@ -16,6 +16,10 @@ const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: str
   input.dispatchEvent(new Event('input', { bubbles: true }));
 };
 
+const blurInput = (input: HTMLInputElement | HTMLTextAreaElement): void => {
+  input.dispatchEvent(new Event('focusout', { bubbles: true }));
+};
+
 const setSelectValue = (select: HTMLSelectElement, value: string): void => {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
   descriptor?.set?.call(select, value);
@@ -46,6 +50,18 @@ const catalog: EventCatalogState = {
   ],
   deletedEventIds: [],
   entrants: [
+    {
+      categoryId: 'cat-1',
+      categoryIds: ['cat-1'],
+      entrantType: 'rider',
+      eventId: 'event-1',
+      firstName: 'Empty',
+      id: 'ent-empty',
+      lastName: 'Rider',
+      memberParticipantIds: ['ent-empty'],
+      name: 'Empty Rider',
+      sessionIds: ['session-1'],
+    },
     {
       categoryId: 'cat-1',
       categoryIds: ['cat-1'],
@@ -102,9 +118,9 @@ const catalog: EventCatalogState = {
       entrantType: 'rider',
       eventId: 'event-2',
       firstName: 'Blue',
-      id: 'p-3',
+      id: 'ent-blue-two',
       lastName: 'Two',
-      memberParticipantIds: ['p-3'],
+      memberParticipantIds: [],
       name: 'Blue Two',
       sessionIds: ['session-2'],
       teamEntrantId: 'ent-2',
@@ -125,7 +141,7 @@ const catalog: EventCatalogState = {
     {
       categoryIds: ['cat-1'],
       date: '2026-06-12',
-      entrantIds: ['ent-1'],
+      entrantIds: ['ent-empty', 'ent-1'],
       format: 'race-weekend',
       id: 'event-1',
       name: 'Winter Round',
@@ -167,6 +183,17 @@ const raceState: Partial<RaceState> = {
     {
       categoryId: 'cat-1',
       currentResult: undefined,
+      entrantId: 'ent-empty',
+      firstname: 'Empty',
+      id: 'ent-empty',
+      identifiers: [],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    },
+    {
+      categoryId: 'cat-1',
+      currentResult: undefined,
       entrantId: 'ent-1',
       firstname: 'Pat',
       id: 'ent-1',
@@ -177,6 +204,34 @@ const raceState: Partial<RaceState> = {
       lastRecordTime: null,
       resultDuration: null,
       surname: 'Rider',
+    },
+    {
+      categoryId: 'cat-2',
+      currentResult: undefined,
+      entrantId: 'ent-2',
+      firstname: 'Blue',
+      id: 'p-2',
+      identifiers: [
+        { fromTime: undefined, racePlate: '201', toTime: undefined },
+        { fromTime: undefined, toTime: undefined, txNo: '9201' },
+      ] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'One',
+    },
+    {
+      categoryId: 'cat-pro',
+      currentResult: undefined,
+      entrantId: 'ent-2',
+      firstname: 'Blue',
+      id: 'p-3',
+      identifiers: [
+        { fromTime: undefined, racePlate: '302', toTime: undefined },
+        { fromTime: undefined, toTime: undefined, txNo: '9302' },
+      ] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Two',
     },
   ],
   records: [],
@@ -422,24 +477,211 @@ describe('EntrantsPage integration', () => {
     expect(container.textContent).toContain('Timing devices');
     expect(container.textContent).toContain('Licences');
 
-    const raceNumbersInput = container.querySelector('input[aria-label="Race Numbers Pat Rider"]') as HTMLInputElement;
-    const timingDevicesInput = container.querySelector('input[aria-label="Timing Devices Pat Rider"]') as HTMLInputElement;
+    const raceNumbersInput = container.querySelector('input[aria-label="Race plate Pat Rider 1"]') as HTMLInputElement;
 
     await act(async () => {
-      setInputValue(raceNumbersInput, '#822, #73');
-      Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Race Numbers')!
+      setInputValue(raceNumbersInput, '822');
+      blurInput(raceNumbersInput);
+    });
+
+    expect(onUpdateParticipantIdentifiers).toHaveBeenCalledWith('ent-1', 'racePlate', ['822']);
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Add device')!
         .dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(onUpdateParticipantIdentifiers).toHaveBeenCalledWith('ent-1', 'racePlate', ['822', '73']);
-
+    const timingDevicesSecondInput = container.querySelector('input[aria-label="Timing device Pat Rider 2"]') as HTMLInputElement;
     await act(async () => {
-      setInputValue(timingDevicesInput, 'Tx1234, Tx10000223');
-      Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Timing Devices')!
-        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      setInputValue(timingDevicesSecondInput, '10000223');
+      blurInput(timingDevicesSecondInput);
     });
 
-    expect(onUpdateParticipantIdentifiers).toHaveBeenCalledWith('ent-1', 'txNo', ['1234', '10000223']);
+    expect(onUpdateParticipantIdentifiers).toHaveBeenCalledWith('ent-1', 'txNo', [
+      expect.objectContaining({ txNo: 1234 }),
+      expect.objectContaining({ txNo: 10000223 }),
+    ]);
+  });
+
+  it('shows editable identifier rows for a participant with no assigned identifiers', async () => {
+    const onUpdateParticipantIdentifiers = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <EntrantsPage
+          catalog={catalog}
+          onCreateEntrant={() => undefined}
+          onDeleteEntrant={() => undefined}
+          onSelectEntrant={() => undefined}
+          onSelectEvent={() => undefined}
+          onUpdateEntrant={() => undefined}
+          onUpdateParticipantIdentifiers={onUpdateParticipantIdentifiers}
+          raceState={raceState}
+          selectedEntrantId="ent-empty"
+          selectedEventId="event-1"
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain('Add plate');
+    expect(container.textContent).toContain('Add device');
+
+    const racePlateInputs = () => Array.from(container.querySelectorAll('input[aria-label^="Race plate Empty Rider"]')) as HTMLInputElement[];
+    const timingDeviceInputs = () => Array.from(container.querySelectorAll('input[aria-label^="Timing device Empty Rider"]')) as HTMLInputElement[];
+    expect(racePlateInputs()).toHaveLength(1);
+    expect(timingDeviceInputs()).toHaveLength(1);
+
+    const addPlateButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Add plate') as HTMLButtonElement | undefined;
+    expect(addPlateButton).toBeDefined();
+    expect(addPlateButton!.disabled).toBe(true);
+
+    await act(async () => {
+      setInputValue(racePlateInputs()[0]!, '#44');
+      blurInput(racePlateInputs()[0]!);
+    });
+
+    expect(onUpdateParticipantIdentifiers).toHaveBeenCalledWith('ent-empty', 'racePlate', ['44']);
+
+    const removePlateButton = Array.from(container.querySelectorAll('button')).find((button) => button.getAttribute('aria-label') === 'Remove plate 1 for Empty Rider') as HTMLButtonElement | undefined;
+    expect(removePlateButton).toBeDefined();
+    expect(removePlateButton!.disabled).toBe(true);
+  });
+
+  it('shows add controls and emits identifier updates for a selected entrant without a loaded participant', async () => {
+    const onUpdateParticipantIdentifiers = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <EntrantsPage
+          catalog={catalog}
+          onCreateEntrant={() => undefined}
+          onDeleteEntrant={() => undefined}
+          onSelectEntrant={() => undefined}
+          onSelectEvent={() => undefined}
+          onUpdateEntrant={() => undefined}
+          onUpdateParticipantIdentifiers={onUpdateParticipantIdentifiers}
+          raceState={raceState}
+          selectedEntrantId="ent-unassigned"
+          selectedEventId="event-2"
+        />,
+      );
+    });
+
+    expect(container.textContent).not.toContain('No participant is selected.');
+    expect(container.textContent).toContain('Add plate');
+    expect(container.textContent).toContain('Add device');
+
+    const racePlateInput = container.querySelector('input[aria-label="Race plate No Category 1"]') as HTMLInputElement;
+    const timingDeviceInput = container.querySelector('input[aria-label="Timing device No Category 1"]') as HTMLInputElement;
+    expect(racePlateInput).toBeTruthy();
+    expect(timingDeviceInput).toBeTruthy();
+
+    await act(async () => {
+      setInputValue(racePlateInput, '#88');
+      blurInput(racePlateInput);
+    });
+
+    expect(onUpdateParticipantIdentifiers).toHaveBeenCalledWith('ent-unassigned', 'racePlate', ['88']);
+
+    await act(async () => {
+      setInputValue(timingDeviceInput, 'Tx7701');
+      blurInput(timingDeviceInput);
+    });
+
+    expect(onUpdateParticipantIdentifiers).toHaveBeenCalledWith('ent-unassigned', 'txNo', [
+      expect.objectContaining({ txNo: 7701 }),
+    ]);
+  });
+
+  it('updates Entrant Details and Identification from the same selected entrant state when a card is clicked', async () => {
+    const Harness = (): React.ReactElement => {
+      const [selectedEntrantId, setSelectedEntrantId] = React.useState<string | undefined>('ent-1');
+      const [selectedEventId] = React.useState<string | undefined>('event-1');
+
+      return (
+        <EntrantsPage
+          catalog={catalog}
+          onCreateEntrant={() => undefined}
+          onDeleteEntrant={() => undefined}
+          onSelectEntrant={setSelectedEntrantId}
+          onSelectEvent={() => undefined}
+          onUpdateEntrant={() => undefined}
+          onUpdateParticipantIdentifiers={() => undefined}
+          raceState={raceState}
+          selectedEntrantId={selectedEntrantId}
+          selectedEventId={selectedEventId}
+        />
+      );
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    expect((container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement).value).toBe('Pat Rider');
+    expect(container.querySelector('input[aria-label="Race plate Pat Rider 1"]')).toBeTruthy();
+    expect(container.querySelector('input[aria-label="Race plate Empty Rider 1"]')).toBeFalsy();
+
+    const emptyRiderCard = Array.from(container.querySelectorAll('button')).find((button) => button.querySelector('strong')?.textContent === 'Empty Rider');
+    expect(emptyRiderCard).toBeDefined();
+
+    await act(async () => {
+      emptyRiderCard!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect((container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement).value).toBe('Empty Rider');
+    expect(container.querySelector('input[aria-label="Race plate Empty Rider 1"]')).toBeTruthy();
+    expect(container.querySelector('input[aria-label="Race plate Pat Rider 1"]')).toBeFalsy();
+
+    const emptyRiderSelectedCard = Array.from(container.querySelectorAll('button')).find((button) => button.querySelector('strong')?.textContent === 'Empty Rider');
+    expect(emptyRiderSelectedCard?.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('updates Identification when selecting individual entrants in a mixed team event', async () => {
+    const selectionEvents: string[] = [];
+
+    const Harness = (): React.ReactElement => {
+      const [selectedEntrantId, setSelectedEntrantId] = React.useState<string | undefined>('p-2');
+      const handleSelectEntrant = (entrantId: string): void => {
+        selectionEvents.push(entrantId);
+        setSelectedEntrantId(entrantId);
+      };
+
+      return (
+        <EntrantsPage
+          catalog={catalog}
+          onCreateEntrant={() => undefined}
+          onDeleteEntrant={() => undefined}
+          onSelectEntrant={handleSelectEntrant}
+          onSelectEvent={() => undefined}
+          onUpdateEntrant={() => undefined}
+          onUpdateParticipantIdentifiers={() => undefined}
+          raceState={raceState}
+          selectedEntrantId={selectedEntrantId}
+          selectedEventId="event-2"
+        />
+      );
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    expect((container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement).value).toBe('Blue One');
+    expect(container.querySelector('input[aria-label="Race plate Blue One 1"]')).toBeTruthy();
+    expect(container.querySelector('input[aria-label="Race plate Blue Two 1"]')).toBeFalsy();
+
+    const blueTwoCard = Array.from(container.querySelectorAll('button')).find((button) => button.querySelector('strong')?.textContent === 'Blue Two');
+    expect(blueTwoCard).toBeDefined();
+
+    await act(async () => {
+      blueTwoCard!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(selectionEvents).toEqual(['ent-blue-two']);
+    expect((container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement).value).toBe('Blue Two');
+    expect(container.querySelector('input[aria-label="Race plate Blue Two 1"]')).toBeTruthy();
+    expect(container.querySelector('input[aria-label="Race plate Blue One 1"]')).toBeFalsy();
   });
 
   it('prompts before replacing a dirty entrant form and saves before continuing', async () => {

@@ -34,3 +34,4 @@ export interface ParticipantTransponder extends ParticipantIdentifier {
 export type ChipCodeType = ParticipantTransponder['txNo'];
 export type RacePlateType = ParticipateRacePlate['racePlate'];
 export type TransponderType = ParticipantTransponder['txNo'];
+export type ParticipantIdentifierUpdate = RacePlateType | TransponderType | ParticipateRacePlate | ParticipantTransponder;

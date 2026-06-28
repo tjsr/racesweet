@@ -20,7 +20,7 @@ export const assignEntrantToPlateCrossing = (
     console.error(`Crossing for plate ${crossing.plateNumber} has no time`);
     return;
   }
-  const entrant = findEntrantByPlateNumber(entrants, crossing.plateNumber);
+  const entrant = findEntrantByPlateNumber(entrants, crossing.plateNumber, crossing.time);
 
   if (!entrant && createUnknownEntrants) {
     const categoryName = 'Unknown Plate';
@@ -69,7 +69,7 @@ export const assignEntrantToChipCrossing = (
     console.error(`Crossing for chip ${crossing.chipCode} has no time`);
     return;
   }
-  let entrant = findEntrantByChipCode(entrants, crossing.chipCode);
+  let entrant = findEntrantByChipCode(entrants, crossing.chipCode, crossing.time);
   if (!entrant && createUnknownEntrants) {
     assert(categoryList !== undefined, 'Categories list must be passed when creating unnown entrants to create unknown entrants');
     entrant = createEntrantForUnmatchedChipCode(categoryList!, crossing.chipCode);
