@@ -2,20 +2,11 @@
 
 ## Initial checks
 
-Perform these checks at the start of each session:
-
-- **NPU availability**: Check whether we have access to either a Qualcomm NPU or an own-hosted ollama model on an nVidia GPU. Retain this knowledge for use throughout the session to inform tool selection (see `Local NPU agents` section). Do not re-check unless the environment changes.
-- **Install dependencies**: Run `npm i` to install all project dependencies. If `npm i` fails (e.g., network unavailable, registry error, package conflict), report the error output to the user and do not proceed with code execution, tests, or lint until the install succeeds or the user explicitly instructs otherwise.
-
-## Branches
-
 Always make sure when opening a terminal that we know firstly whether it is a bash, powershell or cmd terminal first, then determine the version so that only commands and syntax valid for that format are attempted. If terminal type or version cannot be determined, ask the user to confirm the terminal environment before executing any commands.
 
 Whenever we create a new branch for an agent to work in, see Initial checks for the `npm i` policy to ensure dependencies are available.
 
 ## Typescript style
-
-See Initial checks for the `npm i` policy.
 
 When writing Typescript, always prefer arrow functions over regular functions.  Always strongly type variables, never allow implicity 'any' types.
 
@@ -79,19 +70,3 @@ All Markdown files must pass the repository's Markdown lint checks. When adding 
 Remember that all data and modifications should occur in a ledger format, where modifications are an action and all previous data is immutable.  State becomes modified by instructions in sequence over time, and once modified never changes.  If we change an entrants category or name for example, the original information will not change but we log a change in the event data to indicate that it has to be updated.  That update is then reflected in the model.
 
 These changes are sent either by the server as an update to all clients, or stored in the event log when the data is persisted locally.  Every update event is sent to the controller, which will write that log entry to disk, and may also push that event to the server responsible for handling the event.
-
-## Local NPU agents
-
-NPU availability is determined in Initial checks. If neither a Qualcomm NPU nor an ollama model is available, perform all inference tasks using the primary model without routing to local NPU tools.
-
-When a task requires no code edits and operates on a bounded text artifact (e.g., a single log file, a single command output, or a single source file), prefer the `qualcomm_npu` MCP tools if available on the local system.
-
-Use the NPU tools for:
-
-- Evaluating the output of command line tool output.
-- summarizing test logs
-- classifying known failure patterns
-- ranking likely files to inspect
-- extracting structured facts from local text
-
-Do not use NPU tools for code edits, final decisions, or tasks requiring full repository reasoning unless the user explicitly asks.
