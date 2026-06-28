@@ -21,7 +21,7 @@ import { ReloadSummaryDialog } from '../views/display/reloadSummaryDialog.tsx';
 import { type UnsavedChangesGuard } from '../views/display/unsavedChangesWarning.tsx';
 import { PulledApicalRaceState, createApicalCatalogEventId, createApicalCatalogSessionId, fetchApicalRaceStateNow, getConfiguredApicalEventId, pullApicalRaceState } from './apicalDataSource.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
-import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
+import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getCategoryAssignedSessionIds, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
 import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.ts';
 import { EventCatalogService } from './eventCatalogService.ts';
 import './index.css';
@@ -643,7 +643,15 @@ export const RaceSweetMainApp = () => {
 
     const pulledRaceState = await pullAssignedSessionSourceRaceState(eventId, sessionId);
     const existingRaceState = eventCatalogService.getImportedRaceState(eventId, sessionId);
-    const nextRaceState = mergeRaceStateForReload(existingRaceState, pulledRaceState, mode);
+    const eventCategories = getCategoriesForEvent(eventCatalogService.catalog, eventId);
+    const eventSessions = getSessionsForEvent(eventCatalogService.catalog, eventId);
+    const categoryIdsAssignedToSessions = new Set(eventCategories
+      .filter((category) => getCategoryAssignedSessionIds(category, eventSessions).size > 0)
+      .map((category) => category.id.toString()));
+    const nextRaceState = mergeRaceStateForReload(existingRaceState, pulledRaceState, mode, {
+      categoryIdsAssignedToSessions,
+      pruneEmptyReloadEntities: true,
+    });
     const reloadSummary = summarizeSessionSourceReload(existingRaceState, nextRaceState, mode);
     const missingCategoryWarnings = (nextRaceState.categories || [])
       .filter((category) => isMissingLinkedCategoryPlaceholder(category))

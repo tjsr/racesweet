@@ -468,6 +468,16 @@
   padding: 0.25rem 0.45rem;
 }
 
+.lap-chart-table__entrant-cell--selected {
+  background: rgba(0, 87, 184, 0.16);
+}
+
+.lap-chart-table__entrant-cell--selected .lap-entry-button {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 2px rgba(0, 87, 184, 0.58);
+  font-weight: 700;
+}
+
 .lap-entry-info {
   margin-top: 0.8rem;
 }

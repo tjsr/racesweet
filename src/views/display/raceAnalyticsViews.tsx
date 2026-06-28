@@ -597,6 +597,10 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     return lapChart.reduce((maxValue, lap) => Math.max(maxValue, lap.entries.length), 0);
   }, [lapChart]);
 
+  const handleReportLapEntryClick = (entry: LapChartEntry): void => {
+    setSelectedLapEntry((currentEntry) => currentEntry?.entrantId === entry.entrantId ? undefined : entry);
+  };
+
   const fastestLapRows = React.useMemo(() => {
     return [...rows].sort((left, right) => {
       if (typeof left.fastestLap !== 'number') {
@@ -710,13 +714,18 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
                   <td>{rowIndex + 1}</td>
                   {lapChart.map((column) => {
                     const entry = column.entries[rowIndex];
+                    const isSelectedEntrant = !!entry && selectedLapEntry?.entrantId === entry.entrantId;
                     return (
-                      <td key={`reports-lap-cell-${column.lapNo}-${rowIndex + 1}`}>
+                      <td
+                        key={`reports-lap-cell-${column.lapNo}-${rowIndex + 1}`}
+                        className={isSelectedEntrant ? 'lap-chart-table__entrant-cell--selected' : undefined}
+                      >
                         {entry ? (
                           <button
                             type="button"
                             className="lap-entry-button"
-                            onClick={() => setSelectedLapEntry(entry)}
+                            aria-pressed={isSelectedEntrant}
+                            onClick={() => handleReportLapEntryClick(entry)}
                           >
                             {entry.raceNumber}
                           </button>

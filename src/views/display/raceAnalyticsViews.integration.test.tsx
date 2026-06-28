@@ -367,6 +367,69 @@ describe('race analytics views integration', () => {
 
     expect(container.querySelector('table[aria-label="Reports Lap Chart Table"]')).toBeTruthy();
   });
+
+  it('highlights every lap chart cell for the selected reports entrant and toggles the selection', async () => {
+    await act(async () => {
+      root.render(
+        <ReportsPage
+          categories={categories}
+          catalogEntrants={catalogEntrants}
+          raceState={raceState}
+          selectedCategoryId={undefined}
+        />,
+      );
+    });
+
+    const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
+    await act(async () => {
+      setSelectValue(reportSelect, 'lap-chart');
+    });
+
+    const selectedCells = (): HTMLTableCellElement[] => {
+      return Array.from(container.querySelectorAll('td.lap-chart-table__entrant-cell--selected'));
+    };
+    const lapEntryButton = (raceNumber: string): HTMLButtonElement => {
+      const buttons = Array.from(container.querySelectorAll('button.lap-entry-button'));
+      const button = buttons.find((item) => item.textContent === raceNumber) as HTMLButtonElement | undefined;
+      expect(button).toBeTruthy();
+      return button!;
+    };
+
+    await act(async () => {
+      lapEntryButton(createEventParticipantId('p-team-1')).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(selectedCells()).toHaveLength(4);
+    expect(selectedCells().filter((cell) => cell.textContent === createEventParticipantId('p-team-1'))).toHaveLength(2);
+    expect(selectedCells().filter((cell) => cell.textContent === createEventParticipantId('p-team-2'))).toHaveLength(2);
+    expect(selectedCells().some((cell) => cell.textContent === createEventParticipantId('p-rider-1'))).toBe(false);
+    expect(lapEntryButton(createEventParticipantId('p-team-1')).getAttribute('aria-pressed')).toBe('true');
+    expect(lapEntryButton(createEventParticipantId('p-team-2')).getAttribute('aria-pressed')).toBe('true');
+    expect(lapEntryButton(createEventParticipantId('p-rider-1')).getAttribute('aria-pressed')).toBe('false');
+
+    await act(async () => {
+      lapEntryButton(createEventParticipantId('p-team-2')).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(selectedCells()).toHaveLength(0);
+    expect(container.querySelector('[aria-label="Lap Entry Details"]')).toBeFalsy();
+
+    await act(async () => {
+      lapEntryButton(createEventParticipantId('p-team-1')).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    await act(async () => {
+      lapEntryButton(createEventParticipantId('p-rider-1')).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(selectedCells()).toHaveLength(2);
+    expect(selectedCells().map((cell) => cell.textContent)).toEqual([
+      createEventParticipantId('p-rider-1'),
+      createEventParticipantId('p-rider-1'),
+    ]);
+    expect(lapEntryButton(createEventParticipantId('p-team-1')).getAttribute('aria-pressed')).toBe('false');
+    expect(lapEntryButton(createEventParticipantId('p-rider-1')).getAttribute('aria-pressed')).toBe('true');
+    expect(container.textContent).toContain(`Entrant: Solo Rider (${createEventEntrantId('rider-1')})`);
+  });
 });
 
 
