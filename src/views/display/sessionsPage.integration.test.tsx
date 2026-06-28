@@ -23,12 +23,34 @@ const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: str
 const catalog: EventCatalogState = {
   activeEventId: 'event-1',
   activeSessionId: 'session-1',
-  categories: [],
+  categories: [
+    {
+      eventId: 'event-1',
+      id: 'category-1',
+      name: 'Solo',
+    },
+    {
+      eventId: 'event-1',
+      id: 'category-2',
+      name: 'Teams',
+      sessionAssignments: [
+        {
+          sessionId: 'session-1',
+          startTime: '2026-06-12T09:00:00.000Z',
+        },
+      ],
+    },
+    {
+      eventId: 'event-2',
+      id: 'category-3',
+      name: 'Testing',
+    },
+  ],
   deletedEventIds: [],
   entrants: [],
   events: [
     {
-      categoryIds: [],
+      categoryIds: ['category-1', 'category-2'],
       date: '2026-06-12',
       entrantIds: [],
       format: 'race-weekend',
@@ -37,7 +59,7 @@ const catalog: EventCatalogState = {
       sessionIds: ['session-1', 'session-2'],
     },
     {
-      categoryIds: [],
+      categoryIds: ['category-3'],
       date: '2026-07-10',
       entrantIds: [],
       format: 'test-day',
@@ -131,6 +153,7 @@ describe('SessionsPage integration', () => {
     const onMakeSessionActive = vi.fn();
     const onMoveSessionToEvent = vi.fn();
     const onSaveSessionAssignment = vi.fn();
+    const onSaveSessionCategoryAssignment = vi.fn();
     const onUpdateSession = vi.fn();
 
     const Harness = () => {
@@ -150,6 +173,7 @@ describe('SessionsPage integration', () => {
             setSelectedEventId(eventId);
             setSelectedSessionId(catalog.sessions.find((session) => session.eventId === eventId)?.id);
           }}
+          onSaveSessionCategoryAssignment={onSaveSessionCategoryAssignment}
           onSaveSessionAssignment={onSaveSessionAssignment}
           onSelectSession={setSelectedSessionId}
           onUpdateSession={onUpdateSession}
@@ -238,6 +262,27 @@ describe('SessionsPage integration', () => {
 
     expect(onApplySessionSources).toHaveBeenCalledWith('event-2', 'session-3');
 
+    const categorySelect = container.querySelector('select[aria-label="Session Category"]') as HTMLSelectElement;
+    expect(categorySelect).toBeDefined();
+    const availableCategoryLabels = Array.from(categorySelect.options).map((option) => option.textContent);
+    expect(availableCategoryLabels).toEqual(['Testing']);
+    expect(availableCategoryLabels).not.toContain('Solo');
+    expect(availableCategoryLabels).not.toContain('Teams');
+
+    await act(async () => {
+      categorySelect.value = 'category-3';
+      categorySelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    const addCategoryButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Add to session');
+    expect(addCategoryButton).toBeDefined();
+
+    await act(async () => {
+      addCategoryButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onSaveSessionCategoryAssignment).toHaveBeenCalledWith('session-3', 'category-3', true);
+
     const deleteButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Delete Session');
     expect(deleteButton).toBeDefined();
 
@@ -263,6 +308,7 @@ describe('SessionsPage integration', () => {
           onDeleteSession={() => undefined}
           onMakeSessionActive={() => undefined}
           onMoveSessionToEvent={() => undefined}
+          onSaveSessionCategoryAssignment={() => undefined}
           onSelectEvent={() => undefined}
           onSaveSessionAssignment={() => undefined}
           onSelectSession={setSelectedSessionId}

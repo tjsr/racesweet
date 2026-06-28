@@ -113,6 +113,23 @@ const getParticipantTeamName = (participant: EventParticipant | undefined, raceS
   return team?.name || '';
 };
 
+const getParticipantSessionCategoryIds = (participant: EventParticipant, raceStateLookup: RaceStateLookup): EventCategoryId[] => {
+  const teams = (raceStateLookup as unknown as { teams?: EventTeam[] }).teams || [];
+  const categoryIds = new Set<EventCategoryId>();
+
+  if (participant.categoryId) {
+    categoryIds.add(participant.categoryId);
+  }
+
+  teams.forEach((team) => {
+    if (team.members.includes(participant.id) && team.categoryId) {
+      categoryIds.add(team.categoryId);
+    }
+  });
+
+  return Array.from(categoryIds);
+};
+
 const buildManualFlagRecord = (
   anchorRecord: EventTimeRecord,
   currentEventId: EventId | undefined,
@@ -228,6 +245,7 @@ interface RecordsProps {
   warnings?: string[];
   selectedCategories: Set<EventCategoryId>;
   selectedParticipants: Set<EventParticipantId>;
+  sessionValidCategoryIds?: Set<EventCategoryId>;
   timeDisplayZoneMode?: TimeDisplayZoneMode;
   categorySelected?: ((ids: Set<EventCategoryId>) => void) | undefined;
   participantSelected?: ((participantId: Set<EventParticipantId>) => void) | undefined;
@@ -240,6 +258,7 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   selectedRecordId?: TimeRecordId;
   selectedCategories?: Set<EventCategoryId>;
   selectedParticipants?: Set<EventParticipantId>;
+  sessionValidCategoryIds?: Set<EventCategoryId>;
   categorySelected?: ((ids: Set<EventCategoryId>) => void) | undefined;
   participantSelected?: ((participantId: Set<EventParticipantId>) => void) | undefined;
   onAssignFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
@@ -549,6 +568,7 @@ interface PassingRecordRowProps {
   raceStateLookup: RaceStateLookup;
   selectedCategories: Set<EventCategoryId> | undefined;
   selectedParticipants: Set<EventParticipantId> | undefined;
+  sessionValidCategoryIds?: Set<EventCategoryId>;
   onSelect?: (passingRecord: ParticipantPassingRecord) => void;
   onExclude?: (crossingId: TimeRecordId, exclude: boolean) => void;
   onChangeCategory?: (participantId: EventParticipantId, categoryId: EventCategoryId) => void;
@@ -661,6 +681,16 @@ export const PassingRecordRow = (
         if (!shouldExcludeCategoryFromResults(cat)) {
           className += ' selected-category';
         }
+      }
+    }
+
+    if (props.sessionValidCategoryIds) {
+      const entrantCategoryIds = getParticipantSessionCategoryIds(entrant, rs);
+      const isRelatedToSession = entrantCategoryIds.some((categoryId) => props.sessionValidCategoryIds?.has(categoryId));
+      if (!isRelatedToSession) {
+        className += ' unrelated';
+        cellClasses += ' unrelated';
+        categoryStr = categoryStr ? `${categoryStr} (unrelated)` : 'Unrelated';
       }
     }
   }
@@ -808,6 +838,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       passing={passing}
       selectedCategories={props.selectedCategories}
       selectedParticipants={props.selectedParticipants}
+      sessionValidCategoryIds={props.sessionValidCategoryIds}
       selectedRecordId={props.selectedRecordId}
       onSelect={passingRecordSelected}
       onExclude={props.onExclude}
@@ -1668,6 +1699,7 @@ export const RecentRecords = (props: RecordsProps & {
                     selectedRecordId={selectedRecordId}
                     selectedCategories={props.selectedCategories}
                     selectedParticipants={highlightedParticipantIds}
+                    sessionValidCategoryIds={props.sessionValidCategoryIds}
                     categorySelected={props.categorySelected}
                     participantSelected={handleParticipantSelected}
                     onAssignFlagCategory={props.onAssignFlagCategory}

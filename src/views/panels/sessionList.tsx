@@ -1,6 +1,7 @@
 import React from 'react';
 import { type EventCatalogSession } from '../../app/eventCatalog.js';
 import { type SessionId } from '../../model/raceevent.js';
+import { SessionListCard } from '../../controls/sessionListCard.js';
 
 interface SessionListPanelProps {
   activeSessionId?: SessionId;
@@ -8,7 +9,7 @@ interface SessionListPanelProps {
   onMakeSessionActive: () => void | Promise<void>;
   onSelectSession: (sessionId: SessionId) => void | Promise<void>;
   requestFormExit: (action: () => void | Promise<void>) => void;
-  selectedEventId?: string;
+  allowCreateSession: boolean;
   selectedSession?: EventCatalogSession;
   sessions: EventCatalogSession[];
 }
@@ -20,12 +21,12 @@ export const SessionListPanel = (props: SessionListPanelProps): React.ReactEleme
       <button
         type="button"
         onClick={() => {
-          if (!props.selectedEventId) {
+          if (!props.allowCreateSession) {
             return;
           }
           props.requestFormExit(() => props.onCreateSession());
         }}
-        disabled={!props.selectedEventId}
+        disabled={!props.allowCreateSession}
       >
         Create Session
       </button>
@@ -41,22 +42,17 @@ export const SessionListPanel = (props: SessionListPanelProps): React.ReactEleme
       {props.sessions.map((session) => {
         const isSelected = session.id === props.selectedSession?.id;
         return (
-          <button
+          <SessionListCard
             key={session.id}
-            type="button"
-            className={`events-list-item${isSelected ? ' selected' : ''}`}
+            activeSessionId={props.activeSessionId}
             onClick={() => {
               if (!isSelected) {
                 props.requestFormExit(() => props.onSelectSession(session.id));
               }
             }}
-            aria-selected={isSelected}
-          >
-            <strong>{session.name}</strong>
-            <span>{session.kind}</span>
-            <span>{session.status}</span>
-            {session.id === props.activeSessionId ? <span className="events-badge">Active</span> : null}
-          </button>
+            selected={isSelected}
+            session={session}
+          />
         );
       })}
     </div>

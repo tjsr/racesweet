@@ -9,21 +9,23 @@ import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/s
 import { getSupportedTimeZones, getSystemTimeZone } from '../../app/utils/timeutils.js';
 import { type EventId, type SessionId } from '../../model/raceevent.js';
 import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
-import { CategorySummaryPanel } from '../panels/categorySummary.js';
+import { CategoryListPanel } from '../panels/categoryList.js';
 import { EventDataSourcesPanel } from '../panels/eventDataSources.js';
 import { EventDetailsPanel } from '../panels/eventDetails.js';
 import { EventListPanel } from '../panels/eventList.js';
-import { SessionsPanel } from '../panels/sessions.js';
+import { SessionListPanel } from '../panels/sessionList.js';
 
 interface EventsScreenProps {
   catalog: EventCatalogState;
   config: SystemConfiguration;
   onActivateEvent: (eventId: EventId) => void | Promise<void>;
   onCreateEvent: () => void | Promise<void>;
+  onCreateSession: (eventId: EventId) => void | Promise<void>;
   onDeleteEvent: (eventId: EventId) => void | Promise<void>;
   onSaveEventAssignment: (eventId: EventId, sourceIds: string[]) => void | Promise<void>;
   onSelectEvent: (eventId: EventId) => void;
   onSelectSession: (sessionId: SessionId) => void;
+  onMakeSessionActive: (eventId: EventId, sessionId: SessionId) => void | Promise<void>;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
   onUpdateEvent: (eventId: EventId, changes: { date?: string; format?: EventCatalogEvent['format']; name?: string; timeZone?: string }) => void | Promise<void>;
   selectedEventId?: EventId;
@@ -142,12 +144,31 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
         </div>
 
         <div className="event-summary-column">
-          <SessionsPanel
+          <SessionListPanel
+            activeSessionId={props.catalog.activeSessionId}
+            allowCreateSession={false}
+            onCreateSession={() => {
+              if (!selectedEvent) {
+                return;
+              }
+              props.onCreateSession(selectedEvent.id);
+            }}
+            onMakeSessionActive={() => {
+              if (!selectedEvent || !selectedSession) {
+                return;
+              }
+              props.onMakeSessionActive(selectedEvent.id, selectedSession.id);
+            }}
             onSelectSession={props.onSelectSession}
+            requestFormExit={requestFormExit}
             selectedSession={selectedSession}
             sessions={selectedEventSessions}
           />
-          <CategorySummaryPanel categories={selectedEventCategories} />
+          <CategoryListPanel
+            categories={selectedEventCategories}
+            className="category-detail-panel"
+            title="Category Summary"
+          />
         </div>
       </div>
     </section>

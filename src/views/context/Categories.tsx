@@ -159,12 +159,12 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
       </label>
       <div className="events-layout categories-layout">
         <CategoryListPanel
-          eventCategories={eventCategories}
+          allowCreateCategory={!!selectedEvent}
+          categories={eventCategories}
           onCreateCategory={() => selectedEvent && props.onCreateCategory(selectedEvent.id)}
           onSelectCategory={props.onSelectCategory}
           requestFormExit={requestFormExit}
           selectedCategoryId={selectedCategory?.id}
-          selectedEventId={selectedEvent?.id}
         />
         <CategoryDetailsPanel
           categoryDraft={categoryDraft}

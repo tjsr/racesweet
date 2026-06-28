@@ -37,6 +37,7 @@ interface TimingContextProps {
   sessions: EventCatalogSession[];
   timeDisplayZoneMode: TimeDisplayZoneMode;
   timingEvent?: EventCatalogEvent;
+  timingSessionValidCategoryIds?: Set<EventCategoryId>;
   timingSessionValue: string;
 }
 
@@ -81,6 +82,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
         raceStateLookup={props.raceState}
         selectedCategories={props.selectedCategories}
         selectedParticipants={props.selectedParticipants}
+        sessionValidCategoryIds={props.timingSessionValidCategoryIds}
         categorySelected={props.categoryListSelected}
         timeDisplayZoneMode={props.timeDisplayZoneMode}
         onAssignFlagCategory={props.onAssignFlagCategory}

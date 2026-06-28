@@ -19,6 +19,7 @@ import {
   type EventCatalogSession,
   type EventCatalogState,
   applyEventCatalogLedger,
+  getCategoriesForEvent,
   getEntrantsForEvent,
 } from './eventCatalog.js';
 import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
@@ -301,6 +302,37 @@ const normalizeEntrantChanges = (
 const hasSameMembers = (left: string[], right: string[]): boolean =>
   left.length === right.length && left.every((value, index) => value === right[index]);
 
+const hasSameSerializedValue = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right);
+
+const hasSameCategoryScaffold = (existing: EventCatalogCategory, next: EventCatalogCategory): boolean => {
+  return existing.code === next.code &&
+    existing.description === next.description &&
+    existing.distance === next.distance &&
+    hasSameSerializedValue(existing.distanceRule, next.distanceRule) &&
+    existing.duration === next.duration &&
+    existing.excludeFromResults === next.excludeFromResults &&
+    existing.name === next.name &&
+    existing.startTime === next.startTime &&
+    hasSameSerializedValue(existing.sessionAssignments, next.sessionAssignments) &&
+    hasSameSerializedValue(existing.teamRules, next.teamRules);
+};
+
+const hasSameEntrantScaffold = (existing: EventCatalogEntrant, next: EventCatalogEntrant): boolean => {
+  return existing.categoryId === next.categoryId &&
+    hasSameMembers(existing.categoryIds, next.categoryIds) &&
+    existing.dateOfBirth === next.dateOfBirth &&
+    existing.entrantType === next.entrantType &&
+    existing.firstName === next.firstName &&
+    existing.gender === next.gender &&
+    existing.lastName === next.lastName &&
+    hasSameMembers(existing.memberParticipantIds, next.memberParticipantIds) &&
+    existing.name === next.name &&
+    existing.notes === next.notes &&
+    hasSameMembers(existing.sessionIds, next.sessionIds) &&
+    existing.teamEntrantId === next.teamEntrantId &&
+    hasSameSerializedValue(existing.teamMembers, next.teamMembers);
+};
+
 const assertUuid = (errors: string[], label: string, value: string | undefined): void => {
   if (!value || !validateUuid(value)) {
     errors.push(`${label} "${value || ''}" is not a valid UUID.`);
@@ -578,9 +610,17 @@ export class EventCatalogService {
     const categoryIds = scaffoldCategories.map((category) => category.id.toString());
     const entrants = deriveEntrantsFromParticipants(eventId, participants, sessionIds, masterProfiles, teams);
 
-    const existingCategoryIds = new Set(this.state.categories.filter((category) => category.eventId === eventId).map((category) => category.id.toString()));
+    const existingCategoriesById = new Map(this.state.categories
+      .filter((category) => category.eventId === eventId)
+      .map((category) => [category.id.toString(), category] as const));
+    const existingEntrantsById = new Map(getEntrantsForEvent(this.state, eventId).map((entrant) => [entrant.id.toString(), entrant] as const));
     const categoryMutations = scaffoldCategories.map((category) => {
-      if (existingCategoryIds.has(category.id.toString())) {
+      const existingCategory = existingCategoriesById.get(category.id.toString());
+      if (existingCategory) {
+        if (hasSameCategoryScaffold(existingCategory, category)) {
+          return undefined;
+        }
+
         return {
           categoryId: category.id,
           changes: {
@@ -607,11 +647,15 @@ export class EventCatalogService {
         timestamp: createTimestamp(),
         type: 'category-created' as const,
       };
-    });
+    }).filter((mutation): mutation is NonNullable<typeof mutation> => mutation !== undefined);
 
-    const existingEntrantsById = new Set(getEntrantsForEvent(this.state, eventId).map((entrant) => entrant.id));
     const entrantMutations = entrants.map((entrant) => {
-      if (existingEntrantsById.has(entrant.id)) {
+      const existingEntrant = existingEntrantsById.get(entrant.id.toString());
+      if (existingEntrant) {
+        if (hasSameEntrantScaffold(existingEntrant, entrant)) {
+          return undefined;
+        }
+
         return {
           changes: {
             categoryId: entrant.categoryId,
@@ -640,21 +684,38 @@ export class EventCatalogService {
         timestamp: createTimestamp(),
         type: 'entrant-created' as const,
       };
-    });
+    }).filter((mutation): mutation is NonNullable<typeof mutation> => mutation !== undefined);
+
+    const eventCategoryIds = [...(event?.categoryIds || [])];
+    const eventEntrantIds = [...(event?.entrantIds || [])];
+    const eventSessionIds = [...(event?.sessionIds || [])];
+    const nextEventCategoryIds = categoryIds;
+    const nextEventEntrantIds = entrants.map((entrant) => entrant.id);
+    const nextEventSessionIds = sessionIds;
+    const eventChanges = event && (
+      !hasSameMembers(eventCategoryIds, nextEventCategoryIds) ||
+      !hasSameMembers(eventEntrantIds, nextEventEntrantIds) ||
+      !hasSameMembers(eventSessionIds, nextEventSessionIds)
+    ) ? {
+      categoryIds: nextEventCategoryIds,
+      entrantIds: nextEventEntrantIds,
+      sessionIds: nextEventSessionIds,
+    } : undefined;
+
+    if (categoryMutations.length === 0 && entrantMutations.length === 0 && !eventChanges) {
+      return this.state;
+    }
 
     return this.appendMutations([
       ...categoryMutations,
       ...entrantMutations,
-      {
-        changes: {
-          categoryIds,
-          entrantIds: entrants.map((entrant) => entrant.id),
-        },
+      ...(eventChanges ? [{
+        changes: eventChanges,
         eventId,
         id: createMutationId(),
         timestamp: createTimestamp(),
-        type: 'event-updated',
-      },
+        type: 'event-updated' as const,
+      }] : []),
     ]);
   }
 
@@ -670,6 +731,41 @@ export class EventCatalogService {
     const mutations: EventCatalogLedger['mutations'] = [];
     const scheduledStart = normalizedImportData.eventDate ? new Date(normalizedImportData.eventDate).toISOString() : createTimestamp();
     const timeZone = normalizedImportData.timeZone || existingEvent?.timeZone || getSystemTimeZone();
+    const existingImportedRaceState = this.getImportedRaceStateMetadata(normalizedImportData.eventId, normalizedImportData.sessionId);
+    const derivedCategories = deriveCategoriesFromEventData(
+      normalizedImportData.eventId,
+      normalizedImportData.raceState.categories || [],
+      normalizedImportData.raceState.participants || [],
+      normalizedImportData.raceState.teams || []
+    );
+    const derivedEntrants = deriveEntrantsFromParticipants(
+      normalizedImportData.eventId,
+      normalizedImportData.raceState.participants || [],
+      sessionIds,
+      masterProfiles,
+      normalizedImportData.raceState.teams || []
+    );
+    const existingCategories = new Map(getCategoriesForEvent(this.state, normalizedImportData.eventId).map((category) => [category.id.toString(), category] as const));
+    const existingEntrants = new Map(getEntrantsForEvent(this.state, normalizedImportData.eventId).map((entrant) => [entrant.id.toString(), entrant] as const));
+    const importMatchesExistingState = existingEvent &&
+      existingSession &&
+      existingEvent.name === normalizedImportData.eventName &&
+      existingEvent.timeZone === timeZone &&
+      existingEvent.date === scheduledStart.slice(0, 10) &&
+      hasSameSerializedValue(existingImportedRaceState?.apicalDataFilePath, normalizedImportData.apicalDataFilePath) &&
+      hasSameSerializedValue(existingImportedRaceState?.raceState, normalizedImportData.raceState);
+    const scaffoldMatchesExistingState = derivedCategories.every((category) => {
+      const existingCategory = existingCategories.get(category.id.toString());
+      return !!existingCategory && hasSameCategoryScaffold(existingCategory, category);
+    }) &&
+      derivedEntrants.every((entrant) => {
+        const existingEntrant = existingEntrants.get(entrant.id.toString());
+        return !!existingEntrant && hasSameEntrantScaffold(existingEntrant, entrant);
+      });
+
+    if (importMatchesExistingState && scaffoldMatchesExistingState) {
+      return this.state;
+    }
 
     if (!existingEvent) {
       mutations.push({

@@ -217,6 +217,24 @@ const sessionFromPartialRaceState = (raceState: Partial<RaceState>): Session => 
   teams: raceState.teams || [],
 });
 
+const getSessionAssignedCategoryIds = (
+  catalog: EventCatalogState,
+  eventId: EventId | undefined,
+  sessionId: SessionId | undefined
+): Set<EventCategoryId> | undefined => {
+  if (!eventId || !sessionId) {
+    return undefined;
+  }
+
+  const assignedCategoryIds = getCategoriesForEvent(catalog, eventId)
+    .filter((category) => {
+      return (category.sessionAssignments || []).some((assignment) => assignment.sessionId === sessionId);
+    })
+    .map((category) => category.id);
+
+  return assignedCategoryIds.length > 0 ? new Set<EventCategoryId>(assignedCategoryIds) : undefined;
+};
+
 export const RaceSweetMainApp = () => {
   const [activeSection, setActiveSection] = useState<AppSection>('System');
   const [adminService, setAdminService] = useState<RaceAdminService|undefined>(undefined);
@@ -901,6 +919,10 @@ export const RaceSweetMainApp = () => {
     ? 'active'
     : selectedTimingSessionId || timingSessions[0]?.id || '';
   const activeSession = eventCatalogState.sessions.find((session) => session.id === eventCatalogState.activeSessionId);
+  const timingSessionId = timingSessionValue === 'active'
+    ? activeSession?.id
+    : timingSessionValue || undefined;
+  const timingSessionValidCategoryIds = getSessionAssignedCategoryIds(eventCatalogState, timingEvent?.id, timingSessionId);
   const timingTimeDisplayZoneMode = (timingEvent?.id ? systemConfigState.eventOptions[timingEvent.id]?.timeDisplayZoneMode : undefined) || 'event';
   const updateTimingTimeDisplayZoneMode = (mode: EventTimeDisplayZoneMode): void => {
     if (!timingEvent?.id || !systemConfigService) {
@@ -943,6 +965,7 @@ export const RaceSweetMainApp = () => {
           sessions={timingSessions}
           timeDisplayZoneMode={timingTimeDisplayZoneMode}
           timingEvent={timingEvent}
+          timingSessionValidCategoryIds={timingSessionValidCategoryIds}
           timingSessionValue={timingSessionValue}
         />
       )}
@@ -1155,6 +1178,18 @@ export const RaceSweetMainApp = () => {
               updateEventCatalogState(catalog, createdEvent?.id);
             }).catch((error: unknown) => setErrorState(error as Error));
           }}
+          onCreateSession={(eventId: EventId) => {
+            if (!validateUuid(eventId)) {
+              throw new Error(`Invalid eventId provided: ${eventId}`);
+            }
+            if (!eventCatalogService) {
+              return;
+            }
+            eventCatalogService.createSession(eventId).then((catalog) => {
+              const session = getSessionsForEvent(catalog, eventId).find((item) => item.name === 'New Session');
+              updateEventCatalogState(catalog, eventId, session?.id, selectedCategoryId);
+            }).catch((error: unknown) => setErrorState(error as Error));
+          }}
           onDeleteEvent={(eventId) => {
             if (!eventCatalogService) {
               return;
@@ -1162,6 +1197,14 @@ export const RaceSweetMainApp = () => {
 
             eventCatalogService.deleteEvent(eventId).then((catalog) => {
               updateEventCatalogState(catalog);
+            }).catch((error: unknown) => setErrorState(error as Error));
+          }}
+          onMakeSessionActive={(eventId: EventId, sessionId: SessionId) => {
+            if (!eventCatalogService) {
+              return;
+            }
+            eventCatalogService.activateSession(eventId, sessionId).then((catalog) => {
+              updateEventCatalogState(catalog, eventId, sessionId, selectedCategoryId);
             }).catch((error: unknown) => setErrorState(error as Error));
           }}
           onSelectEvent={selectEvent}
@@ -1264,6 +1307,36 @@ export const RaceSweetMainApp = () => {
               return;
             }
             systemConfigService.assignSourcesToSession(sessionId, { mode, sourceIds }).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+          }}
+          onSaveSessionCategoryAssignment={(sessionId, categoryId, assigned) => {
+            if (!eventCatalogService) {
+              return;
+            }
+
+            const category = eventCatalogState.categories.find((item) => item.id === categoryId);
+            const session = eventCatalogState.sessions.find((item) => item.id === sessionId);
+            if (!category || !session) {
+              return;
+            }
+
+            const existingAssignments = category.sessionAssignments || [];
+            const withoutSession = existingAssignments.filter((assignment) => assignment.sessionId !== sessionId);
+            const nextAssignments = assigned
+              ? [
+                ...withoutSession,
+                {
+                  sessionId,
+                  startTime: session.scheduledStart || '',
+                },
+              ]
+              : withoutSession;
+
+            return eventCatalogService.updateCategory(categoryId, { sessionAssignments: nextAssignments }).then((catalog) => {
+              updateEventCatalogState(catalog, selectedSessionsEventId, sessionId, categoryId);
+            }).catch((error: unknown) => {
+              setErrorState(error as Error);
+              throw error;
+            });
           }}
           onSelectSession={setSelectedSessionId}
           onUnsavedChangesGuardChange={(guard) => setUnsavedChangesGuard('Sessions', guard)}

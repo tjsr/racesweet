@@ -120,8 +120,10 @@ describe('EventsScreen integration', () => {
   it('shows event controls and session lists in both center and right panes', async () => {
     const onActivateEvent = vi.fn();
     const onCreateEvent = vi.fn();
+    const onCreateSession = vi.fn();
     const onDeleteEvent = vi.fn();
     const onSaveEventAssignment = vi.fn();
+    const onMakeSessionActive = vi.fn();
     const onSelectEvent = vi.fn();
     const onSelectSession = vi.fn();
     const onUpdateEvent = vi.fn();
@@ -140,6 +142,9 @@ describe('EventsScreen integration', () => {
             setActiveEventId(eventId);
           }}
           onCreateEvent={onCreateEvent}
+          onCreateSession={(eventId) => {
+            onCreateSession(eventId);
+          }}
           onDeleteEvent={onDeleteEvent}
           onSaveEventAssignment={onSaveEventAssignment}
           onSelectEvent={(eventId) => {
@@ -150,6 +155,9 @@ describe('EventsScreen integration', () => {
           onSelectSession={(sessionId) => {
             onSelectSession(sessionId);
             setSelectedSessionId(sessionId);
+          }}
+          onMakeSessionActive={(eventId, sessionId) => {
+            onMakeSessionActive(eventId, sessionId);
           }}
           onUpdateEvent={onUpdateEvent}
           selectedEventId={selectedEventId}
@@ -164,7 +172,7 @@ describe('EventsScreen integration', () => {
 
     expect(container.querySelector('h1')?.textContent).toBe('Events');
     expect(container.textContent).toContain('Event Details');
-    expect(container.textContent).toContain('Sessions');
+    expect(container.textContent).toContain('Session List');
     expect(container.textContent).toContain('Event Data Sources');
     expect(container.textContent).toContain('Winter Round');
     expect(container.textContent).toContain('Friday Practice');
@@ -172,13 +180,21 @@ describe('EventsScreen integration', () => {
     const summarySections = Array.from(summaryColumn?.children || []);
     expect(summaryColumn).toBeDefined();
     expect(summarySections).toHaveLength(2);
-    expect(summarySections[0]?.classList.contains('session-detail-panel')).toBe(true);
+    expect(summarySections[0]?.classList.contains('events-panel')).toBe(true);
     expect(summarySections[1]?.classList.contains('category-detail-panel')).toBe(true);
-    expect(summarySections[0]?.textContent).toContain('Sessions');
+    expect(summarySections[0]?.textContent).toContain('Session List');
     expect(summarySections[1]?.textContent).toContain('Category Summary');
+    expect(summarySections[1]?.textContent).toContain('Premier');
     const detailColumn = container.querySelector('.event-detail-column');
     expect(detailColumn).toBeTruthy();
     expect(detailColumn?.children).toHaveLength(2);
+
+    const createSessionButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Create Session') as HTMLButtonElement | undefined;
+    expect(createSessionButton).toBeDefined();
+    expect(createSessionButton?.disabled).toBe(true);
+
+    const makeActiveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Make Active');
+    expect(makeActiveButton).toBeDefined();
 
     const springTestButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Spring Test'));
     expect(springTestButton).toBeDefined();
@@ -210,8 +226,11 @@ describe('EventsScreen integration', () => {
       testSessionButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(onSelectSession).toHaveBeenCalledWith('session-3');
-    expect(container.textContent).toContain('Selected session: Test Session');
+    await act(async () => {
+      makeActiveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onMakeSessionActive).toHaveBeenCalledWith('event-2', 'session-3');
 
     const eventSourceCheckbox = container.querySelector('input[aria-label="Event Source event-2 source-a"]') as HTMLInputElement;
     expect(eventSourceCheckbox).toBeDefined();
@@ -253,7 +272,9 @@ describe('EventsScreen integration', () => {
           config={configState}
           onActivateEvent={() => undefined}
           onCreateEvent={() => undefined}
+          onCreateSession={() => undefined}
           onDeleteEvent={() => undefined}
+          onMakeSessionActive={() => undefined}
           onSaveEventAssignment={(eventId, sourceIds) => {
             setConfigState((current) => ({
               ...current,
@@ -348,7 +369,9 @@ describe('EventsScreen integration', () => {
             }));
             setSelectedEventId(createdEvent.id);
           }}
+          onCreateSession={() => undefined}
           onDeleteEvent={() => undefined}
+          onMakeSessionActive={() => undefined}
           onSaveEventAssignment={() => undefined}
           onSelectEvent={setSelectedEventId}
           onSelectSession={() => undefined}
@@ -391,6 +414,7 @@ describe('EventsScreen integration', () => {
           config={config}
           onActivateEvent={() => undefined}
           onCreateEvent={() => undefined}
+          onCreateSession={() => undefined}
           onDeleteEvent={(eventId) => {
             onDeleteEvent(eventId);
             setCatalogState((current) => ({
@@ -401,6 +425,7 @@ describe('EventsScreen integration', () => {
             setSelectedEventId('event-1');
             setSelectedSessionId('session-1');
           }}
+          onMakeSessionActive={() => undefined}
           onSaveEventAssignment={() => undefined}
           onSelectEvent={(eventId) => {
             setSelectedEventId(eventId);
@@ -447,7 +472,9 @@ describe('EventsScreen integration', () => {
           config={config}
           onActivateEvent={() => undefined}
           onCreateEvent={() => undefined}
+          onCreateSession={() => undefined}
           onDeleteEvent={() => undefined}
+          onMakeSessionActive={() => undefined}
           onSaveEventAssignment={() => undefined}
           onSelectEvent={(eventId) => {
             setSelectedEventId(eventId);

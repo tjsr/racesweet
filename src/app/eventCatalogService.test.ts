@@ -916,6 +916,128 @@ describe('EventCatalogService', () => {
     expect(seededPersistence.save).toHaveBeenCalledTimes(2);
   });
 
+  it('does not write duplicate scaffold mutations when the same event scaffold is synced twice', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+    const categoryAId = createCategoryId('sync-noop-category-a');
+    const categoryBId = createCategoryId('sync-noop-category-b');
+    const participants: EventParticipant[] = [
+      {
+        categoryId: categoryAId,
+        currentResult: undefined,
+        entrantId: 'team-a',
+        firstname: 'Pat',
+        id: 'p1',
+        identifiers: [],
+        lastRecordTime: null,
+        resultDuration: null,
+        surname: 'Rider',
+      },
+      {
+        categoryId: categoryBId,
+        currentResult: undefined,
+        entrantId: 'team-a',
+        firstname: 'Quinn',
+        id: 'p2',
+        identifiers: [],
+        lastRecordTime: null,
+        resultDuration: null,
+        surname: 'Rider',
+      },
+    ];
+
+    await service.syncEventScaffold(SEED_EVENT_ID, [
+      {
+        code: 'A',
+        description: 'Alpha category',
+        id: categoryAId,
+        name: 'Alpha',
+      },
+      {
+        code: 'B',
+        description: 'Beta category',
+        id: categoryBId,
+        name: 'Beta',
+      },
+    ], participants);
+
+    const saveCountAfterFirstSync = vi.mocked(seededPersistence.save).mock.calls.length;
+
+    await service.syncEventScaffold(SEED_EVENT_ID, [
+      {
+        code: 'A',
+        description: 'Alpha category',
+        id: categoryAId,
+        name: 'Alpha',
+      },
+      {
+        code: 'B',
+        description: 'Beta category',
+        id: categoryBId,
+        name: 'Beta',
+      },
+    ], participants);
+
+    expect(vi.mocked(seededPersistence.save).mock.calls.length).toBe(saveCountAfterFirstSync);
+    expect(getCategoriesForEvent(service.catalog, SEED_EVENT_ID).map((category) => category.id)).toEqual(expect.arrayContaining([categoryAId, categoryBId]));
+  });
+
+  it('treats a duplicate Apical import as a no-op once the event state already matches', async () => {
+    const seededPersistence = createPersistence(createDefaultEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+    const importedEventId = createEventId('apical-noop-event');
+    const importedSessionId = createSessionId('apical-noop-session');
+    const importedCategoryId = createCategoryId('apical-noop-category');
+    const importedEntrantId = createEventEntrantId('apical-noop-entrant');
+    const importedParticipantId = createEventParticipantId('apical-noop-participant');
+
+    const importData = {
+      eventDate: '2026-06-07T01:30:00.000Z',
+      eventId: importedEventId,
+      eventName: 'Apical No-Op Round',
+      raceState: {
+        categories: [
+          {
+            code: 'A',
+            description: '',
+            id: importedCategoryId,
+            name: 'A',
+          },
+        ],
+        participants: [
+          {
+            categoryId: importedCategoryId,
+            currentResult: undefined,
+            entrantId: importedEntrantId,
+            firstname: 'No',
+            id: importedParticipantId,
+            identifiers: [],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'Op',
+          },
+        ],
+        records: [],
+        teams: [],
+      },
+      sessionId: importedSessionId,
+      timeZone: 'Australia/Sydney',
+    };
+
+    await service.importApicalRaceState(importData);
+    const saveCountAfterFirstImport = vi.mocked(seededPersistence.save).mock.calls.length;
+
+    await service.importApicalRaceState(importData);
+
+    expect(vi.mocked(seededPersistence.save).mock.calls.length).toBe(saveCountAfterFirstImport);
+    expect(service.getImportedRaceStateMetadata(importedEventId, importedSessionId)).toEqual(expect.objectContaining({
+      raceState: expect.objectContaining({
+        categories: expect.arrayContaining([expect.objectContaining({ id: importedCategoryId })]),
+        participants: expect.arrayContaining([expect.objectContaining({ id: importedParticipantId })]),
+      }),
+    }));
+  });
+
   it('scaffolds imported Apical teams using the imported team name and category', async () => {
     const seededPersistence = createPersistence(createDefaultEventCatalogLedger());
     const service = await EventCatalogService.create(seededPersistence);

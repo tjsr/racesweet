@@ -13,6 +13,11 @@
   color: #a00;
 }
 
+.unrelated {
+  background-color: #fff4d6;
+  color: #6b4b00;
+}
+
 .selected-category {
   background-color: #ebffd0;
   font-style: italic;

@@ -2569,6 +2569,92 @@ describe('RecentRecords integration', () => {
     });
   });
 
+  it('marks session records as unrelated when their rider or team category is not assigned to the session', async () => {
+    const categoryA: EventCategory = { id: 'category-a', name: 'Category A' };
+    const categoryB: EventCategory = { id: 'category-b', name: 'Category B' };
+    const participantA: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'entrant-a',
+      firstname: 'Pat',
+      id: 'participant-a',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const participantB: EventParticipant = {
+      categoryId: categoryB.id,
+      currentResult: undefined,
+      entrantId: 'entrant-b',
+      firstname: 'Quinn',
+      id: 'participant-b',
+      identifiers: [{ fromTime: undefined, racePlate: '102', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const crossingA: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'crossing-a',
+      isValid: true,
+      participantId: participantA.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const crossingB: ParticipantPassingRecord = {
+      chipCode: 100102,
+      id: 'crossing-b',
+      isValid: true,
+      participantId: participantB.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:07:00.000Z'),
+    } as ParticipantPassingRecord;
+    const categories = [categoryA, categoryB];
+    const participants = new Map<EventParticipant['id'], EventParticipant>([
+      [participantA.id, participantA],
+      [participantB.id, participantB],
+    ]);
+    const records = [crossingA, crossingB];
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories,
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categories.find((category) => category.id === categoryId),
+      getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+      getParticipantById: (participantId) => participants.get(participantId),
+      getParticipantLaps: () => records,
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={records}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+          sessionValidCategoryIds={new Set([categoryA.id])}
+        />
+      );
+    });
+
+    const relatedRow = container.querySelector('tr[data-record-id="crossing-a"]');
+    const unrelatedRow = container.querySelector('tr[data-record-id="crossing-b"]');
+    expect(relatedRow).not.toBeNull();
+    expect(unrelatedRow).not.toBeNull();
+    expect(relatedRow!.className).not.toContain('unrelated');
+    expect(unrelatedRow!.className).toContain('unrelated');
+    expect(unrelatedRow!.textContent).toContain('Category B (unrelated)');
+  });
+
   it('renders chequered flags inline in time order with crossing records', async () => {
     const categoryA: EventCategory = { id: '1', name: 'Category A' };
 
