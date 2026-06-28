@@ -1,3 +1,4 @@
+import type { EventParticipant } from '../model/eventparticipant.js';
 import { createCategoryId, createEventEntrantId, createEventParticipantId, createTimeRecordId } from '../model/ids.js';
 import type { RaceState } from '../model/racestate.js';
 import type { TimeRecord } from '../model/timerecord.js';
@@ -16,10 +17,34 @@ const updatedParticipantId = createEventParticipantId('updated-participant');
 const updatedTeamId = createEventEntrantId('updated-team');
 const updatedFlagId = createTimeRecordId('updated-flag');
 const updatedCrossingId = createTimeRecordId('updated-crossing');
+const staleReloadCategoryId = createCategoryId('stale-reload-category');
+const emptyReloadCategoryId = createCategoryId('empty-reload-category');
+const assignedReloadCategoryId = createCategoryId('assigned-reload-category');
+const addedReloadCategoryId = createCategoryId('added-reload-category');
+const staleReloadParticipantId = createEventParticipantId('stale-reload-participant');
+const addedReloadParticipantId = createEventParticipantId('added-reload-participant');
 
 const activeCategories = (raceState: Partial<RaceState>, categoryId: string) => {
   return (raceState.categories || []).filter((category) => category.id === categoryId && category.deleted !== true);
 };
+
+const participant = (
+  id: string,
+  categoryId: string,
+  racePlate?: string
+): EventParticipant => ({
+  categoryId,
+  currentResult: undefined,
+  entrantId: id,
+  firstname: 'Reload',
+  id,
+  identifiers: racePlate
+    ? [{ fromTime: undefined, racePlate, toTime: undefined }] as unknown as EventParticipant['identifiers']
+    : [],
+  lastRecordTime: null,
+  resultDuration: null,
+  surname: 'Participant',
+});
 
 const existingRaceState: Partial<RaceState> = {
   categories: [{ id: existingCategoryId, name: 'Existing Category' }],
@@ -130,6 +155,41 @@ describe('sessionSourceReload', () => {
     expect(merged.records?.map((record) => record.id)).toEqual([reloadedRecordId]);
     expect(merged.teams?.map((team) => team.id)).toEqual([existingTeamId]);
     expect(merged.eventStartTime).toEqual(new Date('2026-06-01T10:00:00.000Z'));
+  });
+
+  it('prunes stale empty reload participants and unassigned empty categories into deleted summary counts', () => {
+    const existing: Partial<RaceState> = {
+      categories: [
+        { id: staleReloadCategoryId, name: 'Stale' },
+        { id: emptyReloadCategoryId, name: 'Empty' },
+        { id: assignedReloadCategoryId, name: 'Assigned' },
+      ],
+      participants: [participant(staleReloadParticipantId, staleReloadCategoryId)],
+      records: [],
+      teams: [],
+    };
+    const reloaded: Partial<RaceState> = {
+      categories: [
+        { id: staleReloadCategoryId, name: 'Stale' },
+        { id: emptyReloadCategoryId, name: 'Empty' },
+        { id: assignedReloadCategoryId, name: 'Assigned' },
+        { id: addedReloadCategoryId, name: 'Added' },
+      ],
+      participants: [participant(staleReloadParticipantId, staleReloadCategoryId), participant(addedReloadParticipantId, addedReloadCategoryId)],
+      records: [],
+      teams: [],
+    };
+
+    const merged = mergeRaceStateForReload(existing, reloaded, 'all', {
+      categoryIdsAssignedToSessions: new Set([assignedReloadCategoryId]),
+      pruneEmptyReloadEntities: true,
+    });
+    const summary = summarizeSessionSourceReload(existing, merged, 'all');
+
+    expect(merged.participants?.map((entry) => entry.id)).toEqual([addedReloadParticipantId]);
+    expect(merged.categories?.map((category) => category.id)).toEqual([assignedReloadCategoryId, addedReloadCategoryId]);
+    expect(summary.categories).toEqual({ created: 1, deleted: 2, updated: 1 });
+    expect(summary.participants).toEqual({ created: 1, deleted: 1, updated: 0 });
   });
 
   it('summarizes created, deleted, and overwritten reload changes by data type', () => {

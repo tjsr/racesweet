@@ -29,6 +29,7 @@ interface EntrantDetailsPanelProps {
 }
 
 const UNSPECIFIED_GENDER = 'unspecified';
+const isActiveCategory = (category: EventCategory): boolean => category.deleted !== true;
 
 const ReadOnlyList = (props: { emptyText: string; items: string[] }): React.ReactElement => {
   if (props.items.length === 0) {
@@ -130,7 +131,7 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
             onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, categoryId: event.target.value }))}
           >
             <option value="">No category</option>
-            {props.eventCategories.map((category) => (
+            {props.eventCategories.filter(isActiveCategory).map((category) => (
               <option key={category.id.toString()} value={category.id.toString()}>{category.name}</option>
             ))}
           </select>

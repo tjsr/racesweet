@@ -38,6 +38,10 @@ const teamEntrant: EventCatalogEntrant = {
 };
 
 const categories = [{ id: 'category-1', name: 'Premier' }];
+const categoriesWithDeleted = [
+  ...categories,
+  { deleted: true, id: 'category-deleted', name: 'Deleted Category' },
+];
 
 describe('EntrantDetailsPanel', () => {
   let container: HTMLDivElement | undefined;
@@ -130,5 +134,38 @@ describe('EntrantDetailsPanel', () => {
     expect(container.textContent).toContain('Team Details');
     expect(container.textContent).toContain('Team Members');
     expect(container.textContent).toContain('Rider One');
+  });
+
+  it('omits deleted categories from the category dropdown', () => {
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <EntrantDetailsPanel
+          entrantDraft={{
+            categoryId: 'category-1',
+            dateOfBirth: '2000-01-01',
+            firstName: 'Rider',
+            gender: 'male',
+            lastName: 'One',
+            name: 'Rider One',
+            notes: '',
+            teamEntrantId: '' as EventEntrantId,
+          }}
+          eventCategories={categoriesWithDeleted}
+          onDeleteEntrant={() => undefined}
+          onSaveEntrant={() => undefined}
+          onSetEntrantDraft={() => undefined}
+          selectedEntrant={riderEntrant}
+          teamEntrants={[]}
+          teamMembers={[]}
+        />
+      );
+    });
+
+    const categorySelect = container.querySelector('select[aria-label="Entrant Category"]') as HTMLSelectElement;
+    expect(Array.from(categorySelect.options).map((option) => option.textContent)).toEqual(['No category', 'Premier']);
   });
 });

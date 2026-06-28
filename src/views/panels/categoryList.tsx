@@ -13,6 +13,7 @@ interface CategoryListPanelProps {
   categories: EventCatalogCategory[];
   className?: string;
   emptyText?: string;
+  enableShowAllCategories?: boolean;
   onCreateCategory?: () => void | Promise<void>;
   onSelectCategory?: (categoryId: EventCategoryId) => void | Promise<void>;
   requestFormExit?: (action: () => void | Promise<void>) => void;
@@ -21,68 +22,86 @@ interface CategoryListPanelProps {
   title?: string;
 }
 
-export const CategoryListPanel = (props: CategoryListPanelProps): React.ReactElement => (
-  <section className={['events-panel', props.className || ''].filter((value) => value.length > 0).join(' ')}>
-    <h2>{props.title || 'Category List'}</h2>
-    <div className="events-actions">
-      {props.allowCreateCategory && props.onCreateCategory ? (
-        <button
-          type="button"
-          onClick={() => {
-            const onCreateCategory = props.onCreateCategory!;
-            if (props.requestFormExit) {
-              props.requestFormExit(() => onCreateCategory());
-              return;
-            }
+const isActiveCategory = (category: EventCatalogCategory): boolean => category.deleted !== true;
 
-            void onCreateCategory();
-          }}
-        >
-          Create Category
-        </button>
-      ) : null}
-    </div>
-    <div className="events-list" role={props.onSelectCategory ? 'listbox' : 'list'} aria-label="Categories for selected event">
-      {props.categories.length > 0 ? props.categories.map((category) => {
-        const isSelected = category.id === props.selectedCategoryId || (props.selectedCategoryIds || []).includes(category.id);
-        const action = props.categoryAction?.(category);
+export const CategoryListPanel = (props: CategoryListPanelProps): React.ReactElement => {
+  const [showAllCategories, setShowAllCategories] = React.useState(false);
+  const visibleCategories = showAllCategories ? props.categories : props.categories.filter(isActiveCategory);
 
-        if (!props.onSelectCategory) {
+  return (
+    <section className={['events-panel', props.className || ''].filter((value) => value.length > 0).join(' ')}>
+      <h2>{props.title || 'Category List'}</h2>
+      <div className="events-actions">
+        {props.allowCreateCategory && props.onCreateCategory ? (
+          <button
+            type="button"
+            onClick={() => {
+              const onCreateCategory = props.onCreateCategory!;
+              if (props.requestFormExit) {
+                props.requestFormExit(() => onCreateCategory());
+                return;
+              }
+
+              void onCreateCategory();
+            }}
+          >
+            Create Category
+          </button>
+        ) : null}
+        {props.enableShowAllCategories ? (
+          <label>
+            <input
+              aria-label="Show all categories"
+              type="checkbox"
+              checked={showAllCategories}
+              onChange={(event) => setShowAllCategories(event.target.checked)}
+            />
+            Show all
+          </label>
+        ) : null}
+      </div>
+      <div className="events-list" role={props.onSelectCategory ? 'listbox' : 'list'} aria-label="Categories for selected event">
+        {visibleCategories.length > 0 ? visibleCategories.map((category) => {
+          const isSelected = category.id === props.selectedCategoryId || (props.selectedCategoryIds || []).includes(category.id);
+          const action = props.categoryAction?.(category);
+
+          if (!props.onSelectCategory) {
+            return (
+              <CategoryListCard
+                actionLabel={action?.label}
+                actionTitle={action?.title}
+                key={category.id}
+                category={category}
+                isSelected={isSelected}
+                onActionClick={action?.onClick}
+              />
+            );
+          }
+
           return (
             <CategoryListCard
-              actionLabel={action?.label}
-              actionTitle={action?.title}
               key={category.id}
               category={category}
               isSelected={isSelected}
-              onActionClick={action?.onClick}
+              onClick={() => {
+                if (isSelected) {
+                  return;
+                }
+
+                const onSelectCategory = props.onSelectCategory!;
+                if (props.requestFormExit) {
+                  props.requestFormExit(() => onSelectCategory(category.id));
+                  return;
+                }
+
+                void onSelectCategory(category.id);
+              }}
             />
           );
-        }
-
-        return (
-          <CategoryListCard
-            key={category.id}
-            category={category}
-            isSelected={isSelected}
-            onClick={() => {
-              if (isSelected) {
-                return;
-              }
-
-              const onSelectCategory = props.onSelectCategory!;
-              if (props.requestFormExit) {
-                props.requestFormExit(() => onSelectCategory(category.id));
-                return;
-              }
-
-              void onSelectCategory(category.id);
-            }}
-          />
-        );
-      }) : (
-        <p>{props.emptyText || 'No categories are available.'}</p>
-      )}
-    </div>
-  </section>
-);
+        }) : (
+          <p>{props.emptyText || 'No categories are available.'}</p>
+        )}
+      </div>
+    </section>
+  );
+};

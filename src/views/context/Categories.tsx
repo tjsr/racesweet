@@ -1,6 +1,6 @@
 import React from 'react';
 import { parseTeamCompositionRules } from '../../app/categoryRules.js';
-import { type CategoryDistanceRule, getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent } from '../../app/eventCatalog.js';
+import { type CategoryDistanceRule, type EventCatalogCategory, getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent } from '../../app/eventCatalog.js';
 import { SessionId } from '../../model/raceevent.js';
 import { parseInteger } from '../../parsers/parseInteger.js';
 import { CategoriesPageProps, CategoryChanges, CategoryDraft, dedupeCategoriesForDisplay, getCategoryDraft } from '../display/categoriesPage.js';
@@ -16,14 +16,34 @@ export const CategoriesContext = (props: CategoriesContextProps): React.ReactEle
   return <CategoriesPage {...props} />;
 };
 
+const getAllCategoriesForEvent = (
+  catalog: CategoriesPageProps['catalog'],
+  eventId: string | undefined
+): EventCatalogCategory[] => {
+  const event = catalog.events.find((candidate) => candidate.id.toString() === eventId?.toString());
+  if (!event) {
+    return [];
+  }
+
+  const eventCategoryIds = new Set(event.categoryIds.map((categoryId) => categoryId.toString()));
+  return catalog.categories.filter((category) => {
+    if (category.eventId.toString() !== event.id.toString()) {
+      return false;
+    }
+
+    return category.deleted === true || eventCategoryIds.has(category.id.toString());
+  });
+};
+
 export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement => {
   const selectedEvent = props.catalog.events.find((event) => event.id.toString() === props.selectedEventId?.toString()) ??
     props.catalog.events.find((event) => event.id.toString() === props.catalog.activeEventId?.toString()) ??
     props.catalog.events[0];
   const categoriesForEvent = getCategoriesForEvent(props.catalog, selectedEvent?.id?.toString());
-  const eventCategories = dedupeCategoriesForDisplay(categoriesForEvent);
+  const eventCategories = dedupeCategoriesForDisplay(getAllCategoriesForEvent(props.catalog, selectedEvent?.id?.toString()));
+  const activeEventCategories = dedupeCategoriesForDisplay(categoriesForEvent);
   const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id?.toString());
-  const selectedCategory = eventCategories.find((category) => category.id.toString() === props.selectedCategoryId?.toString()) ?? eventCategories[0];
+  const selectedCategory = eventCategories.find((category) => category.id.toString() === props.selectedCategoryId?.toString()) ?? activeEventCategories[0] ?? eventCategories[0];
   const assignedSessionIds = getCategoryAssignedSessionIds(selectedCategory, eventSessions);
   const categorySessions = eventSessions.filter((session) => assignedSessionIds.has(session.id.toString()));
 
@@ -135,6 +155,7 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
         <CategoryListPanel
           allowCreateCategory={!!selectedEvent}
           categories={eventCategories}
+          enableShowAllCategories
           onCreateCategory={() => selectedEvent && props.onCreateCategory(selectedEvent.id)}
           onSelectCategory={props.onSelectCategory}
           requestFormExit={requestFormExit}

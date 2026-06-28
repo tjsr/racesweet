@@ -67,6 +67,16 @@ const catalog: EventCatalogState = {
       teamRules: { teamCompositionRules: [] },
     },
     {
+      code: 'OLD',
+      deleted: true,
+      distanceRule: { kind: 'unspecified' },
+      eventId: 'event-1',
+      id: 'cat-deleted',
+      name: 'Deleted Category',
+      sessionAssignments: [],
+      teamRules: { teamCompositionRules: [] },
+    },
+    {
       code: 'DEV',
       distanceRule: { kind: 'unspecified' },
       eventId: 'event-2',
@@ -249,6 +259,18 @@ describe('CategoriesPage integration', () => {
     let sessionsForCategoryPanel = getPanelByHeading(container, 'Sessions for Category');
     expect(sessionsForCategoryPanel.textContent).toContain('Feature Race');
     expect(sessionsForCategoryPanel.textContent).not.toContain('Practice');
+
+    const categoryListPanel = getPanelByHeading(container, 'Category List');
+    const showAllCategories = categoryListPanel.querySelector('input[aria-label="Show all categories"]') as HTMLInputElement;
+    expect(showAllCategories).toBeTruthy();
+    expect(categoryListPanel.textContent).not.toContain('Deleted Category');
+
+    await act(async () => {
+      showAllCategories.click();
+    });
+
+    expect(showAllCategories.checked).toBe(true);
+    expect(categoryListPanel.textContent).toContain('Deleted Category');
 
     const clubmanButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Clubman'));
     expect(clubmanButton).toBeDefined();

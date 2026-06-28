@@ -14,6 +14,14 @@ const category: EventCatalogCategory = {
   name: 'Premier',
   teamRules: { teamCompositionRules: [] },
 };
+const deletedCategory: EventCatalogCategory = {
+  code: 'DEL',
+  deleted: true,
+  eventId: 'event-1',
+  id: 'cat-deleted',
+  name: 'Deleted Category',
+  teamRules: { teamCompositionRules: [] },
+};
 
 describe('CategoryListPanel', () => {
   let container: HTMLDivElement | undefined;
@@ -106,5 +114,47 @@ describe('CategoryListPanel', () => {
     });
 
     expect(onAction).toHaveBeenCalledOnce();
+  });
+
+  it('hides deleted categories by default and reveals them only when enabled show all is checked', async () => {
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <CategoryListPanel
+          categories={[category, deletedCategory]}
+        />,
+      );
+    });
+
+    expect(container.querySelector('input[aria-label="Show all categories"]')).toBeNull();
+    expect(container.textContent).toContain('Premier');
+    expect(container.textContent).not.toContain('Deleted Category');
+
+    root?.unmount();
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <CategoryListPanel
+          categories={[category, deletedCategory]}
+          enableShowAllCategories
+        />,
+      );
+    });
+
+    const showAllCheckbox = container.querySelector('input[aria-label="Show all categories"]') as HTMLInputElement;
+    expect(showAllCheckbox).toBeTruthy();
+    expect(showAllCheckbox.checked).toBe(false);
+    expect(container.textContent).not.toContain('Deleted Category');
+
+    flushSync(() => {
+      showAllCheckbox.click();
+    });
+
+    expect(showAllCheckbox.checked).toBe(true);
+    expect(container.textContent).toContain('Deleted Category');
   });
 });

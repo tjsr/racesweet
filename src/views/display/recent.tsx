@@ -360,7 +360,8 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
           props.onSelect(record);
         }
       }}>
-      <TableCell colSpan={3}>{record.sequence}{flagText}</TableCell>
+      <TableCell colSpan={1}>{record.sequence}</TableCell>
+      <TableCell colSpan={2}>{flagText}</TableCell>
       <TableCell colSpan={1}>{tableTimeString(record.time, props.timeZone)}</TableCell>
       <TableCell colSpan={4}>{categoryText}</TableCell>
       <TableCell colSpan={2}>{elapsedTime}</TableCell>
