@@ -1,11 +1,5 @@
 # RaceSweet Agent instructions
 
-## Initial checks
-
-Always make sure when opening a terminal that we know firstly whether it is a bash, powershell or cmd terminal first, then determine the version so that only commands and syntax valid for that format are attempted. If terminal type or version cannot be determined, ask the user to confirm the terminal environment before executing any commands.
-
-Whenever we create a new branch for an agent to work in, see Initial checks for the `npm i` policy to ensure dependencies are available.
-
 ## Typescript style
 
 When writing Typescript, always prefer arrow functions over regular functions.  Always strongly type variables, never allow implicity 'any' types.
