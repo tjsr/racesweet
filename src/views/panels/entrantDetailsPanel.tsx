@@ -1,8 +1,8 @@
 import React from 'react';
 import { type EventCatalogEntrant } from '../../app/eventCatalog.js';
 import { type CategoryId } from '../../controllers/category.js';
-import { type EventCategory } from '../../model/eventcategory.js';
 import { type EventEntrantId } from '../../model/entrant.js';
+import { type EventCategory } from '../../model/eventcategory.js';
 
 export interface EntrantDraft {
   categoryId: CategoryId;
@@ -159,6 +159,7 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
             Delete Entrant
           </button>
         </div>
+        <div className="entrant-id">Id: {props.selectedEntrant.id}</div>
         {props.warningModal}
       </>
     ) : (

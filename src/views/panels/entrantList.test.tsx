@@ -184,4 +184,133 @@ describe('EntrantListPanel', () => {
     expect(requestFormExit).toHaveBeenCalledTimes(1);
     expect(onSelectEntrant).toHaveBeenCalledWith('rider-1');
   });
+
+  it('reorders entrant cards when the sort order changes', () => {
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+    const alphaCategory = { eventId: 'event-1', id: 'category-alpha', name: 'A Grade' };
+    const betaCategory = { eventId: 'event-1', id: 'category-beta', name: 'B Grade' };
+    const zedCategory = { eventId: 'event-1', id: 'category-zed', name: 'Z Grade' };
+    const zedEntrant: EventCatalogEntrant = {
+      categoryId: zedCategory.id,
+      categoryIds: [zedCategory.id],
+      entrantType: 'rider',
+      eventId: 'event-1',
+      firstName: 'Ari',
+      id: 'rider-zed',
+      lastName: 'Zed',
+      memberParticipantIds: [],
+      name: 'Ari Zed',
+      sessionIds: [],
+    };
+    const betaEntrant: EventCatalogEntrant = {
+      categoryId: betaCategory.id,
+      categoryIds: [betaCategory.id],
+      entrantType: 'rider',
+      eventId: 'event-1',
+      firstName: 'Bea',
+      id: 'rider-beta',
+      lastName: 'Beta',
+      memberParticipantIds: [],
+      name: 'Bea Beta',
+      sessionIds: [],
+    };
+    const alphaEntrant: EventCatalogEntrant = {
+      categoryId: alphaCategory.id,
+      categoryIds: [alphaCategory.id],
+      entrantType: 'rider',
+      eventId: 'event-1',
+      firstName: 'Cal',
+      id: 'rider-alpha',
+      lastName: 'Alpha',
+      memberParticipantIds: [],
+      name: 'Cal Alpha',
+      sessionIds: [],
+    };
+    const sortCatalog: EventCatalogState = {
+      ...catalog,
+      categories: [alphaCategory, betaCategory, zedCategory],
+      entrants: [zedEntrant, betaEntrant, alphaEntrant],
+      events: [{
+        ...catalog.events[0]!,
+        categoryIds: [alphaCategory.id, betaCategory.id, zedCategory.id],
+        entrantIds: [zedEntrant.id, betaEntrant.id, alphaEntrant.id],
+      }],
+    };
+    const participants: EventParticipant[] = [
+      {
+        ...participant,
+        categoryId: zedCategory.id,
+        entrantId: zedEntrant.id,
+        firstname: 'Ari',
+        id: zedEntrant.id,
+        identifiers: [{ fromTime: undefined, racePlate: '30', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+        surname: 'Zed',
+      },
+      {
+        ...participant,
+        categoryId: betaCategory.id,
+        entrantId: betaEntrant.id,
+        firstname: 'Bea',
+        id: betaEntrant.id,
+        identifiers: [{ fromTime: undefined, racePlate: '2', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+        surname: 'Beta',
+      },
+      {
+        ...participant,
+        categoryId: alphaCategory.id,
+        entrantId: alphaEntrant.id,
+        firstname: 'Cal',
+        id: alphaEntrant.id,
+        identifiers: [{ fromTime: undefined, racePlate: '10', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+        surname: 'Alpha',
+      },
+    ];
+
+    const Harness = (): React.ReactElement => {
+      const [createKind, setCreateKind] = React.useState<EntrantType>('rider');
+
+      return (
+        <EntrantListPanel
+          catalog={sortCatalog}
+          createKind={createKind}
+          filteredTeamEntrants={[]}
+          onCreateEntrant={() => undefined}
+          onSelectEntrant={() => undefined}
+          raceStateParticipants={participants}
+          requestFormExit={() => undefined}
+          riderEntrants={[zedEntrant, betaEntrant, alphaEntrant]}
+          selectedEventId="event-1"
+          setCreateKind={setCreateKind}
+          teamEntrants={[]}
+          teamsEnabled={false}
+        />
+      );
+    };
+    const cardNames = (): string[] => Array.from(container!.querySelectorAll('.entrant-list-name'))
+      .map((element) => element.textContent || '');
+
+    flushSync(() => {
+      root?.render(<Harness />);
+    });
+
+    expect(cardNames()).toEqual(['Cal Alpha', 'Bea Beta', 'Ari Zed']);
+
+    const sortSelect = container.querySelector<HTMLSelectElement>('select[aria-label="Sort Entrants"]');
+    expect(sortSelect).not.toBeNull();
+    expect(Array.from(sortSelect!.options).map((option) => option.textContent)).toEqual(['Surname', 'Plate number', 'Grade']);
+
+    flushSync(() => {
+      sortSelect!.value = 'plateNumber';
+      sortSelect!.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(cardNames()).toEqual(['Bea Beta', 'Cal Alpha', 'Ari Zed']);
+
+    flushSync(() => {
+      sortSelect!.value = 'grade';
+      sortSelect!.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(cardNames()).toEqual(['Cal Alpha', 'Bea Beta', 'Ari Zed']);
+  });
 });
