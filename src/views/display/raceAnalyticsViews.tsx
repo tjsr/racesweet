@@ -64,6 +64,25 @@ interface LapChartColumn {
   lapNo: number;
 }
 
+interface LapChartLinePoint {
+  domOrder: number;
+  entrantId: EventEntrantId;
+  lapNo: number;
+  position: number;
+  x: number;
+  y: number;
+}
+
+interface LapChartLineSegment {
+  color: string;
+  entrantId: EventEntrantId;
+  key: string;
+  x1: number;
+  x2: number;
+  y1: number;
+  y2: number;
+}
+
 interface BaseRaceAnalyticsProps {
   categories: CategoryOption[];
   catalogEntrants: EventCatalogEntrant[];
@@ -83,7 +102,13 @@ interface ReportsPageProps extends BaseRaceAnalyticsProps {
 
 type CategoryFilter = 'overall' | string;
 
+const lapChartLineColors: string[] = ['#0057b8', '#b00020', '#217a34', '#7a4cc2', '#a65f00', '#007a78'];
+
 const normalizeText = (value: string): string => value.trim().toLowerCase();
+
+const getLapChartEntrantLineColor = (_entrantId: EventEntrantId, entrantIndex: number): string => {
+  return lapChartLineColors[entrantIndex % lapChartLineColors.length];
+};
 
 const getCategoryByIdSafely = (
   raceState: Session & RaceStateLookup,
@@ -553,8 +578,11 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   }, [excludedCategoryKeys, props.categories]);
   const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(props.selectedCategoryId || 'overall');
   const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
+  const [drawLineChart, setDrawLineChart] = React.useState<boolean>(false);
+  const [lapChartLineSegments, setLapChartLineSegments] = React.useState<LapChartLineSegment[]>([]);
   const [reportType, setReportType] = React.useState<'fastest-laps' | 'lap-times' | 'lap-chart' | 'handicap-data'>('fastest-laps');
   const [handicapShowFilter, setHandicapShowFilter] = React.useState<'all' | 'event-participants-only'>('all');
+  const lapChartWrapperRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     if (selectedCategory !== 'overall' && !categories.some((category) => category.id === selectedCategory)) {
@@ -600,6 +628,89 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   const handleReportLapEntryClick = (entry: LapChartEntry): void => {
     setSelectedLapEntry((currentEntry) => currentEntry?.entrantId === entry.entrantId ? undefined : entry);
   };
+
+  const updateLapChartLineSegments = React.useCallback((): void => {
+    const wrapper = lapChartWrapperRef.current;
+    if (!drawLineChart || reportType !== 'lap-chart' || !wrapper) {
+      setLapChartLineSegments([]);
+      return;
+    }
+
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const buttons = Array.from(wrapper.querySelectorAll<HTMLButtonElement>('button[data-lap-chart-entrant-id]'));
+    const pointsByEntrant = new Map<EventEntrantId, LapChartLinePoint[]>();
+    const entrantOrder = new Map<EventEntrantId, number>();
+
+    buttons.forEach((button, domOrder: number) => {
+      const entrantId = button.dataset.lapChartEntrantId as EventEntrantId | undefined;
+      const lapNo = Number(button.dataset.lapChartLapNo);
+      const position = Number(button.dataset.lapChartPosition);
+      if (!entrantId || Number.isNaN(lapNo) || Number.isNaN(position)) {
+        return;
+      }
+
+      if (!entrantOrder.has(entrantId)) {
+        entrantOrder.set(entrantId, entrantOrder.size);
+      }
+
+      const buttonRect = button.getBoundingClientRect();
+      const point: LapChartLinePoint = {
+        domOrder,
+        entrantId,
+        lapNo,
+        position,
+        x: buttonRect.left - wrapperRect.left + buttonRect.width / 2,
+        y: buttonRect.top - wrapperRect.top + buttonRect.height / 2,
+      };
+      const points = pointsByEntrant.get(entrantId) || [];
+      points.push(point);
+      pointsByEntrant.set(entrantId, points);
+    });
+
+    const segments: LapChartLineSegment[] = [];
+    pointsByEntrant.forEach((points, entrantId) => {
+      const sortedPoints = [...points].sort((left, right) => {
+        if (left.lapNo !== right.lapNo) {
+          return left.lapNo - right.lapNo;
+        }
+        if (left.position !== right.position) {
+          return left.position - right.position;
+        }
+        return left.domOrder - right.domOrder;
+      });
+      const entrantIndex = entrantOrder.get(entrantId) || 0;
+      const color = getLapChartEntrantLineColor(entrantId, entrantIndex);
+      sortedPoints.slice(1).forEach((point, index) => {
+        const previousPoint = sortedPoints[index];
+        segments.push({
+          color,
+          entrantId,
+          key: `${entrantId}-${previousPoint.lapNo}-${previousPoint.position}-${point.lapNo}-${point.position}-${index}`,
+          x1: previousPoint.x,
+          x2: point.x,
+          y1: previousPoint.y,
+          y2: point.y,
+        });
+      });
+    });
+
+    setLapChartLineSegments(segments);
+  }, [drawLineChart, reportType]);
+
+  React.useLayoutEffect(() => {
+    updateLapChartLineSegments();
+  }, [lapChart, maxLapPosition, updateLapChartLineSegments]);
+
+  React.useEffect(() => {
+    if (!drawLineChart || reportType !== 'lap-chart') {
+      return undefined;
+    }
+
+    window.addEventListener('resize', updateLapChartLineSegments);
+    return () => {
+      window.removeEventListener('resize', updateLapChartLineSegments);
+    };
+  }, [drawLineChart, reportType, updateLapChartLineSegments]);
 
   const fastestLapRows = React.useMemo(() => {
     return [...rows].sort((left, right) => {
@@ -699,44 +810,73 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
       {reportType === 'lap-chart' ? (
         <section className="events-panel">
           <h2>Lap Chart</h2>
-          <table aria-label="Reports Lap Chart Table" className="lap-chart-table">
-            <thead>
-              <tr>
-                <th>Position</th>
-                {lapChart.map((column) => (
-                  <th key={`reports-lap-column-${column.lapNo}`}>Lap {column.lapNo}</th>
+          <label className="lap-chart-line-toggle">
+            <input
+              type="checkbox"
+              checked={drawLineChart}
+              onChange={(event) => setDrawLineChart(event.target.checked)}
+            />
+            Draw line chart
+          </label>
+          <div className="lap-chart-table-wrapper" ref={lapChartWrapperRef}>
+            {drawLineChart ? (
+              <svg className="lap-chart-line-overlay" aria-hidden="true">
+                {lapChartLineSegments.map((segment) => (
+                  <line
+                    key={segment.key}
+                    className="lap-chart-line-overlay__line"
+                    data-lap-chart-entrant-id={segment.entrantId}
+                    stroke={segment.color}
+                    x1={segment.x1}
+                    x2={segment.x2}
+                    y1={segment.y1}
+                    y2={segment.y2}
+                  />
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: maxLapPosition }, (_, rowIndex) => (
-                <tr key={`reports-lap-row-${rowIndex + 1}`}>
-                  <td>{rowIndex + 1}</td>
-                  {lapChart.map((column) => {
-                    const entry = column.entries[rowIndex];
-                    const isSelectedEntrant = !!entry && selectedLapEntry?.entrantId === entry.entrantId;
-                    return (
-                      <td
-                        key={`reports-lap-cell-${column.lapNo}-${rowIndex + 1}`}
-                        className={isSelectedEntrant ? 'lap-chart-table__entrant-cell--selected' : undefined}
-                      >
-                        {entry ? (
-                          <button
-                            type="button"
-                            className="lap-entry-button"
-                            aria-pressed={isSelectedEntrant}
-                            onClick={() => handleReportLapEntryClick(entry)}
-                          >
-                            {entry.raceNumber}
-                          </button>
-                        ) : null}
-                      </td>
-                    );
-                  })}
+              </svg>
+            ) : null}
+            <table aria-label="Reports Lap Chart Table" className="lap-chart-table">
+              <thead>
+                <tr>
+                  <th>Position</th>
+                  {lapChart.map((column) => (
+                    <th key={`reports-lap-column-${column.lapNo}`}>Lap {column.lapNo}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {Array.from({ length: maxLapPosition }, (_, rowIndex) => (
+                  <tr key={`reports-lap-row-${rowIndex + 1}`}>
+                    <td>{rowIndex + 1}</td>
+                    {lapChart.map((column) => {
+                      const entry = column.entries[rowIndex];
+                      const isSelectedEntrant = !!entry && selectedLapEntry?.entrantId === entry.entrantId;
+                      return (
+                        <td
+                          key={`reports-lap-cell-${column.lapNo}-${rowIndex + 1}`}
+                          className={isSelectedEntrant ? 'lap-chart-table__entrant-cell--selected' : undefined}
+                        >
+                          {entry ? (
+                            <button
+                              type="button"
+                              className="lap-entry-button"
+                              aria-pressed={isSelectedEntrant}
+                              data-lap-chart-entrant-id={entry.entrantId}
+                              data-lap-chart-lap-no={entry.lapNo}
+                              data-lap-chart-position={entry.position}
+                              onClick={() => handleReportLapEntryClick(entry)}
+                            >
+                              {entry.raceNumber}
+                            </button>
+                          ) : null}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {selectedLapEntry ? (
             <aside className="events-panel lap-entry-info" aria-label="Lap Entry Details">
               <h3>Lap Entry Details</h3>

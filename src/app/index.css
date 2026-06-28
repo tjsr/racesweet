@@ -459,6 +459,32 @@
   vertical-align: top;
 }
 
+.lap-chart-table-wrapper {
+  position: relative;
+}
+
+.lap-chart-table-wrapper .lap-chart-table {
+  position: relative;
+  z-index: 1;
+}
+
+.lap-chart-line-overlay {
+  height: 100%;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  z-index: 2;
+}
+
+.lap-chart-line-overlay__line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
 .lap-entry-button {
   border: 1px solid rgba(127, 127, 127, 0.45);
   border-radius: 0.35rem;
@@ -466,6 +492,8 @@
   font: inherit;
   min-width: 3rem;
   padding: 0.25rem 0.45rem;
+  position: relative;
+  z-index: 3;
 }
 
 .lap-chart-table__entrant-cell--selected {

@@ -430,6 +430,51 @@ describe('race analytics views integration', () => {
     expect(lapEntryButton(createEventParticipantId('p-rider-1')).getAttribute('aria-pressed')).toBe('true');
     expect(container.textContent).toContain(`Entrant: Solo Rider (${createEventEntrantId('rider-1')})`);
   });
+
+  it('draws entrant line chart segments behind reports lap chart plates when enabled', async () => {
+    await act(async () => {
+      root.render(
+        <ReportsPage
+          categories={categories}
+          catalogEntrants={catalogEntrants}
+          raceState={raceState}
+          selectedCategoryId={undefined}
+        />,
+      );
+    });
+
+    const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
+    await act(async () => {
+      setSelectValue(reportSelect, 'lap-chart');
+    });
+
+    expect(container.textContent).toContain('Draw line chart');
+    expect(container.querySelector('svg.lap-chart-line-overlay')).toBeFalsy();
+
+    const lineChartCheckbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    expect(lineChartCheckbox).toBeTruthy();
+
+    await act(async () => {
+      lineChartCheckbox.click();
+    });
+
+    const overlay = container.querySelector('svg.lap-chart-line-overlay') as SVGSVGElement;
+    expect(overlay).toBeTruthy();
+    const lines = Array.from(overlay.querySelectorAll('line.lap-chart-line-overlay__line'));
+    const teamLines = lines.filter((line) => line.getAttribute('data-lap-chart-entrant-id') === createEventEntrantId('team-1'));
+    const riderLines = lines.filter((line) => line.getAttribute('data-lap-chart-entrant-id') === createEventEntrantId('rider-1'));
+    expect(teamLines).toHaveLength(3);
+    expect(riderLines).toHaveLength(1);
+    expect(teamLines[0].getAttribute('stroke')).toBeTruthy();
+    expect(riderLines[0].getAttribute('stroke')).toBeTruthy();
+    expect(teamLines[0].getAttribute('stroke')).not.toBe(riderLines[0].getAttribute('stroke'));
+
+    await act(async () => {
+      lineChartCheckbox.click();
+    });
+
+    expect(container.querySelector('svg.lap-chart-line-overlay')).toBeFalsy();
+  });
 });
 
 
