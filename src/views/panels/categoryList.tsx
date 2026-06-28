@@ -5,12 +5,19 @@ import { CategoryListCard } from '../../controls/categoryListCard.js';
 
 interface CategoryListPanelProps {
   allowCreateCategory?: boolean;
+  categoryAction?: (category: EventCatalogCategory) => {
+    label: string;
+    onClick: () => void | Promise<void>;
+    title?: string;
+  } | undefined;
   categories: EventCatalogCategory[];
   className?: string;
+  emptyText?: string;
   onCreateCategory?: () => void | Promise<void>;
   onSelectCategory?: (categoryId: EventCategoryId) => void | Promise<void>;
   requestFormExit?: (action: () => void | Promise<void>) => void;
   selectedCategoryId?: EventCategoryId;
+  selectedCategoryIds?: EventCategoryId[];
   title?: string;
 }
 
@@ -36,15 +43,19 @@ export const CategoryListPanel = (props: CategoryListPanelProps): React.ReactEle
       ) : null}
     </div>
     <div className="events-list" role={props.onSelectCategory ? 'listbox' : 'list'} aria-label="Categories for selected event">
-      {props.categories.map((category) => {
-        const isSelected = category.id === props.selectedCategoryId;
+      {props.categories.length > 0 ? props.categories.map((category) => {
+        const isSelected = category.id === props.selectedCategoryId || (props.selectedCategoryIds || []).includes(category.id);
+        const action = props.categoryAction?.(category);
 
         if (!props.onSelectCategory) {
           return (
             <CategoryListCard
+              actionLabel={action?.label}
+              actionTitle={action?.title}
               key={category.id}
               category={category}
               isSelected={isSelected}
+              onActionClick={action?.onClick}
             />
           );
         }
@@ -69,7 +80,9 @@ export const CategoryListPanel = (props: CategoryListPanelProps): React.ReactEle
             }}
           />
         );
-      })}
+      }) : (
+        <p>{props.emptyText || 'No categories are available.'}</p>
+      )}
     </div>
   </section>
 );

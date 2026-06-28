@@ -21,6 +21,16 @@ const setMultiSelectValues = (select: HTMLSelectElement, values: string[]): void
   select.dispatchEvent(new Event('change', { bubbles: true }));
 };
 
+const getPanelByHeading = (container: HTMLElement, headingText: string): HTMLElement => {
+  const heading = Array.from(container.querySelectorAll('h2')).find((item) => item.textContent === headingText);
+  const panel = heading?.closest('section');
+  if (!panel) {
+    throw new Error(`Panel ${headingText} was not rendered.`);
+  }
+
+  return panel as HTMLElement;
+};
+
 const catalog: EventCatalogState = {
   activeEventId: 'event-1',
   categories: [
@@ -44,7 +54,7 @@ const catalog: EventCatalogState = {
       eventId: 'event-1',
       id: 'cat-2',
       name: 'Clubman',
-      sessionAssignments: [],
+      sessionAssignments: [{ sessionId: '', startTime: '2026-06-12T08:00:00.000Z' }],
       teamRules: { teamCompositionRules: [] },
     },
     {
@@ -62,7 +72,7 @@ const catalog: EventCatalogState = {
       eventId: 'event-2',
       id: 'cat-3',
       name: 'Development',
-      sessionAssignments: [],
+      sessionAssignments: [{ sessionId: 'session-3', startTime: '2026-07-10T10:30:00.000Z' }],
       teamRules: { teamCompositionRules: [] },
     },
   ],
@@ -236,6 +246,9 @@ describe('CategoriesPage integration', () => {
     expect(container.textContent).toContain('Teams');
     expect(container.textContent).not.toContain('Individual Entrants');
     expect(container.textContent).toContain('Category List');
+    let sessionsForCategoryPanel = getPanelByHeading(container, 'Sessions for Category');
+    expect(sessionsForCategoryPanel.textContent).toContain('Feature Race');
+    expect(sessionsForCategoryPanel.textContent).not.toContain('Practice');
 
     const clubmanButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Clubman'));
     expect(clubmanButton).toBeDefined();
@@ -247,6 +260,9 @@ describe('CategoriesPage integration', () => {
 
     expect(container.textContent).toContain('Taylor Rider');
     expect(container.textContent).not.toContain('Pat Rider');
+    sessionsForCategoryPanel = getPanelByHeading(container, 'Sessions for Category');
+    expect(sessionsForCategoryPanel.textContent).toContain('Practice');
+    expect(sessionsForCategoryPanel.textContent).not.toContain('Feature Race');
 
     await act(async () => {
       eventSelect.value = 'event-2';
@@ -255,6 +271,9 @@ describe('CategoriesPage integration', () => {
 
     expect(container.textContent).toContain('Development');
     expect(container.textContent).toContain('Jordan Rider');
+    sessionsForCategoryPanel = getPanelByHeading(container, 'Sessions for Category');
+    expect(sessionsForCategoryPanel.textContent).toContain('Development Race');
+    expect(sessionsForCategoryPanel.textContent).not.toContain('Feature Race');
 
     const createButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Create Category');
     expect(createButton).toBeDefined();
@@ -363,7 +382,7 @@ describe('CategoriesPage integration', () => {
     expect(container.textContent).not.toContain('Error loading content');
   });
 
-  it('shows and logs parent event details when the displayed category is missing from the parent event category list', async () => {
+  it('does not display or log a category that is missing from the parent event category list', async () => {
     const onDisplayError = vi.fn();
     const mismatchedCatalog: EventCatalogState = {
       ...catalog,
@@ -399,15 +418,12 @@ describe('CategoriesPage integration', () => {
     });
 
     const parentEventError = container.querySelector('.category-parent-event-error');
-    expect(container.textContent).toContain('Category ID: cat-orphan');
-    expect(parentEventError?.getAttribute('role')).toBe('alert');
-    expect(parentEventError?.textContent).toContain('Category cat-orphan is displayed for the selected event');
-    expect(parentEventError?.textContent).toContain('Parent event: id=event-1, name=Winter Round, date=2026-06-12, format=race-weekend.');
-    expect(parentEventError?.textContent).toContain('Parent event categoryIds: cat-1, cat-2.');
-    expect(onDisplayError).toHaveBeenCalledWith('Categories', expect.any(Error));
-    const loggedError = onDisplayError.mock.calls[0]?.[1] as Error;
-    expect(loggedError.message).toContain('Category cat-orphan is displayed for the selected event');
-    expect(loggedError.message).toContain('Parent event: id=event-1, name=Winter Round, date=2026-06-12, format=race-weekend.');
+    const categoryButtons = Array.from(container.querySelectorAll('[aria-label="Categories for selected event"] button')).map((button) => button.textContent || '');
+    expect(categoryButtons.some((buttonText) => buttonText.includes('Orphan'))).toBe(false);
+    expect(container.textContent).not.toContain('Category ID: cat-orphan');
+    expect(container.textContent).toContain('Category ID: cat-1');
+    expect(parentEventError).toBeNull();
+    expect(onDisplayError).not.toHaveBeenCalled();
   });
 
   it('prompts before replacing a dirty category form and handles save discard and cancel', async () => {

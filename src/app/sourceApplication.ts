@@ -6,6 +6,7 @@ import type { TimeRecord } from '../model/timerecord.js';
 import { normalizeCategoryResultExclusion } from '../controllers/category.js';
 import { rewriteImportedObjectIds } from '../model/ids.js';
 import { validate as validateUuid } from 'uuid';
+import { addMissingLinkedCategoryPlaceholders } from './sessionSourceReload.js';
 
 interface SessionSourceSink {
   addCategories(categories: EventCategory[]): Promise<unknown>;
@@ -147,8 +148,9 @@ const normalizeRaceStateForSession = (
     ...rewrittenRaceState,
     categories: (rewrittenRaceState.categories || []).map((category) => normalizeCategoryResultExclusion(category)),
   };
-  validateRaceStateIds(normalizedRaceState, existingCategories);
-  return normalizedRaceState;
+  const linkedCategorySafeRaceState = addMissingLinkedCategoryPlaceholders(normalizedRaceState);
+  validateRaceStateIds(linkedCategorySafeRaceState, existingCategories);
+  return linkedCategorySafeRaceState;
 };
 
 const getUniqueCategories = (categories: EventCategory[]): EventCategory[] => {

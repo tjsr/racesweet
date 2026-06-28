@@ -1,9 +1,12 @@
 import { CategoryId, normalizeCategoryResultExclusion } from '../controllers/category.js';
 import { EventEntrantId } from '../model/entrant.js';
 import type { EventCategory, EventCategoryId } from '../model/eventcategory.js';
+import type { EventParticipant } from '../model/eventparticipant.js';
+import { EventParticipantId } from '../model/eventparticipant.js';
 import { EventId, SessionId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 import { IdType } from '../model/types.js';
+import { isValidId } from '../validators/isValidId.js';
 
 export type EventFormat = 'race-weekend' | 'test-day' | 'track-day' | 'other';
 export type EventSessionKind = 'practice' | 'qualifying' | 'race' | 'warmup' | 'other';
@@ -61,10 +64,10 @@ export interface EventCatalogEntrant {
   gender?: string;
   id: EventEntrantId;
   lastName?: string;
-  memberParticipantIds: EventEntrantId[];
+  memberParticipantIds: EventParticipantId[];
   name: string;
   notes?: string;
-  sessionIds: SessionId[];
+  sessionIds?: SessionId[];
   teamEntrantId?: EventEntrantId;
   teamMembers?: Array<{
     categoryId?: EventCategoryId;
@@ -72,7 +75,7 @@ export interface EventCatalogEntrant {
     firstName: string;
     gender?: string;
     lastName: string;
-    participantId: EventEntrantId;
+    participantId: EventParticipantId;
   }>;
 }
 
@@ -170,7 +173,7 @@ export interface CategoryCreatedMutation extends EventCatalogMutationBase {
 
 export interface CategoryUpdatedMutation extends EventCatalogMutationBase {
   categoryId: EventCategoryId;
-  changes: Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'excludeFromResults' | 'name' | 'sessionAssignments' | 'startTime' | 'teamRules'>>;
+  changes: Partial<Pick<EventCatalogCategory, 'code' | 'deleted' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'excludeFromResults' | 'name' | 'sessionAssignments' | 'startTime' | 'teamRules'>>;
   type: 'category-updated';
 }
 
@@ -185,7 +188,7 @@ export interface EntrantCreatedMutation extends EventCatalogMutationBase {
 }
 
 export interface EntrantUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>>;
+  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>;
   entrantId: EventEntrantId;
   type: 'entrant-updated';
 }
@@ -233,6 +236,7 @@ export const createDefaultEventCatalogState = (): EventCatalogState => ({
 });
 
 const removeEntry = (ids: IdType[], id: IdType): IdType[] => ids.filter((entryId) => entryId !== id);
+const isActiveCategory = (category: EventCatalogCategory): boolean => category.deleted !== true;
 
 export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalogState => {
   return ledger.mutations.reduce<EventCatalogState>((state, mutation) => {
@@ -299,16 +303,24 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
       };
     }
     case 'category-created': {
+      const category = normalizeCategoryResultExclusion({ ...mutation.category, deleted: false });
       return {
         ...state,
-        categories: [...state.categories, normalizeCategoryResultExclusion(mutation.category)],
+        categories: [
+          ...state.categories.map((existingCategory) => (
+            existingCategory.id === category.id && isActiveCategory(existingCategory)
+              ? { ...existingCategory, deleted: true }
+              : existingCategory
+          )),
+          category,
+        ],
       };
     }
     case 'category-updated': {
       return {
         ...state,
         categories: state.categories.map((category) => {
-          if (category.id !== mutation.categoryId) {
+          if (category.id !== mutation.categoryId || !isActiveCategory(category)) {
             return category;
           }
 
@@ -322,7 +334,11 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
     case 'category-deleted': {
       return {
         ...state,
-        categories: state.categories.filter((category) => category.id !== mutation.categoryId),
+        categories: state.categories.map((category) => (
+          category.id === mutation.categoryId && isActiveCategory(category)
+            ? { ...category, deleted: true }
+            : category
+        )),
         entrants: state.entrants.map((entrant) => ({
           ...entrant,
           categoryId: entrant.categoryId === mutation.categoryId.toString() ? undefined : entrant.categoryId,
@@ -402,10 +418,6 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
       return {
         ...state,
         activeSessionId: nextActiveSession,
-        entrants: state.entrants.map((entrant) => ({
-          ...entrant,
-          sessionIds: removeEntry(entrant.sessionIds, mutation.sessionId),
-        })),
         events: state.events.map((event) => ({
           ...event,
           sessionIds: removeEntry(event.sessionIds, mutation.sessionId),
@@ -438,11 +450,105 @@ export const getCategoriesForEvent = (
   state: EventCatalogState,
   eventId: EventId | undefined
 ): EventCatalogCategory[] => {
-  if (!eventId || !state.events.some((event) => event.id === eventId)) {
+  const event = state.events.find((item) => item.id === eventId);
+  if (!event) {
     return [];
   }
 
-  return state.categories.filter((category) => category.eventId === eventId);
+  const eventCategoryIds = new Set(event.categoryIds);
+  return state.categories.filter((category) => category.eventId === eventId && isActiveCategory(category) && eventCategoryIds.has(category.id));
+};
+
+export const getCategoryAssignedSessionIds = (
+  category: EventCatalogCategory | undefined,
+  eventSessions: EventCatalogSession[] = []
+): Set<SessionId> => {
+  const assignedSessionIds = new Set<SessionId>();
+
+  (category?.sessionAssignments || []).forEach((assignment) => {
+    if (isValidId(assignment.sessionId)) {
+      assignedSessionIds.add(assignment.sessionId);
+      return;
+    }
+
+    const matchingSession = eventSessions.find((session) => session.scheduledStart === assignment.startTime);
+    if (matchingSession) {
+      assignedSessionIds.add(matchingSession.id.toString());
+      return;
+    }
+
+    if (eventSessions.length === 1) {
+      assignedSessionIds.add(eventSessions[0]!.id?.toString());
+    }
+  });
+
+  return assignedSessionIds;
+};
+
+export const getSessionAssignedCategoryIds = (
+  categories: EventCatalogCategory[],
+  sessionId: SessionId | undefined,
+  eventSessions: EventCatalogSession[] = []
+): Set<EventCategoryId> => {
+  if (!sessionId) {
+    return new Set<EventCategoryId>();
+  }
+
+  return new Set(categories
+    .filter((category) => getCategoryAssignedSessionIds(category, eventSessions).has(sessionId))
+    .map((category) => category.id));
+};
+
+export const getEntrantCategoryIds = (
+  entrant: EventCatalogEntrant | undefined,
+  eventEntrants: EventCatalogEntrant[] = []
+): Set<EventCategoryId> => {
+  const categoryIds = new Set<EventCategoryId>();
+  if (!entrant) {
+    return categoryIds;
+  }
+
+  if (entrant.categoryId) {
+    categoryIds.add(entrant.categoryId);
+  }
+  entrant.categoryIds.forEach((categoryId) => categoryIds.add(categoryId));
+
+  if (entrant.teamEntrantId) {
+    const team = eventEntrants.find((candidate) => candidate.id === entrant.teamEntrantId);
+    if (team?.categoryId) {
+      categoryIds.add(team.categoryId);
+    }
+    team?.categoryIds.forEach((categoryId) => categoryIds.add(categoryId));
+  }
+
+  return categoryIds;
+};
+
+export const getEntrantAssignedSessionIds = (
+  entrant: EventCatalogEntrant | undefined,
+  eventCategories: EventCatalogCategory[] = [],
+  eventSessions: EventCatalogSession[] = [],
+  eventEntrants: EventCatalogEntrant[] = []
+): Set<SessionId> => {
+  const entrantCategoryIds = getEntrantCategoryIds(entrant, eventEntrants);
+  const assignedSessionIds = new Set<SessionId>();
+
+  eventCategories
+    .filter((category) => entrantCategoryIds.has(category.id))
+    .forEach((category) => {
+      getCategoryAssignedSessionIds(category, eventSessions).forEach((sessionId) => assignedSessionIds.add(sessionId));
+    });
+
+  return assignedSessionIds;
+};
+
+export const getParticipantAssignedSessionIds = (
+  participant: Pick<EventParticipant, 'categoryId'> | undefined,
+  eventCategories: EventCatalogCategory[] = [],
+  eventSessions: EventCatalogSession[] = []
+): Set<SessionId> => {
+  const category = eventCategories.find((candidate) => candidate.id === participant?.categoryId);
+  return getCategoryAssignedSessionIds(category, eventSessions);
 };
 
 export const getEntrantsForEvent = (
@@ -462,6 +568,11 @@ export const getEntrantsForCategory = (
   categoryId: CategoryId | undefined
 ): EventCatalogEntrant[] => {
   if (!eventId || !categoryId) {
+    return [];
+  }
+
+  const categoryIsListedForEvent = getCategoriesForEvent(state, eventId).some((category) => category.id === categoryId);
+  if (!categoryIsListedForEvent) {
     return [];
   }
 

@@ -5,7 +5,6 @@ import { type CategoryDraft } from '../display/categoriesPage.js';
 
 interface CategoryDetailsPanelProps {
   categoryDraft: CategoryDraft;
-  categoryParentEventMismatch?: string;
   eventSessions: Array<{ id: SessionId; name: string; scheduledStart: string }>;
   formError?: string;
   onDeleteCategory: () => void | Promise<void>;
@@ -147,12 +146,6 @@ export const CategoryDetailsPanel = (props: CategoryDetailsPanelProps): React.Re
             Delete Category
           </button>
           <span className="category-id-display">Category ID: {props.selectedCategory.id.toString()}</span>
-          {props.categoryParentEventMismatch ? (
-            <div className="error category-parent-event-error" role="alert">
-              <span className="warning-icon" aria-hidden="true">!</span>
-              <p>{props.categoryParentEventMismatch}</p>
-            </div>
-          ) : null}
         </div>
         {props.warningModal}
       </>

@@ -1,7 +1,6 @@
 import React from 'react';
 import { parseTeamCompositionRules } from '../../app/categoryRules.js';
-import { type CategoryDistanceRule, getCategoriesForEvent, getSessionsForEvent } from '../../app/eventCatalog.js';
-import { EventCategoryId } from '../../model/eventcategory.js';
+import { type CategoryDistanceRule, getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent } from '../../app/eventCatalog.js';
 import { SessionId } from '../../model/raceevent.js';
 import { parseInteger } from '../../parsers/parseInteger.js';
 import { CategoriesPageProps, CategoryChanges, CategoryDraft, dedupeCategoriesForDisplay, getCategoryDraft } from '../display/categoriesPage.js';
@@ -9,6 +8,7 @@ import { useUnsavedChangesWarning } from '../display/unsavedChangesWarning.js';
 import { CategoryDetailsPanel } from '../panels/categoryDetails.js';
 import { CategoryListPanel } from '../panels/categoryList.js';
 import { EntrantsInCategoryPanel } from '../panels/entrantsInCategory.js';
+import { SessionListPanel } from '../panels/sessionList.js';
 
 type CategoriesContextProps = React.ComponentProps<typeof CategoriesPage>;
 
@@ -16,28 +16,16 @@ export const CategoriesContext = (props: CategoriesContextProps): React.ReactEle
   return <CategoriesPage {...props} />;
 };
 
-const formatCategoryParentEventMismatch = (
-  categoryId: EventCategoryId,
-  event: NonNullable<CategoriesPageProps['catalog']['events'][number]>
-): string => {
-  return [
-    `Category ${categoryId} is displayed for the selected event but is not listed in the parent event ${event.id} categoryIds.`,
-    `Parent event: id=${event.id}, name=${event.name}, date=${event.date}, format=${event.format}.`,
-    `Parent event categoryIds: ${event.categoryIds.length > 0 ? event.categoryIds.join(', ') : '(none)'}.`,
-  ].join(' ');
-};
-
 export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement => {
-  const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId) ??
-    props.catalog.events.find((event) => event.id === props.catalog.activeEventId) ??
+  const selectedEvent = props.catalog.events.find((event) => event.id.toString() === props.selectedEventId?.toString()) ??
+    props.catalog.events.find((event) => event.id.toString() === props.catalog.activeEventId?.toString()) ??
     props.catalog.events[0];
-  const eventCategories = dedupeCategoriesForDisplay(getCategoriesForEvent(props.catalog, selectedEvent?.id));
-  const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
-  const selectedCategory = eventCategories.find((category) => category.id === props.selectedCategoryId) ?? eventCategories[0];
-  const categoryParentEventMismatch = selectedEvent && selectedCategory && !selectedEvent.categoryIds.includes(selectedCategory.id)
-    ? formatCategoryParentEventMismatch(selectedCategory.id.toString(), selectedEvent)
-    : undefined;
-  const loggedParentEventMismatchKeys = React.useRef<Set<string>>(new Set());
+  const categoriesForEvent = getCategoriesForEvent(props.catalog, selectedEvent?.id?.toString());
+  const eventCategories = dedupeCategoriesForDisplay(categoriesForEvent);
+  const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id?.toString());
+  const selectedCategory = eventCategories.find((category) => category.id.toString() === props.selectedCategoryId?.toString()) ?? eventCategories[0];
+  const assignedSessionIds = getCategoryAssignedSessionIds(selectedCategory, eventSessions);
+  const categorySessions = eventSessions.filter((session) => assignedSessionIds.has(session.id.toString()));
 
   const [formError, setFormError] = React.useState<string | undefined>(undefined);
   const [categoryDraft, setCategoryDraft] = React.useState<CategoryDraft>(getCategoryDraft(selectedCategory));
@@ -52,20 +40,6 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
     setSavedCategoryDraft(selectedCategoryDraft);
     setFormError(undefined);
   }, [selectedCategoryDraft]);
-
-  React.useEffect(() => {
-    if (!categoryParentEventMismatch || !selectedEvent || !selectedCategory) {
-      return;
-    }
-
-    const mismatchKey = `${selectedEvent.id}:${selectedCategory.id}`;
-    if (loggedParentEventMismatchKeys.current.has(mismatchKey)) {
-      return;
-    }
-
-    loggedParentEventMismatchKeys.current.add(mismatchKey);
-    props.onDisplayError?.('Categories', new Error(categoryParentEventMismatch));
-  }, [categoryParentEventMismatch, props, selectedCategory, selectedEvent]);
 
   const buildCategoryChanges = (): CategoryChanges => {
     let distanceRule: CategoryDistanceRule;
@@ -168,7 +142,6 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
         />
         <CategoryDetailsPanel
           categoryDraft={categoryDraft}
-          categoryParentEventMismatch={categoryParentEventMismatch}
           eventSessions={eventSessions}
           formError={formError}
           onDeleteCategory={() => selectedEvent && selectedCategory && requestFormExit(() => props.onDeleteCategory(selectedEvent.id, selectedCategory.id.toString()))}
@@ -179,7 +152,14 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
           selectedCategory={selectedCategory}
           warningModal={warningModal}
         />
-        <EntrantsInCategoryPanel entrants={props.entrants} />
+        <div className="event-summary-column">
+          <SessionListPanel
+            emptyText="No sessions are currently assigned to this category."
+            sessions={categorySessions}
+            title="Sessions for Category"
+          />
+          <EntrantsInCategoryPanel entrants={props.entrants} />
+        </div>
       </div>
     </section>
   );

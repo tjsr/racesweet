@@ -82,5 +82,29 @@ describe('CategoryListPanel', () => {
 
     expect(container.querySelector('div.events-list-item')).toBeTruthy();
     expect(container.textContent).toContain('Premier');
+
+    const onAction = vi.fn();
+    root?.unmount();
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <CategoryListPanel
+          categoryAction={() => ({ label: 'Add to session', onClick: onAction })}
+          categories={[category]}
+          selectedCategoryIds={[category.id]}
+        />,
+      );
+    });
+
+    expect(container.querySelector('div.events-list-item.selected')).toBeTruthy();
+    const actionButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Add to session');
+    expect(actionButton).toBeDefined();
+
+    await act(async () => {
+      actionButton!.click();
+    });
+
+    expect(onAction).toHaveBeenCalledOnce();
   });
 });

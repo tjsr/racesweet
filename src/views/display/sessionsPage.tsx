@@ -6,6 +6,7 @@ import {
   getCategoriesForEvent,
   getSessionsForEvent,
 } from '../../app/eventCatalog.js';
+import { type SessionSourceReloadMode } from '../../app/sessionSourceReload.js';
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
 import { type EventCategoryId } from '../../model/eventcategory.js';
 import { EventId, SessionId } from '../../model/raceevent.js';
@@ -22,6 +23,7 @@ interface SessionsPageProps {
   onDeleteSession: (eventId: EventId, sessionId: SessionId) => void | Promise<void>;
   onMakeSessionActive: (eventId: EventId, sessionId: SessionId) => void | Promise<void>;
   onMoveSessionToEvent?: (sessionId: SessionId, eventId: EventId) => void | Promise<void>;
+  onReloadSessionSources: (eventId: EventId, sessionId: SessionId, mode: SessionSourceReloadMode) => void | Promise<void>;
   onSaveSessionCategoryAssignment: (sessionId: SessionId, categoryId: EventCategoryId, assigned: boolean) => void | Promise<void>;
   onSelectEvent: (eventId: EventId) => void;
   onSaveSessionAssignment: (sessionId: SessionId, mode: 'default' | 'specific', sourceIds: string[]) => void | Promise<void>;
@@ -52,7 +54,7 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
     props.catalog.events[0];
   const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
   const selectedSession = eventSessions.find((session) => session.id === props.selectedSessionId) ?? eventSessions[0];
-  const sessionCategories = getCategoriesForEvent(props.catalog, selectedSession?.eventId);
+  const sessionCategories = getCategoriesForEvent(props.catalog, selectedEvent?.id);
   const assignedEventSourceIds = selectedEvent ? getEventAssignedSourceIds(props.config, selectedEvent.id) : [];
   const sessionAssignment = selectedSession ? (props.config.sessionSourceAssignments[selectedSession.id] || { mode: 'default', sourceIds: [] as string[] }) : undefined;
   const effectiveSessionSourceIds = sessionAssignment
@@ -129,6 +131,7 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
               requestFormExit(() => props.onMoveSessionToEvent!(selectedSession.id, eventId));
             }
           } : undefined}
+          onReloadSessionSources={(mode) => selectedEvent && selectedSession && props.onReloadSessionSources(selectedEvent.id, selectedSession.id, mode)}
           onSaveSessionAssignment={(mode, sourceIds) => {
             if (selectedSession) {
               props.onSaveSessionAssignment(selectedSession.id, mode, sourceIds);
@@ -147,11 +150,7 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
         />
         <SessionCategoriesPanel
           categories={sessionCategories}
-          onAssignCategoryToSession={(categoryId) => {
-            if (selectedSession) {
-              props.onSaveSessionCategoryAssignment(selectedSession.id, categoryId, true);
-            }
-          }}
+          eventSessions={eventSessions}
           onRemoveCategoryFromSession={(categoryId) => {
             if (selectedSession) {
               props.onSaveSessionCategoryAssignment(selectedSession.id, categoryId, false);

@@ -205,7 +205,7 @@ describe('sourceApplication', () => {
     }));
   });
 
-  it('rejects pulled race state when participant category parents are unknown', async () => {
+  it('adds a visible missing-category placeholder when participant category parents are unknown', async () => {
     const addCategories = vi.fn(async (_categories: EventCategory[]) => null);
     const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
     const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
@@ -235,10 +235,23 @@ describe('sourceApplication', () => {
         ],
         records: [],
       }
-    )).rejects.toThrow(/references missing category/);
+    )).resolves.toBeUndefined();
 
-    expect(addCategories).not.toHaveBeenCalled();
-    expect(addParticipants).not.toHaveBeenCalled();
-    expect(addRecords).not.toHaveBeenCalled();
+    expect(addCategories).toHaveBeenCalledWith([
+      expect.objectContaining({
+        code: 'MISSING',
+        description: expect.stringContaining('was not found in the reloaded source data'),
+        excludeFromResults: true,
+        id: createCategoryId('missing-category'),
+        name: `Missing category ${createCategoryId('missing-category')}`,
+      }),
+    ]);
+    expect(addParticipants).toHaveBeenCalledWith([
+      expect.objectContaining({
+        categoryId: createCategoryId('missing-category'),
+        id: createEventParticipantId('participant-a'),
+      }),
+    ]);
+    expect(addRecords).toHaveBeenCalled();
   });
 });

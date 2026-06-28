@@ -4,6 +4,7 @@ import {
   type EventCatalogEntrant,
   type EventCatalogState,
   getCategoriesForEvent,
+  getEntrantAssignedSessionIds,
   getEntrantsForEvent,
   getSessionsForEvent,
 } from '../../app/eventCatalog.js';
@@ -14,6 +15,7 @@ import { type RaceState } from '../../model/racestate.js';
 import { EntrantListPanel, getParticipantsForEntrant } from '../panels/entrantList.js';
 import { EntrantDetailsPanel, type EntrantDraft } from '../panels/entrantDetailsPanel.js';
 import { IdentificationPanel } from '../panels/identificationPanel.js';
+import { SessionListPanel } from '../panels/sessionList.js';
 import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
 
 interface EntrantsPageProps {
@@ -25,7 +27,7 @@ interface EntrantsPageProps {
   onSelectEvent: (eventId: EventId) => void;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
   onUpdateParticipantIdentifiers?: (participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: ParticipantIdentifierUpdate[]) => void | Promise<void>;
-  onUpdateEntrant: (entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'sessionIds' | 'teamEntrantId' | 'teamMembers'>>) => void | Promise<void>;
+  onUpdateEntrant: (entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>) => void | Promise<void>;
   raceState?: Partial<RaceState>;
   selectedEntrantId?: EventEntrantId;
   selectedEventId?: EventId;
@@ -156,11 +158,8 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
     setSavedEntrantDraft(selectedEntrantDraft);
   }, [selectedEntrantDraft]);
 
-  const sessionNames = selectedEntrant
-    ? eventSessions
-      .filter((session) => selectedEntrant.sessionIds.includes(session.id))
-      .map((session) => session.name)
-    : [];
+  const selectedEntrantSessionIds = getEntrantAssignedSessionIds(selectedEntrant, eventCategories, eventSessions, eventEntrants);
+  const selectedEntrantSessions = eventSessions.filter((session) => selectedEntrantSessionIds.has(session.id));
   const selectedTeamName = selectedEntrant?.teamEntrantId
     ? teamEntrants.find((team) => team.id === selectedEntrant.teamEntrantId)?.name
     : undefined;
@@ -273,17 +272,23 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           onSetEntrantDraft={setEntrantDraft}
           selectedEntrant={selectedEntrant}
           selectedTeamName={selectedTeamName}
-          sessionNames={sessionNames}
           teamEntrants={teamEntrants}
           teamMembers={selectedTeamMembers}
           warningModal={warningModal}
         />
-        <IdentificationPanel
-          enableMultiplePlates={props.enableMultiplePlates}
-          onUpdateParticipantIdentifiers={props.onUpdateParticipantIdentifiers}
-          participants={identificationParticipants}
-          selectedParticipant={selectedIdentificationParticipant}
-        />
+        <div className="event-summary-column">
+          <SessionListPanel
+            emptyText="No sessions are currently assigned to this entrant."
+            sessions={selectedEntrantSessions}
+            title="Sessions for Entrant"
+          />
+          <IdentificationPanel
+            enableMultiplePlates={props.enableMultiplePlates}
+            onUpdateParticipantIdentifiers={props.onUpdateParticipantIdentifiers}
+            participants={identificationParticipants}
+            selectedParticipant={selectedIdentificationParticipant}
+          />
+        </div>
       </div>
     </section>
   );

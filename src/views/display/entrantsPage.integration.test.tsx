@@ -26,6 +26,16 @@ const setSelectValue = (select: HTMLSelectElement, value: string): void => {
   select.dispatchEvent(new Event('change', { bubbles: true }));
 };
 
+const getPanelByHeading = (container: HTMLElement, headingText: string): HTMLElement => {
+  const heading = Array.from(container.querySelectorAll('h2')).find((item) => item.textContent === headingText);
+  const panel = heading?.closest('section');
+  if (!panel) {
+    throw new Error(`Panel ${headingText} was not rendered.`);
+  }
+
+  return panel as HTMLElement;
+};
+
 const catalog: EventCatalogState = {
   activeEventId: 'event-1',
   categories: [
@@ -33,18 +43,21 @@ const catalog: EventCatalogState = {
       eventId: 'event-1',
       id: 'cat-1',
       name: 'Premier',
+      sessionAssignments: [{ sessionId: 'session-1', startTime: '2026-06-12T09:00:00.000Z' }],
       teamRules: { teamCompositionRules: [] },
     },
     {
       eventId: 'event-2',
       id: 'cat-2',
       name: 'Teams',
+      sessionAssignments: [{ sessionId: 'session-2', startTime: '2026-07-10T09:00:00.000Z' }],
       teamRules: { maxTeamSize: 2, teamCompositionRules: [] },
     },
     {
       eventId: 'event-2',
       id: 'cat-pro',
       name: 'Pro',
+      sessionAssignments: [{ sessionId: 'session-2', startTime: '2026-07-10T09:00:00.000Z' }],
       teamRules: { teamCompositionRules: [] },
     },
   ],
@@ -145,10 +158,10 @@ const catalog: EventCatalogState = {
       format: 'race-weekend',
       id: 'event-1',
       name: 'Winter Round',
-      sessionIds: ['session-1'],
+      sessionIds: ['session-1', 'session-1-practice'],
     },
     {
-      categoryIds: ['cat-2'],
+      categoryIds: ['cat-2', 'cat-pro'],
       date: '2026-07-10',
       entrantIds: ['ent-2'],
       format: 'test-day',
@@ -164,6 +177,14 @@ const catalog: EventCatalogState = {
       kind: 'race',
       name: 'Premier Race',
       scheduledStart: '2026-06-12T09:00:00.000Z',
+      status: 'scheduled',
+    },
+    {
+      eventId: 'event-1',
+      id: 'session-1-practice',
+      kind: 'practice',
+      name: 'Practice',
+      scheduledStart: '2026-06-12T08:00:00.000Z',
       status: 'scheduled',
     },
     {
@@ -291,6 +312,9 @@ describe('EntrantsPage integration', () => {
     const eventSelect = container.querySelector('select[aria-label="Entrants Event"]') as HTMLSelectElement;
     expect(eventSelect.value).toBe('event-1');
     expect(container.textContent).toContain('Pat Rider');
+    let sessionsForEntrantPanel = getPanelByHeading(container, 'Sessions for Entrant');
+    expect(sessionsForEntrantPanel.textContent).toContain('Premier Race');
+    expect(sessionsForEntrantPanel.textContent).not.toContain('Practice');
     const entrantList = container.querySelector('[aria-label="Entrants for selected event"]');
     expect(entrantList?.textContent).not.toContain('ent-1');
     expect(entrantList?.querySelector('.entrant-list-type')?.textContent).toBe('rider');
@@ -301,6 +325,9 @@ describe('EntrantsPage integration', () => {
     });
 
     expect(container.textContent).toContain('Team Blue');
+    sessionsForEntrantPanel = getPanelByHeading(container, 'Sessions for Entrant');
+    expect(sessionsForEntrantPanel.textContent).toContain('Teams Race');
+    expect(sessionsForEntrantPanel.textContent).not.toContain('Premier Race');
     const switchedEntrantList = container.querySelector('[aria-label="Entrants for selected event"]');
     expect(switchedEntrantList?.textContent).toContain('Individual Entrants');
     expect(switchedEntrantList?.textContent).toContain('Teams');

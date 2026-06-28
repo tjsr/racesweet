@@ -273,6 +273,14 @@
   background-color: rgba(127, 127, 127, 0.12);
 }
 
+.session-list-card.readonly {
+  cursor: default;
+}
+
+.session-list-card.readonly:hover {
+  background-color: var(--panel-surface, transparent);
+}
+
 .session-list-card.selected {
   border-color: rgba(0, 0, 0, 0.95);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
@@ -507,6 +515,27 @@
 
 .warning-modal-actions {
   justify-content: flex-end;
+}
+
+.reload-summary-dialog {
+  max-width: 40rem;
+  width: min(100%, 40rem);
+}
+
+.reload-summary-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.reload-summary-table th,
+.reload-summary-table td {
+  border-bottom: 1px solid rgba(127, 127, 127, 0.25);
+  padding: 0.45rem 0.5rem;
+  text-align: right;
+}
+
+.reload-summary-table th:first-child {
+  text-align: left;
 }
 
 @media (max-width: 980px) {

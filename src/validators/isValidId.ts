@@ -1,5 +1,5 @@
-import { isInt } from './isInt.ts';
 import { validate } from 'uuid';
+import { isInt } from './isInt.ts';
 
 export const isValidId = (id: string | number): boolean => {
   if (typeof id === 'number') {

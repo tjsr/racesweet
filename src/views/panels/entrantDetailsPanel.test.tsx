@@ -77,7 +77,6 @@ describe('EntrantDetailsPanel', () => {
           onSetEntrantDraft={() => undefined}
           selectedEntrant={riderEntrant}
           selectedTeamName="Fast Friends"
-          sessionNames={['Race Session']}
           teamEntrants={[teamEntrant]}
           teamMembers={[]}
         />
@@ -86,7 +85,6 @@ describe('EntrantDetailsPanel', () => {
 
     expect(container.textContent).toContain('Entrant Details');
     expect(container.textContent).toContain('First Name');
-    expect(container.textContent).toContain('Race Session');
     expect(container.textContent).toContain('Team: Fast Friends');
 
     const nameInput = container.querySelector<HTMLInputElement>('input[aria-label="Entrant Name"]');
@@ -123,7 +121,6 @@ describe('EntrantDetailsPanel', () => {
           onSaveEntrant={() => undefined}
           onSetEntrantDraft={() => undefined}
           selectedEntrant={teamEntrant}
-          sessionNames={[]}
           teamEntrants={[teamEntrant]}
           teamMembers={['Rider One']}
         />
@@ -133,6 +130,5 @@ describe('EntrantDetailsPanel', () => {
     expect(container.textContent).toContain('Team Details');
     expect(container.textContent).toContain('Team Members');
     expect(container.textContent).toContain('Rider One');
-    expect(container.textContent).toContain('No sessions are assigned.');
   });
 });

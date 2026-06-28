@@ -9,9 +9,12 @@ import {
     createDefaultEventCatalogLedger,
     type EventCatalogLedger,
     type EventCatalogState,
+    getCategoryAssignedSessionIds,
     getCategoriesForEvent,
+    getEntrantAssignedSessionIds,
     getEntrantsForCategory,
     getEntrantsForEvent,
+    getSessionAssignedCategoryIds,
     getSessionsForEvent,
     getTeamsForParticipant,
 } from './eventCatalog.js';
@@ -98,7 +101,7 @@ const expectCatalogStateIdsToBeValid = (state: EventCatalogState): void => {
     entrant.memberParticipantIds.forEach((participantId) => {
       expect(validateUuid(participantId)).toBe(true);
     });
-    entrant.sessionIds.forEach((sessionId) => {
+    (entrant.sessionIds || []).forEach((sessionId) => {
       const session = sessionsById.get(sessionId);
       expect(validateUuid(sessionId)).toBe(true);
       expect(session?.eventId).toBe(entrant.eventId);
@@ -846,6 +849,7 @@ describe('EventCatalogService', () => {
     const event = service.catalog.events.find((item) => item.id === '7b83ad1e-54ba-5f00-9712-1c82d3178640');
     const session = service.catalog.sessions.find((item) => item.id === importedSessionId);
     const entrant = service.catalog.entrants.find((item) => item.id === importedEntrantId);
+    const importedCategory = getCategoriesForEvent(service.catalog, event!.id).find((category) => category.id === importedCategoryId);
     const timingErrorCategory = service.catalog.categories.find((item) => item.name === 'Timing Error List');
 
     expect(service.catalog.activeEventId).toBe(originalActiveEventId);
@@ -867,8 +871,10 @@ describe('EventCatalogService', () => {
       firstName: 'Robert',
       lastName: 'WOOD',
       memberParticipantIds: [importedParticipantId],
-      sessionIds: [importedSessionId],
     }));
+    expect(entrant?.sessionIds).toBeUndefined();
+    expect(Array.from(getCategoryAssignedSessionIds(importedCategory, [session!]))).toEqual([importedSessionId]);
+    expect(Array.from(getEntrantAssignedSessionIds(entrant, getCategoriesForEvent(service.catalog, event!.id), [session!], getEntrantsForEvent(service.catalog, event!.id)))).toEqual([importedSessionId]);
     expect(timingErrorCategory).toEqual(expect.objectContaining({
       excludeFromResults: true,
       name: 'Timing Error List',
@@ -1107,8 +1113,10 @@ describe('EventCatalogService', () => {
       entrantType: 'team',
       memberParticipantIds: [riderOneId, riderTwoId],
       name: 'Fast Friends',
-      sessionIds: [importedSessionId],
     }));
+    expect(teamEntrant?.sessionIds).toBeUndefined();
+    expect(Array.from(getCategoryAssignedSessionIds(importedCategory, getSessionsForEvent(service.catalog, importedEventId)))).toEqual([importedSessionId]);
+    expect(Array.from(getEntrantAssignedSessionIds(teamEntrant, getCategoriesForEvent(service.catalog, importedEventId), getSessionsForEvent(service.catalog, importedEventId), getEntrantsForEvent(service.catalog, importedEventId)))).toEqual([importedSessionId]);
     expect(memberEntrants).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: riderOneId,
@@ -1187,8 +1195,10 @@ describe('EventCatalogService', () => {
       entrantType: 'team',
       id: raceStateTeam!.id,
       name: 'The Evereadys',
-      sessionIds: [importedSessionId],
     }));
+    expect(teamEntrant?.sessionIds).toBeUndefined();
+    expect(Array.from(getCategoryAssignedSessionIds(category, getSessionsForEvent(service.catalog, importedEventId)))).toEqual([importedSessionId]);
+    expect(Array.from(getEntrantAssignedSessionIds(teamEntrant, getCategoriesForEvent(service.catalog, importedEventId), getSessionsForEvent(service.catalog, importedEventId), eventEntrants))).toEqual([importedSessionId]);
     expect([...teamEntrant!.memberParticipantIds].sort()).toEqual(expectedMemberParticipants.map((participant) => participant!.id).sort());
     expect(memberEntrants.every(Boolean)).toBe(true);
     memberEntrants.forEach((memberEntrant) => {
@@ -1389,6 +1399,231 @@ describe('EventCatalogService', () => {
     ]));
   });
 
+  it('links imported categories to their imported sessions while reusing event categories', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+    const importedEventId = createEventId('multi-session-import-event');
+    const firstSessionId = createSessionId('multi-session-import-race-one');
+    const secondSessionId = createSessionId('multi-session-import-race-two');
+    const sharedCategoryId = createCategoryId('multi-session-import-category-shared');
+    const firstOnlyCategoryId = createCategoryId('multi-session-import-category-first-only');
+    const secondOnlyCategoryId = createCategoryId('multi-session-import-category-second-only');
+
+    await service.importApicalRaceState({
+      eventDate: '2026-06-07T01:30:00.000Z',
+      eventId: importedEventId,
+      eventName: 'Imported Race One',
+      raceState: {
+        categories: [
+          {
+            code: 'SHR',
+            description: '',
+            id: 'multi-session-import-category-shared',
+            name: 'Shared',
+          },
+          {
+            code: 'ONE',
+            description: '',
+            id: 'multi-session-import-category-first-only',
+            name: 'Race One Only',
+          },
+        ],
+        participants: [],
+        records: [],
+        teams: [],
+      },
+      sessionId: 'multi-session-import-race-one',
+      timeZone: 'Australia/Sydney',
+    });
+
+    await service.importApicalRaceState({
+      eventDate: '2026-06-07T03:00:00.000Z',
+      eventId: importedEventId,
+      eventName: 'Imported Race Two',
+      raceState: {
+        categories: [
+          {
+            code: 'SHR',
+            description: '',
+            id: 'multi-session-import-category-shared',
+            name: 'Shared',
+          },
+          {
+            code: 'TWO',
+            description: '',
+            id: 'multi-session-import-category-second-only',
+            name: 'Race Two Only',
+          },
+        ],
+        participants: [],
+        records: [],
+        teams: [],
+      },
+      sessionId: 'multi-session-import-race-two',
+      timeZone: 'Australia/Sydney',
+    });
+
+    const eventCategories = getCategoriesForEvent(service.catalog, importedEventId);
+    const eventSessions = getSessionsForEvent(service.catalog, importedEventId);
+    const sharedCategory = eventCategories.find((category) => category.id === sharedCategoryId);
+    const firstOnlyCategory = eventCategories.find((category) => category.id === firstOnlyCategoryId);
+    const secondOnlyCategory = eventCategories.find((category) => category.id === secondOnlyCategoryId);
+
+    expect(eventCategories.map((category) => category.id)).toEqual([
+      sharedCategoryId,
+      firstOnlyCategoryId,
+      secondOnlyCategoryId,
+    ]);
+    expect(eventCategories.filter((category) => category.id === sharedCategoryId)).toHaveLength(1);
+    expect(Array.from(getCategoryAssignedSessionIds(sharedCategory, eventSessions))).toEqual([
+      firstSessionId,
+      secondSessionId,
+    ]);
+    expect(Array.from(getCategoryAssignedSessionIds(firstOnlyCategory, eventSessions))).toEqual([firstSessionId]);
+    expect(Array.from(getCategoryAssignedSessionIds(secondOnlyCategory, eventSessions))).toEqual([secondSessionId]);
+    expect(Array.from(getSessionAssignedCategoryIds(eventCategories, firstSessionId, eventSessions))).toEqual([
+      sharedCategoryId,
+      firstOnlyCategoryId,
+    ]);
+    expect(Array.from(getSessionAssignedCategoryIds(eventCategories, secondSessionId, eventSessions))).toEqual([
+      sharedCategoryId,
+      secondOnlyCategoryId,
+    ]);
+  });
+
+  it('reloads imported race state while replaying manual category and entrant mutations above the refreshed scaffold', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+    const importedEventId = createEventId('reload-source-event');
+    const importedSessionId = createSessionId('reload-source-session');
+    const importedCategoryId = createCategoryId('reload-source-category');
+    const importedEntrantId = createEventEntrantId('reload-source-entrant');
+    const importedParticipantId = createEventParticipantId('reload-source-participant');
+    const importedRecordId = createTimeRecordId('reload-source-record');
+    const importedSourceId = createTimeRecordSourceId('reload-source');
+
+    await service.importApicalRaceState({
+      eventDate: '2026-06-07T01:30:00.000Z',
+      eventId: importedEventId,
+      eventName: 'Reload Source Round',
+      raceState: {
+        categories: [
+          {
+            code: 'A',
+            description: '',
+            id: 'reload-source-category',
+            name: 'A',
+          },
+        ],
+        participants: [
+          {
+            categoryId: 'reload-source-category',
+            currentResult: undefined,
+            entrantId: 'reload-source-entrant',
+            firstname: 'Robert',
+            id: 'reload-source-participant',
+            identifiers: [],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'Wood',
+          },
+        ],
+        records: [
+          {
+            id: 'reload-source-record',
+            recordType: 1,
+            source: 'reload-source',
+            time: new Date('2026-06-07T01:45:00.000Z'),
+          },
+        ],
+      },
+      sessionId: importedSessionId,
+      timeZone: 'Australia/Sydney',
+    });
+    await service.updateCategory(importedCategoryId, { name: 'Manual Category Name' });
+    await service.updateEntrant(importedEntrantId, { firstName: 'Manual', name: 'Manual Rider Name' });
+
+    await service.reloadImportedRaceState(importedEventId, importedSessionId, {
+      categories: [
+        {
+          code: 'A',
+          description: '',
+          id: 'reload-source-category',
+          name: 'A From Source Reload',
+        },
+      ],
+      participants: [
+        {
+          categoryId: 'reload-source-category',
+          currentResult: undefined,
+          entrantId: 'reload-source-entrant',
+          firstname: 'Robert',
+          id: 'reload-source-participant',
+          identifiers: [],
+          lastRecordTime: null,
+          resultDuration: null,
+          surname: 'Wood',
+        },
+      ],
+      records: [
+        {
+          id: 'reload-source-record',
+          recordType: 1,
+          source: 'reload-source',
+          time: new Date('2026-06-07T01:55:00.000Z'),
+        },
+      ],
+      teams: [],
+    });
+
+    const category = service.catalog.categories.find((item) => item.id === importedCategoryId);
+    const entrant = service.catalog.entrants.find((item) => item.id === importedEntrantId);
+    const importedRaceState = service.getImportedRaceState(importedEventId, importedSessionId);
+    const savedLedger = vi.mocked(seededPersistence.save).mock.calls.at(-1)?.[0] as EventCatalogLedger;
+    const finalManualCategoryUpdateIndex = savedLedger.mutations.findLastIndex((mutation) => (
+      mutation.type === 'category-updated' &&
+      mutation.changes.name === 'Manual Category Name'
+    ));
+    const finalManualEntrantUpdateIndex = savedLedger.mutations.findLastIndex((mutation) => (
+      mutation.type === 'entrant-updated' &&
+      mutation.changes.name === 'Manual Rider Name'
+    ));
+    const refreshedImportIndex = savedLedger.mutations.findLastIndex((mutation) => mutation.type === 'race-state-imported');
+
+    expect(category).toEqual(expect.objectContaining({
+      id: importedCategoryId,
+      name: 'Manual Category Name',
+    }));
+    expect(entrant).toEqual(expect.objectContaining({
+      firstName: 'Manual',
+      id: importedEntrantId,
+      name: 'Manual Rider Name',
+    }));
+    expect(importedRaceState).toEqual(expect.objectContaining({
+      categories: [expect.objectContaining({ id: importedCategoryId, name: 'A From Source Reload' })],
+      participants: [expect.objectContaining({ entrantId: importedEntrantId, id: importedParticipantId })],
+      records: [expect.objectContaining({ id: importedRecordId, source: importedSourceId, time: new Date('2026-06-07T01:55:00.000Z') })],
+    }));
+    expect(finalManualCategoryUpdateIndex).toBeGreaterThan(refreshedImportIndex);
+    expect(finalManualEntrantUpdateIndex).toBeGreaterThan(refreshedImportIndex);
+    expect(savedLedger.mutations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        raceState: expect.objectContaining({
+          categories: [expect.objectContaining({ id: importedCategoryId, name: 'A From Source Reload' })],
+        }),
+        type: 'race-state-imported',
+      }),
+      expect.objectContaining({
+        changes: expect.objectContaining({ name: 'Manual Category Name' }),
+        type: 'category-updated',
+      }),
+      expect.objectContaining({
+        changes: expect.objectContaining({ firstName: 'Manual', name: 'Manual Rider Name' }),
+        type: 'entrant-updated',
+      }),
+    ]));
+  });
+
   it('supports entrant detail edits for rider fields and category updates', async () => {
     const seededPersistence = createPersistence(createSeedEventCatalogLedger());
     const service = await EventCatalogService.create(seededPersistence);
@@ -1584,5 +1819,52 @@ describe('applyEventCatalogLedger', () => {
       gender: 'male',
       lastName: 'Rider',
     }));
+  });
+
+  it('keeps deleted historical category versions while exposing only one active category for an ID', () => {
+    const seed = createSeedEventCatalogLedger();
+    const state = applyEventCatalogLedger({
+      ...seed,
+      mutations: [
+        ...seed.mutations,
+        {
+          categoryId: SEED_CLUBMAN_CATEGORY_ID,
+          id: 'mutation-delete-clubman',
+          timestamp: '2026-05-30T11:22:00.000Z',
+          type: 'category-deleted' as const,
+        },
+        {
+          category: {
+            code: 'CLB',
+            eventId: SEED_EVENT_ID,
+            id: SEED_CLUBMAN_CATEGORY_ID,
+            name: 'Clubman Recreated',
+          },
+          id: 'mutation-recreate-clubman',
+          timestamp: '2026-05-30T11:23:00.000Z',
+          type: 'category-created' as const,
+        },
+        {
+          changes: {
+            categoryIds: [SEED_PREMIER_CATEGORY_ID, SEED_CLUBMAN_CATEGORY_ID],
+          },
+          eventId: SEED_EVENT_ID,
+          id: 'mutation-relink-clubman',
+          timestamp: '2026-05-30T11:24:00.000Z',
+          type: 'event-updated' as const,
+        },
+      ],
+    });
+    const categoryVersions = state.categories.filter((category) => category.id === SEED_CLUBMAN_CATEGORY_ID);
+    const activeCategoryVersions = categoryVersions.filter((category) => category.deleted !== true);
+
+    expect(categoryVersions.some((category) => category.deleted === true && category.name !== 'Clubman Recreated')).toBe(true);
+    expect(activeCategoryVersions).toEqual([
+      expect.objectContaining({
+        id: SEED_CLUBMAN_CATEGORY_ID,
+        name: 'Clubman Recreated',
+      }),
+    ]);
+    expect(getCategoriesForEvent(state, SEED_EVENT_ID).filter((category) => category.id === SEED_CLUBMAN_CATEGORY_ID)).toEqual(activeCategoryVersions);
   });
 });

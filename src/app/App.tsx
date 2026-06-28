@@ -17,6 +17,7 @@ import { ResultsContext } from '../views/context/Results.tsx';
 import { SessionsContext } from '../views/context/Sessions.tsx';
 import { SystemContext } from '../views/context/System.tsx';
 import { TimingContext } from '../views/context/Timing.tsx';
+import { ReloadSummaryDialog } from '../views/display/reloadSummaryDialog.tsx';
 import { type UnsavedChangesGuard } from '../views/display/unsavedChangesWarning.tsx';
 import { PulledApicalRaceState, createApicalCatalogEventId, createApicalCatalogSessionId, fetchApicalRaceStateNow, getConfiguredApicalEventId, pullApicalRaceState } from './apicalDataSource.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
@@ -27,6 +28,7 @@ import './index.css';
 import { ElectronJsonRaceAdminPersistence } from './raceAdminPersistence.ts';
 import { RaceAdminService } from './raceAdminService.ts';
 import { selectedCategoriesForParticipants } from './selectionState.ts';
+import { type SessionSourceReloadMode, type SessionSourceReloadSummary, addSessionSourceReloadSummaries, createEmptySessionSourceReloadSummary, isMissingLinkedCategoryPlaceholder, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload } from './sessionSourceReload.ts';
 import { applyPulledRaceStateToSession } from './sourceApplication.ts';
 import { formatErrorForDisplay } from './stackTrace.ts';
 import { type DataSourceConfig, type EventTimeDisplayZoneMode, type SystemConfiguration, createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
@@ -280,6 +282,7 @@ export const RaceSweetMainApp = () => {
   const [timingRaceState, setTimingRaceState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [timingSessionSelection, setTimingSessionSelection] = useState<TimingSessionSelection>('active');
   const [timingErrorState, setTimingErrorState] = useState<Error|undefined>(undefined);
+  const [reloadSummary, setReloadSummary] = useState<SessionSourceReloadSummary|undefined>(undefined);
   const unsavedChangesGuards = useRef<Partial<Record<AppSection, UnsavedChangesGuard>>>({});
   const setUnsavedChangesGuard = useCallback((section: AppSection, guard: UnsavedChangesGuard | undefined): void => {
     unsavedChangesGuards.current[section] = guard;
@@ -608,6 +611,94 @@ export const RaceSweetMainApp = () => {
     return targetSessionState;
   };
 
+  const pullAssignedSessionSourceRaceState = async (eventId: EventId, sessionId: SessionId): Promise<Partial<RaceState>> => {
+    const sourceIds = getSessionAssignedSourceIds(systemConfigState, eventId, sessionId);
+    const sources = systemConfigState.dataSources.filter((source) => source.enabled && sourceIds.includes(source.id));
+    const pulledRaceStates: Partial<RaceState>[] = [];
+
+    for (const source of sources) {
+      if (source.type !== 'api-apical-data-file' && source.type !== 'api-apical-excel-file') {
+        continue;
+      }
+
+      pulledRaceStates.push(await pullApicalRaceState(source, eventId, {
+        localStorageDirectoryPath: systemConfigState.localStorageDirectoryPath,
+        timeZone: getEventTimeZone(eventId),
+      }));
+    }
+
+    return mergePulledRaceStates(pulledRaceStates);
+  };
+
+  const reloadSessionSources = async (eventId: EventId, sessionId: SessionId, mode: SessionSourceReloadMode): Promise<SessionSourceReloadSummary | undefined> => {
+    if (!validateUuid(eventId)) {
+      throw new Error(`Invalid eventId provided: ${eventId}`);
+    }
+    if (!validateUuid(sessionId)) {
+      throw new Error(`Invalid sessionId provided: ${sessionId}`);
+    }
+    if (!eventCatalogService) {
+      return undefined;
+    }
+
+    const pulledRaceState = await pullAssignedSessionSourceRaceState(eventId, sessionId);
+    const existingRaceState = eventCatalogService.getImportedRaceState(eventId, sessionId);
+    const nextRaceState = mergeRaceStateForReload(existingRaceState, pulledRaceState, mode);
+    const reloadSummary = summarizeSessionSourceReload(existingRaceState, nextRaceState, mode);
+    const missingCategoryWarnings = (nextRaceState.categories || [])
+      .filter((category) => isMissingLinkedCategoryPlaceholder(category))
+      .map((category) => category.description || `${category.name} could not be found.`);
+    const catalog = await eventCatalogService.reloadImportedRaceState(
+      eventId,
+      sessionId,
+      nextRaceState,
+      eventCatalogService.getImportedRaceStateMetadata(eventId, sessionId)?.apicalDataFilePath,
+      getMasterEntrantProfilesForEvent(systemConfigState, eventId)
+    );
+    const targetSessionState = createEmptySessionState();
+    await applyPulledRaceStateToSession(targetSessionState, nextRaceState);
+    adminService?.applyChangesToSessionById(targetSessionState, sessionId);
+
+    if (eventCatalogState?.activeEventId === eventId && eventCatalogState.activeSessionId === sessionId) {
+      setSessionState(targetSessionState);
+    }
+    if (selectedTimingEventId === eventId && selectedTimingSessionId === sessionId) {
+      setTimingRaceState(targetSessionState);
+    }
+    if (selectedAnalyticsEventId === eventId && selectedAnalyticsSessionId === sessionId) {
+      setAnalyticsRaceState(targetSessionState);
+    }
+    setRecordSelectedParticipants(new Set<EventParticipantId>());
+    setCategorySelected(new Set<EventCategoryId>());
+    setRecordSelectedCategories(new Set<EventCategoryId>());
+    if (missingCategoryWarnings.length > 0) {
+      setLoadWarnings((warnings) => Array.from(new Set([...warnings, ...missingCategoryWarnings])));
+    }
+    updateEventCatalogState(catalog, eventId, sessionId, selectedCategoryId);
+    setRenderTick((tick) => tick + 1);
+    return reloadSummary;
+  };
+
+  const reloadSessionsLinkedToSource = async (sourceId: string): Promise<SessionSourceReloadSummary | undefined> => {
+    if (!eventCatalogState) {
+      return undefined;
+    }
+
+    const linkedSessions = eventCatalogState.sessions.filter((session) => {
+      return getSessionAssignedSourceIds(systemConfigState, session.eventId, session.id).includes(sourceId);
+    });
+    let summary = createEmptySessionSourceReloadSummary();
+
+    for (const session of linkedSessions) {
+      const sessionSummary = await reloadSessionSources(session.eventId, session.id, 'all');
+      if (sessionSummary) {
+        summary = addSessionSourceReloadSummaries(summary, sessionSummary);
+      }
+    }
+
+    return summary;
+  };
+
   const loadTimingSession = async (eventId: EventId, sessionId: SessionId): Promise<void> => {
     if (!validateUuid(eventId)) {
       throw new Error(`Invalid eventId provided: ${eventId}`);
@@ -793,6 +884,12 @@ export const RaceSweetMainApp = () => {
       <main className="section-content">
         {content}
       </main>
+      {reloadSummary ? (
+        <ReloadSummaryDialog
+          onClose={() => setReloadSummary(undefined)}
+          summary={reloadSummary}
+        />
+      ) : null}
     </div>
   );
 
@@ -992,7 +1089,10 @@ export const RaceSweetMainApp = () => {
     eventCatalogState.events[0];
   const activeEventSessions = getSessionsForEvent(eventCatalogState, activeEvent?.id);
   const selectedCategoryEventId = selectedCategoriesEventId || eventCatalogState.activeEventId || eventCatalogState.events[0]?.id;
-  const selectedCategoryEntrants = getEntrantsForCategory(eventCatalogState, selectedCategoryEventId, selectedCategoryId);
+  const selectedCategoryEventCategories = getCategoriesForEvent(eventCatalogState, selectedCategoryEventId);
+  const resolvedSelectedCategoryId = selectedCategoryEventCategories.find((category) => category.id.toString() === selectedCategoryId)?.id.toString() ??
+    selectedCategoryEventCategories[0]?.id.toString();
+  const selectedCategoryEntrants = getEntrantsForCategory(eventCatalogState, selectedCategoryEventId, resolvedSelectedCategoryId);
   const selectedEntrantsResolvedEventId = selectedEntrantsEventId || eventCatalogState.activeEventId || eventCatalogState.events[0]?.id;
   const selectedEntrantsResolvedSessionId = selectedEntrantsResolvedEventId
     ? eventCatalogState.activeEventId === selectedEntrantsResolvedEventId
@@ -1044,7 +1144,7 @@ export const RaceSweetMainApp = () => {
     displayedAnalyticsRaceState.participants.forEach((participant) => {
       const categoryId = participant.categoryId.toString();
       if (!categoriesById.has(categoryId)) {
-        const category = displayedAnalyticsRaceState.getCategoryById(participant.categoryId);
+        const category = displayedAnalyticsRaceState.categories.find((item) => item.id === participant.categoryId);
         categoriesById.set(categoryId, category?.name || categoryId);
       }
     });
@@ -1121,18 +1221,9 @@ export const RaceSweetMainApp = () => {
               return;
             }
 
-            const apicalEventId = source.apiConfig?.selectedEventIds[0] || source.apiConfig?.apicalEventId;
-            const importEventId = apicalEventId ? createApicalCatalogEventId(apicalEventId) : undefined;
-            return fetchApicalRaceStateNow(source, {
-              cachedSpreadsheetOnly: true,
-              localStorageDirectoryPath: systemConfigState.localStorageDirectoryPath,
-              preferCachedSpreadsheet: true,
-              timeZone: getEventTimeZone(importEventId),
-            })
-              .then(async (importData: PulledApicalRaceState) => {
-                const catalog = await eventCatalogService.importApicalRaceState(importData);
-                updateEventCatalogState(catalog, importData.eventId, importData.sessionId);
-              });
+            return reloadSessionsLinkedToSource(sourceId).then((summary) => {
+              setReloadSummary(summary);
+            });
           }}
           onLoadApicalEvents={(sourceId) => {
             if (!systemConfigService) {
@@ -1316,6 +1407,13 @@ export const RaceSweetMainApp = () => {
               updateEventCatalogState(catalog, eventId, sessionId, selectedCategoryId);
             }).catch((error: unknown) => setErrorState(error as Error));
           }}
+          onReloadSessionSources={(eventId, sessionId, mode) => {
+            reloadSessionSources(eventId, sessionId, mode).then((summary) => {
+              setReloadSummary(summary);
+            }).catch((error: unknown) => {
+              setErrorState(error as Error);
+            });
+          }}
           onSelectEvent={selectSessionsEvent}
           onSaveSessionAssignment={(sessionId, mode, sourceIds) => {
             if (!systemConfigService) {
@@ -1418,7 +1516,7 @@ export const RaceSweetMainApp = () => {
               updateEventCatalogState(catalog, selectedCategoryEventId, selectedSessionId, categoryId);
             });
           }}
-          selectedCategoryId={selectedCategoryId}
+          selectedCategoryId={resolvedSelectedCategoryId}
           selectedEventId={selectedCategoryEventId}
         />
       );

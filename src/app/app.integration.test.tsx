@@ -131,6 +131,7 @@ vi.mock('./views/timing/recentRecords', async () => {
 });
 
 const SEED_QUALIFYING_SESSION_ID = createSessionId('session-1-qualifying');
+const SEED_RACE_SESSION_ID = createSessionId('session-1-race');
 const UUID_TEXT_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const readFixtureBuffer = async (filePath: string): Promise<Buffer> => {
@@ -747,7 +748,7 @@ describe('RaceSweetMainApp integration', () => {
 
     await waitForLoadedApp(container);
     await clickSectionButton(container, 'Entrants');
-    await waitForText(container, 'Individual Entrants');
+    await waitForText(container, 'Entrant List');
 
     const individualCards = getIndividualEntrantCards(container)
       .filter((card) => card.querySelector('.entrant-race-number'));
@@ -1386,8 +1387,148 @@ describe('RaceSweetMainApp integration', () => {
       });
     }
 
-    expect(writtenFiles.filter((write) => write.filePath.includes('event-catalog.json')).length).toBeGreaterThanOrEqual(catalogWriteCountBeforeReprocess);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(writtenFiles.filter((write) => write.filePath.includes('event-catalog.json')).length).toBeGreaterThan(catalogWriteCountBeforeReprocess);
+    expect(fetchMock).toHaveBeenCalled();
+    await waitForText(container, 'Data Reloaded');
+    const reloadRows = Array.from(container.querySelectorAll('table[aria-label="Reload summary"] tbody tr')).map((row) => (
+      Array.from(row.querySelectorAll('th, td')).map((cell) => cell.textContent || '')
+    ));
+    const categorySummaryRow = reloadRows.find((row) => row[0] === 'Categories');
+    const crossingSummaryRow = reloadRows.find((row) => row[0] === 'Crossings');
+    expect(Number(categorySummaryRow?.[3] || 0)).toBeGreaterThan(0);
+    expect(Number(crossingSummaryRow?.[3] || 0)).toBeGreaterThan(0);
+  });
+
+  it('reprocesses every session linked to the Apical data source', async () => {
+    const { apicalData } = await createApicalImportExpectations();
+    const apicalDataFilePath = getCachedApicalExcelFilePath(1001);
+    const cachedWorkbook = await createApicalWorkbookBuffer(apicalData);
+    const writtenFiles: Array<{ content: string; dataType?: string; filePath: string }> = [];
+
+    const requestFileContent = async (filePath: string, _dataType: string): Promise<string> => {
+      if (filePath.includes('event-catalog.json')) {
+        return JSON.stringify(createSeedEventCatalogLedger());
+      }
+
+      if (filePath.includes('system-config.json')) {
+        return JSON.stringify({
+          dataSources: [
+            {
+              apiConfig: {
+                apicalEventId: 1001,
+                authHeaderName: 'Authorization',
+                authHeaderValue: 'Bearer token',
+                baseUrl: 'https://apical.example.com',
+                companyId: 2,
+                httpTimeoutSeconds: 10,
+                live: false,
+                pollIntervalSeconds: 30,
+                selectedEventIds: [1001],
+              },
+              apicalDataFilePath,
+              dataLastRetrieved: '2026-06-08T09:10:11.123Z',
+              enabled: true,
+              id: 'source-apical',
+              listedEvents: [
+                {
+                  eventDate: '2025-06-06T00:00:00.000Z',
+                  id: 1001,
+                  name: 'Apical Downloaded Round',
+                },
+              ],
+              name: 'Apical Source',
+              type: 'api-apical-excel-file',
+            },
+          ],
+          eventSourceAssignments: {},
+          schemaVersion: 1,
+          sessionSourceAssignments: {
+            [SEED_QUALIFYING_SESSION_ID]: {
+              mode: 'specific',
+              sourceIds: ['source-apical'],
+            },
+            [SEED_RACE_SESSION_ID]: {
+              mode: 'specific',
+              sourceIds: ['source-apical'],
+            },
+          },
+        });
+      }
+
+      if (filePath.includes('admin-overrides.json')) {
+        return JSON.stringify({ entrantCategories: {}, excludedCrossings: {}, schemaVersion: 1 });
+      }
+
+      throw new Error(`Unknown generated file requested: ${filePath}`);
+    };
+
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string, dataType?: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer: async (filePath: string): Promise<Buffer> => {
+        if (filePath === apicalDataFilePath) {
+          return cachedWorkbook;
+        }
+
+        return readFixtureBuffer(filePath);
+      },
+      requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async (filePath: string, content: string, dataType?: string) => {
+        writtenFiles.push({ content, dataType, filePath });
+      },
+    };
+    const fetchMock = mockApicalExcelFetch(apicalData);
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    await clickButtonByText(container, 'Reprocess data');
+
+    let latestCatalogWrite: { content: string; dataType?: string; filePath: string } | undefined;
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      latestCatalogWrite = writtenFiles
+        .filter((write) => write.filePath.includes('event-catalog.json'))
+        .at(-1);
+
+      if (
+        latestCatalogWrite?.content.includes('"type":"race-state-imported"') &&
+        latestCatalogWrite.content.includes(SEED_QUALIFYING_SESSION_ID) &&
+        latestCatalogWrite.content.includes(SEED_RACE_SESSION_ID)
+      ) {
+        break;
+      }
+
+      await act(async () => {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 10);
+        });
+      });
+    }
+
+    expect(latestCatalogWrite).toBeDefined();
+    const persistedLedger = JSON.parse(latestCatalogWrite!.content) as { mutations: Array<{ sessionId?: string; type: string }> };
+    const reloadedSessionIds = persistedLedger.mutations
+      .filter((mutation) => mutation.type === 'race-state-imported')
+      .map((mutation) => mutation.sessionId);
+    expect(reloadedSessionIds).toEqual(expect.arrayContaining([
+      SEED_QUALIFYING_SESSION_ID,
+      SEED_RACE_SESSION_ID,
+    ]));
+    expect(fetchMock).toHaveBeenCalled();
+    await waitForText(container, 'Data Reloaded');
+    const reloadSummaryTable = container.querySelector('table[aria-label="Reload summary"]');
+    expect(reloadSummaryTable).toBeTruthy();
+    expect(reloadSummaryTable?.textContent).toContain('Categories');
+    expect(reloadSummaryTable?.textContent).toContain('Participants');
+    expect(reloadSummaryTable?.textContent).toContain('Teams');
+    expect(reloadSummaryTable?.textContent).toContain('Flag records');
+    expect(reloadSummaryTable?.textContent).toContain('Crossings');
   });
 
   it('renames a default Apical source to the fetched event name when event data is retrieved', async () => {

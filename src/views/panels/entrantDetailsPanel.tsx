@@ -23,7 +23,6 @@ interface EntrantDetailsPanelProps {
   onSetEntrantDraft: React.Dispatch<React.SetStateAction<EntrantDraft>>;
   selectedEntrant?: EventCatalogEntrant;
   selectedTeamName?: string;
-  sessionNames: string[];
   teamEntrants: EventCatalogEntrant[];
   teamMembers: string[];
   warningModal?: React.ReactNode;
@@ -136,10 +135,6 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
             ))}
           </select>
         </label>
-        <section className="readonly-summary-section">
-          <h3>Sessions</h3>
-          <ReadOnlyList emptyText="No sessions are assigned." items={props.sessionNames} />
-        </section>
         {props.selectedEntrant.entrantType === 'rider' && props.selectedTeamName ? (
           <p className="readonly-summary">Team: {props.selectedTeamName}</p>
         ) : null}
