@@ -26,7 +26,7 @@ Place all files in the following locations:
 Use the following table to determine how to persist changes. Each data type specifies the required service layer, whether an immutable ledger mutation is required, whether the state must be rebuilt from the ledger, and whether an upstream callback must fire:
 
 | Data Type | Service Layer | Persist Immediately | Ledger Mutation | State Rebuild | Upstream Callback | Notes |
-|-----------|---------------|-------------------|-----------------|----------------|-------------------|-------|
+| ----------- | --------------- | ------------------- | ----------------- | ---------------- | ------------------- | ------- |
 | Race admin (entrant/category properties) | `RaceAdminService` | Yes | No | No | No | Do not perform direct in-memory mutations from UI/controller; go through service layer. Reapply on load. |
 | Event & session metadata | `EventCatalogService` | Yes | Yes (immutable) | Yes (rebuild active-event) | Yes (configured callback) | Append immutable ledger mutations, persist, rebuild state from ledger on load. |
 | Event/category/session UI displays | `EventCatalogService` | Via parent operation | Derived | Derived | Derived | Use scoped selectors and read-only summaries; do not expose raw IDs as editable fields when app can provide dropdown/multi-select. |
