@@ -6,6 +6,7 @@ import { createCategoryId, createEventParticipantId, createTimeRecordId, createT
 import { RECORD_TX_CROSSING } from './timerecord.js';
 import { Session } from './racestate.js';
 import { createGreenFlagEvent } from '../controllers/flag.js';
+import { useStderrGuard } from '../testing/stderrGuard.js';
 
 const createCategory = (id: string, name: string): EventCategory => {
   return { id, name };
@@ -117,6 +118,8 @@ const createSessionWithProcessedLaps = async (): Promise<{
 };
 
 describe('Session category change regressions', () => {
+  useStderrGuard();
+
   it('keeps elapsed and lap times available for all riders after one rider category changes', async () => {
     const fixture = await createSessionWithProcessedLaps();
 
@@ -132,7 +135,6 @@ describe('Session category change regressions', () => {
   });
 
   it('demonstrates why rebuilding Session after category change breaks lap display caches', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const fixture = await createSessionWithProcessedLaps();
 
     fixture.session.updateParticipantCategory(fixture.participant1Id, fixture.categoryBId);
@@ -146,7 +148,6 @@ describe('Session category change regressions', () => {
 
     expect(rebuiltSession.getParticipantLaps(fixture.participant1Id)).toBeUndefined();
     expect(rebuiltSession.getParticipantLaps(fixture.participant2Id)).toBeUndefined();
-    expect(warnSpy).toHaveBeenCalledTimes(2);
   });
 
   it('reprocesses laps when a flag category is assigned and removed', async () => {

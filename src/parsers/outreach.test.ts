@@ -2,6 +2,7 @@ import { parseFile, parseOutreachLine, parseSimpleOutreachChipLine } from "./out
 
 import type { UnsourcedOutreachChipCrossingData } from "./outreach.js";
 import path from 'node:path';
+import { useStderrGuard } from "../testing/stderrGuard.js";
 
 const testdata_dir = path.resolve(path.join('.', 'src', 'testdata'));
 // const dateHint: TZDate = new TZDate();
@@ -19,10 +20,9 @@ const _timeToExpectation = (time: Date) => {
 };
 
 describe('Read in a full outreach file', () => {
-  it('should parse the file correctly', { timeout: 10000 }, async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  useStderrGuard();
 
+  it('should parse the file correctly without warning for expected empty lines', { timeout: 10000 }, async () => {
     const dataFile = '192.168.1.119 2025-03-03.txt';
     let filePath = path.join(testdata_dir, dataFile);
     if (filePath.startsWith('\\')) {

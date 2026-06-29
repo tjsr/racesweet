@@ -84,8 +84,6 @@ export const dateAndTimeStringToDate = (date: string, time: string, dateHint: TZ
   const hasUtcZ = time.endsWith('Z');
   const cleanTime = time.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
   const [hour, minute, second, millisecond] = cleanTime.split(/[:.]/).map(Number);
-  console.debug(dateAndTimeStringToDate, hour, minute, second, millisecond);
-
   const usedTz = hasUtcZ ? 'UTC' : (dateHint.timeZone || (isNaN(dateHint.getTime()) ? 'UTC' : getUserTimezone()));
   const output = new TZDate(year, month - 1, day, hour || 0, minute || 0, second || 0, millisecond || 0, usedTz);
   return output;
@@ -93,7 +91,6 @@ export const dateAndTimeStringToDate = (date: string, time: string, dateHint: TZ
 
 export const dateAndTimeStringToIsoFormat = (date: string, time: string, dateHint: TZDate): RFC3339DateStamp => {
   const parsed = dateAndTimeStringToDate(date, time, dateHint);
-  console.debug(dateAndTimeStringToIsoFormat, date, time, parsed);
   return formatRFC3339(parsed, { fractionDigits: 3 });
 };
 
@@ -124,7 +121,6 @@ export const parseUnknownDateTimeString = (input: string, eventDateHint: TZDate)
   const parsedIso = parseISO(input, { in: parseTz });
 
   if (parsedIso && !isNaN(parsedIso.getTime())) {
-    console.debug(parseUnknownDateTimeString, 'Returning parsed ISO date:', parsedIso.toISOString());
     // If the input is a valid ISO 8601 date, return it
     return parsedIso;
   }

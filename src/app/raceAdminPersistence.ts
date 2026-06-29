@@ -86,6 +86,29 @@ const createPermissionWarning = (filePath: string, action: 'read' | 'write'): st
   return `RaceSweet cannot ${verb} ${filePath} because Windows denied file access. Close any app locking that file/folder and ensure your user account has read/write permission.`;
 };
 
+const reportRecoverableError = (
+  onError: ((error: unknown) => void) | undefined,
+  message: string,
+  error: unknown
+): void => {
+  if (onError) {
+    onError(error);
+    return;
+  }
+  console.error(message, error);
+};
+
+const reportRecoverableWarning = (
+  onError: ((error: unknown) => void) | undefined,
+  warning: string
+): void => {
+  if (onError) {
+    onError(warning);
+    return;
+  }
+  console.warn(warning);
+};
+
 export class ElectronJsonRaceAdminPersistence implements RaceAdminPersistence {
   private readonly filePath: string;
   private readonly onError: ((error: unknown) => void) | undefined;
@@ -120,11 +143,9 @@ export class ElectronJsonRaceAdminPersistence implements RaceAdminPersistence {
         console.info(`Admin overrides file not found at ${this.filePath}, using defaults.`);
       } else if (isPermissionDeniedError(error)) {
         const warning = createPermissionWarning(this.filePath, 'read');
-        console.warn(warning);
-        this.onError?.(warning);
+        reportRecoverableWarning(this.onError, warning);
       } else {
-        console.error(`Failed to load admin overrides from ${this.filePath}:`, error);
-        this.onError?.(error);
+        reportRecoverableError(this.onError, `Failed to load admin overrides from ${this.filePath}:`, error);
       }
       return createDefaultAdministrativeChanges();
     }
@@ -137,8 +158,7 @@ export class ElectronJsonRaceAdminPersistence implements RaceAdminPersistence {
     } catch (error: unknown) {
       if (isPermissionDeniedError(error)) {
         const warning = createPermissionWarning(this.filePath, 'write');
-        console.warn(warning);
-        this.onError?.(warning);
+        reportRecoverableWarning(this.onError, warning);
         return;
       }
       throw error;

@@ -48,7 +48,6 @@ export const splitDateTime = (input: string, tzhint?: string): { isoDate?: Date;
       ? parseWithTimezoneHint(input, tzhint)
       : new TZDate(input, hasInputTz ? undefined : tzhint);
     if (!isNaN(isoDate.getTime())) {
-      console.log('Returning acceptable ISO time.', input, isoDate);
       const outputInUtc = hasInputTz || tzhint !== undefined;
       const formatTarget = outputInUtc ? TZDate.tz('UTC', isoDate) : isoDate;
       const rfcDateString = formatRFC3339(formatTarget, { fractionDigits: 3 });
@@ -69,9 +68,7 @@ export const splitDateTime = (input: string, tzhint?: string): { isoDate?: Date;
 
   const dateTimeParts = input.includes('T') ? input.split('T') : input.split(' ');
 
-  if (input.includes('T')) {
-    console.warn(`Input ${input} contains T but was not parsed as an ISO8601 DateTime.`);
-  } else if (!input.includes(' ')) {
+  if (!input.includes('T') && !input.includes(' ')) {
     throw new InvalidDateTimeStringError(`Invalid date/time format - missing space or T separator: '${input}'`);
   }
 

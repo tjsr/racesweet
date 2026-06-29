@@ -4,10 +4,13 @@ import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.j
 import { EventCatalogService } from './eventCatalogService.js';
 import { createDefaultEventCatalogLedger } from './eventCatalog.js';
 import { createEventId, createId } from '../model/ids.js';
+import { useStderrGuard } from '../testing/stderrGuard.js';
 
 const eventCatalogTestPath = '../../test/generated/event-catalog.test.json';
 
 describe('ElectronJsonEventCatalogPersistence', () => {
+  useStderrGuard();
+
   afterEach(() => {
     delete (window as unknown as { api?: unknown }).api;
     vi.restoreAllMocks();
@@ -83,7 +86,6 @@ describe('ElectronJsonEventCatalogPersistence', () => {
   });
 
   it('calls onError and returns defaults when file content is invalid JSON', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const requestFileContent = vi.fn(async () => 'not valid json{{{');
 
     (window as unknown as {
@@ -98,7 +100,7 @@ describe('ElectronJsonEventCatalogPersistence', () => {
 
     expect(loaded).toEqual(createDefaultEventCatalogLedger());
     expect(onError).toHaveBeenCalledOnce();
-    expect(errorSpy).toHaveBeenCalledOnce();
+    expect(onError.mock.calls[0][0]).toBeInstanceOf(SyntaxError);
   });
 
   it('returns normalized parsed ledger when file exists and is valid', async () => {
@@ -158,7 +160,6 @@ describe('ElectronJsonEventCatalogPersistence', () => {
   });
 
   it('reports save permission errors without throwing', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const writeFileContent = vi.fn(async () => {
       throw new Error('EPERM: operation not permitted');
     });
@@ -174,7 +175,7 @@ describe('ElectronJsonEventCatalogPersistence', () => {
 
     await expect(persistence.save(createDefaultEventCatalogLedger())).resolves.toBeUndefined();
     expect(onError).toHaveBeenCalledOnce();
-    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(onError.mock.calls[0][0]).toContain('Windows denied file access');
   });
 
   it('writes the event catalog ledger to the configured event data file', async () => {

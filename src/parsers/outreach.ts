@@ -62,7 +62,6 @@ const parseOutreachFile = async  (filePath: PathLike): Promise<ChipCrossingData[
       lineNumber++;
       try {
         if (!line || line.trim() == '') {
-          console.warn('Skipping empty line');
           continue;
         } else if (line.startsWith('#')) {
           continue;
@@ -91,10 +90,7 @@ const parseOutreachFile = async  (filePath: PathLike): Promise<ChipCrossingData[
         }
       }
     }
-    return file.close().then(() => {
-      console.log(parseOutreachFile.name, `Finished parsing and closed outreach data file.  ${unparsedData.length} unparsed crossings returned.`);
-      return unparsedData;
-    });
+    return file.close().then(() => unparsedData);
   });
 };
 

@@ -9,14 +9,12 @@ import {
 } from "./datetime.ts";
 
 import { formatRFC3339 } from "date-fns";
+import { useStderrGuard } from "../../testing/stderrGuard.js";
 
 const dateHint: TZDate = new TZDate();
 const melbourneDateHint: TZDate = new TZDate(new Date('2023-10-01T00:00:00Z'), 'Australia/Melbourne');
 
-beforeEach(() => {
-  vi.spyOn(console, 'debug').mockImplementation(() => undefined);
-  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-});
+useStderrGuard();
 
 describe('hasDateAndTime', () => {
   it('Should match for string with a T separator', () => {

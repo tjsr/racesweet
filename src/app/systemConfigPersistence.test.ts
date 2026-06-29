@@ -2,10 +2,13 @@
 
 import { ElectronJsonSystemConfigPersistence } from './systemConfigPersistence.js';
 import { createDefaultSystemConfiguration } from './systemConfig.js';
+import { useStderrGuard } from '../testing/stderrGuard.js';
 
 const systemConfigTestPath = '../../test/generated/system-config.test.json';
 
 describe('ElectronJsonSystemConfigPersistence', () => {
+  useStderrGuard();
+
   afterEach(() => {
     delete (window as unknown as { api?: unknown }).api;
     vi.restoreAllMocks();
@@ -51,7 +54,6 @@ describe('ElectronJsonSystemConfigPersistence', () => {
   });
 
   it('calls onError and returns defaults when file content is invalid JSON', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const requestFileContent = vi.fn(async () => 'not valid json{{{');
 
     (window as unknown as {
@@ -66,7 +68,7 @@ describe('ElectronJsonSystemConfigPersistence', () => {
 
     expect(loaded).toEqual(createDefaultSystemConfiguration());
     expect(onError).toHaveBeenCalledOnce();
-    expect(errorSpy).toHaveBeenCalledOnce();
+    expect(onError.mock.calls[0][0]).toBeInstanceOf(SyntaxError);
   });
 
   it('returns parsed config when file exists and is valid', async () => {
@@ -137,7 +139,6 @@ describe('ElectronJsonSystemConfigPersistence', () => {
   });
 
   it('reports save permission errors without throwing', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const writeFileContent = vi.fn(async () => {
       throw new Error('EACCES: access is denied');
     });
@@ -153,6 +154,6 @@ describe('ElectronJsonSystemConfigPersistence', () => {
 
     await expect(persistence.save(createDefaultSystemConfiguration())).resolves.toBeUndefined();
     expect(onError).toHaveBeenCalledOnce();
-    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(onError.mock.calls[0][0]).toContain('Windows denied file access');
   });
 });

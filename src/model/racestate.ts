@@ -332,7 +332,6 @@ export class Session implements RaceState, RaceStateLookup {
       throw new InvalidIdError(`ParticipantId ${participantId} for lookup is not a valid Id type.`);
     }
     if (!this._cachedParticipantLaps) {
-      console.warn("Participant laps have not been processed yet. Please call addParticipants first.");
       return undefined;
     }
     return this._cachedParticipantLaps.get(participantId) ?? null;

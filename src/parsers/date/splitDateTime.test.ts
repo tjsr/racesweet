@@ -2,12 +2,10 @@ import { splitDateTime, timeStringHasTimezone } from "./splitDateTime.js";
 
 import { TZDate } from "@date-fns/tz/date";
 import { parseableDateTimeStrings } from "./parseableDateTimeStrings.js";
+import { useStderrGuard } from "../../testing/stderrGuard.js";
 
 describe("splitDateTime", () => {
-  beforeEach(() => {
-    vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  });
+  useStderrGuard();
 
   it('Should allow a string with a time only, and infer the date as today', () => {
     const testInput = '19:21:17.533';
