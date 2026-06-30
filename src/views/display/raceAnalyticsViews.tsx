@@ -722,6 +722,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     categoryIds: row.categoryIds,
     id: row.entrantId,
     name: row.entrantName,
+    raceNumber: Array.from(new Set(row.memberDetails.map((member) => member.raceNumber))).join(' / '),
   })), [rows]);
 
   const lapChart = React.useMemo(() => {

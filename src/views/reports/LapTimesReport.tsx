@@ -12,6 +12,7 @@ export interface LapTimesReportEntry {
   categoryIds: string[];
   id: string;
   name: string;
+  raceNumber: string;
 }
 
 export interface LapTimesReportProps {
@@ -140,7 +141,7 @@ const TableView = ({ participants, passings, lapsPerBlock }: TableViewProps) => 
                   return (
                     <tr key={p.id}>
                       <td className="participant-num">
-                        {p.id}
+                        {p.raceNumber}
                       </td>
                       <td className="participant-name">
                         {p.name}
