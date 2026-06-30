@@ -1,244 +1,75 @@
 [
   {
+    "Id": 69,
+    "Name": "GMBC Autumn No Frills Round 4",
+    "EventDate": "2026-06-12T00:00:00",
+    "EntryBossEventNumber": 30301,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 68,
+    "Name": "Crazy 6 2026",
+    "EventDate": "2026-05-29T00:00:00",
+    "EntryBossEventNumber": 30298,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 67,
+    "Name": "Autumn NF Round 2",
+    "EventDate": "2026-05-15T00:00:00",
+    "EntryBossEventNumber": 30297,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 66,
+    "Name": "Autumn NF Round 1 2026",
+    "EventDate": "2026-05-02T00:00:00",
+    "EntryBossEventNumber": 30296,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 65,
+    "Name": "Dirt Squirts 2026 Summer Race 5",
+    "EventDate": "2026-04-12T00:00:00",
+    "EntryBossEventNumber": 28788,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 64,
+    "Name": "Dirt Squirts Summer 2026 Round 4",
+    "EventDate": "2026-03-29T00:00:00",
+    "EntryBossEventNumber": 28787,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
     "Id": 62,
     "Name": "Summer NF Round 6",
     "EventDate": "2026-03-20T00:00:00",
     "EntryBossEventNumber": 28783,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_62.xlsx",
-    "EventHandicapData": {
-      "entrantData": [
-        {
-          "medianLapTime": 606.01,
-          "name": "a-sam rayson",
-          "category": "Unknown",
-          "ratioScore": 0.005660464900477936
-        },
-        {
-          "medianLapTime": 604.424,
-          "name": "a-nikolas doumas",
-          "category": "Unknown",
-          "ratioScore": 0
-        },
-        {
-          "medianLapTime": 607.55,
-          "name": "a-stuart kent",
-          "category": "Unknown",
-          "ratioScore": 0.011156754904724937
-        },
-        {
-          "medianLapTime": 614.627,
-          "name": "a-david gray",
-          "category": "Unknown",
-          "ratioScore": 0.036414705787878796
-        },
-        {
-          "medianLapTime": 624.37,
-          "name": "a-yianni doumas",
-          "category": "Unknown",
-          "ratioScore": 0.07118766261345028
-        },
-        {
-          "medianLapTime": 618.754,
-          "name": "a-ashley goldstraw",
-          "category": "Unknown",
-          "ratioScore": 0.05114404919536469
-        },
-        {
-          "medianLapTime": 619.69,
-          "name": "b-dominic burton",
-          "category": "Unknown",
-          "ratioScore": 0.054484651431712425
-        },
-        {
-          "medianLapTime": 634.47,
-          "name": "b-ben lord",
-          "category": "Unknown",
-          "ratioScore": 0.10723475939455168
-        },
-        {
-          "medianLapTime": 640.117,
-          "name": "b-paul sheean",
-          "category": "Unknown",
-          "ratioScore": 0.12738901241661868
-        },
-        {
-          "medianLapTime": 644.633,
-          "name": "b-benjamin williams",
-          "category": "Unknown",
-          "ratioScore": 0.1435067044030995
-        },
-        {
-          "medianLapTime": 645.324,
-          "name": "b-chris fice",
-          "category": "Unknown",
-          "ratioScore": 0.14597289686604387
-        },
-        {
-          "medianLapTime": 664.014,
-          "name": "b-anders stenhouse",
-          "category": "Unknown",
-          "ratioScore": 0.2126778710084979
-        },
-        {
-          "medianLapTime": 678.34,
-          "name": "b-martz keir",
-          "category": "Unknown",
-          "ratioScore": 0.2638076441259294
-        },
-        {
-          "medianLapTime": 643.98,
-          "name": "b-jason luhm",
-          "category": "Unknown",
-          "ratioScore": 0.14117613468051932
-        },
-        {
-          "medianLapTime": 666.114,
-          "name": "c-vince trotter",
-          "category": "Unknown",
-          "ratioScore": 0.22017281192338042
-        },
-        {
-          "medianLapTime": 672.896,
-          "name": "c-steven payne",
-          "category": "Unknown",
-          "ratioScore": 0.2443779020589672
-        },
-        {
-          "medianLapTime": 681.07,
-          "name": "c-ben van duijne",
-          "category": "Unknown",
-          "ratioScore": 0.2735510673152767
-        },
-        {
-          "medianLapTime": 687.706,
-          "name": "c-zac couyant",
-          "category": "Unknown",
-          "ratioScore": 0.2972350806063051
-        },
-        {
-          "medianLapTime": 680.463,
-          "name": "c-eric van dam",
-          "category": "Unknown",
-          "ratioScore": 0.271384672488927
-        },
-        {
-          "medianLapTime": 696.19,
-          "name": "c-jordan wright",
-          "category": "Unknown",
-          "ratioScore": 0.32751464190243035
-        },
-        {
-          "medianLapTime": 691.125,
-          "name": "c-luis goldstraw",
-          "category": "Unknown",
-          "ratioScore": 0.3094375582196303
-        },
-        {
-          "medianLapTime": 694.9365,
-          "name": "c-nick pile",
-          "category": "Unknown",
-          "ratioScore": 0.32304087598014203
-        },
-        {
-          "medianLapTime": 700.6465000000001,
-          "name": "c-david allen",
-          "category": "Unknown",
-          "ratioScore": 0.3434199772296559
-        },
-        {
-          "medianLapTime": 724.213,
-          "name": "c-alan riedel",
-          "category": "Unknown",
-          "ratioScore": 0.4275292748823114
-        },
-        {
-          "medianLapTime": 733.1,
-          "name": "c-scott williams",
-          "category": "Unknown",
-          "ratioScore": 0.45924715103019753
-        },
-        {
-          "medianLapTime": 647.463,
-          "name": "d-reuben mcloughlin",
-          "category": "Unknown",
-          "ratioScore": 0.15360702954077418
-        },
-        {
-          "medianLapTime": 752.1165,
-          "name": "d-oliver kent",
-          "category": "Unknown",
-          "ratioScore": 0.5271174100339412
-        },
-        {
-          "medianLapTime": 772.925,
-          "name": "d-paul durante",
-          "category": "Unknown",
-          "ratioScore": 0.6013833519517181
-        },
-        {
-          "medianLapTime": 773.4665,
-          "name": "d-wayne cossell",
-          "category": "Unknown",
-          "ratioScore": 0.6033159760019129
-        },
-        {
-          "medianLapTime": 804.8215,
-          "name": "d-colin linahan",
-          "category": "Unknown",
-          "ratioScore": 0.7152225819000745
-        },
-        {
-          "medianLapTime": 874.9884999999999,
-          "name": "d-gary jeffery",
-          "category": "Unknown",
-          "ratioScore": 0.9656499719831966
-        },
-        {
-          "medianLapTime": 884.613,
-          "name": "d-chris hird",
-          "category": "Unknown",
-          "ratioScore": 1
-        },
-        {
-          "medianLapTime": 670.573,
-          "name": "ebike-george couyant",
-          "category": "Unknown",
-          "ratioScore": 0.23608706979931396
-        },
-        {
-          "medianLapTime": 683.62,
-          "name": "ebike-david goodall",
-          "category": "Unknown",
-          "ratioScore": 0.28265206699763373
-        },
-        {
-          "medianLapTime": 697.577,
-          "name": "ebike-peter henkel",
-          "category": "Unknown",
-          "ratioScore": 0.3324648719257358
-        },
-        {
-          "medianLapTime": 649.294,
-          "name": "wa-christy harris",
-          "category": "Unknown",
-          "ratioScore": 0.16014190421465507
-        },
-        {
-          "medianLapTime": 709.52,
-          "name": "wa-heidi hunt",
-          "category": "Unknown",
-          "ratioScore": 0.37508967161451723
-        },
-        {
-          "medianLapTime": 753.7465,
-          "name": "wb-dimity gannon",
-          "category": "Unknown",
-          "ratioScore": 0.5329349117916833
-        }
-      ]
-    }
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 63,
+    "Name": "Testing new mats",
+    "EventDate": "2026-03-20T00:00:00",
+    "EntryBossEventNumber": 28783,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 61,
+    "Name": "Dirt Squirts Summer 2026 Round 3",
+    "EventDate": "2026-03-15T00:00:00",
+    "EntryBossEventNumber": 28786,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   },
   {
     "Id": 60,
@@ -246,234 +77,7 @@
     "EventDate": "2026-03-13T00:00:00",
     "EntryBossEventNumber": 28782,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_60.xlsx",
-    "EventHandicapData": {
-      "entrantData": [
-        {
-          "medianLapTime": 750.905,
-          "name": "a-matt palmer",
-          "category": "Unknown",
-          "ratioScore": 0
-        },
-        {
-          "medianLapTime": 759.6435,
-          "name": "a-ryan holmberg",
-          "category": "Unknown",
-          "ratioScore": 0.018423022189427173
-        },
-        {
-          "medianLapTime": 752.4100000000001,
-          "name": "a-sam rayson",
-          "category": "Unknown",
-          "ratioScore": 0.003172929953091465
-        },
-        {
-          "medianLapTime": 790.638,
-          "name": "a-ian kelly",
-          "category": "Unknown",
-          "ratioScore": 0.08376745902071377
-        },
-        {
-          "medianLapTime": 822.5899999999999,
-          "name": "a-mark mathews",
-          "category": "Unknown",
-          "ratioScore": 0.1511305539450797
-        },
-        {
-          "medianLapTime": 820.81,
-          "name": "a-ashley goldstraw",
-          "category": "Unknown",
-          "ratioScore": 0.14737785273810144
-        },
-        {
-          "medianLapTime": 817.662,
-          "name": "a-tristano cristofoli",
-          "category": "Unknown",
-          "ratioScore": 0.1407410530754231
-        },
-        {
-          "medianLapTime": 805.2085,
-          "name": "b-adrian dillon",
-          "category": "Unknown",
-          "ratioScore": 0.11448584831075735
-        },
-        {
-          "medianLapTime": 806.225,
-          "name": "b-david gray",
-          "category": "Unknown",
-          "ratioScore": 0.11662889369103473
-        },
-        {
-          "medianLapTime": 831.9784999999999,
-          "name": "b-benjamin williams",
-          "category": "Unknown",
-          "ratioScore": 0.17092394455278545
-        },
-        {
-          "medianLapTime": 849.415,
-          "name": "b-matt seehusen",
-          "category": "Unknown",
-          "ratioScore": 0.2076846044378854
-        },
-        {
-          "medianLapTime": 850.0045,
-          "name": "b-chris fice",
-          "category": "Unknown",
-          "ratioScore": 0.2089274231803089
-        },
-        {
-          "medianLapTime": 848.6700000000001,
-          "name": "b-paul sheean",
-          "category": "Unknown",
-          "ratioScore": 0.20611395140462782
-        },
-        {
-          "medianLapTime": 851.3865000000001,
-          "name": "b-ben lord",
-          "category": "Unknown",
-          "ratioScore": 0.21184103726347986
-        },
-        {
-          "medianLapTime": 855.6400000000001,
-          "name": "b-phil o'neil",
-          "category": "Unknown",
-          "ratioScore": 0.2208085173667846
-        },
-        {
-          "medianLapTime": 885.713,
-          "name": "c-richard williams",
-          "category": "Unknown",
-          "ratioScore": 0.2842101934327729
-        },
-        {
-          "medianLapTime": 898.9135,
-          "name": "c-oscar durante",
-          "category": "Unknown",
-          "ratioScore": 0.31204026774890636
-        },
-        {
-          "medianLapTime": 897.0765,
-          "name": "c-jarrod james",
-          "category": "Unknown",
-          "ratioScore": 0.30816739577294056
-        },
-        {
-          "medianLapTime": 945.49,
-          "name": "c-anthony vaughan",
-          "category": "Unknown",
-          "ratioScore": 0.4102355979549887
-        },
-        {
-          "medianLapTime": 945.8265,
-          "name": "c-david allen",
-          "category": "Unknown",
-          "ratioScore": 0.410945027143836
-        },
-        {
-          "medianLapTime": 941.4715,
-          "name": "c-eric van dam",
-          "category": "Unknown",
-          "ratioScore": 0.4017635587413693
-        },
-        {
-          "medianLapTime": 960.5515,
-          "name": "c-benjamin stengel",
-          "category": "Unknown",
-          "ratioScore": 0.4419891424656091
-        },
-        {
-          "medianLapTime": 936.136,
-          "name": "c-jordan wright",
-          "category": "Unknown",
-          "ratioScore": 0.39051494228640693
-        },
-        {
-          "medianLapTime": 975.157,
-          "name": "c-andrew noye",
-          "category": "Unknown",
-          "ratioScore": 0.4727813208243294
-        },
-        {
-          "medianLapTime": 1007.75,
-          "name": "c-ben van duijne",
-          "category": "Unknown",
-          "ratioScore": 0.5414958098350288
-        },
-        {
-          "medianLapTime": 1055.277,
-          "name": "c-nick pile",
-          "category": "Unknown",
-          "ratioScore": 0.6416950403204554
-        },
-        {
-          "medianLapTime": 1124.834,
-          "name": "d-paul fletcher",
-          "category": "Unknown",
-          "ratioScore": 0.7883392188900017
-        },
-        {
-          "medianLapTime": 1132.36,
-          "name": "d-paul durante",
-          "category": "Unknown",
-          "ratioScore": 0.8042059769145625
-        },
-        {
-          "medianLapTime": 1225.23,
-          "name": "d-colin linahan",
-          "category": "Unknown",
-          "ratioScore": 1
-        },
-        {
-          "medianLapTime": 806.8915,
-          "name": "ebike-david goodall",
-          "category": "Unknown",
-          "ratioScore": 0.1180340483845464
-        },
-        {
-          "medianLapTime": 870.35,
-          "name": "ebike-anthony speechley",
-          "category": "Unknown",
-          "ratioScore": 0.2518210088019818
-        },
-        {
-          "medianLapTime": 948.123,
-          "name": "ebike-peter henkel",
-          "category": "Unknown",
-          "ratioScore": 0.41578664417856964
-        },
-        {
-          "medianLapTime": 779.5184999999999,
-          "name": "wa-katriina dower",
-          "category": "Unknown",
-          "ratioScore": 0.06032467190217663
-        },
-        {
-          "medianLapTime": 899.1500000000001,
-          "name": "wa-christy harris",
-          "category": "Unknown",
-          "ratioScore": 0.3125388710272495
-        },
-        {
-          "medianLapTime": 981.044,
-          "name": "wa-fiona mathews",
-          "category": "Unknown",
-          "ratioScore": 0.4851926421757234
-        },
-        {
-          "medianLapTime": 1072.563,
-          "name": "wb-dimity gannon",
-          "category": "Unknown",
-          "ratioScore": 0.6781384072102463
-        },
-        {
-          "medianLapTime": 1145.547,
-          "name": "wb-kari lankford",
-          "category": "Unknown",
-          "ratioScore": 0.8320075897327782
-        }
-      ]
-    }
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   },
   {
     "Id": 59,
@@ -481,8 +85,15 @@
     "EventDate": "2026-02-21T00:00:00",
     "EntryBossEventNumber": 28781,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_59.xlsx"
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 58,
+    "Name": "Dirt Squirts Summer 2026 Round 2",
+    "EventDate": "2026-02-15T00:00:00",
+    "EntryBossEventNumber": 28785,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   },
   {
     "Id": 57,
@@ -490,8 +101,23 @@
     "EventDate": "2026-02-13T00:00:00",
     "EntryBossEventNumber": 28780,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_57.xlsx"
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 56,
+    "Name": "Summer Twilight Race 2026",
+    "EventDate": "2026-02-06T00:00:00",
+    "EntryBossEventNumber": 28779,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 55,
+    "Name": "Dirt Squirts Summer 2026 Round 1",
+    "EventDate": "2026-02-01T00:00:00",
+    "EntryBossEventNumber": 28784,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   },
   {
     "Id": 54,
@@ -499,8 +125,7 @@
     "EventDate": "2026-01-30T00:00:00",
     "EntryBossEventNumber": 28778,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_54.xlsx"
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   },
   {
     "Id": 52,
@@ -508,44 +133,7 @@
     "EventDate": "2025-12-06T00:00:00",
     "EntryBossEventNumber": 28172,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_52.xlsx"
-  },
-  {
-    "Id": 51,
-    "Name": "Spring NF Round 5",
-    "EventDate": "2025-11-28T00:00:00",
-    "EntryBossEventNumber": 27110,
-    "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_51.xlsx"
-  },
-  {
-    "Id": 48,
-    "Name": "Summer NF Rd3 - Race 1",
-    "EventDate": "2025-11-14T00:00:00",
-    "EntryBossEventNumber": 27035,
-    "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_48.xlsx"
-  },
-  {
-    "Id": 49,
-    "Name": "Summer NF Rd 3 - Race 2",
-    "EventDate": "2025-11-14T00:00:00",
-    "EntryBossEventNumber": 27035,
-    "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_49.xlsx"
-  },
-  {
-    "Id": 41,
-    "Name": "Winter NF Round 6",
-    "EventDate": "2025-09-05T00:00:00",
-    "EntryBossEventNumber": 26138,
-    "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_46.xlsx"
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   },
   {
     "Id": 53,
@@ -553,26 +141,87 @@
     "EventDate": "2025-12-06T00:00:00",
     "EntryBossEventNumber": 27111,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_53.xlsx"
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   },
   {
-    "Id": 38,
-    "Name": "Winter NF Round 4",
-    "EventDate": "2025-08-22T00:00:00",
-    "EntryBossEventNumber": 26137,
+    "Id": 51,
+    "Name": "Spring NF Round 5",
+    "EventDate": "2025-11-28T00:00:00",
+    "EntryBossEventNumber": 27110,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_38.xlsx"
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   },
   {
-    "Id": 30,
-    "Name": "Autumn NF Round 4",
-    "EventDate": "2025-06-06T00:00:00",
-    "EntryBossEventNumber": 25180,
+    "Id": 50,
+    "Name": "Crazy 6 on tour Anglesea",
+    "EventDate": "2025-11-22T00:00:00",
+    "EntryBossEventNumber": 27031,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_30.xlsx"
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 48,
+    "Name": "Summer NF Rd3 - Race 1",
+    "EventDate": "2025-11-14T00:00:00",
+    "EntryBossEventNumber": 27035,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 49,
+    "Name": "Summer NF Rd 3 - Race 2",
+    "EventDate": "2025-11-14T00:00:00",
+    "EntryBossEventNumber": 27035,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 46,
+    "Name": "Summer NFF Round 2",
+    "EventDate": "2025-10-31T00:00:00",
+    "EntryBossEventNumber": 27109,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 47,
+    "Name": "Demo Race",
+    "EventDate": "2025-10-31T00:00:00",
+    "EntryBossEventNumber": 27109,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 45,
+    "Name": "Dirt Squirts Winter Round 5",
+    "EventDate": "2025-10-26T00:00:00",
+    "EntryBossEventNumber": 26144,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 44,
+    "Name": "Club Champs 2025",
+    "EventDate": "2025-10-25T00:00:00",
+    "EntryBossEventNumber": 26974,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 43,
+    "Name": "Dirt Squirts Winter Round 4",
+    "EventDate": "2025-10-12T00:00:00",
+    "EntryBossEventNumber": 26143,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 42,
+    "Name": "Dirt Squirts Winter Round 3",
+    "EventDate": "2025-09-14T00:00:00",
+    "EntryBossEventNumber": 26142,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   },
   {
     "Id": 41,
@@ -580,26 +229,15 @@
     "EventDate": "2025-09-05T00:00:00",
     "EntryBossEventNumber": 26138,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_41.xlsx"
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   },
   {
-    "Id": 35,
-    "Name": "Winter NF Round 3",
-    "EventDate": "2025-08-09T00:00:00",
-    "EntryBossEventNumber": 26136,
+    "Id": 40,
+    "Name": "Dirt squirts winter 2025 Round 2",
+    "EventDate": "2025-08-31T00:00:00",
+    "EntryBossEventNumber": 26141,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_35.xlsx"
-  },
-  {
-    "Id": 33,
-    "Name": "Winter NF Round 1",
-    "EventDate": "2025-07-26T00:00:00",
-    "EntryBossEventNumber": 26133,
-    "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_33.xlsx"
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   },
   {
     "Id": 39,
@@ -607,8 +245,39 @@
     "EventDate": "2025-08-30T00:00:00",
     "EntryBossEventNumber": 26139,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_39.xlsx"
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 37,
+    "Name": "Vic Schools Race GMBC 2025",
+    "EventDate": "2025-08-23T00:00:00",
+    "EntryBossEventNumber": 25166,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 38,
+    "Name": "Winter NF Round 4",
+    "EventDate": "2025-08-22T00:00:00",
+    "EntryBossEventNumber": 26137,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 36,
+    "Name": "Dirt Squirts Winter 2025 Round 1",
+    "EventDate": "2025-08-16T00:00:00",
+    "EntryBossEventNumber": 26140,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 35,
+    "Name": "Winter NF Round 3",
+    "EventDate": "2025-08-09T00:00:00",
+    "EntryBossEventNumber": 26136,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   },
   {
     "Id": 34,
@@ -616,8 +285,15 @@
     "EventDate": "2025-08-02T00:00:00",
     "EntryBossEventNumber": 26134,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_34.xlsx"
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 33,
+    "Name": "Winter NF Round 1",
+    "EventDate": "2025-07-26T00:00:00",
+    "EntryBossEventNumber": 26133,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   },
   {
     "Id": 32,
@@ -625,8 +301,7 @@
     "EventDate": "2025-06-21T00:00:00",
     "EntryBossEventNumber": 25179,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_32.xlsx"
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   },
   {
     "Id": 31,
@@ -634,7 +309,78 @@
     "EventDate": "2025-06-13T00:00:00",
     "EntryBossEventNumber": 25181,
     "CompanyName": "Geelong Mountain Bike Club",
-    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png",
-    "ExcelDataPath": "C:\\Users\\tim\\AppData\\Local\\Temp\\apical_event_31.xlsx"
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 30,
+    "Name": "Autumn NF Round 4",
+    "EventDate": "2025-06-06T00:00:00",
+    "EntryBossEventNumber": 25180,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 29,
+    "Name": "Crazy 6",
+    "EventDate": "2025-05-31T00:00:00",
+    "EntryBossEventNumber": 25182,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 27,
+    "Name": "Forrest Race May 17 2025",
+    "EventDate": "2025-05-17T00:00:00",
+    "EntryBossEventNumber": 25184,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 26,
+    "Name": "No Frills Autumn 1 (v2)",
+    "EventDate": "2025-05-02T00:00:00",
+    "EntryBossEventNumber": 25178,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 24,
+    "Name": "Dirt Squirts 29",
+    "EventDate": "2025-04-29T00:00:00",
+    "EntryBossEventNumber": 23806,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 23,
+    "Name": "Dirt Squirts 28",
+    "EventDate": "2025-04-28T00:00:00",
+    "EntryBossEventNumber": 23806,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 20,
+    "Name": "DS22",
+    "EventDate": "2025-04-22T00:00:00",
+    "EntryBossEventNumber": 23806,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 21,
+    "Name": "DS 22-02",
+    "EventDate": "2025-04-22T00:00:00",
+    "EntryBossEventNumber": 23806,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
+  },
+  {
+    "Id": 19,
+    "Name": "DS6 Test",
+    "EventDate": "2025-04-12T00:00:00",
+    "EntryBossEventNumber": 23806,
+    "CompanyName": "Geelong Mountain Bike Club",
+    "ThumbPathAndFileName": "/DoNotRemove/ClubLogoThumbs/gmbc with text.png"
   }
 ]
