@@ -2,7 +2,7 @@ import type { RaceStateLookup, Session } from '../../model/racestate.js';
 
 import React from 'react';
 import type { EventCatalogEntrant } from '../../app/eventCatalog.js';
-import { millisecondsToTime } from '../../app/utils/timeutils.js';
+import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
 import { shouldExcludeCategoryFromResults } from '../../controllers/category.js';
 import { getParticipantNumber } from '../../controllers/participant.js';
 import { EventEntrantId } from '../../model/entrant.js';
@@ -62,6 +62,18 @@ interface LapChartEntry {
 interface LapChartColumn {
   entries: LapChartEntry[];
   lapNo: number;
+}
+
+interface FastestLapTimelineRow {
+  elapsedTime: number;
+  entrantId: EventEntrantId;
+  lapNo: number;
+  lapTime: number;
+  participantId: EventParticipantId;
+  participantName: string;
+  raceNumber: string;
+  teamName: string;
+  time?: Date;
 }
 
 interface LapChartLinePoint {
@@ -361,6 +373,59 @@ const buildLapChart = (rows: EntrantSummaryRow[]): LapChartColumn[] => {
     });
 };
 
+const buildFastestLapTimeline = (rows: EntrantSummaryRow[]): FastestLapTimelineRow[] => {
+  const candidates = rows.flatMap((row) => {
+    const memberById = new Map(row.memberDetails.map((detail) => [detail.participantId, detail]));
+    const isTeamEntrant = row.memberDetails.length > 1;
+
+    return row.laps
+      .filter((lap) => {
+        return isValidLap(lap) && typeof lap.lapTime === 'number' && lap.lapTime > 0 && !!lap.participantId && !!lap.lapNo;
+      })
+      .map((lap) => {
+        const participantId = lap.participantId!.toString();
+        const detail = memberById.get(participantId);
+        if (!detail) {
+          return undefined;
+        }
+
+        const timelineRow: FastestLapTimelineRow = {
+          elapsedTime: lap.elapsedTime!,
+          entrantId: row.entrantId,
+          lapNo: lap.lapNo!,
+          lapTime: lap.lapTime!,
+          participantId: detail.participantId,
+          participantName: detail.participantName,
+          raceNumber: detail.raceNumber,
+          teamName: isTeamEntrant ? row.entrantName : '',
+          time: lap.time,
+        };
+        return timelineRow;
+      })
+      .filter((lap): lap is FastestLapTimelineRow => !!lap);
+  }).sort((left, right) => {
+    const leftTime = left.time?.getTime() || Number.MAX_SAFE_INTEGER;
+    const rightTime = right.time?.getTime() || Number.MAX_SAFE_INTEGER;
+    if (leftTime !== rightTime) {
+      return leftTime - rightTime;
+    }
+    if (left.elapsedTime !== right.elapsedTime) {
+      return left.elapsedTime - right.elapsedTime;
+    }
+    return left.lapTime - right.lapTime;
+  });
+
+  const timeline: FastestLapTimelineRow[] = [];
+  candidates.forEach((lap) => {
+    const currentFastest = timeline[timeline.length - 1]?.lapTime;
+    if (typeof currentFastest !== 'number' || lap.lapTime < currentFastest) {
+      timeline.push(lap);
+    }
+  });
+
+  return timeline;
+};
+
 const CategorySelector = (props: {
   categories: CategoryOption[];
   selectedCategory: CategoryFilter;
@@ -580,7 +645,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
   const [drawLineChart, setDrawLineChart] = React.useState<boolean>(false);
   const [lapChartLineSegments, setLapChartLineSegments] = React.useState<LapChartLineSegment[]>([]);
-  const [reportType, setReportType] = React.useState<'fastest-laps' | 'lap-times' | 'lap-chart' | 'handicap-data'>('fastest-laps');
+  const [reportType, setReportType] = React.useState<'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'handicap-data'>('fastest-laps');
   const [handicapShowFilter, setHandicapShowFilter] = React.useState<'all' | 'event-participants-only'>('all');
   const lapChartWrapperRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -619,6 +684,10 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
 
   const lapChart = React.useMemo(() => {
     return buildLapChart(rows);
+  }, [rows]);
+
+  const fastestLapTimelineRows = React.useMemo(() => {
+    return buildFastestLapTimeline(rows);
   }, [rows]);
 
   const maxLapPosition = React.useMemo(() => {
@@ -744,9 +813,10 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <select
               aria-label="Reports View Type"
               value={reportType}
-              onChange={(event) => setReportType(event.target.value as 'fastest-laps' | 'lap-times' | 'lap-chart' | 'handicap-data')}
+              onChange={(event) => setReportType(event.target.value as 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'handicap-data')}
             >
               <option value="fastest-laps">Fastest Laps</option>
+              <option value="fastest-lap-timeline">Fastest Lap Timeline</option>
               <option value="lap-times">Lap Times</option>
               <option value="lap-chart">Lap Chart</option>
               <option value="handicap-data">Handicap Data</option>
@@ -792,6 +862,38 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
                   <td>{formatDuration(row.fastestLap)}</td>
                   <td>{row.fastestLapNo || '-'}</td>
                   <td>{row.lapCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+
+      {reportType === 'fastest-lap-timeline' ? (
+        <section className="events-panel">
+          <h2>Fastest Lap Timeline</h2>
+          <table aria-label="Fastest Lap Timeline Report Table">
+            <thead>
+              <tr>
+                <th>Plate</th>
+                <th>Participant</th>
+                <th>Team</th>
+                <th>Time of day</th>
+                <th>Elapsed</th>
+                <th>On</th>
+                <th>Lap Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fastestLapTimelineRows.map((row) => (
+                <tr key={`${row.participantId}-${row.lapNo}-${row.elapsedTime}`}>
+                  <td>{row.raceNumber}</td>
+                  <td>{row.participantName}</td>
+                  <td>{row.teamName || '-'}</td>
+                  <td>{tableTimeString(row.time)}</td>
+                  <td>{formatDuration(row.elapsedTime)}</td>
+                  <td>{row.lapNo}</td>
+                  <td>{formatDuration(row.lapTime)}</td>
                 </tr>
               ))}
             </tbody>
