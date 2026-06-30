@@ -29,6 +29,7 @@ describe('SessionListCard', () => {
           onClick={onClick}
           selected
           session={{
+            categoryIds: [],
             eventId: 'event-1',
             id: 'session-1',
             kind: 'race',

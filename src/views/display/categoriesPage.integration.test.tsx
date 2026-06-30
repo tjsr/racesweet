@@ -40,7 +40,6 @@ const catalog: EventCatalogState = {
       eventId: 'event-1',
       id: 'cat-1',
       name: 'Premier',
-      sessionAssignments: [{ sessionId: 'session-1', startTime: '2026-06-12T09:00:00.000Z' }],
       teamRules: {
         maxRiderAge: 60,
         maxTeamSize: 2,
@@ -54,7 +53,6 @@ const catalog: EventCatalogState = {
       eventId: 'event-1',
       id: 'cat-2',
       name: 'Clubman',
-      sessionAssignments: [{ sessionId: '', startTime: '2026-06-12T08:00:00.000Z' }],
       teamRules: { teamCompositionRules: [] },
     },
     {
@@ -63,7 +61,6 @@ const catalog: EventCatalogState = {
       eventId: 'event-1',
       id: 'cat-2-duplicate',
       name: 'Clubman',
-      sessionAssignments: [],
       teamRules: { teamCompositionRules: [] },
     },
     {
@@ -73,7 +70,6 @@ const catalog: EventCatalogState = {
       eventId: 'event-1',
       id: 'cat-deleted',
       name: 'Deleted Category',
-      sessionAssignments: [],
       teamRules: { teamCompositionRules: [] },
     },
     {
@@ -82,7 +78,6 @@ const catalog: EventCatalogState = {
       eventId: 'event-2',
       id: 'cat-3',
       name: 'Development',
-      sessionAssignments: [{ sessionId: 'session-3', startTime: '2026-07-10T10:30:00.000Z' }],
       teamRules: { teamCompositionRules: [] },
     },
   ],
@@ -110,6 +105,7 @@ const catalog: EventCatalogState = {
   ],
   sessions: [
     {
+      categoryIds: ['cat-1'],
       eventId: 'event-1',
       id: 'session-1',
       kind: 'race',
@@ -118,6 +114,7 @@ const catalog: EventCatalogState = {
       status: 'scheduled',
     },
     {
+      categoryIds: ['cat-2'],
       eventId: 'event-1',
       id: 'session-2',
       kind: 'practice',
@@ -126,6 +123,7 @@ const catalog: EventCatalogState = {
       status: 'scheduled',
     },
     {
+      categoryIds: ['cat-3'],
       eventId: 'event-2',
       id: 'session-3',
       kind: 'race',
@@ -220,6 +218,7 @@ describe('CategoriesPage integration', () => {
     const onCreateCategory = vi.fn();
     const onDeleteCategory = vi.fn();
     const onUpdateCategory = vi.fn();
+    const onUpdateCategorySessionAssignments = vi.fn();
 
     const Harness = () => {
       const [selectedEventId, setSelectedEventId] = React.useState<string | undefined>(catalog.activeEventId);
@@ -237,6 +236,7 @@ describe('CategoriesPage integration', () => {
             setSelectedCategoryId(catalog.categories.find((category) => category.eventId === eventId)?.id);
           }}
           onUpdateCategory={onUpdateCategory}
+          onUpdateCategorySessionAssignments={onUpdateCategorySessionAssignments}
           selectedCategoryId={selectedCategoryId}
           selectedEventId={selectedEventId}
         />
@@ -342,7 +342,6 @@ describe('CategoriesPage integration', () => {
       distanceRule: { kind: 'time', value: '1:30' },
       excludeFromResults: true,
       name: 'Development Cup',
-      sessionAssignments: [{ sessionId: 'session-3', startTime: '2026-07-10T10:30:00.000Z' }],
       teamRules: {
         maxRiderAge: 55,
         maxTeamSize: 3,
@@ -353,6 +352,7 @@ describe('CategoriesPage integration', () => {
         ],
       },
     }));
+    expect(onUpdateCategorySessionAssignments).toHaveBeenCalledWith('cat-3', ['session-3']);
 
     const deleteButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Delete Category');
     expect(deleteButton).toBeDefined();
@@ -369,6 +369,7 @@ describe('CategoriesPage integration', () => {
     const onCreateCategory = vi.fn();
     const onDeleteCategory = vi.fn();
     const onUpdateCategory = vi.fn().mockRejectedValue(new Error('Category cat-1 does not exist.'));
+    const onUpdateCategorySessionAssignments = vi.fn();
 
     await act(async () => {
       root.render(
@@ -380,6 +381,7 @@ describe('CategoriesPage integration', () => {
           onSelectCategory={vi.fn()}
           onSelectEvent={vi.fn()}
           onUpdateCategory={onUpdateCategory}
+          onUpdateCategorySessionAssignments={onUpdateCategorySessionAssignments}
           selectedCategoryId="cat-1"
           selectedEventId="event-1"
         />
@@ -416,7 +418,6 @@ describe('CategoriesPage integration', () => {
           eventId: 'event-1',
           id: 'cat-orphan',
           name: 'Orphan',
-          sessionAssignments: [],
           teamRules: { teamCompositionRules: [] },
         },
       ],
@@ -433,6 +434,7 @@ describe('CategoriesPage integration', () => {
           onSelectCategory={vi.fn()}
           onSelectEvent={vi.fn()}
           onUpdateCategory={vi.fn()}
+          onUpdateCategorySessionAssignments={vi.fn()}
           selectedCategoryId="cat-orphan"
           selectedEventId="event-1"
         />
@@ -452,6 +454,7 @@ describe('CategoriesPage integration', () => {
     const onCreateCategory = vi.fn();
     const onDeleteCategory = vi.fn();
     const onUpdateCategory = vi.fn().mockResolvedValue(undefined);
+    const onUpdateCategorySessionAssignments = vi.fn().mockResolvedValue(undefined);
 
     const Harness = () => {
       const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | undefined>('cat-1');
@@ -465,6 +468,7 @@ describe('CategoriesPage integration', () => {
           onSelectCategory={setSelectedCategoryId}
           onSelectEvent={vi.fn()}
           onUpdateCategory={onUpdateCategory}
+          onUpdateCategorySessionAssignments={onUpdateCategorySessionAssignments}
           selectedCategoryId={selectedCategoryId}
           selectedEventId="event-1"
         />
@@ -516,6 +520,7 @@ describe('CategoriesPage integration', () => {
     });
 
     expect(onUpdateCategory).toHaveBeenCalledWith('cat-1', expect.objectContaining({ name: 'Premier Edited' }));
+    expect(onUpdateCategorySessionAssignments).toHaveBeenCalledWith('cat-1', ['session-1']);
     expect(container.textContent).toContain('Taylor Rider');
     expect((container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement).value).toBe('Clubman');
 
@@ -559,6 +564,7 @@ describe('CategoriesPage integration', () => {
             guard = nextGuard;
           }}
           onUpdateCategory={vi.fn()}
+          onUpdateCategorySessionAssignments={vi.fn()}
           selectedCategoryId="cat-1"
           selectedEventId="event-1"
         />

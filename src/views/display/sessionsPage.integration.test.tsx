@@ -33,12 +33,6 @@ const catalog: EventCatalogState = {
       eventId: 'event-1',
       id: 'category-2',
       name: 'Teams',
-      sessionAssignments: [
-        {
-          sessionId: 'session-1',
-          startTime: '2026-06-12T09:00:00.000Z',
-        },
-      ],
     },
     {
       eventId: 'event-2',
@@ -49,46 +43,22 @@ const catalog: EventCatalogState = {
       eventId: 'event-2',
       id: 'category-4',
       name: 'Sprint',
-      sessionAssignments: [
-        {
-          sessionId: 'session-4',
-          startTime: '2026-07-10T11:30:00.000Z',
-        },
-      ],
     },
     {
       eventId: 'event-2',
       id: 'category-5',
       name: 'Endurance',
-      sessionAssignments: [
-        {
-          sessionId: 'session-3',
-          startTime: '2026-07-10T10:30:00.000Z',
-        },
-      ],
     },
     {
       eventId: 'event-2',
       id: 'category-legacy',
       name: 'Legacy Timed',
-      sessionAssignments: [
-        {
-          sessionId: '',
-          startTime: '2026-07-10T10:30:00.000Z',
-        },
-      ],
     },
     {
       deleted: true,
       eventId: 'event-2',
       id: 'category-deleted',
       name: 'Archived',
-      sessionAssignments: [
-        {
-          sessionId: 'session-3',
-          startTime: '2026-07-10T10:30:00.000Z',
-        },
-      ],
     },
   ],
   deletedEventIds: [],
@@ -115,6 +85,7 @@ const catalog: EventCatalogState = {
   ],
   sessions: [
     {
+      categoryIds: ['category-2'],
       eventId: 'event-1',
       id: 'session-1',
       kind: 'practice',
@@ -124,6 +95,7 @@ const catalog: EventCatalogState = {
       status: 'scheduled',
     },
     {
+      categoryIds: [],
       eventId: 'event-1',
       id: 'session-2',
       kind: 'race',
@@ -133,6 +105,7 @@ const catalog: EventCatalogState = {
       status: 'scheduled',
     },
     {
+      categoryIds: ['category-5', 'category-legacy', 'category-deleted'],
       eventId: 'event-2',
       id: 'session-3',
       kind: 'qualifying',
@@ -142,6 +115,7 @@ const catalog: EventCatalogState = {
       status: 'draft',
     },
     {
+      categoryIds: ['category-4'],
       eventId: 'event-2',
       id: 'session-4',
       kind: 'race',

@@ -96,6 +96,7 @@ describe('TimingContext integration', () => {
       sessionIds: ['session-1'],
     };
     const session: EventCatalogState['sessions'][number] = {
+      categoryIds: [categoryA.id],
       eventId: event.id,
       id: 'session-1',
       kind: 'race',

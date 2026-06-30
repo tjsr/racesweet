@@ -43,21 +43,18 @@ const catalog: EventCatalogState = {
       eventId: 'event-1',
       id: 'cat-1',
       name: 'Premier',
-      sessionAssignments: [{ sessionId: 'session-1', startTime: '2026-06-12T09:00:00.000Z' }],
       teamRules: { teamCompositionRules: [] },
     },
     {
       eventId: 'event-2',
       id: 'cat-2',
       name: 'Teams',
-      sessionAssignments: [{ sessionId: 'session-2', startTime: '2026-07-10T09:00:00.000Z' }],
       teamRules: { maxTeamSize: 2, teamCompositionRules: [] },
     },
     {
       eventId: 'event-2',
       id: 'cat-pro',
       name: 'Pro',
-      sessionAssignments: [{ sessionId: 'session-2', startTime: '2026-07-10T09:00:00.000Z' }],
       teamRules: { teamCompositionRules: [] },
     },
   ],
@@ -172,6 +169,7 @@ const catalog: EventCatalogState = {
   ],
   sessions: [
     {
+      categoryIds: ['cat-1'],
       eventId: 'event-1',
       id: 'session-1',
       kind: 'race',
@@ -180,6 +178,7 @@ const catalog: EventCatalogState = {
       status: 'scheduled',
     },
     {
+      categoryIds: [],
       eventId: 'event-1',
       id: 'session-1-practice',
       kind: 'practice',
@@ -188,6 +187,7 @@ const catalog: EventCatalogState = {
       status: 'scheduled',
     },
     {
+      categoryIds: ['cat-2', 'cat-pro'],
       eventId: 'event-2',
       id: 'session-2',
       kind: 'race',

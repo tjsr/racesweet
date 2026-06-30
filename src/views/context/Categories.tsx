@@ -1,7 +1,6 @@
 import React from 'react';
 import { parseTeamCompositionRules } from '../../app/categoryRules.js';
 import { type CategoryDistanceRule, type EventCatalogCategory, getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent } from '../../app/eventCatalog.js';
-import { SessionId } from '../../model/raceevent.js';
 import { parseInteger } from '../../parsers/parseInteger.js';
 import { CategoriesPageProps, CategoryChanges, CategoryDraft, dedupeCategoriesForDisplay, getCategoryDraft } from '../display/categoriesPage.js';
 import { useUnsavedChangesWarning } from '../display/unsavedChangesWarning.js';
@@ -44,13 +43,15 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
   const activeEventCategories = dedupeCategoriesForDisplay(categoriesForEvent);
   const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id?.toString());
   const selectedCategory = eventCategories.find((category) => category.id.toString() === props.selectedCategoryId?.toString()) ?? activeEventCategories[0] ?? eventCategories[0];
-  const assignedSessionIds = getCategoryAssignedSessionIds(selectedCategory, eventSessions);
+  const assignedSessionIdList = Array.from(getCategoryAssignedSessionIds(selectedCategory, eventSessions));
+  const assignedSessionIdKey = assignedSessionIdList.slice().sort().join('|');
+  const assignedSessionIds = new Set(assignedSessionIdList);
   const categorySessions = eventSessions.filter((session) => assignedSessionIds.has(session.id.toString()));
 
   const [formError, setFormError] = React.useState<string | undefined>(undefined);
-  const [categoryDraft, setCategoryDraft] = React.useState<CategoryDraft>(getCategoryDraft(selectedCategory));
-  const [savedCategoryDraft, setSavedCategoryDraft] = React.useState<CategoryDraft>(getCategoryDraft(selectedCategory));
-  const selectedCategoryDraft = React.useMemo(() => getCategoryDraft(selectedCategory), [selectedCategory]);
+  const [categoryDraft, setCategoryDraft] = React.useState<CategoryDraft>(getCategoryDraft(selectedCategory, assignedSessionIdList));
+  const [savedCategoryDraft, setSavedCategoryDraft] = React.useState<CategoryDraft>(getCategoryDraft(selectedCategory, assignedSessionIdList));
+  const selectedCategoryDraft = React.useMemo(() => getCategoryDraft(selectedCategory, assignedSessionIdList), [assignedSessionIdKey, selectedCategory]);
   const hasUnsavedChanges = selectedCategory
     ? JSON.stringify(categoryDraft) !== JSON.stringify(savedCategoryDraft)
     : false;
@@ -84,22 +85,12 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
       };
     }
     const teamCompositionRules = parseTeamCompositionRules(categoryDraft.teamCompositionRules);
-    const existingAssignments = selectedCategory?.sessionAssignments || [];
-    const sessionAssignments = categoryDraft.sessionIds.map((sessionId: SessionId) => {
-      const existing = existingAssignments.find((assignment) => assignment.sessionId === sessionId);
-      return {
-        sessionId,
-        startTime: existing?.startTime || eventSessions.find((session) => session.id === sessionId)?.scheduledStart || '',
-      };
-    });
-
     return {
       code: categoryDraft.code || undefined,
       description: categoryDraft.description || undefined,
       distanceRule,
       excludeFromResults: categoryDraft.excludeFromResults,
       name: categoryDraft.name,
-      sessionAssignments,
       teamRules: {
         maxRiderAge: parseInteger(categoryDraft.maxRiderAge),
         maxTeamSize: parseInteger(categoryDraft.maxTeamSize),
@@ -116,6 +107,7 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
 
     try {
       await props.onUpdateCategory(selectedCategory.id, buildCategoryChanges());
+      await props.onUpdateCategorySessionAssignments(selectedCategory.id, categoryDraft.sessionIds);
       setSavedCategoryDraft(categoryDraft);
       setFormError(undefined);
       return true;

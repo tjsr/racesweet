@@ -353,6 +353,7 @@ describe('EventCatalogService', () => {
         {
           id: 'legacy-mutation-session',
           session: {
+            categoryIds: [],
             eventId: 'legacy-event',
             id: 'legacy-session',
             kind: 'practice',
@@ -485,6 +486,7 @@ describe('EventCatalogService', () => {
         {
           id: 'mutation-extra-session',
           session: {
+            categoryIds: ['event-2026-test-day-category'],
             eventId: 'event-2026-test-day',
             id: 'event-2026-test-day-session',
             kind: 'practice',
@@ -687,7 +689,6 @@ describe('EventCatalogService', () => {
     });
     await service.updateCategory(SEED_PREMIER_CATEGORY_ID, {
       distanceRule: { kind: 'time', value: '1:45' },
-      sessionAssignments: [{ sessionId: SEED_RACE_SESSION_ID, startTime: '2026-06-13T14:45:00.000Z' }],
       teamRules: {
         maxRiderAge: 50,
         maxTeamSize: 3,
@@ -695,9 +696,13 @@ describe('EventCatalogService', () => {
         teamCompositionRules: [{ gender: 'female', max: 2, min: 1 }],
       },
     });
+    await service.updateSession(SEED_RACE_SESSION_ID, {
+      categoryIds: [SEED_PREMIER_CATEGORY_ID],
+    });
 
     const event = service.catalog.events.find((item) => item.id === SEED_EVENT_ID);
     const session = service.catalog.sessions.find((item) => item.id === SEED_PRACTICE_SESSION_ID);
+    const raceSession = service.catalog.sessions.find((item) => item.id === SEED_RACE_SESSION_ID);
     const category = service.catalog.categories.find((item) => item.id === SEED_PREMIER_CATEGORY_ID);
 
     expect(event?.name).toBe('RaceSweet Open Track Day');
@@ -705,9 +710,10 @@ describe('EventCatalogService', () => {
     expect(event?.timeZone).toBe('Australia/Brisbane');
     expect(session?.name).toBe('Friday Free Practice');
     expect(session?.status).toBe('live');
+    expect(raceSession?.categoryIds).toEqual([SEED_PREMIER_CATEGORY_ID]);
     expect(category?.distanceRule).toEqual({ kind: 'time', value: '1:45' });
     expect(category?.teamRules?.maxTeamSize).toBe(3);
-    expect(seededPersistence.save).toHaveBeenCalledTimes(3);
+    expect(seededPersistence.save).toHaveBeenCalledTimes(4);
   });
 
   it('syncs categories and entrants from imported event data IDs', async () => {

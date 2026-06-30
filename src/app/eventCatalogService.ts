@@ -159,19 +159,8 @@ const createCategoryTeamRules = (categoryId: string, maxTeamSizeByCategory: Map<
   };
 };
 
-const mergeCategorySessionAssignments = (
-  existingAssignments: EventCatalogCategory['sessionAssignments'] = [],
-  nextAssignments: EventCatalogCategory['sessionAssignments'] = []
-): EventCatalogCategory['sessionAssignments'] => {
-  return [...existingAssignments, ...nextAssignments].reduce<NonNullable<EventCatalogCategory['sessionAssignments']>>((assignments, assignment) => {
-    const hasAssignment = assignments.some((existingAssignment) => (
-      assignment.sessionId.length > 0
-        ? existingAssignment.sessionId === assignment.sessionId
-        : existingAssignment.sessionId.length === 0 && existingAssignment.startTime === assignment.startTime
-    ));
-
-    return hasAssignment ? assignments : [...assignments, assignment];
-  }, []);
+const mergeSessionCategoryIds = (existingCategoryIds: string[] = [], nextCategoryIds: string[] = []): string[] => {
+  return unique([...existingCategoryIds, ...nextCategoryIds]);
 };
 
 const deriveCategoriesFromEventData = (
@@ -179,8 +168,8 @@ const deriveCategoriesFromEventData = (
   categories: EventCategory[],
   participants: EventParticipant[],
   teams: EventTeam[] = [],
-  assignedSessionId?: SessionId,
-  assignedSessionStart?: string
+  _assignedSessionId?: SessionId,
+  _assignedSessionStart?: string
 ): EventCatalogCategory[] => {
   const byId = new Map<EventId, EventCatalogCategory>();
   const maxTeamSizeByCategory = deriveMaxTeamSizesByCategory(teams, participants);
@@ -191,14 +180,6 @@ const deriveCategoriesFromEventData = (
       ...category,
       distanceRule: deriveDistanceRule(category),
       eventId,
-      sessionAssignments: category.startTime || assignedSessionId
-        ? [
-          {
-            sessionId: assignedSessionId || '',
-            startTime: category.startTime || assignedSessionStart || '',
-          },
-        ]
-        : [],
       teamRules: createCategoryTeamRules(id.toString(), maxTeamSizeByCategory),
     });
   });
@@ -214,14 +195,6 @@ const deriveCategoriesFromEventData = (
         eventId,
         id: categoryId,
         name: `Category ${categoryId}`,
-        sessionAssignments: assignedSessionId
-          ? [
-            {
-              sessionId: assignedSessionId,
-              startTime: assignedSessionStart || '',
-            },
-          ]
-          : [],
         teamRules: createCategoryTeamRules(categoryId, maxTeamSizeByCategory),
       });
     }
@@ -341,7 +314,6 @@ const hasSameCategoryScaffold = (existing: EventCatalogCategory, next: EventCata
     existing.excludeFromResults === next.excludeFromResults &&
     existing.name === next.name &&
     existing.startTime === next.startTime &&
-    hasSameSerializedValue(existing.sessionAssignments, next.sessionAssignments) &&
     hasSameSerializedValue(existing.teamRules, next.teamRules);
 };
 
@@ -368,7 +340,6 @@ const getCategoryScaffoldChanges = (category: EventCatalogCategory): NonNullable
   duration: category.duration,
   excludeFromResults: category.excludeFromResults,
   name: category.name,
-  sessionAssignments: category.sessionAssignments,
   startTime: category.startTime,
   teamRules: category.teamRules,
 });
@@ -669,7 +640,7 @@ export class EventCatalogService {
       ? this.state.sessions.find((session) => session.id === assignedSessionId)
       : undefined;
 
-    const scaffoldCategories = deriveCategoriesFromEventData(eventId, categories, participants, teams, assignedSessionId, assignedSession?.scheduledStart);
+    const scaffoldCategories = deriveCategoriesFromEventData(eventId, categories, participants, teams);
     const categoryIds = scaffoldCategories.map((category) => category.id.toString());
     const entrants = deriveEntrantsFromParticipants(eventId, participants, masterProfiles, teams);
 
@@ -680,18 +651,13 @@ export class EventCatalogService {
     const categoryMutations = scaffoldCategories.map((category) => {
       const existingCategory = existingCategoriesById.get(category.id.toString());
       if (existingCategory) {
-        const categoryWithMergedAssignments = {
-          ...category,
-          sessionAssignments: mergeCategorySessionAssignments(existingCategory.sessionAssignments, category.sessionAssignments),
-        };
-
-        if (hasSameCategoryScaffold(existingCategory, categoryWithMergedAssignments)) {
+        if (hasSameCategoryScaffold(existingCategory, category)) {
           return undefined;
         }
 
         return {
           categoryId: category.id,
-          changes: getCategoryScaffoldChanges(categoryWithMergedAssignments),
+          changes: getCategoryScaffoldChanges(category),
           id: createMutationId(),
           timestamp: createTimestamp(),
           type: 'category-updated' as const,
@@ -705,6 +671,25 @@ export class EventCatalogService {
         type: 'category-created' as const,
       };
     }).filter((mutation): mutation is NonNullable<typeof mutation> => mutation !== undefined);
+
+    const sessionCategoryMutation = assignedSession
+      ? (() => {
+        const nextCategoryIds = mergeSessionCategoryIds(assignedSession.categoryIds, categoryIds);
+        if (hasSameMembers(assignedSession.categoryIds || [], nextCategoryIds)) {
+          return undefined;
+        }
+
+        return {
+          changes: {
+            categoryIds: nextCategoryIds,
+          },
+          id: createMutationId(),
+          sessionId: assignedSession.id,
+          timestamp: createTimestamp(),
+          type: 'session-updated' as const,
+        };
+      })()
+      : undefined;
 
     const entrantMutations = entrants.map((entrant) => {
       const existingEntrant = existingEntrantsById.get(entrant.id.toString());
@@ -747,12 +732,15 @@ export class EventCatalogService {
     } : undefined;
 
     if (categoryMutations.length === 0 && entrantMutations.length === 0 && !eventChanges) {
-      return this.state;
+      if (!sessionCategoryMutation) {
+        return this.state;
+      }
     }
 
     return this.appendMutations([
       ...categoryMutations,
       ...entrantMutations,
+      ...(sessionCategoryMutation ? [sessionCategoryMutation] : []),
       ...(eventChanges ? [{
         changes: eventChanges,
         eventId,
@@ -780,10 +768,9 @@ export class EventCatalogService {
       normalizedImportData.eventId,
       normalizedImportData.raceState.categories || [],
       normalizedImportData.raceState.participants || [],
-      normalizedImportData.raceState.teams || [],
-      normalizedImportData.sessionId,
-      existingSession?.scheduledStart || scheduledStart
+      normalizedImportData.raceState.teams || []
     );
+    const categoryIds = derivedCategories.map((category) => category.id.toString());
     const derivedEntrants = deriveEntrantsFromParticipants(
       normalizedImportData.eventId,
       normalizedImportData.raceState.participants || [],
@@ -801,15 +788,13 @@ export class EventCatalogService {
       hasSameSerializedValue(existingImportedRaceState?.raceState, normalizedImportData.raceState);
     const scaffoldMatchesExistingState = derivedCategories.every((category) => {
       const existingCategory = existingCategories.get(category.id.toString());
-      return !!existingCategory && hasSameCategoryScaffold(existingCategory, {
-        ...category,
-        sessionAssignments: mergeCategorySessionAssignments(existingCategory.sessionAssignments, category.sessionAssignments),
-      });
+      return !!existingCategory && hasSameCategoryScaffold(existingCategory, category);
     }) &&
       derivedEntrants.every((entrant) => {
         const existingEntrant = existingEntrants.get(entrant.id.toString());
         return !!existingEntrant && hasSameEntrantScaffold(existingEntrant, entrant);
-      });
+      }) &&
+      derivedCategories.every((category) => (existingSession?.categoryIds || []).includes(category.id));
 
     if (importMatchesExistingState && scaffoldMatchesExistingState) {
       return this.state;
@@ -850,6 +835,7 @@ export class EventCatalogService {
       mutations.push({
         id: createMutationId(),
         session: {
+          categoryIds: categoryIds,
           eventId: normalizedImportData.eventId,
           id: normalizedImportData.sessionId,
           kind: 'race',
@@ -961,6 +947,7 @@ export class EventCatalogService {
   public async createSession(eventId: EventId): Promise<EventCatalogState> {
     const sessionId = createSessionId();
     const session: EventCatalogSession = {
+      categoryIds: [],
       eventId,
       id: sessionId,
       kind: 'practice',
@@ -990,7 +977,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async updateSession(sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>): Promise<EventCatalogState> {
+  public async updateSession(sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes,
@@ -1099,7 +1086,6 @@ export class EventCatalogService {
       eventId,
       id: categoryId,
       name: 'New Category',
-      sessionAssignments: [],
       teamRules: {
         teamCompositionRules: [],
       },
@@ -1125,7 +1111,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async updateCategory(categoryId: CategoryId, changes: Partial<Pick<EventCatalogCategory, 'code' | 'deleted' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'excludeFromResults' | 'name' | 'sessionAssignments' | 'startTime' | 'teamRules'>>): Promise<EventCatalogState> {
+  public async updateCategory(categoryId: CategoryId, changes: Partial<Pick<EventCatalogCategory, 'code' | 'deleted' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'excludeFromResults' | 'name' | 'startTime' | 'teamRules'>>): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         categoryId,

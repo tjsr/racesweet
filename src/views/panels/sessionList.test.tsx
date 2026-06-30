@@ -8,6 +8,7 @@ import { type EventCatalogSession } from '../../app/eventCatalog.js';
 import { SessionListPanel } from './sessionList.js';
 
 const session: EventCatalogSession = {
+  categoryIds: [],
   eventId: 'event-1',
   id: 'session-1',
   kind: 'race',

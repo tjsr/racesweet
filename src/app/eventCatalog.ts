@@ -50,7 +50,6 @@ export interface CategorySessionAssignment {
 export type EventCatalogCategory = EventCategory & {
   distanceRule?: CategoryDistanceRule;
   eventId: EventId;
-  sessionAssignments?: CategorySessionAssignment[];
   teamRules?: CategoryTeamRules;
 };
 
@@ -91,6 +90,7 @@ export interface EventCatalogEvent {
 }
 
 export interface EventCatalogSession {
+  categoryIds: EventCategoryId[];
   eventId: EventId;
   id: SessionId;
   kind: EventSessionKind;
@@ -142,7 +142,7 @@ export interface SessionCreatedMutation extends EventCatalogMutationBase {
 }
 
 export interface SessionUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogSession, 'eventId' | 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>;
+  changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'eventId' | 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>;
   sessionId: SessionId;
   type: 'session-updated';
 }
@@ -173,7 +173,7 @@ export interface CategoryCreatedMutation extends EventCatalogMutationBase {
 
 export interface CategoryUpdatedMutation extends EventCatalogMutationBase {
   categoryId: EventCategoryId;
-  changes: Partial<Pick<EventCatalogCategory, 'code' | 'deleted' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'excludeFromResults' | 'name' | 'sessionAssignments' | 'startTime' | 'teamRules'>>;
+  changes: Partial<Pick<EventCatalogCategory, 'code' | 'deleted' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'excludeFromResults' | 'name' | 'startTime' | 'teamRules'>>;
   type: 'category-updated';
 }
 
@@ -236,30 +236,65 @@ export const createDefaultEventCatalogState = (): EventCatalogState => ({
 });
 
 const removeEntry = (ids: IdType[], id: IdType): IdType[] => ids.filter((entryId) => entryId !== id);
+const addUniqueEntry = <TValue extends IdType>(ids: TValue[], id: TValue): TValue[] => ids.includes(id) ? ids : [...ids, id];
 const isActiveCategory = (category: EventCatalogCategory): boolean => category.deleted !== true;
+const getLegacyCategorySessionAssignments = (category: EventCatalogCategory | undefined): CategorySessionAssignment[] => {
+  return ((category as EventCatalogCategory & { sessionAssignments?: CategorySessionAssignment[] } | undefined)?.sessionAssignments || []);
+};
+
+const getCategoryIdsForSession = (session: EventCatalogSession | undefined): EventCategoryId[] => session?.categoryIds || [];
+
+const migrateLegacyCategoryAssignments = (state: EventCatalogState): EventCatalogState => {
+  const activeCategories = state.categories.filter(isActiveCategory);
+  if (!activeCategories.some((category) => getLegacyCategorySessionAssignments(category).length > 0)) {
+    return state;
+  }
+
+  return {
+    ...state,
+    sessions: state.sessions.map((session) => {
+      const categoryIds = activeCategories.reduce<EventCategoryId[]>((assignedCategoryIds, category) => {
+        const isAssigned = getLegacyCategorySessionAssignments(category).some((assignment) => {
+          if (isValidId(assignment.sessionId)) {
+            return assignment.sessionId === session.id;
+          }
+
+          return assignment.startTime === session.scheduledStart;
+        });
+
+        return isAssigned ? addUniqueEntry(assignedCategoryIds, category.id) : assignedCategoryIds;
+      }, getCategoryIdsForSession(session));
+
+      return {
+        ...session,
+        categoryIds,
+      };
+    }),
+  };
+};
 
 export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalogState => {
-  return ledger.mutations.reduce<EventCatalogState>((state, mutation) => {
+  const state = ledger.mutations.reduce<EventCatalogState>((currentState, mutation) => {
     switch (mutation.type) {
     case 'event-created': {
-      if (state.deletedEventIds.includes(mutation.event.id)) {
-        return state;
+      if (currentState.deletedEventIds.includes(mutation.event.id)) {
+        return currentState;
       }
 
       return {
-        ...state,
-        activeEventId: state.activeEventId ?? mutation.event.id,
-        events: [...state.events, mutation.event],
+        ...currentState,
+        activeEventId: currentState.activeEventId ?? mutation.event.id,
+        events: [...currentState.events, mutation.event],
       };
     }
     case 'event-updated': {
-      if (state.deletedEventIds.includes(mutation.eventId)) {
-        return state;
+      if (currentState.deletedEventIds.includes(mutation.eventId)) {
+        return currentState;
       }
 
       return {
-        ...state,
-        events: state.events.map((event) => {
+        ...currentState,
+        events: currentState.events.map((event) => {
           if (event.id !== mutation.eventId) {
             return event;
           }
@@ -272,32 +307,32 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
       };
     }
     case 'event-deleted': {
-      const remainingEvents = state.events.filter((event) => event.id !== mutation.eventId);
-      const nextActiveEventId = state.activeEventId === mutation.eventId
+      const remainingEvents = currentState.events.filter((event) => event.id !== mutation.eventId);
+      const nextActiveEventId = currentState.activeEventId === mutation.eventId
         ? remainingEvents[0]?.id
-        : state.activeEventId;
-      const nextActiveSessionId = state.activeEventId === mutation.eventId
-        ? state.sessions.find((session) => session.eventId === nextActiveEventId)?.id
-        : state.activeSessionId;
+        : currentState.activeEventId;
+      const nextActiveSessionId = currentState.activeEventId === mutation.eventId
+        ? currentState.sessions.find((session) => session.eventId === nextActiveEventId)?.id
+        : currentState.activeSessionId;
 
       return {
-        ...state,
+        ...currentState,
         activeEventId: nextActiveEventId,
         activeSessionId: nextActiveSessionId,
-        deletedEventIds: [...state.deletedEventIds, mutation.eventId],
+        deletedEventIds: [...currentState.deletedEventIds, mutation.eventId],
         events: remainingEvents,
       };
     }
     case 'event-activated': {
-      if (state.deletedEventIds.includes(mutation.eventId) || !state.events.some((event) => event.id === mutation.eventId)) {
-        return state;
+      if (currentState.deletedEventIds.includes(mutation.eventId) || !currentState.events.some((event) => event.id === mutation.eventId)) {
+        return currentState;
       }
 
-      const existingActiveSession = state.sessions.find((session) => session.id === state.activeSessionId && session.eventId === mutation.eventId);
-      const firstEventSession = state.sessions.find((session) => session.eventId === mutation.eventId);
+      const existingActiveSession = currentState.sessions.find((session) => session.id === currentState.activeSessionId && session.eventId === mutation.eventId);
+      const firstEventSession = currentState.sessions.find((session) => session.eventId === mutation.eventId);
 
       return {
-        ...state,
+        ...currentState,
         activeEventId: mutation.eventId,
         activeSessionId: existingActiveSession?.id || firstEventSession?.id,
       };
@@ -305,9 +340,9 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
     case 'category-created': {
       const category = normalizeCategoryResultExclusion({ ...mutation.category, deleted: false });
       return {
-        ...state,
+        ...currentState,
         categories: [
-          ...state.categories.map((existingCategory) => (
+          ...currentState.categories.map((existingCategory) => (
             existingCategory.id === category.id && isActiveCategory(existingCategory)
               ? { ...existingCategory, deleted: true }
               : existingCategory
@@ -318,8 +353,8 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
     }
     case 'category-updated': {
       return {
-        ...state,
-        categories: state.categories.map((category) => {
+        ...currentState,
+        categories: currentState.categories.map((category) => {
           if (category.id !== mutation.categoryId || !isActiveCategory(category)) {
             return category;
           }
@@ -333,33 +368,37 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
     }
     case 'category-deleted': {
       return {
-        ...state,
-        categories: state.categories.map((category) => (
+        ...currentState,
+        categories: currentState.categories.map((category) => (
           category.id === mutation.categoryId && isActiveCategory(category)
             ? { ...category, deleted: true }
             : category
         )),
-        entrants: state.entrants.map((entrant) => ({
+        entrants: currentState.entrants.map((entrant) => ({
           ...entrant,
           categoryId: entrant.categoryId === mutation.categoryId.toString() ? undefined : entrant.categoryId,
           categoryIds: removeEntry(entrant.categoryIds, mutation.categoryId.toString()),
         })),
-        events: state.events.map((event) => ({
+        events: currentState.events.map((event) => ({
           ...event,
           categoryIds: removeEntry(event.categoryIds, mutation.categoryId.toString()),
+        })),
+        sessions: currentState.sessions.map((session) => ({
+          ...session,
+          categoryIds: removeEntry(getCategoryIdsForSession(session), mutation.categoryId.toString()),
         })),
       };
     }
     case 'entrant-created': {
       return {
-        ...state,
-        entrants: [...state.entrants, mutation.entrant],
+        ...currentState,
+        entrants: [...currentState.entrants, mutation.entrant],
       };
     }
     case 'entrant-updated': {
       return {
-        ...state,
-        entrants: state.entrants.map((entrant) => {
+        ...currentState,
+        entrants: currentState.entrants.map((entrant) => {
           if (entrant.id !== mutation.entrantId) {
             return entrant;
           }
@@ -373,9 +412,9 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
     }
     case 'entrant-deleted': {
       return {
-        ...state,
-        entrants: state.entrants.filter((entrant) => entrant.id !== mutation.entrantId),
-        events: state.events.map((event) => ({
+        ...currentState,
+        entrants: currentState.entrants.filter((entrant) => entrant.id !== mutation.entrantId),
+        events: currentState.events.map((event) => ({
           ...event,
           entrantIds: removeEntry(event.entrantIds, mutation.entrantId),
         })),
@@ -383,14 +422,14 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
     }
     case 'session-created': {
       return {
-        ...state,
-        sessions: [...state.sessions, mutation.session],
+        ...currentState,
+        sessions: [...currentState.sessions, { ...mutation.session, categoryIds: getCategoryIdsForSession(mutation.session) }],
       };
     }
     case 'session-updated': {
       return {
-        ...state,
-        sessions: state.sessions.map((session) => {
+        ...currentState,
+        sessions: currentState.sessions.map((session) => {
           if (session.id !== mutation.sessionId) {
             return session;
           }
@@ -404,21 +443,21 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
     }
     case 'session-activated': {
       return {
-        ...state,
+        ...currentState,
         activeEventId: mutation.eventId,
         activeSessionId: mutation.sessionId,
       };
     }
     case 'session-deleted': {
-      const remainingSessions = state.sessions.filter((session) => session.id !== mutation.sessionId);
-      const nextActiveSession = state.activeSessionId === mutation.sessionId
-        ? remainingSessions.find((session) => session.eventId === state.activeEventId)?.id
-        : state.activeSessionId;
+      const remainingSessions = currentState.sessions.filter((session) => session.id !== mutation.sessionId);
+      const nextActiveSession = currentState.activeSessionId === mutation.sessionId
+        ? remainingSessions.find((session) => session.eventId === currentState.activeEventId)?.id
+        : currentState.activeSessionId;
 
       return {
-        ...state,
+        ...currentState,
         activeSessionId: nextActiveSession,
-        events: state.events.map((event) => ({
+        events: currentState.events.map((event) => ({
           ...event,
           sessionIds: removeEntry(event.sessionIds, mutation.sessionId),
         })),
@@ -426,13 +465,15 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
       };
     }
     case 'race-state-imported': {
-      return state;
+      return currentState;
     }
     default: {
-      return state;
+      return currentState;
     }
     }
   }, createDefaultEventCatalogState());
+
+  return migrateLegacyCategoryAssignments(state);
 };
 
 export const getSessionsForEvent = (
@@ -465,7 +506,13 @@ export const getCategoryAssignedSessionIds = (
 ): Set<SessionId> => {
   const assignedSessionIds = new Set<SessionId>();
 
-  (category?.sessionAssignments || []).forEach((assignment) => {
+  if (category) {
+    eventSessions
+      .filter((session) => getCategoryIdsForSession(session).includes(category.id))
+      .forEach((session) => assignedSessionIds.add(session.id));
+  }
+
+  getLegacyCategorySessionAssignments(category).forEach((assignment) => {
     if (isValidId(assignment.sessionId)) {
       assignedSessionIds.add(assignment.sessionId);
       return;
@@ -494,9 +541,14 @@ export const getSessionAssignedCategoryIds = (
     return new Set<EventCategoryId>();
   }
 
-  return new Set(categories
+  const activeCategoryIds = new Set(categories.filter(isActiveCategory).map((category) => category.id));
+  const sessionCategoryIds = getCategoryIdsForSession(eventSessions.find((session) => session.id === sessionId))
+    .filter((categoryId) => activeCategoryIds.has(categoryId));
+  const legacyCategoryIds = categories
     .filter((category) => getCategoryAssignedSessionIds(category, eventSessions).has(sessionId))
-    .map((category) => category.id));
+    .map((category) => category.id);
+
+  return new Set([...sessionCategoryIds, ...legacyCategoryIds]);
 };
 
 export const getEntrantCategoryIds = (
@@ -533,11 +585,14 @@ export const getEntrantAssignedSessionIds = (
   const entrantCategoryIds = getEntrantCategoryIds(entrant, eventEntrants);
   const assignedSessionIds = new Set<SessionId>();
 
+  eventSessions
+    .filter((session) => getCategoryIdsForSession(session).some((categoryId) => entrantCategoryIds.has(categoryId)))
+    .forEach((session) => assignedSessionIds.add(session.id));
+
   eventCategories
     .filter((category) => entrantCategoryIds.has(category.id))
-    .forEach((category) => {
-      getCategoryAssignedSessionIds(category, eventSessions).forEach((sessionId) => assignedSessionIds.add(sessionId));
-    });
+    .forEach((category) => getLegacyCategorySessionAssignments(category)
+      .forEach(() => getCategoryAssignedSessionIds(category, eventSessions).forEach((sessionId) => assignedSessionIds.add(sessionId))));
 
   return assignedSessionIds;
 };

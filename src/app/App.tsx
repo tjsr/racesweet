@@ -21,7 +21,7 @@ import { ReloadSummaryDialog } from '../views/display/reloadSummaryDialog.tsx';
 import { type UnsavedChangesGuard } from '../views/display/unsavedChangesWarning.tsx';
 import { PulledApicalRaceState, createApicalCatalogEventId, createApicalCatalogSessionId, fetchApicalRaceStateNow, getConfiguredApicalEventId, pullApicalRaceState } from './apicalDataSource.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
-import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getCategoryAssignedSessionIds, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
+import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
 import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.ts';
 import { EventCatalogService } from './eventCatalogService.ts';
 import './index.css';
@@ -243,11 +243,10 @@ const getSessionAssignedCategoryIds = (
     return undefined;
   }
 
-  const assignedCategoryIds = getCategoriesForEvent(catalog, eventId)
-    .filter((category) => {
-      return (category.sessionAssignments || []).some((assignment) => assignment.sessionId === sessionId);
-    })
-    .map((category) => category.id);
+  const eventCategoryIds = new Set(getCategoriesForEvent(catalog, eventId).map((category) => category.id));
+  const assignedCategoryIds = (getSessionsForEvent(catalog, eventId)
+    .find((session) => session.id === sessionId)?.categoryIds || [])
+    .filter((categoryId) => eventCategoryIds.has(categoryId));
 
   return assignedCategoryIds.length > 0 ? new Set<EventCategoryId>(assignedCategoryIds) : undefined;
 };
@@ -645,9 +644,11 @@ export const RaceSweetMainApp = () => {
     const existingRaceState = eventCatalogService.getImportedRaceState(eventId, sessionId);
     const eventCategories = getCategoriesForEvent(eventCatalogService.catalog, eventId);
     const eventSessions = getSessionsForEvent(eventCatalogService.catalog, eventId);
-    const categoryIdsAssignedToSessions = new Set(eventCategories
-      .filter((category) => getCategoryAssignedSessionIds(category, eventSessions).size > 0)
-      .map((category) => category.id.toString()));
+    const eventCategoryIds = new Set(eventCategories.map((category) => category.id.toString()));
+    const categoryIdsAssignedToSessions = new Set(eventSessions
+      .flatMap((session) => session.categoryIds || [])
+      .filter((categoryId) => eventCategoryIds.has(categoryId.toString()))
+      .map((categoryId) => categoryId.toString()));
     const nextRaceState = mergeRaceStateForReload(existingRaceState, pulledRaceState, mode, {
       categoryIdsAssignedToSessions,
       pruneEmptyReloadEntities: true,
@@ -1140,13 +1141,13 @@ export const RaceSweetMainApp = () => {
     const categorySeriesKey = (_id: string, name: string): string => normalizeCategoryText(name);
     const sessionId = selectedResultsSessionId;
     const candidates = getCategoriesForEvent(eventCatalogState, selectedResultsEventId);
-    const fromCatalog = candidates.filter((category) => {
-      const assignments = category.sessionAssignments || [];
-      if (assignments.length === 0) {
-        return true;
-      }
-      return assignments.some((assignment) => !assignment.sessionId || assignment.sessionId === sessionId);
-    });
+    const selectedSessionCategoryIds = new Set(
+      getSessionsForEvent(eventCatalogState, selectedResultsEventId)
+        .find((session) => session.id === sessionId)?.categoryIds || []
+    );
+    const fromCatalog = selectedSessionCategoryIds.size === 0
+      ? candidates
+      : candidates.filter((category) => selectedSessionCategoryIds.has(category.id));
 
     const categoriesById = new Map(fromCatalog.map((category) => [category.id.toString(), category.name]));
     displayedAnalyticsRaceState.participants.forEach((participant) => {
@@ -1434,25 +1435,17 @@ export const RaceSweetMainApp = () => {
               return;
             }
 
-            const category = eventCatalogState.categories.find((item) => item.id === categoryId);
             const session = eventCatalogState.sessions.find((item) => item.id === sessionId);
-            if (!category || !session) {
+            if (!session) {
               return;
             }
 
-            const existingAssignments = category.sessionAssignments || [];
-            const withoutSession = existingAssignments.filter((assignment) => assignment.sessionId !== sessionId);
-            const nextAssignments = assigned
-              ? [
-                ...withoutSession,
-                {
-                  sessionId,
-                  startTime: session.scheduledStart || '',
-                },
-              ]
-              : withoutSession;
+            const existingCategoryIds = session.categoryIds || [];
+            const nextCategoryIds = assigned
+              ? Array.from(new Set([...existingCategoryIds, categoryId]))
+              : existingCategoryIds.filter((id) => id !== categoryId);
 
-            return eventCatalogService.updateCategory(categoryId, { sessionAssignments: nextAssignments }).then((catalog) => {
+            return eventCatalogService.updateSession(sessionId, { categoryIds: nextCategoryIds }).then((catalog) => {
               updateEventCatalogState(catalog, selectedSessionsEventId, sessionId, categoryId);
             }).catch((error: unknown) => {
               setErrorState(error as Error);
@@ -1522,6 +1515,36 @@ export const RaceSweetMainApp = () => {
                 setRenderTick((tick) => tick + 1);
               }
               updateEventCatalogState(catalog, selectedCategoryEventId, selectedSessionId, categoryId);
+            });
+          }}
+          onUpdateCategorySessionAssignments={(categoryId, sessionIds) => {
+            if (!eventCatalogService || !selectedCategoryEventId) {
+              return;
+            }
+
+            const selectedSessionIds = new Set(sessionIds);
+            const eventSessions = getSessionsForEvent(eventCatalogService.catalog, selectedCategoryEventId);
+            return eventSessions.reduce<Promise<EventCatalogState | undefined>>(async (previousUpdate, session) => {
+              await previousUpdate;
+              const existingCategoryIds = session.categoryIds || [];
+              const isAssigned = existingCategoryIds.includes(categoryId);
+              const shouldBeAssigned = selectedSessionIds.has(session.id);
+              if (isAssigned === shouldBeAssigned) {
+                return eventCatalogService.catalog;
+              }
+
+              const nextCategoryIds = shouldBeAssigned
+                ? Array.from(new Set([...existingCategoryIds, categoryId]))
+                : existingCategoryIds.filter((id) => id !== categoryId);
+
+              return eventCatalogService.updateSession(session.id, { categoryIds: nextCategoryIds });
+            }, Promise.resolve(eventCatalogService.catalog)).then((catalog) => {
+              if (catalog) {
+                updateEventCatalogState(catalog, selectedCategoryEventId, selectedSessionId, categoryId);
+              }
+            }).catch((error: unknown) => {
+              setErrorState(error as Error);
+              throw error;
             });
           }}
           selectedCategoryId={resolvedSelectedCategoryId}

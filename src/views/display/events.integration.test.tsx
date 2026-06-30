@@ -53,6 +53,7 @@ const catalog: EventCatalogState = {
   ],
   sessions: [
     {
+      categoryIds: ['cat-1'],
       eventId: 'event-1',
       id: 'session-1',
       kind: 'practice',
@@ -62,6 +63,7 @@ const catalog: EventCatalogState = {
       status: 'scheduled',
     },
     {
+      categoryIds: ['cat-1'],
       eventId: 'event-1',
       id: 'session-2',
       kind: 'race',
@@ -71,6 +73,7 @@ const catalog: EventCatalogState = {
       status: 'scheduled',
     },
     {
+      categoryIds: ['cat-2'],
       eventId: 'event-2',
       id: 'session-3',
       kind: 'qualifying',

@@ -29,7 +29,7 @@ interface SessionsPageProps {
   onSaveSessionAssignment: (sessionId: SessionId, mode: 'default' | 'specific', sourceIds: string[]) => void | Promise<void>;
   onSelectSession: (sessionId: SessionId) => void;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
-  onUpdateSession: (sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>) => void | Promise<void>;
+  onUpdateSession: (sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>) => void | Promise<void>;
   selectedEventId?: EventId;
   selectedSessionId?: SessionId;
 }

@@ -29,12 +29,6 @@ export const createSeedEventCatalogLedger = (): EventCatalogLedger => {
           eventId: createEventId('event-2026-racesweet-round-1'),
           id: createCategoryId('event-2026-racesweet-round-1-category-premier'),
           name: 'Premier',
-          sessionAssignments: [
-            {
-              sessionId: createSessionId('session-1-race'),
-              startTime: '2026-06-13T14:30:00.000Z',
-            },
-          ],
           teamRules: {
             maxRiderAge: 60,
             maxTeamSize: 2,
@@ -68,16 +62,6 @@ export const createSeedEventCatalogLedger = (): EventCatalogLedger => {
           eventId: createEventId('event-2026-racesweet-round-1'),
           id: createCategoryId('event-2026-racesweet-round-1-category-clubman'),
           name: 'Clubman',
-          sessionAssignments: [
-            {
-              sessionId: createSessionId('session-1-practice'),
-              startTime: '2026-06-12T09:00:00.000Z',
-            },
-            {
-              sessionId: createSessionId('session-1-race'),
-              startTime: '2026-06-13T12:00:00.000Z',
-            },
-          ],
           teamRules: {
             maxRiderAge: 55,
             maxTeamSize: 1,
@@ -106,6 +90,7 @@ export const createSeedEventCatalogLedger = (): EventCatalogLedger => {
       {
         id: createMutationId('mutation-session-seed-1'),
         session: {
+          categoryIds: [createCategoryId('event-2026-racesweet-round-1-category-clubman')],
           eventId: createEventId('event-2026-racesweet-round-1'),
           id: createSessionId('session-1-practice'),
           kind: 'practice',
@@ -120,6 +105,7 @@ export const createSeedEventCatalogLedger = (): EventCatalogLedger => {
       {
         id: createMutationId('mutation-session-seed-2'),
         session: {
+          categoryIds: [],
           eventId: createEventId('event-2026-racesweet-round-1'),
           id: createSessionId('session-1-qualifying'),
           kind: 'qualifying',
@@ -134,6 +120,7 @@ export const createSeedEventCatalogLedger = (): EventCatalogLedger => {
       {
         id: createMutationId('mutation-session-seed-3'),
         session: {
+          categoryIds: [createCategoryId('event-2026-racesweet-round-1-category-premier'), createCategoryId('event-2026-racesweet-round-1-category-clubman')],
           eventId: createEventId('event-2026-racesweet-round-1'),
           id: createSessionId('session-1-race'),
           kind: 'race',

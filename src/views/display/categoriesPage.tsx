@@ -11,7 +11,7 @@ import { EventCategoryId } from '../../model/eventcategory.js';
 import { EventId } from '../../model/raceevent.js';
 import { type UnsavedChangesGuard } from './unsavedChangesWarning.js';
 
-export type CategoryChanges = Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distanceRule' | 'excludeFromResults' | 'name' | 'sessionAssignments' | 'teamRules'>>;
+export type CategoryChanges = Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distanceRule' | 'excludeFromResults' | 'name' | 'teamRules'>>;
 
 export interface CategoriesPageProps {
   catalog: EventCatalogState;
@@ -23,6 +23,7 @@ export interface CategoriesPageProps {
   onSelectEvent: (eventId: EventId) => void;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
   onUpdateCategory: (categoryId: EventCategoryId, changes: CategoryChanges) => void | Promise<void>;
+  onUpdateCategorySessionAssignments: (categoryId: EventCategoryId, sessionIds: string[]) => void | Promise<void>;
   selectedCategoryId?: EventCategoryId;
   selectedEventId?: EventId;
 }
@@ -58,7 +59,7 @@ export const dedupeCategoriesForDisplay = (categories: EventCatalogCategory[]): 
   return Array.from(bySeriesKey.values());
 };
 
-export const getCategoryDraft = (category: EventCatalogCategory | undefined): CategoryDraft => ({
+export const getCategoryDraft = (category: EventCatalogCategory | undefined, sessionIds: string[] = []): CategoryDraft => ({
   code: category?.code || '',
   description: category?.description || '',
   distanceRuleKind: category?.distanceRule?.kind || 'unspecified',
@@ -68,7 +69,7 @@ export const getCategoryDraft = (category: EventCatalogCategory | undefined): Ca
   maxTeamSize: category?.teamRules?.maxTeamSize?.toString() || '',
   minRiderAge: category?.teamRules?.minRiderAge?.toString() || '',
   name: category?.name || '',
-  sessionIds: category?.sessionAssignments?.map((assignment) => assignment.sessionId).filter((sessionId) => sessionId.length > 0) || [],
+  sessionIds,
   teamCompositionRules: formatTeamCompositionRules(category?.teamRules?.teamCompositionRules),
 });
 
