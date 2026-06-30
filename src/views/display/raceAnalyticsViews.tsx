@@ -35,6 +35,7 @@ interface EntrantSummaryRow {
   entrantName: string;
   fastestLap?: number;
   fastestLapNo?: number;
+  fastestLapPlate?: string;
   lapCount: number;
   laps: ParticipantPassingRecord[];
   memberDetails: Array<{
@@ -236,6 +237,13 @@ const findFastestLapRecord = (laps: ParticipantPassingRecord[], ignoreFirstLap: 
     })[0];
 };
 
+const findFastestLapPlate = (row: EntrantSummaryRow, fastestLapRecord: ParticipantPassingRecord | undefined): string | undefined => {
+  if (!fastestLapRecord?.participantId) {
+    return undefined;
+  }
+  return row.memberDetails.find((member) => member.participantId === fastestLapRecord.participantId?.toString())?.raceNumber;
+};
+
 const buildEntrantRows = (
   raceState: Session & RaceStateLookup,
   catalogEntrants: EventCatalogEntrant[],
@@ -296,6 +304,7 @@ const buildEntrantRows = (
       entrantName: findEntrantName(entrantId, members, catalogEntrantsById),
       fastestLap: fastestLapRecord?.lapTime || undefined,
       fastestLapNo: fastestLapRecord?.lapNo || undefined,
+      fastestLapPlate: undefined,
       lapCount: laps.length,
       laps,
       memberDetails,
@@ -443,6 +452,7 @@ const buildFastestLapReportRows = (rows: EntrantSummaryRow[], ignoreFirstLap: bo
         ...row,
         fastestLap: fastestLapRecord?.lapTime || undefined,
         fastestLapNo: fastestLapRecord?.lapNo || undefined,
+        fastestLapPlate: findFastestLapPlate(row, fastestLapRecord),
       };
     })
     .sort((left, right) => {
@@ -880,6 +890,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
           <table aria-label="Fastest Laps Report Table">
             <thead>
               <tr>
+                <th>Plate</th>
                 <th>Entrant</th>
                 <th>Category</th>
                 <th>Fastest Lap</th>
@@ -890,6 +901,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <tbody>
               {fastestLapRows.map((row) => (
                 <tr key={row.entrantId}>
+                  <td>{row.fastestLapPlate || '-'}</td>
                   <td>{row.entrantName}</td>
                   <td>{row.categoryName}</td>
                   <td>{formatDuration(row.fastestLap)}</td>

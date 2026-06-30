@@ -289,6 +289,14 @@ describe('race analytics views integration', () => {
     expect(container.querySelector('table[aria-label="Fastest Laps Report Table"]')).toBeTruthy();
     const fastestTable = container.querySelector('table[aria-label="Fastest Laps Report Table"]') as HTMLTableElement;
     expect(fastestTable.textContent).toContain('On');
+    expect(Array.from(fastestTable.querySelectorAll('thead th')).map((cell) => cell.textContent)).toEqual([
+      'Plate',
+      'Entrant',
+      'Category',
+      'Fastest Lap',
+      'On',
+      'Total Laps',
+    ]);
     expect(container.textContent).toContain('Team Rocket');
     expect(container.textContent).toContain('Solo Rider');
     expect(container.textContent).not.toContain('Timing Error Entrant');
@@ -306,6 +314,7 @@ describe('race analytics views integration', () => {
     expect(fastestIgnoreFirstLapCheckbox).toBeTruthy();
     expect(fastestIgnoreFirstLapCheckbox.checked).toBe(true);
     expect(fastestRowCells('Team Rocket')).toEqual([
+      createEventParticipantId('p-team-2'),
       'Team Rocket',
       'Category A',
       '00:01:03.000',
@@ -313,6 +322,7 @@ describe('race analytics views integration', () => {
       '4',
     ]);
     expect(fastestRowCells('Solo Rider')).toEqual([
+      createEventParticipantId('p-rider-1'),
       'Solo Rider',
       'Category B',
       '00:01:15.000',
@@ -325,6 +335,7 @@ describe('race analytics views integration', () => {
     });
 
     expect(fastestRowCells('Solo Rider')).toEqual([
+      createEventParticipantId('p-rider-1'),
       'Solo Rider',
       'Category B',
       '00:01:10.000',
