@@ -373,14 +373,19 @@ const buildLapChart = (rows: EntrantSummaryRow[]): LapChartColumn[] => {
     });
 };
 
-const buildFastestLapTimeline = (rows: EntrantSummaryRow[]): FastestLapTimelineRow[] => {
+const buildFastestLapTimeline = (rows: EntrantSummaryRow[], ignoreFirstLap: boolean): FastestLapTimelineRow[] => {
   const candidates = rows.flatMap((row) => {
     const memberById = new Map(row.memberDetails.map((detail) => [detail.participantId, detail]));
     const isTeamEntrant = row.memberDetails.length > 1;
 
     return row.laps
       .filter((lap) => {
-        return isValidLap(lap) && typeof lap.lapTime === 'number' && lap.lapTime > 0 && !!lap.participantId && !!lap.lapNo;
+        return isValidLap(lap) &&
+          typeof lap.lapTime === 'number' &&
+          lap.lapTime > 0 &&
+          !!lap.participantId &&
+          !!lap.lapNo &&
+          (!ignoreFirstLap || lap.lapNo !== 1);
       })
       .map((lap) => {
         const participantId = lap.participantId!.toString();
@@ -646,6 +651,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   const [drawLineChart, setDrawLineChart] = React.useState<boolean>(false);
   const [lapChartLineSegments, setLapChartLineSegments] = React.useState<LapChartLineSegment[]>([]);
   const [reportType, setReportType] = React.useState<'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'handicap-data'>('fastest-laps');
+  const [ignoreFirstLapForTimeline, setIgnoreFirstLapForTimeline] = React.useState<boolean>(true);
   const [handicapShowFilter, setHandicapShowFilter] = React.useState<'all' | 'event-participants-only'>('all');
   const lapChartWrapperRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -687,8 +693,8 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   }, [rows]);
 
   const fastestLapTimelineRows = React.useMemo(() => {
-    return buildFastestLapTimeline(rows);
-  }, [rows]);
+    return buildFastestLapTimeline(rows, ignoreFirstLapForTimeline);
+  }, [ignoreFirstLapForTimeline, rows]);
 
   const maxLapPosition = React.useMemo(() => {
     return lapChart.reduce((maxValue, lap) => Math.max(maxValue, lap.entries.length), 0);
@@ -872,6 +878,15 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
       {reportType === 'fastest-lap-timeline' ? (
         <section className="events-panel">
           <h2>Fastest Lap Timeline</h2>
+          <label className="lap-chart-line-toggle">
+            <input
+              aria-label="Ignore first lap"
+              type="checkbox"
+              checked={ignoreFirstLapForTimeline}
+              onChange={(event) => setIgnoreFirstLapForTimeline(event.target.checked)}
+            />
+            Ignore first lap
+          </label>
           <table aria-label="Fastest Lap Timeline Report Table">
             <thead>
               <tr>

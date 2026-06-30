@@ -322,7 +322,29 @@ describe('race analytics views integration', () => {
       'On',
       'Lap Time',
     ]);
-    expect(Array.from(timelineTable.querySelectorAll('tbody tr')).map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent))).toEqual([
+    const timelineRows = (): (string | null)[][] => {
+      return Array.from(timelineTable.querySelectorAll('tbody tr')).map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent));
+    };
+    const ignoreFirstLapCheckbox = container.querySelector('input[aria-label="Ignore first lap"]') as HTMLInputElement;
+    expect(ignoreFirstLapCheckbox).toBeTruthy();
+    expect(ignoreFirstLapCheckbox.checked).toBe(true);
+    expect(timelineRows()).toEqual([
+      [
+        createEventParticipantId('p-team-2'),
+        'Team Two',
+        'Team Rocket',
+        tableTimeString(lapsByParticipant.get(createEventParticipantId('p-team-2'))![1].time),
+        '00:02:10.000',
+        '2',
+        '00:01:03.000',
+      ],
+    ]);
+
+    await act(async () => {
+      ignoreFirstLapCheckbox.click();
+    });
+
+    expect(timelineRows()).toEqual([
       [
         createEventParticipantId('p-team-2'),
         'Team Two',
