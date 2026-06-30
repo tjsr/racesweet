@@ -306,9 +306,45 @@ describe('race analytics views integration', () => {
       '4',
     ]);
 
+    const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
+    await act(async () => {
+      setSelectValue(reportSelect, 'fastest-lap-timeline');
+    });
+
+    const timelineTable = container.querySelector('table[aria-label="Fastest Lap Timeline Report Table"]') as HTMLTableElement;
+    expect(timelineTable).toBeTruthy();
+    expect(Array.from(timelineTable.querySelectorAll('thead th')).map((cell) => cell.textContent)).toEqual([
+      'Plate',
+      'Participant',
+      'Team',
+      'Time of day',
+      'Elapsed',
+      'On',
+      'Lap Time',
+    ]);
+    expect(Array.from(timelineTable.querySelectorAll('tbody tr')).map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent))).toEqual([
+      [
+        createEventParticipantId('p-team-2'),
+        'Team Two',
+        'Team Rocket',
+        tableTimeString(lapsByParticipant.get(createEventParticipantId('p-team-2'))![0].time),
+        '00:01:04.000',
+        '1',
+        '00:01:04.000',
+      ],
+      [
+        createEventParticipantId('p-team-2'),
+        'Team Two',
+        'Team Rocket',
+        tableTimeString(lapsByParticipant.get(createEventParticipantId('p-team-2'))![1].time),
+        '00:02:10.000',
+        '2',
+        '00:01:03.000',
+      ],
+    ]);
+
     const categorySelect = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
     expect(container.querySelector('select[aria-label="Race View Event Session"]')).toBeTruthy();
-    const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
 
     await act(async () => {
       setSelectValue(categorySelect, createCategoryId('cat-a'));

@@ -21,6 +21,7 @@ import {
 
 import type { EventParticipant } from '../model/eventparticipant.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
+import { createApicalTeamNameDisplayWorkbookBuffer } from '../testing/apicalTeamWorkbook.js';
 import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
 import { EventCatalogService } from './eventCatalogService.js';
 
@@ -1144,8 +1145,7 @@ describe('EventCatalogService', () => {
     const service = await EventCatalogService.create(seededPersistence, { onPersistedLedger });
     const importedEventId = createEventId('apical-event-68-real-ledger-event');
     const importedSessionId = createSessionId('apical-event-68-real-ledger-session');
-    const workbook = await readFile(path.join(process.cwd(), 'src', 'generated', 'apical-excel-cache', 'apical-event-68.xlsx'));
-    const apicalData = await readApicalExcelBuffer(workbook.buffer.slice(workbook.byteOffset, workbook.byteOffset + workbook.byteLength));
+    const apicalData = await readApicalExcelBuffer(createApicalTeamNameDisplayWorkbookBuffer());
     const teamResult = apicalData
       .flatMap((category) => category.ParticipantViewModels)
       .find((entrant) => entrant.TeamNameDisplay === 'The Evereadys');

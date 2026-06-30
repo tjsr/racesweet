@@ -1,10 +1,9 @@
 import * as XLSX from 'xlsx';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
 
 import { readApicalExcelBuffer } from './apicalSpreadsheetProcessor.js';
 
 import type { ApicalSpreadsheetLapsRow, ApicalSpreadsheetResultsRow } from '../../app/apicalDataSource.js';
+import { createApicalTeamNameDisplayWorkbookBuffer } from '../../testing/apicalTeamWorkbook.js';
 
 const createTeamLapsRows = (): ApicalSpreadsheetLapsRow[] => [
   {
@@ -90,8 +89,7 @@ describe('apical spreadsheet processor', () => {
   });
 
   it('uses real Results TeamNameDisplay rows to create team entrants with listed race numbers', async () => {
-    const workbook = await readFile(path.join(process.cwd(), 'src', 'generated', 'apical-excel-cache', 'apical-event-68.xlsx'));
-    const data = await readApicalExcelBuffer(workbook.buffer.slice(workbook.byteOffset, workbook.byteOffset + workbook.byteLength));
+    const data = await readApicalExcelBuffer(createApicalTeamNameDisplayWorkbookBuffer());
     const eBikeTeamCategory = data.find((category) => category.CategoryName === 'EBIKE_TEAM');
     const evereadys = eBikeTeamCategory?.ParticipantViewModels.find((entrant) => entrant.TeamNameDisplay === 'The Evereadys');
 
