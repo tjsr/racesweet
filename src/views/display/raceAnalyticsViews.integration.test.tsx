@@ -293,17 +293,43 @@ describe('race analytics views integration', () => {
     expect(container.textContent).toContain('Solo Rider');
     expect(container.textContent).not.toContain('Timing Error Entrant');
     expect(container.textContent).toContain('00:01:03.000');
-    expect(container.textContent).toContain('00:01:10.000');
+    expect(container.textContent).toContain('00:01:15.000');
+    expect(container.textContent).not.toContain('00:01:10.000');
     expect(container.textContent).not.toContain('00:00:10.000');
-    const fastestRows = Array.from(fastestTable.querySelectorAll('tbody tr'));
-    const teamFastestRow = fastestRows.find((row) => row.textContent?.includes('Team Rocket'));
-    expect(teamFastestRow).toBeTruthy();
-    expect(Array.from(teamFastestRow!.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
+    const fastestRows = (): HTMLTableRowElement[] => Array.from(fastestTable.querySelectorAll('tbody tr'));
+    const fastestRowCells = (entrantName: string): (string | null)[] => {
+      const row = fastestRows().find((item) => item.textContent?.includes(entrantName));
+      expect(row).toBeTruthy();
+      return Array.from(row!.querySelectorAll('td')).map((cell) => cell.textContent);
+    };
+    const fastestIgnoreFirstLapCheckbox = container.querySelector('input[aria-label="Ignore first lap"]') as HTMLInputElement;
+    expect(fastestIgnoreFirstLapCheckbox).toBeTruthy();
+    expect(fastestIgnoreFirstLapCheckbox.checked).toBe(true);
+    expect(fastestRowCells('Team Rocket')).toEqual([
       'Team Rocket',
       'Category A',
       '00:01:03.000',
       '2',
       '4',
+    ]);
+    expect(fastestRowCells('Solo Rider')).toEqual([
+      'Solo Rider',
+      'Category B',
+      '00:01:15.000',
+      '2',
+      '2',
+    ]);
+
+    await act(async () => {
+      fastestIgnoreFirstLapCheckbox.click();
+    });
+
+    expect(fastestRowCells('Solo Rider')).toEqual([
+      'Solo Rider',
+      'Category B',
+      '00:01:10.000',
+      '1',
+      '2',
     ]);
 
     const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;

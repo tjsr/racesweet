@@ -225,6 +225,17 @@ const findEntrantName = (entrantId: EventEntrantId, members: EventParticipant[],
   return names.join(' / ');
 };
 
+const findFastestLapRecord = (laps: ParticipantPassingRecord[], ignoreFirstLap: boolean): ParticipantPassingRecord | undefined => {
+  return laps
+    .filter((lap) => typeof lap.lapTime === 'number' && lap.lapTime > 0 && (!ignoreFirstLap || lap.lapNo !== 1))
+    .sort((left, right) => {
+      if (left.lapTime !== right.lapTime) {
+        return (left.lapTime || 0) - (right.lapTime || 0);
+      }
+      return (left.lapNo || 0) - (right.lapNo || 0);
+    })[0];
+};
+
 const buildEntrantRows = (
   raceState: Session & RaceStateLookup,
   catalogEntrants: EventCatalogEntrant[],
@@ -260,14 +271,7 @@ const buildEntrantRows = (
         return (a.elapsedTime || 0) - (b.elapsedTime || 0);
       });
 
-    const fastestLapRecord = laps
-      .filter((lap) => typeof lap.lapTime === 'number' && lap.lapTime > 0)
-      .sort((left, right) => {
-        if (left.lapTime !== right.lapTime) {
-          return (left.lapTime || 0) - (right.lapTime || 0);
-        }
-        return (left.lapNo || 0) - (right.lapNo || 0);
-      })[0];
+    const fastestLapRecord = findFastestLapRecord(laps, false);
 
     const totalTime = laps.length > 0 ? laps[laps.length - 1].elapsedTime || undefined : undefined;
     const memberDetails = includedMembers.map((member) => {
@@ -429,6 +433,27 @@ const buildFastestLapTimeline = (rows: EntrantSummaryRow[], ignoreFirstLap: bool
   });
 
   return timeline;
+};
+
+const buildFastestLapReportRows = (rows: EntrantSummaryRow[], ignoreFirstLap: boolean): EntrantSummaryRow[] => {
+  return rows
+    .map((row) => {
+      const fastestLapRecord = findFastestLapRecord(row.laps, ignoreFirstLap);
+      return {
+        ...row,
+        fastestLap: fastestLapRecord?.lapTime || undefined,
+        fastestLapNo: fastestLapRecord?.lapNo || undefined,
+      };
+    })
+    .sort((left, right) => {
+      if (typeof left.fastestLap !== 'number') {
+        return 1;
+      }
+      if (typeof right.fastestLap !== 'number') {
+        return -1;
+      }
+      return left.fastestLap - right.fastestLap;
+    });
 };
 
 const CategorySelector = (props: {
@@ -651,6 +676,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   const [drawLineChart, setDrawLineChart] = React.useState<boolean>(false);
   const [lapChartLineSegments, setLapChartLineSegments] = React.useState<LapChartLineSegment[]>([]);
   const [reportType, setReportType] = React.useState<'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'handicap-data'>('fastest-laps');
+  const [ignoreFirstLapForFastestLaps, setIgnoreFirstLapForFastestLaps] = React.useState<boolean>(true);
   const [ignoreFirstLapForTimeline, setIgnoreFirstLapForTimeline] = React.useState<boolean>(true);
   const [handicapShowFilter, setHandicapShowFilter] = React.useState<'all' | 'event-participants-only'>('all');
   const lapChartWrapperRef = React.useRef<HTMLDivElement | null>(null);
@@ -788,16 +814,8 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   }, [drawLineChart, reportType, updateLapChartLineSegments]);
 
   const fastestLapRows = React.useMemo(() => {
-    return [...rows].sort((left, right) => {
-      if (typeof left.fastestLap !== 'number') {
-        return 1;
-      }
-      if (typeof right.fastestLap !== 'number') {
-        return -1;
-      }
-      return left.fastestLap - right.fastestLap;
-    });
-  }, [rows]);
+    return buildFastestLapReportRows(rows, ignoreFirstLapForFastestLaps);
+  }, [ignoreFirstLapForFastestLaps, rows]);
 
   const eventParticipantNames = React.useMemo(() => {
     return reportParticipants.map((participant) => participant.name).filter((name) => name.length > 0);
@@ -850,6 +868,15 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
       {reportType === 'fastest-laps' ? (
         <section className="events-panel">
           <h2>Fastest Laps</h2>
+          <label className="lap-chart-line-toggle">
+            <input
+              aria-label="Ignore first lap"
+              type="checkbox"
+              checked={ignoreFirstLapForFastestLaps}
+              onChange={(event) => setIgnoreFirstLapForFastestLaps(event.target.checked)}
+            />
+            Ignore first lap
+          </label>
           <table aria-label="Fastest Laps Report Table">
             <thead>
               <tr>
