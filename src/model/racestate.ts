@@ -55,6 +55,7 @@ export class Session implements RaceState, RaceStateLookup {
   private _cachedParticipantLaps: Map<TimeRecordId, ParticipantPassingRecord[]> | undefined;
   // private __currentBulkProcess: Barrier<void>|undefined;
   private _bulkProcess: boolean = false;
+  private _bulkProcessDepth = 0;
   private _categoryGreenFlags: Map<EventCategoryId, GreenFlagRecord> | undefined;
   private _minimumLapTimeMilliseconds: number | undefined = 60000;
   private _cachedTransponderCrossings: Map<ChipCrossingData["chipCode"], ChipCrossingData[]>;
@@ -84,6 +85,7 @@ export class Session implements RaceState, RaceStateLookup {
   };
 
   public async beginBulkProcess(): Promise<boolean> {
+    this._bulkProcessDepth += 1;
     this._bulkProcess = true;
     // this.__currentBulkProcess = this.__currentBulkProcess || Promise.resolve();
     // // const onComplete = (resolve: () => void) => {
@@ -100,12 +102,15 @@ export class Session implements RaceState, RaceStateLookup {
 
   public async endBulkProcess(): Promise<void> {
     return Promise.resolve(true).then(() => {
-      assignParticpantsToCrossings(this._participants, this.records);
-      const processedLaps: Map<EventParticipantId, ParticipantPassingRecord[]> = processAllParticipantLaps(
-        this.records, this._participants
-      );
+      this._bulkProcessDepth = Math.max(0, this._bulkProcessDepth - 1);
+      if (this._bulkProcessDepth > 0) {
+        return;
+      }
 
-      this._cachedParticipantLaps = processedLaps;
+      this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
+      this._categoryGreenFlags = undefined;
+      assignParticpantsToCrossings(this._participants, this.records);
+      this.__reprocessAllParticipantLaps();
       this._bulkProcess = false;
     });
   };

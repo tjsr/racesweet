@@ -361,7 +361,7 @@ const clickSectionButton = async (container: HTMLDivElement, sectionName: string
 
 const waitForLoadedApp = async (container: HTMLDivElement): Promise<void> => {
   for (let attempt = 0; attempt < 120; attempt += 1) {
-    if (!container.textContent?.includes('Loading...')) {
+    if (!container.querySelector('.loading-progress')) {
       return;
     }
 
@@ -741,6 +741,49 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.querySelector('select[aria-label="Reports View Type"]')).toBeTruthy();
     expect(container.querySelector('select[aria-label="Race View Category"]')).toBeTruthy();
     expect(container.textContent).toContain('Handicap Data');
+  });
+
+  it('shows staged startup progress while generated files are loading', async () => {
+    let catalogFilePath = '';
+    let resolveCatalogLoad: ((content: string) => void) | undefined;
+    const blockedCatalogLoad = new Promise<string>((resolve) => {
+      resolveCatalogLoad = resolve;
+    });
+    const requestFileContent = async (filePath: string, _dataType: string): Promise<string> => {
+      if (filePath.includes('event-catalog.json')) {
+        catalogFilePath = filePath;
+        return blockedCatalogLoad;
+      }
+
+      return readGeneratedFixture(filePath);
+    };
+
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer: readFixtureBuffer,
+      requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async () => undefined,
+    };
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForText(container, 'Loading RaceSweet');
+    const progressBar = container.querySelector('progress[aria-label="Loading RaceSweet progress"]') as HTMLProgressElement | null;
+    expect(progressBar).toBeTruthy();
+    expect(container.textContent).toContain('Loading generated data files');
+    expect(container.textContent).not.toContain('Loading...');
+
+    await act(async () => {
+      resolveCatalogLoad?.(await readGeneratedFixture(catalogFilePath));
+    });
+    await waitForLoadedApp(container);
   });
 
   it('routes individual entrant card selections through app state to details and identification panels', async () => {

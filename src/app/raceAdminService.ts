@@ -1,5 +1,5 @@
-import type { EventEntrantId } from '../model/entrant.js';
 import type { EventCategoryId } from '../model/eventcategory.js';
+import type { EventEntrantId } from '../model/entrant.js';
 import type { SessionId } from '../model/raceevent.js';
 import type { RaceStateLookup, Session } from '../model/racestate.js';
 import type { EventTimeRecord, TimeRecordId } from '../model/timerecord.js';
@@ -37,7 +37,7 @@ export class RaceAdminService {
     const session = await sessionLoader();
     const changes = await persistence.load();
     const service = new RaceAdminService(session, persistence, changes, sessionId);
-    service.applyChanges();
+    await service.applyChanges();
     return service;
   }
 
@@ -81,12 +81,12 @@ export class RaceAdminService {
     await this.persistence.save(this.changes);
   }
 
-  public applyChangesToSession(session: Session & RaceStateLookup): void {
-    this.applyChanges(session);
+  public async applyChangesToSession(session: Session & RaceStateLookup): Promise<void> {
+    await this.applyChanges(session);
   }
 
-  public applyChangesToSessionById(session: Session & RaceStateLookup, sessionId: SessionId | undefined): void {
-    this.applyChanges(session, sessionId);
+  public async applyChangesToSessionById(session: Session & RaceStateLookup, sessionId: SessionId | undefined): Promise<void> {
+    await this.applyChanges(session, sessionId);
   }
 
   public async addRecordForSession(
@@ -169,50 +169,70 @@ export class RaceAdminService {
     await this.persistence.save(this.changes);
   }
 
-  private applyChanges(session: Session & RaceStateLookup = this.session, sessionId: SessionId | undefined = this.sessionId): void {
+  private async applyChanges(session: Session & RaceStateLookup = this.session, sessionId: SessionId | undefined = this.sessionId): Promise<void> {
     const changes = this.changes || createDefaultAdministrativeChanges();
+    const addedRecords = changes.addedRecords.filter((candidate) => this.shouldApplyRecordToSession(candidate, sessionId));
+    const updatedRecords = changes.updatedRecords.filter((entry) => this.shouldApplyUpdatedRecordToSession(entry, sessionId));
+    const flagDeletedChanges = Object.entries(changes.flagDeleted);
+    const entrantCategoryChanges = Object.entries(changes.entrantCategories);
+    const excludedCrossingChanges = Object.entries(changes.excludedCrossings);
+    const hasApplicableChanges = addedRecords.length > 0 ||
+      updatedRecords.length > 0 ||
+      flagDeletedChanges.length > 0 ||
+      changes.flagCategoryChanges.length > 0 ||
+      entrantCategoryChanges.length > 0 ||
+      excludedCrossingChanges.length > 0;
+    if (!hasApplicableChanges) {
+      return;
+    }
 
-    changes.addedRecords
-      .filter((entry) => this.shouldApplyRecordToSession(entry, sessionId))
-      .forEach((entry) => {
-        this.applyStoredRecordChange(session, entry.record);
-      });
+    const bulkStarted = await session.beginBulkProcess() === true;
 
-    changes.updatedRecords
-      .filter((entry) => this.shouldApplyUpdatedRecordToSession(entry, sessionId))
-      .forEach((entry) => {
+    try {
+      for (const entry of addedRecords) {
+        await this.applyStoredRecordChange(session, entry.record);
+      }
+
+      updatedRecords.forEach((entry) => {
         this.applyStoredUpdatedRecordChange(session, entry.record);
       });
 
-    Object.entries(changes.flagDeleted).forEach(([flagId, deleted]) => {
-      this.applyStoredFlagChange(() => this.markFlagDeletedInSession(session, flagId, deleted));
-    });
+      flagDeletedChanges.forEach(([flagId, deleted]) => {
+        this.applyStoredFlagChange(() => this.markFlagDeletedInSession(session, flagId, deleted));
+      });
 
-    changes.flagCategoryChanges.forEach((change) => {
-      if (change.action === 'assign') {
-        this.applyStoredFlagChange(() => this.assignFlagCategoryInSession(session, change.flagId, change.categoryId));
-      } else {
-        this.applyStoredFlagChange(() => this.removeFlagCategoryInSession(session, change.flagId, change.categoryId));
+      changes.flagCategoryChanges.forEach((change) => {
+        if (change.action === 'assign') {
+          this.applyStoredFlagChange(() => this.assignFlagCategoryInSession(session, change.flagId, change.categoryId));
+        } else {
+          this.applyStoredFlagChange(() => this.removeFlagCategoryInSession(session, change.flagId, change.categoryId));
+        }
+      });
+
+      entrantCategoryChanges.forEach(([entrantId, categoryId]) => {
+        this.updateEntrantCategoryInSession(session, entrantId, categoryId);
+      });
+
+      excludedCrossingChanges.forEach(([crossingId, exclude]) => {
+        this.excludeCrossingInSession(session, crossingId, exclude);
+      });
+    } finally {
+      if (bulkStarted) {
+        await session.endBulkProcess();
       }
-    });
-
-    Object.entries(changes.entrantCategories).forEach(([entrantId, categoryId]) => {
-      this.updateEntrantCategoryInSession(session, entrantId, categoryId);
-    });
-
-    Object.entries(changes.excludedCrossings).forEach(([crossingId, exclude]) => {
-      this.excludeCrossingInSession(session, crossingId, exclude);
-    });
+    }
   }
 
   private assignFlagCategoryInSession(session: Session & RaceStateLookup, flagId: TimeRecordId, categoryId: EventCategoryId): void {
     session.assignFlagCategory?.(flagId, categoryId);
   }
 
-  private applyStoredRecordChange(session: Session & RaceStateLookup, record: EventTimeRecord): void {
-    this.addRecordInSession(session, record).catch((_error: unknown) => {
+  private async applyStoredRecordChange(session: Session & RaceStateLookup, record: EventTimeRecord): Promise<void> {
+    try {
+      await this.addRecordInSession(session, record);
+    } catch (_error: unknown) {
       // Saved admin changes are replayed across session reloads; ignore records that cannot be re-added here.
-    });
+    }
   }
 
   private applyStoredUpdatedRecordChange(session: Session & RaceStateLookup, record: EventTimeRecord): void {

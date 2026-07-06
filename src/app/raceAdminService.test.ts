@@ -11,6 +11,7 @@ import { RaceAdminService } from './raceAdminService.js';
 
 const createSessionDouble = () => {
   const addedRecords: EventTimeRecord[] = [];
+  const bulkEvents: string[] = [];
   const excluded: Record<string, boolean> = {};
   const entrantCategories: Record<string, string> = {};
   const flagCategoryAssignments: Array<{ categoryId: string; flagId: string }> = [];
@@ -24,6 +25,13 @@ const createSessionDouble = () => {
     },
     addRecords: async (records: EventTimeRecord[]): Promise<void> => {
       addedRecords.push(...records);
+    },
+    beginBulkProcess: async (): Promise<boolean> => {
+      bulkEvents.push('begin');
+      return true;
+    },
+    endBulkProcess: async (): Promise<void> => {
+      bulkEvents.push('end');
     },
     excludeCrossing: (crossingId: string, exclude: boolean): void => {
       excluded[crossingId] = exclude;
@@ -42,7 +50,7 @@ const createSessionDouble = () => {
     },
   };
 
-  return { addedRecords, entrantCategories, excluded, flagCategoryAssignments, flagCategoryRemovals, flagDeleted, session, updatedRecords };
+  return { addedRecords, bulkEvents, entrantCategories, excluded, flagCategoryAssignments, flagCategoryRemovals, flagDeleted, session, updatedRecords };
 };
 
 class MemoryPersistence implements RaceAdminPersistence {
@@ -100,6 +108,38 @@ describe('RaceAdminService', () => {
     expect(sessionDouble.flagDeleted['flag-1']).toBe(true);
     expect(sessionDouble.flagCategoryAssignments).toEqual([{ categoryId: 'cat-b', flagId: 'flag-1' }]);
     expect(sessionDouble.flagCategoryRemovals).toEqual([{ categoryId: 'cat-a', flagId: 'flag-1' }]);
+    expect(sessionDouble.bulkEvents).toEqual(['begin', 'end']);
+  });
+
+  it('applies stored changes to a displayed session in one bulk replay', async () => {
+    const activeSessionDouble = createSessionDouble();
+    const displayedSessionDouble = createSessionDouble();
+    const persistence = new MemoryPersistence({
+      entrantCategories: { team1: 'cat-b' },
+      excludedCrossings: { crossing1: true },
+      addedRecords: [
+        {
+          record: { id: 'record-1', recordType: 16, sequence: 1, sessionId: 'session-b', source: 'manual-source' } as EventTimeRecord,
+          sessionId: 'session-b' as SessionId,
+        },
+        {
+          record: { id: 'record-2', recordType: 16, sequence: 2, sessionId: 'session-b', source: 'manual-source' } as EventTimeRecord,
+          sessionId: 'session-b' as SessionId,
+        },
+      ],
+      flagCategoryChanges: [{ action: 'assign', categoryId: 'cat-b', flagId: 'flag-1' }],
+      flagDeleted: { 'flag-1': true },
+      schemaVersion: 1,
+      updatedRecords: [],
+    });
+    const service = await RaceAdminService.create(async () => activeSessionDouble.session as never, persistence, 'session-a');
+
+    await service.applyChangesToSessionById(displayedSessionDouble.session as never, 'session-b');
+
+    expect(displayedSessionDouble.addedRecords.map((record) => record.id)).toEqual(['record-1', 'record-2']);
+    expect(displayedSessionDouble.excluded.crossing1).toBe(true);
+    expect(displayedSessionDouble.flagCategoryAssignments).toEqual([{ categoryId: 'cat-b', flagId: 'flag-1' }]);
+    expect(displayedSessionDouble.bulkEvents).toEqual(['begin', 'end']);
   });
 
   it('persists entrant category updates', async () => {
@@ -207,7 +247,7 @@ describe('RaceAdminService', () => {
     });
 
     const service = await RaceAdminService.create(async () => activeSessionDouble.session as never, persistence, 'session-a');
-    service.applyChangesToSessionById(displayedSessionDouble.session as never, 'session-b');
+    await service.applyChangesToSessionById(displayedSessionDouble.session as never, 'session-b');
     await service.excludeCrossingForSession(displayedSessionDouble.session as never, 'crossing2', true);
     await service.updateEntrantCategoryForSession(displayedSessionDouble.session as never, 'team2', 'cat-c');
     await service.markFlagDeletedForSession(displayedSessionDouble.session as never, 'flag-2', true);

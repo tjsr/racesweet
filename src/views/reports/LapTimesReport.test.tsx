@@ -86,7 +86,7 @@ describe('LapTimesReport', () => {
     expect(Array.from(table.querySelectorAll('tbody tr:first-child td')).map((cell) => cell.textContent)).toEqual([
       '42',
       'Plate Rider',
-      '00:01:05.000',
+      '1:05.000',
     ]);
     expect(table.textContent).not.toContain(createEventEntrantId('entrant-42'));
   });

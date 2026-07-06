@@ -7,6 +7,7 @@ import { type EventParticipant, type EventParticipantId } from '../model/eventpa
 import { EventId, SessionId } from '../model/raceevent.ts';
 import { type RaceState, RaceStateLookup, Session } from '../model/racestate.ts';
 import { type EventTimeRecord, type TimeRecordId } from '../model/timerecord.ts';
+import { type LoadingProgressState, completeLoadingProgressStage, createLoadingProgressState, updateLoadingProgressStage } from '../loadingProgress.ts';
 import { type MrScatsCatalogImport, loadMrScatsCatalogFromLocation } from '../parsers/mrScats/catalogImport.ts';
 import { listMrScatsDataFiles } from '../parsers/mrScats/fileInventory.ts';
 import { previewMrScatsDataFile } from '../parsers/mrScats/filePreview.ts';
@@ -22,6 +23,7 @@ import { SystemContext } from '../views/context/System.tsx';
 import { TimingContext } from '../views/context/Timing.tsx';
 import { ReloadSummaryDialog } from '../views/display/reloadSummaryDialog.tsx';
 import { type UnsavedChangesGuard } from '../views/display/unsavedChangesWarning.tsx';
+import { LoadingProgress } from '../views/panels/LoadingProgress.tsx';
 import { PulledApicalRaceState, createApicalCatalogEventId, createApicalCatalogSessionId, fetchApicalRaceStateNow, getConfiguredApicalEventId, pullApicalRaceState } from './apicalDataSource.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
 import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
@@ -42,6 +44,15 @@ import { type EventSessionOption } from './views/results/resultsPage.tsx';
 
 type AppSection = 'System' | 'Events' | 'Entrants' | 'Categories' | 'Sessions' | 'Timing' | 'Results' | 'Reports';
 type TimingSessionSelection = 'active' | 'session';
+
+const createStartupLoadingProgress = (): LoadingProgressState => createLoadingProgressState('Loading RaceSweet', [
+  { id: 'services', label: 'Loading generated data files', total: 3 },
+  { id: 'source-metadata', label: 'Restoring source metadata', total: 1 },
+  { id: 'catalog-validation', label: 'Checking event catalog links', total: 1 },
+  { id: 'session-state', label: 'Preparing active session state', total: 1 },
+  { id: 'scaffold', label: 'Synchronising event scaffold', total: 1 },
+  { id: 'publish', label: 'Displaying application', total: 1 },
+]);
 
 interface PageErrorFallbackProps {
   error: Error;
@@ -283,6 +294,7 @@ export const RaceSweetMainApp = () => {
   const [, setRenderTick] = useState(0);
   const [errorState, setErrorState] = useState<Error|undefined>(undefined);
   const [displayedErrorLogEntries, setDisplayedErrorLogEntries] = useState<DisplayedErrorLogEntry[]>([]);
+  const [loadingProgress, setLoadingProgress] = useState<LoadingProgressState>(createStartupLoadingProgress);
   const [loadWarnings, setLoadWarnings] = useState<string[]>([]);
   const [selectedCategories, setCategorySelected] = useState<Set<EventCategoryId>>(new Set<EventCategoryId>());
   const [selectedCategoryId, setSelectedCategoryId] = useState<string|undefined>(undefined);
@@ -365,26 +377,77 @@ export const RaceSweetMainApp = () => {
         setLoadWarnings((existing) => existing.includes(message) ? existing : [...existing, message]);
       };
 
-      Promise.all([loadAdminService(onLoadError), loadEventCatalogService(onLoadError), loadSystemConfigService(onLoadError)]).then(async ([raceService, catalogService, systemService]) => {
+      setLoadingProgress(createStartupLoadingProgress());
+      let loadedServiceCount = 0;
+      const updateProgressStage = (
+        stageId: string,
+        total: number,
+        completed: number,
+        active: boolean = true
+      ): void => {
+        setLoadingProgress((current) => updateLoadingProgressStage(current, stageId, {
+          active,
+          completed,
+          total,
+        }));
+      };
+      const completeProgressStage = (stageId: string): void => {
+        setLoadingProgress((current) => completeLoadingProgressStage(current, stageId));
+      };
+      const markServiceLoaded = (): void => {
+        loadedServiceCount += 1;
+        updateProgressStage('services', 3, loadedServiceCount);
+      };
+      const adminServicePromise = loadAdminService(onLoadError).then((service) => {
+        markServiceLoaded();
+        return service;
+      });
+      const catalogServicePromise = loadEventCatalogService(onLoadError).then((service) => {
+        markServiceLoaded();
+        return service;
+      });
+      const systemServicePromise = loadSystemConfigService(onLoadError).then((service) => {
+        markServiceLoaded();
+        return service;
+      });
+
+      Promise.all([adminServicePromise, catalogServicePromise, systemServicePromise]).then(async ([raceService, catalogService, systemService]) => {
+        completeProgressStage('services');
         const session = raceService.raceState;
         const initialCatalog = catalogService.catalog;
+        updateProgressStage('source-metadata', Math.max(1, systemService.state.dataSources.length), 0);
         const initialSystemConfig = await loadSystemConfigWithImportedApicalPaths(systemService, catalogService);
+        updateProgressStage('source-metadata', Math.max(1, initialSystemConfig.dataSources.length), initialSystemConfig.dataSources.length);
         const initialEventId: EventId = initialCatalog.activeEventId || initialCatalog.events[0]?.id;
         if (!validateUuid(initialEventId)) {
           throw new Error(`Invalid initial event ID in catalog: ${initialEventId}`);
         };
+        const catalogValidationTotal = Math.max(1, initialCatalog.events.length + session.participants.length + 4);
+        let catalogValidationCompleted = 0;
         initialCatalog.events.forEach((event) => {
           if (!validateUuid(event.id)) {
             throw new Error(`Invalid event ID in catalog: ${event.id}`);
           }
+          catalogValidationCompleted += 1;
+          updateProgressStage('catalog-validation', catalogValidationTotal, catalogValidationCompleted);
         });
         const participantCategoryIds = new Set(session.participants.map((participant) => participant.categoryId.toString()));
+        catalogValidationCompleted += session.participants.length;
+        updateProgressStage('catalog-validation', catalogValidationTotal, catalogValidationCompleted);
         const participantEntrantIds = new Set(session.participants.map((participant) => participant.entrantId.toString()));
         const catalogCategoryIds = new Set(getCategoriesForEvent(initialCatalog, initialEventId).map((category) => category.id.toString()));
+        catalogValidationCompleted += 1;
+        updateProgressStage('catalog-validation', catalogValidationTotal, catalogValidationCompleted);
         const catalogEntrantIds = new Set(getEntrantsForEvent(initialCatalog, initialEventId).map((entrant) => entrant.id.toString()));
+        catalogValidationCompleted += 1;
+        updateProgressStage('catalog-validation', catalogValidationTotal, catalogValidationCompleted);
         const expectedCategoryCount = Math.max(session.categories.length, participantCategoryIds.size, catalogCategoryIds.size);
         const missingCategoryIds = Array.from(participantCategoryIds).filter((categoryId) => !catalogCategoryIds.has(categoryId));
+        catalogValidationCompleted += 1;
+        updateProgressStage('catalog-validation', catalogValidationTotal, catalogValidationCompleted);
         const missingEntrantIds = Array.from(participantEntrantIds).filter((entrantId) => !catalogEntrantIds.has(entrantId));
+        catalogValidationCompleted += 1;
+        updateProgressStage('catalog-validation', catalogValidationTotal, catalogValidationTotal);
         const shouldSyncScaffold = !!initialEventId && (
           getCategoriesForEvent(initialCatalog, initialEventId).length !== expectedCategoryCount || 
           (initialCatalog.events.find((event) => event.id === initialEventId)?.entrantIds.length || 0) !== participantEntrantIds.size ||
@@ -392,15 +455,19 @@ export const RaceSweetMainApp = () => {
           missingEntrantIds.length > 0
         );
 
-        const finalizeLoad = (catalog: EventCatalogState) => {
+        const finalizeLoad = async (catalog: EventCatalogState): Promise<void> => {
           const sessionList = getSessionsForEvent(catalog, initialEventId);
           const categoryList = getCategoriesForEvent(catalog, initialEventId);
           const entrantList = getEntrantsForEvent(catalog, initialEventId);
           const initialSessionId = sessionList.find((session) => session.id === catalog.activeSessionId)?.id || sessionList[0]?.id;
 
+          const sessionPreparationTotal = Math.max(1, session.categories.length + session.participants.length + session.records.length);
+          updateProgressStage('session-state', sessionPreparationTotal, 0);
           if (initialSessionId) {
-            raceService.applyChangesToSessionById(session, initialSessionId);
+            await raceService.applyChangesToSessionById(session, initialSessionId);
           }
+          updateProgressStage('session-state', sessionPreparationTotal, sessionPreparationTotal);
+          updateProgressStage('publish', 1, 0);
           setAdminService(raceService);
           setEventCatalogService(catalogService);
           setSystemConfigService(systemService);
@@ -421,20 +488,25 @@ export const RaceSweetMainApp = () => {
           setAnalyticsRaceState(session);
           setTimingRaceState(session);
           setErrorState(undefined);
+          updateProgressStage('publish', 1, 1);
         };
 
         if (shouldSyncScaffold) {
           const masterProfiles = getMasterEntrantProfilesForEvent(initialSystemConfig, initialEventId!);
+          const scaffoldTotal = Math.max(1, session.categories.length + session.participants.length + masterProfiles.length);
+          updateProgressStage('scaffold', scaffoldTotal, 0);
 
-          catalogService.syncEventScaffold(initialEventId!, session.categories, session.participants, masterProfiles).then((catalog) => {
-            finalizeLoad(catalog);
+          catalogService.syncEventScaffold(initialEventId!, session.categories, session.participants, masterProfiles).then(async (catalog) => {
+            updateProgressStage('scaffold', scaffoldTotal, scaffoldTotal);
+            await finalizeLoad(catalog);
           }).catch((error: unknown) => {
             setErrorState(error as Error);
           });
           return;
         }
 
-        finalizeLoad(initialCatalog);
+        updateProgressStage('scaffold', 1, 1);
+        await finalizeLoad(initialCatalog);
       }).catch((error: unknown) => {
         setErrorState(error as Error);
       });
@@ -538,7 +610,9 @@ export const RaceSweetMainApp = () => {
       eventId,
       sessionId: options.sessionId,
     });
-    setRenderTick((tick) => tick + 1);
+    if (!targetSessionState) {
+      setRenderTick((tick) => tick + 1);
+    }
   };
 
   const applyPersistedRaceStateToSession = async (eventId: EventId, sessionId: SessionId, targetSessionState: Session & RaceStateLookup): Promise<boolean> => {
@@ -593,7 +667,6 @@ export const RaceSweetMainApp = () => {
     let targetSessionState = options?.targetSessionState || sessionState;
     if (options?.replaceSessionState) {
       targetSessionState = createEmptySessionState();
-      setSessionState(targetSessionState);
     }
 
     if (options?.clearSelections || options?.replaceSessionState) {
@@ -609,7 +682,10 @@ export const RaceSweetMainApp = () => {
       const loadedPersistedState = await applyPersistedRaceStateToSession(eventId, sessionId, targetSessionState);
       if (loadedPersistedState) {
         if (adminService) {
-          adminService.applyChangesToSessionById(targetSessionState, sessionId);
+          await adminService.applyChangesToSessionById(targetSessionState, sessionId);
+        }
+        if (options?.replaceSessionState) {
+          setSessionState(targetSessionState);
         }
         return targetSessionState;
       }
@@ -618,7 +694,10 @@ export const RaceSweetMainApp = () => {
         const loadedSourcePersistedState = await applyPersistedRaceStateForSourceToSession(source, targetSessionState);
         if (loadedSourcePersistedState) {
           if (adminService) {
-            adminService.applyChangesToSessionById(targetSessionState, sessionId);
+            await adminService.applyChangesToSessionById(targetSessionState, sessionId);
+          }
+          if (options?.replaceSessionState) {
+            setSessionState(targetSessionState);
           }
           return targetSessionState;
         }
@@ -634,7 +713,11 @@ export const RaceSweetMainApp = () => {
     }
 
     if (targetSessionState && adminService) {
-      adminService.applyChangesToSessionById(targetSessionState, sessionId);
+      await adminService.applyChangesToSessionById(targetSessionState, sessionId);
+    }
+
+    if (targetSessionState && options?.replaceSessionState) {
+      setSessionState(targetSessionState);
     }
 
     return targetSessionState;
@@ -700,7 +783,7 @@ export const RaceSweetMainApp = () => {
       eventId,
       sessionId,
     });
-    adminService?.applyChangesToSessionById(targetSessionState, sessionId);
+    await adminService?.applyChangesToSessionById(targetSessionState, sessionId);
 
     if (eventCatalogState?.activeEventId === eventId && eventCatalogState.activeSessionId === sessionId) {
       setSessionState(targetSessionState);
@@ -972,7 +1055,7 @@ export const RaceSweetMainApp = () => {
     return renderShell(<PageErrorFallback error={errorState} onDismiss={() => setErrorState(undefined)} />);
   }
   if (!sessionState || !eventCatalogState) {
-    return renderShell(<>Loading...</>);
+    return renderShell(<LoadingProgress progress={loadingProgress} />);
   }
 
   const handleExcludeCrossing = (crossingId: TimeRecordId, exclude: boolean) => {

@@ -14,7 +14,9 @@ interface SessionSourceSink {
   addParticipants(participants: EventParticipant[]): void;
   addRecords(records: TimeRecord[], validate?: boolean): Promise<void>;
   addTeams?(teams: EventTeam[]): void;
+  beginBulkProcess?(): Promise<boolean>;
   categories: EventCategory[];
+  endBulkProcess?(): Promise<void>;
   records: TimeRecord[];
 }
 
@@ -314,23 +316,30 @@ export const applyPulledRaceStateToSession = async (
   options: SessionSourceApplicationOptions = {}
 ): Promise<void> => {
   const normalizedRaceState = normalizeRaceStateForSession(raceState, sessionState.categories, options);
-  const categoriesToAdd = getCategoriesToAdd(
-    sessionState.categories,
-    normalizedRaceState.categories || []
-  );
-  if (categoriesToAdd.length > 0) {
-    try {
-      await sessionState.addCategories(categoriesToAdd);
-    } catch (error: unknown) {
-      const message = (error as Error)?.message || '';
-      if (!message.includes('already exists')) {
-        throw error;
+  const bulkStarted = await sessionState.beginBulkProcess?.() === true;
+  try {
+    const categoriesToAdd = getCategoriesToAdd(
+      sessionState.categories,
+      normalizedRaceState.categories || []
+    );
+    if (categoriesToAdd.length > 0) {
+      try {
+        await sessionState.addCategories(categoriesToAdd);
+      } catch (error: unknown) {
+        const message = (error as Error)?.message || '';
+        if (!message.includes('already exists')) {
+          throw error;
+        }
       }
     }
-  }
 
-  sessionState.addParticipants(normalizedRaceState.participants || []);
-  sessionState.addTeams?.(normalizedRaceState.teams || []);
-  const incomingRecords = (normalizedRaceState.records as TimeRecord[]) || [];
-  await sessionState.addRecords(incomingRecords, false);
+    sessionState.addParticipants(normalizedRaceState.participants || []);
+    sessionState.addTeams?.(normalizedRaceState.teams || []);
+    const incomingRecords = (normalizedRaceState.records as TimeRecord[]) || [];
+    await sessionState.addRecords(incomingRecords, false);
+  } finally {
+    if (bulkStarted) {
+      await sessionState.endBulkProcess?.();
+    }
+  }
 };

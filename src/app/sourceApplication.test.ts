@@ -62,6 +62,8 @@ describe('sourceApplication', () => {
     const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
     const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
     const addTeams = vi.fn((_teams: EventTeam[]) => undefined);
+    const beginBulkProcess = vi.fn(async () => true);
+    const endBulkProcess = vi.fn(async () => undefined);
 
     await applyPulledRaceStateToSession(
       {
@@ -69,7 +71,9 @@ describe('sourceApplication', () => {
         addParticipants,
         addRecords,
         addTeams,
+        beginBulkProcess,
         categories: existingCategories,
+        endBulkProcess,
         records: [],
       },
       {
@@ -91,6 +95,38 @@ describe('sourceApplication', () => {
     expect(addTeams).toHaveBeenCalledTimes(1);
     expect(addTeams).toHaveBeenCalledWith([]);
     expect(addRecords).toHaveBeenCalledTimes(1);
+    expect(beginBulkProcess).toHaveBeenCalledTimes(1);
+    expect(endBulkProcess).toHaveBeenCalledTimes(1);
+  });
+
+  it('ends the session bulk process when a source application step fails', async () => {
+    const addCategories = vi.fn(async (_categories: EventCategory[]) => null);
+    const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
+    const addRecords = vi.fn(async (_records: TimeRecord[]) => {
+      throw new Error('record import failed');
+    });
+    const beginBulkProcess = vi.fn(async () => true);
+    const endBulkProcess = vi.fn(async () => undefined);
+
+    await expect(applyPulledRaceStateToSession(
+      {
+        addCategories,
+        addParticipants,
+        addRecords,
+        beginBulkProcess,
+        categories: existingCategories,
+        endBulkProcess,
+        records: [],
+      },
+      {
+        categories: [],
+        participants: [],
+        records: [{ id: createTimeRecordId('bulk-error-record'), recordType: 16, source: createTimeRecordSourceId('bulk-error-source') } as TimeRecord],
+      }
+    )).rejects.toThrow('record import failed');
+
+    expect(beginBulkProcess).toHaveBeenCalledTimes(1);
+    expect(endBulkProcess).toHaveBeenCalledTimes(1);
   });
 
   it('applies pulled teams into the target session state sink', async () => {
