@@ -1147,6 +1147,7 @@ export const RaceSweetMainApp = () => {
           selectedCategories={hilightCategories}
           selectedParticipants={recordSelectedParticipants}
           sessions={timingSessions}
+          fastestTimeIndicatorColors={systemConfigState.fastestTimeIndicatorColors}
           timeDisplayZoneMode={timingTimeDisplayZoneMode}
           timingEvent={timingEvent}
           timingSessionValidCategoryIds={timingSessionValidCategoryIds}
@@ -1346,6 +1347,12 @@ export const RaceSweetMainApp = () => {
               return;
             }
             systemConfigService.updateLocalStorageDirectoryPath(directoryPath).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+          }}
+          onSaveFastestTimeIndicatorColors={(changes) => {
+            if (!systemConfigService) {
+              return;
+            }
+            systemConfigService.updateFastestTimeIndicatorColors(changes).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
           }}
           onSaveSource={(sourceId, changes) => {
             if (!systemConfigService) {

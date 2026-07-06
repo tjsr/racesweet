@@ -5,6 +5,7 @@ import { TimeRecordSourceId } from '../../model/types.js';
 import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
 import type { MrScatsDataFilePreview } from '../../parsers/mrScats/filePreview.js';
 import { DataSourcesPanel } from '../panels/dataSources.js';
+import { FastestTimeIndicatorsPanel } from '../panels/fastestTimeIndicators.js';
 import { LocalStorageLocationPanel } from '../panels/localStorageLocation.js';
 import { LogPanel } from '../panels/log.js';
 import { RuntimeInformationPanel } from '../panels/runtimeInformation.js';
@@ -21,6 +22,7 @@ interface SystemPageProps {
   onLoadMrScatsEvent?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onReprocessApicalData: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onPreviewMrScatsDataFile?: (sourceId: TimeRecordSourceId, file: MrScatsDataFileSummary) => Promise<MrScatsDataFilePreview>;
+  onSaveFastestTimeIndicatorColors?: (changes: Partial<SystemConfiguration['fastestTimeIndicatorColors']>) => void | Promise<void>;
   onSaveLocalStorageDirectoryPath: (directoryPath: string) => void | Promise<void>;
   onSaveSource: (sourceId: TimeRecordSourceId, changes: Partial<DataSourceConfig>) => void | Promise<void>;
   onSelectMrScatsDataArchive?: () => Promise<MrScatsDataFileInventory | undefined>;
@@ -41,6 +43,10 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
       <LocalStorageLocationPanel
         localStorageDirectoryPath={props.config.localStorageDirectoryPath}
         onSaveLocalStorageDirectoryPath={props.onSaveLocalStorageDirectoryPath}
+      />
+      <FastestTimeIndicatorsPanel
+        colors={props.config.fastestTimeIndicatorColors}
+        onSaveFastestTimeIndicatorColors={props.onSaveFastestTimeIndicatorColors || (() => undefined)}
       />
 
       <DataSourcesPanel

@@ -44,21 +44,28 @@
   background-color: #c2e5ff;
 }
 
-.lap-time-session-fastest {
-  color: #a0f;
-  font-weight: bold;
+.lapLeader {
+  font-weight: 700;
 }
 
-.lap-time-too-fast {
-  color: #a00;
+.lapLeader > .MuiTableCell-root {
+  font-weight: 700;
 }
 
-.lap-time-imroved {
-  color: #0a0;
+.lap-time-cell {
+  border-right: 0.35rem solid transparent;
 }
 
-.lap-time-personal-best {
-  color: #ff0;
+.lap-time-cell.entrantFaster {
+  border-right-color: var(--entrant-faster-time-color, #f2c94c);
+}
+
+.lap-time-cell.entrantFastest {
+  border-right-color: var(--entrant-fastest-time-color, #21a366);
+}
+
+.lap-time-cell.overallFastest {
+  border-right-color: var(--session-fastest-time-color, #8a2be2);
 }
 
 .recent-records-toolbar {

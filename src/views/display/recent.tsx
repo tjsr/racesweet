@@ -1,5 +1,6 @@
 import { Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField } from '@mui/material';
 import React, { type JSX } from 'react';
+import { DEFAULT_FASTEST_TIME_INDICATOR_COLORS, type FastestTimeIndicatorColors } from '../../app/systemConfig.ts';
 import { type MillisecondsDuration, type TimeDisplayZoneMode, millisecondsToTime, resolveDisplayTimeZone, tableTimeString } from '../../app/utils/timeutils.ts';
 import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../controllers/category.ts';
 import { createGreenFlagEvent, createRedFlagEvent, isFlagRecord } from '../../controllers/flag';
@@ -20,6 +21,13 @@ import "./recent.css";
 
 type RecentRecordsFilterMode = 'all' | 'category' | 'participant' | 'team';
 type RecentRecordsIgnoreMode = 'outsideEventWindow' | 'unrecognised';
+
+interface LapTimeIndicators {
+  entrantFaster: boolean;
+  entrantFastest: boolean;
+  lapLeader: boolean;
+  overallFastest: boolean;
+}
 
 const ignoreModeLabels: Record<RecentRecordsIgnoreMode, string> = {
   outsideEventWindow: 'Outside event window',
@@ -237,6 +245,7 @@ interface RecordsProps {
   currentEventId?: EventId;
   currentSessionId?: SessionId;
   eventTimeZone?: string;
+  fastestTimeIndicatorColors?: FastestTimeIndicatorColors;
   onAddRecord?: (record: EventTimeRecord) => void;
   onEditRecord?: (record: EventTimeRecord) => void;
   onTimeDisplayZoneModeChange?: (mode: TimeDisplayZoneMode) => void;
@@ -255,6 +264,7 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   record: RecordType;
   index: number;
   raceStateLookup: RaceStateLookup;
+  lapTimeIndicators?: LapTimeIndicators;
   selectedRecordId?: TimeRecordId;
   selectedCategories?: Set<EventCategoryId>;
   selectedPlateNumber?: string;
@@ -581,6 +591,7 @@ const UnknownChipRow = (
 };
 
 interface PassingRecordRowProps {
+  lapTimeIndicators?: LapTimeIndicators;
   passing: ParticipantPassingRecord;
   raceStateLookup: RaceStateLookup;
   selectedCategories: Set<EventCategoryId> | undefined;
@@ -741,8 +752,18 @@ export const PassingRecordRow = (
     className += ' selected-plate-number';
     cellClasses += ' selected-plate-number';
   }
+  if (props.lapTimeIndicators?.lapLeader) {
+    className += ' lapLeader';
+  }
 
   const allCategories = (rs as unknown as { categories: EventCategory[] }).categories || [];
+  const lapTimeCellClasses = [
+    cellClasses,
+    'lap-time-cell',
+    props.lapTimeIndicators?.entrantFaster ? 'entrantFaster' : '',
+    props.lapTimeIndicators?.entrantFastest ? 'entrantFastest' : '',
+    props.lapTimeIndicators?.overallFastest ? 'overallFastest' : '',
+  ].filter((classItem) => classItem.length > 0).join(' ');
 
   return (
     <>
@@ -762,7 +783,7 @@ export const PassingRecordRow = (
         <TableCell className={cellClasses}>{categoryStr || ''}</TableCell>
         <TableCell className={cellClasses}>{lapNo}</TableCell>
         <TableCell className={cellClasses}>{elapsedTime}</TableCell>
-        <TableCell className={cellClasses}>{lapTime}</TableCell>
+        <TableCell className={lapTimeCellClasses}>{lapTime}</TableCell>
       </TableRow>
       <Menu
         open={contextMenu !== null}
@@ -872,6 +893,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
     };
 
     return <PassingRecordRow
+      lapTimeIndicators={props.lapTimeIndicators}
       raceStateLookup={props.raceStateLookup}
       passing={passing}
       selectedCategories={props.selectedCategories}
@@ -1133,6 +1155,71 @@ const getEntrantKey = (
   return raceStateLookup.getEntrantIdForParticipant(participant.id)?.toString() ||
     participant.entrantId?.toString() ||
     participant.id.toString();
+};
+
+const createEmptyLapTimeIndicators = (): LapTimeIndicators => ({
+  entrantFaster: false,
+  entrantFastest: false,
+  lapLeader: false,
+  overallFastest: false,
+});
+
+const buildLapTimeIndicatorMap = (
+  records: EventTimeRecord[],
+  raceStateLookup: RaceStateLookup
+): Map<TimeRecordId, LapTimeIndicators> => {
+  const indicatorsByRecordId = new Map<TimeRecordId, LapTimeIndicators>();
+  const bestLapTimeByEntrant = new Map<string, MillisecondsDuration>();
+  const previousLapTimeByEntrant = new Map<string, MillisecondsDuration>();
+  const leadingLapNumbers = new Set<number>();
+  let overallBestLapTime: MillisecondsDuration | undefined = undefined;
+
+  records
+    .map((record, index) => ({ index, record }))
+    .sort(compareRecordsByTimeAndInputOrder)
+    .forEach(({ record }) => {
+      if (!isCrossingRecord(record) || !record.participantId || !record.isValid || record.isExcluded) {
+        return;
+      }
+
+      const passingRecord = record as ParticipantPassingRecord;
+      const lapNo = passingRecord.lapNo;
+      const lapTime = passingRecord.lapTime;
+      if (lapNo === undefined || lapNo === null || lapTime === undefined || lapTime === null || lapTime <= 0) {
+        return;
+      }
+
+      const participant = raceStateLookup.getParticipantById(record.participantId);
+      if (!participant) {
+        return;
+      }
+
+      const indicators = createEmptyLapTimeIndicators();
+      const entrantKey = getEntrantKey(participant, raceStateLookup);
+      const previousLapTime = previousLapTimeByEntrant.get(entrantKey);
+      const entrantBestLapTime = bestLapTimeByEntrant.get(entrantKey);
+
+      if (!leadingLapNumbers.has(lapNo)) {
+        indicators.lapLeader = true;
+        leadingLapNumbers.add(lapNo);
+      }
+      if (previousLapTime !== undefined && lapTime < previousLapTime) {
+        indicators.entrantFaster = true;
+      }
+      if (entrantBestLapTime === undefined || lapTime < entrantBestLapTime) {
+        indicators.entrantFastest = true;
+        bestLapTimeByEntrant.set(entrantKey, lapTime);
+      }
+      if (overallBestLapTime === undefined || lapTime < overallBestLapTime) {
+        indicators.overallFastest = true;
+        overallBestLapTime = lapTime;
+      }
+
+      previousLapTimeByEntrant.set(entrantKey, lapTime);
+      indicatorsByRecordId.set(record.id, indicators);
+    });
+
+  return indicatorsByRecordId;
 };
 
 const getOutsideEventWindowIgnoredRecordIds = (
@@ -1572,8 +1659,13 @@ export const RecentRecords = (props: RecordsProps & {
       return a.time!.getTime() - b.time!.getTime();
     }
   });
+  const lapTimeIndicators = buildLapTimeIndicatorMap(filteredRecords, props.raceStateLookup);
+  const fastestTimeIndicatorColors = props.fastestTimeIndicatorColors || DEFAULT_FASTEST_TIME_INDICATOR_COLORS;
   const tableContainerStyle = {
+    '--entrant-faster-time-color': fastestTimeIndicatorColors.entrantFasterTime,
+    '--entrant-fastest-time-color': fastestTimeIndicatorColors.entrantFastestTime,
     '--recent-records-table-header-top': toolbarDock.isDocked ? `${toolbarDock.height}px` : '0px',
+    '--session-fastest-time-color': fastestTimeIndicatorColors.sessionFastestTime,
   } as React.CSSProperties;
   const openAddRecordDialog = (record: EventTimeRecord): void => {
     setAddRecordDialogState({ anchorRecord: record, mode: 'add' });
@@ -1741,6 +1833,7 @@ export const RecentRecords = (props: RecordsProps & {
                 {sortedRecords.map((record, index) => (
                   <RecordRow
                     key={record.id}
+                    lapTimeIndicators={lapTimeIndicators.get(record.id)}
                     record={record}
                     index={index}
                     raceStateLookup={props.raceStateLookup}

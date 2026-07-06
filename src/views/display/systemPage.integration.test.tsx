@@ -83,6 +83,13 @@ const insertTextAtCursor = (input: HTMLInputElement, text: string): void => {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 };
 
+const setInputValue = (input: HTMLInputElement, value: string): void => {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  descriptor?.set?.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+};
+
 describe('SystemPage integration', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -177,6 +184,41 @@ describe('SystemPage integration', () => {
     });
 
     expect(onSaveLocalStorageDirectoryPath).toHaveBeenCalledWith(`${config.localStorageDirectoryPath}-local`);
+  });
+
+  it('saves fastest time indicator colors from the system panel', async () => {
+    const onSaveFastestTimeIndicatorColors = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <SystemPage
+          config={config}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={vi.fn()}
+          onReprocessApicalData={vi.fn()}
+          onSaveFastestTimeIndicatorColors={onSaveFastestTimeIndicatorColors}
+          onSaveLocalStorageDirectoryPath={vi.fn()}
+          onSaveSource={vi.fn()}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain('Fastest time indicators');
+
+    const sessionFastestInput = container.querySelector('input[aria-label="Session fastest time"]') as HTMLInputElement;
+    const entrantFastestInput = container.querySelector('input[aria-label="Entrant fastest time"]') as HTMLInputElement;
+    const entrantFasterInput = container.querySelector('input[aria-label="Entrant faster time"]') as HTMLInputElement;
+    expect(sessionFastestInput.value).toBe(config.fastestTimeIndicatorColors.sessionFastestTime);
+    expect(entrantFastestInput.value).toBe(config.fastestTimeIndicatorColors.entrantFastestTime);
+    expect(entrantFasterInput.value).toBe(config.fastestTimeIndicatorColors.entrantFasterTime);
+
+    await act(async () => {
+      setInputValue(sessionFastestInput, '#123456');
+    });
+
+    expect(onSaveFastestTimeIndicatorColors).toHaveBeenCalledWith({ sessionFastestTime: '#123456' });
   });
 
   it('shows the application error log in a read-only textarea below configured data sources', async () => {

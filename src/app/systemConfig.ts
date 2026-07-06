@@ -91,17 +91,29 @@ export interface EventOptionsConfig {
   timeDisplayZoneMode?: EventTimeDisplayZoneMode;
 }
 
+export interface FastestTimeIndicatorColors {
+  entrantFasterTime: string;
+  entrantFastestTime: string;
+  sessionFastestTime: string;
+}
+
 export interface SystemConfiguration {
   apicalListedEvents?: ApicalListedEvent[];
   dataSources: DataSourceConfig[];
   eventOptions: Record<string, EventOptionsConfig>;
   eventSourceAssignments: Record<string, string[]>;
+  fastestTimeIndicatorColors: FastestTimeIndicatorColors;
   localStorageDirectoryPath: string;
   schemaVersion: 1;
   sessionSourceAssignments: Record<string, SessionSourceAssignment>;
 }
 
 export const DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH = path.resolve('src/generated');
+export const DEFAULT_FASTEST_TIME_INDICATOR_COLORS: FastestTimeIndicatorColors = {
+  entrantFasterTime: '#f2c94c',
+  entrantFastestTime: '#21a366',
+  sessionFastestTime: '#8a2be2',
+};
 const APICAL_EXCEL_CACHE_DIRECTORY_NAME = 'apical-excel-cache';
 
 export const normalizeSystemDirectoryPath = (directoryPath: string | undefined): string => {
@@ -119,6 +131,7 @@ export const createDefaultSystemConfiguration = (): SystemConfiguration => ({
   dataSources: [],
   eventOptions: {},
   eventSourceAssignments: {},
+  fastestTimeIndicatorColors: DEFAULT_FASTEST_TIME_INDICATOR_COLORS,
   localStorageDirectoryPath: DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH,
   schemaVersion: 1,
   sessionSourceAssignments: {},
@@ -216,6 +229,10 @@ export const normalizeSystemConfiguration = (
     )),
     eventOptions: config.eventOptions || {},
     eventSourceAssignments: config.eventSourceAssignments || {},
+    fastestTimeIndicatorColors: {
+      ...DEFAULT_FASTEST_TIME_INDICATOR_COLORS,
+      ...(config.fastestTimeIndicatorColors || {}),
+    },
     localStorageDirectoryPath: normalizeLocalStorageDirectoryPath(config.localStorageDirectoryPath, config.apicalExcelCacheDirectoryPath),
     schemaVersion: 1,
     sessionSourceAssignments: config.sessionSourceAssignments || {},

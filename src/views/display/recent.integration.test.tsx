@@ -208,6 +208,138 @@ describe('RecentRecords integration', () => {
     expect(toolbar?.querySelector('#recent-records-order-dropdown')).toBeDefined();
   });
 
+  it('marks lap time cells with fastest indicators and lap-leading rows', async () => {
+    const category: EventCategory = { id: 'category-1', name: 'Category 1' };
+    const participantA: EventParticipant = {
+      categoryId: category.id,
+      currentResult: undefined,
+      entrantId: 'entrant-1',
+      firstname: 'Pat',
+      id: 'participant-1',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const participantB: EventParticipant = {
+      categoryId: category.id,
+      currentResult: undefined,
+      entrantId: 'entrant-2',
+      firstname: 'Quinn',
+      id: 'participant-2',
+      identifiers: [{ fromTime: undefined, racePlate: '102', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const crossings = [
+      {
+        chipCode: 100101,
+        id: 'participant-a-lap-1',
+        isValid: true,
+        lapNo: 1,
+        lapTime: 100000,
+        participantId: participantA.id,
+        recordType: RECORD_TX_CROSSING,
+        sequence: 1,
+        source: 'test-source',
+        time: new Date('2026-05-29T10:01:00.000Z'),
+      },
+      {
+        chipCode: 100102,
+        id: 'participant-b-lap-1',
+        isValid: true,
+        lapNo: 1,
+        lapTime: 90000,
+        participantId: participantB.id,
+        recordType: RECORD_TX_CROSSING,
+        sequence: 2,
+        source: 'test-source',
+        time: new Date('2026-05-29T10:01:05.000Z'),
+      },
+      {
+        chipCode: 100101,
+        id: 'participant-a-lap-2',
+        isValid: true,
+        lapNo: 2,
+        lapTime: 95000,
+        participantId: participantA.id,
+        recordType: RECORD_TX_CROSSING,
+        sequence: 3,
+        source: 'test-source',
+        time: new Date('2026-05-29T10:02:35.000Z'),
+      },
+      {
+        chipCode: 100101,
+        id: 'participant-a-lap-3',
+        isValid: true,
+        lapNo: 3,
+        lapTime: 97000,
+        participantId: participantA.id,
+        recordType: RECORD_TX_CROSSING,
+        sequence: 4,
+        source: 'test-source',
+        time: new Date('2026-05-29T10:04:12.000Z'),
+      },
+    ] as unknown as ParticipantPassingRecord[];
+    const participants = new Map<EventParticipantId, EventParticipant>([
+      [participantA.id, participantA],
+      [participantB.id, participantB],
+    ]);
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [category],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === category.id ? category : undefined,
+      getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+      getParticipantById: (participantId) => participants.get(participantId),
+      getParticipantLaps: () => crossings,
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          fastestTimeIndicatorColors={{
+            entrantFasterTime: '#aaaa00',
+            entrantFastestTime: '#00aa00',
+            sessionFastestTime: '#6600aa',
+          }}
+          raceStateLookup={raceStateLookup}
+          records={crossings}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const tableContainer = container.querySelector('.recent-records-table-container') as HTMLDivElement;
+    expect(tableContainer.style.getPropertyValue('--session-fastest-time-color')).toBe('#6600aa');
+    expect(tableContainer.style.getPropertyValue('--entrant-fastest-time-color')).toBe('#00aa00');
+    expect(tableContainer.style.getPropertyValue('--entrant-faster-time-color')).toBe('#aaaa00');
+
+    const firstLapLeader = container.querySelector('tr[data-record-id="participant-a-lap-1"]');
+    const sessionFastestRow = container.querySelector('tr[data-record-id="participant-b-lap-1"]');
+    const entrantImprovedRow = container.querySelector('tr[data-record-id="participant-a-lap-2"]');
+    const laterLapLeaderRow = container.querySelector('tr[data-record-id="participant-a-lap-3"]');
+    const getLapTimeCell = (row: Element | null): Element => row!.querySelectorAll('td')[9]!;
+
+    expect(firstLapLeader?.className).toContain('lapLeader');
+    expect(container.querySelector('tr[data-record-id="participant-a-lap-1"].lapLeader > td')).not.toBeNull();
+    expect(getLapTimeCell(firstLapLeader).className).toContain('overallFastest');
+    expect(sessionFastestRow?.className).not.toContain('lapLeader');
+    expect(getLapTimeCell(sessionFastestRow).className).toContain('overallFastest');
+    expect(entrantImprovedRow?.className).toContain('lapLeader');
+    expect(getLapTimeCell(entrantImprovedRow).className).toContain('entrantFastest');
+    expect(getLapTimeCell(entrantImprovedRow).className).toContain('entrantFaster');
+    expect(laterLapLeaderRow?.className).toContain('lapLeader');
+    expect(getLapTimeCell(laterLapLeaderRow).className).not.toContain('entrantFastest');
+    expect(getLapTimeCell(laterLapLeaderRow).className).not.toContain('entrantFaster');
+  });
+
   it('selects categories from the recent records toolbar', async () => {
     const categoryA: EventCategory = { code: 'A', id: 'cat-a', name: 'Category A' };
     const categoryB: EventCategory = { code: 'B', id: 'cat-b', name: 'Category B' };

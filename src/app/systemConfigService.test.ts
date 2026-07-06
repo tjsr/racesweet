@@ -224,6 +224,24 @@ describe('SystemConfigService', () => {
     }));
   });
 
+  it('persists fastest time indicator color settings', async () => {
+    const persistence = createPersistence();
+    const service = await SystemConfigService.create(persistence);
+
+    await service.updateFastestTimeIndicatorColors({ sessionFastestTime: '#123456' });
+
+    expect(service.state.fastestTimeIndicatorColors).toEqual({
+      ...systemConfig.DEFAULT_FASTEST_TIME_INDICATOR_COLORS,
+      sessionFastestTime: '#123456',
+    });
+    expect(persistence.save).toHaveBeenCalledWith(expect.objectContaining({
+      fastestTimeIndicatorColors: {
+        ...systemConfig.DEFAULT_FASTEST_TIME_INDICATOR_COLORS,
+        sessionFastestTime: '#123456',
+      },
+    }));
+  });
+
   it('normalizes the local storage directory to an absolute system config path', async () => {
     const normalizedConfig = systemConfig.normalizeSystemConfiguration({
       ...systemConfig.createDefaultSystemConfiguration(),

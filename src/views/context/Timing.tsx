@@ -1,5 +1,6 @@
 import React from 'react';
 import { type EventCatalogState } from '../../app/eventCatalog.js';
+import { type FastestTimeIndicatorColors } from '../../app/systemConfig.js';
 import { type TimeDisplayZoneMode } from '../../app/utils/timeutils.js';
 import { RecentRecords } from '../../app/views/timing/recentRecords.js';
 import { type EventCategory, type EventCategoryId } from '../../model/eventcategory.js';
@@ -20,6 +21,7 @@ interface TimingContextProps {
   categoryListSelected: (ids: Set<EventCategoryId>) => void;
   eventTimeZone: string;
   events: EventCatalogEvent[];
+  fastestTimeIndicatorColors?: FastestTimeIndicatorColors;
   onAddRecord: (record: EventTimeRecord) => void;
   onEditRecord: (record: EventTimeRecord) => void;
   onAssignFlagCategory: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
@@ -76,6 +78,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
         currentEventId={props.timingEvent?.id}
         currentSessionId={props.timingSessionValue === 'active' ? props.activeSession?.id : props.timingSessionValue}
         eventTimeZone={props.eventTimeZone}
+        fastestTimeIndicatorColors={props.fastestTimeIndicatorColors}
         onAddRecord={props.onAddRecord}
         onEditRecord={props.onEditRecord}
         records={(props.raceState.records as EventTimeRecord[]) || []}

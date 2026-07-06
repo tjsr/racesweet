@@ -201,6 +201,20 @@ export class SystemConfigService {
     return this.config;
   }
 
+  public async updateFastestTimeIndicatorColors(
+    changes: Partial<SystemConfiguration['fastestTimeIndicatorColors']>
+  ): Promise<SystemConfiguration> {
+    this.config = {
+      ...this.config,
+      fastestTimeIndicatorColors: {
+        ...this.config.fastestTimeIndicatorColors,
+        ...changes,
+      },
+    };
+    await this.persist();
+    return this.config;
+  }
+
   public async updateLocalStorageDirectoryPath(directoryPath: string): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
