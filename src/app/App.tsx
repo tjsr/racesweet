@@ -866,7 +866,10 @@ export const RaceSweetMainApp = () => {
 
     const targetSessionState = createEmptySessionState();
     applySessionSources(nextEventId, nextSessionId, {
+      cachedSpreadsheetOnly: true,
       clearSelections: true,
+      preferCachedSpreadsheet: true,
+      preferPersistedRaceState: true,
       targetSessionState,
     }).then((loadedState) => {
       setAnalyticsRaceState(loadedState || targetSessionState);

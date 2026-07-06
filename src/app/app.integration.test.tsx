@@ -7,10 +7,12 @@ import { type Root, createRoot } from 'react-dom/client';
 import XLSX from 'xlsx';
 import { convertApicalSpreadsheetRowsToApicalData } from '../controllers/apical/apicalSpreadsheetProcessor.js';
 import { CategoryId } from '../controllers/category.js';
+import { createGreenFlagEvent } from '../controllers/flag.js';
 import type { ApicalLapByCategory } from '../model/apical.js';
-import { createSessionId } from '../model/ids.js';
+import type { EventParticipant } from '../model/eventparticipant.js';
+import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
 import { EventId, SessionId } from '../model/raceevent.js';
-import { TimeRecordId } from '../model/timerecord.js';
+import { RECORD_TX_CROSSING, TimeRecordId } from '../model/timerecord.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
 import { useUiConsoleGuards } from '../testing/uiConsoleGuards.js';
 import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from '../utils/apical/excelDownload.js';
@@ -876,6 +878,238 @@ describe('RaceSweetMainApp integration', () => {
     });
 
     expect(container.querySelector('table[aria-label="Fastest Laps Report Table"]')).toBeTruthy();
+  });
+
+  it('loads selected Reports sessions from persisted imported MR-SCATS ledger data', async () => {
+    const importedEventId = createEventId('mr-scats-report-event');
+    const importedSessionId = createSessionId('mr-scats-report-session');
+    const categoryId = createCategoryId('mr-scats-report-category');
+    const entrantId = createEventEntrantId('mr-scats-report-entrant');
+    const participantId = createEventParticipantId('mr-scats-report-participant');
+    const sourceId = createTimeRecordSourceId('mr-scats-report-source');
+    const startFlagId = createTimeRecordId('mr-scats-report-start');
+    const lapOneId = createTimeRecordId('mr-scats-report-lap-1');
+    const lapTwoId = createTimeRecordId('mr-scats-report-lap-2');
+    const participant: EventParticipant = {
+      categoryId,
+      currentResult: undefined,
+      entrantId,
+      firstname: 'MR-SCATS',
+      id: participantId,
+      identifiers: [
+        { fromTime: undefined, racePlate: '42', toTime: undefined },
+        { fromTime: undefined, toTime: undefined, txNo: 420001 },
+      ] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const startFlag = createGreenFlagEvent({
+      categoryIds: [categoryId],
+      eventId: importedEventId,
+      id: startFlagId,
+      indicatesRaceStart: true,
+      sequence: 1,
+      sessionId: importedSessionId,
+      source: sourceId,
+      time: new Date('2026-05-29T10:00:00.000Z'),
+    });
+    const importedRaceState = {
+      categories: [{ code: 'MSC', description: '', id: categoryId, name: 'MR-SCATS Category' }],
+      participants: [participant],
+      records: [
+        startFlag,
+        {
+          chipCode: 420001,
+          eventId: importedEventId,
+          id: lapOneId,
+          originRecordNumber: 1,
+          plateNumber: '42',
+          recordType: RECORD_TX_CROSSING,
+          sequence: 2,
+          sessionId: importedSessionId,
+          source: sourceId,
+          time: new Date('2026-05-29T10:01:30.000Z'),
+        },
+        {
+          chipCode: 420001,
+          eventId: importedEventId,
+          id: lapTwoId,
+          originRecordNumber: 2,
+          plateNumber: '42',
+          recordType: RECORD_TX_CROSSING,
+          sequence: 3,
+          sessionId: importedSessionId,
+          source: sourceId,
+          time: new Date('2026-05-29T10:03:05.000Z'),
+        },
+      ],
+      teams: [],
+    };
+
+    const requestBuffer = vi.fn(async (filePath: string): Promise<Buffer> => readFixtureBuffer(filePath));
+    const requestFileContent = async (filePath: string, _dataType: string): Promise<string> => {
+      if (filePath.includes('event-catalog.json')) {
+        return JSON.stringify({
+          mutations: [
+            ...createSeedEventCatalogLedger().mutations,
+            {
+              event: {
+                categoryIds: [categoryId],
+                date: '2026-05-29',
+                entrantIds: [entrantId],
+                format: 'race-weekend',
+                id: importedEventId,
+                name: 'MR-SCATS Imported Round',
+                sessionIds: [importedSessionId],
+                timeZone: 'Australia/Sydney',
+              },
+              id: 'mutation-mr-scats-report-event',
+              timestamp: '2026-05-29T00:00:00.000Z',
+              type: 'event-created',
+            },
+            {
+              category: {
+                code: 'MSC',
+                description: '',
+                eventId: importedEventId,
+                id: categoryId,
+                name: 'MR-SCATS Category',
+              },
+              id: 'mutation-mr-scats-report-category',
+              timestamp: '2026-05-29T00:00:01.000Z',
+              type: 'category-created',
+            },
+            {
+              entrant: {
+                categoryId,
+                categoryIds: [categoryId],
+                entrantType: 'rider',
+                eventId: importedEventId,
+                firstName: 'MR-SCATS',
+                id: entrantId,
+                identifiers: participant.identifiers,
+                lastName: 'Rider',
+                memberParticipantIds: [participantId],
+                name: 'MR-SCATS Rider',
+                sessionIds: [importedSessionId],
+              },
+              id: 'mutation-mr-scats-report-entrant',
+              timestamp: '2026-05-29T00:00:02.000Z',
+              type: 'entrant-created',
+            },
+            {
+              id: 'mutation-mr-scats-report-session',
+              session: {
+                categoryIds: [categoryId],
+                eventId: importedEventId,
+                id: importedSessionId,
+                kind: 'race',
+                name: 'MR-SCATS Race',
+                scheduledStart: '2026-05-29T10:00:00.000Z',
+                status: 'completed',
+              },
+              timestamp: '2026-05-29T00:00:03.000Z',
+              type: 'session-created',
+            },
+            {
+              eventId: importedEventId,
+              id: 'mutation-mr-scats-report-state',
+              raceState: importedRaceState,
+              sessionId: importedSessionId,
+              timestamp: '2026-05-29T00:00:04.000Z',
+              type: 'race-state-imported',
+            },
+          ],
+          schemaVersion: 1,
+        });
+      }
+
+      if (filePath.includes('system-config.json')) {
+        return JSON.stringify({
+          dataSources: [
+            {
+              enabled: true,
+              id: 'source-mr-scats',
+              mrScatsConfig: {
+                dataFilesLocation: 'C:/RaceTime/timing-data/S0101',
+                files: [],
+              },
+              name: 'MR-SCATS Source',
+              type: 'file-mr-scats-data',
+            },
+          ],
+          eventSourceAssignments: {
+            [importedEventId]: ['source-mr-scats'],
+          },
+          schemaVersion: 1,
+          sessionSourceAssignments: {
+            [importedSessionId]: {
+              mode: 'specific',
+              sourceIds: ['source-mr-scats'],
+            },
+          },
+        });
+      }
+
+      if (filePath.includes('admin-overrides.json')) {
+        return JSON.stringify({ entrantCategories: {}, excludedCrossings: {}, schemaVersion: 1 });
+      }
+
+      throw new Error(`Unknown generated file requested: ${filePath}`);
+    };
+
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string, dataType?: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer,
+      requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async () => undefined,
+    };
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    requestBuffer.mockClear();
+    await clickSectionButton(container, 'Reports');
+    const eventSessionSelect = container.querySelector('select[aria-label="Race View Event Session"]') as HTMLSelectElement;
+    expect(eventSessionSelect).toBeTruthy();
+
+    await act(async () => {
+      setSelectValue(eventSessionSelect, `session:${importedEventId}:${importedSessionId}`);
+    });
+
+    await waitForText(container, 'MR-SCATS Rider');
+    const fastestLapsTable = container.querySelector('table[aria-label="Fastest Laps Report Table"]') as HTMLTableElement | null;
+    expect(fastestLapsTable?.textContent).toContain('42');
+    expect(fastestLapsTable?.textContent).toContain('1:35.000');
+
+    const reportViewSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
+    expect(reportViewSelect).toBeTruthy();
+    await act(async () => {
+      setSelectValue(reportViewSelect, 'lap-times');
+    });
+
+    await waitForText(container, 'Lap Times Report');
+    const participantSelect = container.querySelector('select[aria-label="Reports Participant"]') as HTMLSelectElement | null;
+    expect(Array.from(participantSelect?.options || []).map((option) => option.textContent)).toContain('MR-SCATS Rider');
+    const lapTimesTable = container.querySelector('table[aria-label="Lap Times Report Table"]') as HTMLTableElement | null;
+    expect(lapTimesTable?.textContent).toContain('1:30.000');
+    expect(lapTimesTable?.textContent).toContain('3:05.000');
+
+    await act(async () => {
+      setSelectValue(reportViewSelect, 'lap-chart');
+    });
+
+    const lapChartTable = container.querySelector('table[aria-label="Reports Lap Chart Table"]') as HTMLTableElement | null;
+    expect(lapChartTable?.textContent).toContain('42');
+    expect(requestBuffer).not.toHaveBeenCalled();
   });
 
   it('keeps panel rendering healthy after edits and panel switches', async () => {
