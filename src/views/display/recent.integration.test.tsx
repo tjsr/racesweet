@@ -1003,7 +1003,7 @@ describe('RecentRecords integration', () => {
       root.render(<Harness />);
     });
 
-    expect(getCrossingRow()?.textContent).toContain('00:06:00.000');
+    expect(getCrossingRow()?.textContent).toContain('6:00.000');
     expect(getCrossingRow()?.textContent).not.toContain('01:06:00.000');
 
     await openFlagMenu(laterFlagId);
@@ -1014,7 +1014,7 @@ describe('RecentRecords integration', () => {
       categoryId: categoryBId,
       flagId: laterFlagId,
     });
-    expect(getCrossingRow()?.textContent).toContain('00:01:00.000');
+    expect(getCrossingRow()?.textContent).toContain('1:00.000');
 
     await openFlagMenu(laterFlagId);
     await clickMenuItem('Category B');
@@ -1024,7 +1024,7 @@ describe('RecentRecords integration', () => {
       categoryId: categoryBId,
       flagId: laterFlagId,
     });
-    expect(getCrossingRow()?.textContent).toContain('00:06:00.000');
+    expect(getCrossingRow()?.textContent).toContain('6:00.000');
 
     await openFlagMenu(earlyFlagId);
     await clickMenuItem('Mark deleted');
@@ -1147,8 +1147,8 @@ describe('RecentRecords integration', () => {
     });
 
     expect(getCrossingCells()[7]?.textContent).toBe('1');
-    expect(getCrossingCells()[8]?.textContent).toBe('00:06:00.000');
-    expect(getCrossingCells()[9]?.textContent).toBe('00:06:00.000');
+    expect(getCrossingCells()[8]?.textContent).toBe('6:00.000');
+    expect(getCrossingCells()[9]?.textContent).toBe('6:00.000');
 
     await openFlagMenu();
     await clickMenuItem('Category B');
@@ -1171,8 +1171,8 @@ describe('RecentRecords integration', () => {
       flagId,
     });
     expect(getCrossingCells()[7]?.textContent).toBe('1');
-    expect(getCrossingCells()[8]?.textContent).toBe('00:06:00.000');
-    expect(getCrossingCells()[9]?.textContent).toBe('00:06:00.000');
+    expect(getCrossingCells()[8]?.textContent).toBe('6:00.000');
+    expect(getCrossingCells()[9]?.textContent).toBe('6:00.000');
 
     await openFlagMenu();
     await clickMenuItem('Mark deleted');

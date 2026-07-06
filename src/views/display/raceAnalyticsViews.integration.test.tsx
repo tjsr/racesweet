@@ -219,10 +219,10 @@ describe('race analytics views integration', () => {
     expect(container.textContent).toContain('Team Rocket');
     expect(container.textContent).toContain('Solo Rider');
     expect(container.textContent).not.toContain('Timing Error Entrant');
-    expect(container.textContent).toContain('00:02:12.000');
-    expect(container.textContent).toContain('00:02:25.000');
-    expect(container.textContent).toContain('00:01:03.000');
-    expect(container.textContent).toContain('00:01:10.000');
+    expect(container.textContent).toContain('2:12.000');
+    expect(container.textContent).toContain('2:25.000');
+    expect(container.textContent).toContain('1:03.000');
+    expect(container.textContent).toContain('1:10.000');
 
     const categorySelect = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
     expect(categorySelect).toBeTruthy();
@@ -300,10 +300,10 @@ describe('race analytics views integration', () => {
     expect(container.textContent).toContain('Team Rocket');
     expect(container.textContent).toContain('Solo Rider');
     expect(container.textContent).not.toContain('Timing Error Entrant');
-    expect(container.textContent).toContain('00:01:03.000');
-    expect(container.textContent).toContain('00:01:15.000');
-    expect(container.textContent).not.toContain('00:01:10.000');
-    expect(container.textContent).not.toContain('00:00:10.000');
+    expect(container.textContent).toContain('1:03.000');
+    expect(container.textContent).toContain('1:15.000');
+    expect(container.textContent).not.toContain('1:10.000');
+    expect(container.textContent).not.toContain('0:10.000');
     const fastestRows = (): HTMLTableRowElement[] => Array.from(fastestTable.querySelectorAll('tbody tr'));
     const fastestRowCells = (entrantName: string): (string | null)[] => {
       const row = fastestRows().find((item) => item.textContent?.includes(entrantName));
@@ -317,7 +317,7 @@ describe('race analytics views integration', () => {
       createEventParticipantId('p-team-2'),
       'Team Rocket',
       'Category A',
-      '00:01:03.000',
+      '1:03.000',
       '2',
       '4',
     ]);
@@ -325,7 +325,7 @@ describe('race analytics views integration', () => {
       createEventParticipantId('p-rider-1'),
       'Solo Rider',
       'Category B',
-      '00:01:15.000',
+      '1:15.000',
       '2',
       '2',
     ]);
@@ -338,7 +338,7 @@ describe('race analytics views integration', () => {
       createEventParticipantId('p-rider-1'),
       'Solo Rider',
       'Category B',
-      '00:01:10.000',
+      '1:10.000',
       '1',
       '2',
     ]);
@@ -371,9 +371,9 @@ describe('race analytics views integration', () => {
         'Team Two',
         'Team Rocket',
         tableTimeString(lapsByParticipant.get(createEventParticipantId('p-team-2'))![1].time),
-        '00:02:10.000',
+        '2:10.000',
         '2',
-        '00:01:03.000',
+        '1:03.000',
       ],
     ]);
 
@@ -387,18 +387,18 @@ describe('race analytics views integration', () => {
         'Team Two',
         'Team Rocket',
         tableTimeString(lapsByParticipant.get(createEventParticipantId('p-team-2'))![0].time),
-        '00:01:04.000',
+        '1:04.000',
         '1',
-        '00:01:04.000',
+        '1:04.000',
       ],
       [
         createEventParticipantId('p-team-2'),
         'Team Two',
         'Team Rocket',
         tableTimeString(lapsByParticipant.get(createEventParticipantId('p-team-2'))![1].time),
-        '00:02:10.000',
+        '2:10.000',
         '2',
-        '00:01:03.000',
+        '1:03.000',
       ],
     ]);
 
@@ -428,9 +428,9 @@ describe('race analytics views integration', () => {
     ]);
     expect(Array.from(individualLapTimesTable.querySelectorAll('tbody tr:first-child td')).map((cell) => cell.textContent)).toEqual([
       '1',
-      '00:01:04.000',
+      '1:04.000',
       tableTimeString(lapsByParticipant.get(createEventParticipantId('p-team-2'))![0].time),
-      '00:01:04.000',
+      '1:04.000',
     ]);
 
     const lapTimesModeSelect = container.querySelector('.lap-times-report__toolbar select') as HTMLSelectElement;
@@ -441,8 +441,8 @@ describe('race analytics views integration', () => {
     });
 
     expect(container.querySelector('table.lap-times-block-table')).toBeTruthy();
-    expect(container.textContent).toContain('00:01:05.000');
-    expect(container.textContent).toContain('00:01:07.000');
+    expect(container.textContent).toContain('1:05.000');
+    expect(container.textContent).toContain('1:07.000');
 
     await act(async () => {
       setSelectValue(reportSelect, 'fastest-laps');

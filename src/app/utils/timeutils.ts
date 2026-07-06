@@ -11,7 +11,7 @@ export type MillisecondsDuration = number;
 
 export type UnknownDurationString = '--:--:--.---';
 
-export type DurationString = `${string}:${string}:${string}.${string}` | UnknownDurationString;
+export type DurationString = `${string}:${string}.${string}` | `${string}:${string}:${string}.${string}` | UnknownDurationString;
 
 export type TimeStringOrError = DurationString | 'Unknown time' | 'Invalid time' | 'Undefined time';
 
@@ -99,10 +99,13 @@ export const tableTimeStringInTimeZone = (time: Date | undefined, timeZone: stri
 export const millisecondsToTime = (milliseconds: MillisecondsDuration): DurationString => {
   const seconds = Math.floor((milliseconds / 1000) % 60);
   const minutes = Math.floor((milliseconds / (1000 * 60)) % 60);
-  const hours = Math.floor((milliseconds / (1000 * 60 * 60)) % 24);
+  const hours = Math.floor(milliseconds / (1000 * 60 * 60));
   milliseconds = Math.floor(milliseconds % 1000);
-  const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}` as DurationString;
-  return formattedTime;
+  const secondsText = `${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
+  const formattedTime = hours > 0
+    ? `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${secondsText}`
+    : `${minutes}:${secondsText}`;
+  return formattedTime as DurationString;
 };
 
 export const elapsedTimeMilliseconds = (start: Date, end: Date): MillisecondsDuration => {
