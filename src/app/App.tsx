@@ -7,6 +7,9 @@ import { type EventParticipant, type EventParticipantId } from '../model/eventpa
 import { EventId, SessionId } from '../model/raceevent.ts';
 import { type RaceState, RaceStateLookup, Session } from '../model/racestate.ts';
 import { type EventTimeRecord, type TimeRecordId } from '../model/timerecord.ts';
+import { type MrScatsCatalogImport, loadMrScatsCatalogFromLocation } from '../parsers/mrScats/catalogImport.ts';
+import { listMrScatsDataFiles } from '../parsers/mrScats/fileInventory.ts';
+import { previewMrScatsDataFile } from '../parsers/mrScats/filePreview.ts';
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
 import { TestSession } from '../testdata/testsession.ts';
 import { CategoriesContext } from '../views/context/Categories.tsx';
@@ -219,6 +222,24 @@ const sessionFromPartialRaceState = (raceState: Partial<RaceState>): Session => 
   teams: raceState.teams || [],
 });
 
+const filterMrScatsRaceStateForSession = (
+  raceState: Partial<RaceState>,
+  sessionId: SessionId,
+  categoryIds: string[]
+): Partial<RaceState> => {
+  const categoryIdSet = new Set(categoryIds);
+  return {
+    ...raceState,
+    categories: (raceState.categories || []).filter((category) => categoryIdSet.has(category.id.toString())),
+    participants: (raceState.participants || []).filter((participant) => categoryIdSet.has(participant.categoryId.toString())),
+    records: (raceState.records || []).filter((record) => {
+      const recordSessionId = (record as EventTimeRecord).sessionId?.toString();
+      return !recordSessionId || recordSessionId === sessionId.toString();
+    }),
+    teams: raceState.teams || [],
+  };
+};
+
 const createParticipantFromEntrant = (
   entrant: EventCatalogEntrant,
   participantId: EventParticipantId
@@ -228,7 +249,7 @@ const createParticipantFromEntrant = (
   entrantId: entrant.id,
   firstname: entrant.firstName || entrant.name,
   id: participantId,
-  identifiers: [],
+  identifiers: [...(entrant.identifiers || [])],
   lastRecordTime: null,
   resultDuration: null,
   surname: entrant.lastName || '',
@@ -495,7 +516,7 @@ export const RaceSweetMainApp = () => {
     eventId: EventId,
     source: DataSourceConfig,
     targetSessionState?: Session & RaceStateLookup,
-    options: { cachedSpreadsheetOnly?: boolean; preferCachedSpreadsheet?: boolean } = {}
+    options: { cachedSpreadsheetOnly?: boolean; preferCachedSpreadsheet?: boolean; sessionId?: SessionId } = {}
   ): Promise<void> => {
     if (!validateUuid(eventId)) {
       throw new Error(`Invalid eventId provided: ${eventId}`);
@@ -512,7 +533,11 @@ export const RaceSweetMainApp = () => {
       preferCachedSpreadsheet: options.preferCachedSpreadsheet,
       timeZone: getEventTimeZone(eventId),
     });
-    await applyPulledRaceStateToSession(sessionTarget, raceState);
+    await applyPulledRaceStateToSession(sessionTarget, raceState, {
+      catalog: eventCatalogService?.catalog || eventCatalogState,
+      eventId,
+      sessionId: options.sessionId,
+    });
     setRenderTick((tick) => tick + 1);
   };
 
@@ -522,7 +547,11 @@ export const RaceSweetMainApp = () => {
       return false;
     }
 
-    await applyPulledRaceStateToSession(targetSessionState, raceState);
+    await applyPulledRaceStateToSession(targetSessionState, raceState, {
+      catalog: eventCatalogService?.catalog || eventCatalogState,
+      eventId,
+      sessionId,
+    });
     return true;
   };
 
@@ -600,6 +629,7 @@ export const RaceSweetMainApp = () => {
       await applySourceToSessionState(eventId, source, targetSessionState, {
         cachedSpreadsheetOnly: options?.cachedSpreadsheetOnly,
         preferCachedSpreadsheet: options?.preferCachedSpreadsheet,
+        sessionId,
       });
     }
 
@@ -665,7 +695,11 @@ export const RaceSweetMainApp = () => {
       getMasterEntrantProfilesForEvent(systemConfigState, eventId)
     );
     const targetSessionState = createEmptySessionState();
-    await applyPulledRaceStateToSession(targetSessionState, nextRaceState);
+    await applyPulledRaceStateToSession(targetSessionState, nextRaceState, {
+      catalog: eventCatalogService.catalog,
+      eventId,
+      sessionId,
+    });
     adminService?.applyChangesToSessionById(targetSessionState, sessionId);
 
     if (eventCatalogState?.activeEventId === eventId && eventCatalogState.activeSessionId === sessionId) {
@@ -704,6 +738,35 @@ export const RaceSweetMainApp = () => {
         summary = addSessionSourceReloadSummaries(summary, sessionSummary);
       }
     }
+
+    return summary;
+  };
+
+  const summarizeMrScatsImport = (importData: MrScatsCatalogImport): SessionSourceReloadSummary => {
+    const summary = createEmptySessionSourceReloadSummary();
+    if (!eventCatalogService) {
+      return summary;
+    }
+
+    const existingEvent = eventCatalogService.catalog.events.find((event) => event.id === importData.eventId);
+    summary.events = existingEvent
+      ? { created: 0, deleted: 0, updated: 1 }
+      : { created: 1, deleted: 0, updated: 0 };
+
+    importData.sessions.forEach((session) => {
+      const existingSession = eventCatalogService.catalog.sessions.find((item) => item.id === session.id);
+      summary.sessions[existingSession ? 'updated' : 'created'] += 1;
+
+      const existingRaceState = eventCatalogService.getImportedRaceState(importData.eventId, session.id);
+      const nextRaceState = filterMrScatsRaceStateForSession(importData.raceState, session.id, session.categoryIds);
+      const sessionSummary = summarizeSessionSourceReload(existingRaceState, nextRaceState, 'all');
+      const accumulatedSummary = addSessionSourceReloadSummaries(summary, sessionSummary);
+      summary.categories = accumulatedSummary.categories;
+      summary.crossings = accumulatedSummary.crossings;
+      summary.flags = accumulatedSummary.flags;
+      summary.participants = accumulatedSummary.participants;
+      summary.teams = accumulatedSummary.teams;
+    });
 
     return summary;
   };
@@ -843,12 +906,12 @@ export const RaceSweetMainApp = () => {
     });
 
     const timers = liveSources.map((source) => {
-      applySourceToSessionState(selectedSessionsEventId, source).catch((error: unknown) => {
+      applySourceToSessionState(selectedSessionsEventId, source, undefined, { sessionId: selectedSessionId }).catch((error: unknown) => {
         setErrorState(error as Error);
       });
       const intervalMs = Math.max(1, source.apiConfig!.pollIntervalSeconds) * 1000;
       return window.setInterval(() => {
-        applySourceToSessionState(selectedSessionsEventId, source).catch((error: unknown) => {
+        applySourceToSessionState(selectedSessionsEventId, source, undefined, { sessionId: selectedSessionId }).catch((error: unknown) => {
           setErrorState(error as Error);
         });
       }, intervalMs);
@@ -1246,6 +1309,37 @@ export const RaceSweetMainApp = () => {
               .then((events) => systemConfigService.persistListedApicalEvents(sourceId, events))
               .then(updateSystemConfigState);
           }}
+          onLoadMrScatsEvent={(sourceId) => {
+            if (!eventCatalogService || !systemConfigService) {
+              return;
+            }
+
+            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+            const locationPath = source?.mrScatsConfig?.dataLocationPath;
+            if (!source || source.type !== 'file-mr-scats-data' || !locationPath) {
+              throw new Error('MR-SCATS data files location must be selected before loading the event.');
+            }
+
+            return loadMrScatsCatalogFromLocation(locationPath)
+              .then(async (importData) => {
+                const importSummary = summarizeMrScatsImport(importData);
+                const catalog = await eventCatalogService.importMrScatsCatalog(importData);
+                updateEventCatalogState(catalog, importData.eventId, importData.sessions[0]?.id);
+                let config = await systemConfigService.assignSourcesToEvent(importData.eventId, [sourceId]);
+                for (const session of importData.sessions) {
+                  config = await systemConfigService.assignSourcesToSession(session.id, {
+                    mode: 'specific',
+                    sourceIds: [sourceId],
+                  });
+                }
+                updateSystemConfigState(config);
+                setReloadSummary(importSummary);
+              })
+              .catch((error: unknown) => {
+                setErrorState(error as Error);
+                throw error;
+              });
+          }}
           onOpenLocalFile={(filePath) => window.api.openLocalFile(filePath)}
           onSaveLocalStorageDirectoryPath={(directoryPath) => {
             if (!systemConfigService) {
@@ -1259,10 +1353,33 @@ export const RaceSweetMainApp = () => {
             }
             systemConfigService.updateSource(sourceId, changes).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
           }}
+          onPreviewMrScatsDataFile={(sourceId, file) => {
+            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+            const locationPath = source?.mrScatsConfig?.dataLocationPath;
+            if (!locationPath) {
+              throw new Error('MR-SCATS data files location must be selected before previewing files.');
+            }
+
+            return previewMrScatsDataFile(locationPath, file.relativePath, file.kind);
+          }}
           onSelectLocalFile={() => {
             return window.api.selectLocalFile({
               filters: [{ extensions: ['csv'], name: 'CSV files' }],
               title: 'Select RFID Timing CSV file',
+            });
+          }}
+          onSelectMrScatsDataArchive={() => {
+            return window.api.selectLocalFile({
+              filters: [{ extensions: ['zip', 'arj'], name: 'MR-SCATS archive files' }],
+              properties: ['openFile'],
+              title: 'Select MR-SCATS archive file',
+            }).then((locationPath) => {
+              return locationPath ? listMrScatsDataFiles(locationPath) : undefined;
+            });
+          }}
+          onSelectMrScatsDataDirectory={() => {
+            return window.api.selectLocalDirectory('Select MR-SCATS data directory').then((locationPath) => {
+              return locationPath ? listMrScatsDataFiles(locationPath) : undefined;
             });
           }}
         />
@@ -1524,21 +1641,25 @@ export const RaceSweetMainApp = () => {
 
             const selectedSessionIds = new Set(sessionIds);
             const eventSessions = getSessionsForEvent(eventCatalogService.catalog, selectedCategoryEventId);
-            return eventSessions.reduce<Promise<EventCatalogState | undefined>>(async (previousUpdate, session) => {
-              await previousUpdate;
+            const updates = eventSessions.flatMap((session) => {
               const existingCategoryIds = session.categoryIds || [];
               const isAssigned = existingCategoryIds.includes(categoryId);
               const shouldBeAssigned = selectedSessionIds.has(session.id);
               if (isAssigned === shouldBeAssigned) {
-                return eventCatalogService.catalog;
+                return [];
               }
 
               const nextCategoryIds = shouldBeAssigned
                 ? Array.from(new Set([...existingCategoryIds, categoryId]))
                 : existingCategoryIds.filter((id) => id !== categoryId);
 
-              return eventCatalogService.updateSession(session.id, { categoryIds: nextCategoryIds });
-            }, Promise.resolve(eventCatalogService.catalog)).then((catalog) => {
+              return [{
+                changes: { categoryIds: nextCategoryIds },
+                sessionId: session.id,
+              }];
+            });
+
+            return eventCatalogService.updateSessions(updates).then((catalog) => {
               if (catalog) {
                 updateEventCatalogState(catalog, selectedCategoryEventId, selectedSessionId, categoryId);
               }

@@ -8,6 +8,7 @@ import {
   RequestExternalHttpIpcInvokeChannel,
   RequestOpenLocalFileIpcInvokeChannel,
   RequestReadIpcSendChannel,
+  RequestSelectLocalDirectoryIpcInvokeChannel,
   RequestSelectLocalFileIpcInvokeChannel,
   RequestWriteIpcSendChannel,
   WriteContentErrorIpcReceiveChannel,
@@ -176,8 +177,25 @@ ipcMain.handle(RequestSelectLocalFileIpcInvokeChannel, async (event: Electron.Ip
   }
   const result = await dialog.showOpenDialog(browserWindow, {
     filters: options?.filters,
-    properties: ['openFile'],
+    properties: options?.properties || ['openFile'],
     title: options?.title,
+  });
+
+  if (result.canceled) {
+    return undefined;
+  }
+
+  return result.filePaths[0];
+});
+
+ipcMain.handle(RequestSelectLocalDirectoryIpcInvokeChannel, async (event: Electron.IpcMainInvokeEvent, title?: string): Promise<string | undefined> => {
+  const browserWindow = BrowserWindow.fromWebContents(event.sender);
+  if (!browserWindow) {
+    return undefined;
+  }
+  const result = await dialog.showOpenDialog(browserWindow, {
+    properties: ['openDirectory'],
+    title,
   });
 
   if (result.canceled) {

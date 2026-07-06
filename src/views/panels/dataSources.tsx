@@ -2,7 +2,10 @@ import React from 'react';
 import { formatErrorForDisplay } from '../../app/stackTrace.js';
 import { type DataSourceConfig, type DataSourceType, getDataSourceTypeLabel } from '../../app/systemConfig.js';
 import { TimeRecordSourceId } from '../../model/types.js';
+import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
+import type { MrScatsDataFilePreview } from '../../parsers/mrScats/filePreview.js';
 import { DataSourceTypesPanel } from './dataSourceTypes.js';
+import { MrScatsDataSourcePanel } from './mrScatsDataSourcePanel.js';
 
 interface DataSourcesPanelProps {
   dataSources: DataSourceConfig[];
@@ -11,9 +14,13 @@ interface DataSourcesPanelProps {
   onDisplayError?: (source: string, error: unknown) => void;
   onFetchApicalDataNow: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: TimeRecordSourceId) => void | Promise<void>;
+  onLoadMrScatsEvent?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
+  onPreviewMrScatsDataFile?: (sourceId: TimeRecordSourceId, file: MrScatsDataFileSummary) => Promise<MrScatsDataFilePreview>;
   onReprocessApicalData: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onSaveSource: (sourceId: TimeRecordSourceId, changes: Partial<DataSourceConfig>) => void | Promise<void>;
+  onSelectMrScatsDataArchive?: () => Promise<MrScatsDataFileInventory | undefined>;
+  onSelectMrScatsDataDirectory?: () => Promise<MrScatsDataFileInventory | undefined>;
   onSelectLocalFile?: () => Promise<string | undefined>;
 }
 
@@ -218,6 +225,7 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
               const selectedEventIds = source.apiConfig?.selectedEventIds || [];
               const selectedApicalEventId = selectedEventIds[0];
               const isMasterEntrants = source.type === 'master-entrant-profiles';
+              const isMrScatsData = source.type === 'file-mr-scats-data';
               const isRfidTimingCsv = source.type === 'file-rfid-timing-csv';
               const masterProfilesJson = JSON.stringify(source.masterEntrantConfig?.profiles || [], null, 2);
               const sourceFetchError = sourceFetchErrors[source.id];
@@ -244,7 +252,16 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                     />
                   </label>
 
-                  {isRfidTimingCsv ? (
+                  {isMrScatsData ? (
+                    <MrScatsDataSourcePanel
+                      source={source}
+                      onLoadEvent={props.onLoadMrScatsEvent}
+                      onPreviewDataFile={props.onPreviewMrScatsDataFile}
+                      onSaveSource={props.onSaveSource}
+                      onSelectDataArchive={props.onSelectMrScatsDataArchive}
+                      onSelectDataDirectory={props.onSelectMrScatsDataDirectory}
+                    />
+                  ) : isRfidTimingCsv ? (
                     <>
                       <h4>RFID Timing CSV File</h4>
                       <label>

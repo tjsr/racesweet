@@ -24,8 +24,10 @@ export interface SessionSourceReloadSummaryCounts {
 export interface SessionSourceReloadSummary {
   categories: SessionSourceReloadSummaryCounts;
   crossings: SessionSourceReloadSummaryCounts;
+  events: SessionSourceReloadSummaryCounts;
   flags: SessionSourceReloadSummaryCounts;
   participants: SessionSourceReloadSummaryCounts;
+  sessions: SessionSourceReloadSummaryCounts;
   teams: SessionSourceReloadSummaryCounts;
 }
 
@@ -37,8 +39,10 @@ export interface SessionSourceReloadMergeOptions {
 export const createEmptySessionSourceReloadSummary = (): SessionSourceReloadSummary => ({
   categories: { created: 0, deleted: 0, updated: 0 },
   crossings: { created: 0, deleted: 0, updated: 0 },
+  events: { created: 0, deleted: 0, updated: 0 },
   flags: { created: 0, deleted: 0, updated: 0 },
   participants: { created: 0, deleted: 0, updated: 0 },
+  sessions: { created: 0, deleted: 0, updated: 0 },
   teams: { created: 0, deleted: 0, updated: 0 },
 });
 
@@ -245,8 +249,10 @@ export const addSessionSourceReloadSummaries = (
 ): SessionSourceReloadSummary => ({
   categories: addSummaryCounts(left.categories, right.categories),
   crossings: addSummaryCounts(left.crossings, right.crossings),
+  events: addSummaryCounts(left.events, right.events),
   flags: addSummaryCounts(left.flags, right.flags),
   participants: addSummaryCounts(left.participants, right.participants),
+  sessions: addSummaryCounts(left.sessions, right.sessions),
   teams: addSummaryCounts(left.teams, right.teams),
 });
 

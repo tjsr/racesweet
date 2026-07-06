@@ -35,8 +35,10 @@ describe('ReloadSummaryDialog', () => {
           summary={{
             categories: { created: 1, deleted: 2, updated: 3 },
             crossings: { created: 13, deleted: 14, updated: 15 },
+            events: { created: 16, deleted: 17, updated: 18 },
             flags: { created: 10, deleted: 11, updated: 12 },
             participants: { created: 4, deleted: 5, updated: 6 },
+            sessions: { created: 19, deleted: 20, updated: 21 },
             teams: { created: 7, deleted: 8, updated: 9 },
           }}
         />
@@ -49,8 +51,10 @@ describe('ReloadSummaryDialog', () => {
     ));
 
     expect(rows).toEqual([
+      ['Events', '16', '17', '18'],
+      ['Sessions', '19', '20', '21'],
       ['Categories', '1', '2', '3'],
-      ['Participants', '4', '5', '6'],
+      ['Competitors', '4', '5', '6'],
       ['Teams', '7', '8', '9'],
       ['Flag records', '10', '11', '12'],
       ['Crossings', '13', '14', '15'],

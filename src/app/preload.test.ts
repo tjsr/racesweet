@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { RequestOpenLocalFileIpcInvokeChannel, RequestReadIpcSendChannel, RequestWriteIpcSendChannel } from '../model/electronIpc.js';
+import { RequestOpenLocalFileIpcInvokeChannel, RequestReadIpcSendChannel, RequestSelectLocalDirectoryIpcInvokeChannel, RequestSelectLocalFileIpcInvokeChannel, RequestWriteIpcSendChannel } from '../model/electronIpc.js';
 import { contextBridge, ipcRenderer } from 'electron';
 
 vi.mock('electron', () => ({
@@ -52,6 +52,7 @@ describe('Electron preload renderer API', () => {
       requestBuffer: expect.any(Function),
       requestExternalHttp: expect.any(Function),
       requestFileContent: expect.any(Function),
+      selectLocalDirectory: expect.any(Function),
       selectLocalFile: expect.any(Function),
       send: expect.any(Function),
       writeFileContent: expect.any(Function),
@@ -103,6 +104,41 @@ describe('Electron preload renderer API', () => {
     expect(ipcRenderer.invoke).toHaveBeenCalledWith(
       RequestOpenLocalFileIpcInvokeChannel,
       '../../src/generated/apical-excel-cache/apical-event-1001.xlsx'
+    );
+  });
+
+  it('selects local directories through the dedicated invoke IPC bridge', async () => {
+    setContextIsolation(false);
+
+    await import('./preload.js');
+
+    void window.api.selectLocalDirectory('Select MR-SCATS data directory');
+
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(
+      RequestSelectLocalDirectoryIpcInvokeChannel,
+      'Select MR-SCATS data directory'
+    );
+  });
+
+  it('falls back to the file picker directory mode when the main process lacks the dedicated directory handler', async () => {
+    setContextIsolation(false);
+    vi.mocked(ipcRenderer.invoke)
+      .mockRejectedValueOnce(new Error("No handler registered for 'askToSelectLocalDirectory'"))
+      .mockResolvedValueOnce('C:/RaceTime/timing-data/W9721');
+
+    await import('./preload.js');
+
+    await expect(window.api.selectLocalDirectory('Select MR-SCATS data directory')).resolves.toBe('C:/RaceTime/timing-data/W9721');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(
+      RequestSelectLocalDirectoryIpcInvokeChannel,
+      'Select MR-SCATS data directory'
+    );
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(
+      RequestSelectLocalFileIpcInvokeChannel,
+      {
+        properties: ['openDirectory'],
+        title: 'Select MR-SCATS data directory',
+      }
     );
   });
 });

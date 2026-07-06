@@ -35,6 +35,7 @@ describe('DataSourceTypesPanel', () => {
 
     expect(container.textContent).toContain('Data Source Type');
     expect(container.textContent).toContain('Add Data Source');
+    expect(container.textContent).toContain('MR-SCATS Data');
 
     const select = container.querySelector('select[aria-label="New Data Source Type"]') as HTMLSelectElement;
     expect(select.value).toBe('api-apical-excel-file');

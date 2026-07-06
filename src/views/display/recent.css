@@ -36,6 +36,14 @@
   box-shadow: inset 0.35rem 0 0 #1c5f8f;
 }
 
+.selected-plate-number {
+  background-color: #d9f0ff;
+}
+
+.selected-row.selected-plate-number {
+  background-color: #c2e5ff;
+}
+
 .lap-time-session-fastest {
   color: #a0f;
   font-weight: bold;

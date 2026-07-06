@@ -7,7 +7,8 @@ import type { EventTeam } from '../model/eventteam.js';
 import { createCategoryId, createEventEntrantId, createEventId, createId, createSessionId, rewriteImportedObjectIds } from '../model/ids.js';
 import { EventId, SessionId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
-import type { TimeRecord } from '../model/timerecord.js';
+import type { EventTimeRecord, TimeRecord } from '../model/timerecord.js';
+import { MR_SCATS_DEFAULT_TIME_ZONE, type MrScatsCatalogImport } from '../parsers/mrScats/catalogImport.js';
 import { createSeedEventCatalogLedger } from './createSeedEventCatalogLedger.js';
 import {
   type CategoryDistanceRule,
@@ -19,9 +20,11 @@ import {
   type EventCatalogMutation,
   type EventCatalogSession,
   type EventCatalogState,
+  type ParticipantEntrantMembership,
   applyEventCatalogLedger,
   getCategoriesForEvent,
   getEntrantsForEvent,
+  getParticipantEntrantMemberships,
 } from './eventCatalog.js';
 import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
 import { addMissingLinkedCategoryPlaceholders } from './sessionSourceReload.js';
@@ -37,6 +40,33 @@ interface ApicalCatalogImport {
   sessionId: SessionId;
   timeZone?: string;
 }
+
+const getMrScatsSessionKind = (eventType: string | undefined): EventCatalogSession['kind'] => {
+  switch (eventType?.toUpperCase()) {
+  case 'Q':
+    return 'qualifying';
+  case 'R':
+    return 'race';
+  case 'S':
+    return 'practice';
+  default:
+    return 'other';
+  }
+};
+
+const filterRaceStateForCategories = (raceState: Partial<RaceState>, categoryIds: string[], sessionId?: SessionId): Partial<RaceState> => {
+  const categoryIdSet = new Set(categoryIds);
+  return {
+    ...raceState,
+    categories: (raceState.categories || []).filter((category) => categoryIdSet.has(category.id.toString())),
+    participants: (raceState.participants || []).filter((participant) => categoryIdSet.has(participant.categoryId.toString())),
+    records: (raceState.records || []).filter((record) => {
+      const recordSessionId = (record as EventTimeRecord).sessionId?.toString();
+      return !sessionId || !recordSessionId || recordSessionId === sessionId.toString();
+    }),
+    teams: raceState.teams || [],
+  };
+};
 
 export interface ImportedRaceStateMetadata {
   apicalDataFilePath?: string;
@@ -55,6 +85,10 @@ const assertEventCatalogPersistence = (persistence: EventCatalogPersistence): vo
 
 const createMutationId = (): string => createId('mutationId');
 const createTimestamp = (): string => new Date().toISOString();
+const createLedgerWithMutations = (mutations: EventCatalogLedger['mutations']): EventCatalogLedger => ({
+  mutations,
+  schemaVersion: 1,
+});
 
 const reviveDate = (value: Date | string | undefined): Date | undefined => {
   if (!value) {
@@ -126,6 +160,52 @@ const deriveDistanceRule = (category: EventCategory): CategoryDistanceRule | und
 
 const normalizeCategoriesForResultExclusion = (categories: EventCategory[]): EventCategory[] =>
   categories.map((category) => normalizeCategoryResultExclusion(category));
+
+const getTeamEntrantIdsByParticipantId = (teams: EventTeam[]): Map<string, string> => {
+  const teamEntrantIdsByParticipantId = new Map<string, string>();
+
+  teams.forEach((team) => {
+    team.members.forEach((participantId) => {
+      teamEntrantIdsByParticipantId.set(participantId.toString(), team.id.toString());
+    });
+  });
+
+  return teamEntrantIdsByParticipantId;
+};
+
+const ensureImportedParticipantEntrantIds = (raceState: Partial<RaceState>): Partial<RaceState> => {
+  const teams = raceState.teams || [];
+  const teamEntrantIdsByParticipantId = getTeamEntrantIdsByParticipantId(teams);
+  const participants = (raceState.participants || []).map((participant): EventParticipant => {
+    const participantId = participant.id.toString();
+    const entrantId = nonEmpty(participant.entrantId?.toString()) ||
+      teamEntrantIdsByParticipantId.get(participantId) ||
+      participantId;
+
+    if (participant.entrantId?.toString() === entrantId) {
+      return participant;
+    }
+
+    return {
+      ...participant,
+      entrantId,
+    };
+  });
+
+  return {
+    ...raceState,
+    participants,
+  };
+};
+
+const normalizeImportedRaceStateForCatalog = (raceState: Partial<RaceState>): Partial<RaceState> => {
+  const parentSafeRaceState = ensureImportedParticipantEntrantIds(raceState);
+
+  return addMissingLinkedCategoryPlaceholders({
+    ...parentSafeRaceState,
+    categories: normalizeCategoriesForResultExclusion(parentSafeRaceState.categories || []),
+  });
+};
 
 const deriveMaxTeamSizesByCategory = (teams: EventTeam[], participants: EventParticipant[]): Map<string, number> => {
   const participantById = new Map(participants.map((participant) => [participant.id.toString(), participant]));
@@ -258,6 +338,7 @@ const deriveEntrantsFromParticipants = (
         firstName: riderFirstName,
         gender: nonEmpty(profile?.gender),
         id: entrantType === 'team' ? participantId : entrantId,
+        identifiers: [...member.identifiers],
         lastName: riderLastName,
         memberParticipantIds: [participantId],
         name: riderName || `${member.firstname || ''} ${member.surname || ''}`.trim() || participantId,
@@ -286,8 +367,8 @@ const deriveEntrantsFromParticipants = (
 };
 
 const normalizeEntrantChanges = (
-  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>
-): Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>> => {
+  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>
+): Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>> => {
   if (!hasOwn(changes, 'categoryId')) {
     return changes;
   }
@@ -304,6 +385,83 @@ const hasSameMembers = (left: string[], right: string[]): boolean =>
   left.length === right.length && left.every((value, index) => value === right[index]);
 
 const hasSameSerializedValue = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right);
+
+const findLatestRaceStateImportMutation = (
+  mutations: EventCatalogLedger['mutations'],
+  eventId: EventId,
+  sessionId: SessionId
+): Extract<EventCatalogMutation, { type: 'race-state-imported' }> | undefined => {
+  return [...mutations].reverse().find((mutation): mutation is Extract<EventCatalogMutation, { type: 'race-state-imported' }> => {
+    return mutation.type === 'race-state-imported' &&
+      mutation.eventId === eventId &&
+      mutation.sessionId === sessionId;
+  });
+};
+
+const raceStateImportMutationChangesLedger = (
+  acceptedMutations: EventCatalogLedger['mutations'],
+  mutation: Extract<EventCatalogMutation, { type: 'race-state-imported' }>
+): boolean => {
+  const existingImport = findLatestRaceStateImportMutation(acceptedMutations, mutation.eventId, mutation.sessionId);
+  if (!existingImport) {
+    return true;
+  }
+
+  return !hasSameSerializedValue(existingImport.apicalDataFilePath, mutation.apicalDataFilePath) ||
+    !hasSameSerializedValue(existingImport.raceState, mutation.raceState);
+};
+
+const mutationChangesLedgerState = (
+  acceptedMutations: EventCatalogLedger['mutations'],
+  mutation: EventCatalogMutation
+): boolean => {
+  if (mutation.type === 'race-state-imported') {
+    return raceStateImportMutationChangesLedger(acceptedMutations, mutation);
+  }
+
+  const currentState = applyEventCatalogLedger(createLedgerWithMutations(acceptedMutations));
+  const nextState = applyEventCatalogLedger(createLedgerWithMutations([...acceptedMutations, mutation]));
+  return !hasSameSerializedValue(currentState, nextState);
+};
+
+const removeDuplicateMutationIds = (mutations: EventCatalogLedger['mutations']): EventCatalogLedger['mutations'] => {
+  const acceptedMutations: EventCatalogLedger['mutations'] = [];
+  const acceptedMutationIds = new Set<string>();
+
+  mutations.forEach((mutation) => {
+    if (acceptedMutationIds.has(mutation.id)) {
+      return;
+    }
+
+    acceptedMutations.push(mutation);
+    acceptedMutationIds.add(mutation.id);
+  });
+
+  return acceptedMutations;
+};
+
+const removeDuplicateAndNoopMutations = (
+  existingMutations: EventCatalogLedger['mutations'],
+  proposedMutations: EventCatalogLedger['mutations']
+): EventCatalogLedger['mutations'] => {
+  const acceptedMutations = removeDuplicateMutationIds(existingMutations);
+  const acceptedMutationIds = new Set(acceptedMutations.map((mutation) => mutation.id));
+
+  proposedMutations.forEach((mutation) => {
+    if (acceptedMutationIds.has(mutation.id)) {
+      return;
+    }
+
+    if (!mutationChangesLedgerState(acceptedMutations, mutation)) {
+      return;
+    }
+
+    acceptedMutations.push(mutation);
+    acceptedMutationIds.add(mutation.id);
+  });
+
+  return acceptedMutations;
+};
 
 const hasSameCategoryScaffold = (existing: EventCatalogCategory, next: EventCatalogCategory): boolean => {
   return existing.code === next.code &&
@@ -324,6 +482,7 @@ const hasSameEntrantScaffold = (existing: EventCatalogEntrant, next: EventCatalo
     existing.entrantType === next.entrantType &&
     existing.firstName === next.firstName &&
     existing.gender === next.gender &&
+    hasSameSerializedValue(existing.identifiers, next.identifiers) &&
     existing.lastName === next.lastName &&
     hasSameMembers(existing.memberParticipantIds, next.memberParticipantIds) &&
     existing.name === next.name &&
@@ -351,12 +510,28 @@ const getEntrantScaffoldChanges = (entrant: EventCatalogEntrant): NonNullable<Ex
   entrantType: entrant.entrantType,
   firstName: entrant.firstName,
   gender: entrant.gender,
+  identifiers: entrant.identifiers,
   lastName: entrant.lastName,
   memberParticipantIds: entrant.memberParticipantIds,
   name: entrant.name,
   notes: entrant.notes,
   teamEntrantId: entrant.teamEntrantId,
   teamMembers: entrant.teamMembers,
+});
+
+const mergeLinkedCatalogEntrant = (
+  existingEntrant: EventCatalogEntrant,
+  derivedEntrant: EventCatalogEntrant,
+  eventId: EventId
+): EventCatalogEntrant => ({
+  ...existingEntrant,
+  categoryId: derivedEntrant.categoryId,
+  categoryIds: derivedEntrant.categoryIds,
+  eventId,
+  identifiers: derivedEntrant.identifiers || existingEntrant.identifiers,
+  memberParticipantIds: unique([...existingEntrant.memberParticipantIds, ...derivedEntrant.memberParticipantIds]),
+  teamEntrantId: derivedEntrant.teamEntrantId,
+  teamMembers: derivedEntrant.teamMembers || existingEntrant.teamMembers,
 });
 
 const assertUuid = (errors: string[], label: string, value: string | undefined): void => {
@@ -496,12 +671,16 @@ const createLedgerRelationshipRepairMutations = (state: EventCatalogState): Even
 };
 
 const repairAndValidateLoadedLedger = (ledger: EventCatalogLedger): EventCatalogLedger => {
-  let repairedLedger = rewriteImportedObjectIds(ledger).value;
+  const rewrittenLedger = rewriteImportedObjectIds(ledger).value;
+  let repairedLedger: EventCatalogLedger = {
+    ...rewrittenLedger,
+    mutations: removeDuplicateMutationIds(rewrittenLedger.mutations),
+  };
   const repairMutations = createLedgerRelationshipRepairMutations(applyEventCatalogLedger(repairedLedger));
   if (repairMutations.length > 0) {
     repairedLedger = {
       ...repairedLedger,
-      mutations: [...repairedLedger.mutations, ...repairMutations],
+      mutations: removeDuplicateAndNoopMutations(repairedLedger.mutations, repairMutations),
     };
   }
 
@@ -510,7 +689,9 @@ const repairAndValidateLoadedLedger = (ledger: EventCatalogLedger): EventCatalog
 };
 
 export class EventCatalogService {
+  private batchDepth = 0;
   private ledger: EventCatalogLedger;
+  private pendingBatchPersist = false;
   private state: EventCatalogState;
   private readonly options: EventCatalogServiceOptions;
   private readonly persistence: EventCatalogPersistence;
@@ -570,6 +751,13 @@ export class EventCatalogService {
 
   public getImportedRaceState(eventId: EventId, sessionId: SessionId): Partial<RaceState> | undefined {
     return this.getImportedRaceStateMetadata(eventId, sessionId)?.raceState;
+  }
+
+  public findEntrantMembershipsForParticipant(participantId: EventParticipant['id'], eventId?: EventId): ParticipantEntrantMembership[] {
+    return getParticipantEntrantMemberships(this.state, participantId, {
+      eventId,
+      includeTeamParents: true,
+    });
   }
 
   public async createEvent(): Promise<EventCatalogState> {
@@ -642,12 +830,27 @@ export class EventCatalogService {
 
     const scaffoldCategories = deriveCategoriesFromEventData(eventId, categories, participants, teams);
     const categoryIds = scaffoldCategories.map((category) => category.id.toString());
-    const entrants = deriveEntrantsFromParticipants(eventId, participants, masterProfiles, teams);
+    const derivedEntrants = deriveEntrantsFromParticipants(eventId, participants, masterProfiles, teams);
+    const existingEventEntrantsById = new Map(getEntrantsForEvent(this.state, eventId).map((entrant) => [entrant.id.toString(), entrant] as const));
+    const linkedGlobalEntrantsById = new Map(this.state.entrants
+      .filter((entrant) => entrant.eventId !== eventId)
+      .filter((entrant) => !existingEventEntrantsById.has(entrant.id.toString()))
+      .map((entrant) => [entrant.id.toString(), entrant] as const));
+    const linkedEntrantIds = new Set<string>();
+    const entrants = derivedEntrants.map((entrant) => {
+      const linkedEntrant = linkedGlobalEntrantsById.get(entrant.id.toString());
+      if (!linkedEntrant) {
+        return entrant;
+      }
+
+      linkedEntrantIds.add(entrant.id.toString());
+      return mergeLinkedCatalogEntrant(linkedEntrant, entrant, eventId);
+    });
 
     const existingCategoriesById = new Map(this.state.categories
       .filter((category) => category.eventId === eventId)
       .map((category) => [category.id.toString(), category] as const));
-    const existingEntrantsById = new Map(getEntrantsForEvent(this.state, eventId).map((entrant) => [entrant.id.toString(), entrant] as const));
+    const existingEntrantsById = new Map(existingEventEntrantsById);
     const categoryMutations = scaffoldCategories.map((category) => {
       const existingCategory = existingCategoriesById.get(category.id.toString());
       if (existingCategory) {
@@ -691,29 +894,47 @@ export class EventCatalogService {
       })()
       : undefined;
 
-    const entrantMutations = entrants.map((entrant) => {
+    const entrantMutations: EventCatalogLedger['mutations'] = entrants.flatMap((entrant): EventCatalogLedger['mutations'] => {
+      const linkedEntrant = linkedGlobalEntrantsById.get(entrant.id.toString());
+      if (linkedEntrantIds.has(entrant.id.toString()) && linkedEntrant) {
+        return [
+          {
+            entrantId: linkedEntrant.id,
+            id: createMutationId(),
+            timestamp: createTimestamp(),
+            type: 'entrant-deleted' as const,
+          },
+          {
+            entrant,
+            id: createMutationId(),
+            timestamp: createTimestamp(),
+            type: 'entrant-created' as const,
+          },
+        ];
+      }
+
       const existingEntrant = existingEntrantsById.get(entrant.id.toString());
       if (existingEntrant) {
         if (hasSameEntrantScaffold(existingEntrant, entrant)) {
-          return undefined;
+          return [];
         }
 
-        return {
+        return [{
           changes: getEntrantScaffoldChanges(entrant),
           entrantId: entrant.id,
           id: createMutationId(),
           timestamp: createTimestamp(),
           type: 'entrant-updated' as const,
-        };
+        }];
       }
 
-      return {
+      return [{
         entrant,
         id: createMutationId(),
         timestamp: createTimestamp(),
         type: 'entrant-created' as const,
-      };
-    }).filter((mutation): mutation is NonNullable<typeof mutation> => mutation !== undefined);
+      }];
+    });
 
     const eventCategoryIds = [...(event?.categoryIds || [])];
     const eventEntrantIds = [...(event?.entrantIds || [])];
@@ -752,11 +973,12 @@ export class EventCatalogService {
   }
 
   public async importApicalRaceState(importData: ApicalCatalogImport, masterProfiles: MasterEntrantProfile[] = []): Promise<EventCatalogState> {
+    return this.runMutationBatch(async () => this.importApicalRaceStateUnbatched(importData, masterProfiles));
+  }
+
+  private async importApicalRaceStateUnbatched(importData: ApicalCatalogImport, masterProfiles: MasterEntrantProfile[] = []): Promise<EventCatalogState> {
     const normalizedImportData = rewriteImportedObjectIds(importData).value;
-    normalizedImportData.raceState = {
-      ...normalizedImportData.raceState,
-      categories: normalizeCategoriesForResultExclusion(normalizedImportData.raceState.categories || []),
-    };
+    normalizedImportData.raceState = normalizeImportedRaceStateForCatalog(normalizedImportData.raceState);
     const existingEvent = this.state.events.find((event) => event.id === normalizedImportData.eventId);
     const existingSession = this.state.sessions.find((session) => session.id === normalizedImportData.sessionId);
     const sessionIds = Array.from(new Set([...(existingEvent?.sessionIds || []), normalizedImportData.sessionId]));
@@ -884,25 +1106,153 @@ export class EventCatalogService {
     );
   }
 
+  public async importMrScatsCatalog(importData: MrScatsCatalogImport): Promise<EventCatalogState> {
+    return this.runMutationBatch(async () => this.importMrScatsCatalogUnbatched(importData));
+  }
+
+  private async importMrScatsCatalogUnbatched(importData: MrScatsCatalogImport): Promise<EventCatalogState> {
+    const normalizedImportData = rewriteImportedObjectIds(importData).value;
+    normalizedImportData.raceState = normalizeImportedRaceStateForCatalog(normalizedImportData.raceState);
+
+    const existingEvent = this.state.events.find((event) => event.id === normalizedImportData.eventId);
+    const existingSessions = new Map(this.state.sessions.map((session) => [session.id, session] as const));
+    const sessionIds = normalizedImportData.sessions.map((session) => session.id);
+    const mutations: EventCatalogLedger['mutations'] = [];
+    const eventDate = normalizedImportData.eventDate || normalizedImportData.sessions[0]?.scheduledStart?.slice(0, 10) || createTimestamp().slice(0, 10);
+    const timeZone = existingEvent?.timeZone || MR_SCATS_DEFAULT_TIME_ZONE || getSystemTimeZone();
+
+    if (!existingEvent) {
+      mutations.push({
+        event: {
+          categoryIds: [],
+          date: eventDate,
+          entrantIds: [],
+          format: 'race-weekend',
+          id: normalizedImportData.eventId,
+          name: normalizedImportData.eventName,
+          sessionIds,
+          timeZone,
+        },
+        id: createMutationId(),
+        timestamp: createTimestamp(),
+        type: 'event-created',
+      });
+    } else {
+      mutations.push({
+        changes: {
+          date: eventDate,
+          name: normalizedImportData.eventName,
+          sessionIds: Array.from(new Set([...existingEvent.sessionIds, ...sessionIds])),
+          timeZone,
+        },
+        eventId: normalizedImportData.eventId,
+        id: createMutationId(),
+        timestamp: createTimestamp(),
+        type: 'event-updated',
+      });
+    }
+
+    normalizedImportData.sessions.forEach((session) => {
+      const existingSession = existingSessions.get(session.id);
+      if (!existingSession) {
+        mutations.push({
+          id: createMutationId(),
+          session: {
+            categoryIds: session.categoryIds,
+            eventId: normalizedImportData.eventId,
+            id: session.id,
+            kind: getMrScatsSessionKind(session.eventType),
+            name: session.name,
+            notes: 'Imported from MR-SCATS data files.',
+            scheduledStart: session.scheduledStart,
+            status: 'completed',
+          },
+          timestamp: createTimestamp(),
+          type: 'session-created',
+        });
+        return;
+      }
+
+      mutations.push({
+        changes: {
+          categoryIds: session.categoryIds,
+          kind: getMrScatsSessionKind(session.eventType),
+          name: session.name,
+          scheduledStart: session.scheduledStart,
+          status: 'completed',
+        },
+        id: createMutationId(),
+        sessionId: session.id,
+        timestamp: createTimestamp(),
+        type: 'session-updated',
+      });
+    });
+
+    normalizedImportData.sessions.forEach((session) => {
+      mutations.push({
+        eventId: normalizedImportData.eventId,
+        id: createMutationId(),
+        raceState: filterRaceStateForCategories(normalizedImportData.raceState, session.categoryIds, session.id),
+        sessionId: session.id,
+        timestamp: createTimestamp(),
+        type: 'race-state-imported',
+      });
+    });
+
+    await this.appendMutations(mutations);
+
+    return this.syncEventScaffold(
+      normalizedImportData.eventId,
+      normalizedImportData.raceState.categories || [],
+      normalizedImportData.raceState.participants || [],
+      [],
+      normalizedImportData.raceState.teams || []
+    );
+  }
+
   public async updateImportedRaceState(
     eventId: EventId,
     sessionId: SessionId,
     raceState: Partial<RaceState>,
     apicalDataFilePath?: string
   ): Promise<EventCatalogState> {
-    const existingMetadata = this.getImportedRaceStateMetadata(eventId, sessionId);
+    return this.runMutationBatch(async () => this.updateImportedRaceStateUnbatched(eventId, sessionId, raceState, apicalDataFilePath));
+  }
 
-    return this.appendMutations([
+  private async updateImportedRaceStateUnbatched(
+    eventId: EventId,
+    sessionId: SessionId,
+    raceState: Partial<RaceState>,
+    apicalDataFilePath?: string
+  ): Promise<EventCatalogState> {
+    const normalizedRaceState = normalizeImportedRaceStateForCatalog(rewriteImportedObjectIds(raceState).value);
+    const existingMetadata = this.getImportedRaceStateMetadata(eventId, sessionId);
+    const existingEvent = this.state.events.find((event) => event.id === eventId);
+
+    await this.appendMutations([
       {
         apicalDataFilePath: apicalDataFilePath ?? existingMetadata?.apicalDataFilePath,
         eventId,
         id: createMutationId(),
-        raceState,
+        raceState: normalizedRaceState,
         sessionId,
         timestamp: createTimestamp(),
         type: 'race-state-imported',
       },
     ]);
+
+    if (!existingEvent) {
+      return this.state;
+    }
+
+    return this.syncEventScaffold(
+      eventId,
+      normalizedRaceState.categories || [],
+      normalizedRaceState.participants || [],
+      [],
+      normalizedRaceState.teams || [],
+      sessionId
+    );
   }
 
   public async reloadImportedRaceState(
@@ -912,9 +1262,17 @@ export class EventCatalogService {
     apicalDataFilePath?: string,
     masterProfiles: MasterEntrantProfile[] = []
   ): Promise<EventCatalogState> {
-    const normalizedRaceState = rewriteImportedObjectIds(raceState).value;
-    normalizedRaceState.categories = normalizeCategoriesForResultExclusion(normalizedRaceState.categories || []);
-    const linkedCategorySafeRaceState = addMissingLinkedCategoryPlaceholders(normalizedRaceState);
+    return this.runMutationBatch(async () => this.reloadImportedRaceStateUnbatched(eventId, sessionId, raceState, apicalDataFilePath, masterProfiles));
+  }
+
+  private async reloadImportedRaceStateUnbatched(
+    eventId: EventId,
+    sessionId: SessionId,
+    raceState: Partial<RaceState>,
+    apicalDataFilePath?: string,
+    masterProfiles: MasterEntrantProfile[] = []
+  ): Promise<EventCatalogState> {
+    const linkedCategorySafeRaceState = normalizeImportedRaceStateForCatalog(rewriteImportedObjectIds(raceState).value);
     const existingMetadata = this.getImportedRaceStateMetadata(eventId, sessionId);
     const replayMutations = this.getManualScaffoldMutationsAfterLatestImport(eventId, sessionId, masterProfiles);
 
@@ -987,6 +1345,21 @@ export class EventCatalogService {
         type: 'session-updated',
       },
     ]);
+  }
+
+  public async updateSessions(
+    updates: Array<{
+      changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>;
+      sessionId: SessionId;
+    }>
+  ): Promise<EventCatalogState> {
+    return this.appendMutations(updates.map((update) => ({
+      changes: update.changes,
+      id: createMutationId(),
+      sessionId: update.sessionId,
+      timestamp: createTimestamp(),
+      type: 'session-updated' as const,
+    })));
   }
 
   public async moveSessionToEvent(sessionId: SessionId, nextEventId: EventId): Promise<EventCatalogState> {
@@ -1180,7 +1553,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async updateEntrant(entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>): Promise<EventCatalogState> {
+  public async updateEntrant(entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes: normalizeEntrantChanges(changes),
@@ -1194,6 +1567,9 @@ export class EventCatalogService {
 
   public async deleteEntrant(eventId: EventId, entrantId: EventEntrantId): Promise<EventCatalogState> {
     const event = this.state.events.find((item) => item.id === eventId);
+    if (this.importedRaceStateReferencesEntrant(eventId, entrantId)) {
+      throw new Error(`Cannot delete entrant ${entrantId} because imported participants still reference it.`);
+    }
 
     return this.appendMutations([
       {
@@ -1215,9 +1591,14 @@ export class EventCatalogService {
   }
 
   private async appendMutations(mutations: EventCatalogLedger['mutations']): Promise<EventCatalogState> {
+    const nextMutations = removeDuplicateAndNoopMutations(this.ledger.mutations, mutations);
+    if (nextMutations.length === this.ledger.mutations.length) {
+      return this.state;
+    }
+
     this.ledger = {
       ...this.ledger,
-      mutations: [...this.ledger.mutations, ...mutations],
+      mutations: nextMutations,
     };
     await this.persist();
     return this.state;
@@ -1229,6 +1610,44 @@ export class EventCatalogService {
       id: createMutationId(),
       timestamp: createTimestamp(),
     };
+  }
+
+  private async runMutationBatch<T>(operation: () => Promise<T>): Promise<T> {
+    this.batchDepth += 1;
+    try {
+      return await operation();
+    } finally {
+      this.batchDepth -= 1;
+      if (this.batchDepth === 0 && this.pendingBatchPersist) {
+        this.pendingBatchPersist = false;
+        await this.persistCurrentLedger();
+      }
+    }
+  }
+
+  private getLatestImportedRaceStatesForEvent(eventId: EventId): Partial<RaceState>[] {
+    const latestRaceStatesBySessionId = new Map<string, Partial<RaceState>>();
+
+    this.ledger.mutations.forEach((mutation) => {
+      if (mutation.type !== 'race-state-imported' || mutation.eventId !== eventId) {
+        return;
+      }
+
+      latestRaceStatesBySessionId.set(mutation.sessionId.toString(), normalizeImportedRaceStateForCatalog(mutation.raceState));
+    });
+
+    return Array.from(latestRaceStatesBySessionId.values());
+  }
+
+  private importedRaceStateReferencesEntrant(eventId: EventId, entrantId: EventEntrantId): boolean {
+    const targetEntrantId = entrantId.toString();
+
+    return this.getLatestImportedRaceStatesForEvent(eventId).some((raceState) => {
+      return (raceState.participants || []).some((participant) => {
+        return participant.entrantId?.toString() === targetEntrantId ||
+          participant.id.toString() === targetEntrantId;
+      });
+    });
   }
 
   private getManualScaffoldMutationsAfterLatestImport(
@@ -1266,6 +1685,8 @@ export class EventCatalogService {
       entrant.id.toString(),
       getEntrantScaffoldChanges(entrant),
     ] as const));
+    const importedCategoryIds = new Set(importedCategories.map((category) => category.id.toString()));
+    const importedEntrantIds = new Set(importedEntrants.map((entrant) => entrant.id.toString()));
 
     return this.ledger.mutations.slice(latestImportIndex + 1).reduce<EventCatalogLedger['mutations']>((replayMutations, mutation) => {
       if (mutation.type === 'category-updated') {
@@ -1284,8 +1705,18 @@ export class EventCatalogService {
         return replayMutations;
       }
 
-      if (mutation.type === 'category-deleted' || mutation.type === 'entrant-deleted') {
-        replayMutations.push(this.cloneReplayMutation(mutation));
+      if (mutation.type === 'category-deleted') {
+        if (!importedCategoryIds.has(mutation.categoryId.toString())) {
+          replayMutations.push(this.cloneReplayMutation(mutation));
+        }
+        return replayMutations;
+      }
+
+      if (mutation.type === 'entrant-deleted') {
+        if (!importedEntrantIds.has(mutation.entrantId.toString())) {
+          replayMutations.push(this.cloneReplayMutation(mutation));
+        }
+        return replayMutations;
       }
 
       return replayMutations;
@@ -1294,6 +1725,15 @@ export class EventCatalogService {
 
   private async persist(): Promise<void> {
     this.state = applyEventCatalogLedger(this.ledger);
+    if (this.batchDepth > 0) {
+      this.pendingBatchPersist = true;
+      return;
+    }
+
+    await this.persistCurrentLedger();
+  }
+
+  private async persistCurrentLedger(): Promise<void> {
     await this.persistence.save(this.ledger);
     if (this.options.onPersistedLedger) {
       await this.options.onPersistedLedger(this.ledger);

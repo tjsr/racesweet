@@ -1,4 +1,5 @@
 import path from 'node:path';
+import type { MrScatsDataFileSummary } from '../parsers/mrScats/fileInventory';
 import { EventId, SessionId } from '../model/raceevent';
 
 export type DataSourceType =
@@ -6,6 +7,7 @@ export type DataSourceType =
   | 'timing-mylaps-decoder'
   | 'timing-dorian-data1-supernode'
   | 'file-rfid-timing-csv'
+  | 'file-mr-scats-data'
   | 'file-apical-data-file'
   | 'file-racesweet-ledger'
   | 'api-aws-sqs'
@@ -30,6 +32,12 @@ export interface MasterEntrantSourceConfig {
 
 export interface LocalFileSourceConfig {
   filePath?: string;
+}
+
+export interface MrScatsSourceConfig {
+  dataLocationPath?: string;
+  files: MrScatsDataFileSummary[];
+  sourceKind?: 'archive' | 'directory';
 }
 
 export interface ApicalListedEvent {
@@ -67,6 +75,7 @@ export interface DataSourceConfig {
   id: string;
   listedEvents?: ApicalListedEvent[];
   masterEntrantConfig?: MasterEntrantSourceConfig;
+  mrScatsConfig?: MrScatsSourceConfig;
   name: string;
   type: DataSourceType;
 }
@@ -133,11 +142,30 @@ const isApicalDataSource = (source: Pick<DataSourceConfig, 'type'>): boolean => 
   return source.type === 'api-apical-data-file' || source.type === 'api-apical-excel-file';
 };
 
+const normalizeMrScatsSourceConfig = (config: MrScatsSourceConfig | undefined): MrScatsSourceConfig | undefined => {
+  if (!config) {
+    return undefined;
+  }
+
+  return {
+    ...config,
+    dataLocationPath: normalizeOptionalSystemFilePath(config.dataLocationPath),
+    files: config.files || [],
+  };
+};
+
 const normalizeApicalListedEvents = (listedEvents: ApicalListedEvent[] | undefined): ApicalListedEvent[] => {
   return (listedEvents || []).map((event) => ({ ...event }));
 };
 
 export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListedEvents: ApicalListedEvent[] = []): DataSourceConfig => {
+  if (source.type === 'file-mr-scats-data') {
+    return {
+      ...source,
+      mrScatsConfig: normalizeMrScatsSourceConfig(source.mrScatsConfig) || { files: [] },
+    };
+  }
+
   if (!isApicalDataSource(source) || !source.apiConfig) {
     return source;
   }
@@ -204,6 +232,8 @@ export const getDataSourceTypeLabel = (type: DataSourceType): string => {
     return 'Dorian DATA-1 Supernode';
   case 'file-rfid-timing-csv':
     return 'RFID Timing CSV';
+  case 'file-mr-scats-data':
+    return 'MR-SCATS Data';
   case 'file-apical-data-file':
     return 'Apical data file';
   case 'file-racesweet-ledger':

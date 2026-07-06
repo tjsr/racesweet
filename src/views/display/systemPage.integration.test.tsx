@@ -57,6 +57,15 @@ const config: SystemConfiguration = {
       name: 'RFID CSV Source',
       type: 'file-rfid-timing-csv',
     },
+    {
+      enabled: true,
+      id: 'source-mr-scats',
+      mrScatsConfig: {
+        files: [],
+      },
+      name: 'MR-SCATS Source',
+      type: 'file-mr-scats-data',
+    },
   ],
   eventSourceAssignments: {
     'event-1': ['source-apical'],
@@ -504,6 +513,90 @@ describe('SystemPage integration', () => {
     expect(onSaveSource).toHaveBeenCalledWith('source-rfid-csv', {
       fileConfig: {
         filePath: sampleFilePath,
+      },
+    });
+  });
+
+  it('opens a local directory picker and saves the MR-SCATS data inventory', async () => {
+    const onCreateSource = vi.fn();
+    const onDeleteSource = vi.fn();
+    const onLoadApicalEvents = vi.fn();
+    const onSaveSource = vi.fn();
+    const onSelectMrScatsDataDirectory = vi.fn(async () => ({
+      files: [
+        {
+          dbf: {
+            fields: [{ decimals: 0, length: 4, name: 'CARNUMBER', type: 'N' }],
+            headerLength: 226,
+            recordCount: 228,
+            recordLength: 30,
+            version: 3,
+          },
+          extension: '.dbf',
+          kind: 'dbf-table' as const,
+          meetingCode: 'W9721',
+          name: 'W9721Q01.DBF',
+          relativePath: 'W9721Q01.DBF',
+          sessionCode: 'Q',
+          sessionNumber: 1,
+          size: 7067,
+        },
+      ],
+      locationPath: 'C:/RaceTime/timing-data/W9721',
+      sourceKind: 'directory' as const,
+    }));
+
+    await act(async () => {
+      root.render(
+        <SystemPage
+          config={config}
+          onCreateSource={onCreateSource}
+          onDeleteSource={onDeleteSource}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={onLoadApicalEvents}
+          onReprocessApicalData={vi.fn()}
+          onSaveLocalStorageDirectoryPath={vi.fn()}
+          onSaveSource={onSaveSource}
+          onSelectMrScatsDataDirectory={onSelectMrScatsDataDirectory}
+        />,
+      );
+    });
+
+    const sourceTypeSelect = container.querySelector('select[aria-label="New Data Source Type"]') as HTMLSelectElement;
+    expect(Array.from(sourceTypeSelect.options).map((option) => option.textContent)).toContain('MR-SCATS Data');
+
+    const mrScatsRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('MR-SCATS Source'));
+    expect(mrScatsRow).toBeDefined();
+
+    await act(async () => {
+      mrScatsRow!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('MR-SCATS Data');
+    const locationInput = container.querySelector('input[aria-label="MR-SCATS Data Files Location source-mr-scats"]') as HTMLInputElement;
+    expect(locationInput).toBeDefined();
+    expect(locationInput.placeholder).toBe('No file or directory selected');
+
+    const selectDirectoryButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Select Directory');
+    const selectArchiveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Select Archive');
+    expect(selectDirectoryButton).toBeDefined();
+    expect(selectArchiveButton).toBeDefined();
+
+    await act(async () => {
+      selectDirectoryButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onSelectMrScatsDataDirectory).toHaveBeenCalled();
+    expect(onSaveSource).toHaveBeenCalledWith('source-mr-scats', {
+      mrScatsConfig: {
+        dataLocationPath: 'C:/RaceTime/timing-data/W9721',
+        files: [
+          expect.objectContaining({
+            dbf: expect.objectContaining({ recordCount: 228 }),
+            relativePath: 'W9721Q01.DBF',
+          }),
+        ],
+        sourceKind: 'directory',
       },
     });
   });

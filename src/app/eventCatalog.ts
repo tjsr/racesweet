@@ -62,6 +62,7 @@ export interface EventCatalogEntrant {
   firstName?: string;
   gender?: string;
   id: EventEntrantId;
+  identifiers?: EventParticipant['identifiers'];
   lastName?: string;
   memberParticipantIds: EventParticipantId[];
   name: string;
@@ -108,6 +109,18 @@ export interface EventCatalogState {
   entrants: EventCatalogEntrant[];
   events: EventCatalogEvent[];
   sessions: EventCatalogSession[];
+}
+
+export interface ParticipantEntrantMembership {
+  categories: EventCatalogCategory[];
+  entrant: EventCatalogEntrant;
+  event: EventCatalogEvent;
+  sessions: EventCatalogSession[];
+}
+
+export interface ParticipantEntrantMembershipOptions {
+  eventId?: EventId;
+  includeTeamParents?: boolean;
 }
 
 interface EventCatalogMutationBase {
@@ -188,7 +201,7 @@ export interface EntrantCreatedMutation extends EventCatalogMutationBase {
 }
 
 export interface EntrantUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>;
+  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>;
   entrantId: EventEntrantId;
   type: 'entrant-updated';
 }
@@ -658,4 +671,74 @@ export const getTeamsForParticipant = (
   return getEntrantsForEvent(state, eventId)
     .filter((entrant) => entrant.entrantType === 'team')
     .filter((entrant) => entrant.memberParticipantIds.includes(participantId));
+};
+
+export const getParticipantEntrantMemberships = (
+  state: EventCatalogState,
+  participantId: IdType | undefined,
+  options: ParticipantEntrantMembershipOptions = {}
+): ParticipantEntrantMembership[] => {
+  if (!participantId) {
+    return [];
+  }
+
+  const eventIds = options.eventId
+    ? [options.eventId]
+    : state.events
+      .filter((event) => !state.deletedEventIds.includes(event.id))
+      .map((event) => event.id);
+  const memberships: ParticipantEntrantMembership[] = [];
+  const includedMembershipIds = new Set<string>();
+
+  const addMembership = (
+    event: EventCatalogEvent,
+    entrant: EventCatalogEntrant,
+    eventEntrants: EventCatalogEntrant[],
+    eventCategories: EventCatalogCategory[],
+    eventSessions: EventCatalogSession[]
+  ): void => {
+    const membershipId = `${event.id}:${entrant.id}`;
+    if (includedMembershipIds.has(membershipId)) {
+      return;
+    }
+
+    const entrantCategoryIds = getEntrantCategoryIds(entrant, eventEntrants);
+    const assignedSessionIds = getEntrantAssignedSessionIds(entrant, eventCategories, eventSessions, eventEntrants);
+    memberships.push({
+      categories: eventCategories.filter((category) => entrantCategoryIds.has(category.id)),
+      entrant,
+      event,
+      sessions: eventSessions.filter((session) => assignedSessionIds.has(session.id)),
+    });
+    includedMembershipIds.add(membershipId);
+  };
+
+  eventIds.forEach((eventId) => {
+    const event = state.events.find((candidate) => candidate.id === eventId && !state.deletedEventIds.includes(candidate.id));
+    if (!event) {
+      return;
+    }
+
+    const eventEntrants = getEntrantsForEvent(state, event.id);
+    const eventCategories = getCategoriesForEvent(state, event.id);
+    const eventSessions = getSessionsForEvent(state, event.id);
+    const matchingEntrants = eventEntrants.filter((entrant) => {
+      return entrant.id === participantId || entrant.memberParticipantIds.includes(participantId);
+    });
+
+    matchingEntrants.forEach((entrant) => {
+      addMembership(event, entrant, eventEntrants, eventCategories, eventSessions);
+
+      if (!options.includeTeamParents || !entrant.teamEntrantId) {
+        return;
+      }
+
+      const teamEntrant = eventEntrants.find((candidate) => candidate.id === entrant.teamEntrantId);
+      if (teamEntrant) {
+        addMembership(event, teamEntrant, eventEntrants, eventCategories, eventSessions);
+      }
+    });
+  });
+
+  return memberships;
 };

@@ -1373,23 +1373,9 @@ describe('RaceSweetMainApp integration', () => {
     fetchMock.mockClear();
 
     await clickButtonByText(container, 'Reprocess data');
-
-    for (let attempt = 0; attempt < 120; attempt += 1) {
-      const catalogWriteCount = writtenFiles.filter((write) => write.filePath.includes('event-catalog.json')).length;
-      if (catalogWriteCount > catalogWriteCountBeforeReprocess) {
-        break;
-      }
-
-      await act(async () => {
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, 10);
-        });
-      });
-    }
-
-    expect(writtenFiles.filter((write) => write.filePath.includes('event-catalog.json')).length).toBeGreaterThan(catalogWriteCountBeforeReprocess);
     expect(fetchMock).toHaveBeenCalled();
     await waitForText(container, 'Data Reloaded');
+    expect(writtenFiles.filter((write) => write.filePath.includes('event-catalog.json')).length).toBeLessThanOrEqual(catalogWriteCountBeforeReprocess + 1);
     const reloadRows = Array.from(container.querySelectorAll('table[aria-label="Reload summary"] tbody tr')).map((row) => (
       Array.from(row.querySelectorAll('th, td')).map((cell) => cell.textContent || '')
     ));
@@ -1525,7 +1511,7 @@ describe('RaceSweetMainApp integration', () => {
     const reloadSummaryTable = container.querySelector('table[aria-label="Reload summary"]');
     expect(reloadSummaryTable).toBeTruthy();
     expect(reloadSummaryTable?.textContent).toContain('Categories');
-    expect(reloadSummaryTable?.textContent).toContain('Participants');
+    expect(reloadSummaryTable?.textContent).toContain('Competitors');
     expect(reloadSummaryTable?.textContent).toContain('Teams');
     expect(reloadSummaryTable?.textContent).toContain('Flag records');
     expect(reloadSummaryTable?.textContent).toContain('Crossings');

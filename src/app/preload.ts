@@ -8,6 +8,7 @@ import {
   RequestExternalHttpIpcInvokeChannel,
   RequestOpenLocalFileIpcInvokeChannel,
   RequestReadIpcSendChannel,
+  RequestSelectLocalDirectoryIpcInvokeChannel,
   RequestSelectLocalFileIpcInvokeChannel,
   RequestWriteIpcSendChannel,
   VALID_RECEIVE_CHANNELS,
@@ -111,6 +112,21 @@ const rendererApi: Window['api'] = {
   },
   openLocalFile: (filePath: string): Promise<void> => {
     return ipcRenderer.invoke(RequestOpenLocalFileIpcInvokeChannel, filePath) as Promise<void>;
+  },
+  selectLocalDirectory: async (title?: string): Promise<string | undefined> => {
+    try {
+      return await ipcRenderer.invoke(RequestSelectLocalDirectoryIpcInvokeChannel, title) as string | undefined;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('No handler registered')) {
+        throw error;
+      }
+
+      return ipcRenderer.invoke(RequestSelectLocalFileIpcInvokeChannel, {
+        properties: ['openDirectory'],
+        title,
+      } satisfies SelectLocalFileOptions) as Promise<string | undefined>;
+    }
   },
   selectLocalFile: (options?: SelectLocalFileOptions): Promise<string | undefined> => {
     return ipcRenderer.invoke(RequestSelectLocalFileIpcInvokeChannel, options) as Promise<string | undefined>;

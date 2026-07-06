@@ -1053,12 +1053,12 @@ describe('RecentRecords integration', () => {
     debugSpy.mockRestore();
   });
 
-  it('does not render system-generated start flags in the recent records table', async () => {
+  it('does not render non-start system-generated flags in the recent records table', async () => {
     const categoryA: EventCategory = { id: '1', name: 'Category A' };
-    const systemStartFlag: FlagRecord = {
-      flagType: 'green',
+    const systemFlag: FlagRecord = {
+      flagType: 'yellow',
       flagValue: 'course',
-      id: 'system-start-flag',
+      id: 'system-flag',
       recordType: 4,
       sequence: 0,
       source: 'test-source',
@@ -1092,7 +1092,7 @@ describe('RecentRecords integration', () => {
       root.render(
         <RecentRecords
           raceStateLookup={raceStateLookup}
-          records={[systemStartFlag as unknown as ParticipantPassingRecord, crossing]}
+          records={[systemFlag as unknown as ParticipantPassingRecord, crossing]}
           selectedCategories={new Set()}
           selectedParticipants={new Set()}
         />
@@ -1100,7 +1100,7 @@ describe('RecentRecords integration', () => {
     });
 
     expect(getDisplayedRecordIds(container)).toEqual(['crossing-1']);
-    expect(container.querySelector('tr[data-record-id="system-start-flag"]')).toBeNull();
+    expect(container.querySelector('tr[data-record-id="system-flag"]')).toBeNull();
   });
 
   it('deselects participant and category when clicking the already-selected row', async () => {
@@ -2736,6 +2736,216 @@ describe('RecentRecords integration', () => {
 
     const flagRow = container.querySelector('tr[data-record-id="flag-1"]');
     expect(flagRow?.textContent).toContain('Chequered flag');
+  });
+
+  it('renders plate-only crossings in the Number column and resolves entrants by racePlate', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const participant: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'entrant-123',
+      firstname: 'Plate',
+      id: 'participant-123',
+      identifiers: [{ fromTime: undefined, racePlate: '123', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const crossing = {
+      id: 'plate-crossing-1',
+      isValid: true,
+      plateNumber: '123',
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord & { plateNumber: string };
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
+      categories: [categoryA],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantLaps: () => [crossing],
+      getTransponderCrossings: () => [],
+      participants: [participant],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[crossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const row = container.querySelector('tr[data-record-id="plate-crossing-1"]');
+    expect(row).not.toBeNull();
+    const cells = Array.from(row!.querySelectorAll('td')).map((cell) => cell.textContent || '');
+
+    expect(cells[2]).toBe('');
+    expect(cells[4]).toBe('123');
+    expect(cells[5]).toBe('Plate Rider');
+    expect(cells[6]).toBe('Category A');
+  });
+
+  it('selects unrecognised plate crossings, opens edit actions, and highlights matching plate rows', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const firstCrossing = {
+      id: 'unknown-plate-1',
+      isValid: true,
+      plateNumber: '404',
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord & { plateNumber: string };
+    const secondCrossing = {
+      id: 'unknown-plate-2',
+      isValid: true,
+      plateNumber: '404',
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:07:00.000Z'),
+    } as ParticipantPassingRecord & { plateNumber: string };
+    const otherCrossing = {
+      id: 'unknown-plate-3',
+      isValid: true,
+      plateNumber: '405',
+      recordType: RECORD_TX_CROSSING,
+      sequence: 3,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:08:00.000Z'),
+    } as ParticipantPassingRecord & { plateNumber: string };
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
+      categories: [categoryA],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getEntrantIdForParticipant: () => undefined,
+      getParticipantById: () => undefined,
+      getParticipantLaps: () => [],
+      getTransponderCrossings: () => [],
+      participants: [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[firstCrossing, secondCrossing, otherCrossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const firstRow = container.querySelector('tr[data-record-id="unknown-plate-1"]');
+    const secondRow = container.querySelector('tr[data-record-id="unknown-plate-2"]');
+    const otherRow = container.querySelector('tr[data-record-id="unknown-plate-3"]');
+    expect(firstRow).not.toBeNull();
+    expect(secondRow).not.toBeNull();
+    expect(otherRow).not.toBeNull();
+
+    await act(async () => {
+      firstRow!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(firstRow!.className).toContain('selected-row');
+    expect(firstRow!.className).toContain('selected-plate-number');
+    expect(secondRow!.className).toContain('selected-plate-number');
+    expect(otherRow!.className).not.toContain('selected-plate-number');
+
+    await act(async () => {
+      secondRow!.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 100,
+        clientY: 100,
+      }));
+    });
+
+    expect(firstRow!.className).not.toContain('selected-row');
+    expect(firstRow!.className).toContain('selected-plate-number');
+    expect(secondRow!.className).toContain('selected-row');
+    expect(secondRow!.className).toContain('selected-plate-number');
+    expect(Array.from(document.querySelectorAll('li[role="menuitem"]')).map((item) => item.textContent?.trim()))
+      .toEqual(expect.arrayContaining(['Add record', 'Edit record', 'Exclude crossing']));
+  });
+
+  it('renders system-generated green race-start flags inline with crossings', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const participant: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'entrant-123',
+      firstname: 'Plate',
+      id: 'participant-123',
+      identifiers: [{ fromTime: undefined, racePlate: '123', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const greenFlag = {
+      ...createGreenFlagEvent({
+        categoryIds: [categoryA.id],
+        id: '677318b9-31a4-5606-a7b9-d1a9e2e79499',
+        sequence: 1,
+        source: 'test-source',
+        time: new Date('2026-05-29T09:56:00.000Z'),
+      }),
+      systemGenerated: true,
+    };
+    const crossing = {
+      id: 'plate-crossing-1',
+      isValid: true,
+      participantId: participant.id,
+      plateNumber: '123',
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord & { plateNumber: string };
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
+      categories: [categoryA],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantLaps: () => [crossing],
+      getTransponderCrossings: () => [],
+      participants: [participant],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[crossing, greenFlag as unknown as ParticipantPassingRecord]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const orderedRowIds = getDisplayedRecordIds(container);
+    expect(orderedRowIds).toEqual(['677318b9-31a4-5606-a7b9-d1a9e2e79499', 'plate-crossing-1']);
+    expect(container.querySelector('tr[data-record-id="677318b9-31a4-5606-a7b9-d1a9e2e79499"]')?.textContent).toContain('Green flag');
   });
 
   it('opens the add-record dialog from a passing row and builds a passing record with looked-up entrant details', async () => {

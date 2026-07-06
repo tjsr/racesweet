@@ -27,7 +27,7 @@ interface EntrantsPageProps {
   onSelectEvent: (eventId: EventId) => void;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
   onUpdateParticipantIdentifiers?: (participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: ParticipantIdentifierUpdate[]) => void | Promise<void>;
-  onUpdateEntrant: (entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>) => void | Promise<void>;
+  onUpdateEntrant: (entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>) => void | Promise<void>;
   raceState?: Partial<RaceState>;
   selectedEntrantId?: EventEntrantId;
   selectedEventId?: EventId;
@@ -70,7 +70,7 @@ const getFallbackParticipantForEntrant = (entrant: EventCatalogEntrant | undefin
     entrantId: entrant.id,
     firstname: entrant.firstName || entrant.name,
     id: participantId,
-    identifiers: [],
+    identifiers: [...(entrant.identifiers || [])],
     lastRecordTime: null,
     resultDuration: null,
     surname: entrant.lastName || '',

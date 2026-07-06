@@ -28,6 +28,15 @@ const dataSources: DataSourceConfig[] = [
     name: 'Apical Source',
     type: 'api-apical-excel-file',
   },
+  {
+    enabled: true,
+    id: 'source-mr-scats',
+    mrScatsConfig: {
+      files: [],
+    },
+    name: 'MR-SCATS Source',
+    type: 'file-mr-scats-data',
+  },
 ];
 
 describe('DataSourcesPanel', () => {
@@ -66,5 +75,209 @@ describe('DataSourcesPanel', () => {
     expect(container.querySelector('select[aria-label="New Data Source Type"]')).toBeTruthy();
     expect(container.querySelector('table[aria-label="Configured data sources table"]')).toBeTruthy();
     expect(container.textContent).toContain('Add Data Source');
+  });
+
+  it('selects an MR-SCATS data directory and persists the discovered file list', async () => {
+    const onSaveSource = vi.fn();
+    const onSelectMrScatsDataDirectory = vi.fn(async () => ({
+      files: [
+        {
+          dbf: {
+            fields: [{ decimals: 0, length: 4, name: 'CARNUMBER', type: 'N' }],
+            headerLength: 226,
+            recordCount: 228,
+            recordLength: 30,
+            version: 3,
+          },
+          extension: '.dbf',
+          kind: 'dbf-table' as const,
+          meetingCode: 'W9721',
+          name: 'W9721Q01.DBF',
+          relativePath: 'W9721Q01.DBF',
+          sessionCode: 'Q',
+          sessionNumber: 1,
+          size: 7067,
+        },
+      ],
+      locationPath: 'C:/RaceTime/timing-data/W9721',
+      sourceKind: 'directory' as const,
+    }));
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <DataSourcesPanel
+          dataSources={dataSources}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={vi.fn()}
+          onReprocessApicalData={vi.fn()}
+          onSaveSource={onSaveSource}
+          onSelectMrScatsDataDirectory={onSelectMrScatsDataDirectory}
+        />,
+      );
+    });
+
+    const mrScatsRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('MR-SCATS Source'));
+    expect(mrScatsRow).toBeDefined();
+    flushSync(() => {
+      mrScatsRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('MR-SCATS Data');
+    const locationInput = container.querySelector('input[aria-label="MR-SCATS Data Files Location source-mr-scats"]') as HTMLInputElement;
+    expect(locationInput).toBeTruthy();
+    expect(locationInput.placeholder).toBe('No file or directory selected');
+    const disabledLoadEventButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Load event') as HTMLButtonElement | undefined;
+    expect(disabledLoadEventButton?.disabled).toBe(true);
+
+    const selectDirectoryButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Select Directory');
+    const selectArchiveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Select Archive');
+    expect(selectDirectoryButton).toBeDefined();
+    expect(selectArchiveButton).toBeDefined();
+    selectDirectoryButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+
+    expect(onSelectMrScatsDataDirectory).toHaveBeenCalled();
+    expect(onSaveSource).toHaveBeenCalledWith('source-mr-scats', {
+      mrScatsConfig: {
+        dataLocationPath: 'C:/RaceTime/timing-data/W9721',
+        files: [
+          expect.objectContaining({
+            dbf: expect.objectContaining({ recordCount: 228 }),
+            relativePath: 'W9721Q01.DBF',
+          }),
+        ],
+        sourceKind: 'directory',
+      },
+    });
+  });
+
+  it('loads an MR-SCATS event from a selected data location', async () => {
+    const onLoadMrScatsEvent = vi.fn();
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <DataSourcesPanel
+          dataSources={dataSources.map((source) => source.id === 'source-mr-scats'
+            ? {
+              ...source,
+              mrScatsConfig: {
+                dataLocationPath: 'C:/RaceTime/timing-data/W9721',
+                files: [],
+                sourceKind: 'directory',
+              },
+            }
+            : source)}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={vi.fn()}
+          onLoadMrScatsEvent={onLoadMrScatsEvent}
+          onReprocessApicalData={vi.fn()}
+          onSaveSource={vi.fn()}
+        />,
+      );
+    });
+
+    const mrScatsRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('MR-SCATS Source'));
+    expect(mrScatsRow).toBeDefined();
+    flushSync(() => {
+      mrScatsRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const loadEventButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Load event') as HTMLButtonElement | undefined;
+    expect(loadEventButton).toBeDefined();
+    expect(loadEventButton?.disabled).toBe(false);
+    loadEventButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+
+    expect(onLoadMrScatsEvent).toHaveBeenCalledWith('source-mr-scats');
+  });
+
+  it('opens an MR-SCATS file preview dialog from the file inventory table', async () => {
+    const onPreviewMrScatsDataFile = vi.fn(async () => ({
+      columns: ['CARNUMBER', 'DRIVER'],
+      displayedRowCount: 1,
+      fileKind: 'dbf-table' as const,
+      fileName: 'DRIVERS.DBF',
+      parser: 'dbf' as const,
+      recordCount: 1,
+      rows: [{ CARNUMBER: 42, DRIVER: 'Alice Rider' }],
+      warnings: [],
+    }));
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <DataSourcesPanel
+          dataSources={dataSources.map((source) => source.id === 'source-mr-scats'
+            ? {
+              ...source,
+              mrScatsConfig: {
+                dataLocationPath: 'C:/RaceTime/timing-data/W9721',
+                files: [
+                  {
+                    dbf: {
+                      fields: [
+                        { decimals: 0, length: 4, name: 'CARNUMBER', type: 'N' },
+                        { decimals: 0, length: 20, name: 'DRIVER', type: 'C' },
+                      ],
+                      headerLength: 97,
+                      recordCount: 1,
+                      recordLength: 25,
+                      version: 3,
+                    },
+                    extension: '.dbf',
+                    kind: 'dbf-table' as const,
+                    name: 'DRIVERS.DBF',
+                    relativePath: 'DRIVERS.DBF',
+                    size: 122,
+                  },
+                ],
+                sourceKind: 'directory',
+              },
+            }
+            : source)}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={vi.fn()}
+          onPreviewMrScatsDataFile={onPreviewMrScatsDataFile}
+          onReprocessApicalData={vi.fn()}
+          onSaveSource={vi.fn()}
+        />,
+      );
+    });
+
+    const mrScatsRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('MR-SCATS Source'));
+    expect(mrScatsRow).toBeDefined();
+    flushSync(() => {
+      mrScatsRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const previewFileButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'DRIVERS.DBF');
+    expect(previewFileButton).toBeDefined();
+    previewFileButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    expect(onPreviewMrScatsDataFile).toHaveBeenCalledWith('source-mr-scats', expect.objectContaining({
+      relativePath: 'DRIVERS.DBF',
+    }));
+    const previewDialog = container.querySelector('[role="dialog"]');
+    expect(previewDialog?.classList.contains('mr-scats-preview-dialog')).toBe(true);
+    expect(previewDialog?.querySelector('.mr-scats-preview-content')).toBeTruthy();
+    expect(previewDialog?.textContent).toContain('DRIVERS.DBF');
+    expect(previewDialog?.textContent).toContain('Alice Rider');
   });
 });

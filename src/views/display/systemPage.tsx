@@ -2,6 +2,8 @@ import React from 'react';
 import { type DataSourceConfig, type DataSourceType, type SystemConfiguration } from '../../app/systemConfig.js';
 import { getRuntimeVersions } from '../../app/versionInfo.js';
 import { TimeRecordSourceId } from '../../model/types.js';
+import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
+import type { MrScatsDataFilePreview } from '../../parsers/mrScats/filePreview.js';
 import { DataSourcesPanel } from '../panels/dataSources.js';
 import { LocalStorageLocationPanel } from '../panels/localStorageLocation.js';
 import { LogPanel } from '../panels/log.js';
@@ -16,9 +18,13 @@ interface SystemPageProps {
   onFetchApicalDataNow: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: TimeRecordSourceId) => void | Promise<void>;
+  onLoadMrScatsEvent?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onReprocessApicalData: (sourceId: TimeRecordSourceId) => void | Promise<void>;
+  onPreviewMrScatsDataFile?: (sourceId: TimeRecordSourceId, file: MrScatsDataFileSummary) => Promise<MrScatsDataFilePreview>;
   onSaveLocalStorageDirectoryPath: (directoryPath: string) => void | Promise<void>;
   onSaveSource: (sourceId: TimeRecordSourceId, changes: Partial<DataSourceConfig>) => void | Promise<void>;
+  onSelectMrScatsDataArchive?: () => Promise<MrScatsDataFileInventory | undefined>;
+  onSelectMrScatsDataDirectory?: () => Promise<MrScatsDataFileInventory | undefined>;
   onSelectLocalFile?: () => Promise<string | undefined>;
 }
 
@@ -44,9 +50,13 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         onDisplayError={props.onDisplayError}
         onFetchApicalDataNow={props.onFetchApicalDataNow}
         onLoadApicalEvents={props.onLoadApicalEvents}
+        onLoadMrScatsEvent={props.onLoadMrScatsEvent}
         onOpenLocalFile={props.onOpenLocalFile}
+        onPreviewMrScatsDataFile={props.onPreviewMrScatsDataFile}
         onReprocessApicalData={props.onReprocessApicalData}
         onSaveSource={props.onSaveSource}
+        onSelectMrScatsDataArchive={props.onSelectMrScatsDataArchive}
+        onSelectMrScatsDataDirectory={props.onSelectMrScatsDataDirectory}
         onSelectLocalFile={props.onSelectLocalFile}
       />
 

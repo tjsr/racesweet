@@ -23,6 +23,7 @@ export interface ExternalHttpProxyResponse {
 }
 export interface SelectLocalFileOptions {
   filters?: Array<{ extensions: string[]; name: string }>;
+  properties?: Array<'openFile' | 'openDirectory'>;
   title?: string;
 }
 
@@ -46,6 +47,7 @@ declare global {
       requestExternalHttp: (request: ExternalHttpProxyRequest) => Promise<ExternalHttpProxyResponse>;
       requestBuffer: (filePath: string) => Promise<Buffer>;
       openLocalFile: (filePath: string) => Promise<void>;
+      selectLocalDirectory: (title?: string) => Promise<string | undefined>;
       selectLocalFile: (options?: SelectLocalFileOptions) => Promise<string | undefined>;
       writeFileContent: (filePath: string, contents: string, dataType?: FileWriteDataType) => Promise<void>;
       send: (channel: AvailableSendChannels, ...args: unknown[]) => void;

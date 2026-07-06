@@ -1,11 +1,12 @@
+import { validate as validateUuid } from 'uuid';
+import { normalizeCategoryResultExclusion } from '../controllers/category.js';
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { EventTeam } from '../model/eventteam.js';
+import { rewriteImportedObjectIds } from '../model/ids.js';
 import type { RaceState } from '../model/racestate.js';
 import type { TimeRecord } from '../model/timerecord.js';
-import { normalizeCategoryResultExclusion } from '../controllers/category.js';
-import { rewriteImportedObjectIds } from '../model/ids.js';
-import { validate as validateUuid } from 'uuid';
+import type { EventCatalogEntrant, EventCatalogEvent, EventCatalogSession, EventCatalogState } from './eventCatalog.js';
 import { addMissingLinkedCategoryPlaceholders } from './sessionSourceReload.js';
 
 interface SessionSourceSink {
@@ -15,6 +16,18 @@ interface SessionSourceSink {
   addTeams?(teams: EventTeam[]): void;
   categories: EventCategory[];
   records: TimeRecord[];
+}
+
+interface SessionSourceApplicationOptions {
+  catalog?: EventCatalogState;
+  eventId?: string;
+  sessionId?: string;
+}
+
+interface EntrantCatalogMatch {
+  entrant: EventCatalogEntrant;
+  event: EventCatalogEvent;
+  matchKind: 'entrant' | 'member';
 }
 
 const assertUuid = (errors: string[], label: string, value: string | undefined | null): void => {
@@ -33,7 +46,109 @@ const getRecordStringArrayValue = (record: TimeRecord, key: string): string[] =>
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 };
 
-const validateRaceStateIds = (raceState: Partial<RaceState>, existingCategories: EventCategory[]): void => {
+const getEntrantCatalogMatches = (
+  catalog: EventCatalogState | undefined,
+  entrantId: string
+): EntrantCatalogMatch[] => {
+  if (!catalog) {
+    return [];
+  }
+
+  const activeEventsById = new Map(catalog.events
+    .filter((event) => !catalog.deletedEventIds.includes(event.id))
+    .map((event) => [event.id, event] as const));
+
+  return catalog.entrants.reduce<EntrantCatalogMatch[]>((matches, entrant) => {
+    const event = activeEventsById.get(entrant.eventId);
+    if (!event) {
+      return matches;
+    }
+
+    if (entrant.id === entrantId) {
+      matches.push({ entrant, event, matchKind: 'entrant' });
+      return matches;
+    }
+
+    if (entrant.memberParticipantIds.includes(entrantId)) {
+      matches.push({ entrant, event, matchKind: 'member' });
+    }
+
+    return matches;
+  }, []);
+};
+
+const formatEntrantCatalogSearch = (
+  catalog: EventCatalogState | undefined,
+  entrantId: string
+): string => {
+  if (!catalog) {
+    return 'Catalog search was not available.';
+  }
+
+  const matches = getEntrantCatalogMatches(catalog, entrantId);
+  if (matches.length === 0) {
+    return 'Catalog search: entrant ID was not found in any active event.';
+  }
+
+  const matchSummary = matches.map(({ entrant, event, matchKind }) => {
+    const relation = matchKind === 'entrant'
+      ? `${entrant.entrantType} entrant`
+      : `member of ${entrant.entrantType} entrant`;
+    return `${event.name} (${event.id}): ${relation} "${entrant.name}" (${entrant.id})`;
+  });
+
+  return `Catalog search: found ${matches.length} possible match${matches.length === 1 ? '' : 'es'}: ${matchSummary.join('; ')}.`;
+};
+
+const formatEventContext = (event: EventCatalogEvent | undefined, eventId: string): string => {
+  return event
+    ? `event "${event.name}" (${event.id})`
+    : `event ${eventId}`;
+};
+
+const formatSessionContext = (session: EventCatalogSession | undefined, sessionId: string): string => {
+  return session
+    ? `session "${session.name}" (${session.id})`
+    : `session ${sessionId}`;
+};
+
+const formatRaceStateValidationContext = (options: SessionSourceApplicationOptions): string => {
+  const contextParts: string[] = [];
+
+  if (options.eventId) {
+    const event = options.catalog?.events.find((candidate) => candidate.id === options.eventId);
+    contextParts.push(formatEventContext(event, options.eventId));
+  }
+
+  if (options.sessionId) {
+    const session = options.catalog?.sessions.find((candidate) => candidate.id === options.sessionId);
+    contextParts.push(formatSessionContext(session, options.sessionId));
+  }
+
+  return contextParts.length > 0
+    ? ` for ${contextParts.join(', ')}`
+    : '';
+};
+
+const catalogHasEntrantForEvent = (
+  options: SessionSourceApplicationOptions,
+  entrantId: string
+): boolean => {
+  if (!options.catalog || !options.eventId) {
+    return false;
+  }
+
+  const event = options.catalog.events.find((candidate) => candidate.id === options.eventId);
+  const entrant = options.catalog.entrants.find((candidate) => candidate.id === entrantId && candidate.eventId === options.eventId);
+
+  return !!event?.entrantIds.includes(entrantId) && !!entrant;
+};
+
+const validateRaceStateIds = (
+  raceState: Partial<RaceState>,
+  existingCategories: EventCategory[],
+  options: SessionSourceApplicationOptions = {}
+): void => {
   const errors: string[] = [];
   const categoryIds = new Set<string>();
   const participantIds = new Set<string>();
@@ -76,8 +191,10 @@ const validateRaceStateIds = (raceState: Partial<RaceState>, existingCategories:
   });
 
   (raceState.participants || []).forEach((participant) => {
-    if (participant.entrantId && !teamIds.has(participant.entrantId) && !participantIds.has(participant.entrantId)) {
-      errors.push(`participant ${participant.id} references missing entrant ${participant.entrantId}.`);
+    if (participant.entrantId && !teamIds.has(participant.entrantId) && !participantIds.has(participant.entrantId) && !catalogHasEntrantForEvent(options, participant.entrantId)) {
+      errors.push(
+        `participant ${participant.id} (${participant.firstname} ${participant.surname?.toUpperCase()}) references missing entrant ${participant.entrantId}. ${formatEntrantCatalogSearch(options.catalog, participant.entrantId)}`
+      );
     }
   });
 
@@ -105,7 +222,7 @@ const validateRaceStateIds = (raceState: Partial<RaceState>, existingCategories:
     }
     if (entrantId) {
       assertUuid(errors, `record ${record.id} entrantId`, entrantId);
-      if (!teamIds.has(entrantId) && !participantIds.has(entrantId)) {
+      if (!teamIds.has(entrantId) && !participantIds.has(entrantId) && !catalogHasEntrantForEvent(options, entrantId)) {
         errors.push(`record ${record.id} references missing entrant ${entrantId}.`);
       }
     }
@@ -135,13 +252,14 @@ const validateRaceStateIds = (raceState: Partial<RaceState>, existingCategories:
   });
 
   if (errors.length > 0) {
-    throw new Error(`Pulled race state contains invalid IDs or parent relationships:\n${errors.join('\n')}`);
+    throw new Error(`Pulled race state contains invalid IDs or parent relationships${formatRaceStateValidationContext(options)}:\n${errors.join('\n')}`);
   }
 };
 
 const normalizeRaceStateForSession = (
   raceState: Partial<RaceState>,
-  existingCategories: EventCategory[]
+  existingCategories: EventCategory[],
+  options: SessionSourceApplicationOptions = {}
 ): Partial<RaceState> => {
   const rewrittenRaceState = rewriteImportedObjectIds(raceState).value;
   const normalizedRaceState = {
@@ -149,7 +267,7 @@ const normalizeRaceStateForSession = (
     categories: (rewrittenRaceState.categories || []).map((category) => normalizeCategoryResultExclusion(category)),
   };
   const linkedCategorySafeRaceState = addMissingLinkedCategoryPlaceholders(normalizedRaceState);
-  validateRaceStateIds(linkedCategorySafeRaceState, existingCategories);
+  validateRaceStateIds(linkedCategorySafeRaceState, existingCategories, options);
   return linkedCategorySafeRaceState;
 };
 
@@ -192,9 +310,10 @@ export const getCategoriesToAdd = (
 
 export const applyPulledRaceStateToSession = async (
   sessionState: SessionSourceSink,
-  raceState: Partial<RaceState>
+  raceState: Partial<RaceState>,
+  options: SessionSourceApplicationOptions = {}
 ): Promise<void> => {
-  const normalizedRaceState = normalizeRaceStateForSession(raceState, sessionState.categories);
+  const normalizedRaceState = normalizeRaceStateForSession(raceState, sessionState.categories, options);
   const categoriesToAdd = getCategoriesToAdd(
     sessionState.categories,
     normalizedRaceState.categories || []

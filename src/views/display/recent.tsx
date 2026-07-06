@@ -257,6 +257,7 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   raceStateLookup: RaceStateLookup;
   selectedRecordId?: TimeRecordId;
   selectedCategories?: Set<EventCategoryId>;
+  selectedPlateNumber?: string;
   selectedParticipants?: Set<EventParticipantId>;
   sessionValidCategoryIds?: Set<EventCategoryId>;
   categorySelected?: ((ids: Set<EventCategoryId>) => void) | undefined;
@@ -269,6 +270,7 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void;
   onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
   onSelectRecord?: (recordId: TimeRecordId | undefined) => void;
+  onSelectUnrecognisedPlateNumber?: (plateNumber: string | undefined) => void;
   timeZone?: string;
 }
 
@@ -479,12 +481,15 @@ interface _CompletedLapProps {
 }
 
 const UnknownChipRow = (
-  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae, onOpenAddRecordDialog, onOpenEditRecordDialog, onSelectRecord, record, selectedRecordId, timeZone }: {
+  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae, onOpenAddRecordDialog, onOpenEditRecordDialog, onSelectRecord, onSelectUnrecognisedPlateNumber, plateNumber, record, selectedPlateNumber, selectedRecordId, timeZone }: {
     antennae: string
     onOpenAddRecordDialog?: (record: EventTimeRecord) => void,
     onOpenEditRecordDialog?: (record: EventTimeRecord) => void,
     onSelectRecord?: (recordId: TimeRecordId | undefined) => void,
+    onSelectUnrecognisedPlateNumber?: (plateNumber: string | undefined) => void,
+    plateNumber?: string,
     record: EventTimeRecord,
+    selectedPlateNumber?: string,
     selectedRecordId?: TimeRecordId,
     txNo: number | undefined,
     sequenceNumber: number
@@ -500,11 +505,22 @@ const UnknownChipRow = (
     mouseY: number;
   } | null>(null);
   const txCount = txNo !== undefined ? rs.countTransponderCrossings(txNo, passingTime) : undefined;
-  const content = `Unknown transponder ${identifier} (${txCount})`;
+  const content = plateNumber
+    ? `Unknown race number #${plateNumber}`
+    : `Unknown transponder ${identifier} (${txCount})`;
   const timeString = tableTimeString(passingTime, timeZone);
+  const isSelectedPlate = plateNumber !== undefined && plateNumber.length > 0 && plateNumber === selectedPlateNumber;
+  const rowClassName = [
+    timeRecordId === selectedRecordId ? 'selected-row' : '',
+    isSelectedPlate ? 'selected-plate-number' : '',
+  ].filter((value) => value.length > 0).join(' ') || undefined;
+  const handleSelect = (): void => {
+    onSelectRecord?.(timeRecordId);
+    onSelectUnrecognisedPlateNumber?.(plateNumber);
+  };
   const handleContextMenu = (event: React.MouseEvent): void => {
     event.preventDefault();
-    onSelectRecord?.(timeRecordId);
+    handleSelect();
     setContextMenu(
       contextMenu === null
         ? {
@@ -529,18 +545,18 @@ const UnknownChipRow = (
   return (
     <>
       <TableRow
-        className={timeRecordId === selectedRecordId ? 'selected-row' : undefined}
+        className={rowClassName}
         key={timeRecordId}
         data-record-id={timeRecordId}
         onContextMenu={handleContextMenu}
-        onClick={() => onSelectRecord?.(timeRecordId)}
+        onClick={handleSelect}
         style={{ cursor: 'context-menu' }}
       >
         <TableCell>{sequenceNumber}</TableCell>
         <TableCell>{antennae}</TableCell>
-        <TableCell>{txNo}</TableCell>
+        <TableCell>{txNo ?? ''}</TableCell>
         <TableCell>{timeString}</TableCell>
-        <TableCell>{identifier}</TableCell>
+        <TableCell>{plateNumber || ''}</TableCell>
         <TableCell colSpan={6}>{content}</TableCell>
       </TableRow>
       <Menu
@@ -568,6 +584,7 @@ interface PassingRecordRowProps {
   passing: ParticipantPassingRecord;
   raceStateLookup: RaceStateLookup;
   selectedCategories: Set<EventCategoryId> | undefined;
+  selectedPlateNumber?: string;
   selectedParticipants: Set<EventParticipantId> | undefined;
   sessionValidCategoryIds?: Set<EventCategoryId>;
   onSelect?: (passingRecord: ParticipantPassingRecord) => void;
@@ -576,6 +593,7 @@ interface PassingRecordRowProps {
   onOpenAddRecordDialog?: (record: EventTimeRecord) => void;
   onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
   onSelectRecord?: (recordId: TimeRecordId | undefined) => void;
+  onSelectUnrecognisedPlateNumber?: (plateNumber: string | undefined) => void;
   selectedRecordId?: TimeRecordId;
   timeZone?: string;
 }
@@ -591,13 +609,25 @@ export const PassingRecordRow = (
     mouseY: number;
   } | null>(null);
 
-  const handleContextMenu = (event: React.MouseEvent) => {
-    event.preventDefault();
+  const recordPlateNumber = ((passing as ParticipantPassingRecord & { plateNumber?: string | number }).plateNumber);
+  const normalizedRecordPlateNumber = recordPlateNumber === undefined || recordPlateNumber === null ? undefined : recordPlateNumber.toString().trim();
+  const automaticIdentifier = getAutomaticIdentifier(passing);
+  const txNo = automaticIdentifier !== undefined && automaticIdentifier > 0 ? automaticIdentifier : undefined;
+  const handleSelect = (): void => {
     props.onSelectRecord?.(passing.id);
-    
-    if (props.onSelect && passing) {
+    if (passing.participantId) {
+      props.onSelectUnrecognisedPlateNumber?.(undefined);
+    } else {
+      props.onSelectUnrecognisedPlateNumber?.(normalizedRecordPlateNumber);
+    }
+    if (props.onSelect) {
       props.onSelect(passing);
     }
+  };
+
+  const handleContextMenu = (event: React.MouseEvent) => {
+    event.preventDefault();
+    handleSelect();
 
     setContextMenu(
       contextMenu === null
@@ -637,9 +667,14 @@ export const PassingRecordRow = (
 
   let categoryStr = undefined;
   const timeString = tableTimeString(passing.time, props.timeZone);
-  const identifier: string = getTimeRecordIdentifier(passing, true);
+  const identifier: string = txNo !== undefined ? `Tx${txNo}` : '';
   const antenna = (passing as ParticipantPassingRecord & { antenna?: string }).antenna || '';
-  const entrant = passing.participantId ? rs.getParticipantById(passing.participantId) : undefined;
+  const participantMap = participantMapFromLookup(rs);
+  const entrant = passing.participantId
+    ? rs.getParticipantById(passing.participantId)
+    : normalizedRecordPlateNumber
+      ? findEntrantByPlateNumber(participantMap, normalizedRecordPlateNumber, passing.time)
+      : undefined;
   let plateNumber: string | number | undefined = undefined;
   let entrantName: string | undefined = undefined;
   let lapNo: string = '';
@@ -702,6 +737,10 @@ export const PassingRecordRow = (
   if (passing.id === props.selectedRecordId) {
     className += ' selected-row';
   }
+  if (!passing.participantId && normalizedRecordPlateNumber && normalizedRecordPlateNumber === props.selectedPlateNumber) {
+    className += ' selected-plate-number';
+    cellClasses += ' selected-plate-number';
+  }
 
   const allCategories = (rs as unknown as { categories: EventCategory[] }).categories || [];
 
@@ -713,16 +752,12 @@ export const PassingRecordRow = (
         className={className}
         onContextMenu={handleContextMenu}
         style={{ cursor: 'context-menu' }}
-        onClick={(_event: React.MouseEvent<HTMLTableRowElement, MouseEvent>) => {
-          if (props.onSelect) {
-            props.onSelect(passing);
-          }
-        }}>
+        onClick={handleSelect}>
         <TableCell className={cellClasses}>{passing.sequence}</TableCell>
         <TableCell className={cellClasses}>{antenna}</TableCell>
         <TableCell className={cellClasses}>{identifier}</TableCell>
         <TableCell className={cellClasses}>{timeString}</TableCell>
-        <TableCell className={cellClasses}>{plateNumber || '?'}</TableCell>
+        <TableCell className={cellClasses}>{plateNumber || normalizedRecordPlateNumber || '?'}</TableCell>
         <TableCell className={cellClasses}>{entrantName}</TableCell>
         <TableCell className={cellClasses}>{categoryStr || ''}</TableCell>
         <TableCell className={cellClasses}>{lapNo}</TableCell>
@@ -783,6 +818,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       index={props.index}
       raceStateLookup={props.raceStateLookup}
       selectedCategories={props.selectedCategories}
+      selectedPlateNumber={props.selectedPlateNumber}
       selectedRecordId={props.selectedRecordId}
       onAssignFlagCategory={props.onAssignFlagCategory}
       onMarkFlagDeleted={props.onMarkFlagDeleted}
@@ -790,6 +826,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       onOpenEditRecordDialog={props.onOpenEditRecordDialog}
       onRemoveFlagCategory={props.onRemoveFlagCategory}
       onSelectRecord={props.onSelectRecord}
+      onSelectUnrecognisedPlateNumber={props.onSelectUnrecognisedPlateNumber}
       onSelect={flagRecordSelected}
       timeZone={props.timeZone}
     />;
@@ -838,6 +875,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       raceStateLookup={props.raceStateLookup}
       passing={passing}
       selectedCategories={props.selectedCategories}
+      selectedPlateNumber={props.selectedPlateNumber}
       selectedParticipants={props.selectedParticipants}
       sessionValidCategoryIds={props.sessionValidCategoryIds}
       selectedRecordId={props.selectedRecordId}
@@ -847,12 +885,16 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       onOpenAddRecordDialog={props.onOpenAddRecordDialog}
       onOpenEditRecordDialog={props.onOpenEditRecordDialog}
       onSelectRecord={props.onSelectRecord}
+      onSelectUnrecognisedPlateNumber={props.onSelectUnrecognisedPlateNumber}
       timeZone={props.timeZone}
     />;
   }
 
   const identifier = getTimeRecordIdentifier(record, true);
-  const txNo = getAutomaticIdentifier(record);
+  const automaticIdentifier = getAutomaticIdentifier(record);
+  const txNo = automaticIdentifier !== undefined && automaticIdentifier > 0 ? automaticIdentifier : undefined;
+  const plateNumber = ((record as EventTimeRecord & { plateNumber?: string | number }).plateNumber);
+  const normalizedPlateNumber = plateNumber === undefined || plateNumber === null ? undefined : plateNumber.toString();
   // if (!plateNumber) {
   return <UnknownChipRow
     sequenceNumber={record.sequence}
@@ -861,8 +903,11 @@ export const RecordRow = (props: RecentRecordRowProps) => {
     onOpenAddRecordDialog={props.onOpenAddRecordDialog}
     onOpenEditRecordDialog={props.onOpenEditRecordDialog}
     onSelectRecord={props.onSelectRecord}
+    onSelectUnrecognisedPlateNumber={props.onSelectUnrecognisedPlateNumber}
     passingTime={record.time!}
+    plateNumber={normalizedPlateNumber}
     record={record}
+    selectedPlateNumber={props.selectedPlateNumber}
     selectedRecordId={props.selectedRecordId}
     txNo={txNo}
     identifier={identifier}
@@ -988,7 +1033,7 @@ const isStartFlag = (flag: FlagRecord): boolean => {
 };
 
 const isSystemGeneratedFlag = (record: EventTimeRecord): boolean => {
-  return isFlagRecord(record) && record.systemGenerated === true;
+  return isFlagRecord(record) && record.systemGenerated === true && !isStartFlag(record);
 };
 
 const isFinishFlag = (flag: FlagRecord): boolean => {
@@ -1419,6 +1464,7 @@ export const RecentRecords = (props: RecordsProps & {
   const [recentFirst, setRecentFirst] = React.useState<boolean>(false);
   const [filterMode, setFilterMode] = React.useState<RecentRecordsFilterMode>('all');
   const [ignoreModes, setIgnoreModes] = React.useState<RecentRecordsIgnoreMode[]>([]);
+  const [selectedPlateNumber, setSelectedPlateNumber] = React.useState<string | undefined>(undefined);
   const [selectedRecordId, setSelectedRecordId] = React.useState<TimeRecordId | undefined>(undefined);
   const toolbarAnchorRef = React.useRef<HTMLDivElement>(null);
   const toolbarRef = React.useRef<HTMLDivElement>(null);
@@ -1536,6 +1582,7 @@ export const RecentRecords = (props: RecordsProps & {
     setAddRecordDialogState({ anchorRecord: record, existingRecord: record, mode: 'edit' });
   };
   const handleParticipantSelected = (participantIds: Set<EventParticipantId>): void => {
+    setSelectedPlateNumber(undefined);
     setLocalSelectedParticipants(new Set<EventParticipantId>(participantIds));
     props.participantSelected?.(participantIds);
   };
@@ -1699,6 +1746,7 @@ export const RecentRecords = (props: RecordsProps & {
                     raceStateLookup={props.raceStateLookup}
                     selectedRecordId={selectedRecordId}
                     selectedCategories={props.selectedCategories}
+                    selectedPlateNumber={selectedPlateNumber}
                     selectedParticipants={highlightedParticipantIds}
                     sessionValidCategoryIds={props.sessionValidCategoryIds}
                     categorySelected={props.categorySelected}
@@ -1711,6 +1759,7 @@ export const RecentRecords = (props: RecordsProps & {
                     onMarkFlagDeleted={props.onMarkFlagDeleted}
                     onRemoveFlagCategory={props.onRemoveFlagCategory}
                     onSelectRecord={setSelectedRecordId}
+                    onSelectUnrecognisedPlateNumber={setSelectedPlateNumber}
                     timeZone={displayTimeZone}
                   />
                 ))}

@@ -2,11 +2,11 @@ import type { EventParticipant, EventParticipantId } from "../model/eventpartici
 import { getParticipantIdentifiers, validateIdentifierType } from "./participant.js";
 
 import { type ChipCrossingData } from "../model/chipcrossing.js";
-import type { ParticipantPassingRecord } from "../model/timerecord.js";
 import type { PlateCrossingData } from "../model/platecrossing.js";
+import type { ParticipantPassingRecord } from "../model/timerecord.js";
 import type { PlateNumberType } from "../model/types.js";
 import { asParsedChipCrossing } from "./chipCrossing.js";
-import { asUnparsedPlateCrossing } from "./plateCrossing.js";
+import { isPlateCrossing } from "./plateCrossing.js";
 
 export const entrantHasIdentifier = (
   idenfitier: string | number | undefined,
@@ -53,7 +53,8 @@ export const matchParticipantToIdentifier = (
     if (identifiers.length > 1) {
       console.warn(`Participant ${participant.id} has multiple mathing ${identifierType} identifiers: ${identifiers.join(', ')}`);
     }
-    if (identifiers.some((value) => value === identifierValue)) {
+    const normalizedIdentifierValue = identifierValue.toString().trim();
+    if (identifiers.some((value) => value.toString().trim() === normalizedIdentifierValue)) {
       return participant.id;
     }
   }
@@ -71,8 +72,8 @@ export const crossingMatchesParticipantIdentifiers = (
   if (chipCrossing && entrantHasTransponder(chipCrossing.chipCode, participant, passing.time)) {
     return true;
   }
-  const manualPassing = asUnparsedPlateCrossing(passing as PlateCrossingData);
-  if (manualPassing && entrantHasPlate(manualPassing.plateNumber, participant, passing.time)) {
+  const platePassing = passing as PlateCrossingData;
+  if (isPlateCrossing(platePassing) && entrantHasPlate(platePassing.plateNumber, participant, passing.time)) {
     return true;
   }
 

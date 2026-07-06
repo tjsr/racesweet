@@ -348,8 +348,10 @@ describe('sessionSourceReload', () => {
     expect(summary).toEqual({
       categories: { created: 1, deleted: 1, updated: 1 },
       crossings: { created: 1, deleted: 1, updated: 1 },
+      events: { created: 0, deleted: 0, updated: 0 },
       flags: { created: 1, deleted: 1, updated: 1 },
       participants: { created: 1, deleted: 1, updated: 1 },
+      sessions: { created: 0, deleted: 0, updated: 0 },
       teams: { created: 1, deleted: 1, updated: 1 },
     });
   });
@@ -366,8 +368,10 @@ describe('sessionSourceReload', () => {
     expect(summary).toEqual({
       categories: { created: 1, deleted: 0, updated: 1 },
       crossings: { created: 0, deleted: 0, updated: 0 },
+      events: { created: 0, deleted: 0, updated: 0 },
       flags: { created: 0, deleted: 0, updated: 0 },
       participants: { created: 0, deleted: 0, updated: 0 },
+      sessions: { created: 0, deleted: 0, updated: 0 },
       teams: { created: 0, deleted: 0, updated: 0 },
     });
   });

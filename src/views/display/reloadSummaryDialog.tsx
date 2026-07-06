@@ -7,8 +7,10 @@ interface ReloadSummaryDialogProps {
 }
 
 const SUMMARY_ROWS: Array<{ key: keyof SessionSourceReloadSummary; label: string }> = [
+  { key: 'events', label: 'Events' },
+  { key: 'sessions', label: 'Sessions' },
   { key: 'categories', label: 'Categories' },
-  { key: 'participants', label: 'Participants' },
+  { key: 'participants', label: 'Competitors' },
   { key: 'teams', label: 'Teams' },
   { key: 'flags', label: 'Flag records' },
   { key: 'crossings', label: 'Crossings' },

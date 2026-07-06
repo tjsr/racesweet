@@ -185,6 +185,55 @@ describe('EntrantListPanel', () => {
     expect(onSelectEntrant).toHaveBeenCalledWith('rider-1');
   });
 
+  it('uses catalog entrant identifiers when a race-state participant is not loaded', () => {
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+    const entrantWithImportedIdentifiers: EventCatalogEntrant = {
+      ...riderEntrant,
+      identifiers: [
+        { fromTime: undefined, racePlate: '15', toTime: undefined },
+        { fromTime: undefined, toTime: undefined, txNo: 315 },
+      ] as unknown as EventParticipant['identifiers'],
+    };
+
+    const Harness = (): React.ReactElement => {
+      const [createKind, setCreateKind] = React.useState<EntrantType>('rider');
+
+      return (
+        <EntrantListPanel
+          catalog={{
+            ...catalog,
+            entrants: [entrantWithImportedIdentifiers],
+            events: [{
+              ...catalog.events[0]!,
+              entrantIds: [entrantWithImportedIdentifiers.id],
+            }],
+          }}
+          createKind={createKind}
+          filteredTeamEntrants={[]}
+          onCreateEntrant={() => undefined}
+          onSelectEntrant={() => undefined}
+          raceStateParticipants={[]}
+          requestFormExit={() => undefined}
+          riderEntrants={[entrantWithImportedIdentifiers]}
+          selectedEntrant={entrantWithImportedIdentifiers}
+          selectedEventId="event-1"
+          setCreateKind={setCreateKind}
+          teamEntrants={[]}
+          teamsEnabled={false}
+        />
+      );
+    };
+
+    flushSync(() => {
+      root?.render(<Harness />);
+    });
+
+    expect(container.textContent).toContain('#15');
+    expect(container.textContent).toContain('Tx315');
+  });
+
   it('reorders entrant cards when the sort order changes', () => {
     container = document.createElement('div');
     document.body.append(container);

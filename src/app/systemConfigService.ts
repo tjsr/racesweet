@@ -65,6 +65,16 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
     };
   }
 
+  if (type === 'file-mr-scats-data') {
+    return {
+      ...base,
+      mrScatsConfig: {
+        files: [],
+      },
+      name: 'MR-SCATS Data',
+    };
+  }
+
   return base;
 };
 

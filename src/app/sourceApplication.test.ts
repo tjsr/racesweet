@@ -4,7 +4,8 @@ import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { EventTeam } from '../model/eventteam.js';
 import type { TimeRecord } from '../model/timerecord.js';
-import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
+import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
+import type { EventCatalogState } from './eventCatalog.js';
 
 const EXISTING_CATEGORY_ID = createCategoryId('cat-existing');
 const NEW_CATEGORY_ID = createCategoryId('cat-new');
@@ -253,5 +254,253 @@ describe('sourceApplication', () => {
       }),
     ]);
     expect(addRecords).toHaveBeenCalled();
+  });
+
+  it('adds catalog event and entrant details to missing entrant validation errors when the entrant exists elsewhere', async () => {
+    const addCategories = vi.fn(async (_categories: EventCategory[]) => null);
+    const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
+    const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
+    const eventId = createEventId('missing-entrant-search-event');
+    const previousEventId = createEventId('missing-entrant-search-previous-event');
+    const sessionId = createSessionId('missing-entrant-search-session');
+    const entrantId = createEventEntrantId('missing-entrant-search-entrant');
+    const participantId = createEventParticipantId('missing-entrant-search-participant');
+    const catalog: EventCatalogState = {
+      activeEventId: eventId,
+      activeSessionId: undefined,
+      categories: [],
+      deletedEventIds: [],
+      entrants: [
+        {
+          categoryId: EXISTING_CATEGORY_ID,
+          categoryIds: [EXISTING_CATEGORY_ID],
+          entrantType: 'team',
+          eventId: previousEventId,
+          id: entrantId,
+          memberParticipantIds: [],
+          name: 'Recovered Team',
+        },
+      ],
+      events: [
+        {
+          categoryIds: [],
+          date: '2026-01-01',
+          entrantIds: [],
+          format: 'race-weekend',
+          id: eventId,
+          name: 'Current Event',
+          sessionIds: [sessionId],
+        },
+        {
+          categoryIds: [EXISTING_CATEGORY_ID],
+          date: '2025-12-01',
+          entrantIds: [entrantId],
+          format: 'race-weekend',
+          id: previousEventId,
+          name: 'Recovered Event',
+          sessionIds: [],
+        },
+      ],
+      sessions: [
+        {
+          categoryIds: [EXISTING_CATEGORY_ID],
+          eventId,
+          id: sessionId,
+          kind: 'race',
+          name: 'Recovered Session',
+          scheduledStart: '2026-01-01T10:00:00.000Z',
+          status: 'completed',
+        },
+      ],
+    };
+
+    await expect(applyPulledRaceStateToSession(
+      {
+        addCategories,
+        addParticipants,
+        addRecords,
+        categories: existingCategories,
+        records: [],
+      },
+      {
+        categories: [],
+        participants: [
+          {
+            categoryId: EXISTING_CATEGORY_ID,
+            currentResult: undefined,
+            entrantId,
+            firstname: 'Pat',
+            id: participantId,
+            identifiers: [],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'Rider',
+          },
+        ],
+        records: [],
+      },
+      { catalog, eventId, sessionId }
+    )).rejects.toThrow(`Pulled race state contains invalid IDs or parent relationships for event "Current Event" (${eventId}), session "Recovered Session" (${sessionId}):`);
+    await expect(applyPulledRaceStateToSession(
+      {
+        addCategories,
+        addParticipants,
+        addRecords,
+        categories: existingCategories,
+        records: [],
+      },
+      {
+        categories: [],
+        participants: [
+          {
+            categoryId: EXISTING_CATEGORY_ID,
+            currentResult: undefined,
+            entrantId,
+            firstname: 'Pat',
+            id: participantId,
+            identifiers: [],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'Rider',
+          },
+        ],
+        records: [],
+      },
+      { catalog, eventId, sessionId }
+    )).rejects.toThrow(`Catalog search: found 1 possible match: Recovered Event (${previousEventId}): team entrant "Recovered Team" (${entrantId}).`);
+  });
+
+  it('accepts missing entrant references when the catalog has linked that entrant to the target event', async () => {
+    const addCategories = vi.fn(async (_categories: EventCategory[]) => null);
+    const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
+    const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
+    const eventId = createEventId('linked-entrant-event');
+    const sessionId = createSessionId('linked-entrant-session');
+    const entrantId = createEventEntrantId('linked-entrant');
+    const participantId = createEventParticipantId('linked-entrant-participant');
+    const catalog: EventCatalogState = {
+      activeEventId: eventId,
+      activeSessionId: sessionId,
+      categories: [],
+      deletedEventIds: [],
+      entrants: [
+        {
+          categoryId: EXISTING_CATEGORY_ID,
+          categoryIds: [EXISTING_CATEGORY_ID],
+          entrantType: 'team',
+          eventId,
+          id: entrantId,
+          memberParticipantIds: [participantId],
+          name: 'Linked Team',
+        },
+      ],
+      events: [
+        {
+          categoryIds: [EXISTING_CATEGORY_ID],
+          date: '2026-01-01',
+          entrantIds: [entrantId],
+          format: 'race-weekend',
+          id: eventId,
+          name: 'Linked Event',
+          sessionIds: [sessionId],
+        },
+      ],
+      sessions: [
+        {
+          categoryIds: [EXISTING_CATEGORY_ID],
+          eventId,
+          id: sessionId,
+          kind: 'race',
+          name: 'Linked Session',
+          scheduledStart: '2026-01-01T10:00:00.000Z',
+          status: 'completed',
+        },
+      ],
+    };
+
+    await expect(applyPulledRaceStateToSession(
+      {
+        addCategories,
+        addParticipants,
+        addRecords,
+        categories: existingCategories,
+        records: [],
+      },
+      {
+        categories: [],
+        participants: [
+          {
+            categoryId: EXISTING_CATEGORY_ID,
+            currentResult: undefined,
+            entrantId,
+            firstname: 'Pat',
+            id: participantId,
+            identifiers: [],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'Rider',
+          },
+        ],
+        records: [],
+      },
+      { catalog, eventId, sessionId }
+    )).resolves.toBeUndefined();
+    expect(addParticipants).toHaveBeenCalledWith([expect.objectContaining({ entrantId, id: participantId })]);
+  });
+
+  it('reports when a missing entrant cannot be found in any active event catalog', async () => {
+    const addCategories = vi.fn(async (_categories: EventCategory[]) => null);
+    const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
+    const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
+    const eventId = createEventId('missing-entrant-not-found-event');
+    const entrantId = createEventEntrantId('missing-entrant-not-found-entrant');
+    const participantId = createEventParticipantId('missing-entrant-not-found-participant');
+    const catalog: EventCatalogState = {
+      activeEventId: eventId,
+      activeSessionId: undefined,
+      categories: [],
+      deletedEventIds: [],
+      entrants: [],
+      events: [
+        {
+          categoryIds: [],
+          date: '2026-01-01',
+          entrantIds: [],
+          format: 'race-weekend',
+          id: eventId,
+          name: 'Current Event',
+          sessionIds: [],
+        },
+      ],
+      sessions: [],
+    };
+
+    await expect(applyPulledRaceStateToSession(
+      {
+        addCategories,
+        addParticipants,
+        addRecords,
+        categories: existingCategories,
+        records: [],
+      },
+      {
+        categories: [],
+        participants: [
+          {
+            categoryId: EXISTING_CATEGORY_ID,
+            currentResult: undefined,
+            entrantId,
+            firstname: 'Pat',
+            id: participantId,
+            identifiers: [],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'Rider',
+          },
+        ],
+        records: [],
+      },
+      { catalog }
+    )).rejects.toThrow('Catalog search: entrant ID was not found in any active event.');
   });
 });

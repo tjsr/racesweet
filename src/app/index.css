@@ -560,6 +560,30 @@
   width: min(100%, 40rem);
 }
 
+.mr-scats-preview-dialog {
+  box-sizing: border-box;
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+.mr-scats-preview-dialog .warning-modal-heading,
+.mr-scats-preview-dialog .warning-modal-actions {
+  flex: 0 0 auto;
+}
+
+.mr-scats-preview-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.8rem;
+  min-height: 0;
+  overflow: auto;
+}
+
+.mr-scats-preview-content table {
+  flex: 0 0 auto;
+}
+
 .reload-summary-table {
   border-collapse: collapse;
   width: 100%;

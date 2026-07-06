@@ -16,6 +16,7 @@ export const isParsedPlateCrossing = (crossing: PlateCrossingData): crossing is 
 export const asParsedChipCrossing = (
   crossing: PlateCrossingData
 ): (PlateCrossingData & ParsedTimeRecord) | undefined => isParsedPlateCrossing(crossing) ? crossing : undefined;
+
 export const isPlateCrossing = (crossing: TimeRecord): crossing is PlateCrossingData => {
   return Object.prototype.hasOwnProperty.call(crossing, 'plateNumber') && (crossing as PlateCrossingData).plateNumber !== undefined;
 };

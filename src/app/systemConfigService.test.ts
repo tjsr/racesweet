@@ -409,4 +409,56 @@ describe('SystemConfigService', () => {
       ],
     }));
   });
+
+  it('creates and persists MR-SCATS data source inventory config', async () => {
+    const persistence = createPersistence();
+    const service = await SystemConfigService.create(persistence);
+
+    await service.createSource('file-mr-scats-data');
+    const source = service.state.dataSources[0];
+    expect(source).toBeDefined();
+    expect(source.type).toBe('file-mr-scats-data');
+    expect(source.mrScatsConfig).toEqual({ files: [] });
+
+    await service.updateSource(source.id, {
+      mrScatsConfig: {
+        dataLocationPath: 'C:/RaceTime/timing-data/W9721',
+        files: [
+          {
+            extension: '.dbf',
+            kind: 'dbf-table',
+            name: 'W9721Q01.DBF',
+            relativePath: 'W9721Q01.DBF',
+            size: 7067,
+          },
+        ],
+        sourceKind: 'directory',
+      },
+    });
+
+    expect(service.state.dataSources[0]?.mrScatsConfig).toEqual({
+      dataLocationPath: systemConfig.normalizeOptionalSystemFilePath('C:/RaceTime/timing-data/W9721'),
+      files: [
+        {
+          extension: '.dbf',
+          kind: 'dbf-table',
+          name: 'W9721Q01.DBF',
+          relativePath: 'W9721Q01.DBF',
+          size: 7067,
+        },
+      ],
+      sourceKind: 'directory',
+    });
+    expect(persistence.save).toHaveBeenCalledWith(expect.objectContaining({
+      dataSources: [
+        expect.objectContaining({
+          mrScatsConfig: expect.objectContaining({
+            dataLocationPath: systemConfig.normalizeOptionalSystemFilePath('C:/RaceTime/timing-data/W9721'),
+            sourceKind: 'directory',
+          }),
+          type: 'file-mr-scats-data',
+        }),
+      ],
+    }));
+  });
 });

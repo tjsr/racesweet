@@ -56,11 +56,30 @@ const getEntrantCategoryId = (entrant: EventCatalogEntrant): CategoryId | undefi
   entrant.categoryId || entrant.categoryIds[0]
 );
 
+const createParticipantFromEntrantIdentifiers = (entrant: EventCatalogEntrant): EventParticipant | undefined => {
+  if (entrant.entrantType !== 'rider' || !entrant.identifiers || entrant.identifiers.length === 0) {
+    return undefined;
+  }
+
+  return {
+    categoryId: entrant.categoryId || entrant.categoryIds[0] || '',
+    currentResult: undefined,
+    entrantId: entrant.id,
+    firstname: entrant.firstName || entrant.name,
+    id: entrant.memberParticipantIds[0] || entrant.id,
+    identifiers: [...entrant.identifiers],
+    lastRecordTime: null,
+    resultDuration: null,
+    surname: entrant.lastName || '',
+  };
+};
+
 const getEntrantParticipant = (
   entrant: EventCatalogEntrant,
   participants: EventParticipant[],
   teamEntrants: EventCatalogEntrant[]
-): EventParticipant | undefined => getParticipantsForEntrant(entrant, participants, teamEntrants)[0];
+): EventParticipant | undefined => getParticipantsForEntrant(entrant, participants, teamEntrants)[0] ||
+  createParticipantFromEntrantIdentifiers(entrant);
 
 const sortEntrants = (
   entrants: EventCatalogEntrant[],
