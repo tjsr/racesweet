@@ -28,6 +28,7 @@ import {
   type EventCatalogMutation,
   applyEventCatalogLedger,
 } from '../ledger/eventCatalogLedger.js';
+import { incrementLoadingMetric } from '../loadingMetrics.js';
 import type { EventCatalogPersistence } from '../persistence/eventCatalogPersistence.js';
 import type { MasterEntrantProfile } from '../app/systemConfig.js';
 import { getSystemTimeZone } from '../app/utils/timeutils.js';
@@ -673,6 +674,7 @@ const createLedgerRelationshipRepairMutations = (state: EventCatalogState): Even
 };
 
 const repairAndValidateLoadedLedger = (ledger: EventCatalogLedger): EventCatalogLedger => {
+  incrementLoadingMetric('Repair event catalog ledger', `${ledger.mutations.length} mutations`);
   const rewrittenLedger = rewriteImportedObjectIds(ledger).value;
   let repairedLedger: EventCatalogLedger = {
     ...rewrittenLedger,
@@ -699,6 +701,7 @@ export class EventCatalogService {
   private readonly persistence: EventCatalogPersistence;
 
   private constructor(persistence: EventCatalogPersistence, ledger: EventCatalogLedger, options: EventCatalogServiceOptions = {}) {
+    incrementLoadingMetric('Rebuild event catalog state', `${ledger.mutations.length} mutations`);
     this.ledger = ledger;
     this.options = options;
     this.persistence = persistence;
@@ -707,8 +710,10 @@ export class EventCatalogService {
 
   public static async create(persistence: EventCatalogPersistence, options: EventCatalogServiceOptions = {}): Promise<EventCatalogService> {
     assertEventCatalogPersistence(persistence);
+    incrementLoadingMetric('Load event catalog service ledger');
     let ledger: EventCatalogLedger = await persistence.load();
     if (ledger.mutations.length === 0) {
+      incrementLoadingMetric('Create seed event catalog ledger');
       ledger = createSeedEventCatalogLedger();
       await persistence.save(ledger);
       if (options.onPersistedLedger) {
@@ -825,10 +830,15 @@ export class EventCatalogService {
     teams: EventTeam[] = [],
     assignedSessionId?: SessionId
   ): Promise<EventCatalogState> {
+    incrementLoadingMetric('Sync event scaffold', eventId);
     const event = this.state.events.find((item) => item.id === eventId);
     const assignedSession = assignedSessionId
       ? this.state.sessions.find((session) => session.id === assignedSessionId)
       : undefined;
+
+    categories.forEach((category) => incrementLoadingMetric('Derive scaffold category', category.name || category.id.toString()));
+    participants.forEach((participant) => incrementLoadingMetric('Derive scaffold entrant participant', participant.id.toString()));
+    teams.forEach((team) => incrementLoadingMetric('Derive scaffold team', team.id.toString()));
 
     const scaffoldCategories = deriveCategoriesFromEventData(eventId, categories, participants, teams);
     const categoryIds = scaffoldCategories.map((category) => category.id.toString());
@@ -854,6 +864,7 @@ export class EventCatalogService {
       .map((category) => [category.id.toString(), category] as const));
     const existingEntrantsById = new Map(existingEventEntrantsById);
     const categoryMutations = scaffoldCategories.map((category) => {
+      incrementLoadingMetric('Prepare scaffold category mutation', category.name || category.id.toString());
       const existingCategory = existingCategoriesById.get(category.id.toString());
       if (existingCategory) {
         if (hasSameCategoryScaffold(existingCategory, category)) {
@@ -897,6 +908,7 @@ export class EventCatalogService {
       : undefined;
 
     const entrantMutations: EventCatalogLedger['mutations'] = entrants.flatMap((entrant): EventCatalogLedger['mutations'] => {
+      incrementLoadingMetric('Prepare scaffold entrant mutation', entrant.name || entrant.id.toString());
       const linkedEntrant = linkedGlobalEntrantsById.get(entrant.id.toString());
       if (linkedEntrantIds.has(entrant.id.toString()) && linkedEntrant) {
         return [

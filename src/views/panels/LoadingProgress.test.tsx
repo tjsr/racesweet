@@ -45,4 +45,33 @@ describe('LoadingProgress', () => {
     expect(container.textContent).toContain('Stage 2 of 2');
     expect(container.textContent).toContain('2 of 7');
   });
+
+  it('renders loading metrics when provided', () => {
+    const progress = createLoadingProgressState('Loading RaceSweet', [
+      { id: 'files', label: 'Loading files', total: 3 },
+    ]);
+
+    flushSync(() => {
+      root!.render(<LoadingProgress
+        metrics={{
+          recentCalls: [
+            {
+              detail: 'event-created',
+              id: 14,
+              label: 'Apply event catalog ledger mutation',
+              timestamp: '2026-07-07T10:00:00.000Z',
+            },
+          ],
+          recentLimit: 10,
+          totalCalls: 14,
+        }}
+        progress={progress}
+      />);
+    });
+
+    expect(container.textContent).toContain('14');
+    expect(container.textContent).toContain('tracked calls');
+    expect(container.textContent).toContain('Apply event catalog ledger mutation');
+    expect(container.textContent).toContain('event-created');
+  });
 });

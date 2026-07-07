@@ -778,6 +778,8 @@ describe('RaceSweetMainApp integration', () => {
     const progressBar = container.querySelector('progress[aria-label="Loading RaceSweet progress"]') as HTMLProgressElement | null;
     expect(progressBar).toBeTruthy();
     expect(container.textContent).toContain('Loading generated data files');
+    expect(container.textContent).toContain('tracked calls');
+    expect(container.textContent).toContain('Load event catalog persistence');
     expect(container.textContent).not.toContain('Loading...');
 
     await act(async () => {

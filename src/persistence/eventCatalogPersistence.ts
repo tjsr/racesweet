@@ -3,6 +3,7 @@ import {
   type EventCatalogLedger,
   createDefaultEventCatalogLedger,
 } from '../ledger/eventCatalogLedger.js';
+import { incrementLoadingMetric } from '../loadingMetrics.js';
 import { rewriteImportedObjectIds } from '../model/ids.js';
 
 export interface EventCatalogPersistence {
@@ -62,15 +63,20 @@ export class ElectronJsonEventCatalogPersistence implements EventCatalogPersiste
 
   public async load(): Promise<EventCatalogLedger> {
     try {
+      incrementLoadingMetric('Load event catalog persistence', this.filePath);
       const api = getRendererApi(['requestFileContent']);
       const content = await api.requestFileContent<string>(this.filePath, 'utf8');
       const parsed = JSON.parse(content) as Partial<EventCatalogLedger>;
       const mappedParsedData = rewriteImportedObjectIds(parsed).value;
+      const mutations = mappedParsedData.mutations || [];
+      mutations.forEach((mutation) => {
+        incrementLoadingMetric('Read event catalog mutation', mutation.type);
+      });
 
       return {
         ...createDefaultEventCatalogLedger(),
         ...mappedParsedData,
-        mutations: mappedParsedData.mutations || [],
+        mutations,
         schemaVersion: 1,
       };
     } catch (error: unknown) {

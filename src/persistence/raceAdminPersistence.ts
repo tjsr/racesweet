@@ -4,6 +4,7 @@ import type { SessionId } from '../model/raceevent.js';
 import type { EventTimeRecord } from '../model/timerecord.js';
 import type { TimeRecordId } from '../model/timerecord.js';
 import { RendererApiUnavailableError, getRendererApi } from '../app/rendererApi.js';
+import { incrementLoadingMetric } from '../loadingMetrics.js';
 
 export interface FlagCategoryChange {
   action: 'assign' | 'remove';
@@ -120,20 +121,34 @@ export class ElectronJsonRaceAdminPersistence implements RaceAdminPersistence {
 
   public async load(): Promise<AdministrativeChanges> {
     try {
+      incrementLoadingMetric('Load race admin persistence', this.filePath);
       const api = getRendererApi(['requestFileContent']);
       const content = await api.requestFileContent<string>(this.filePath, 'utf8');
       const parsed = JSON.parse(content) as Partial<AdministrativeChanges>;
+      const addedRecords = parsed.addedRecords || [];
+      const entrantCategories = parsed.entrantCategories || {};
+      const excludedCrossings = parsed.excludedCrossings || {};
+      const flagCategoryChanges = parsed.flagCategoryChanges || [];
+      const flagDeleted = parsed.flagDeleted || {};
+      const updatedRecords = parsed.updatedRecords || [];
+
+      addedRecords.forEach((entry) => incrementLoadingMetric('Read admin added record', entry.record.id.toString()));
+      updatedRecords.forEach((entry) => incrementLoadingMetric('Read admin updated record', entry.record.id.toString()));
+      Object.keys(entrantCategories).forEach((entrantId) => incrementLoadingMetric('Read admin entrant category', entrantId));
+      Object.keys(excludedCrossings).forEach((crossingId) => incrementLoadingMetric('Read admin excluded crossing', crossingId));
+      flagCategoryChanges.forEach((change) => incrementLoadingMetric('Read admin flag category change', change.flagId.toString()));
+      Object.keys(flagDeleted).forEach((flagId) => incrementLoadingMetric('Read admin deleted flag', flagId));
 
       return {
         ...createDefaultAdministrativeChanges(),
         ...parsed,
-        addedRecords: (parsed.addedRecords || []).map(reviveAddedSessionRecord),
-        entrantCategories: parsed.entrantCategories || {},
-        excludedCrossings: parsed.excludedCrossings || {},
-        flagCategoryChanges: parsed.flagCategoryChanges || [],
-        flagDeleted: parsed.flagDeleted || {},
+        addedRecords: addedRecords.map(reviveAddedSessionRecord),
+        entrantCategories,
+        excludedCrossings,
+        flagCategoryChanges,
+        flagDeleted,
         schemaVersion: 1,
-        updatedRecords: (parsed.updatedRecords || []).map(reviveUpdatedSessionRecord),
+        updatedRecords: updatedRecords.map(reviveUpdatedSessionRecord),
       };
     } catch (error: unknown) {
       if (error instanceof RendererApiUnavailableError) {

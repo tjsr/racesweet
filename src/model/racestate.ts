@@ -12,6 +12,7 @@ import type { EventTimeRecord, ParticipantPassingRecord, TimeRecord, TimeRecordI
 import { isPlaceholderCatgegory } from "../controllers/category.js";
 import { isParsedChipCrossing } from "../controllers/chipCrossing.js";
 import { crossingMatchesParticipantIdentifiers } from "../controllers/participantMatch.js";
+import { incrementLoadingMetric } from "../loadingMetrics.js";
 import { listToMap } from "../utils.js";
 import { isValidId } from "../validators/isValidId.js";
 import type { ChipCrossingData } from "./chipcrossing.js";
@@ -85,6 +86,7 @@ export class Session implements RaceState, RaceStateLookup {
   };
 
   public async beginBulkProcess(): Promise<boolean> {
+    incrementLoadingMetric('Begin session bulk process');
     this._bulkProcessDepth += 1;
     this._bulkProcess = true;
     // this.__currentBulkProcess = this.__currentBulkProcess || Promise.resolve();
@@ -102,6 +104,7 @@ export class Session implements RaceState, RaceStateLookup {
 
   public async endBulkProcess(): Promise<void> {
     return Promise.resolve(true).then(() => {
+      incrementLoadingMetric('End session bulk process', `${this._records.size} records`);
       this._bulkProcessDepth = Math.max(0, this._bulkProcessDepth - 1);
       if (this._bulkProcessDepth > 0) {
         return;
@@ -290,6 +293,7 @@ export class Session implements RaceState, RaceStateLookup {
     }
 
     records.forEach((record: TimeRecord) => {
+      incrementLoadingMetric('Add session record', record.id.toString());
       if (!isValidId(record.id)) {
         throw new InvalidIdError(`Record ID ${record.id} is not a valid Id type.`);
       }
@@ -423,6 +427,7 @@ export class Session implements RaceState, RaceStateLookup {
     }
 
     categories.forEach((category: EventCategory) => {
+      incrementLoadingMetric('Add session category', category.name || category.id.toString());
       if (!isValidId(category.id) && category.id) {
         throw new InvalidCategoryIdError(`Category ID ${category.id} is invalid while adding category to session.`);
       }
@@ -582,6 +587,7 @@ export class Session implements RaceState, RaceStateLookup {
 
   public addParticipants(participants: EventParticipant[]): void {
     participants.forEach((participant) => {
+      incrementLoadingMetric('Add session participant', participant.id.toString());
       if (this._participants.has(participant.id)) {
         console.warn(`Participant with ID ${participant.id} already exists. Skipping duplicate.`);
         return;
@@ -655,6 +661,7 @@ export class Session implements RaceState, RaceStateLookup {
 
   public addTeams(teams: EventTeam[]): void {
     teams.forEach((team) => {
+      incrementLoadingMetric('Add session team', team.id.toString());
       if (this._teams.has(team.id)) {
         console.warn(`Team with ID ${team.id} already exists. Skipping duplicate.`);
         return;

@@ -6,6 +6,7 @@ import type { EventTeam } from '../model/eventteam.js';
 import { rewriteImportedObjectIds } from '../model/ids.js';
 import type { RaceState } from '../model/racestate.js';
 import type { TimeRecord } from '../model/timerecord.js';
+import { incrementLoadingMetric } from '../loadingMetrics.js';
 import type { EventCatalogEntrant, EventCatalogEvent, EventCatalogSession, EventCatalogState } from '../catalog/eventCatalog.js';
 import { addMissingLinkedCategoryPlaceholders } from '../service/sessionSourceReload.js';
 
@@ -315,7 +316,12 @@ export const applyPulledRaceStateToSession = async (
   raceState: Partial<RaceState>,
   options: SessionSourceApplicationOptions = {}
 ): Promise<void> => {
+  incrementLoadingMetric('Apply pulled race state to session', options.sessionId || options.eventId);
   const normalizedRaceState = normalizeRaceStateForSession(raceState, sessionState.categories, options);
+  (normalizedRaceState.categories || []).forEach((category) => incrementLoadingMetric('Normalize pulled category', category.name || category.id.toString()));
+  (normalizedRaceState.participants || []).forEach((participant) => incrementLoadingMetric('Normalize pulled participant', participant.id.toString()));
+  (normalizedRaceState.teams || []).forEach((team) => incrementLoadingMetric('Normalize pulled team', team.id.toString()));
+  ((normalizedRaceState.records as TimeRecord[]) || []).forEach((record) => incrementLoadingMetric('Normalize pulled record', record.id.toString()));
   const bulkStarted = await sessionState.beginBulkProcess?.() === true;
   try {
     const categoriesToAdd = getCategoriesToAdd(

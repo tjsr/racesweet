@@ -3,6 +3,7 @@ import type { EventEntrantId } from '../model/entrant.js';
 import type { SessionId } from '../model/raceevent.js';
 import type { RaceStateLookup, Session } from '../model/racestate.js';
 import type { EventTimeRecord, TimeRecordId } from '../model/timerecord.js';
+import { incrementLoadingMetric } from '../loadingMetrics.js';
 import {
   type AddedSessionRecord,
   type AdministrativeChanges,
@@ -34,6 +35,7 @@ export class RaceAdminService {
     persistence: RaceAdminPersistence,
     sessionId?: SessionId
   ): Promise<RaceAdminService> {
+    incrementLoadingMetric('Load race admin service');
     const session = await sessionLoader();
     const changes = await persistence.load();
     const service = new RaceAdminService(session, persistence, changes, sessionId);
@@ -170,6 +172,7 @@ export class RaceAdminService {
   }
 
   private async applyChanges(session: Session & RaceStateLookup = this.session, sessionId: SessionId | undefined = this.sessionId): Promise<void> {
+    incrementLoadingMetric('Apply race admin changes', sessionId);
     const changes = this.changes || createDefaultAdministrativeChanges();
     const addedRecords = changes.addedRecords.filter((candidate) => this.shouldApplyRecordToSession(candidate, sessionId));
     const updatedRecords = changes.updatedRecords.filter((entry) => this.shouldApplyUpdatedRecordToSession(entry, sessionId));
@@ -190,18 +193,22 @@ export class RaceAdminService {
 
     try {
       for (const entry of addedRecords) {
+        incrementLoadingMetric('Apply admin added record', entry.record.id.toString());
         await this.applyStoredRecordChange(session, entry.record);
       }
 
       updatedRecords.forEach((entry) => {
+        incrementLoadingMetric('Apply admin updated record', entry.record.id.toString());
         this.applyStoredUpdatedRecordChange(session, entry.record);
       });
 
       flagDeletedChanges.forEach(([flagId, deleted]) => {
+        incrementLoadingMetric('Apply admin deleted flag', flagId);
         this.applyStoredFlagChange(() => this.markFlagDeletedInSession(session, flagId, deleted));
       });
 
       changes.flagCategoryChanges.forEach((change) => {
+        incrementLoadingMetric('Apply admin flag category change', change.flagId.toString());
         if (change.action === 'assign') {
           this.applyStoredFlagChange(() => this.assignFlagCategoryInSession(session, change.flagId, change.categoryId));
         } else {
@@ -210,10 +217,12 @@ export class RaceAdminService {
       });
 
       entrantCategoryChanges.forEach(([entrantId, categoryId]) => {
+        incrementLoadingMetric('Apply admin entrant category', entrantId);
         this.updateEntrantCategoryInSession(session, entrantId, categoryId);
       });
 
       excludedCrossingChanges.forEach(([crossingId, exclude]) => {
+        incrementLoadingMetric('Apply admin excluded crossing', crossingId);
         this.excludeCrossingInSession(session, crossingId, exclude);
       });
     } finally {

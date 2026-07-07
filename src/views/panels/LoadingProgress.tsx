@@ -1,12 +1,14 @@
 import type { ReactElement } from 'react';
 
+import type { LoadingMetricsState } from '../../loadingMetrics.js';
 import { type LoadingProgressState, getLoadingProgressSummary } from '../../loadingProgress.js';
 
 interface LoadingProgressProps {
+  metrics?: LoadingMetricsState;
   progress: LoadingProgressState;
 }
 
-export const LoadingProgress = ({ progress }: LoadingProgressProps): ReactElement => {
+export const LoadingProgress = ({ metrics, progress }: LoadingProgressProps): ReactElement => {
   const summary = getLoadingProgressSummary(progress);
   const stagePosition = summary.activeStageIndex + 1;
   const stageCount = progress.stages.length;
@@ -32,6 +34,24 @@ export const LoadingProgress = ({ progress }: LoadingProgressProps): ReactElemen
           {summary.activeStage.completed} of {summary.activeStage.total}
         </span>
       </div>
+      {metrics ? (
+        <div className="loading-progress__metrics">
+          <div className="loading-progress__metric-count">
+            <strong>{metrics.totalCalls}</strong>
+            <span>tracked calls</span>
+          </div>
+          {metrics.recentCalls.length > 0 ? (
+            <ol className="loading-progress__recent-calls" aria-label="Recent loading calls">
+              {metrics.recentCalls.map((call) => (
+                <li key={call.id}>
+                  <span>{call.label}</span>
+                  {call.detail ? <small>{call.detail}</small> : null}
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </div>
+      ) : null}
       <ol className="loading-progress__stages">
         {progress.stages.map((stage, index) => (
           <li

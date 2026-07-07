@@ -13,6 +13,7 @@ import {
     normalizeSystemDirectoryPath,
     shouldRenameApicalSourceForFetchedEvent,
 } from '../app/systemConfig.js';
+import { incrementLoadingMetric } from '../loadingMetrics.js';
 import type { SystemConfigPersistence } from '../persistence/systemConfigPersistence.js';
 
 interface SystemConfigServiceOptions {
@@ -94,7 +95,11 @@ export class SystemConfigService {
   }
 
   public static async create(persistence: SystemConfigPersistence, options: SystemConfigServiceOptions = {}): Promise<SystemConfigService> {
+    incrementLoadingMetric('Load system config service');
     const config = await persistence.load();
+    config.dataSources.forEach((source) => incrementLoadingMetric('Normalize system data source', source.name || source.id));
+    Object.keys(config.eventSourceAssignments).forEach((eventId) => incrementLoadingMetric('Normalize event source assignment', eventId));
+    Object.keys(config.sessionSourceAssignments).forEach((sessionId) => incrementLoadingMetric('Normalize session source assignment', sessionId));
     return new SystemConfigService(persistence, normalizeSystemConfiguration(config), options);
   }
 

@@ -7,6 +7,7 @@ import { type EventParticipant, type EventParticipantId } from '../model/eventpa
 import { EventId, SessionId } from '../model/raceevent.ts';
 import { type RaceState, RaceStateLookup, Session } from '../model/racestate.ts';
 import { type EventTimeRecord, type TimeRecordId } from '../model/timerecord.ts';
+import { type LoadingMetricsState, getLoadingMetricsSnapshot, incrementLoadingMetric, resetLoadingMetrics, subscribeLoadingMetrics } from '../loadingMetrics.ts';
 import { type LoadingProgressState, completeLoadingProgressStage, createLoadingProgressState, updateLoadingProgressStage } from '../loadingProgress.ts';
 import { type MrScatsCatalogImport, loadMrScatsCatalogFromLocation } from '../parsers/mrScats/catalogImport.ts';
 import { listMrScatsDataFiles } from '../parsers/mrScats/fileInventory.ts';
@@ -131,12 +132,14 @@ class PageErrorBoundary extends Component<PageErrorBoundaryProps, PageErrorBound
 }
 
 const loadAdminService = async (onError?: (error: unknown) => void): Promise<RaceAdminService> => {
+  incrementLoadingMetric('Create admin service');
   const apicalSession: TestSession = new ApicalElectronFile();
   const eventSession: TestSession = apicalSession; // undefined!; // rfidSession;
 
   const persistence = new ElectronJsonRaceAdminPersistence('../../src/generated/admin-overrides.json', onError);
 
   return RaceAdminService.create(async () => {
+    incrementLoadingMetric('Load startup test data');
     await eventSession.loadTestData(false);
     console.log("Test data loaded successfully.");
     return eventSession as Session & RaceStateLookup;
@@ -144,11 +147,13 @@ const loadAdminService = async (onError?: (error: unknown) => void): Promise<Rac
 };
 
 const loadEventCatalogService = async (onError?: (error: unknown) => void): Promise<EventCatalogService> => {
+  incrementLoadingMetric('Create event catalog service');
   const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json', onError);
   return EventCatalogService.create(persistence);
 };
 
 const loadSystemConfigService = async (onError?: (error: unknown) => void): Promise<SystemConfigService> => {
+  incrementLoadingMetric('Create system config service');
   const persistence = new ElectronJsonSystemConfigPersistence('../../src/generated/system-config.json', onError);
   return SystemConfigService.create(persistence);
 };
@@ -294,6 +299,7 @@ export const RaceSweetMainApp = () => {
   const [, setRenderTick] = useState(0);
   const [errorState, setErrorState] = useState<Error|undefined>(undefined);
   const [displayedErrorLogEntries, setDisplayedErrorLogEntries] = useState<DisplayedErrorLogEntry[]>([]);
+  const [loadingMetrics, setLoadingMetrics] = useState<LoadingMetricsState>(getLoadingMetricsSnapshot);
   const [loadingProgress, setLoadingProgress] = useState<LoadingProgressState>(createStartupLoadingProgress);
   const [loadWarnings, setLoadWarnings] = useState<string[]>([]);
   const [selectedCategories, setCategorySelected] = useState<Set<EventCategoryId>>(new Set<EventCategoryId>());
@@ -331,6 +337,12 @@ export const RaceSweetMainApp = () => {
         timestamp,
       },
     ]);
+  }, []);
+
+  useEffect(() => {
+    return subscribeLoadingMetrics(() => {
+      setLoadingMetrics(getLoadingMetricsSnapshot());
+    });
   }, []);
 
   const dismissDisplayedErrors = useCallback((): void => {
@@ -377,6 +389,7 @@ export const RaceSweetMainApp = () => {
         setLoadWarnings((existing) => existing.includes(message) ? existing : [...existing, message]);
       };
 
+      resetLoadingMetrics();
       setLoadingProgress(createStartupLoadingProgress());
       let loadedServiceCount = 0;
       const updateProgressStage = (
@@ -385,6 +398,7 @@ export const RaceSweetMainApp = () => {
         completed: number,
         active: boolean = true
       ): void => {
+        incrementLoadingMetric(`Startup stage: ${stageId}`, `${completed}/${total}`);
         setLoadingProgress((current) => updateLoadingProgressStage(current, stageId, {
           active,
           completed,
@@ -392,10 +406,12 @@ export const RaceSweetMainApp = () => {
         }));
       };
       const completeProgressStage = (stageId: string): void => {
+        incrementLoadingMetric(`Complete startup stage: ${stageId}`);
         setLoadingProgress((current) => completeLoadingProgressStage(current, stageId));
       };
       const markServiceLoaded = (): void => {
         loadedServiceCount += 1;
+        incrementLoadingMetric('Startup service loaded', `${loadedServiceCount}/3`);
         updateProgressStage('services', 3, loadedServiceCount);
       };
       const adminServicePromise = loadAdminService(onLoadError).then((service) => {
@@ -425,6 +441,7 @@ export const RaceSweetMainApp = () => {
         const catalogValidationTotal = Math.max(1, initialCatalog.events.length + session.participants.length + 4);
         let catalogValidationCompleted = 0;
         initialCatalog.events.forEach((event) => {
+          incrementLoadingMetric('Validate catalog event', event.name);
           if (!validateUuid(event.id)) {
             throw new Error(`Invalid event ID in catalog: ${event.id}`);
           }
@@ -432,6 +449,7 @@ export const RaceSweetMainApp = () => {
           updateProgressStage('catalog-validation', catalogValidationTotal, catalogValidationCompleted);
         });
         const participantCategoryIds = new Set(session.participants.map((participant) => participant.categoryId.toString()));
+        session.participants.forEach((participant) => incrementLoadingMetric('Read startup participant category', participant.id.toString()));
         catalogValidationCompleted += session.participants.length;
         updateProgressStage('catalog-validation', catalogValidationTotal, catalogValidationCompleted);
         const participantEntrantIds = new Set(session.participants.map((participant) => participant.entrantId.toString()));
@@ -456,6 +474,7 @@ export const RaceSweetMainApp = () => {
         );
 
         const finalizeLoad = async (catalog: EventCatalogState): Promise<void> => {
+          incrementLoadingMetric('Finalize startup catalog');
           const sessionList = getSessionsForEvent(catalog, initialEventId);
           const categoryList = getCategoriesForEvent(catalog, initialEventId);
           const entrantList = getEntrantsForEvent(catalog, initialEventId);
@@ -464,6 +483,7 @@ export const RaceSweetMainApp = () => {
           const sessionPreparationTotal = Math.max(1, session.categories.length + session.participants.length + session.records.length);
           updateProgressStage('session-state', sessionPreparationTotal, 0);
           if (initialSessionId) {
+            incrementLoadingMetric('Apply admin changes to startup session', initialSessionId);
             await raceService.applyChangesToSessionById(session, initialSessionId);
           }
           updateProgressStage('session-state', sessionPreparationTotal, sessionPreparationTotal);
@@ -497,6 +517,7 @@ export const RaceSweetMainApp = () => {
           updateProgressStage('scaffold', scaffoldTotal, 0);
 
           catalogService.syncEventScaffold(initialEventId!, session.categories, session.participants, masterProfiles).then(async (catalog) => {
+            incrementLoadingMetric('Startup scaffold synced', initialEventId);
             updateProgressStage('scaffold', scaffoldTotal, scaffoldTotal);
             await finalizeLoad(catalog);
           }).catch((error: unknown) => {
@@ -1055,7 +1076,7 @@ export const RaceSweetMainApp = () => {
     return renderShell(<PageErrorFallback error={errorState} onDismiss={() => setErrorState(undefined)} />);
   }
   if (!sessionState || !eventCatalogState) {
-    return renderShell(<LoadingProgress progress={loadingProgress} />);
+    return renderShell(<LoadingProgress metrics={loadingMetrics} progress={loadingProgress} />);
   }
 
   const handleExcludeCrossing = (crossingId: TimeRecordId, exclude: boolean) => {

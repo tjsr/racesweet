@@ -4,6 +4,7 @@ import type { EventCategoryId } from '../model/eventcategory.js';
 import type { EventId, SessionId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 import type { IdType } from '../model/types.js';
+import { incrementLoadingMetric } from '../loadingMetrics.js';
 import { isValidId } from '../validators/isValidId.js';
 import {
   type CategorySessionAssignment,
@@ -170,6 +171,7 @@ const migrateLegacyCategoryAssignments = (state: EventCatalogState): EventCatalo
 
 export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalogState => {
   const state = ledger.mutations.reduce<EventCatalogState>((currentState, mutation) => {
+    incrementLoadingMetric('Apply event catalog ledger mutation', mutation.type);
     switch (mutation.type) {
     case 'event-created': {
       if (currentState.deletedEventIds.includes(mutation.event.id)) {

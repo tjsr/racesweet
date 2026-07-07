@@ -1,6 +1,7 @@
 import { RendererApiUnavailableError, getRendererApi } from '../app/rendererApi.js';
 import { createDefaultSystemConfiguration, normalizeSystemConfiguration } from '../app/systemConfig.js';
 import type { SystemConfiguration } from '../app/systemConfig.js';
+import { incrementLoadingMetric } from '../loadingMetrics.js';
 
 export interface SystemConfigPersistence {
   load(): Promise<SystemConfiguration>;
@@ -59,9 +60,19 @@ export class ElectronJsonSystemConfigPersistence implements SystemConfigPersiste
 
   public async load(): Promise<SystemConfiguration> {
     try {
+      incrementLoadingMetric('Load system config persistence', this.filePath);
       const api = getRendererApi(['requestFileContent']);
       const content = await api.requestFileContent<string>(this.filePath, 'utf8');
       const parsed = JSON.parse(content) as Partial<SystemConfiguration>;
+      (parsed.dataSources || []).forEach((source) => {
+        incrementLoadingMetric('Read system data source', source.name || source.id);
+      });
+      Object.keys(parsed.eventSourceAssignments || {}).forEach((eventId) => {
+        incrementLoadingMetric('Read event source assignment', eventId);
+      });
+      Object.keys(parsed.sessionSourceAssignments || {}).forEach((sessionId) => {
+        incrementLoadingMetric('Read session source assignment', sessionId);
+      });
 
       return normalizeSystemConfiguration(parsed);
     } catch (error: unknown) {
