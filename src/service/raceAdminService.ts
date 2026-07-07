@@ -9,7 +9,7 @@ import {
   type RaceAdminPersistence,
   type UpdatedSessionRecord,
   createDefaultAdministrativeChanges,
-} from './raceAdminPersistence.js';
+} from '../persistence/raceAdminPersistence.js';
 
 export class RaceAdminService {
   private changes: AdministrativeChanges;

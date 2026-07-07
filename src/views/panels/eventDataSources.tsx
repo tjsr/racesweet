@@ -1,6 +1,6 @@
 import React from 'react';
 import { type DataSourceConfig } from '../../app/systemConfig.js';
-import { type EventCatalogEvent } from '../../app/eventCatalog.js';
+import { type EventCatalogEvent } from '../../catalog/eventCatalog.js';
 
 interface EventDataSourcesPanelProps {
   assignedSourceIds: string[];

@@ -18,7 +18,7 @@ import { useUiConsoleGuards } from '../testing/uiConsoleGuards.js';
 import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from '../utils/apical/excelDownload.js';
 import { type ApicalSpreadsheetLapsRow, createApicalCatalogEventId, createApicalCatalogSessionId, getCachedApicalExcelFilePath } from './apicalDataSource.js';
 import { RaceSweetMainApp } from './App.js';
-import { createSeedEventCatalogLedger } from './createSeedEventCatalogLedger.js';
+import { createSeedEventCatalogLedger } from '../ledger/createSeedEventCatalogLedger.js';
 import { APICAL_DEFAULT_SOURCE_NAME } from './systemConfig.js';
 
 vi.mock('../views/display/categories', () => ({
@@ -847,7 +847,7 @@ describe('RaceSweetMainApp integration', () => {
     const persistenceError = new Error('Catalog ledger could not be written');
     persistenceError.stack = [
       'Error: Catalog ledger could not be written',
-      '    at writeCatalog (webpack://racesweet/./src/app/eventCatalogPersistence.ts:84:7)',
+      '    at writeCatalog (webpack://racesweet/./src/persistence/eventCatalogPersistence.ts:84:7)',
       '    at async RaceSweetMainApp (webpack://racesweet/./src/app/App.tsx:659:15)',
     ].join('\n');
 
@@ -877,7 +877,7 @@ describe('RaceSweetMainApp integration', () => {
     expect(errorDetails).toBeTruthy();
     expect(errorDetails!.textContent).toContain('Catalog ledger could not be written');
     expect(errorDetails!.textContent).toContain('Error: Catalog ledger could not be written');
-    expect(errorDetails!.textContent).toContain('webpack://racesweet/./src/app/eventCatalogPersistence.ts:84:7');
+    expect(errorDetails!.textContent).toContain('webpack://racesweet/./src/persistence/eventCatalogPersistence.ts:84:7');
     expect(errorDetails!.textContent).toContain('webpack://racesweet/./src/app/App.tsx:659:15');
   });
 

@@ -1,5 +1,5 @@
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createMutationId, createSessionId } from '../model/ids.js';
-import { EventCatalogLedger } from './eventCatalog';
+import type { EventCatalogLedger } from './eventCatalogLedger.js';
 
 export const createSeedEventCatalogLedger = (): EventCatalogLedger => {
   return ({

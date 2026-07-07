@@ -1,5 +1,5 @@
 import React from 'react';
-import { type EventCatalogState } from '../../app/eventCatalog.js';
+import { type EventCatalogState } from '../../catalog/eventCatalog.js';
 import { type FastestTimeIndicatorColors } from '../../app/systemConfig.js';
 import { type TimeDisplayZoneMode } from '../../app/utils/timeutils.js';
 import { RecentRecords } from '../../app/views/timing/recentRecords.js';

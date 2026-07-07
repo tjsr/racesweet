@@ -1,5 +1,5 @@
 import React from 'react';
-import { type CategoryDistanceRule, type EventCatalogCategory } from '../../app/eventCatalog.js';
+import { type CategoryDistanceRule, type EventCatalogCategory } from '../../catalog/eventCatalog.js';
 import { type SessionId } from '../../model/raceevent.js';
 import { type CategoryDraft } from '../display/categoriesPage.js';
 

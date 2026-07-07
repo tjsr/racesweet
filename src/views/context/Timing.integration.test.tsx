@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { type EventCatalogState } from '../../app/eventCatalog.js';
+import { type EventCatalogState } from '../../catalog/eventCatalog.js';
 import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';

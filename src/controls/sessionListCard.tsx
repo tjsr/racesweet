@@ -1,5 +1,5 @@
 import React from 'react';
-import { type EventCatalogSession } from '../app/eventCatalog.js';
+import { type EventCatalogSession } from '../catalog/eventCatalog.js';
 import { type SessionId } from '../model/raceevent.js';
 
 interface SessionListCardProps {

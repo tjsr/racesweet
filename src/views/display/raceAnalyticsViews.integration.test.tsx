@@ -2,7 +2,7 @@
 
 import { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
-import type { EventCatalogEntrant } from '../../app/eventCatalog.js';
+import type { EventCatalogEntrant } from '../../catalog/eventCatalog.js';
 import { tableTimeString } from '../../app/utils/timeutils.js';
 import { CategoryId } from '../../controllers/category.js';
 import { EventEntrantId } from '../../model/entrant.js';

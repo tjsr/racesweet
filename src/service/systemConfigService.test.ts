@@ -1,8 +1,8 @@
 import { createEventEntrantId, createEventId } from '../model/ids.js';
-import * as systemConfig from './systemConfig.js';
+import * as systemConfig from '../app/systemConfig.js';
 
-import type { SystemConfigPersistence } from './systemConfigPersistence.js';
-import { SystemConfigService } from './systemConfigService.js';
+import type { SystemConfigPersistence } from '../persistence/systemConfigPersistence.js';
+import { SystemConfigService } from '../service/systemConfigService.js';
 
 const createPersistence = (initial = systemConfig.createDefaultSystemConfiguration()): SystemConfigPersistence => {
   let config = initial;

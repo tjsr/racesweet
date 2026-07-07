@@ -2,7 +2,8 @@
 
 import { type Root, createRoot } from 'react-dom/client';
 import { EntrantsPage } from './entrantsPage.js';
-import { type EventCatalogLedger, type EventCatalogState, applyEventCatalogLedger, createDefaultEventCatalogLedger } from '../../app/eventCatalog.js';
+import { type EventCatalogState } from '../../catalog/eventCatalog.js';
+import { type EventCatalogLedger, applyEventCatalogLedger, createDefaultEventCatalogLedger } from '../../ledger/eventCatalogLedger.js';
 import { type EventParticipant } from '../../model/eventparticipant.js';
 import { type RaceState } from '../../model/racestate.js';
 import React from 'react';

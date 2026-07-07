@@ -3,7 +3,7 @@ import type { EventEntrantId } from '../model/entrant.js';
 import type { SessionId } from '../model/raceevent.js';
 import type { EventTimeRecord } from '../model/timerecord.js';
 import type { TimeRecordId } from '../model/timerecord.js';
-import { RendererApiUnavailableError, getRendererApi } from './rendererApi.js';
+import { RendererApiUnavailableError, getRendererApi } from '../app/rendererApi.js';
 
 export interface FlagCategoryChange {
   action: 'assign' | 'remove';

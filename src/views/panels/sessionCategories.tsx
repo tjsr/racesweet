@@ -1,5 +1,5 @@
 import React from 'react';
-import { type EventCatalogCategory, type EventCatalogSession, getSessionAssignedCategoryIds } from '../../app/eventCatalog.js';
+import { type EventCatalogCategory, type EventCatalogSession, getSessionAssignedCategoryIds } from '../../catalog/eventCatalog.js';
 import { type EventCategoryId } from '../../model/eventcategory.js';
 import { CategoryListPanel } from './categoryList.js';
 

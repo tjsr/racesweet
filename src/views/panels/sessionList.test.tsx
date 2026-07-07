@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { type Root, createRoot } from 'react-dom/client';
 import { act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { type EventCatalogSession } from '../../app/eventCatalog.js';
+import { type EventCatalogSession } from '../../catalog/eventCatalog.js';
 import { SessionListPanel } from './sessionList.js';
 
 const session: EventCatalogSession = {

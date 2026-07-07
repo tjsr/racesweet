@@ -2,7 +2,7 @@
 
 import React, { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
-import type { EventCatalogState } from '../../app/eventCatalog.js';
+import type { EventCatalogState } from '../../catalog/eventCatalog.js';
 import type { SystemConfiguration } from '../../app/systemConfig.js';
 import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';

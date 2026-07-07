@@ -5,8 +5,8 @@ import {
   type EventCatalogState,
   getCategoriesForEvent,
   getSessionsForEvent,
-} from '../../app/eventCatalog.js';
-import { type SessionSourceReloadMode } from '../../app/sessionSourceReload.js';
+} from '../../catalog/eventCatalog.js';
+import { type SessionSourceReloadMode } from '../../service/sessionSourceReload.js';
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
 import { type EventCategoryId } from '../../model/eventcategory.js';
 import { EventId, SessionId } from '../../model/raceevent.js';

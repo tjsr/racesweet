@@ -1,5 +1,5 @@
 import React from 'react';
-import { type EventCatalogCategory } from '../../app/eventCatalog.js';
+import { type EventCatalogCategory } from '../../catalog/eventCatalog.js';
 import { type EventCategoryId } from '../../model/eventcategory.js';
 import { CategoryListCard } from '../../controls/categoryListCard.js';
 

@@ -7,7 +7,7 @@ import {
   getEntrantAssignedSessionIds,
   getEntrantsForEvent,
   getSessionsForEvent,
-} from '../../app/eventCatalog.js';
+} from '../../catalog/eventCatalog.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import { type EventParticipant, type EventParticipantId, type ParticipantIdentifierUpdate } from '../../model/eventparticipant.js';
 import { EventId } from '../../model/raceevent.js';

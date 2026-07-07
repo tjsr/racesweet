@@ -2,7 +2,7 @@ import type { EventParticipant } from '../model/eventparticipant.js';
 import { createCategoryId, createEventEntrantId, createEventParticipantId, createTimeRecordId } from '../model/ids.js';
 import type { RaceState } from '../model/racestate.js';
 import type { TimeRecord } from '../model/timerecord.js';
-import { getMissingLinkedCategoryIds, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload } from './sessionSourceReload.js';
+import { getMissingLinkedCategoryIds, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload } from '../service/sessionSourceReload.js';
 
 const existingCategoryId = createCategoryId('existing-category');
 const reloadedCategoryId = createCategoryId('reloaded-category');

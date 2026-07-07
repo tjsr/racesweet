@@ -4,7 +4,7 @@ import {
   type EventCatalogState,
   getCategoriesForEvent,
   getSessionsForEvent,
-} from '../../app/eventCatalog.js';
+} from '../../catalog/eventCatalog.js';
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
 import { getSupportedTimeZones, getSystemTimeZone } from '../../app/utils/timeutils.js';
 import { type EventId, type SessionId } from '../../model/raceevent.js';

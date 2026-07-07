@@ -1,7 +1,7 @@
 import type { RaceStateLookup, Session } from '../../model/racestate.js';
 
 import React from 'react';
-import type { EventCatalogEntrant } from '../../app/eventCatalog.js';
+import type { EventCatalogEntrant } from '../../catalog/eventCatalog.js';
 import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
 import { shouldExcludeCategoryFromResults } from '../../controllers/category.js';
 import { getParticipantNumber } from '../../controllers/participant.js';

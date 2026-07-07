@@ -3,7 +3,7 @@
 import {
   ElectronJsonRaceAdminPersistence,
   createDefaultAdministrativeChanges,
-} from './raceAdminPersistence.js';
+} from '../persistence/raceAdminPersistence.js';
 import { useStderrGuard } from '../testing/stderrGuard.js';
 
 const adminOverridesTestPath = '../../test/generated/admin-overrides.test.json';

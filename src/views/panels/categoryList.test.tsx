@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { type Root, createRoot } from 'react-dom/client';
 import { act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { type EventCatalogCategory } from '../../app/eventCatalog.js';
+import { type EventCatalogCategory } from '../../catalog/eventCatalog.js';
 import { CategoryListPanel } from './categoryList.js';
 
 const category: EventCatalogCategory = {

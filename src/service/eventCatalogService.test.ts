@@ -3,11 +3,8 @@ import path from 'node:path';
 import { validate as validateUuid } from 'uuid';
 import { readApicalExcelBuffer } from '../controllers/apical/apicalSpreadsheetProcessor.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
-import { createSeedEventCatalogLedger } from './createSeedEventCatalogLedger.js';
+import { createSeedEventCatalogLedger } from '../ledger/createSeedEventCatalogLedger.js';
 import {
-    applyEventCatalogLedger,
-    createDefaultEventCatalogLedger,
-    type EventCatalogLedger,
     type EventCatalogState,
     getCategoryAssignedSessionIds,
     getCategoriesForEvent,
@@ -18,14 +15,19 @@ import {
     getSessionAssignedCategoryIds,
     getSessionsForEvent,
     getTeamsForParticipant,
-} from './eventCatalog.js';
+} from '../catalog/eventCatalog.js';
+import {
+    type EventCatalogLedger,
+    applyEventCatalogLedger,
+    createDefaultEventCatalogLedger,
+} from '../ledger/eventCatalogLedger.js';
 
 import type { EventParticipant, ParticipateRacePlate, ParticipantTransponder } from '../model/eventparticipant.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
 import { RECORD_TX_CROSSING, type EventTimeRecord } from '../model/timerecord.js';
 import { createApicalTeamNameDisplayWorkbookBuffer } from '../testing/apicalTeamWorkbook.js';
-import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
-import { EventCatalogService } from './eventCatalogService.js';
+import type { EventCatalogPersistence } from '../persistence/eventCatalogPersistence.js';
+import { EventCatalogService } from '../service/eventCatalogService.js';
 
 const createPersistence = (initial = createDefaultEventCatalogLedger()): EventCatalogPersistence => {
   let ledger = initial;

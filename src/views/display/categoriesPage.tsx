@@ -6,7 +6,7 @@ import {
   type EventCatalogCategory,
   type EventCatalogEntrant,
   type EventCatalogState,
-} from '../../app/eventCatalog.js';
+} from '../../catalog/eventCatalog.js';
 import { EventCategoryId } from '../../model/eventcategory.js';
 import { EventId } from '../../model/raceevent.js';
 import { type UnsavedChangesGuard } from './unsavedChangesWarning.js';

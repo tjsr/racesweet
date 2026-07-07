@@ -1,5 +1,5 @@
 import React from 'react';
-import { type EventCatalogEvent } from '../../app/eventCatalog.js';
+import { type EventCatalogEvent } from '../../catalog/eventCatalog.js';
 import { type EventId } from '../../model/raceevent.js';
 
 interface EventListPanelProps {

@@ -9,27 +9,29 @@ import { EventId, SessionId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 import type { EventTimeRecord, TimeRecord } from '../model/timerecord.js';
 import { MR_SCATS_DEFAULT_TIME_ZONE, type MrScatsCatalogImport } from '../parsers/mrScats/catalogImport.js';
-import { createSeedEventCatalogLedger } from './createSeedEventCatalogLedger.js';
+import { createSeedEventCatalogLedger } from '../ledger/createSeedEventCatalogLedger.js';
 import {
   type CategoryDistanceRule,
   type CategoryTeamRules,
   type EntrantType,
   type EventCatalogCategory,
   type EventCatalogEntrant,
-  type EventCatalogLedger,
-  type EventCatalogMutation,
   type EventCatalogSession,
   type EventCatalogState,
   type ParticipantEntrantMembership,
-  applyEventCatalogLedger,
   getCategoriesForEvent,
   getEntrantsForEvent,
   getParticipantEntrantMemberships,
-} from './eventCatalog.js';
-import type { EventCatalogPersistence } from './eventCatalogPersistence.js';
-import { addMissingLinkedCategoryPlaceholders } from './sessionSourceReload.js';
-import type { MasterEntrantProfile } from './systemConfig.js';
-import { getSystemTimeZone } from './utils/timeutils.js';
+} from '../catalog/eventCatalog.js';
+import {
+  type EventCatalogLedger,
+  type EventCatalogMutation,
+  applyEventCatalogLedger,
+} from '../ledger/eventCatalogLedger.js';
+import type { EventCatalogPersistence } from '../persistence/eventCatalogPersistence.js';
+import type { MasterEntrantProfile } from '../app/systemConfig.js';
+import { getSystemTimeZone } from '../app/utils/timeutils.js';
+import { addMissingLinkedCategoryPlaceholders } from '../service/sessionSourceReload.js';
 
 interface ApicalCatalogImport {
   apicalDataFilePath?: string;

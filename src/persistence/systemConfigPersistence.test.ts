@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { ElectronJsonSystemConfigPersistence } from './systemConfigPersistence.js';
-import { createDefaultSystemConfiguration } from './systemConfig.js';
+import { ElectronJsonSystemConfigPersistence } from '../persistence/systemConfigPersistence.js';
+import { createDefaultSystemConfiguration } from '../app/systemConfig.js';
 import { useStderrGuard } from '../testing/stderrGuard.js';
 
 const systemConfigTestPath = '../../test/generated/system-config.test.json';

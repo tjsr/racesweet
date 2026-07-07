@@ -1,5 +1,5 @@
 import React from 'react';
-import { type EntrantType, type EventCatalogEntrant, type EventCatalogState } from '../../app/eventCatalog.js';
+import { type EntrantType, type EventCatalogEntrant, type EventCatalogState } from '../../catalog/eventCatalog.js';
 import { type CategoryId } from '../../controllers/category.js';
 import { getParticipantNumber, getParticipantTransponders } from '../../controllers/participant.js';
 import { EntrantListCard } from '../../controls/entrantListCard.js';

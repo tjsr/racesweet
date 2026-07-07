@@ -1,11 +1,11 @@
-import { applyPulledRaceStateToSession, getCategoriesToAdd } from './sourceApplication.js';
+import { applyPulledRaceStateToSession, getCategoriesToAdd } from '../service/sourceApplication.js';
 
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { EventTeam } from '../model/eventteam.js';
 import type { TimeRecord } from '../model/timerecord.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
-import type { EventCatalogState } from './eventCatalog.js';
+import type { EventCatalogState } from '../catalog/eventCatalog.js';
 
 const EXISTING_CATEGORY_ID = createCategoryId('cat-existing');
 const NEW_CATEGORY_ID = createCategoryId('cat-new');

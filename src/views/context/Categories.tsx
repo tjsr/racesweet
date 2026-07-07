@@ -1,6 +1,6 @@
 import React from 'react';
 import { parseTeamCompositionRules } from '../../app/categoryRules.js';
-import { type CategoryDistanceRule, type EventCatalogCategory, getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent } from '../../app/eventCatalog.js';
+import { type CategoryDistanceRule, type EventCatalogCategory, getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent } from '../../catalog/eventCatalog.js';
 import { parseInteger } from '../../parsers/parseInteger.js';
 import { CategoriesPageProps, CategoryChanges, CategoryDraft, dedupeCategoriesForDisplay, getCategoryDraft } from '../display/categoriesPage.js';
 import { useUnsavedChangesWarning } from '../display/unsavedChangesWarning.js';

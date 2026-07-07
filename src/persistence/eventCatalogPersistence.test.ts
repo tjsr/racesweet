@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.js';
-import { EventCatalogService } from './eventCatalogService.js';
-import { createDefaultEventCatalogLedger } from './eventCatalog.js';
+import { ElectronJsonEventCatalogPersistence } from '../persistence/eventCatalogPersistence.js';
+import { EventCatalogService } from '../service/eventCatalogService.js';
+import { createDefaultEventCatalogLedger } from '../ledger/eventCatalogLedger.js';
 import { createEventId, createId } from '../model/ids.js';
 import { useStderrGuard } from '../testing/stderrGuard.js';
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import * as ReactDomClient from 'react-dom/client';
-import * as EventCatalog from '../../app/eventCatalog.js';
+import * as EventCatalog from '../../catalog/eventCatalog.js';
 import * as SystemConfig from '../../app/systemConfig.js';
 
 import React, { act } from 'react';

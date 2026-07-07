@@ -4,7 +4,7 @@ import React from 'react';
 import { flushSync } from 'react-dom';
 import { type Root, createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { type EventCatalogEntrant } from '../../app/eventCatalog.js';
+import { type EventCatalogEntrant } from '../../catalog/eventCatalog.js';
 import { type EventEntrantId } from '../../model/entrant.js';
 import { EntrantDetailsPanel, type EntrantDraft } from './entrantDetailsPanel.js';
 

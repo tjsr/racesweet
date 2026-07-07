@@ -12,8 +12,8 @@ import {
     normalizeSystemConfiguration,
     normalizeSystemDirectoryPath,
     shouldRenameApicalSourceForFetchedEvent,
-} from './systemConfig.js';
-import type { SystemConfigPersistence } from './systemConfigPersistence.js';
+} from '../app/systemConfig.js';
+import type { SystemConfigPersistence } from '../persistence/systemConfigPersistence.js';
 
 interface SystemConfigServiceOptions {
   onPersistedConfig?: (config: SystemConfiguration) => Promise<void>;

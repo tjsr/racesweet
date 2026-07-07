@@ -1,5 +1,5 @@
 import React from 'react';
-import { type EventCatalogEntrant } from '../app/eventCatalog.js';
+import { type EventCatalogEntrant } from '../catalog/eventCatalog.js';
 
 interface EntrantListCartProps {
   categoryName?: string;

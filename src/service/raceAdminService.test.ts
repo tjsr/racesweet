@@ -2,12 +2,12 @@ import {
   type AdministrativeChanges,
   type RaceAdminPersistence,
   createDefaultAdministrativeChanges,
-} from './raceAdminPersistence.js';
+} from '../persistence/raceAdminPersistence.js';
 import type { EventCategoryId } from '../model/eventcategory.js';
 import type { EventEntrantId } from '../model/entrant.js';
 import type { SessionId } from '../model/raceevent.js';
 import type { EventTimeRecord, TimeRecordId } from '../model/timerecord.js';
-import { RaceAdminService } from './raceAdminService.js';
+import { RaceAdminService } from '../service/raceAdminService.js';
 
 const createSessionDouble = () => {
   const addedRecords: EventTimeRecord[] = [];

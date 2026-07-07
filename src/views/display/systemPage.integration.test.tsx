@@ -225,7 +225,7 @@ describe('SystemPage integration', () => {
     const displayedErrorLog = [
       '[2026-06-23T01:02:03.004Z] Application',
       'Error: Catalog ledger could not be written',
-      '    at mapped (webpack://racesweet/./src/app/eventCatalogPersistence.ts:84:7)',
+      '    at mapped (webpack://racesweet/./src/persistence/eventCatalogPersistence.ts:84:7)',
     ].join('\n');
 
     await act(async () => {

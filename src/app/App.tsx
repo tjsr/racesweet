@@ -26,19 +26,19 @@ import { type UnsavedChangesGuard } from '../views/display/unsavedChangesWarning
 import { LoadingProgress } from '../views/panels/LoadingProgress.tsx';
 import { PulledApicalRaceState, createApicalCatalogEventId, createApicalCatalogSessionId, fetchApicalRaceStateNow, getConfiguredApicalEventId, pullApicalRaceState } from './apicalDataSource.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
-import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from './eventCatalog.ts';
-import { ElectronJsonEventCatalogPersistence } from './eventCatalogPersistence.ts';
-import { EventCatalogService } from './eventCatalogService.ts';
+import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from '../catalog/eventCatalog.ts';
+import { ElectronJsonEventCatalogPersistence } from '../persistence/eventCatalogPersistence.ts';
+import { EventCatalogService } from '../service/eventCatalogService.ts';
 import './index.css';
-import { ElectronJsonRaceAdminPersistence } from './raceAdminPersistence.ts';
-import { RaceAdminService } from './raceAdminService.ts';
+import { ElectronJsonRaceAdminPersistence } from '../persistence/raceAdminPersistence.ts';
+import { RaceAdminService } from '../service/raceAdminService.ts';
 import { selectedCategoriesForParticipants } from './selectionState.ts';
-import { type SessionSourceReloadMode, type SessionSourceReloadSummary, addSessionSourceReloadSummaries, createEmptySessionSourceReloadSummary, isMissingLinkedCategoryPlaceholder, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload } from './sessionSourceReload.ts';
-import { applyPulledRaceStateToSession } from './sourceApplication.ts';
+import { type SessionSourceReloadMode, type SessionSourceReloadSummary, addSessionSourceReloadSummaries, createEmptySessionSourceReloadSummary, isMissingLinkedCategoryPlaceholder, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload } from '../service/sessionSourceReload.ts';
+import { applyPulledRaceStateToSession } from '../service/sourceApplication.ts';
 import { formatErrorForDisplay } from './stackTrace.ts';
 import { type DataSourceConfig, type EventTimeDisplayZoneMode, type SystemConfiguration, createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
-import { ElectronJsonSystemConfigPersistence } from './systemConfigPersistence.ts';
-import { SystemConfigService } from './systemConfigService.ts';
+import { ElectronJsonSystemConfigPersistence } from '../persistence/systemConfigPersistence.ts';
+import { SystemConfigService } from '../service/systemConfigService.ts';
 import { getSystemTimeZone } from './utils/timeutils.ts';
 import { type EventSessionOption } from './views/results/resultsPage.tsx';
 

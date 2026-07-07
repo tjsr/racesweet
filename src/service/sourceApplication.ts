@@ -6,8 +6,8 @@ import type { EventTeam } from '../model/eventteam.js';
 import { rewriteImportedObjectIds } from '../model/ids.js';
 import type { RaceState } from '../model/racestate.js';
 import type { TimeRecord } from '../model/timerecord.js';
-import type { EventCatalogEntrant, EventCatalogEvent, EventCatalogSession, EventCatalogState } from './eventCatalog.js';
-import { addMissingLinkedCategoryPlaceholders } from './sessionSourceReload.js';
+import type { EventCatalogEntrant, EventCatalogEvent, EventCatalogSession, EventCatalogState } from '../catalog/eventCatalog.js';
+import { addMissingLinkedCategoryPlaceholders } from '../service/sessionSourceReload.js';
 
 interface SessionSourceSink {
   addCategories(categories: EventCategory[]): Promise<unknown>;

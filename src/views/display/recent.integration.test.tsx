@@ -3,9 +3,9 @@
 import React, { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import { updateCategorySelectionsForChangedParticipant } from '../../app/categoryChangeState.js';
-import { applyPulledRaceStateToSession } from '../../app/sourceApplication.js';
-import { type AdministrativeChanges, type RaceAdminPersistence, createDefaultAdministrativeChanges } from '../../app/raceAdminPersistence.js';
-import { RaceAdminService } from '../../app/raceAdminService.js';
+import { applyPulledRaceStateToSession } from '../../service/sourceApplication.js';
+import { type AdministrativeChanges, type RaceAdminPersistence, createDefaultAdministrativeChanges } from '../../persistence/raceAdminPersistence.js';
+import { RaceAdminService } from '../../service/raceAdminService.js';
 import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
 import { createGreenFlagEvent } from '../../controllers/flag.js';
 import type { EventCategory } from '../../model/eventcategory.js';

@@ -2,7 +2,7 @@ import type {
   CategoryDistanceRule,
   CategorySessionAssignment,
   CategoryTeamCompositionRule,
-} from './eventCatalog.js';
+} from '../catalog/eventCatalog.js';
 
 const timePattern = /^\d+(:[0-5]\d)?$/;
 

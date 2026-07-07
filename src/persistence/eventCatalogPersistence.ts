@@ -1,13 +1,13 @@
+import { RendererApiUnavailableError, getRendererApi } from '../app/rendererApi.js';
 import {
-  type SystemConfiguration,
-  createDefaultSystemConfiguration,
-  normalizeSystemConfiguration,
-} from './systemConfig.js';
-import { RendererApiUnavailableError, getRendererApi } from './rendererApi.js';
+  type EventCatalogLedger,
+  createDefaultEventCatalogLedger,
+} from '../ledger/eventCatalogLedger.js';
+import { rewriteImportedObjectIds } from '../model/ids.js';
 
-export interface SystemConfigPersistence {
-  load(): Promise<SystemConfiguration>;
-  save(config: SystemConfiguration): Promise<void>;
+export interface EventCatalogPersistence {
+  load(): Promise<EventCatalogLedger>;
+  save(ledger: EventCatalogLedger): Promise<void>;
 }
 
 const isFileNotFoundError = (error: unknown): boolean => {
@@ -51,7 +51,7 @@ const reportRecoverableWarning = (
   console.warn(warning);
 };
 
-export class ElectronJsonSystemConfigPersistence implements SystemConfigPersistence {
+export class ElectronJsonEventCatalogPersistence implements EventCatalogPersistence {
   private readonly filePath: string;
   private readonly onError: ((error: unknown) => void) | undefined;
 
@@ -60,33 +60,39 @@ export class ElectronJsonSystemConfigPersistence implements SystemConfigPersiste
     this.onError = onError;
   }
 
-  public async load(): Promise<SystemConfiguration> {
+  public async load(): Promise<EventCatalogLedger> {
     try {
       const api = getRendererApi(['requestFileContent']);
       const content = await api.requestFileContent<string>(this.filePath, 'utf8');
-      const parsed = JSON.parse(content) as Partial<SystemConfiguration>;
+      const parsed = JSON.parse(content) as Partial<EventCatalogLedger>;
+      const mappedParsedData = rewriteImportedObjectIds(parsed).value;
 
-      return normalizeSystemConfiguration(parsed);
+      return {
+        ...createDefaultEventCatalogLedger(),
+        ...mappedParsedData,
+        mutations: mappedParsedData.mutations || [],
+        schemaVersion: 1,
+      };
     } catch (error: unknown) {
       if (error instanceof RendererApiUnavailableError) {
         throw error;
       }
       if (isFileNotFoundError(error)) {
-        console.info(`System config file not found at ${this.filePath}, using defaults.`);
+        console.info(`Event catalog file not found at ${this.filePath}, using defaults.`);
       } else if (isPermissionDeniedError(error)) {
         const warning = createPermissionWarning(this.filePath, 'read');
         reportRecoverableWarning(this.onError, warning);
       } else {
-        reportRecoverableError(this.onError, `Failed to load system config from ${this.filePath}:`, error);
+        reportRecoverableError(this.onError, `Failed to load event catalog from ${this.filePath}:`, error);
       }
-      return createDefaultSystemConfiguration();
+      return createDefaultEventCatalogLedger();
     }
   }
 
-  public async save(config: SystemConfiguration): Promise<void> {
+  public async save(ledger: EventCatalogLedger): Promise<void> {
     try {
       const api = getRendererApi(['writeFileContent']);
-      await api.writeFileContent(this.filePath, JSON.stringify(config, null, 2));
+      await api.writeFileContent(this.filePath, JSON.stringify(ledger, null, 2));
     } catch (error: unknown) {
       if (isPermissionDeniedError(error)) {
         const warning = createPermissionWarning(this.filePath, 'write');
