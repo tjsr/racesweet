@@ -7,9 +7,9 @@ import { createCategoryId, createEventEntrantId, createEventId, createEventParti
 import type { EventId, SessionId } from '../../model/raceevent.js';
 import type { RaceState } from '../../model/racestate.js';
 import { EVENT_FLAG_DISPLAYED, RECORD_TX_CROSSING, type EventTimeRecord, type ParticipantPassingRecord } from '../../model/timerecord.js';
-import { parseCtcRawCrossingFile, type CtcRawCrossingRecord } from '../ctc/rawCrossing.js';
-import { readMrScatsDbfTable, type MrScatsDbfRecord } from './dbf.js';
-import { readMrScatsZipEntryBuffers } from './fileInventory.js';
+import { parseCtcRawCrossingLine, splitCtcRawCrossingLines, type CtcRawCrossingRecord } from '../ctc/rawCrossing.js';
+import { readMrScatsDbfTable, readMrScatsDbfTableAsync, type MrScatsDbfRecord } from './dbf.js';
+import { parseMrScatsDbfSummary, readMrScatsZipEntryBuffers } from './fileInventory.js';
 
 export interface MrScatsImportedSession {
   categoryIds: string[];
@@ -31,12 +31,48 @@ export interface MrScatsCatalogImport {
 interface MrScatsCoreTables {
   buffers: Map<string, Buffer>;
   drivers: MrScatsDbfRecord[];
+  loadPlan: MrScatsLoadPlan;
   programme: MrScatsDbfRecord[];
+  progress?: MrScatsLoadProgressTracker;
 }
 
 interface CoreTableSource {
   fileName: string;
   records: MrScatsDbfRecord[];
+}
+
+export interface MrScatsCatalogLoadProgress {
+  callerName?: string;
+  completed: number;
+  currentFile?: string;
+  currentTask?: string;
+  total: number;
+}
+
+interface MrScatsCatalogLoadOptions {
+  extraSteps?: number;
+  onProgress?: (progress: MrScatsCatalogLoadProgress) => void | Promise<void>;
+}
+
+interface MrScatsLoadProgressTracker {
+  completeFileScan: (fileName: string, callerName: string) => Promise<void>;
+  completeRow: (fileName: string, callerName: string) => Promise<void>;
+}
+
+interface MrScatsSessionLoadPlan {
+  dbfFileNames: string[];
+  rawLinesByFileName: Map<string, string[]>;
+}
+
+interface MrScatsLoadPlan {
+  coreFileCount: number;
+  coreRowCount: number;
+  drivers: CoreTableSource;
+  programme: CoreTableSource;
+  sessionPlansById: Map<string, MrScatsSessionLoadPlan>;
+  sessionFileCount: number;
+  sessionRowCount: number;
+  total: number;
 }
 
 const DEFAULT_TIME_ZONE = 'Australia/Sydney';
@@ -54,6 +90,34 @@ const CROSSING_PLATE_FIELDS = ['CARNUMBER', 'CAR', 'CAR_NO', 'CARNO'];
 const CROSSING_GREEN_ELAPSED_FIELDS = ['GREENELAPS', 'GREEN_ELAP', 'STARTELAP', 'START_ELAP', 'STARTELPSD'];
 const CROSSING_GREEN_FLAG_FIELDS = ['FLAG', 'SYNCMARK', 'STARTFIN'];
 const RAW_CROSSING_EXTENSIONS = ['.SRT', '.ERF', '.AT1', '.AT2'];
+
+const createProgressTracker = (total: number, onProgress: MrScatsCatalogLoadOptions['onProgress']): MrScatsLoadProgressTracker => {
+  let completed = 0;
+  const fixedTotal = Math.max(1, total);
+
+  const emit = async (currentFile: string | undefined, callerName: string): Promise<void> => {
+    await onProgress?.({
+      callerName,
+      completed,
+      currentFile,
+      currentTask: currentFile ? `Processing ${currentFile}` : 'Processing MR-SCATS import',
+      total: fixedTotal,
+    });
+  };
+
+  void emit(undefined, 'createProgressTracker');
+
+  return {
+    completeFileScan: async (fileName, callerName) => {
+      completed += 1;
+      await emit(fileName, callerName);
+    },
+    completeRow: async (fileName, callerName) => {
+      completed += 1;
+      await emit(fileName, callerName);
+    },
+  };
+};
 
 const asString = (value: unknown): string => value === undefined || value === null ? '' : String(value).trim();
 
@@ -139,7 +203,11 @@ const readCoreTableBuffersFromZip = async (locationPath: string): Promise<Map<st
   return archiveEntries;
 };
 
-const readCoreTableSource = (buffers: Map<string, Buffer>, baseNames: string[], label: string): CoreTableSource => {
+const readCoreTableSource = (
+  buffers: Map<string, Buffer>,
+  baseNames: string[],
+  label: string
+): CoreTableSource => {
   const candidates = findCoreTableFileNames(Array.from(buffers.keys()), baseNames);
   const errors: string[] = [];
 
@@ -161,7 +229,21 @@ const readCoreTableSource = (buffers: Map<string, Buffer>, baseNames: string[], 
   throw new Error(`MR-SCATS ${label} table could not be read. Tried ${tried}. Found related files: ${related}.${errorDetails}`);
 };
 
-const readCoreTables = async (locationPath: string): Promise<MrScatsCoreTables> => {
+const readPlannedCoreTableSource = async (
+  buffers: Map<string, Buffer>,
+  plannedSource: CoreTableSource,
+  progress: MrScatsLoadProgressTracker
+): Promise<CoreTableSource> => {
+  await progress.completeFileScan(plannedSource.fileName, 'readPlannedCoreTableSource');
+  return {
+    fileName: plannedSource.fileName,
+    records: (await readMrScatsDbfTableAsync(buffers.get(plannedSource.fileName)!, {
+      onRecordRead: () => progress.completeRow(plannedSource.fileName, 'readPlannedCoreTableSource'),
+    })).records,
+  };
+};
+
+const readCoreTables = async (locationPath: string, options: MrScatsCatalogLoadOptions = {}): Promise<MrScatsCoreTables> => {
   const locationStat = await stat(locationPath);
   const buffers = locationStat.isDirectory()
     ? await readCoreTableBuffersFromDirectory(locationPath)
@@ -170,14 +252,17 @@ const readCoreTables = async (locationPath: string): Promise<MrScatsCoreTables> 
       : (() => {
         throw new Error('MR-SCATS event loading currently supports directories and ZIP archives.');
       })();
-
-  const programme = readCoreTableSource(buffers, PROGRAMME_BASE_NAMES, 'programme');
-  const drivers = readCoreTableSource(buffers, DRIVER_BASE_NAMES, 'driver');
+  const loadPlan = createLoadPlan(buffers, locationPath, options.extraSteps || 0);
+  const progress = createProgressTracker(loadPlan.total, options.onProgress);
+  const programme = await readPlannedCoreTableSource(buffers, loadPlan.programme, progress);
+  const drivers = await readPlannedCoreTableSource(buffers, loadPlan.drivers, progress);
 
   return {
     buffers,
     drivers: drivers.records,
+    loadPlan,
     programme: programme.records,
+    progress,
   };
 };
 
@@ -409,6 +494,55 @@ const inferSessionCategoryIds = (
   }));
 };
 
+const createLoadPlan = (buffers: Map<string, Buffer>, locationPath: string, extraSteps: number): MrScatsLoadPlan => {
+  const programme = readCoreTableSource(buffers, PROGRAMME_BASE_NAMES, 'programme');
+  const drivers = readCoreTableSource(buffers, DRIVER_BASE_NAMES, 'driver');
+  const meetingCode = getMeetingCode(programme.records, locationPath);
+  const categories = buildCategories(meetingCode, programme.records, drivers.records);
+  const categoryIdByName = new Map(categories.map((category) => [category.name, category.id]));
+  const participants = buildParticipants(meetingCode, drivers.records, categoryIdByName);
+  const sessions = inferSessionCategoryIds(buffers, buildSessions(meetingCode, programme.records, categoryIdByName), participants);
+  const sessionPlansById = new Map<string, MrScatsSessionLoadPlan>();
+  let sessionFileCount = 0;
+  let sessionRowCount = 0;
+
+  for (const session of sessions) {
+    const dbfFileNames = findSessionDbfCrossingFileNames(buffers, session);
+    const rawFileNames = findSessionRawCrossingFileNames(buffers, session);
+    const rawLinesByFileName = new Map<string, string[]>();
+
+    sessionFileCount += dbfFileNames.length + rawFileNames.length;
+    for (const fileName of dbfFileNames) {
+      const summary = parseMrScatsDbfSummary(buffers.get(fileName)!);
+      sessionRowCount += summary?.recordCount || 0;
+    }
+    for (const fileName of rawFileNames) {
+      const rawLines = splitCtcRawCrossingLines(buffers.get(fileName)!);
+      rawLinesByFileName.set(fileName, rawLines);
+      sessionRowCount += rawLines.length;
+    }
+
+    sessionPlansById.set(session.id.toString(), {
+      dbfFileNames,
+      rawLinesByFileName,
+    });
+  }
+
+  const coreFileCount = 2;
+  const coreRowCount = programme.records.length + drivers.records.length;
+
+  return {
+    coreFileCount,
+    coreRowCount,
+    drivers,
+    programme,
+    sessionFileCount,
+    sessionPlansById,
+    sessionRowCount,
+    total: Math.max(1, coreFileCount + coreRowCount + sessionFileCount + sessionRowCount + extraSteps),
+  };
+};
+
 const getElapsedMilliseconds = (record: MrScatsDbfRecord): number | undefined => {
   const elapsedTicks = getFirstNumber(record, CROSSING_ELAPSED_FIELDS);
   if (elapsedTicks === undefined) {
@@ -595,28 +729,43 @@ const createRawCrossingRecord = (
   } as ParticipantPassingRecord & { chipCode: number };
 };
 
-const buildSessionRecords = (
+const buildSessionRecords = async (
   meetingCode: string,
   buffers: Map<string, Buffer>,
   sessions: MrScatsImportedSession[],
-  participants: EventParticipant[]
-): EventTimeRecord[] => {
+  participants: EventParticipant[],
+  loadPlan: MrScatsLoadPlan,
+  progress?: MrScatsLoadProgressTracker
+): Promise<EventTimeRecord[]> => {
   const participantsByPlate = buildParticipantsByPlate(participants);
+  const sessionRecords: EventTimeRecord[] = [];
 
-  return sessions.flatMap((session): EventTimeRecord[] => {
+  for (const session of sessions) {
     const source = createTimeRecordSourceId(`mr-scats:${meetingCode}:source:${session.eventCode}`);
     const scheduledStartTime = new Date(session.scheduledStart);
-    const sessionFileNames = findSessionDbfCrossingFileNames(buffers, session);
-    const sessionFileTables = sessionFileNames.flatMap((fileName) => {
+    const sessionPlan = loadPlan.sessionPlansById.get(session.id.toString()) || {
+      dbfFileNames: [],
+      rawLinesByFileName: new Map<string, string[]>(),
+    };
+    const sessionFileTables: CoreTableSource[] = [];
+    let length = sessionPlan.rawLinesByFileName.size;
+    for (const fileName of sessionPlan.dbfFileNames) {
+      let completedFileScan = false;
       try {
-        return [{
+        await progress?.completeFileScan(fileName, 'buildSessionRecords[scan]');
+        completedFileScan = true;
+        sessionFileTables.push({
           fileName,
-          records: readMrScatsDbfTable(buffers.get(fileName)!).records,
-        }];
+          records: (await readMrScatsDbfTableAsync(buffers.get(fileName)!, {
+            onRecordRead: (rowNumber: number) => progress?.completeRow(fileName, `buildSessionRecords[onRecordRead:${rowNumber}]`),
+          })).records,
+        });
       } catch (_error) {
-        return [];
+        if (!completedFileScan) {
+          await progress?.completeFileScan(fileName, 'buildSessionRecords[error]');
+        }
       }
-    });
+    }
     const crossingRows = sessionFileTables.flatMap((table) => table.records);
     const greenElapsedMilliseconds = getGreenElapsedMilliseconds(crossingRows);
     const sessionElapsedZeroTime = new Date(scheduledStartTime.getTime() - greenElapsedMilliseconds);
@@ -633,13 +782,26 @@ const buildSessionRecords = (
         participantsByPlate
       ))
       .filter((record): record is EventTimeRecord => record !== undefined));
-    const rawCrossingRecords = findSessionRawCrossingFileNames(buffers, session).flatMap((fileName, fileIndex): EventTimeRecord[] => {
+    const rawCrossingRecords: EventTimeRecord[] = [];
+    const rawFileNames = Array.from(sessionPlan.rawLinesByFileName.keys());
+    for (const [fileIndex, fileName] of rawFileNames.entries()) {
       const buffer = buffers.get(fileName);
       if (!buffer) {
-        return [];
+        continue;
       }
 
-      return parseCtcRawCrossingFile(buffer)
+      const rawLines = sessionPlan.rawLinesByFileName.get(fileName) || [];
+      await progress?.completeFileScan(fileName, 'buildSessionRecords');
+      const rawRecords: CtcRawCrossingRecord[] = [];
+      for (const [rowIndex, line] of rawLines.entries()) {
+        const record = parseCtcRawCrossingLine(line, rowIndex + 1);
+        await progress?.completeRow(fileName, 'buildSessionRecords');
+        if (record) {
+          rawRecords.push(record);
+        }
+      }
+
+      rawCrossingRecords.push(...rawRecords
         .map((record, rowIndex) => createRawCrossingRecord(
           meetingCode,
           session,
@@ -650,8 +812,8 @@ const buildSessionRecords = (
           sessionFileTables.reduce((total, table) => total + table.records.length, 0) + (fileIndex * 100000) + rowIndex + 2,
           participantsByPlate
         ))
-        .filter((record): record is EventTimeRecord => record !== undefined);
-    });
+        .filter((record): record is EventTimeRecord => record !== undefined));
+    }
     const crossingRecords = [...dbfCrossingRecords, ...rawCrossingRecords]
       .sort((left, right) => (left.time?.getTime() || 0) - (right.time?.getTime() || 0))
       .map((record, index): EventTimeRecord => ({
@@ -660,14 +822,16 @@ const buildSessionRecords = (
       }));
 
     if (crossingRecords.length === 0) {
-      return [];
+      continue;
     }
 
-    return [
+    sessionRecords.push(
       createSessionGreenFlag(meetingCode, session, source, scheduledStartTime, 1),
       ...crossingRecords,
-    ];
-  });
+    );
+  }
+
+  return sessionRecords;
 };
 
 const splitDriverName = (name: string): { firstname: string; surname: string } => {
@@ -742,14 +906,17 @@ const getEventDate = (programme: MrScatsDbfRecord[]): string => {
   return programme.map((row) => parseDate(row.STARTDATE)).find((date): date is string => !!date) || FALLBACK_EVENT_DATE;
 };
 
-export const loadMrScatsCatalogFromLocation = async (locationPath: string): Promise<MrScatsCatalogImport> => {
-  const { buffers, drivers, programme } = await readCoreTables(locationPath);
+export const loadMrScatsCatalogFromLocation = async (
+  locationPath: string,
+  options: MrScatsCatalogLoadOptions = {}
+): Promise<MrScatsCatalogImport> => {
+  const { buffers, drivers, loadPlan, programme, progress } = await readCoreTables(locationPath, options);
   const meetingCode = getMeetingCode(programme, locationPath);
   const categories = buildCategories(meetingCode, programme, drivers);
   const categoryIdByName = new Map(categories.map((category) => [category.name, category.id]));
   const participants = buildParticipants(meetingCode, drivers, categoryIdByName);
   const sessions = inferSessionCategoryIds(buffers, buildSessions(meetingCode, programme, categoryIdByName), participants);
-  const records = buildSessionRecords(meetingCode, buffers, sessions, participants);
+  const records = await buildSessionRecords(meetingCode, buffers, sessions, participants, loadPlan, progress);
   const eventDate = getEventDate(programme);
 
   return {

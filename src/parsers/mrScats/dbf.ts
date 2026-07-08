@@ -15,6 +15,7 @@ export interface MrScatsDbfTable {
 
 interface ReadMrScatsDbfTableOptions {
   maxRecords?: number;
+  onRecordRead?: (recordNumber: number) => void | Promise<void>;
 }
 
 const parseNumeric = (value: string): number | undefined => {
@@ -50,14 +51,14 @@ const parseFieldValue = (rawValue: string, field: DbfFieldLayout): string | numb
   }
 };
 
-export const readMrScatsDbfTable = (buffer: Buffer, options: ReadMrScatsDbfTableOptions = {}): MrScatsDbfTable => {
+const getDbfFieldLayouts = (buffer: Buffer): DbfFieldLayout[] => {
   const summary = parseMrScatsDbfSummary(buffer);
   if (!summary) {
     throw new Error('MR-SCATS file does not have a readable DBF header.');
   }
 
   let fieldOffset = 1;
-  const fields: DbfFieldLayout[] = summary.fields.map((field) => {
+  return summary.fields.map((field) => {
     const layout = {
       length: field.length,
       name: field.name,
@@ -67,6 +68,15 @@ export const readMrScatsDbfTable = (buffer: Buffer, options: ReadMrScatsDbfTable
     fieldOffset += field.length;
     return layout;
   });
+};
+
+export const readMrScatsDbfTable = (buffer: Buffer, options: ReadMrScatsDbfTableOptions = {}): MrScatsDbfTable => {
+  const summary = parseMrScatsDbfSummary(buffer);
+  if (!summary) {
+    throw new Error('MR-SCATS file does not have a readable DBF header.');
+  }
+
+  const fields = getDbfFieldLayouts(buffer);
 
   const maxRecords = options.maxRecords === undefined ? summary.recordCount : Math.min(summary.recordCount, options.maxRecords);
   const records = Array.from({ length: maxRecords }, (_, index): MrScatsDbfRecord | undefined => {
@@ -74,15 +84,50 @@ export const readMrScatsDbfTable = (buffer: Buffer, options: ReadMrScatsDbfTable
     if (recordOffset + summary.recordLength > buffer.length) {
       return undefined;
     }
+    options.onRecordRead?.(index + 1);
     if (buffer[recordOffset] === 0x2a) {
       return undefined;
     }
 
-    return Object.fromEntries(fields.map((field) => {
+    const record = Object.fromEntries(fields.map((field) => {
       const rawValue = buffer.subarray(recordOffset + field.offset, recordOffset + field.offset + field.length).toString('latin1');
       return [field.name, parseFieldValue(rawValue, field)];
     }));
+    return record;
   }).filter((record): record is MrScatsDbfRecord => record !== undefined);
+
+  return { records };
+};
+
+export const readMrScatsDbfTableAsync = async (
+  buffer: Buffer,
+  options: ReadMrScatsDbfTableOptions = {}
+): Promise<MrScatsDbfTable> => {
+  const summary = parseMrScatsDbfSummary(buffer);
+  if (!summary) {
+    throw new Error('MR-SCATS file does not have a readable DBF header.');
+  }
+
+  const fields = getDbfFieldLayouts(buffer);
+  const maxRecords = options.maxRecords === undefined ? summary.recordCount : Math.min(summary.recordCount, options.maxRecords);
+  const records: MrScatsDbfRecord[] = [];
+
+  for (let index = 0; index < maxRecords; index += 1) {
+    const recordOffset = summary.headerLength + (index * summary.recordLength);
+    if (recordOffset + summary.recordLength > buffer.length) {
+      continue;
+    }
+
+    await options.onRecordRead?.(index + 1);
+    if (buffer[recordOffset] === 0x2a) {
+      continue;
+    }
+
+    records.push(Object.fromEntries(fields.map((field) => {
+      const rawValue = buffer.subarray(recordOffset + field.offset, recordOffset + field.offset + field.length).toString('latin1');
+      return [field.name, parseFieldValue(rawValue, field)];
+    })));
+  }
 
   return { records };
 };

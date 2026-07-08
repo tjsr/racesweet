@@ -284,6 +284,56 @@ describe('MR-SCATS catalog import parser', () => {
     }));
   });
 
+  it('reports load progress for parsed files and rows', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 5, name: 'STARTTIME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+    ], [
+      { CATEGORY: 'CAT-A', EVENTNAME: 'Race 1', EV_CODE: 'W9721R01', STARTDATE: '19970629', STARTTIME: '09:00' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 42, DRIVER: 'Alice Rider', DRIV_CLASS: 'CAT-A', TXNUM: 1001 },
+    ]));
+    await writeFile(path.join(tempDir, 'W9721R01.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'ELAPSED', type: 'N' },
+      { length: 4, name: 'COUNTER', type: 'N' },
+    ], [
+      { CARNUMBER: 42, COUNTER: 1, ELAPSED: 10000, TXNUM: 1001 },
+      { CARNUMBER: 42, COUNTER: 2, ELAPSED: 25000, TXNUM: 1001 },
+    ]));
+    const progressEvents: Array<{ callerName?: string; completed: number; total: number }> = [];
+
+    await loadMrScatsCatalogFromLocation(tempDir, {
+      onProgress: (progress) => {
+        progressEvents.push({
+          callerName: progress.callerName,
+          completed: progress.completed,
+          total: progress.total,
+        });
+      },
+    });
+
+    expect(progressEvents.length).toBeGreaterThan(0);
+    expect(new Set(progressEvents.map((progress) => progress.total))).toEqual(new Set([7]));
+    expect(progressEvents[0]).toEqual({ callerName: 'createProgressTracker', completed: 0, total: 7 });
+    expect(progressEvents.at(-1)).toEqual({ callerName: 'buildSessionRecords', completed: 7, total: 7 });
+    expect(progressEvents.map((progress) => progress.callerName)).toEqual(expect.arrayContaining([
+      'buildSessionRecords',
+      'readPlannedCoreTableSource',
+    ]));
+  });
+
   it('imports TX zero crossings with car numbers as manual plate crossings', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
     await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([

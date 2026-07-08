@@ -8,6 +8,7 @@ import { type EventParticipantId } from '../../model/eventparticipant.js';
 import { EventId, SessionId } from '../../model/raceevent.js';
 import { type RaceStateLookup } from '../../model/racestate.js';
 import { type EventTimeRecord, type TimeRecordId } from '../../model/timerecord.js';
+import { InlineLoadingIndicator } from '../panels/InlineLoadingIndicator.js';
 
 type EventCatalogEvent = EventCatalogState['events'][number];
 type EventCatalogSession = EventCatalogState['sessions'][number];
@@ -66,11 +67,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
               ))}
             </select>
             {props.timingSelectionLoading ? (
-              <span
-                aria-label="Loading Timing event"
-                className="timing-selection-spinner"
-                role="status"
-              />
+              <InlineLoadingIndicator ariaLabel="Loading Timing event" />
             ) : null}
           </span>
         </label>
@@ -88,11 +85,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
               ))}
             </select>
             {props.timingSelectionLoading ? (
-              <span
-                aria-label="Loading Timing session"
-                className="timing-selection-spinner"
-                role="status"
-              />
+              <InlineLoadingIndicator ariaLabel="Loading Timing session" />
             ) : null}
           </span>
         </label>

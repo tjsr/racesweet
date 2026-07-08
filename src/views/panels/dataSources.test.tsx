@@ -157,7 +157,14 @@ describe('DataSourcesPanel', () => {
   });
 
   it('loads an MR-SCATS event from a selected data location', async () => {
-    const onLoadMrScatsEvent = vi.fn();
+    let resolveLoadEvent: (() => void) | undefined;
+    const loadEventPromise = new Promise<void>((resolve) => {
+      resolveLoadEvent = resolve;
+    });
+    const onLoadMrScatsEvent = vi.fn((_sourceId: string, onProgress?: (progress: { callerName?: string; completed: number; total: number }) => void) => {
+      onProgress?.({ callerName: 'mockLoadMrScatsEvent', completed: 2, total: 7 });
+      return loadEventPromise;
+    });
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -170,7 +177,22 @@ describe('DataSourcesPanel', () => {
               ...source,
               mrScatsConfig: {
                 dataLocationPath: 'C:/RaceTime/timing-data/W9721',
-                files: [],
+                files: [
+                  {
+                    dbf: {
+                      fields: [{ decimals: 0, length: 4, name: 'CARNUMBER', type: 'N' }],
+                      headerLength: 65,
+                      recordCount: 4,
+                      recordLength: 5,
+                      version: 3,
+                    },
+                    extension: '.dbf',
+                    kind: 'dbf-table' as const,
+                    name: 'W9721R01.DBF',
+                    relativePath: 'W9721R01.DBF',
+                    size: 85,
+                  },
+                ],
                 sourceKind: 'directory',
               },
             }
@@ -195,10 +217,37 @@ describe('DataSourcesPanel', () => {
     const loadEventButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Load event') as HTMLButtonElement | undefined;
     expect(loadEventButton).toBeDefined();
     expect(loadEventButton?.disabled).toBe(false);
-    loadEventButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await Promise.resolve();
+    flushSync(() => {
+      loadEventButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
 
-    expect(onLoadMrScatsEvent).toHaveBeenCalledWith('source-mr-scats');
+    expect(loadEventButton?.disabled).toBe(true);
+    const initialLoadEventIndicator = container.querySelector('[role="status"][aria-label="Loading MR-SCATS event"]');
+    expect(initialLoadEventIndicator).not.toBeNull();
+    expect(initialLoadEventIndicator?.textContent).not.toContain('/');
+    expect(initialLoadEventIndicator?.textContent).toContain('handleLoadEvent');
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    expect(onLoadMrScatsEvent).toHaveBeenCalledWith('source-mr-scats', expect.any(Function));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    const loadEventIndicator = container.querySelector('[role="status"][aria-label="Loading MR-SCATS event"]');
+    expect(loadEventIndicator).not.toBeNull();
+    expect(loadEventIndicator?.textContent).toContain('2/7');
+    expect(loadEventIndicator?.textContent).toContain('mockLoadMrScatsEvent');
+
+    resolveLoadEvent?.();
+    await loadEventPromise;
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    expect(container.querySelector('[role="status"][aria-label="Loading MR-SCATS event"]')).toBeNull();
   });
 
   it('opens an MR-SCATS file preview dialog from the file inventory table', async () => {

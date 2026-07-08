@@ -275,8 +275,15 @@
   gap: 0.45rem;
 }
 
-.timing-selection-spinner {
-  animation: timing-selection-spin 0.8s linear infinite;
+.inline-loading-indicator {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.inline-loading-indicator__spinner {
+  animation: inline-loading-spin 0.8s linear infinite;
   border: 2px solid rgba(0, 0, 0, 0.18);
   border-radius: 50%;
   border-top-color: var(--color-primary);
@@ -285,7 +292,23 @@
   width: 1rem;
 }
 
-@keyframes timing-selection-spin {
+.inline-loading-indicator__progress {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.inline-loading-indicator__status {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1;
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes inline-loading-spin {
   to {
     transform: rotate(360deg);
   }

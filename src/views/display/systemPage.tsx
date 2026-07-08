@@ -6,6 +6,7 @@ import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../par
 import type { MrScatsDataFilePreview } from '../../parsers/mrScats/filePreview.js';
 import { DataSourcesPanel } from '../panels/dataSources.js';
 import { FastestTimeIndicatorsPanel } from '../panels/fastestTimeIndicators.js';
+import type { InlineLoadingProgress } from '../panels/InlineLoadingIndicator.js';
 import { LocalStorageLocationPanel } from '../panels/localStorageLocation.js';
 import { LogPanel } from '../panels/log.js';
 import { RuntimeInformationPanel } from '../panels/runtimeInformation.js';
@@ -19,7 +20,7 @@ interface SystemPageProps {
   onFetchApicalDataNow: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: TimeRecordSourceId) => void | Promise<void>;
-  onLoadMrScatsEvent?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
+  onLoadMrScatsEvent?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
   onReprocessApicalData: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onPreviewMrScatsDataFile?: (sourceId: TimeRecordSourceId, file: MrScatsDataFileSummary) => Promise<MrScatsDataFilePreview>;
   onSaveFastestTimeIndicatorColors?: (changes: Partial<SystemConfiguration['fastestTimeIndicatorColors']>) => void | Promise<void>;

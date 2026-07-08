@@ -5,6 +5,7 @@ import { TimeRecordSourceId } from '../../model/types.js';
 import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
 import type { MrScatsDataFilePreview } from '../../parsers/mrScats/filePreview.js';
 import { DataSourceTypesPanel } from './dataSourceTypes.js';
+import type { InlineLoadingProgress } from './InlineLoadingIndicator.js';
 import { MrScatsDataSourcePanel } from './mrScatsDataSourcePanel.js';
 
 interface DataSourcesPanelProps {
@@ -14,7 +15,7 @@ interface DataSourcesPanelProps {
   onDisplayError?: (source: string, error: unknown) => void;
   onFetchApicalDataNow: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: TimeRecordSourceId) => void | Promise<void>;
-  onLoadMrScatsEvent?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
+  onLoadMrScatsEvent?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
   onPreviewMrScatsDataFile?: (sourceId: TimeRecordSourceId, file: MrScatsDataFileSummary) => Promise<MrScatsDataFilePreview>;
   onReprocessApicalData: (sourceId: TimeRecordSourceId) => void | Promise<void>;

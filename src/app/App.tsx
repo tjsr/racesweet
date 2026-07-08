@@ -1,17 +1,26 @@
 import { Component, type ReactElement, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { validate as validateUuid } from 'uuid';
+import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from '../catalog/eventCatalog.ts';
 import { fetchApicalEvents } from '../controllers/apical/getResultListJson.ts';
 import { CategoryId } from '../controllers/category.ts';
+import { type LoadingMetricsState, getLoadingMetricsSnapshot, incrementLoadingMetric, resetLoadingMetrics, subscribeLoadingMetrics } from '../loadingMetrics.ts';
+import { type LoadingProgressState, completeLoadingProgressStage, createLoadingProgressState, updateLoadingProgressStage } from '../loadingProgress.ts';
 import { EventCategoryId } from '../model/eventcategory.ts';
 import { type EventParticipant, type EventParticipantId } from '../model/eventparticipant.ts';
 import { EventId, SessionId } from '../model/raceevent.ts';
 import { type RaceState, RaceStateLookup, Session } from '../model/racestate.ts';
 import { type EventTimeRecord, type TimeRecordId } from '../model/timerecord.ts';
-import { type LoadingMetricsState, getLoadingMetricsSnapshot, incrementLoadingMetric, resetLoadingMetrics, subscribeLoadingMetrics } from '../loadingMetrics.ts';
-import { type LoadingProgressState, completeLoadingProgressStage, createLoadingProgressState, updateLoadingProgressStage } from '../loadingProgress.ts';
-import { type MrScatsCatalogImport, loadMrScatsCatalogFromLocation } from '../parsers/mrScats/catalogImport.ts';
+import { type MrScatsCatalogImport, type MrScatsCatalogLoadProgress, loadMrScatsCatalogFromLocation } from '../parsers/mrScats/catalogImport.ts';
 import { listMrScatsDataFiles } from '../parsers/mrScats/fileInventory.ts';
 import { previewMrScatsDataFile } from '../parsers/mrScats/filePreview.ts';
+import { ElectronJsonEventCatalogPersistence } from '../persistence/eventCatalogPersistence.ts';
+import { ElectronJsonRaceAdminPersistence } from '../persistence/raceAdminPersistence.ts';
+import { ElectronJsonSystemConfigPersistence } from '../persistence/systemConfigPersistence.ts';
+import { EventCatalogService } from '../service/eventCatalogService.ts';
+import { RaceAdminService } from '../service/raceAdminService.ts';
+import { type SessionSourceReloadMode, type SessionSourceReloadSummary, addSessionSourceReloadSummaries, createEmptySessionSourceReloadSummary, isMissingLinkedCategoryPlaceholder, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload } from '../service/sessionSourceReload.ts';
+import { applyPulledRaceStateToSession, getMinimumLapTimeMillisecondsForSession } from '../service/sourceApplication.ts';
+import { SystemConfigService } from '../service/systemConfigService.ts';
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
 import { TestSession } from '../testdata/testsession.ts';
 import { CategoriesContext } from '../views/context/Categories.tsx';
@@ -27,19 +36,10 @@ import { type UnsavedChangesGuard } from '../views/display/unsavedChangesWarning
 import { LoadingProgress } from '../views/panels/LoadingProgress.tsx';
 import { PulledApicalRaceState, createApicalCatalogEventId, createApicalCatalogSessionId, fetchApicalRaceStateNow, getConfiguredApicalEventId, pullApicalRaceState } from './apicalDataSource.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
-import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from '../catalog/eventCatalog.ts';
-import { ElectronJsonEventCatalogPersistence } from '../persistence/eventCatalogPersistence.ts';
-import { EventCatalogService } from '../service/eventCatalogService.ts';
 import './index.css';
-import { ElectronJsonRaceAdminPersistence } from '../persistence/raceAdminPersistence.ts';
-import { RaceAdminService } from '../service/raceAdminService.ts';
 import { selectedCategoriesForParticipants } from './selectionState.ts';
-import { type SessionSourceReloadMode, type SessionSourceReloadSummary, addSessionSourceReloadSummaries, createEmptySessionSourceReloadSummary, isMissingLinkedCategoryPlaceholder, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload } from '../service/sessionSourceReload.ts';
-import { applyPulledRaceStateToSession, getMinimumLapTimeMillisecondsForSession } from '../service/sourceApplication.ts';
 import { formatErrorForDisplay } from './stackTrace.ts';
 import { type DataSourceConfig, type EventTimeDisplayZoneMode, type SystemConfiguration, createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
-import { ElectronJsonSystemConfigPersistence } from '../persistence/systemConfigPersistence.ts';
-import { SystemConfigService } from '../service/systemConfigService.ts';
 import { getSystemTimeZone } from './utils/timeutils.ts';
 import { type EventSessionOption } from './views/results/resultsPage.tsx';
 
@@ -1469,7 +1469,7 @@ export const RaceSweetMainApp = () => {
               .then((events) => systemConfigService.persistListedApicalEvents(sourceId, events))
               .then(updateSystemConfigState);
           }}
-          onLoadMrScatsEvent={(sourceId) => {
+          onLoadMrScatsEvent={(sourceId, onProgress) => {
             if (!eventCatalogService || !systemConfigService) {
               return;
             }
@@ -1480,11 +1480,38 @@ export const RaceSweetMainApp = () => {
               throw new Error('MR-SCATS data files location must be selected before loading the event.');
             }
 
-            return loadMrScatsCatalogFromLocation(locationPath)
+            const postParseStepCount = 5;
+            let latestProgress: MrScatsCatalogLoadProgress | undefined;
+            const publishProgress = async (progress: MrScatsCatalogLoadProgress): Promise<void> => {
+              latestProgress = progress;
+              await onProgress?.(progress);
+            };
+            const completeImportStep = async (currentTask: string, index: number): Promise<void> => {
+              if (!latestProgress) {
+                return;
+              }
+              latestProgress = {
+                ...latestProgress,
+                callerName: `completeImportStep:${index}`,
+                completed: Math.min(latestProgress.total, latestProgress.completed + 1),
+                currentFile: undefined,
+                currentTask,
+              };
+              await onProgress?.(latestProgress);
+            };
+
+            return loadMrScatsCatalogFromLocation(locationPath, {
+              extraSteps: postParseStepCount,
+              onProgress: publishProgress,
+            })
               .then(async (importData) => {
+                await completeImportStep('Summarising MR-SCATS import', 1);
                 const importSummary = summarizeMrScatsImport(importData);
+                await completeImportStep('Writing MR-SCATS event catalog', 2);
                 const catalog = await eventCatalogService.importMrScatsCatalog(importData);
+                await completeImportStep('Updating event display', 3);
                 updateEventCatalogState(catalog, importData.eventId, importData.sessions[0]?.id);
+                await completeImportStep('Assigning MR-SCATS source', 4);
                 let config = await systemConfigService.assignSourcesToEvent(importData.eventId, [sourceId]);
                 for (const session of importData.sessions) {
                   config = await systemConfigService.assignSourcesToSession(session.id, {
@@ -1492,6 +1519,7 @@ export const RaceSweetMainApp = () => {
                     sourceIds: [sourceId],
                   });
                 }
+                await completeImportStep('Showing MR-SCATS import summary', 5);
                 updateSystemConfigState(config);
                 setReloadSummary(importSummary);
               })
