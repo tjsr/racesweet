@@ -27,7 +27,7 @@ interface EventsScreenProps {
   onSelectSession: (sessionId: SessionId) => void;
   onMakeSessionActive: (eventId: EventId, sessionId: SessionId) => void | Promise<void>;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
-  onUpdateEvent: (eventId: EventId, changes: { date?: string; format?: EventCatalogEvent['format']; name?: string; timeZone?: string }) => void | Promise<void>;
+  onUpdateEvent: (eventId: EventId, changes: { date?: string; format?: EventCatalogEvent['format']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string }) => void | Promise<void>;
   selectedEventId?: EventId;
   selectedSessionId?: SessionId;
 }
@@ -35,14 +35,30 @@ interface EventsScreenProps {
 const getEventDraft = (event: EventCatalogEvent | undefined, systemTimeZone: string): {
   date: string;
   format: EventCatalogEvent['format'];
+  minimumLapTimeSeconds: string;
   name: string;
   timeZone: string;
 } => ({
   date: event?.date || '',
   format: event?.format || 'race-weekend',
+  minimumLapTimeSeconds: event?.minimumLapTimeMilliseconds == null
+    ? ''
+    : String(event.minimumLapTimeMilliseconds / 1000),
   name: event?.name || '',
   timeZone: event?.timeZone || systemTimeZone,
 });
+
+const parseMinimumLapTimeMilliseconds = (seconds: string): number | null => {
+  const trimmedValue = seconds.trim();
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const parsedValue = Number(trimmedValue);
+  return Number.isFinite(parsedValue) && parsedValue >= 0
+    ? Math.round(parsedValue * 1000)
+    : null;
+};
 
 export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
   const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId) ??
@@ -72,7 +88,13 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
       return true;
     }
 
-    await props.onUpdateEvent(selectedEvent.id, eventDraft);
+    await props.onUpdateEvent(selectedEvent.id, {
+      date: eventDraft.date,
+      format: eventDraft.format,
+      minimumLapTimeMilliseconds: parseMinimumLapTimeMilliseconds(eventDraft.minimumLapTimeSeconds),
+      name: eventDraft.name,
+      timeZone: eventDraft.timeZone,
+    });
     setSavedEventDraft(eventDraft);
     return true;
   };

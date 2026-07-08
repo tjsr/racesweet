@@ -27,7 +27,7 @@ export interface EventCreatedMutation extends EventCatalogMutationBase {
 }
 
 export interface EventUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogEvent, 'categoryIds' | 'date' | 'entrantIds' | 'format' | 'name' | 'sessionIds' | 'timeZone'>>;
+  changes: Partial<Pick<EventCatalogEvent, 'categoryIds' | 'date' | 'entrantIds' | 'format' | 'minimumLapTimeMilliseconds' | 'name' | 'sessionIds' | 'timeZone'>>;
   eventId: EventId;
   type: 'event-updated';
 }
@@ -48,7 +48,7 @@ export interface SessionCreatedMutation extends EventCatalogMutationBase {
 }
 
 export interface SessionUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'eventId' | 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>;
+  changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'eventId' | 'kind' | 'minimumLapTimeMilliseconds' | 'name' | 'notes' | 'scheduledStart' | 'status'>>;
   sessionId: SessionId;
   type: 'session-updated';
 }

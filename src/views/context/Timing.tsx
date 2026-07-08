@@ -44,6 +44,10 @@ interface TimingContextProps {
 }
 
 export const TimingContext = (props: TimingContextProps): React.ReactElement => {
+  const selectedTimingSession = props.timingSessionValue === 'active'
+    ? props.activeSession
+    : props.sessions.find((session) => session.id === props.timingSessionValue);
+
   return (
     <>
       <h1>Timing</h1>
@@ -85,6 +89,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
         raceStateLookup={props.raceState}
         selectedCategories={props.selectedCategories}
         selectedParticipants={props.selectedParticipants}
+        sessionKind={selectedTimingSession?.kind}
         sessionValidCategoryIds={props.timingSessionValidCategoryIds}
         categorySelected={props.categoryListSelected}
         timeDisplayZoneMode={props.timeDisplayZoneMode}

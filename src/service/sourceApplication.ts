@@ -7,7 +7,7 @@ import { rewriteImportedObjectIds } from '../model/ids.js';
 import type { RaceState } from '../model/racestate.js';
 import type { TimeRecord } from '../model/timerecord.js';
 import { incrementLoadingMetric } from '../loadingMetrics.js';
-import type { EventCatalogEntrant, EventCatalogEvent, EventCatalogSession, EventCatalogState } from '../catalog/eventCatalog.js';
+import type { EventCatalogEntrant, EventCatalogEvent, EventCatalogSession, EventCatalogState, EventSessionKind } from '../catalog/eventCatalog.js';
 import { addMissingLinkedCategoryPlaceholders } from '../service/sessionSourceReload.js';
 
 interface SessionSourceSink {
@@ -19,6 +19,8 @@ interface SessionSourceSink {
   categories: EventCategory[];
   endBulkProcess?(): Promise<void>;
   records: TimeRecord[];
+  setMinimumLapTimeMilliseconds?(minimumLapTimeMilliseconds: number | undefined): void;
+  setSessionKind?(sessionKind: EventSessionKind | undefined): void;
 }
 
 interface SessionSourceApplicationOptions {
@@ -26,6 +28,24 @@ interface SessionSourceApplicationOptions {
   eventId?: string;
   sessionId?: string;
 }
+
+export const getMinimumLapTimeMillisecondsForSession = (
+  catalog: EventCatalogState | undefined,
+  eventId: string | undefined,
+  sessionId: string | undefined
+): number | undefined => {
+  const session = catalog?.sessions.find((item) => item.id === sessionId);
+  const event = catalog?.events.find((item) => item.id === (eventId || session?.eventId));
+
+  return session?.minimumLapTimeMilliseconds ?? event?.minimumLapTimeMilliseconds ?? undefined;
+};
+
+export const getSessionKindForSession = (
+  catalog: EventCatalogState | undefined,
+  sessionId: string | undefined
+): EventSessionKind | undefined => {
+  return catalog?.sessions.find((item) => item.id === sessionId)?.kind;
+};
 
 interface EntrantCatalogMatch {
   entrant: EventCatalogEntrant;
@@ -324,6 +344,12 @@ export const applyPulledRaceStateToSession = async (
   ((normalizedRaceState.records as TimeRecord[]) || []).forEach((record) => incrementLoadingMetric('Normalize pulled record', record.id.toString()));
   const bulkStarted = await sessionState.beginBulkProcess?.() === true;
   try {
+    sessionState.setMinimumLapTimeMilliseconds?.(getMinimumLapTimeMillisecondsForSession(
+      options.catalog,
+      options.eventId,
+      options.sessionId
+    ));
+    sessionState.setSessionKind?.(getSessionKindForSession(options.catalog, options.sessionId));
     const categoriesToAdd = getCategoriesToAdd(
       sessionState.categories,
       normalizedRaceState.categories || []

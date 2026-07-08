@@ -29,24 +29,40 @@ interface SessionsPageProps {
   onSaveSessionAssignment: (sessionId: SessionId, mode: 'default' | 'specific', sourceIds: string[]) => void | Promise<void>;
   onSelectSession: (sessionId: SessionId) => void;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
-  onUpdateSession: (sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>) => void | Promise<void>;
+  onUpdateSession: (sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'kind' | 'minimumLapTimeMilliseconds' | 'name' | 'notes' | 'scheduledStart' | 'status'>>) => void | Promise<void>;
   selectedEventId?: EventId;
   selectedSessionId?: SessionId;
 }
 
 const getSessionDraft = (session: EventCatalogSession | undefined): {
   kind: EventCatalogSession['kind'];
+  minimumLapTimeSeconds: string;
   name: string;
   notes: string;
   scheduledStart: string;
   status: EventCatalogSession['status'];
 } => ({
   kind: session?.kind || 'practice',
+  minimumLapTimeSeconds: session?.minimumLapTimeMilliseconds == null
+    ? ''
+    : String(session.minimumLapTimeMilliseconds / 1000),
   name: session?.name || '',
   notes: session?.notes || '',
   scheduledStart: session?.scheduledStart || '',
   status: session?.status || 'draft',
 });
+
+const parseMinimumLapTimeMilliseconds = (seconds: string): number | null => {
+  const trimmedValue = seconds.trim();
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const parsedValue = Number(trimmedValue);
+  return Number.isFinite(parsedValue) && parsedValue >= 0
+    ? Math.round(parsedValue * 1000)
+    : null;
+};
 
 export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
   const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId) ??
@@ -78,7 +94,14 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
       return true;
     }
 
-    await props.onUpdateSession(selectedSession.id, sessionDraft);
+    await props.onUpdateSession(selectedSession.id, {
+      kind: sessionDraft.kind,
+      minimumLapTimeMilliseconds: parseMinimumLapTimeMilliseconds(sessionDraft.minimumLapTimeSeconds),
+      name: sessionDraft.name,
+      notes: sessionDraft.notes,
+      scheduledStart: sessionDraft.scheduledStart,
+      status: sessionDraft.status,
+    });
     setSavedSessionDraft(sessionDraft);
     return true;
   };

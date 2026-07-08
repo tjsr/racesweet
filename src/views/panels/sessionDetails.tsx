@@ -6,6 +6,7 @@ import { type EventId } from '../../model/raceevent.js';
 
 interface SessionDraft {
   kind: EventCatalogSession['kind'];
+  minimumLapTimeSeconds: string;
   name: string;
   notes: string;
   scheduledStart: string;
@@ -24,7 +25,7 @@ interface SessionDetailsPanelProps {
   onSetSessionDraft: React.Dispatch<React.SetStateAction<SessionDraft>>;
   onSaveSession: () => void | Promise<void>;
   requestFormExit: (action: () => void | Promise<void>) => void;
-  selectedEvent?: { id: EventId; name: string };
+  selectedEvent?: { id: EventId; minimumLapTimeMilliseconds?: number | null; name: string };
   selectedSession?: EventCatalogSession;
   sessionAssignment?: { mode: 'default' | 'specific'; sourceIds: string[] };
   sessionDraft: SessionDraft;
@@ -92,6 +93,18 @@ export const SessionDetailsPanel = (props: SessionDetailsPanelProps): React.Reac
               <option value="live">Live</option>
               <option value="completed">Completed</option>
             </select>
+          </label>
+          <label>
+          Minimum Lap Time
+            <input
+              aria-label="Sessions Page Minimum Lap Time Seconds"
+              min="0"
+              placeholder={props.selectedEvent?.minimumLapTimeMilliseconds == null ? 'Inherit event/default' : String(props.selectedEvent.minimumLapTimeMilliseconds / 1000)}
+              step="0.001"
+              type="number"
+              value={props.sessionDraft.minimumLapTimeSeconds}
+              onChange={(event) => props.onSetSessionDraft((current) => ({ ...current, minimumLapTimeSeconds: event.target.value }))}
+            />
           </label>
           <label>
           Scheduled Start

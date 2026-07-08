@@ -84,6 +84,7 @@ export interface EventCatalogEvent {
   entrantIds: EventEntrantId[];
   format: EventFormat;
   id: EventId;
+  minimumLapTimeMilliseconds?: number | null;
   name: string;
   sessionIds: SessionId[];
   timeZone?: string;
@@ -94,6 +95,7 @@ export interface EventCatalogSession {
   eventId: EventId;
   id: SessionId;
   kind: EventSessionKind;
+  minimumLapTimeMilliseconds?: number | null;
   name: string;
   notes?: string;
   scheduledStart: string;

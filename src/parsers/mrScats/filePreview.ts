@@ -1,5 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { splitCtcRawCrossingLines } from '../ctc/rawCrossing.js';
 import { readMrScatsDbfTable, type MrScatsDbfRecord } from './dbf.js';
 import { parseMrScatsDbfSummary, readMrScatsZipEntryBuffers, type MrScatsDataFileKind } from './fileInventory.js';
 
@@ -347,10 +348,7 @@ const createRawCrossingTextPreview = (
   buffer: Buffer,
   maxRows: number,
 ): MrScatsDataFilePreview => {
-  const lines = buffer
-    .toString('latin1')
-    .split(/\r\n|\r|\n/)
-    .filter((line) => line.length > 0);
+  const lines = splitCtcRawCrossingLines(buffer);
   const rows = lines.slice(0, maxRows).map((line, index) => ({
     'Line number': index + 1,
     'Raw crossing data': line,
@@ -364,7 +362,7 @@ const createRawCrossingTextPreview = (
     parser: 'text',
     recordCount: lines.length,
     rows,
-    warnings: ['SRT and ERF files are raw crossing text files split by carriage-return style line breaks, not dBase tables.'],
+    warnings: ['CTC/Data-1 raw crossing files are plain-text records split by carriage-return style line breaks, not dBase tables.'],
   };
 };
 

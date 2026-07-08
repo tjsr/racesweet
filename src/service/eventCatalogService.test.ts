@@ -1057,10 +1057,12 @@ describe('EventCatalogService', () => {
 
     await service.updateEvent(SEED_EVENT_ID, {
       format: 'track-day',
+      minimumLapTimeMilliseconds: 75000,
       name: 'RaceSweet Open Track Day',
       timeZone: 'Australia/Brisbane',
     });
     await service.updateSession(SEED_PRACTICE_SESSION_ID, {
+      minimumLapTimeMilliseconds: 45000,
       name: 'Friday Free Practice',
       status: 'live',
     });
@@ -1084,8 +1086,10 @@ describe('EventCatalogService', () => {
 
     expect(event?.name).toBe('RaceSweet Open Track Day');
     expect(event?.format).toBe('track-day');
+    expect(event?.minimumLapTimeMilliseconds).toBe(75000);
     expect(event?.timeZone).toBe('Australia/Brisbane');
     expect(session?.name).toBe('Friday Free Practice');
+    expect(session?.minimumLapTimeMilliseconds).toBe(45000);
     expect(session?.status).toBe('live');
     expect(raceSession?.categoryIds).toEqual([SEED_PREMIER_CATEGORY_ID]);
     expect(category?.distanceRule).toEqual({ kind: 'time', value: '1:45' });

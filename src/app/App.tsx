@@ -35,7 +35,7 @@ import { ElectronJsonRaceAdminPersistence } from '../persistence/raceAdminPersis
 import { RaceAdminService } from '../service/raceAdminService.ts';
 import { selectedCategoriesForParticipants } from './selectionState.ts';
 import { type SessionSourceReloadMode, type SessionSourceReloadSummary, addSessionSourceReloadSummaries, createEmptySessionSourceReloadSummary, isMissingLinkedCategoryPlaceholder, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload } from '../service/sessionSourceReload.ts';
-import { applyPulledRaceStateToSession } from '../service/sourceApplication.ts';
+import { applyPulledRaceStateToSession, getMinimumLapTimeMillisecondsForSession } from '../service/sourceApplication.ts';
 import { formatErrorForDisplay } from './stackTrace.ts';
 import { type DataSourceConfig, type EventTimeDisplayZoneMode, type SystemConfiguration, createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
 import { ElectronJsonSystemConfigPersistence } from '../persistence/systemConfigPersistence.ts';
@@ -237,6 +237,19 @@ const sessionFromPartialRaceState = (raceState: Partial<RaceState>): Session => 
   records: raceState.records || [],
   teams: raceState.teams || [],
 });
+
+const applyCatalogMinimumLapTimeToRaceState = (
+  raceState: (Session & RaceStateLookup) | undefined,
+  catalog: EventCatalogState,
+  eventId: EventId | undefined,
+  sessionId: SessionId | undefined
+): void => {
+  if (!raceState || !eventId || !sessionId) {
+    return;
+  }
+
+  raceState.setMinimumLapTimeMilliseconds?.(getMinimumLapTimeMillisecondsForSession(catalog, eventId, sessionId));
+};
 
 const filterMrScatsRaceStateForSession = (
   raceState: Partial<RaceState>,
@@ -591,6 +604,9 @@ export const RaceSweetMainApp = () => {
     setSelectedCategoryId(nextCategoryId);
     setSelectedAnalyticsEventId(nextEventId);
     setSelectedAnalyticsSessionId(nextSessionId);
+    applyCatalogMinimumLapTimeToRaceState(sessionState, catalog, catalog.activeEventId, catalog.activeSessionId);
+    applyCatalogMinimumLapTimeToRaceState(timingRaceState, catalog, selectedTimingEventId, selectedTimingSessionId);
+    applyCatalogMinimumLapTimeToRaceState(analyticsRaceState, catalog, selectedAnalyticsEventId, selectedAnalyticsSessionId);
     if (nextEventId === catalog.activeEventId && nextSessionId === catalog.activeSessionId) {
       setAnalyticsRaceState(sessionState);
     }
@@ -976,7 +992,10 @@ export const RaceSweetMainApp = () => {
       preferPersistedRaceState: true,
       targetSessionState,
     }).then((loadedState) => {
-      setAnalyticsRaceState(loadedState || targetSessionState);
+      const hydratedState = loadedState || targetSessionState;
+      const analyticsSessionState = sessionFromPartialRaceState(raceStateSnapshot(hydratedState));
+      applyCatalogMinimumLapTimeToRaceState(analyticsSessionState, eventCatalogService?.catalog || eventCatalogState, nextEventId, nextSessionId);
+      setAnalyticsRaceState(analyticsSessionState);
     }).catch((error: unknown) => {
       setErrorState(error as Error);
     });

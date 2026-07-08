@@ -1,9 +1,11 @@
-import { applyPulledRaceStateToSession, getCategoriesToAdd } from '../service/sourceApplication.js';
+import { applyPulledRaceStateToSession, getCategoriesToAdd, getMinimumLapTimeMillisecondsForSession, getSessionKindForSession } from '../service/sourceApplication.js';
 
+import { createGreenFlagEvent } from '../controllers/flag.js';
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { EventTeam } from '../model/eventteam.js';
-import type { TimeRecord } from '../model/timerecord.js';
+import { Session } from '../model/racestate.js';
+import { RECORD_TX_CROSSING, type ParticipantPassingRecord, type TimeRecord } from '../model/timerecord.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
 import type { EventCatalogState } from '../catalog/eventCatalog.js';
 
@@ -97,6 +99,331 @@ describe('sourceApplication', () => {
     expect(addRecords).toHaveBeenCalledTimes(1);
     expect(beginBulkProcess).toHaveBeenCalledTimes(1);
     expect(endBulkProcess).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies the session minimum lap time override when loading pulled race state', async () => {
+    const addCategories = vi.fn(async (_categories: EventCategory[]) => null);
+    const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
+    const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
+    const beginBulkProcess = vi.fn(async () => true);
+    const endBulkProcess = vi.fn(async () => undefined);
+    const setMinimumLapTimeMilliseconds = vi.fn();
+    const setSessionKind = vi.fn();
+    const eventId = createEventId('11111111-1111-4111-8111-111111111111');
+    const sessionId = createSessionId('22222222-2222-4222-8222-222222222222');
+    const catalog: EventCatalogState = {
+      activeEventId: eventId,
+      activeSessionId: sessionId,
+      categories: [],
+      deletedEventIds: [],
+      entrants: [],
+      events: [{
+        categoryIds: [],
+        date: '2026-07-07',
+        entrantIds: [],
+        format: 'race-weekend',
+        id: eventId,
+        minimumLapTimeMilliseconds: 60000,
+        name: 'Configured Event',
+        sessionIds: [sessionId],
+      }],
+      sessions: [{
+        categoryIds: [],
+        eventId,
+        id: sessionId,
+        kind: 'race',
+        minimumLapTimeMilliseconds: 45000,
+        name: 'Configured Session',
+        scheduledStart: '2026-07-07T10:00:00.000Z',
+        status: 'scheduled',
+      }],
+    };
+
+    await applyPulledRaceStateToSession(
+      {
+        addCategories,
+        addParticipants,
+        addRecords,
+        beginBulkProcess,
+        categories: existingCategories,
+        endBulkProcess,
+        records: [],
+        setMinimumLapTimeMilliseconds,
+        setSessionKind,
+      },
+      {
+        categories: [],
+        participants: [],
+        records: [],
+      },
+      {
+        catalog,
+        eventId,
+        sessionId,
+      }
+    );
+
+    expect(getMinimumLapTimeMillisecondsForSession(catalog, eventId, sessionId)).toBe(45000);
+    expect(getSessionKindForSession(catalog, sessionId)).toBe('race');
+    expect(setMinimumLapTimeMilliseconds).toHaveBeenCalledWith(45000);
+    expect(setSessionKind).toHaveBeenCalledWith('race');
+    expect(endBulkProcess).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses short post-green crossings as lap start references for imported qualifying sessions', async () => {
+    const eventId = createEventId('qualifying-short-reference-event');
+    const sessionId = createSessionId('qualifying-short-reference-session');
+    const categoryId = createCategoryId('qualifying-short-reference-category');
+    const entrantId = createEventEntrantId('qualifying-short-reference-entrant');
+    const participantId = createEventParticipantId('qualifying-short-reference-participant');
+    const sourceId = createTimeRecordSourceId('qualifying-short-reference-source');
+    const participant: EventParticipant = {
+      categoryId,
+      currentResult: undefined,
+      entrantId,
+      firstname: 'Qualifying',
+      id: participantId,
+      identifiers: [
+        { fromTime: undefined, racePlate: '82', toTime: undefined },
+        { fromTime: undefined, toTime: undefined, txNo: 820001 },
+      ] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Driver',
+    };
+    const session = new Session({
+      categories: [],
+      participants: [],
+      records: [],
+      teams: [],
+    });
+
+    await applyPulledRaceStateToSession(
+      session,
+      {
+        categories: [{ code: 'Q', id: categoryId, name: 'Qualifying Category' }],
+        participants: [participant],
+        records: [
+          createGreenFlagEvent({
+            categoryIds: [categoryId],
+            eventId,
+            id: createTimeRecordId('qualifying-short-reference-green'),
+            indicatesRaceStart: true,
+            sequence: 1,
+            sessionId,
+            source: sourceId,
+            time: new Date('2026-05-29T10:00:00.000Z'),
+          }),
+          {
+            chipCode: 820001,
+            eventId,
+            id: createTimeRecordId('qualifying-short-reference-under-minimum'),
+            plateNumber: '82',
+            recordType: RECORD_TX_CROSSING,
+            sequence: 2,
+            sessionId,
+            source: sourceId,
+            time: new Date('2026-05-29T10:00:30.000Z'),
+          } as ParticipantPassingRecord,
+          {
+            chipCode: 820001,
+            eventId,
+            id: createTimeRecordId('qualifying-short-reference-valid'),
+            plateNumber: '82',
+            recordType: RECORD_TX_CROSSING,
+            sequence: 3,
+            sessionId,
+            source: sourceId,
+            time: new Date('2026-05-29T10:01:30.000Z'),
+          } as ParticipantPassingRecord,
+        ],
+      },
+      {
+        catalog: {
+          activeEventId: eventId,
+          activeSessionId: sessionId,
+          categories: [],
+          deletedEventIds: [],
+          entrants: [{
+            categoryId,
+            categoryIds: [categoryId],
+            entrantType: 'rider',
+            eventId,
+            firstName: 'Qualifying',
+            id: entrantId,
+            identifiers: participant.identifiers,
+            lastName: 'Driver',
+            memberParticipantIds: [participantId],
+            name: 'Qualifying Driver',
+            sessionIds: [sessionId],
+          }],
+          events: [{
+            categoryIds: [categoryId],
+            date: '2026-05-29',
+            entrantIds: [entrantId],
+            format: 'race-weekend',
+            id: eventId,
+            minimumLapTimeMilliseconds: 60000,
+            name: 'Qualifying Event',
+            sessionIds: [sessionId],
+          }],
+          sessions: [{
+            categoryIds: [categoryId],
+            eventId,
+            id: sessionId,
+            kind: 'qualifying',
+            minimumLapTimeMilliseconds: null,
+            name: 'Qualifying Session',
+            scheduledStart: '2026-05-29T10:00:00.000Z',
+            status: 'completed',
+          }],
+        },
+        eventId,
+        sessionId,
+      }
+    );
+
+    const laps = session.getParticipantLaps(participantId);
+    expect(laps?.map((lap) => ({
+      id: lap.id,
+      isExcluded: lap.isExcluded,
+      isValid: lap.isValid,
+      lapTime: lap.lapTime,
+      startingLapRecordId: lap.startingLapRecordId,
+    }))).toEqual([
+      {
+        id: createTimeRecordId('qualifying-short-reference-under-minimum'),
+        isExcluded: true,
+        isValid: false,
+        lapTime: 30000,
+        startingLapRecordId: createTimeRecordId('qualifying-short-reference-green'),
+      },
+      {
+        id: createTimeRecordId('qualifying-short-reference-valid'),
+        isExcluded: false,
+        isValid: true,
+        lapTime: 60000,
+        startingLapRecordId: createTimeRecordId('qualifying-short-reference-under-minimum'),
+      },
+    ]);
+  });
+
+  it('uses the configured minimum lap time when calculating laps for imported session records', async () => {
+    const eventId = createEventId('33333333-3333-4333-8333-333333333333');
+    const sessionId = createSessionId('44444444-4444-4444-8444-444444444444');
+    const categoryId = createCategoryId('55555555-5555-4555-8555-555555555555');
+    const entrantId = createEventEntrantId('66666666-6666-4666-8666-666666666666');
+    const participantId = createEventParticipantId('77777777-7777-4777-8777-777777777777');
+    const sourceId = createTimeRecordSourceId('88888888-8888-4888-8888-888888888888');
+    const participant: EventParticipant = {
+      categoryId,
+      currentResult: undefined,
+      entrantId,
+      firstname: 'MR-SCATS',
+      id: participantId,
+      identifiers: [
+        { fromTime: undefined, racePlate: '42', toTime: undefined },
+        { fromTime: undefined, toTime: undefined, txNo: 420001 },
+      ] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const session = new Session({
+      categories: [],
+      participants: [],
+      records: [],
+      teams: [],
+    });
+
+    await applyPulledRaceStateToSession(
+      session,
+      {
+        categories: [{ code: 'MSC', id: categoryId, name: 'MR-SCATS Category' }],
+        participants: [participant],
+        records: [
+          createGreenFlagEvent({
+            categoryIds: [categoryId],
+            eventId,
+            id: createTimeRecordId('99999999-9999-4999-8999-999999999999'),
+            indicatesRaceStart: true,
+            sequence: 1,
+            sessionId,
+            source: sourceId,
+            time: new Date('2026-05-29T10:00:00.000Z'),
+          }),
+          {
+            chipCode: 420001,
+            eventId,
+            id: createTimeRecordId('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+            originRecordNumber: 1,
+            plateNumber: '42',
+            recordType: RECORD_TX_CROSSING,
+            sequence: 2,
+            sessionId,
+            source: sourceId,
+            time: new Date('2026-05-29T10:01:30.000Z'),
+          } as ParticipantPassingRecord,
+          {
+            chipCode: 420001,
+            eventId,
+            id: createTimeRecordId('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),
+            originRecordNumber: 2,
+            plateNumber: '42',
+            recordType: RECORD_TX_CROSSING,
+            sequence: 3,
+            sessionId,
+            source: sourceId,
+            time: new Date('2026-05-29T10:03:05.000Z'),
+          } as ParticipantPassingRecord,
+        ],
+      },
+      {
+        catalog: {
+          activeEventId: eventId,
+          activeSessionId: sessionId,
+          categories: [],
+          deletedEventIds: [],
+          entrants: [{
+            categoryId,
+            categoryIds: [categoryId],
+            entrantType: 'rider',
+            eventId,
+            firstName: 'MR-SCATS',
+            id: entrantId,
+            identifiers: participant.identifiers,
+            lastName: 'Rider',
+            memberParticipantIds: [participantId],
+            name: 'MR-SCATS Rider',
+            sessionIds: [sessionId],
+          }],
+          events: [{
+            categoryIds: [categoryId],
+            date: '2026-05-29',
+            entrantIds: [entrantId],
+            format: 'race-weekend',
+            id: eventId,
+            minimumLapTimeMilliseconds: 60000,
+            name: 'MR-SCATS Imported Round',
+            sessionIds: [sessionId],
+          }],
+          sessions: [{
+            categoryIds: [categoryId],
+            eventId,
+            id: sessionId,
+            kind: 'race',
+            minimumLapTimeMilliseconds: null,
+            name: 'MR-SCATS Race',
+            scheduledStart: '2026-05-29T10:00:00.000Z',
+            status: 'completed',
+          }],
+        },
+        eventId,
+        sessionId,
+      }
+    );
+
+    expect(session.getParticipantLaps(participantId)?.map((lap) => lap.lapTime)).toEqual([90000, 95000]);
   });
 
   it('ends the session bulk process when a source application step fails', async () => {

@@ -260,8 +260,10 @@ describe('SessionsPage integration', () => {
     expect(onMoveSessionToEvent).toHaveBeenCalledWith('session-3', 'event-1');
 
     const sessionNameInput = container.querySelector('input[aria-label="Sessions Page Name"]') as HTMLInputElement;
+    const sessionMinimumLapTimeInput = container.querySelector('input[aria-label="Sessions Page Minimum Lap Time Seconds"]') as HTMLInputElement;
     await act(async () => {
       setInputValue(sessionNameInput, 'Updated Test Session');
+      setInputValue(sessionMinimumLapTimeInput, '45');
     });
 
     const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Session');
@@ -271,7 +273,10 @@ describe('SessionsPage integration', () => {
       saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(onUpdateSession).toHaveBeenCalledWith('session-3', expect.objectContaining({ name: 'Updated Test Session' }));
+    expect(onUpdateSession).toHaveBeenCalledWith('session-3', expect.objectContaining({
+      minimumLapTimeMilliseconds: 45000,
+      name: 'Updated Test Session',
+    }));
 
     const sourceModeSelect = container.querySelector('select[aria-label="Sessions Source Mode"]') as HTMLSelectElement;
     expect(sourceModeSelect).toBeDefined();

@@ -150,6 +150,46 @@ describe('MR-SCATS catalog import parser', () => {
     ]);
   });
 
+  it('uses DRIV_CODE before DRIV_CLASS for imported entrant categories and inferred session categories', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 5, name: 'STARTTIME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+    ], [
+      { CATEGORY: 'EVENT', EVENTNAME: 'Race 1', EV_CODE: 'T9743R01', STARTDATE: '19970629', STARTTIME: '09:00' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'DRIV_CODE', type: 'C' },
+      { length: 12, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 15, DRIVER: 'Code Driver', DRIV_CLASS: 'Sports Cars', DRIV_CODE: 'A', TXNUM: 1234 },
+    ]));
+    await writeFile(path.join(tempDir, 'T9743R01.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'ELAPSED', type: 'N' },
+      { length: 4, name: 'COUNTER', type: 'N' },
+    ], [
+      { CARNUMBER: 15, COUNTER: 1, ELAPSED: 100000, TXNUM: 1234 },
+    ]));
+
+    const imported = await loadMrScatsCatalogFromLocation(tempDir);
+    const categoryIdsByName = new Map(imported.raceState.categories?.map((category) => [category.name, category.id]));
+
+    expect(imported.raceState.categories?.map((category) => category.name)).toEqual(['EVENT', 'A']);
+    expect(imported.raceState.categories?.map((category) => category.name)).not.toContain('Sports Cars');
+    expect(imported.raceState.participants?.[0]).toEqual(expect.objectContaining({
+      categoryId: categoryIdsByName.get('A'),
+    }));
+    expect(imported.sessions[0]?.categoryIds).toEqual([categoryIdsByName.get('A')]);
+  });
+
   it('continues through unreadable driver candidates and imports the next DBF-compatible fallback', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
     await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
@@ -373,5 +413,49 @@ describe('MR-SCATS catalog import parser', () => {
       plateNumber: '123',
     }));
     expect(crossing).not.toHaveProperty('chipCode');
+  });
+
+  it('imports SRT, ERF, AT1, and AT2 raw crossing records for matching sessions', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 5, name: 'STARTTIME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+    ], [
+      { CATEGORY: 'CAT-A', EVENTNAME: 'Race 1', EV_CODE: 'W9721R01', STARTDATE: '19970629', STARTTIME: '09:00' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 42, DRIVER: 'Raw Driver', DRIV_CLASS: 'CAT-A', TXNUM: 1234 },
+    ]));
+    await writeFile(path.join(tempDir, 'W9721R01.SRT'), '040000000010000012340302064000\r');
+    await writeFile(path.join(tempDir, 'W9721R01.ERF'), '040000000020000012340401063016\r');
+    await writeFile(path.join(tempDir, 'W9721R01.AT1'), '040000000030000012340501062000\r');
+    await writeFile(path.join(tempDir, 'W9721R01.AT2'), '040000000040000012340601061000\r');
+
+    const imported = await loadMrScatsCatalogFromLocation(tempDir);
+    const records = imported.raceState.records || [];
+    const crossings = records.slice(1) as unknown as Array<Record<string, unknown>>;
+
+    expect(records).toHaveLength(5);
+    expect(crossings.map((crossing) => crossing.chipCode)).toEqual([1234, 1234, 1234, 1234]);
+    expect(crossings.map((crossing) => crossing.antenna)).toEqual([
+      'Line 3 Loop 2',
+      'Line 4 Loop 1',
+      'Line 5 Loop 1',
+      'Line 6 Loop 1',
+    ]);
+    expect(crossings.map((crossing) => crossing.time)).toEqual([
+      new Date('1997-06-28T23:00:10.000Z'),
+      new Date('1997-06-28T23:00:20.000Z'),
+      new Date('1997-06-28T23:00:30.000Z'),
+      new Date('1997-06-28T23:00:40.000Z'),
+    ]);
   });
 });

@@ -209,8 +209,10 @@ describe('EventsScreen integration', () => {
     expect(onSelectEvent).toHaveBeenCalledWith('event-2');
 
     const eventNameInput = container.querySelector('input[aria-label="Event Name"]') as HTMLInputElement;
+    const eventMinimumLapTimeInput = container.querySelector('input[aria-label="Event Minimum Lap Time Seconds"]') as HTMLInputElement;
     await act(async () => {
       setInputValue(eventNameInput, 'Winter Championship Round');
+      setInputValue(eventMinimumLapTimeInput, '75');
     });
 
     const saveEventButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Event Details');
@@ -220,7 +222,10 @@ describe('EventsScreen integration', () => {
       saveEventButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(onUpdateEvent).toHaveBeenCalledWith('event-2', expect.objectContaining({ name: 'Winter Championship Round' }));
+    expect(onUpdateEvent).toHaveBeenCalledWith('event-2', expect.objectContaining({
+      minimumLapTimeMilliseconds: 75000,
+      name: 'Winter Championship Round',
+    }));
 
     const testSessionButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Test Session'));
     expect(testSessionButton).toBeDefined();

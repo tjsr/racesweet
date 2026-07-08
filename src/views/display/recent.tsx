@@ -1,7 +1,8 @@
-import { Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField } from '@mui/material';
+import { Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip } from '@mui/material';
 import React, { type JSX } from 'react';
 import { DEFAULT_FASTEST_TIME_INDICATOR_COLORS, type FastestTimeIndicatorColors } from '../../app/systemConfig.ts';
 import { type MillisecondsDuration, type TimeDisplayZoneMode, millisecondsToTime, resolveDisplayTimeZone, tableTimeString } from '../../app/utils/timeutils.ts';
+import type { EventSessionKind } from '../../catalog/eventCatalog.ts';
 import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../controllers/category.ts';
 import { createGreenFlagEvent, createRedFlagEvent, isFlagRecord } from '../../controllers/flag';
 import { getLapTimeCell } from '../../controllers/laps.ts';
@@ -241,6 +242,13 @@ const getEditablePassingAntenna = (record: EventTimeRecord): string => {
   return ((record as ParticipantPassingRecord & { antenna?: string }).antenna || '').toString();
 };
 
+const getCrossingUnrelatedReason = (passing: ParticipantPassingRecord): string | undefined => {
+  if (!passing.isExcluded && passing.isValid !== false) {
+    return undefined;
+  }
+  return passing.unrelatedReason;
+};
+
 interface RecordsProps {
   currentEventId?: EventId;
   currentSessionId?: SessionId;
@@ -251,6 +259,7 @@ interface RecordsProps {
   onTimeDisplayZoneModeChange?: (mode: TimeDisplayZoneMode) => void;
   records: EventTimeRecord[];
   raceStateLookup: RaceStateLookup;
+  sessionKind?: EventSessionKind;
   warnings?: string[];
   selectedCategories: Set<EventCategoryId>;
   selectedParticipants: Set<EventParticipantId>;
@@ -764,6 +773,7 @@ export const PassingRecordRow = (
     props.lapTimeIndicators?.entrantFastest ? 'entrantFastest' : '',
     props.lapTimeIndicators?.overallFastest ? 'overallFastest' : '',
   ].filter((classItem) => classItem.length > 0).join(' ');
+  const unrelatedReason = getCrossingUnrelatedReason(passing);
 
   return (
     <>
@@ -783,7 +793,20 @@ export const PassingRecordRow = (
         <TableCell className={cellClasses}>{categoryStr || ''}</TableCell>
         <TableCell className={cellClasses}>{lapNo}</TableCell>
         <TableCell className={cellClasses}>{elapsedTime}</TableCell>
-        <TableCell className={lapTimeCellClasses}>{lapTime}</TableCell>
+        <TableCell className={lapTimeCellClasses}>
+          <span>{lapTime}</span>
+          {unrelatedReason ? (
+            <Tooltip title={unrelatedReason}>
+              <span
+                aria-label={unrelatedReason}
+                className="unrelated-reason-marker"
+                role="img"
+              >
+                !
+              </span>
+            </Tooltip>
+          ) : null}
+        </TableCell>
       </TableRow>
       <Menu
         open={contextMenu !== null}
@@ -1166,12 +1189,14 @@ const createEmptyLapTimeIndicators = (): LapTimeIndicators => ({
 
 const buildLapTimeIndicatorMap = (
   records: EventTimeRecord[],
-  raceStateLookup: RaceStateLookup
+  raceStateLookup: RaceStateLookup,
+  sessionKind: EventSessionKind | undefined = 'race'
 ): Map<TimeRecordId, LapTimeIndicators> => {
   const indicatorsByRecordId = new Map<TimeRecordId, LapTimeIndicators>();
   const bestLapTimeByEntrant = new Map<string, MillisecondsDuration>();
   const previousLapTimeByEntrant = new Map<string, MillisecondsDuration>();
   const leadingLapNumbers = new Set<number>();
+  const isRaceSession = sessionKind === undefined || sessionKind === 'race';
   let overallBestLapTime: MillisecondsDuration | undefined = undefined;
 
   records
@@ -1199,7 +1224,7 @@ const buildLapTimeIndicatorMap = (
       const previousLapTime = previousLapTimeByEntrant.get(entrantKey);
       const entrantBestLapTime = bestLapTimeByEntrant.get(entrantKey);
 
-      if (!leadingLapNumbers.has(lapNo)) {
+      if (isRaceSession && !leadingLapNumbers.has(lapNo)) {
         indicators.lapLeader = true;
         leadingLapNumbers.add(lapNo);
       }
@@ -1212,6 +1237,9 @@ const buildLapTimeIndicatorMap = (
       }
       if (overallBestLapTime === undefined || lapTime < overallBestLapTime) {
         indicators.overallFastest = true;
+        if (!isRaceSession) {
+          indicators.lapLeader = true;
+        }
         overallBestLapTime = lapTime;
       }
 
@@ -1659,7 +1687,7 @@ export const RecentRecords = (props: RecordsProps & {
       return a.time!.getTime() - b.time!.getTime();
     }
   });
-  const lapTimeIndicators = buildLapTimeIndicatorMap(filteredRecords, props.raceStateLookup);
+  const lapTimeIndicators = buildLapTimeIndicatorMap(filteredRecords, props.raceStateLookup, props.sessionKind);
   const fastestTimeIndicatorColors = props.fastestTimeIndicatorColors || DEFAULT_FASTEST_TIME_INDICATOR_COLORS;
   const tableContainerStyle = {
     '--entrant-faster-time-color': fastestTimeIndicatorColors.entrantFasterTime,

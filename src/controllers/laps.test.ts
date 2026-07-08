@@ -1,0 +1,154 @@
+import { calculateParticipantLapTimes } from './laps.js';
+import type { EventParticipant } from '../model/eventparticipant.js';
+import type { GreenFlagRecord } from '../model/flag.js';
+import { createCategoryId, createEventEntrantId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
+import { EVENT_FLAG_DISPLAYED, RECORD_TX_CROSSING, type ParticipantPassingRecord } from '../model/timerecord.js';
+import { CROSSING_FLAG_LAP_UNDER_MINIMUM, CROSSING_UNRELATED_LAP_UNDER_MINIMUM } from '../model/timerecord.js';
+
+describe('lap calculation exclusion reasons', () => {
+  const createLapCalculationFixture = (): {
+    categoryId: ReturnType<typeof createCategoryId>;
+    participant: EventParticipant;
+    source: ReturnType<typeof createTimeRecordSourceId>;
+    startFlag: GreenFlagRecord;
+  } => {
+    const categoryId = createCategoryId('test-category');
+    const source = createTimeRecordSourceId('test-source');
+    const startFlag: GreenFlagRecord = {
+      categoryIds: [categoryId],
+      flagType: 'green',
+      flagValue: 'course',
+      id: createTimeRecordId('start'),
+      recordType: EVENT_FLAG_DISPLAYED,
+      sequence: 1,
+      source,
+      time: new Date('2026-05-29T10:00:00.000Z'),
+    };
+    const participant: EventParticipant = {
+      categoryId,
+      currentResult: undefined,
+      entrantId: createEventEntrantId('entrant-42'),
+      firstname: 'Fast',
+      id: createEventParticipantId('participant-42'),
+      identifiers: [{ fromTime: undefined, racePlate: '42', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Driver',
+    };
+
+    return {
+      categoryId,
+      participant,
+      source,
+      startFlag,
+    };
+  };
+
+  it('marks crossings excluded below the configured minimum lap time with a reason', () => {
+    const { participant, source, startFlag } = createLapCalculationFixture();
+    const passings: ParticipantPassingRecord[] = [
+      {
+        elapsedTime: 59999,
+        id: createTimeRecordId('passing-under-minimum'),
+        participantId: participant.id,
+        recordType: RECORD_TX_CROSSING,
+        sequence: 2,
+        source,
+        time: new Date('2026-05-29T10:00:59.999Z'),
+      },
+    ];
+
+    calculateParticipantLapTimes(startFlag, passings, participant, 60000);
+
+    expect(passings[0]).toEqual(expect.objectContaining({
+      infoFlags: CROSSING_FLAG_LAP_UNDER_MINIMUM,
+      isExcluded: true,
+      isValid: false,
+      lapTime: 59999,
+      unrelatedReason: 'Lap time is below minimum of 1:00.0000.',
+      unrelatedReasonCode: CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
+    }));
+  });
+
+  it('ignores race crossings under the minimum lap time when calculating the next lap', () => {
+    const { participant, source, startFlag } = createLapCalculationFixture();
+    const passings: ParticipantPassingRecord[] = [
+      {
+        elapsedTime: 30000,
+        id: createTimeRecordId('race-passing-under-minimum'),
+        participantId: participant.id,
+        recordType: RECORD_TX_CROSSING,
+        sequence: 2,
+        source,
+        time: new Date('2026-05-29T10:00:30.000Z'),
+      },
+      {
+        elapsedTime: 90000,
+        id: createTimeRecordId('race-passing-valid'),
+        participantId: participant.id,
+        recordType: RECORD_TX_CROSSING,
+        sequence: 3,
+        source,
+        time: new Date('2026-05-29T10:01:30.000Z'),
+      },
+    ];
+
+    calculateParticipantLapTimes(startFlag, passings, participant, 60000, 'race');
+
+    expect(passings[0]).toEqual(expect.objectContaining({
+      isExcluded: true,
+      isValid: false,
+      lapTime: 30000,
+      startingLapRecordId: startFlag.id,
+      unrelatedReasonCode: CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
+    }));
+    expect(passings[1]).toEqual(expect.objectContaining({
+      isExcluded: false,
+      isValid: true,
+      lapNo: 1,
+      lapTime: 90000,
+      startingLapRecordId: startFlag.id,
+    }));
+  });
+
+  it('uses non-race crossings under the minimum lap time as the next lap start reference', () => {
+    const { participant, source, startFlag } = createLapCalculationFixture();
+    const passings: ParticipantPassingRecord[] = [
+      {
+        elapsedTime: 30000,
+        id: createTimeRecordId('qualifying-passing-under-minimum'),
+        participantId: participant.id,
+        recordType: RECORD_TX_CROSSING,
+        sequence: 2,
+        source,
+        time: new Date('2026-05-29T10:00:30.000Z'),
+      },
+      {
+        elapsedTime: 90000,
+        id: createTimeRecordId('qualifying-passing-valid'),
+        participantId: participant.id,
+        recordType: RECORD_TX_CROSSING,
+        sequence: 3,
+        source,
+        time: new Date('2026-05-29T10:01:30.000Z'),
+      },
+    ];
+
+    calculateParticipantLapTimes(startFlag, passings, participant, 60000, 'qualifying');
+
+    expect(passings[0]).toEqual(expect.objectContaining({
+      isExcluded: true,
+      isValid: false,
+      lapTime: 30000,
+      startingLapRecordId: startFlag.id,
+      unrelatedReasonCode: CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
+    }));
+    expect(passings[1]).toEqual(expect.objectContaining({
+      isExcluded: false,
+      isValid: true,
+      lapNo: 1,
+      lapTime: 60000,
+      startingLapRecordId: passings[0]?.id,
+    }));
+  });
+});

@@ -134,7 +134,7 @@ describe('Session category change regressions', () => {
     });
   });
 
-  it('demonstrates why rebuilding Session after category change breaks lap display caches', async () => {
+  it('keeps lap display caches when rebuilding Session after category change', async () => {
     const fixture = await createSessionWithProcessedLaps();
 
     fixture.session.updateParticipantCategory(fixture.participant1Id, fixture.categoryBId);
@@ -146,8 +146,8 @@ describe('Session category change regressions', () => {
       teams: fixture.session.teams,
     });
 
-    expect(rebuiltSession.getParticipantLaps(fixture.participant1Id)).toBeUndefined();
-    expect(rebuiltSession.getParticipantLaps(fixture.participant2Id)).toBeUndefined();
+    expect(rebuiltSession.getParticipantLaps(fixture.participant1Id)?.length).toBeGreaterThan(0);
+    expect(rebuiltSession.getParticipantLaps(fixture.participant2Id)?.length).toBeGreaterThan(0);
   });
 
   it('reprocesses laps when a flag category is assigned and removed', async () => {
@@ -239,9 +239,9 @@ describe('Session category change regressions', () => {
 
     expect(session.getParticipantLaps(participantId)?.[0]).toMatchObject({
       elapsedTime: 60000,
-      isExcluded: true,
-      isValid: false,
-      lapNo: 0,
+      isExcluded: false,
+      isValid: true,
+      lapNo: 1,
       lapTime: 60000,
       participantStartRecordId: flagId,
     });
@@ -394,9 +394,9 @@ describe('Session category change regressions', () => {
 
     expect(session.getParticipantLaps(participantId)?.[0]).toMatchObject({
       elapsedTime: 60000,
-      isExcluded: true,
-      isValid: false,
-      lapNo: 0,
+      isExcluded: false,
+      isValid: true,
+      lapNo: 1,
       lapTime: 60000,
       participantStartRecordId: flagId,
     });

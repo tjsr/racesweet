@@ -2,6 +2,7 @@ import { getOrCacheGreenFlagForCategory, hasCategoryIds, isFlagRecord } from "..
 import { processAllParticipantLaps } from "../controllers/laps.js";
 import { ParticipantNotFoundError, assignParticpantsToCrossings } from "../controllers/participant.js";
 import { addError, compareByTime, isCrossingRecord } from "../controllers/timerecord.js";
+import type { EventSessionKind } from "../catalog/eventCatalog.js";
 import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError, NoStartFlagError, SessionStateError } from "../validators/errors.js";
 import { FlagReferencesUnknownCategoryError, InvalidFlagRecordError } from "./errors.js";
 import type { EventCategory, EventCategoryId } from "./eventcategory.js";
@@ -36,6 +37,8 @@ export interface RaceStateLookup {
   updateEntrantCategory(entrantId: EventEntrantId, categoryId: EventCategoryId): void;
   updateParticipantCategory(participantId: EventParticipantId, categoryId: EventCategoryId): void;
   updateParticipantIdentifiers?(participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: ParticipantIdentifierUpdate[]): void;
+  setMinimumLapTimeMilliseconds?(minimumLapTimeMilliseconds: number | undefined): void;
+  setSessionKind?(sessionKind: EventSessionKind | undefined): void;
 }
 
 export interface RaceState {
@@ -59,6 +62,7 @@ export class Session implements RaceState, RaceStateLookup {
   private _bulkProcessDepth = 0;
   private _categoryGreenFlags: Map<EventCategoryId, GreenFlagRecord> | undefined;
   private _minimumLapTimeMilliseconds: number | undefined = 60000;
+  private _sessionKind: EventSessionKind | undefined = 'race';
   private _cachedTransponderCrossings: Map<ChipCrossingData["chipCode"], ChipCrossingData[]>;
 
   public constructor(state: RaceState) {
@@ -67,6 +71,26 @@ export class Session implements RaceState, RaceStateLookup {
     this._teams = listToMap(state.teams);
     this._records = listToMap(state.records);
     this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
+    if (this._records.size > 0 || this._participants.size > 0) {
+      assignParticpantsToCrossings(this._participants, this.records);
+      this.__reprocessAllParticipantLaps();
+    }
+  }
+
+  public setMinimumLapTimeMilliseconds(minimumLapTimeMilliseconds: number | undefined): void {
+    this._minimumLapTimeMilliseconds = minimumLapTimeMilliseconds;
+    this._cachedParticipantLaps = undefined;
+    if (!this._bulkProcess) {
+      this.__reprocessAllParticipantLaps();
+    }
+  }
+
+  public setSessionKind(sessionKind: EventSessionKind | undefined): void {
+    this._sessionKind = sessionKind;
+    this._cachedParticipantLaps = undefined;
+    if (!this._bulkProcess) {
+      this.__reprocessAllParticipantLaps();
+    }
   }
 
   public get records(): TimeRecord[] {
@@ -340,6 +364,19 @@ export class Session implements RaceState, RaceStateLookup {
     if (!isValidId(participantId)) {
       throw new InvalidIdError(`ParticipantId ${participantId} for lookup is not a valid Id type.`);
     }
+    const participant = this._participants.get(participantId);
+    const hasMatchingCrossings = participant
+      ? this.records.some((record) => isCrossingRecord(record) && (
+        (record as ParticipantPassingRecord).participantId === participantId ||
+        crossingMatchesParticipantIdentifiers(participant, record)
+      ))
+      : false;
+
+    if (!this._cachedParticipantLaps || (!this._cachedParticipantLaps.has(participantId) && hasMatchingCrossings)) {
+      assignParticpantsToCrossings(this._participants, this.records);
+      this.__reprocessAllParticipantLaps();
+    }
+
     if (!this._cachedParticipantLaps) {
       return undefined;
     }
@@ -476,7 +513,7 @@ export class Session implements RaceState, RaceStateLookup {
 
   private __reprocessAllParticipantLaps(): void {
     const processedLaps: Map<EventParticipantId, ParticipantPassingRecord[]> = processAllParticipantLaps(
-      this.records, this._participants, this._minimumLapTimeMilliseconds, true // silence warnigns
+      this.records, this._participants, this._minimumLapTimeMilliseconds, true, this._sessionKind // silence warnigns
     );
 
     this._cachedParticipantLaps = processedLaps;

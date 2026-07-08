@@ -7,6 +7,7 @@ import { createCategoryId, createEventEntrantId, createEventId, createEventParti
 import type { EventId, SessionId } from '../../model/raceevent.js';
 import type { RaceState } from '../../model/racestate.js';
 import { EVENT_FLAG_DISPLAYED, RECORD_TX_CROSSING, type EventTimeRecord, type ParticipantPassingRecord } from '../../model/timerecord.js';
+import { parseCtcRawCrossingFile, type CtcRawCrossingRecord } from '../ctc/rawCrossing.js';
 import { readMrScatsDbfTable, type MrScatsDbfRecord } from './dbf.js';
 import { readMrScatsZipEntryBuffers } from './fileInventory.js';
 
@@ -52,6 +53,7 @@ const CROSSING_TRANSPONDER_FIELDS = ['TXNUM', 'TX_NO', 'TRANSPONDR', 'TRANSPONDE
 const CROSSING_PLATE_FIELDS = ['CARNUMBER', 'CAR', 'CAR_NO', 'CARNO'];
 const CROSSING_GREEN_ELAPSED_FIELDS = ['GREENELAPS', 'GREEN_ELAP', 'STARTELAP', 'START_ELAP', 'STARTELPSD'];
 const CROSSING_GREEN_FLAG_FIELDS = ['FLAG', 'SYNCMARK', 'STARTFIN'];
+const RAW_CROSSING_EXTENSIONS = ['.SRT', '.ERF', '.AT1', '.AT2'];
 
 const asString = (value: unknown): string => value === undefined || value === null ? '' : String(value).trim();
 
@@ -307,10 +309,12 @@ const getEventName = (programme: MrScatsDbfRecord[], meetingCode: string): strin
 
 const getCategoryName = (value: unknown): string => asString(value) || 'Unclassified';
 
+const getDriverCategoryName = (driver: MrScatsDbfRecord): string => getCategoryName(asString(driver.DRIV_CODE) || driver.DRIV_CLASS);
+
 const buildCategories = (meetingCode: string, programme: MrScatsDbfRecord[], drivers: MrScatsDbfRecord[]): EventCategory[] => {
   const categoryNames = [
     ...programme.map((row) => getCategoryName(row.CATEGORY)),
-    ...drivers.map((row) => getCategoryName(row.DRIV_CLASS)),
+    ...drivers.map(getDriverCategoryName),
   ];
   return Array.from(new Set(categoryNames)).map((name): EventCategory => ({
     code: name,
@@ -342,11 +346,18 @@ const buildSessions = (meetingCode: string, programme: MrScatsDbfRecord[], categ
     });
 };
 
-const findSessionCrossingFileNames = (buffers: Map<string, Buffer>, session: MrScatsImportedSession): string[] => {
+const findSessionDbfCrossingFileNames = (buffers: Map<string, Buffer>, session: MrScatsImportedSession): string[] => {
   const eventCode = session.eventCode.toUpperCase();
   return Array.from(buffers.keys())
     .filter((fileName) => normalizeBaseName(fileName) === eventCode)
     .filter((fileName) => path.extname(fileName).toUpperCase() === '.DBF');
+};
+
+const findSessionRawCrossingFileNames = (buffers: Map<string, Buffer>, session: MrScatsImportedSession): string[] => {
+  const eventCode = session.eventCode.toUpperCase();
+  return Array.from(buffers.keys())
+    .filter((fileName) => normalizeBaseName(fileName) === eventCode)
+    .filter((fileName) => RAW_CROSSING_EXTENSIONS.includes(path.extname(fileName).toUpperCase()));
 };
 
 const inferSessionCategoryIdsFromCrossings = (
@@ -363,7 +374,7 @@ const inferSessionCategoryIdsFromCrossings = (
   }
 
   const inferredCategoryIds = new Set<string>();
-  findSessionCrossingFileNames(buffers, session).forEach((fileName) => {
+  findSessionDbfCrossingFileNames(buffers, session).forEach((fileName) => {
     try {
       readMrScatsDbfTable(buffers.get(fileName)!).records.forEach((record) => {
         const plateNumber = getFirstString(record, CROSSING_PLATE_FIELDS);
@@ -405,6 +416,10 @@ const getElapsedMilliseconds = (record: MrScatsDbfRecord): number | undefined =>
   }
 
   return (elapsedTicks / CROSSING_ELAPSED_TICKS_PER_SECOND) * 1000;
+};
+
+const getRawElapsedMilliseconds = (record: CtcRawCrossingRecord): number => {
+  return (record.rawTimeTicks / CROSSING_ELAPSED_TICKS_PER_SECOND) * 1000;
 };
 
 const getGreenElapsedMilliseconds = (records: MrScatsDbfRecord[]): number => {
@@ -512,6 +527,74 @@ const createCrossingRecord = (
   } as ParticipantPassingRecord & { plateNumber: string };
 };
 
+const createRawCrossingRecord = (
+  meetingCode: string,
+  session: MrScatsImportedSession,
+  source: ReturnType<typeof createTimeRecordSourceId>,
+  fileName: string,
+  record: CtcRawCrossingRecord,
+  sessionElapsedZeroTime: Date,
+  sequence: number,
+  participantsByPlate: Map<string, EventParticipant>
+): EventTimeRecord | undefined => {
+  const transponder = record.transmitter !== undefined && record.transmitter > 0 ? record.transmitter : undefined;
+  if (transponder === undefined) {
+    return undefined;
+  }
+
+  const plateNumber = transponder.toString();
+  const transponderLooksLikePlateNumber =
+    hasParticipantPlate(participantsByPlate, plateNumber) &&
+    !hasParticipantTransponderForPlate(participantsByPlate, plateNumber, transponder);
+  const elapsedMilliseconds = getRawElapsedMilliseconds(record);
+  const time = new Date(sessionElapsedZeroTime.getTime() + elapsedMilliseconds);
+  const stableRecordKey = [
+    'mr-scats',
+    meetingCode,
+    session.eventCode,
+    path.basename(fileName),
+    record.recordNumber.toString(),
+    record.drtCode,
+    transponder.toString(),
+    record.rawTimeTicks.toString(),
+  ].join(':');
+  const baseRecord: ParticipantPassingRecord & {
+    antenna?: string;
+    confidence?: string;
+    drtCode?: string;
+    rawStatus?: string;
+  } = {
+    antenna: record.lineNumber !== undefined
+      ? `Line ${record.lineNumber}${record.laneNumber !== undefined ? ` Loop ${record.laneNumber}` : ''}`
+      : undefined,
+    confidence: record.confidence,
+    dataLine: record.raw,
+    drtCode: record.drtCode,
+    elapsedTime: null,
+    eventId: createEventId(`mr-scats:${meetingCode}:event`),
+    id: createTimeRecordId(stableRecordKey),
+    originRecordNumber: record.recordNumber,
+    rawStatus: record.status,
+    recordType: RECORD_TX_CROSSING,
+    sequence,
+    sessionId: session.id,
+    source,
+    time,
+  };
+
+  if (transponderLooksLikePlateNumber) {
+    return {
+      ...baseRecord,
+      plateNumber,
+    } as ParticipantPassingRecord & { plateNumber: string };
+  }
+
+  return {
+    ...baseRecord,
+    chipCode: transponder,
+  } as ParticipantPassingRecord & { chipCode: number };
+};
+
 const buildSessionRecords = (
   meetingCode: string,
   buffers: Map<string, Buffer>,
@@ -523,7 +606,7 @@ const buildSessionRecords = (
   return sessions.flatMap((session): EventTimeRecord[] => {
     const source = createTimeRecordSourceId(`mr-scats:${meetingCode}:source:${session.eventCode}`);
     const scheduledStartTime = new Date(session.scheduledStart);
-    const sessionFileNames = findSessionCrossingFileNames(buffers, session);
+    const sessionFileNames = findSessionDbfCrossingFileNames(buffers, session);
     const sessionFileTables = sessionFileNames.flatMap((fileName) => {
       try {
         return [{
@@ -537,7 +620,7 @@ const buildSessionRecords = (
     const crossingRows = sessionFileTables.flatMap((table) => table.records);
     const greenElapsedMilliseconds = getGreenElapsedMilliseconds(crossingRows);
     const sessionElapsedZeroTime = new Date(scheduledStartTime.getTime() - greenElapsedMilliseconds);
-    const crossingRecords = sessionFileTables.flatMap((table) => table.records
+    const dbfCrossingRecords = sessionFileTables.flatMap((table) => table.records
       .map((record, rowIndex) => createCrossingRecord(
         meetingCode,
         session,
@@ -550,6 +633,31 @@ const buildSessionRecords = (
         participantsByPlate
       ))
       .filter((record): record is EventTimeRecord => record !== undefined));
+    const rawCrossingRecords = findSessionRawCrossingFileNames(buffers, session).flatMap((fileName, fileIndex): EventTimeRecord[] => {
+      const buffer = buffers.get(fileName);
+      if (!buffer) {
+        return [];
+      }
+
+      return parseCtcRawCrossingFile(buffer)
+        .map((record, rowIndex) => createRawCrossingRecord(
+          meetingCode,
+          session,
+          source,
+          fileName,
+          record,
+          sessionElapsedZeroTime,
+          sessionFileTables.reduce((total, table) => total + table.records.length, 0) + (fileIndex * 100000) + rowIndex + 2,
+          participantsByPlate
+        ))
+        .filter((record): record is EventTimeRecord => record !== undefined);
+    });
+    const crossingRecords = [...dbfCrossingRecords, ...rawCrossingRecords]
+      .sort((left, right) => (left.time?.getTime() || 0) - (right.time?.getTime() || 0))
+      .map((record, index): EventTimeRecord => ({
+        ...record,
+        sequence: index + 2,
+      }));
 
     if (crossingRecords.length === 0) {
       return [];
@@ -605,7 +713,7 @@ const buildParticipants = (
       return [];
     }
 
-    const categoryName = getCategoryName(driver.DRIV_CLASS);
+    const categoryName = getDriverCategoryName(driver);
     const categoryId = categoryIdByName.get(categoryName) || createCategoryId(`mr-scats:${meetingCode}:category:${categoryName}`);
     const entrantId = createEventEntrantId(`mr-scats:${meetingCode}:entrant:${plateNumber}`);
     const driverNames = DRIVER_NAME_FIELDS.map((field) => asString(driver[field]))

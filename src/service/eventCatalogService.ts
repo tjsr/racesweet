@@ -799,7 +799,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async updateEvent(eventId: EventId, changes: { date?: string; format?: EventCatalogState['events'][number]['format']; name?: string; timeZone?: string; }): Promise<EventCatalogState> {
+  public async updateEvent(eventId: EventId, changes: { date?: string; format?: EventCatalogState['events'][number]['format']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string; }): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes,
@@ -1349,7 +1349,7 @@ export class EventCatalogService {
     ]);
   }
 
-  public async updateSession(sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>): Promise<EventCatalogState> {
+  public async updateSession(sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'kind' | 'minimumLapTimeMilliseconds' | 'name' | 'notes' | 'scheduledStart' | 'status'>>): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes,
@@ -1363,7 +1363,7 @@ export class EventCatalogService {
 
   public async updateSessions(
     updates: Array<{
-      changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'kind' | 'name' | 'notes' | 'scheduledStart' | 'status'>>;
+      changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'kind' | 'minimumLapTimeMilliseconds' | 'name' | 'notes' | 'scheduledStart' | 'status'>>;
       sessionId: SessionId;
     }>
   ): Promise<EventCatalogState> {

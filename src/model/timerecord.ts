@@ -41,6 +41,11 @@ export const CROSSING_FLAG_PARTICIPANT_FASTEST = 0x02; // Indicates a crossing i
 export const CROSSING_FLAG_PARTICIPANT_IMPROVED = 0x04; // Indicates a crossing is quicker than previous lap.
 export const CROSSING_FLAG_LAP_UNDER_MINIMUM = 0x08; // Indicates a crossing is under the minimum lap time.
 
+export const CROSSING_UNRELATED_LAP_UNDER_MINIMUM = 'lap-under-minimum';
+
+export type CrossingUnrelatedReasonCode =
+  | typeof CROSSING_UNRELATED_LAP_UNDER_MINIMUM;
+
 export interface ParticipantPassingRecord extends EventTimeRecord {
   id: PassingRecordId;
   participantId?: EventParticipantId | null | undefined;
@@ -57,6 +62,8 @@ export interface ParticipantPassingRecord extends EventTimeRecord {
   positionInClass?: number | null | undefined;
   isValid?: boolean | null | undefined; // Indicates if the record is valid
   infoFlags?: number;
+  unrelatedReasonCode?: CrossingUnrelatedReasonCode;
+  unrelatedReason?: string;
 }
 
 export interface EntrantPassingRecord extends ParticipantPassingRecord {

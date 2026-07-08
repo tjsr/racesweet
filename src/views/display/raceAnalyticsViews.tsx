@@ -386,6 +386,20 @@ const buildLapChart = (rows: EntrantSummaryRow[]): LapChartColumn[] => {
     });
 };
 
+const getRaceStateContentSignature = (raceState: Session & RaceStateLookup): string => {
+  const participantSignature = raceState.participants
+    .map((participant) => `${participant.id}:${participant.categoryId}:${participant.identifiers?.length || 0}`)
+    .join('|');
+  const recordSignature = raceState.records
+    .map((record) => {
+      const passing = record as ParticipantPassingRecord;
+      return `${record.id}:${passing.participantId || ''}:${passing.lapNo || ''}:${passing.lapTime || ''}:${record.time?.getTime() || ''}`;
+    })
+    .join('|');
+
+  return `${participantSignature}::${recordSignature}`;
+};
+
 const buildFastestLapTimeline = (rows: EntrantSummaryRow[], ignoreFirstLap: boolean): FastestLapTimelineRow[] => {
   const candidates = rows.flatMap((row) => {
     const memberById = new Map(row.memberDetails.map((detail) => [detail.participantId, detail]));
@@ -548,9 +562,10 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
     }
   }, [categories, selectedCategory]);
 
+  const raceStateContentSignature = getRaceStateContentSignature(props.raceState);
   const allRows = React.useMemo(() => {
     return buildEntrantRows(props.raceState, props.catalogEntrants, excludedCategoryKeys);
-  }, [excludedCategoryKeys, props.catalogEntrants, props.raceState]);
+  }, [excludedCategoryKeys, props.catalogEntrants, props.raceState, raceStateContentSignature]);
 
   const rows = React.useMemo(() => {
     if (selectedCategory === 'overall') {
@@ -697,9 +712,10 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     }
   }, [categories, selectedCategory]);
 
+  const raceStateContentSignature = getRaceStateContentSignature(props.raceState);
   const allRows = React.useMemo(() => {
     return buildEntrantRows(props.raceState, props.catalogEntrants, excludedCategoryKeys);
-  }, [excludedCategoryKeys, props.catalogEntrants, props.raceState]);
+  }, [excludedCategoryKeys, props.catalogEntrants, props.raceState, raceStateContentSignature]);
 
   const rows = React.useMemo(() => {
     if (selectedCategory === 'overall') {
