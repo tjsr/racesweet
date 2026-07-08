@@ -69,10 +69,18 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
   if (type === 'file-mr-scats-data') {
     return {
       ...base,
+      finishLineNumbers: [1],
       mrScatsConfig: {
         files: [],
       },
       name: 'MR-SCATS Data',
+    };
+  }
+
+  if (type === 'timing-dorian-data1-supernode') {
+    return {
+      ...base,
+      finishLineNumbers: [1],
     };
   }
 

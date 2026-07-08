@@ -74,6 +74,14 @@ export const dateAtStartOfDayInTimeZone = (date: Date, timeZone: string | undefi
   return new TZDate(year, month - 1, day, 0, 0, 0, 0, normalizedTimeZone);
 };
 
+const describeTimeValue = (time: Date | undefined): string => {
+  if (!time) {
+    return 'undefined';
+  }
+
+  return `toString="${time.toString()}", getTime=${time.getTime()}`;
+};
+
 export const tableTimeStringInTimeZone = (time: Date | undefined, timeZone: string | undefined): string => {
   if (!time) {
     return 'Unknown time';
@@ -91,7 +99,7 @@ export const tableTimeStringInTimeZone = (time: Date | undefined, timeZone: stri
     const parts = Object.fromEntries(formatter.formatToParts(time).map((part) => [part.type, part.value]));
     return `${parts.hour}:${parts.minute}:${parts.second}.${parts.fractionalSecond}`;
   } catch (error) {
-    console.error(`Error formatting time for time zone ${timeZone}`);
+    console.error(`Error formatting time value ${describeTimeValue(time)} for time zone ${timeZone}`);
     throw error;
   }
 };
@@ -163,7 +171,7 @@ export const tableTimeString = (time: Date | undefined, timeZone?: string): stri
     }
     return timeString;
   } catch (error) {
-    console.error(`Error formatting time for green flag ${timeString}`);
+    console.error(`Error formatting time value ${describeTimeValue(time)} for green flag ${timeString}`);
     throw error;
   }
 };

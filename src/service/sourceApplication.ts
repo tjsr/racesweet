@@ -19,6 +19,7 @@ interface SessionSourceSink {
   categories: EventCategory[];
   endBulkProcess?(): Promise<void>;
   records: TimeRecord[];
+  setFinishLineNumbers?(finishLineNumbers: number[] | undefined): void;
   setMinimumLapTimeMilliseconds?(minimumLapTimeMilliseconds: number | undefined): void;
   setSessionKind?(sessionKind: EventSessionKind | undefined): void;
 }
@@ -26,6 +27,7 @@ interface SessionSourceSink {
 interface SessionSourceApplicationOptions {
   catalog?: EventCatalogState;
   eventId?: string;
+  finishLineNumbers?: number[];
   sessionId?: string;
 }
 
@@ -349,6 +351,7 @@ export const applyPulledRaceStateToSession = async (
       options.eventId,
       options.sessionId
     ));
+    sessionState.setFinishLineNumbers?.(options.finishLineNumbers);
     sessionState.setSessionKind?.(getSessionKindForSession(options.catalog, options.sessionId));
     const categoriesToAdd = getCategoriesToAdd(
       sessionState.categories,

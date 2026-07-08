@@ -57,9 +57,14 @@ const ZIP_LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50;
 const ARJ_HEADER_SIGNATURE = 0xea60;
 
 const classifyMrScatsFile = (extension: string): MrScatsDataFileKind => {
+  if (/^\.no\d+$/i.test(extension)) {
+    return 'no1-report';
+  }
+
   switch (extension.toLowerCase()) {
   case '.at1':
   case '.at2':
+    return 'dbf-table';
   case '.fst':
   case '.nt1':
   case '.ntt':
@@ -79,8 +84,6 @@ const classifyMrScatsFile = (extension: string): MrScatsDataFileKind => {
     return 'leader';
   case '.md5':
     return 'checksum';
-  case '.no1':
-    return 'no1-report';
   case '.pit':
     return 'pit';
   case '.erf':
@@ -168,7 +171,7 @@ const createSummary = async (
     ...extractSessionParts(relativePath),
   };
 
-  if (summary.kind === 'dbf-table') {
+  if (summary.kind === 'dbf-table' || summary.kind === 'no1-report') {
     summary.dbf = parseMrScatsDbfSummary(await readFile(path.join(rootPath, relativePath)));
   }
 

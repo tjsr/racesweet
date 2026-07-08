@@ -1,13 +1,14 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { TZDate } from '@date-fns/tz';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
-import type { GreenFlagRecord } from '../../model/flag.js';
+import type { GreenFlagRecord, YellowFlagRecord } from '../../model/flag.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
 import type { EventId, SessionId } from '../../model/raceevent.js';
 import type { RaceState } from '../../model/racestate.js';
 import { EVENT_FLAG_DISPLAYED, RECORD_TX_CROSSING, type EventTimeRecord, type ParticipantPassingRecord } from '../../model/timerecord.js';
-import { parseCtcRawCrossingLine, splitCtcRawCrossingLines, type CtcRawCrossingRecord } from '../ctc/rawCrossing.js';
+import { parseCtcRawCrossingFile, type CtcRawCrossingRecord } from '../ctc/rawCrossing.js';
 import { readMrScatsDbfTable, readMrScatsDbfTableAsync, type MrScatsDbfRecord } from './dbf.js';
 import { parseMrScatsDbfSummary, readMrScatsZipEntryBuffers } from './fileInventory.js';
 
@@ -60,8 +61,17 @@ interface MrScatsLoadProgressTracker {
 }
 
 interface MrScatsSessionLoadPlan {
+  auxiliaryDbfFileNames: string[];
   dbfFileNames: string[];
-  rawLinesByFileName: Map<string, string[]>;
+  noFileNames: string[];
+  rawFiles: MrScatsRawFilePlan[];
+}
+
+interface MrScatsRawFilePlan {
+  fileName: string;
+  lines: string[];
+  records: CtcRawCrossingRecord[];
+  segmentIndex: number;
 }
 
 interface MrScatsLoadPlan {
@@ -84,12 +94,17 @@ const CORE_TABLE_RELATED_EXTENSIONS = ['.DBF', '.DAT', '.TXT'];
 const DRIVER_NAME_FIELDS = ['DRIVER', 'DRIVER_2', 'DRIVER_3', 'DRIVER_4'];
 const TRANSPONDER_FIELDS = ['TXNUM', 'TXNUM2', 'TXNUM3', 'TXNUM4', 'TXNUM5', 'TXNUM6', 'TXNUM7', 'TXNUM8'];
 const CROSSING_ELAPSED_TICKS_PER_SECOND = 10000;
+const CROSSING_MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+const CROSSING_TIME_OF_DAY_PROXIMITY_MILLISECONDS = 6 * 60 * 60 * 1000;
 const CROSSING_ELAPSED_FIELDS = ['ELAPSED', 'ENTRYTIME'];
 const CROSSING_TRANSPONDER_FIELDS = ['TXNUM', 'TX_NO', 'TRANSPONDR', 'TRANSPONDER'];
 const CROSSING_PLATE_FIELDS = ['CARNUMBER', 'CAR', 'CAR_NO', 'CARNO'];
+const CROSSING_LINE_FIELDS = ['LINE_NO', 'LINE', 'LINENO', 'LINE_NUM', 'LINE_NUMBER'];
+const CROSSING_LOOP_FIELDS = ['LANE_NO', 'LANE', 'LANENO', 'LOOP', 'LOOP_NO', 'LOOPNO', 'LOOP_NUMBER'];
 const CROSSING_GREEN_ELAPSED_FIELDS = ['GREENELAPS', 'GREEN_ELAP', 'STARTELAP', 'START_ELAP', 'STARTELPSD'];
 const CROSSING_GREEN_FLAG_FIELDS = ['FLAG', 'SYNCMARK', 'STARTFIN'];
-const RAW_CROSSING_EXTENSIONS = ['.SRT', '.ERF', '.AT1', '.AT2'];
+const AUXILIARY_DBF_EXTENSIONS = ['.AT1', '.AT2'];
+const RAW_CROSSING_EXTENSIONS = ['.SRT', '.ERF'];
 
 const createProgressTracker = (total: number, onProgress: MrScatsCatalogLoadOptions['onProgress']): MrScatsLoadProgressTracker => {
   let completed = 0;
@@ -282,8 +297,13 @@ const parseDateTime = (dateValue: unknown, timeValue: unknown): string | undefin
   }
 
   const time = asString(timeValue);
-  const normalizedTime = /^\d{1,2}:\d{2}$/.test(time) ? `${time.padStart(5, '0')}:00` : '00:00:00';
-  return new Date(`${date}T${normalizedTime}+10:00`).toISOString();
+  const normalizedTime = /^\d{1,2}:\d{2}$/.test(time)
+    ? `${time.padStart(5, '0')}:00`
+    : /^\d{1,2}:\d{2}:\d{2}$/.test(time)
+      ? time.padStart(8, '0')
+      : '00:00:00';
+  const zonedDate = new TZDate(`${date}T${normalizedTime}`, DEFAULT_TIME_ZONE);
+  return Number.isNaN(zonedDate.getTime()) ? undefined : new Date(zonedDate.getTime()).toISOString();
 };
 
 const parseNumber = (value: unknown): number | undefined => {
@@ -314,6 +334,20 @@ const getFirstNumber = (record: MrScatsDbfRecord, fields: string[]): number | un
     const parsed = parseNumber(record[field]);
     if (parsed !== undefined) {
       return parsed;
+    }
+  }
+
+  return undefined;
+};
+
+const getFirstNumberMatch = (record: MrScatsDbfRecord, fields: string[]): { fieldName: string; value: number } | undefined => {
+  for (const field of fields) {
+    const parsed = parseNumber(record[field]);
+    if (parsed !== undefined) {
+      return {
+        fieldName: field,
+        value: parsed,
+      };
     }
   }
 
@@ -417,7 +451,8 @@ const buildSessions = (meetingCode: string, programme: MrScatsDbfRecord[], categ
       const eventCodeType = /^([A-Z]\d{4})([A-Z])\d{2}/i.exec(eventCode)?.[2]?.toUpperCase();
       const categoryName = getCategoryName(row.CATEGORY);
       const categoryId = categoryIdByName.get(categoryName);
-      const scheduledStart = parseDateTime(row.STARTDATE, row.ACTUALSTRT || row.STARTTIME) ||
+      const sessionStartText = [row.ACTUALSTRT, row.GRIDTIME, row.STARTTIME].map(asString).find((value) => value.length > 0);
+      const scheduledStart = parseDateTime(row.STARTDATE, sessionStartText) ||
         parseDateTime(row.STARTDATE, undefined) ||
         new Date(`${FALLBACK_EVENT_DATE}T00:00:00+10:00`).toISOString();
       return {
@@ -438,11 +473,102 @@ const findSessionDbfCrossingFileNames = (buffers: Map<string, Buffer>, session: 
     .filter((fileName) => path.extname(fileName).toUpperCase() === '.DBF');
 };
 
-const findSessionRawCrossingFileNames = (buffers: Map<string, Buffer>, session: MrScatsImportedSession): string[] => {
+const findSessionAuxiliaryDbfFileNames = (buffers: Map<string, Buffer>, session: MrScatsImportedSession): string[] => {
   const eventCode = session.eventCode.toUpperCase();
   return Array.from(buffers.keys())
     .filter((fileName) => normalizeBaseName(fileName) === eventCode)
-    .filter((fileName) => RAW_CROSSING_EXTENSIONS.includes(path.extname(fileName).toUpperCase()));
+    .filter((fileName) => AUXILIARY_DBF_EXTENSIONS.includes(path.extname(fileName).toUpperCase()));
+};
+
+const findSessionNoCrossingFileNames = (buffers: Map<string, Buffer>, session: MrScatsImportedSession): string[] => {
+  const eventCode = session.eventCode.toUpperCase();
+  return Array.from(buffers.keys())
+    .filter((fileName) => normalizeBaseName(fileName) === eventCode)
+    .filter((fileName) => /^\.NO\d+$/i.test(path.extname(fileName)));
+};
+
+const splitRawRecordsByStartRecords = (records: CtcRawCrossingRecord[]): CtcRawCrossingRecord[][] => {
+  const segments: CtcRawCrossingRecord[][] = [];
+  let currentSegment: CtcRawCrossingRecord[] = [];
+  let seenStartRecord = false;
+
+  records.forEach((record) => {
+    const isStartRecord = record.specialType === 'start-of-race';
+    if (isStartRecord && seenStartRecord && currentSegment.length > 0) {
+      segments.push(currentSegment);
+      currentSegment = [record];
+      return;
+    }
+
+    if (isStartRecord) {
+      seenStartRecord = true;
+    }
+    currentSegment.push(record);
+  });
+
+  if (currentSegment.length > 0) {
+    segments.push(currentSegment);
+  }
+
+  return segments;
+};
+
+const parseSessionNumberFromEventCode = (eventCode: string): number | undefined => {
+  const match = /^[A-Z]\d{4}[A-Z](\d{2})$/i.exec(eventCode.trim());
+  return match ? Number(match[1]) : undefined;
+};
+
+const replaceSessionNumberInEventCode = (eventCode: string, sessionNumber: number): string => {
+  return eventCode.replace(/(\d{2})$/u, String(sessionNumber).padStart(2, '0'));
+};
+
+const findSessionRawCrossingFiles = (buffers: Map<string, Buffer>, session: MrScatsImportedSession): MrScatsRawFilePlan[] => {
+  const targetEventCode = session.eventCode.toUpperCase();
+  const targetSessionNumber = parseSessionNumberFromEventCode(targetEventCode);
+  const rawFiles: MrScatsRawFilePlan[] = [];
+
+  RAW_CROSSING_EXTENSIONS.forEach((extension) => {
+    const directMatch = Array.from(buffers.keys()).find((fileName) =>
+      normalizeBaseName(fileName) === targetEventCode &&
+      path.extname(fileName).toUpperCase() === extension
+    );
+    const sessionNumbersToTry = targetSessionNumber === undefined
+      ? [undefined]
+      : Array.from({ length: targetSessionNumber }, (_value, index) => targetSessionNumber - index);
+
+    for (const candidateSessionNumber of sessionNumbersToTry) {
+      const candidateEventCode = candidateSessionNumber === undefined
+        ? targetEventCode
+        : replaceSessionNumberInEventCode(targetEventCode, candidateSessionNumber);
+      const fileName = candidateSessionNumber === targetSessionNumber && directMatch
+        ? directMatch
+        : Array.from(buffers.keys()).find((candidateFileName) =>
+          normalizeBaseName(candidateFileName) === candidateEventCode &&
+          path.extname(candidateFileName).toUpperCase() === extension
+        );
+      if (!fileName) {
+        continue;
+      }
+
+      const segmentIndex = targetSessionNumber === undefined || candidateSessionNumber === undefined
+        ? 0
+        : targetSessionNumber - candidateSessionNumber;
+      const allRecords = parseCtcRawCrossingFile(buffers.get(fileName)!);
+      const segments = splitRawRecordsByStartRecords(allRecords);
+      const records = segments[segmentIndex] || [];
+      if (records.length > 0) {
+        rawFiles.push({
+          fileName,
+          lines: records.map((record) => record.raw),
+          records,
+          segmentIndex,
+        });
+      }
+      break;
+    }
+  });
+
+  return rawFiles;
 };
 
 const inferSessionCategoryIdsFromCrossings = (
@@ -507,24 +633,25 @@ const createLoadPlan = (buffers: Map<string, Buffer>, locationPath: string, extr
   let sessionRowCount = 0;
 
   for (const session of sessions) {
+    const auxiliaryDbfFileNames = findSessionAuxiliaryDbfFileNames(buffers, session);
     const dbfFileNames = findSessionDbfCrossingFileNames(buffers, session);
-    const rawFileNames = findSessionRawCrossingFileNames(buffers, session);
-    const rawLinesByFileName = new Map<string, string[]>();
+    const noFileNames = findSessionNoCrossingFileNames(buffers, session);
+    const rawFiles = findSessionRawCrossingFiles(buffers, session);
 
-    sessionFileCount += dbfFileNames.length + rawFileNames.length;
-    for (const fileName of dbfFileNames) {
+    sessionFileCount += auxiliaryDbfFileNames.length + dbfFileNames.length + noFileNames.length + rawFiles.length;
+    for (const fileName of [...dbfFileNames, ...noFileNames, ...auxiliaryDbfFileNames]) {
       const summary = parseMrScatsDbfSummary(buffers.get(fileName)!);
       sessionRowCount += summary?.recordCount || 0;
     }
-    for (const fileName of rawFileNames) {
-      const rawLines = splitCtcRawCrossingLines(buffers.get(fileName)!);
-      rawLinesByFileName.set(fileName, rawLines);
-      sessionRowCount += rawLines.length;
+    for (const rawFile of rawFiles) {
+      sessionRowCount += rawFile.lines.length;
     }
 
     sessionPlansById.set(session.id.toString(), {
+      auxiliaryDbfFileNames,
       dbfFileNames,
-      rawLinesByFileName,
+      noFileNames,
+      rawFiles,
     });
   }
 
@@ -543,8 +670,8 @@ const createLoadPlan = (buffers: Map<string, Buffer>, locationPath: string, extr
   };
 };
 
-const getElapsedMilliseconds = (record: MrScatsDbfRecord): number | undefined => {
-  const elapsedTicks = getFirstNumber(record, CROSSING_ELAPSED_FIELDS);
+const getElapsedMilliseconds = (record: MrScatsDbfRecord, fields: string[] = CROSSING_ELAPSED_FIELDS): number | undefined => {
+  const elapsedTicks = getFirstNumberMatch(record, fields)?.value;
   if (elapsedTicks === undefined) {
     return undefined;
   }
@@ -574,6 +701,101 @@ const getGreenElapsedMilliseconds = (records: MrScatsDbfRecord[]): number => {
   return flaggedRecord ? getElapsedMilliseconds(flaggedRecord) || 0 : 0;
 };
 
+const getTimeZoneDate = (date: Date): string => {
+  const zonedDate = TZDate.tz(DEFAULT_TIME_ZONE, date);
+  return `${zonedDate.getFullYear()}-${String(zonedDate.getMonth() + 1).padStart(2, '0')}-${String(zonedDate.getDate()).padStart(2, '0')}`;
+};
+
+const getTimeZoneMillisecondsSinceMidnight = (date: Date): number => {
+  const zonedDate = TZDate.tz(DEFAULT_TIME_ZONE, date);
+  return (((zonedDate.getHours() * 60) + zonedDate.getMinutes()) * 60 + zonedDate.getSeconds()) * 1000 + zonedDate.getMilliseconds();
+};
+
+const createTimeZoneDateTime = (dateText: string, millisecondsSinceMidnight: number): Date => {
+  const totalMilliseconds = Math.round(millisecondsSinceMidnight);
+  const hours = Math.floor(totalMilliseconds / (60 * 60 * 1000));
+  const minutes = Math.floor((totalMilliseconds % (60 * 60 * 1000)) / (60 * 1000));
+  const seconds = Math.floor((totalMilliseconds % (60 * 1000)) / 1000);
+  const milliseconds = totalMilliseconds % 1000;
+  return new TZDate(
+    `${dateText}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`,
+    DEFAULT_TIME_ZONE
+  );
+};
+
+const createTimeOfDayDateNearSession = (scheduledStartTime: Date, millisecondsSinceMidnight: number): Date => {
+  const scheduledDate = getTimeZoneDate(scheduledStartTime);
+  let candidate = createTimeZoneDateTime(scheduledDate, millisecondsSinceMidnight);
+  while (candidate.getTime() < scheduledStartTime.getTime() - (12 * 60 * 60 * 1000)) {
+    candidate = new Date(candidate.getTime() + CROSSING_MILLISECONDS_PER_DAY);
+  }
+  while (candidate.getTime() > scheduledStartTime.getTime() + (12 * 60 * 60 * 1000)) {
+    candidate = new Date(candidate.getTime() - CROSSING_MILLISECONDS_PER_DAY);
+  }
+  return candidate;
+};
+
+const shouldTreatElapsedTicksAsTimeOfDay = (
+  scheduledStartTime: Date,
+  elapsedTicks: number
+): boolean => {
+  if (elapsedTicks < 0 || elapsedTicks >= CROSSING_MILLISECONDS_PER_DAY * CROSSING_ELAPSED_TICKS_PER_SECOND / 1000) {
+    return false;
+  }
+
+  const millisecondsSinceMidnight = (elapsedTicks / CROSSING_ELAPSED_TICKS_PER_SECOND) * 1000;
+  const scheduledMilliseconds = getTimeZoneMillisecondsSinceMidnight(scheduledStartTime);
+  const directDifference = Math.abs(millisecondsSinceMidnight - scheduledMilliseconds);
+  const wrappedDifference = CROSSING_MILLISECONDS_PER_DAY - directDifference;
+  return Math.min(directDifference, wrappedDifference) <= CROSSING_TIME_OF_DAY_PROXIMITY_MILLISECONDS;
+};
+
+const getCrossingTime = (
+  record: MrScatsDbfRecord,
+  scheduledStartTime: Date,
+  sessionElapsedZeroTime: Date
+): { elapsedMilliseconds: number; time: Date } | undefined => {
+  const elapsedClockMatch = getFirstNumberMatch(record, ['ELAPSED']);
+  if (elapsedClockMatch && shouldTreatElapsedTicksAsTimeOfDay(scheduledStartTime, elapsedClockMatch.value)) {
+    const elapsedMilliseconds = (elapsedClockMatch.value / CROSSING_ELAPSED_TICKS_PER_SECOND) * 1000;
+    return {
+      elapsedMilliseconds,
+      time: createTimeOfDayDateNearSession(scheduledStartTime, elapsedMilliseconds),
+    };
+  }
+
+  const elapsedMatch = getFirstNumberMatch(record, CROSSING_ELAPSED_FIELDS);
+  if (!elapsedMatch) {
+    return undefined;
+  }
+
+  const elapsedMilliseconds = (elapsedMatch.value / CROSSING_ELAPSED_TICKS_PER_SECOND) * 1000;
+  return {
+    elapsedMilliseconds,
+    time: new Date(sessionElapsedZeroTime.getTime() + elapsedMilliseconds),
+  };
+};
+
+const getNoFileLineNumber = (fileName: string): number | undefined => {
+  const match = /^\.NO(\d+)$/i.exec(path.extname(fileName));
+  if (!match) {
+    return undefined;
+  }
+
+  const parsed = Number(match[1]);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+};
+
+const getCrossingAntenna = (record: MrScatsDbfRecord, fileName: string): string | undefined => {
+  const lineNumber = getFirstPositiveInteger(record, CROSSING_LINE_FIELDS) || getNoFileLineNumber(fileName);
+  const loopNumber = getFirstPositiveInteger(record, CROSSING_LOOP_FIELDS);
+  if (lineNumber === undefined) {
+    return undefined;
+  }
+
+  return `Line ${lineNumber}${loopNumber !== undefined ? ` Loop ${loopNumber}` : ''}`;
+};
+
 const createSessionGreenFlag = (
   meetingCode: string,
   session: MrScatsImportedSession,
@@ -595,6 +817,63 @@ const createSessionGreenFlag = (
   time: scheduledStartTime,
 });
 
+const parseRawTimeOfDay = (timeText: string | undefined, fallbackTime: Date): Date => {
+  const explicitTimeMatch = timeText ? /^(\d{2}):(\d{2}):(\d{2})\.(\d{4})$/.exec(timeText) : undefined;
+  const explicitTimeOfDayMilliseconds = explicitTimeMatch
+    ? ((((Number(explicitTimeMatch[1]) * 60) + Number(explicitTimeMatch[2])) * 60) + Number(explicitTimeMatch[3])) * 1000 +
+      Math.floor(Number(explicitTimeMatch[4]) / 10)
+    : undefined;
+
+  return explicitTimeOfDayMilliseconds === undefined
+    ? fallbackTime
+    : createTimeOfDayDateNearSession(fallbackTime, explicitTimeOfDayMilliseconds);
+};
+
+const createSessionGreenResumeFlag = (
+  meetingCode: string,
+  session: MrScatsImportedSession,
+  source: ReturnType<typeof createTimeRecordSourceId>,
+  fileName: string,
+  record: CtcRawCrossingRecord,
+  sequence: number
+): GreenFlagRecord => ({
+  categoryIds: session.categoryIds,
+  dataLine: record.raw,
+  eventId: createEventId(`mr-scats:${meetingCode}:event`),
+  flagType: 'green',
+  flagValue: 'course',
+  id: createTimeRecordId(`mr-scats:${meetingCode}:session:${session.eventCode}:${path.basename(fileName)}:raw-flag:${record.recordNumber}:${record.drtCode}`),
+  indicatesRaceStart: false,
+  recordType: EVENT_FLAG_DISPLAYED,
+  sequence,
+  sessionId: session.id,
+  source,
+  systemGenerated: true,
+  time: parseRawTimeOfDay(record.timeText, new Date(session.scheduledStart)),
+});
+
+const createSessionYellowFlag = (
+  meetingCode: string,
+  session: MrScatsImportedSession,
+  source: ReturnType<typeof createTimeRecordSourceId>,
+  fileName: string,
+  record: CtcRawCrossingRecord,
+  sequence: number
+): YellowFlagRecord => ({
+  categoryIds: session.categoryIds,
+  dataLine: record.raw,
+  eventId: createEventId(`mr-scats:${meetingCode}:event`),
+  flagType: 'yellow',
+  flagValue: 'caution',
+  id: createTimeRecordId(`mr-scats:${meetingCode}:session:${session.eventCode}:${path.basename(fileName)}:raw-flag:${record.recordNumber}:${record.drtCode}`),
+  recordType: EVENT_FLAG_DISPLAYED,
+  sequence,
+  sessionId: session.id,
+  source,
+  systemGenerated: true,
+  time: parseRawTimeOfDay(record.timeText, new Date(session.scheduledStart)),
+});
+
 const createCrossingRecord = (
   meetingCode: string,
   session: MrScatsImportedSession,
@@ -602,12 +881,14 @@ const createCrossingRecord = (
   fileName: string,
   record: MrScatsDbfRecord,
   rowIndex: number,
+  scheduledStartTime: Date,
   sessionElapsedZeroTime: Date,
   sequence: number,
-  participantsByPlate: Map<string, EventParticipant>
+  participantsByPlate: Map<string, EventParticipant>,
+  options: { isLapCompletion?: boolean } = {}
 ): EventTimeRecord | undefined => {
-  const elapsedMilliseconds = getElapsedMilliseconds(record);
-  if (elapsedMilliseconds === undefined) {
+  const crossingTime = getCrossingTime(record, scheduledStartTime, sessionElapsedZeroTime);
+  if (!crossingTime) {
     return undefined;
   }
 
@@ -623,7 +904,6 @@ const createCrossingRecord = (
     return undefined;
   }
 
-  const time = new Date(sessionElapsedZeroTime.getTime() + elapsedMilliseconds);
   const stableRecordKey = [
     'mr-scats',
     meetingCode,
@@ -632,19 +912,21 @@ const createCrossingRecord = (
     asString(record.COUNTER) || `${rowIndex + 1}`,
     transponder === undefined ? '' : transponder.toString(),
     plateNumber,
-    elapsedMilliseconds.toString(),
+    crossingTime.elapsedMilliseconds.toString(),
   ].join(':');
-  const baseRecord: ParticipantPassingRecord = {
+  const baseRecord: ParticipantPassingRecord & { antenna?: string } = {
+    antenna: getCrossingAntenna(record, fileName),
     dataLine: JSON.stringify(record),
     elapsedTime: null,
     eventId: createEventId(`mr-scats:${meetingCode}:event`),
     id: createTimeRecordId(stableRecordKey),
+    isLapCompletion: options.isLapCompletion,
     originRecordNumber: rowIndex + 1,
     recordType: RECORD_TX_CROSSING,
     sequence,
     sessionId: session.id,
     source,
-    time,
+    time: crossingTime.time,
   };
 
   if (transponder !== undefined) {
@@ -681,7 +963,9 @@ const createRawCrossingRecord = (
     hasParticipantPlate(participantsByPlate, plateNumber) &&
     !hasParticipantTransponderForPlate(participantsByPlate, plateNumber, transponder);
   const elapsedMilliseconds = getRawElapsedMilliseconds(record);
-  const time = new Date(sessionElapsedZeroTime.getTime() + elapsedMilliseconds);
+  const time = record.timeText === undefined
+    ? new Date(sessionElapsedZeroTime.getTime() + elapsedMilliseconds)
+    : parseRawTimeOfDay(record.timeText, new Date(session.scheduledStart));
   const stableRecordKey = [
     'mr-scats',
     meetingCode,
@@ -707,6 +991,8 @@ const createRawCrossingRecord = (
     elapsedTime: null,
     eventId: createEventId(`mr-scats:${meetingCode}:event`),
     id: createTimeRecordId(stableRecordKey),
+    lineNumber: record.lineNumber,
+    loopNumber: record.laneNumber,
     originRecordNumber: record.recordNumber,
     rawStatus: record.status,
     recordType: RECORD_TX_CROSSING,
@@ -742,20 +1028,28 @@ const buildSessionRecords = async (
 
   for (const session of sessions) {
     const source = createTimeRecordSourceId(`mr-scats:${meetingCode}:source:${session.eventCode}`);
-    const scheduledStartTime = new Date(session.scheduledStart);
     const sessionPlan = loadPlan.sessionPlansById.get(session.id.toString()) || {
+      auxiliaryDbfFileNames: [],
       dbfFileNames: [],
-      rawLinesByFileName: new Map<string, string[]>(),
+      noFileNames: [],
+      rawFiles: [],
     };
-    const sessionFileTables: CoreTableSource[] = [];
-    let length = sessionPlan.rawLinesByFileName.size;
-    for (const fileName of sessionPlan.dbfFileNames) {
+    const parsedRawFiles = sessionPlan.rawFiles;
+    const rawStartRecord = parsedRawFiles
+      .flatMap((rawFile) => rawFile.records)
+      .find((record) => record.specialType === 'start-of-race' && record.timeText !== undefined);
+    const scheduledStartTime = rawStartRecord?.timeText
+      ? parseRawTimeOfDay(rawStartRecord.timeText, new Date(session.scheduledStart))
+      : new Date(session.scheduledStart);
+    const sessionFileTables: Array<CoreTableSource & { isLapCompletion: boolean }> = [];
+    for (const fileName of [...sessionPlan.dbfFileNames, ...sessionPlan.noFileNames, ...sessionPlan.auxiliaryDbfFileNames]) {
       let completedFileScan = false;
       try {
         await progress?.completeFileScan(fileName, 'buildSessionRecords[scan]');
         completedFileScan = true;
         sessionFileTables.push({
           fileName,
+          isLapCompletion: !(sessionPlan.noFileNames.includes(fileName) || sessionPlan.auxiliaryDbfFileNames.includes(fileName)),
           records: (await readMrScatsDbfTableAsync(buffers.get(fileName)!, {
             onRecordRead: (rowNumber: number) => progress?.completeRow(fileName, `buildSessionRecords[onRecordRead:${rowNumber}]`),
           })).records,
@@ -766,7 +1060,9 @@ const buildSessionRecords = async (
         }
       }
     }
-    const crossingRows = sessionFileTables.flatMap((table) => table.records);
+    const crossingRows = sessionFileTables
+      .filter((table) => table.isLapCompletion)
+      .flatMap((table) => table.records);
     const greenElapsedMilliseconds = getGreenElapsedMilliseconds(crossingRows);
     const sessionElapsedZeroTime = new Date(scheduledStartTime.getTime() - greenElapsedMilliseconds);
     const dbfCrossingRecords = sessionFileTables.flatMap((table) => table.records
@@ -777,29 +1073,34 @@ const buildSessionRecords = async (
         table.fileName,
         record,
         rowIndex,
+        scheduledStartTime,
         sessionElapsedZeroTime,
         rowIndex + 2,
-        participantsByPlate
+        participantsByPlate,
+        { isLapCompletion: table.isLapCompletion }
       ))
       .filter((record): record is EventTimeRecord => record !== undefined));
     const rawCrossingRecords: EventTimeRecord[] = [];
-    const rawFileNames = Array.from(sessionPlan.rawLinesByFileName.keys());
-    for (const [fileIndex, fileName] of rawFileNames.entries()) {
-      const buffer = buffers.get(fileName);
-      if (!buffer) {
-        continue;
-      }
-
-      const rawLines = sessionPlan.rawLinesByFileName.get(fileName) || [];
+    const rawFlagRecords: EventTimeRecord[] = [];
+    for (const [fileIndex, rawFile] of parsedRawFiles.entries()) {
+      const fileName = rawFile.fileName;
+      const rawLines = rawFile.lines;
       await progress?.completeFileScan(fileName, 'buildSessionRecords');
-      const rawRecords: CtcRawCrossingRecord[] = [];
-      for (const [rowIndex, line] of rawLines.entries()) {
-        const record = parseCtcRawCrossingLine(line, rowIndex + 1);
+      for (const _line of rawLines) {
         await progress?.completeRow(fileName, 'buildSessionRecords');
-        if (record) {
-          rawRecords.push(record);
-        }
       }
+      const rawRecords = rawFile.records;
+      const baseSequence = sessionFileTables.reduce((total, table) => total + table.records.length, 0) + (fileIndex * 100000) + 2;
+
+      rawFlagRecords.push(...rawRecords.flatMap((record, rowIndex): EventTimeRecord[] => {
+        if (record.specialType === 'yellow-flag') {
+          return [createSessionYellowFlag(meetingCode, session, source, fileName, record, baseSequence + rowIndex)];
+        }
+        if (record.specialType === 'yellow-end') {
+          return [createSessionGreenResumeFlag(meetingCode, session, source, fileName, record, baseSequence + rowIndex)];
+        }
+        return [];
+      }));
 
       rawCrossingRecords.push(...rawRecords
         .map((record, rowIndex) => createRawCrossingRecord(
@@ -809,12 +1110,12 @@ const buildSessionRecords = async (
           fileName,
           record,
           sessionElapsedZeroTime,
-          sessionFileTables.reduce((total, table) => total + table.records.length, 0) + (fileIndex * 100000) + rowIndex + 2,
+          baseSequence + rowIndex,
           participantsByPlate
         ))
         .filter((record): record is EventTimeRecord => record !== undefined));
     }
-    const crossingRecords = [...dbfCrossingRecords, ...rawCrossingRecords]
+    const crossingRecords = [...dbfCrossingRecords, ...rawFlagRecords, ...rawCrossingRecords]
       .sort((left, right) => (left.time?.getTime() || 0) - (right.time?.getTime() || 0))
       .map((record, index): EventTimeRecord => ({
         ...record,

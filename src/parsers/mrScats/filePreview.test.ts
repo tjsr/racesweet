@@ -236,22 +236,82 @@ describe('MR-SCATS file preview', () => {
 
   it('previews SRT and ERF files as raw crossing text lines instead of DBF tables', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-preview-'));
-    await writeFile(path.join(tempDir, 'W9721R10.SRT'), '000123456789\r000987654321\r\n000555666777');
+    await writeFile(path.join(tempDir, 'W9721R10.SRT'), '600881437728440008814377286801 021 19:48:48.6801 00\r040881438149697001300108255000002\r4D08814381718986');
 
     const preview = await previewMrScatsDataFile(tempDir, 'W9721R10.SRT', 'raw-crossing-text');
 
     expect(preview).toEqual(expect.objectContaining({
-      columns: ['Line number', 'Raw crossing data'],
+      columns: ['Line number', 'Record type', 'Time of day', 'Time ticks', 'TxNo', 'Line', 'Loop', 'Confidence', 'Status', 'Raw crossing data'],
       displayedRowCount: 3,
       fileKind: 'raw-crossing-text',
       parser: 'text',
       recordCount: 3,
     }));
     expect(preview.rows).toEqual([
-      { 'Line number': 1, 'Raw crossing data': '000123456789' },
-      { 'Line number': 2, 'Raw crossing data': '000987654321' },
-      { 'Line number': 3, 'Raw crossing data': '000555666777' },
+      {
+        Confidence: '',
+        Line: '',
+        'Line number': 1,
+        Loop: '',
+        'Raw crossing data': '600881437728440008814377286801 021 19:48:48.6801 00',
+        'Record type': 'SRT',
+        Status: '00',
+        'Time of day': '19:48:48.6801',
+        'Time ticks': 713286801,
+        TxNo: 6008,
+      },
+      {
+        Confidence: '255',
+        Line: 1,
+        'Line number': 2,
+        Loop: 8,
+        'Raw crossing data': '040881438149697001300108255000002',
+        'Record type': '04',
+        Status: '000',
+        'Time of day': '19:55:49.6970',
+        'Time ticks': 717496970,
+        TxNo: 130,
+      },
+      {
+        Confidence: '',
+        Line: '',
+        'Line number': 3,
+        Loop: '',
+        'Raw crossing data': '4D08814381718986',
+        'Record type': 'yellow-flag',
+        Status: '',
+        'Time of day': '19:56:11.8986',
+        'Time ticks': 717718986,
+        TxNo: '',
+      },
     ]);
     expect(preview.warnings.join(' ')).toContain('not dBase tables');
+    expect(preview.warnings.join(' ')).toContain('authoritative time-of-day values');
+  });
+
+  it('previews AT1 files as DBF-compatible tables instead of raw crossing text', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-preview-'));
+    await writeFile(path.join(tempDir, 'W9721R10.AT1'), createDbfBuffer([
+      { length: 4, name: 'CAR', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 9, name: 'ELAPSED', type: 'N' },
+      { length: 3, name: 'LINE_NO', type: 'N' },
+      { length: 3, name: 'LANE_NO', type: 'N' },
+    ], [
+      { CAR: 7, ELAPSED: 15000, LANE_NO: 2, LINE_NO: 5, TXNUM: 1234 },
+    ]));
+
+    const preview = await previewMrScatsDataFile(tempDir, 'W9721R10.AT1', 'dbf-table');
+
+    expect(preview).toEqual(expect.objectContaining({
+      columns: ['CAR', 'TXNUM', 'ELAPSED', 'LINE_NO', 'LANE_NO'],
+      displayedRowCount: 1,
+      fileKind: 'dbf-table',
+      parser: 'dbf',
+      recordCount: 1,
+    }));
+    expect(preview.rows).toEqual([
+      { CAR: 7, ELAPSED: 15000, LANE_NO: 2, LINE_NO: 5, TXNUM: 1234 },
+    ]);
   });
 });

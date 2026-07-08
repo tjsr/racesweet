@@ -10,13 +10,14 @@ import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.js";
 
 import type { EventEntrantId } from "../model/entrant.js";
 import type { EventCategoryId } from "../model/eventcategory.js";
-import { CROSSING_FLAG_LAP_UNDER_MINIMUM, CROSSING_UNRELATED_LAP_UNDER_MINIMUM, EVENT_SESSION_END } from "../model/timerecord.js";
+import { CROSSING_FLAG_LAP_UNDER_MINIMUM, CROSSING_FLAG_NON_LAP_COMPLETION, CROSSING_UNRELATED_LAP_UNDER_MINIMUM, CROSSING_UNRELATED_NON_LAP_COMPLETION, EVENT_SESSION_END } from "../model/timerecord.js";
 import { warn } from "../utils.js";
 import { setCategoryStartForPassings } from "./category.js";
 import { entrantHasAnyTx } from "./participantMatch.js";
 import { compareByTime } from './timerecord.js';
 
 const MINIMUM_LAP_TIME_SECONDS = 300;
+const DEFAULT_FINISH_LINE_NUMBERS = [1];
 
 const isRaceSessionKind = (sessionKind: EventSessionKind | undefined): boolean => {
   return sessionKind === undefined || sessionKind === 'race';
@@ -66,10 +67,68 @@ const setPassingLapUnderMinimum = (
 };
 
 const clearCalculatedUnrelatedReason = (passing: ParticipantPassingRecord): void => {
-  passing.infoFlags = (passing.infoFlags || 0) & ~CROSSING_FLAG_LAP_UNDER_MINIMUM;
-  if (passing.unrelatedReasonCode === CROSSING_UNRELATED_LAP_UNDER_MINIMUM) {
+  passing.infoFlags = (passing.infoFlags || 0) & ~CROSSING_FLAG_LAP_UNDER_MINIMUM & ~CROSSING_FLAG_NON_LAP_COMPLETION;
+  if (
+    passing.unrelatedReasonCode === CROSSING_UNRELATED_LAP_UNDER_MINIMUM ||
+    passing.unrelatedReasonCode === CROSSING_UNRELATED_NON_LAP_COMPLETION
+  ) {
     setPassingUnrelatedReason(passing, undefined, undefined);
   }
+};
+
+const isLapCompletionPassing = (passing: ParticipantPassingRecord): boolean => passing.isLapCompletion !== false;
+
+export const normalizeFinishLineNumbers = (finishLineNumbers: number[] | undefined): number[] => {
+  const normalizedNumbers = Array.from(new Set(
+    (finishLineNumbers || DEFAULT_FINISH_LINE_NUMBERS)
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  return normalizedNumbers.length > 0 ? normalizedNumbers : [...DEFAULT_FINISH_LINE_NUMBERS];
+};
+
+const getAntennaString = (passing: ParticipantPassingRecord): string | undefined => {
+  const antenna = (passing as ParticipantPassingRecord & { antenna?: string }).antenna;
+  return typeof antenna === 'string' ? antenna : undefined;
+};
+
+export const getPassingLineNumber = (passing: ParticipantPassingRecord): number | undefined => {
+  if (typeof passing.lineNumber === 'number' && Number.isInteger(passing.lineNumber) && passing.lineNumber > 0) {
+    return passing.lineNumber;
+  }
+
+  const lineMatch = getAntennaString(passing)?.match(/line\s+(\d+)/i);
+  return lineMatch ? Number(lineMatch[1]) : undefined;
+};
+
+export const getPassingLoopNumber = (passing: ParticipantPassingRecord): number | undefined => {
+  if (typeof passing.loopNumber === 'number' && Number.isInteger(passing.loopNumber) && passing.loopNumber > 0) {
+    return passing.loopNumber;
+  }
+
+  const loopMatch = getAntennaString(passing)?.match(/(?:loop|lane)\s+(\d+)/i);
+  return loopMatch ? Number(loopMatch[1]) : undefined;
+};
+
+export const isFinishLinePassing = (
+  passing: ParticipantPassingRecord,
+  finishLineNumbers: number[] | undefined
+): boolean => {
+  const lineNumber = getPassingLineNumber(passing);
+  if (lineNumber === undefined) {
+    return true;
+  }
+
+  return normalizeFinishLineNumbers(finishLineNumbers).includes(lineNumber);
+};
+
+export const getTimingLineKey = (
+  passing: ParticipantPassingRecord,
+  finishLineNumbers: number[] | undefined
+): string => {
+  return isFinishLinePassing(passing, finishLineNumbers)
+    ? 'finish'
+    : `line:${getPassingLineNumber(passing)?.toString() || 'unknown'}`;
 };
 
 const resetPassingLapState = (passing: ParticipantPassingRecord): void => {
@@ -130,13 +189,21 @@ export const processParticipantLaps = (
   participantPassings: ParticipantPassingRecord[],
   participantCategoryStartFlag: GreenFlagRecord,
   minimumLapTimeMilliseconds: number = MINIMUM_LAP_TIME_SECONDS * 1000, // Default to 60 seconds if not provided
-  sessionKind: EventSessionKind | undefined = 'race'
+  sessionKind: EventSessionKind | undefined = 'race',
+  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS
 ): void => {
   validateParticipantStartFlag(participantCategoryStartFlag, participant);
 
   setCategoryStartForPassings(participantCategoryStartFlag.id, participantPassings);
   calculateParticipantElapsedTimes(participantCategoryStartFlag, participantPassings);
-  calculateParticipantLapTimes(participantCategoryStartFlag, participantPassings, participant, minimumLapTimeMilliseconds, sessionKind);
+  calculateParticipantLapTimes(
+    participantCategoryStartFlag,
+    participantPassings,
+    participant,
+    minimumLapTimeMilliseconds,
+    sessionKind,
+    finishLineNumbers
+  );
 };
 
 export const processAllParticipantLaps = (
@@ -144,7 +211,8 @@ export const processAllParticipantLaps = (
   eventParticipants: Map<EventParticipantId, EventParticipant>,
   minimumLapTimeMilliseconds: number = MINIMUM_LAP_TIME_SECONDS * 1000, // Default to 60 seconds if not provided
   silenceWarnings: boolean = false,
-  sessionKind: EventSessionKind | undefined = 'race'
+  sessionKind: EventSessionKind | undefined = 'race',
+  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS
 ): Map<EventParticipantId, ParticipantPassingRecord[]> => {
   const participantTimesMap = new Map<EventParticipantId, ParticipantPassingRecord[]>();
   const entrantParticipantMap = new Map<EventEntrantId, EventParticipant[]>();
@@ -226,7 +294,14 @@ export const processAllParticipantLaps = (
       try {
         validateParticipantStartFlag(participantCategoryStartFlag, participant);
         const finishFlag = getFinishFlagForCategory(participant.categoryId);
-        processEntrantLaps(entrantPassings, participantCategoryStartFlag!, minimumLapTimeMilliseconds, sessionKind, finishFlag);
+        processEntrantLaps(
+          entrantPassings,
+          participantCategoryStartFlag!,
+          minimumLapTimeMilliseconds,
+          sessionKind,
+          finishFlag,
+          finishLineNumbers
+        );
       } catch (error: unknown) {
         if (error instanceof ParticipantStartFlagError || error instanceof StartFlagHasNoTimeError) {
           console.error(processAllParticipantLaps.name, error.message);
@@ -249,14 +324,16 @@ const processEntrantLaps = (
   entrantCategoryStartFlag: GreenFlagRecord,
   minimumLapTimeMilliseconds: number,
   sessionKind: EventSessionKind | undefined,
-  finishFlag?: FlagRecord
+  finishFlag?: FlagRecord,
+  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS
 ): void => {
   setCategoryStartForPassings(entrantCategoryStartFlag.id, entrantPassings);
 
   const orderedPassings = [...entrantPassings].sort(compareByTime);
   const finishTime = finishFlag?.time;
   let hasCountedFirstPassingAfterFinish = false;
-  let previousPassing: ParticipantPassingRecord | undefined;
+  let previousFinishPassing: ParticipantPassingRecord | undefined;
+  const previousPassingByLine = new Map<string, ParticipantPassingRecord>();
   let lapNo = 0;
   const isRaceSession = isRaceSessionKind(sessionKind);
 
@@ -283,25 +360,46 @@ const processEntrantLaps = (
     if (isAfterFinish && hasCountedFirstPassingAfterFinish) {
       passing.elapsedTime = elapsedTimeMilliseconds(entrantCategoryStartFlag.time!, passing.time);
       passing.lapNo = lapNo;
-      passing.lapTime = validTimeAfterLastLap(passing, previousPassing);
+      passing.lapTime = validTimeAfterLastLap(passing, previousFinishPassing);
       passing.isValid = false;
       passing.isExcluded = true;
       clearCalculatedUnrelatedReason(passing);
       return;
     }
 
+    const timingLineKey = getTimingLineKey(passing, finishLineNumbers);
+    const previousPassingOnLine = previousPassingByLine.get(timingLineKey);
+    const lapStartReference = previousFinishPassing || entrantCategoryStartFlag;
+    const finishLine = isFinishLinePassing(passing, finishLineNumbers);
+
     passing.elapsedTime = elapsedTimeMilliseconds(entrantCategoryStartFlag.time!, passing.time);
-    const lapTime = previousPassing
-      ? validTimeAfterLastLap(passing, previousPassing)
-      : passing.elapsedTime;
+    const lapTime = finishLine
+      ? (previousPassingOnLine
+        ? validTimeAfterLastLap(passing, previousPassingOnLine)
+        : passing.elapsedTime)
+      : elapsedTimeMilliseconds(lapStartReference.time!, passing.time);
 
     passing.lapTime = lapTime;
-    passing.startingLapRecordId = previousPassing?.id || entrantCategoryStartFlag.id;
+    passing.startingLapRecordId = (finishLine ? previousPassingOnLine?.id : previousFinishPassing?.id) || entrantCategoryStartFlag.id;
+
+    if (!isLapCompletionPassing(passing)) {
+      previousPassingByLine.set(timingLineKey, passing);
+      passing.isValid = true;
+      passing.isExcluded = false;
+      clearCalculatedUnrelatedReason(passing);
+      const sectorLineDuration = validTimeAfterLastLap(passing, previousPassingOnLine);
+      if (sectorLineDuration !== undefined && sectorLineDuration < minimumLapTimeMilliseconds) {
+        setPassingLapUnderMinimum(passing, minimumLapTimeMilliseconds);
+      }
+      passing.lapNo = lapNo;
+      return;
+    }
 
     const shouldForceCountAsFinishLap = isAfterFinish && !hasCountedFirstPassingAfterFinish;
     if ((lapTime || 0) >= minimumLapTimeMilliseconds || shouldForceCountAsFinishLap) {
       lapNo += 1;
-      previousPassing = passing;
+      previousFinishPassing = passing;
+      previousPassingByLine.set(timingLineKey, passing);
       passing.isValid = true;
       passing.isExcluded = false;
       clearCalculatedUnrelatedReason(passing);
@@ -313,7 +411,8 @@ const processEntrantLaps = (
       passing.isExcluded = true;
       setPassingLapUnderMinimum(passing, minimumLapTimeMilliseconds);
       if (!isRaceSession) {
-        previousPassing = passing;
+        previousFinishPassing = passing;
+        previousPassingByLine.set(timingLineKey, passing);
       }
     }
 
@@ -346,7 +445,8 @@ export const calculateParticipantLapTimes = (
   passings: ParticipantPassingRecord[],
   participant: EventParticipant,
   minimumLapTimeMilliseconds: number = MINIMUM_LAP_TIME_SECONDS * 1000, // 1 minute in milliseconds
-  sessionKind: EventSessionKind | undefined = 'race'
+  sessionKind: EventSessionKind | undefined = 'race',
+  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS
 ): void => {
   const identifier = '#' + getParticipantNumber(participant);
   if (!(passings?.length > 0)) {
@@ -356,7 +456,8 @@ export const calculateParticipantLapTimes = (
   }
   validateParticipantStartFlag(participantCategoryStartFlag, participant);
 
-  let prevPassing: ParticipantPassingRecord | undefined = undefined;
+  let prevFinishPassing: ParticipantPassingRecord | undefined = undefined;
+  const previousPassingByLine = new Map<string, ParticipantPassingRecord>();
   let onLapNumber = 0;
   const isRaceSession = isRaceSessionKind(sessionKind);
   passings.forEach((passing) => {
@@ -377,23 +478,32 @@ export const calculateParticipantLapTimes = (
       clearCalculatedUnrelatedReason(passing);
       return;
     }
-    let lapTime: number | undefined | null;
-    if (prevPassing) {
-      // if (passing.time.getTime() < prevPassing.time!.getTime()) {
-      //   console.error(`Passing for ${getTimeRecordIdentifier(passing)} is before previous passing @${getTimeRecordIdentifier(prevPassing)}`);
-      //   passing.lapNo = undefined;
-      //   passing.lapTime = undefined;
-      //   return;
-      // }
-      passing.startingLapRecordId = prevPassing.id;
-      lapTime = validTimeAfterLastLap(passing, prevPassing);
-    } else {
-      passing.startingLapRecordId = participantCategoryStartFlag?.id || null;
-      lapTime = passing.elapsedTime;
+    const timingLineKey = getTimingLineKey(passing, finishLineNumbers);
+    const previousPassingOnLine = previousPassingByLine.get(timingLineKey);
+    const lapStartReference = prevFinishPassing || participantCategoryStartFlag;
+    const finishLine = isFinishLinePassing(passing, finishLineNumbers);
+    const lapTime: number | undefined | null = finishLine
+      ? (previousPassingOnLine ? validTimeAfterLastLap(passing, previousPassingOnLine) : passing.elapsedTime)
+      : elapsedTimeMilliseconds(lapStartReference.time!, passing.time);
+    passing.startingLapRecordId = (finishLine ? previousPassingOnLine?.id : prevFinishPassing?.id) || participantCategoryStartFlag?.id || null;
+    if (!isLapCompletionPassing(passing)) {
+      previousPassingByLine.set(timingLineKey, passing);
+      passing.isExcluded = false;
+      passing.isValid = true;
+      clearCalculatedUnrelatedReason(passing);
+      const sectorLineDuration = validTimeAfterLastLap(passing, previousPassingOnLine);
+      if (sectorLineDuration !== undefined && sectorLineDuration < minimumLapTimeMilliseconds) {
+        setPassingLapUnderMinimum(passing, minimumLapTimeMilliseconds);
+      }
+      passing.lapNo = onLapNumber;
+      passing.lapTime = lapTime;
+      return;
     }
+
     if ((lapTime || 0) >= minimumLapTimeMilliseconds) {
       onLapNumber++;
-      prevPassing = passing;
+      prevFinishPassing = passing;
+      previousPassingByLine.set(timingLineKey, passing);
       passing.isValid = true;
       passing.isExcluded = false;
       clearCalculatedUnrelatedReason(passing);
@@ -402,13 +512,10 @@ export const calculateParticipantLapTimes = (
       passing.isValid = false;
       setPassingLapUnderMinimum(passing, minimumLapTimeMilliseconds);
       if (!isRaceSession) {
-        prevPassing = passing;
+        prevFinishPassing = passing;
+        previousPassingByLine.set(timingLineKey, passing);
       }
     }
-    //  else {
-    //   passing.startingLapRecordId = participantCategoryStartFlag?.id || null;
-    //   // passing.lapStart = prevPassing?.id || participantCategoryStartFlag?.id || null;
-    // }
     passing.lapNo = onLapNumber;
     passing.lapTime = lapTime;
   });

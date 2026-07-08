@@ -71,6 +71,7 @@ Use this file for durable knowledge about RaceTime, MR-SCATS, and related timing
   - `.LDR`: leader/laps-led records; sample fields include `CARNUMBER`, `DRIVER`, `LAPS_LEAD`, `LAP_FROM`, and `LAP_TO`.
   - `.CTN`: continuity records; sample fields include `STARTTIME`, `ENDTIME`, `LAPS_LEAD`, `LAP_FROM`, and `LAP_TO`.
   - `.NO1`: report-style DBF observed for some race sessions; sample fields include `CAR`, `TXNUM`, `LAP_COUNT`, `LAP_TIME`, `ENTRYTIME`, `LINE_NO`, `LANE_NO`, `ELAPSED`, `SYNCMARK`, `FLAG`, `STARTFIN`, and `FAST_LAP`.
+  - For `.NO*` report/crossing files, `ELAPSED` may represent a time-of-day tick value rather than a session-relative crossing offset. When it is close to the scheduled session clock, anchor it to the event date as time-of-day.
 - `.NTX` files are Clipper index files. Headers include a readable key expression, for example `ELAPSED`, `CARNUMBER`, `Ev_Code`, `dtos(StartDate)+StartTime+Ev_Code`, `str(Carnumber)+Driv_Code`, `upper(Driver)`, or `txnum`.
 - `.AT1`, `.AT2`, `.FST`, `.NT1`, `.NTT`, and `.TTX` have been observed as Clipper index files created by timing/session sources, despite not using the `.NTX` extension.
 - Known related DBF mappings:
@@ -93,6 +94,7 @@ Use this file for durable knowledge about RaceTime, MR-SCATS, and related timing
 - A system-generated green flag is added per imported session when crossings exist.
 - The flag time is the programme `ACTUALSTRT` or `STARTTIME`.
 - Crossing absolute times are calculated from `ELAPSED / 10000`; if a future table exposes a green/start elapsed offset in fields such as `STARTELAP` or `GREENELAPS`, subtract that offset so pre-green crossings remain before the generated green flag. Without such a field, elapsed zero is treated as the programme start time.
+- `.NO*` sidecar files can describe non-start/finish timing lines and should not provide the session green/start elapsed offset.
 - Event, session, category, entrant, and participant IDs are deterministic UUIDs generated from `mr-scats:<meeting-code>:...` source strings for MR-SCATS imports.
 
 ## TRACK.CFG Notes

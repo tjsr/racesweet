@@ -40,14 +40,19 @@ export const CROSSING_FLAG_SESSION_FASTEST = 0x01; // Indicates a crossing is th
 export const CROSSING_FLAG_PARTICIPANT_FASTEST = 0x02; // Indicates a crossing is the fastest for the participant so far.
 export const CROSSING_FLAG_PARTICIPANT_IMPROVED = 0x04; // Indicates a crossing is quicker than previous lap.
 export const CROSSING_FLAG_LAP_UNDER_MINIMUM = 0x08; // Indicates a crossing is under the minimum lap time.
+export const CROSSING_FLAG_NON_LAP_COMPLETION = 0x10; // Indicates a crossing is from an intermediate line and does not complete a lap.
 
 export const CROSSING_UNRELATED_LAP_UNDER_MINIMUM = 'lap-under-minimum';
+export const CROSSING_UNRELATED_NON_LAP_COMPLETION = 'non-lap-completion';
 
 export type CrossingUnrelatedReasonCode =
-  | typeof CROSSING_UNRELATED_LAP_UNDER_MINIMUM;
+  | typeof CROSSING_UNRELATED_LAP_UNDER_MINIMUM
+  | typeof CROSSING_UNRELATED_NON_LAP_COMPLETION;
 
 export interface ParticipantPassingRecord extends EventTimeRecord {
   id: PassingRecordId;
+  lineNumber?: number | undefined;
+  loopNumber?: number | undefined;
   participantId?: EventParticipantId | null | undefined;
   entrantId?: EventEntrantId | null | undefined;
   participantStartRecordId?: TimeRecordId | null | undefined;
@@ -58,6 +63,7 @@ export interface ParticipantPassingRecord extends EventTimeRecord {
   lapNo?: number | null | undefined;
   isExcluded?: boolean | null | undefined;
   isManuallyExcluded?: boolean | null | undefined;
+  isLapCompletion?: boolean | null | undefined;
   overallTrackPosition?: number | null | undefined;
   positionInClass?: number | null | undefined;
   isValid?: boolean | null | undefined; // Indicates if the record is valid

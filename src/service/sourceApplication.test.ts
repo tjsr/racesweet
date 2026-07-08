@@ -107,6 +107,7 @@ describe('sourceApplication', () => {
     const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
     const beginBulkProcess = vi.fn(async () => true);
     const endBulkProcess = vi.fn(async () => undefined);
+    const setFinishLineNumbers = vi.fn();
     const setMinimumLapTimeMilliseconds = vi.fn();
     const setSessionKind = vi.fn();
     const eventId = createEventId('11111111-1111-4111-8111-111111111111');
@@ -148,6 +149,7 @@ describe('sourceApplication', () => {
         categories: existingCategories,
         endBulkProcess,
         records: [],
+        setFinishLineNumbers,
         setMinimumLapTimeMilliseconds,
         setSessionKind,
       },
@@ -159,12 +161,14 @@ describe('sourceApplication', () => {
       {
         catalog,
         eventId,
+        finishLineNumbers: [2, 7],
         sessionId,
       }
     );
 
     expect(getMinimumLapTimeMillisecondsForSession(catalog, eventId, sessionId)).toBe(45000);
     expect(getSessionKindForSession(catalog, sessionId)).toBe('race');
+    expect(setFinishLineNumbers).toHaveBeenCalledWith([2, 7]);
     expect(setMinimumLapTimeMilliseconds).toHaveBeenCalledWith(45000);
     expect(setSessionKind).toHaveBeenCalledWith('race');
     expect(endBulkProcess).toHaveBeenCalledTimes(1);

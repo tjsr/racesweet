@@ -28,6 +28,13 @@ const formatPreviewValue = (value: MrScatsPreviewValue): string => {
   return String(value);
 };
 
+const parseFinishLineNumbers = (value: string): number[] => {
+  return value
+    .split(',')
+    .map((item) => Number(item.trim()))
+    .filter((item) => Number.isInteger(item) && item > 0);
+};
+
 const waitForInlineProgressPaint = async (): Promise<void> => {
   await new Promise<void>((resolve) => {
     setTimeout(resolve, 0);
@@ -36,6 +43,7 @@ const waitForInlineProgressPaint = async (): Promise<void> => {
 
 export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): React.ReactElement => {
   const config = props.source.mrScatsConfig || { files: [] };
+  const finishLineNumbersValue = (props.source.finishLineNumbers || [1]).join(', ');
   const [isLoadingEvent, setIsLoadingEvent] = React.useState<boolean>(false);
   const [loadEventProgress, setLoadEventProgress] = React.useState<InlineLoadingProgress>({ completed: 0, total: 1 });
   const [preview, setPreview] = React.useState<MrScatsDataFilePreview | undefined>();
@@ -133,6 +141,19 @@ export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): Reac
           type="text"
           value={config.dataLocationPath || ''}
           placeholder="No file or directory selected"
+        />
+      </label>
+      <label>
+        Finish line numbers
+        <input
+          aria-label={`MR-SCATS Finish Line Numbers ${props.source.id}`}
+          defaultValue={finishLineNumbersValue}
+          onBlur={(event) => {
+            void props.onSaveSource(props.source.id, {
+              finishLineNumbers: parseFinishLineNumbers(event.target.value),
+            });
+          }}
+          type="text"
         />
       </label>
       <div className="events-actions">

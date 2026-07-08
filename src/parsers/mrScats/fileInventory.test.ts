@@ -61,7 +61,8 @@ describe('MR-SCATS file inventory', () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-'));
     await writeFile(path.join(tempDir, 'W9721Q01.DBF'), createDbfBuffer());
     await writeFile(path.join(tempDir, 'W9721Q01.NTX'), Buffer.alloc(4));
-    await writeFile(path.join(tempDir, 'W9721Q01.AT1'), Buffer.alloc(4));
+    await writeFile(path.join(tempDir, 'W9721Q01.AT1'), createDbfBuffer());
+    await writeFile(path.join(tempDir, 'W9721Q01.NO2'), createDbfBuffer());
     await writeFile(path.join(tempDir, 'W9721Q01.SRT'), '123456\r789012\r\n345678');
 
     const inventory = await listMrScatsDataFiles(tempDir);
@@ -69,14 +70,26 @@ describe('MR-SCATS file inventory', () => {
     expect(inventory.sourceKind).toBe('directory');
     expect(inventory.files).toEqual([
       expect.objectContaining({
-        kind: 'index',
+        dbf: expect.objectContaining({ recordCount: 1 }),
+        kind: 'dbf-table',
+        meetingCode: 'W9721',
         relativePath: 'W9721Q01.AT1',
+        sessionCode: 'Q',
+        sessionNumber: 1,
       }),
       expect.objectContaining({
         dbf: expect.objectContaining({ recordCount: 1 }),
         kind: 'dbf-table',
         meetingCode: 'W9721',
         relativePath: 'W9721Q01.DBF',
+        sessionCode: 'Q',
+        sessionNumber: 1,
+      }),
+      expect.objectContaining({
+        dbf: expect.objectContaining({ recordCount: 1 }),
+        kind: 'no1-report',
+        meetingCode: 'W9721',
+        relativePath: 'W9721Q01.NO2',
         sessionCode: 'Q',
         sessionNumber: 1,
       }),

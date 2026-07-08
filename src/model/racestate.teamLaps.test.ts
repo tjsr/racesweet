@@ -2,7 +2,7 @@ import type { ChipCrossingData } from './chipcrossing.js';
 import type { EventCategory } from './eventcategory.js';
 import type { EventParticipant } from './eventparticipant.js';
 import { Session } from './racestate.js';
-import { type ParticipantPassingRecord } from './timerecord.js';
+import { CROSSING_UNRELATED_LAP_UNDER_MINIMUM, type ParticipantPassingRecord } from './timerecord.js';
 import { createGreenFlagEvent } from '../controllers/flag.js';
 
 const category: EventCategory = { id: '1', name: 'Team Category' };
@@ -250,5 +250,92 @@ describe('Session team lap processing', () => {
     const crossing = session.records.find((record) => record.id === '1001') as ParticipantPassingRecord | undefined;
     expect(crossing?.participantId).toBe('101');
     expect(session.getParticipantLaps('101')?.map((record) => record.id)).toEqual(['1001']);
+  });
+
+  it('uses non-lap timing lines as split references without incrementing the lap count', async () => {
+    const session = new Session({
+      categories: [category],
+      participants: [participant('101', '11', 1001)],
+      records: [],
+      teams: [],
+    });
+    const sectorCrossing = {
+      ...chipCrossing('1001', 1001, 2, '2026-05-30T10:01:00.000Z'),
+      antenna: 'Line 3 Loop 9',
+      isLapCompletion: false,
+    } as ParticipantPassingRecord & { antenna: string };
+    const finishCrossing = chipCrossing('1002', 1001, 3, '2026-05-30T10:02:00.000Z');
+
+    await session.addRecords([
+      createGreenFlagEvent({
+        categoryIds: [category.id],
+        flagValue: 'course',
+        id: '1',
+        recordType: 4,
+        sequence: 1,
+        source: 'test',
+        time: new Date('2026-05-30T10:00:00.000Z'),
+      }),
+      sectorCrossing,
+      finishCrossing,
+    ]);
+
+    const laps = session.getParticipantLaps('101') || [];
+
+    expect(laps.map((record) => record.id)).toEqual(['1001', '1002']);
+    expect(laps[0]).toMatchObject({
+      antenna: 'Line 3 Loop 9',
+      isExcluded: false,
+      isLapCompletion: false,
+      isValid: true,
+      lapNo: 0,
+      lapTime: 60000,
+      startingLapRecordId: '1',
+    });
+    expect(laps[1]).toMatchObject({
+      isExcluded: false,
+      isValid: true,
+      lapNo: 1,
+      lapTime: 120000,
+      startingLapRecordId: '1',
+    });
+  });
+
+  it('only warns for short sector crossings when the same line is repeated too quickly', async () => {
+    const session = new Session({
+      categories: [category],
+      participants: [participant('101', '11', 1001)],
+      records: [],
+      teams: [],
+    });
+    session.setMinimumLapTimeMilliseconds(60000);
+
+    await session.addRecords([
+      createGreenFlagEvent({
+        categoryIds: [category.id],
+        flagValue: 'course',
+        id: '1',
+        recordType: 4,
+        sequence: 1,
+        source: 'test',
+        time: new Date('2026-05-30T10:00:00.000Z'),
+      }),
+      { ...chipCrossing('1001', 1001, 2, '2026-05-30T10:01:00.000Z'), isLapCompletion: false, lineNumber: 3 } as ParticipantPassingRecord,
+      { ...chipCrossing('1002', 1001, 3, '2026-05-30T10:01:20.000Z'), isLapCompletion: false, lineNumber: 3 } as ParticipantPassingRecord,
+      chipCrossing('1003', 1001, 4, '2026-05-30T10:02:00.000Z'),
+    ]);
+
+    const laps = session.getParticipantLaps('101') || [];
+    expect(laps[0]?.unrelatedReasonCode).toBeUndefined();
+    expect(laps[1]).toMatchObject({
+      isExcluded: false,
+      isValid: true,
+      unrelatedReasonCode: CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
+    });
+    expect(laps[2]).toMatchObject({
+      isExcluded: false,
+      lapNo: 1,
+      startingLapRecordId: '1',
+    });
   });
 });

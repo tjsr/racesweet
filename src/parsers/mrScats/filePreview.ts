@@ -1,6 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { splitCtcRawCrossingLines } from '../ctc/rawCrossing.js';
+import { parseCtcRawCrossingFile, splitCtcRawCrossingLines, type CtcRawCrossingRecord } from '../ctc/rawCrossing.js';
 import { readMrScatsDbfTable, type MrScatsDbfRecord } from './dbf.js';
 import { parseMrScatsDbfSummary, readMrScatsZipEntryBuffers, type MrScatsDataFileKind } from './fileInventory.js';
 
@@ -349,20 +349,36 @@ const createRawCrossingTextPreview = (
   maxRows: number,
 ): MrScatsDataFilePreview => {
   const lines = splitCtcRawCrossingLines(buffer);
-  const rows = lines.slice(0, maxRows).map((line, index) => ({
-    'Line number': index + 1,
-    'Raw crossing data': line,
-  }));
+  const parsedRecords = parseCtcRawCrossingFile(buffer);
+  const parsedRowsByLine = new Map(parsedRecords.map((record) => [record.recordNumber, record]));
+  const rows = lines.slice(0, maxRows).map((line, index) => {
+    const parsedRecord = parsedRowsByLine.get(index + 1);
+    return {
+      'Line number': index + 1,
+      'Record type': parsedRecord?.specialType || parsedRecord?.drtCode || '',
+      'Time of day': parsedRecord?.timeText || '',
+      'Time ticks': stringifyPreviewValue(parsedRecord?.rawTimeTicks),
+      TxNo: stringifyPreviewValue(parsedRecord?.transmitter),
+      Line: stringifyPreviewValue(parsedRecord?.lineNumber),
+      Loop: stringifyPreviewValue(parsedRecord?.laneNumber),
+      Confidence: stringifyPreviewValue(parsedRecord?.confidence),
+      Status: stringifyPreviewValue(parsedRecord?.status),
+      'Raw crossing data': line,
+    };
+  });
 
   return {
-    columns: ['Line number', 'Raw crossing data'],
+    columns: ['Line number', 'Record type', 'Time of day', 'Time ticks', 'TxNo', 'Line', 'Loop', 'Confidence', 'Status', 'Raw crossing data'],
     displayedRowCount: rows.length,
     fileKind: 'raw-crossing-text',
     fileName,
     parser: 'text',
     recordCount: lines.length,
     rows,
-    warnings: ['CTC/Data-1 raw crossing files are plain-text records split by carriage-return style line breaks, not dBase tables.'],
+    warnings: [
+      'CTC/Data-1 raw crossing files are plain-text records split by carriage-return style line breaks, not dBase tables.',
+      'Where visible-time SRT rows are present, compact and control records derive authoritative time-of-day values from the same file offset.',
+    ],
   };
 };
 

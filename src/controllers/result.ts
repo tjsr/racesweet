@@ -19,7 +19,9 @@ export const filterPassingsByTime = (passings: EntrantPassingRecord[], upToTime:
     return record.time <= upToTime && record.isExcluded !== true;
   });
 
-const isValidLapPassing = (record: ParticipantPassingRecord): boolean => !(record.lapNo === undefined || record.lapNo === null || record.lapNo < 1);
+const isValidLapPassing = (record: ParticipantPassingRecord): boolean => {
+  return record.isLapCompletion !== false && !(record.lapNo === undefined || record.lapNo === null || record.lapNo < 1);
+};
 
 export const getLapsOnly = (sortedRecords: EntrantPassingRecord[]): ParticipantPassingRecord[] => {
   const laps: ParticipantPassingRecord[] = [];

@@ -72,6 +72,7 @@ export interface DataSourceConfig {
   dataLastRetrieved?: string;
   enabled: boolean;
   fileConfig?: LocalFileSourceConfig;
+  finishLineNumbers?: number[];
   id: string;
   listedEvents?: ApicalListedEvent[];
   masterEntrantConfig?: MasterEntrantSourceConfig;
@@ -155,6 +156,19 @@ const isApicalDataSource = (source: Pick<DataSourceConfig, 'type'>): boolean => 
   return source.type === 'api-apical-data-file' || source.type === 'api-apical-excel-file';
 };
 
+const normalizeFinishLineNumbers = (finishLineNumbers: number[] | undefined): number[] | undefined => {
+  if (!finishLineNumbers) {
+    return undefined;
+  }
+
+  const uniqueNumbers = Array.from(new Set(
+    finishLineNumbers
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  return uniqueNumbers.length > 0 ? uniqueNumbers : undefined;
+};
+
 const normalizeMrScatsSourceConfig = (config: MrScatsSourceConfig | undefined): MrScatsSourceConfig | undefined => {
   if (!config) {
     return undefined;
@@ -175,12 +189,23 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListed
   if (source.type === 'file-mr-scats-data') {
     return {
       ...source,
+      finishLineNumbers: normalizeFinishLineNumbers(source.finishLineNumbers) || [1],
       mrScatsConfig: normalizeMrScatsSourceConfig(source.mrScatsConfig) || { files: [] },
     };
   }
 
+  if (source.type === 'timing-dorian-data1-supernode') {
+    return {
+      ...source,
+      finishLineNumbers: normalizeFinishLineNumbers(source.finishLineNumbers) || [1],
+    };
+  }
+
   if (!isApicalDataSource(source) || !source.apiConfig) {
-    return source;
+    return {
+      ...source,
+      finishLineNumbers: normalizeFinishLineNumbers(source.finishLineNumbers),
+    };
   }
 
   const selectedEventIds = source.apiConfig.selectedEventIds?.length > 0
@@ -192,6 +217,7 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListed
   return {
     ...source,
     apicalDataFilePath: normalizeOptionalSystemFilePath(source.apicalDataFilePath),
+    finishLineNumbers: normalizeFinishLineNumbers(source.finishLineNumbers),
     ...(source.listedEvents && source.listedEvents.length > 0
       ? { listedEvents: normalizeApicalListedEvents(source.listedEvents) }
       : apicalListedEvents.length > 0
@@ -279,6 +305,16 @@ export const getSessionAssignedSourceIds = (config: SystemConfiguration, eventId
   }
 
   return sessionAssignment.sourceIds;
+};
+
+export const getFinishLineNumbersForSession = (
+  config: SystemConfiguration,
+  eventId: EventId,
+  sessionId: SessionId
+): number[] | undefined => {
+  const sourceIds = getSessionAssignedSourceIds(config, eventId, sessionId);
+  const source = config.dataSources.find((candidate) => candidate.enabled && sourceIds.includes(candidate.id) && (candidate.finishLineNumbers || []).length > 0);
+  return source?.finishLineNumbers;
 };
 
 export const getMasterEntrantProfilesForEvent = (config: SystemConfiguration, eventId: EventId): MasterEntrantProfile[] => {

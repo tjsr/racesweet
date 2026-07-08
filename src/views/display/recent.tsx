@@ -5,7 +5,7 @@ import { type MillisecondsDuration, type TimeDisplayZoneMode, millisecondsToTime
 import type { EventSessionKind } from '../../catalog/eventCatalog.ts';
 import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../controllers/category.ts';
 import { createGreenFlagEvent, createRedFlagEvent, isFlagRecord } from '../../controllers/flag';
-import { getLapTimeCell } from '../../controllers/laps.ts';
+import { getLapTimeCell, getTimingLineKey } from '../../controllers/laps.ts';
 import { getParticipantNumber, getParticipantTransponders } from '../../controllers/participant.ts';
 import { findEntrantByChipCode, findEntrantByPlateNumber } from '../../controllers/participantSearch.ts';
 import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
@@ -243,9 +243,6 @@ const getEditablePassingAntenna = (record: EventTimeRecord): string => {
 };
 
 const getCrossingUnrelatedReason = (passing: ParticipantPassingRecord): string | undefined => {
-  if (!passing.isExcluded && passing.isValid !== false) {
-    return undefined;
-  }
   return passing.unrelatedReason;
 };
 
@@ -290,7 +287,9 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
   onSelectRecord?: (recordId: TimeRecordId | undefined) => void;
   onSelectUnrecognisedPlateNumber?: (plateNumber: string | undefined) => void;
+  sectorTimesByRecordId?: Map<TimeRecordId, number>;
   timeZone?: string;
+  showSectorColumn?: boolean;
 }
 
 interface FlagRecordRowProps<FlagType extends FlagRecord> extends RecentRecordRowProps<FlagType> {
@@ -385,7 +384,7 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
       <TableCell colSpan={2}>{flagText}</TableCell>
       <TableCell colSpan={1}>{tableTimeString(record.time, props.timeZone)}</TableCell>
       <TableCell colSpan={4}>{categoryText}</TableCell>
-      <TableCell colSpan={2}>{elapsedTime}</TableCell>
+      <TableCell colSpan={props.showSectorColumn ? 3 : 2}>{elapsedTime}</TableCell>
     </TableRow>
     <Menu
       open={contextMenu !== null}
@@ -500,7 +499,7 @@ interface _CompletedLapProps {
 }
 
 const UnknownChipRow = (
-  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae, onOpenAddRecordDialog, onOpenEditRecordDialog, onSelectRecord, onSelectUnrecognisedPlateNumber, plateNumber, record, selectedPlateNumber, selectedRecordId, timeZone }: {
+  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae, onOpenAddRecordDialog, onOpenEditRecordDialog, onSelectRecord, onSelectUnrecognisedPlateNumber, plateNumber, record, selectedPlateNumber, selectedRecordId, showSectorColumn, timeZone }: {
     antennae: string
     onOpenAddRecordDialog?: (record: EventTimeRecord) => void,
     onOpenEditRecordDialog?: (record: EventTimeRecord) => void,
@@ -510,6 +509,7 @@ const UnknownChipRow = (
     record: EventTimeRecord,
     selectedPlateNumber?: string,
     selectedRecordId?: TimeRecordId,
+    showSectorColumn?: boolean,
     txNo: number | undefined,
     sequenceNumber: number
     passingTime: Date,
@@ -576,7 +576,7 @@ const UnknownChipRow = (
         <TableCell>{txNo ?? ''}</TableCell>
         <TableCell>{timeString}</TableCell>
         <TableCell>{plateNumber || ''}</TableCell>
-        <TableCell colSpan={6}>{content}</TableCell>
+        <TableCell colSpan={showSectorColumn ? 7 : 6}>{content}</TableCell>
       </TableRow>
       <Menu
         open={contextMenu !== null}
@@ -614,8 +614,10 @@ interface PassingRecordRowProps {
   onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
   onSelectRecord?: (recordId: TimeRecordId | undefined) => void;
   onSelectUnrecognisedPlateNumber?: (plateNumber: string | undefined) => void;
+  sectorTime?: number;
   selectedRecordId?: TimeRecordId;
   timeZone?: string;
+  showSectorColumn?: boolean;
 }
 
 export const PassingRecordRow = (
@@ -700,6 +702,7 @@ export const PassingRecordRow = (
   let lapNo: string = '';
   let elapsedTime = '--:--:--.---';
   let lapTime = '';
+  const sectorTime = props.sectorTime !== undefined ? millisecondsToTime(props.sectorTime) : '';
 
   let className = passing.isValid ? 'passing' : 'invalid-passing';
   let cellClasses = '';
@@ -793,6 +796,7 @@ export const PassingRecordRow = (
         <TableCell className={cellClasses}>{categoryStr || ''}</TableCell>
         <TableCell className={cellClasses}>{lapNo}</TableCell>
         <TableCell className={cellClasses}>{elapsedTime}</TableCell>
+        {props.showSectorColumn ? <TableCell className={cellClasses}>{sectorTime}</TableCell> : null}
         <TableCell className={lapTimeCellClasses}>
           <span>{lapTime}</span>
           {unrelatedReason ? (
@@ -872,6 +876,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       onSelectRecord={props.onSelectRecord}
       onSelectUnrecognisedPlateNumber={props.onSelectUnrecognisedPlateNumber}
       onSelect={flagRecordSelected}
+      showSectorColumn={props.showSectorColumn}
       timeZone={props.timeZone}
     />;
   }
@@ -922,8 +927,10 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       selectedCategories={props.selectedCategories}
       selectedPlateNumber={props.selectedPlateNumber}
       selectedParticipants={props.selectedParticipants}
+      sectorTime={props.sectorTimesByRecordId?.get(passing.id)}
       sessionValidCategoryIds={props.sessionValidCategoryIds}
       selectedRecordId={props.selectedRecordId}
+      showSectorColumn={props.showSectorColumn}
       onSelect={passingRecordSelected}
       onExclude={props.onExclude}
       onChangeCategory={props.onChangeCategory}
@@ -954,6 +961,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
     record={record}
     selectedPlateNumber={props.selectedPlateNumber}
     selectedRecordId={props.selectedRecordId}
+    showSectorColumn={props.showSectorColumn}
     txNo={txNo}
     identifier={identifier}
     rs={props.raceStateLookup}
@@ -1015,18 +1023,19 @@ export const Warnings = ({ warnings }: { warnings: string[] }): JSX.Element => {
   );
 };
 
-const headings: string[] = [
-  "Seq",
-  "Antenna",
-  "TxNo",
-  "Time",
-  "Number",
-  "Entrant",
-  "Category",
-  "Lap#",
-  "Elapsed Time",
-  "Lap Time"
-];
+const getHeadings = (showSectorColumn: boolean): string[] => ([
+  'Seq',
+  'Antenna',
+  'TxNo',
+  'Time',
+  'Number',
+  'Entrant',
+  'Category',
+  'Lap#',
+  'Elapsed Time',
+  ...(showSectorColumn ? ['Sector'] : []),
+  'Lap Time',
+]);
 
 const recordMatchesSelectedCategory = (
   record: EventTimeRecord,
@@ -1203,7 +1212,7 @@ const buildLapTimeIndicatorMap = (
     .map((record, index) => ({ index, record }))
     .sort(compareRecordsByTimeAndInputOrder)
     .forEach(({ record }) => {
-      if (!isCrossingRecord(record) || !record.participantId || !record.isValid || record.isExcluded) {
+      if (!isCrossingRecord(record) || !record.participantId || !record.isValid || record.isExcluded || record.isLapCompletion === false) {
         return;
       }
 
@@ -1248,6 +1257,54 @@ const buildLapTimeIndicatorMap = (
     });
 
   return indicatorsByRecordId;
+};
+
+const buildSectorTimesByRecordId = (
+  records: EventTimeRecord[],
+  raceStateLookup: RaceStateLookup
+): Map<TimeRecordId, number> => {
+  const sectorTimesByRecordId = new Map<TimeRecordId, number>();
+  const previousCrossingsByParticipant = new Map<EventParticipantId, ParticipantPassingRecord[]>();
+  const finishLineNumbers = raceStateLookup.getFinishLineNumbers?.();
+
+  records
+    .map((record, index) => ({ index, record }))
+    .sort(compareRecordsByTimeAndInputOrder)
+    .forEach(({ record }) => {
+      if (!isCrossingRecord(record) || !record.participantId || !record.time) {
+        return;
+      }
+
+      const previousCrossings = previousCrossingsByParticipant.get(record.participantId) || [];
+      const currentLineKey = getTimingLineKey(record, finishLineNumbers);
+      const previousCrossingOnAnotherLine = [...previousCrossings]
+        .reverse()
+        .find((crossing) => crossing.time && getTimingLineKey(crossing, finishLineNumbers) !== currentLineKey);
+
+      if (previousCrossingOnAnotherLine?.time) {
+        sectorTimesByRecordId.set(record.id, record.time.getTime() - previousCrossingOnAnotherLine.time.getTime());
+      }
+
+      previousCrossings.push(record);
+      previousCrossingsByParticipant.set(record.participantId, previousCrossings);
+    });
+
+  return sectorTimesByRecordId;
+};
+
+const shouldShowSectorColumnForLookup = (
+  records: EventTimeRecord[],
+  raceStateLookup: RaceStateLookup
+): boolean => {
+  const lineKeys = new Set<string>();
+  const finishLineNumbers = raceStateLookup.getFinishLineNumbers?.();
+  records.forEach((record) => {
+    if (!isCrossingRecord(record)) {
+      return;
+    }
+    lineKeys.add(getTimingLineKey(record, finishLineNumbers));
+  });
+  return lineKeys.size > 1;
 };
 
 const getOutsideEventWindowIgnoredRecordIds = (
@@ -1688,6 +1745,9 @@ export const RecentRecords = (props: RecordsProps & {
     }
   });
   const lapTimeIndicators = buildLapTimeIndicatorMap(filteredRecords, props.raceStateLookup, props.sessionKind);
+  const showSectorColumn = shouldShowSectorColumnForLookup(filteredRecords, props.raceStateLookup);
+  const sectorTimesByRecordId = showSectorColumn ? buildSectorTimesByRecordId(filteredRecords, props.raceStateLookup) : new Map<TimeRecordId, number>();
+  const headings = getHeadings(showSectorColumn);
   const fastestTimeIndicatorColors = props.fastestTimeIndicatorColors || DEFAULT_FASTEST_TIME_INDICATOR_COLORS;
   const tableContainerStyle = {
     '--entrant-faster-time-color': fastestTimeIndicatorColors.entrantFasterTime,
@@ -1881,6 +1941,8 @@ export const RecentRecords = (props: RecordsProps & {
                     onRemoveFlagCategory={props.onRemoveFlagCategory}
                     onSelectRecord={setSelectedRecordId}
                     onSelectUnrecognisedPlateNumber={setSelectedPlateNumber}
+                    sectorTimesByRecordId={sectorTimesByRecordId}
+                    showSectorColumn={showSectorColumn}
                     timeZone={displayTimeZone}
                   />
                 ))}

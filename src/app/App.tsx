@@ -39,7 +39,7 @@ import { updateCategorySelectionsForChangedParticipant } from './categoryChangeS
 import './index.css';
 import { selectedCategoriesForParticipants } from './selectionState.ts';
 import { formatErrorForDisplay } from './stackTrace.ts';
-import { type DataSourceConfig, type EventTimeDisplayZoneMode, type SystemConfiguration, createDefaultSystemConfiguration, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
+import { type DataSourceConfig, type EventTimeDisplayZoneMode, type SystemConfiguration, createDefaultSystemConfiguration, getFinishLineNumbersForSession, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
 import { getSystemTimeZone } from './utils/timeutils.ts';
 import { type EventSessionOption } from './views/results/resultsPage.tsx';
 
@@ -646,6 +646,7 @@ export const RaceSweetMainApp = () => {
     await applyPulledRaceStateToSession(sessionTarget, raceState, {
       catalog: eventCatalogService?.catalog || eventCatalogState,
       eventId,
+      finishLineNumbers: options.sessionId ? getFinishLineNumbersForSession(systemConfigState, eventId, options.sessionId) : undefined,
       sessionId: options.sessionId,
     });
     if (!targetSessionState) {
@@ -662,6 +663,7 @@ export const RaceSweetMainApp = () => {
     await applyPulledRaceStateToSession(targetSessionState, raceState, {
       catalog: eventCatalogService?.catalog || eventCatalogState,
       eventId,
+      finishLineNumbers: getFinishLineNumbersForSession(systemConfigState, eventId, sessionId),
       sessionId,
     });
     return true;
@@ -819,6 +821,7 @@ export const RaceSweetMainApp = () => {
     await applyPulledRaceStateToSession(targetSessionState, nextRaceState, {
       catalog: eventCatalogService.catalog,
       eventId,
+      finishLineNumbers: getFinishLineNumbersForSession(systemConfigState, eventId, sessionId),
       sessionId,
     });
     await adminService?.applyChangesToSessionById(targetSessionState, sessionId);
@@ -863,7 +866,7 @@ export const RaceSweetMainApp = () => {
     return summary;
   };
 
-  const summarizeMrScatsImport = (importData: MrScatsCatalogImport): SessionSourceReloadSummary => {
+  const summarizeMrScatsImport = (importData: MrScatsCatalogImport, onCompleteStep: (currentTask: string, index: number) => Promise<void>): SessionSourceReloadSummary => {
     const summary = createEmptySessionSourceReloadSummary();
     if (!eventCatalogService) {
       return summary;
@@ -887,6 +890,9 @@ export const RaceSweetMainApp = () => {
       summary.flags = accumulatedSummary.flags;
       summary.participants = accumulatedSummary.participants;
       summary.teams = accumulatedSummary.teams;
+      onCompleteStep(`Summarizing session ${session.name}`, 0).catch((error: unknown) => {
+        setErrorState(error as Error);
+      });
     });
 
     return summary;
@@ -1492,7 +1498,7 @@ export const RaceSweetMainApp = () => {
               }
               latestProgress = {
                 ...latestProgress,
-                callerName: `completeImportStep:${index}`,
+                callerName: `${currentTask}:${index}`,
                 completed: Math.min(latestProgress.total, latestProgress.completed + 1),
                 currentFile: undefined,
                 currentTask,
@@ -1506,9 +1512,9 @@ export const RaceSweetMainApp = () => {
             })
               .then(async (importData) => {
                 await completeImportStep('Summarising MR-SCATS import', 1);
-                const importSummary = summarizeMrScatsImport(importData);
+                const importSummary = summarizeMrScatsImport(importData, completeImportStep);
                 await completeImportStep('Writing MR-SCATS event catalog', 2);
-                const catalog = await eventCatalogService.importMrScatsCatalog(importData);
+                const catalog = await eventCatalogService.importMrScatsCatalog(importData, completeImportStep);
                 await completeImportStep('Updating event display', 3);
                 updateEventCatalogState(catalog, importData.eventId, importData.sessions[0]?.id);
                 await completeImportStep('Assigning MR-SCATS source', 4);

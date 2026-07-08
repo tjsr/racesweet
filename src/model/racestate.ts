@@ -24,6 +24,7 @@ import type { MapOf } from "./types.js";
 export interface RaceStateLookup {
   getParticipantById(participantId: EventParticipantId): EventParticipant | undefined;
   getCategoryById(categoryId: EventCategoryId): EventCategory | undefined;
+  getFinishLineNumbers?(): number[] | undefined;
   getParticipantLaps(participantId: EventParticipantId): ParticipantPassingRecord[] | null | undefined;
   getEntrantIdForParticipant(participantId: EventParticipantId): EventEntrantId | undefined;
   countTransponderCrossings(txNo: ChipCrossingData['chipCode'], untilTime?: Date): number;
@@ -37,6 +38,7 @@ export interface RaceStateLookup {
   updateEntrantCategory(entrantId: EventEntrantId, categoryId: EventCategoryId): void;
   updateParticipantCategory(participantId: EventParticipantId, categoryId: EventCategoryId): void;
   updateParticipantIdentifiers?(participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: ParticipantIdentifierUpdate[]): void;
+  setFinishLineNumbers?(finishLineNumbers: number[] | undefined): void;
   setMinimumLapTimeMilliseconds?(minimumLapTimeMilliseconds: number | undefined): void;
   setSessionKind?(sessionKind: EventSessionKind | undefined): void;
 }
@@ -61,6 +63,7 @@ export class Session implements RaceState, RaceStateLookup {
   private _bulkProcess: boolean = false;
   private _bulkProcessDepth = 0;
   private _categoryGreenFlags: Map<EventCategoryId, GreenFlagRecord> | undefined;
+  private _finishLineNumbers: number[] | undefined = [1];
   private _minimumLapTimeMilliseconds: number | undefined = 60000;
   private _sessionKind: EventSessionKind | undefined = 'race';
   private _cachedTransponderCrossings: Map<ChipCrossingData["chipCode"], ChipCrossingData[]>;
@@ -73,6 +76,14 @@ export class Session implements RaceState, RaceStateLookup {
     this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
     if (this._records.size > 0 || this._participants.size > 0) {
       assignParticpantsToCrossings(this._participants, this.records);
+      this.__reprocessAllParticipantLaps();
+    }
+  }
+
+  public setFinishLineNumbers(finishLineNumbers: number[] | undefined): void {
+    this._finishLineNumbers = finishLineNumbers;
+    this._cachedParticipantLaps = undefined;
+    if (!this._bulkProcess) {
       this.__reprocessAllParticipantLaps();
     }
   }
@@ -145,6 +156,10 @@ export class Session implements RaceState, RaceStateLookup {
   public getCategoryById(categoryId: EventCategoryId): EventCategory {
     this.validateCategory(categoryId);
     return this._categories.get(categoryId)!;
+  }
+
+  public getFinishLineNumbers(): number[] | undefined {
+    return this._finishLineNumbers;
   }
 
   public getParticipantById(participantId: EventParticipantId): EventParticipant | undefined {
@@ -513,7 +528,12 @@ export class Session implements RaceState, RaceStateLookup {
 
   private __reprocessAllParticipantLaps(): void {
     const processedLaps: Map<EventParticipantId, ParticipantPassingRecord[]> = processAllParticipantLaps(
-      this.records, this._participants, this._minimumLapTimeMilliseconds, true, this._sessionKind // silence warnigns
+      this.records,
+      this._participants,
+      this._minimumLapTimeMilliseconds,
+      true,
+      this._sessionKind,
+      this._finishLineNumbers
     );
 
     this._cachedParticipantLaps = processedLaps;

@@ -435,6 +435,7 @@ describe('SystemConfigService', () => {
     await service.createSource('file-mr-scats-data');
     const source = service.state.dataSources[0];
     expect(source).toBeDefined();
+    expect(source.finishLineNumbers).toEqual([1]);
     expect(source.type).toBe('file-mr-scats-data');
     expect(source.mrScatsConfig).toEqual({ files: [] });
 
@@ -470,6 +471,7 @@ describe('SystemConfigService', () => {
     expect(persistence.save).toHaveBeenCalledWith(expect.objectContaining({
       dataSources: [
         expect.objectContaining({
+          finishLineNumbers: [1],
           mrScatsConfig: expect.objectContaining({
             dataLocationPath: systemConfig.normalizeOptionalSystemFilePath('C:/RaceTime/timing-data/W9721'),
             sourceKind: 'directory',
