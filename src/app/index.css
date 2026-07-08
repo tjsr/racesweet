@@ -269,6 +269,28 @@
   margin-bottom: 1rem;
 }
 
+.timing-selection-select-row {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.45rem;
+}
+
+.timing-selection-spinner {
+  animation: timing-selection-spin 0.8s linear infinite;
+  border: 2px solid rgba(0, 0, 0, 0.18);
+  border-radius: 50%;
+  border-top-color: var(--color-primary);
+  display: inline-block;
+  height: 1rem;
+  width: 1rem;
+}
+
+@keyframes timing-selection-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .events-panel input,
 .events-panel select,
 .events-panel textarea {

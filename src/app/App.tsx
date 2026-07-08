@@ -332,6 +332,7 @@ export const RaceSweetMainApp = () => {
   const [analyticsRaceState, setAnalyticsRaceState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [timingRaceState, setTimingRaceState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [timingSessionSelection, setTimingSessionSelection] = useState<TimingSessionSelection>('active');
+  const [timingSelectionLoading, setTimingSelectionLoading] = useState<boolean>(false);
   const [timingErrorState, setTimingErrorState] = useState<Error|undefined>(undefined);
   const [reloadSummary, setReloadSummary] = useState<SessionSourceReloadSummary|undefined>(undefined);
   const unsavedChangesGuards = useRef<Partial<Record<AppSection, UnsavedChangesGuard>>>({});
@@ -911,6 +912,17 @@ export const RaceSweetMainApp = () => {
     setRenderTick((tick) => tick + 1);
   };
 
+  const runAfterTimingLoadingPaint = (operation: () => void): void => {
+    if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+      setTimeout(operation, 0);
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      window.setTimeout(operation, 0);
+    });
+  };
+
   const selectTimingEvent = (eventId: EventId): void => {
     if (!validateUuid(eventId)) {
       throw new Error(`Invalid eventId provided: ${eventId}`);
@@ -924,33 +936,52 @@ export const RaceSweetMainApp = () => {
     setTimingSessionSelection('session');
     setSelectedTimingEventId(eventId);
     setSelectedTimingSessionId(nextSessionId);
+    setTimingSelectionLoading(true);
+    setTimingRaceState(createEmptySessionState());
 
-    if (nextSessionId) {
+    runAfterTimingLoadingPaint(() => {
+      if (!nextSessionId) {
+        setTimingSelectionLoading(false);
+        return;
+      }
+
       loadTimingSession(eventId, nextSessionId).catch((error: unknown) => {
         setTimingErrorState(error as Error);
+      }).finally(() => {
+        setTimingSelectionLoading(false);
       });
-    }
+    });
   };
 
   const selectTimingSession = (sessionId: SessionId): void => {
+    setTimingSelectionLoading(true);
     if (sessionId === 'active') {
-      setTimingSessionSelection('active');
-      setSelectedTimingEventId(eventCatalogState?.activeEventId);
-      setSelectedTimingSessionId(eventCatalogState?.activeSessionId);
-      setTimingRaceState(sessionState);
-      setTimingErrorState(undefined);
+      runAfterTimingLoadingPaint(() => {
+        setTimingSessionSelection('active');
+        setSelectedTimingEventId(eventCatalogState?.activeEventId);
+        setSelectedTimingSessionId(eventCatalogState?.activeSessionId);
+        setTimingRaceState(sessionState);
+        setTimingErrorState(undefined);
+        setTimingSelectionLoading(false);
+      });
       return;
     }
 
     const eventId = selectedTimingEventId || eventCatalogState?.activeEventId;
     if (!eventId) {
+      setTimingSelectionLoading(false);
       return;
     }
 
     setTimingSessionSelection('session');
     setSelectedTimingSessionId(sessionId);
-    loadTimingSession(eventId, sessionId).catch((error: unknown) => {
-      setTimingErrorState(error as Error);
+    setTimingRaceState(createEmptySessionState());
+    runAfterTimingLoadingPaint(() => {
+      loadTimingSession(eventId, sessionId).catch((error: unknown) => {
+        setTimingErrorState(error as Error);
+      }).finally(() => {
+        setTimingSelectionLoading(false);
+      });
     });
   };
 
@@ -1010,6 +1041,7 @@ export const RaceSweetMainApp = () => {
     setSelectedTimingSessionId(eventCatalogState?.activeSessionId);
     setTimingRaceState(sessionState);
     setTimingErrorState(undefined);
+    setTimingSelectionLoading(false);
   }, [eventCatalogState?.activeEventId, eventCatalogState?.activeSessionId, sessionState, timingSessionSelection]);
 
   useEffect(() => {
@@ -1276,6 +1308,7 @@ export const RaceSweetMainApp = () => {
           fastestTimeIndicatorColors={systemConfigState.fastestTimeIndicatorColors}
           timeDisplayZoneMode={timingTimeDisplayZoneMode}
           timingEvent={timingEvent}
+          timingSelectionLoading={timingSelectionLoading}
           timingSessionValidCategoryIds={timingSessionValidCategoryIds}
           timingSessionValue={timingSessionValue}
         />

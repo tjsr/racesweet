@@ -39,6 +39,7 @@ interface TimingContextProps {
   sessions: EventCatalogSession[];
   timeDisplayZoneMode: TimeDisplayZoneMode;
   timingEvent?: EventCatalogEvent;
+  timingSelectionLoading?: boolean;
   timingSessionValidCategoryIds?: Set<EventCategoryId>;
   timingSessionValue: string;
 }
@@ -54,28 +55,46 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
       <div className="timing-context-row">
         <label className="page-filter-label">
           Event
-          <select
-            aria-label="Timing Event"
-            value={props.timingEvent?.id || ''}
-            onChange={(event) => props.onSelectEvent(event.target.value)}
-          >
-            {props.events.map((event: EventCatalogEvent) => (
-              <option key={event.id} value={event.id}>{event.name}</option>
-            ))}
-          </select>
+          <span className="timing-selection-select-row">
+            <select
+              aria-label="Timing Event"
+              value={props.timingEvent?.id || ''}
+              onChange={(event) => props.onSelectEvent(event.target.value)}
+            >
+              {props.events.map((event: EventCatalogEvent) => (
+                <option key={event.id} value={event.id}>{event.name}</option>
+              ))}
+            </select>
+            {props.timingSelectionLoading ? (
+              <span
+                aria-label="Loading Timing event"
+                className="timing-selection-spinner"
+                role="status"
+              />
+            ) : null}
+          </span>
         </label>
         <label className="page-filter-label">
           Session
-          <select
-            aria-label="Timing Session"
-            value={props.timingSessionValue}
-            onChange={(event) => props.onSelectSession(event.target.value)}
-          >
-            <option value="active">Active session ({props.activeSession?.name || 'None'})</option>
-            {props.sessions.map((session) => (
-              <option key={session.id} value={session.id}>{session.name}{props.activeSession?.id == session.id ? ' (Active)' : ''}</option>
-            ))}
-          </select>
+          <span className="timing-selection-select-row">
+            <select
+              aria-label="Timing Session"
+              value={props.timingSessionValue}
+              onChange={(event) => props.onSelectSession(event.target.value)}
+            >
+              <option value="active">Active session ({props.activeSession?.name || 'None'})</option>
+              {props.sessions.map((session) => (
+                <option key={session.id} value={session.id}>{session.name}{props.activeSession?.id == session.id ? ' (Active)' : ''}</option>
+              ))}
+            </select>
+            {props.timingSelectionLoading ? (
+              <span
+                aria-label="Loading Timing session"
+                className="timing-selection-spinner"
+                role="status"
+              />
+            ) : null}
+          </span>
         </label>
       </div>
       <RecentRecords

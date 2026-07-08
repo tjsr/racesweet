@@ -174,4 +174,88 @@ describe('TimingContext integration', () => {
 
     expect(selectedCategoryState()).toBe(categoryB.name);
   });
+
+  it('shows loading spinners next to the event and session selectors while timing selection is loading', async () => {
+    const event: EventCatalogState['events'][number] = {
+      categoryIds: [],
+      date: '2026-05-29',
+      entrantIds: [],
+      format: 'race-weekend',
+      id: 'event-1',
+      name: 'RaceSweet Test Event',
+      sessionIds: ['session-1'],
+    };
+    const session: EventCatalogState['sessions'][number] = {
+      categoryIds: [],
+      eventId: event.id,
+      id: 'session-1',
+      kind: 'race',
+      name: 'Feature Race',
+      scheduledStart: '2026-05-29T10:00:00.000Z',
+      status: 'scheduled',
+    };
+    const raceState: RaceStateLookup & { categories: EventCategory[]; records: ParticipantPassingRecord[] } = {
+      categories: [],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: () => undefined,
+      getEntrantIdForParticipant: () => undefined,
+      getParticipantById: () => undefined,
+      getParticipantLaps: () => [],
+      getTransponderCrossings: () => [],
+      records: [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+    const onSelectEvent = vi.fn();
+    const onSelectSession = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <TimingContext
+          activeSession={session}
+          categoryListSelected={() => undefined}
+          eventTimeZone="Australia/Sydney"
+          events={[event]}
+          onAddRecord={() => undefined}
+          onEditRecord={() => undefined}
+          onAssignFlagCategory={() => undefined}
+          onChangeCategory={() => undefined}
+          onExclude={() => undefined}
+          onMarkFlagDeleted={() => undefined}
+          onRemoveFlagCategory={() => undefined}
+          onSelectEvent={onSelectEvent}
+          onSelectSession={onSelectSession}
+          onTimeDisplayZoneModeChange={() => undefined}
+          participantSelected={() => undefined}
+          raceState={raceState}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+          sessions={[session]}
+          timeDisplayZoneMode="event"
+          timingEvent={event}
+          timingSelectionLoading
+          timingSessionValue="active"
+        />
+      );
+    });
+
+    expect(container.querySelector('[role="status"][aria-label="Loading Timing event"]')).not.toBeNull();
+    expect(container.querySelector('[role="status"][aria-label="Loading Timing session"]')).not.toBeNull();
+
+    const timingEventSelect = container.querySelector('select[aria-label="Timing Event"]') as HTMLSelectElement;
+    await act(async () => {
+      timingEventSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(onSelectEvent).toHaveBeenCalledWith(event.id);
+
+    const timingSessionSelect = container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement;
+    await act(async () => {
+      timingSessionSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(onSelectSession).toHaveBeenCalledWith('active');
+  });
 });
