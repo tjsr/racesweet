@@ -133,6 +133,8 @@ const nonEmpty = (value?: string): string | undefined => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
+const NO_OP_COMPLETE_STEP = async (_currentTask: string, _index: number): Promise<void> => undefined;
+
 const findProfileForParticipant = (participant: EventParticipant, masterProfiles: MasterEntrantProfile[]): MasterEntrantProfile | undefined => {
   const participantId = participant.id.toString();
   const entrantId = participant.entrantId.toString();
@@ -443,27 +445,27 @@ const removeDuplicateMutationIds = (mutations: EventCatalogLedger['mutations']):
   return acceptedMutations;
 };
 
-const removeDuplicateAndNoopMutations = (
+const removeDuplicateAndNoopMutations = async (
   existingMutations: EventCatalogLedger['mutations'],
   proposedMutations: EventCatalogLedger['mutations'],
-  onCompleteStep: (currentTask: string, index: number) => Promise<void>,
-): EventCatalogLedger['mutations'] => {
+  onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP,
+): Promise<EventCatalogLedger['mutations']> => {
   const acceptedMutations = removeDuplicateMutationIds(existingMutations);
   const acceptedMutationIds = new Set(acceptedMutations.map((mutation) => mutation.id));
 
-  proposedMutations.forEach((mutation, index) => {
+  for (const [index, mutation] of proposedMutations.entries()) {
     if (acceptedMutationIds.has(mutation.id)) {
-      return;
+      continue;
     }
 
     if (!mutationChangesLedgerState(acceptedMutations, mutation)) {
-      return;
+      continue;
     }
 
     acceptedMutations.push(mutation);
     acceptedMutationIds.add(mutation.id);
     await onCompleteStep('removeDuplicateAndNoopMutations', index);
-  });
+  }
 
   return acceptedMutations;
 };
@@ -675,7 +677,7 @@ const createLedgerRelationshipRepairMutations = (state: EventCatalogState): Even
   });
 };
 
-const repairAndValidateLoadedLedger = (ledger: EventCatalogLedger): EventCatalogLedger => {
+const repairAndValidateLoadedLedger = async (ledger: EventCatalogLedger): Promise<EventCatalogLedger> => {
   incrementLoadingMetric('Repair event catalog ledger', `${ledger.mutations.length} mutations`);
   const rewrittenLedger = rewriteImportedObjectIds(ledger).value;
   let repairedLedger: EventCatalogLedger = {
@@ -686,7 +688,7 @@ const repairAndValidateLoadedLedger = (ledger: EventCatalogLedger): EventCatalog
   if (repairMutations.length > 0) {
     repairedLedger = {
       ...repairedLedger,
-      mutations: removeDuplicateAndNoopMutations(repairedLedger.mutations, repairMutations),
+      mutations: await removeDuplicateAndNoopMutations(repairedLedger.mutations, repairMutations),
     };
   }
 
@@ -722,7 +724,7 @@ export class EventCatalogService {
         await options.onPersistedLedger(ledger);
       }
     } else {
-      const repairedLedger: EventCatalogLedger = repairAndValidateLoadedLedger(ledger);
+      const repairedLedger: EventCatalogLedger = await repairAndValidateLoadedLedger(ledger);
       if (JSON.stringify(repairedLedger) !== JSON.stringify(ledger)) {
         ledger = repairedLedger;
         await persistence.save(ledger);
@@ -769,7 +771,7 @@ export class EventCatalogService {
     });
   }
 
-  public async createEvent(): Promise<EventCatalogState> {
+  public async createEvent(onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const eventId = createEventId();
     return this.appendMutations([
       {
@@ -787,10 +789,10 @@ export class EventCatalogService {
         timestamp: createTimestamp(),
         type: 'event-created',
       },
-    ]);
+    ], onCompleteStep);
   }
 
-  public async activateEvent(eventId: EventId): Promise<EventCatalogState> {
+  public async activateEvent(eventId: EventId, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         eventId,
@@ -798,10 +800,10 @@ export class EventCatalogService {
         timestamp: createTimestamp(),
         type: 'event-activated',
       },
-    ]);
+    ], onCompleteStep);
   }
 
-  public async updateEvent(eventId: EventId, changes: { date?: string; format?: EventCatalogState['events'][number]['format']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string; }): Promise<EventCatalogState> {
+  public async updateEvent(eventId: EventId, changes: { date?: string; format?: EventCatalogState['events'][number]['format']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string; }, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes,
@@ -810,10 +812,10 @@ export class EventCatalogService {
         timestamp: createTimestamp(),
         type: 'event-updated',
       },
-    ]);
+    ], onCompleteStep);
   }
 
-  public async deleteEvent(eventId: EventId): Promise<EventCatalogState> {
+  public async deleteEvent(eventId: EventId, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         eventId,
@@ -821,7 +823,7 @@ export class EventCatalogService {
         timestamp: createTimestamp(),
         type: 'event-deleted',
       },
-    ]);
+    ], onCompleteStep);
   }
 
   public async syncEventScaffold(
@@ -830,7 +832,8 @@ export class EventCatalogService {
     participants: EventParticipant[],
     masterProfiles: MasterEntrantProfile[] = [],
     teams: EventTeam[] = [],
-    assignedSessionId?: SessionId
+    assignedSessionId?: SessionId,
+    onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP
   ): Promise<EventCatalogState> {
     incrementLoadingMetric('Sync event scaffold', eventId);
     const event = this.state.events.find((item) => item.id === eventId);
@@ -844,7 +847,7 @@ export class EventCatalogService {
 
     const scaffoldCategories = deriveCategoriesFromEventData(eventId, categories, participants, teams);
     const categoryIds = scaffoldCategories.map((category) => category.id.toString());
-    const derivedEntrants = deriveEntrantsFromParticipants(eventId, participants, masterProfiles, teams);
+    const derivedEntrants = await deriveEntrantsFromParticipants(eventId, participants, masterProfiles, teams);
     const existingEventEntrantsById = new Map(getEntrantsForEvent(this.state, eventId).map((entrant) => [entrant.id.toString(), entrant] as const));
     const linkedGlobalEntrantsById = new Map(this.state.entrants
       .filter((entrant) => entrant.eventId !== eventId)
@@ -985,14 +988,14 @@ export class EventCatalogService {
         timestamp: createTimestamp(),
         type: 'event-updated' as const,
       }] : []),
-    ]);
+    ], onCompleteStep);
   }
 
-  public async importApicalRaceState(importData: ApicalCatalogImport, masterProfiles: MasterEntrantProfile[] = [], onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  public async importApicalRaceState(importData: ApicalCatalogImport, masterProfiles: MasterEntrantProfile[] = [], onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     return this.runMutationBatch(async () => this.importApicalRaceStateUnbatched(importData, masterProfiles, onCompleteStep));
   }
 
-  private async importApicalRaceStateUnbatched(importData: ApicalCatalogImport, masterProfiles: MasterEntrantProfile[] = [], onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  private async importApicalRaceStateUnbatched(importData: ApicalCatalogImport, masterProfiles: MasterEntrantProfile[] = [], onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const normalizedImportData = rewriteImportedObjectIds(importData).value;
     normalizedImportData.raceState = normalizeImportedRaceStateForCatalog(normalizedImportData.raceState);
     const existingEvent = this.state.events.find((event) => event.id === normalizedImportData.eventId);
@@ -1118,15 +1121,16 @@ export class EventCatalogService {
       normalizedImportData.raceState.participants || [],
       masterProfiles,
       normalizedImportData.raceState.teams || [],
-      normalizedImportData.sessionId
+      normalizedImportData.sessionId,
+      onCompleteStep
     );
   }
 
-  public async importMrScatsCatalog(importData: MrScatsCatalogImport, onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  public async importMrScatsCatalog(importData: MrScatsCatalogImport, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     return this.runMutationBatch(async () => this.importMrScatsCatalogUnbatched(importData, onCompleteStep));
   }
 
-  private async importMrScatsCatalogUnbatched(importData: MrScatsCatalogImport, onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  private async importMrScatsCatalogUnbatched(importData: MrScatsCatalogImport, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const normalizedImportData = rewriteImportedObjectIds(importData).value;
     normalizedImportData.raceState = normalizeImportedRaceStateForCatalog(normalizedImportData.raceState);
 
@@ -1223,7 +1227,9 @@ export class EventCatalogService {
       normalizedImportData.raceState.categories || [],
       normalizedImportData.raceState.participants || [],
       [],
-      normalizedImportData.raceState.teams || []
+      normalizedImportData.raceState.teams || [],
+      undefined,
+      onCompleteStep
     );
   }
 
@@ -1231,15 +1237,17 @@ export class EventCatalogService {
     eventId: EventId,
     sessionId: SessionId,
     raceState: Partial<RaceState>,
-    apicalDataFilePath?: string
+    apicalDataFilePath?: string,
+    onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP
   ): Promise<EventCatalogState> {
-    return this.runMutationBatch(async () => this.updateImportedRaceStateUnbatched(eventId, sessionId, raceState, apicalDataFilePath));
+    return this.runMutationBatch(async () => this.updateImportedRaceStateUnbatched(eventId, sessionId, raceState, onCompleteStep, apicalDataFilePath));
   }
 
   private async updateImportedRaceStateUnbatched(
     eventId: EventId,
     sessionId: SessionId,
     raceState: Partial<RaceState>,
+    onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP,
     apicalDataFilePath?: string
   ): Promise<EventCatalogState> {
     const normalizedRaceState = normalizeImportedRaceStateForCatalog(rewriteImportedObjectIds(raceState).value);
@@ -1256,7 +1264,7 @@ export class EventCatalogService {
         timestamp: createTimestamp(),
         type: 'race-state-imported',
       },
-    ]);
+    ], onCompleteStep);
 
     if (!existingEvent) {
       return this.state;
@@ -1268,7 +1276,8 @@ export class EventCatalogService {
       normalizedRaceState.participants || [],
       [],
       normalizedRaceState.teams || [],
-      sessionId
+      sessionId,
+      onCompleteStep
     );
   }
 
@@ -1276,9 +1285,9 @@ export class EventCatalogService {
     eventId: EventId,
     sessionId: SessionId,
     raceState: Partial<RaceState>,
-    onCompleteStep: (currentTask: string, index: number) => Promise<void>,
     apicalDataFilePath?: string,
-    masterProfiles: MasterEntrantProfile[] = []
+    masterProfiles: MasterEntrantProfile[] = [],
+    onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP
   ): Promise<EventCatalogState> {
     return this.runMutationBatch(async () => this.reloadImportedRaceStateUnbatched(eventId, sessionId, raceState, onCompleteStep, apicalDataFilePath, masterProfiles));
   }
@@ -1313,7 +1322,8 @@ export class EventCatalogService {
       linkedCategorySafeRaceState.participants || [],
       masterProfiles,
       linkedCategorySafeRaceState.teams || [],
-      sessionId
+      sessionId,
+      onCompleteStep
     );
 
     return replayMutations.length > 0
@@ -1321,7 +1331,7 @@ export class EventCatalogService {
       : this.state;
   }
 
-  public async createSession(eventId: EventId, onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  public async createSession(eventId: EventId, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const sessionId = createSessionId();
     const session: EventCatalogSession = {
       categoryIds: [],
@@ -1354,7 +1364,7 @@ export class EventCatalogService {
     ], onCompleteStep);
   }
 
-  public async updateSession(sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'kind' | 'minimumLapTimeMilliseconds' | 'name' | 'notes' | 'scheduledStart' | 'status'>>, onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  public async updateSession(sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'kind' | 'minimumLapTimeMilliseconds' | 'name' | 'notes' | 'scheduledStart' | 'status'>>, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes,
@@ -1370,7 +1380,7 @@ export class EventCatalogService {
     updates: Array<{
       changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'kind' | 'minimumLapTimeMilliseconds' | 'name' | 'notes' | 'scheduledStart' | 'status'>>;
       sessionId: SessionId;
-    }>, onCompleteStep: (currentTask: string, index: number) => Promise<void>
+    }>, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP
   ): Promise<EventCatalogState> {
     return this.appendMutations(updates.map((update) => ({
       changes: update.changes,
@@ -1381,7 +1391,7 @@ export class EventCatalogService {
     })), onCompleteStep);
   }
 
-  public async moveSessionToEvent(sessionId: SessionId, nextEventId: EventId, onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  public async moveSessionToEvent(sessionId: SessionId, nextEventId: EventId, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const session = this.state.sessions.find((item) => item.id === sessionId);
     const nextEvent = this.state.events.find((item) => item.id === nextEventId);
     if (!session || !nextEvent || session.eventId === nextEventId) {
@@ -1425,7 +1435,7 @@ export class EventCatalogService {
     return this.appendMutations(mutations, onCompleteStep);
   }
 
-  public async activateSession(eventId: EventId, sessionId: SessionId, onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  public async activateSession(eventId: EventId, sessionId: SessionId, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         eventId,
@@ -1446,7 +1456,7 @@ export class EventCatalogService {
     ], onCompleteStep);
   }
 
-  public async deleteSession(eventId: EventId, sessionId: SessionId, onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  public async deleteSession(eventId: EventId, sessionId: SessionId, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const event = this.state.events.find((item) => item.id === eventId);
     return this.appendMutations([
       {
@@ -1467,7 +1477,7 @@ export class EventCatalogService {
     ], onCompleteStep);
   }
 
-  public async createCategory(eventId: EventId, onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  public async createCategory(eventId: EventId, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const categoryId = createCategoryId();
     const category: EventCatalogCategory = {
       code: '',
@@ -1503,7 +1513,7 @@ export class EventCatalogService {
     ], onCompleteStep);
   }
 
-  public async updateCategory(categoryId: CategoryId, changes: Partial<Pick<EventCatalogCategory, 'code' | 'deleted' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'excludeFromResults' | 'name' | 'startTime' | 'teamRules'>>, onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  public async updateCategory(categoryId: CategoryId, changes: Partial<Pick<EventCatalogCategory, 'code' | 'deleted' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'excludeFromResults' | 'name' | 'startTime' | 'teamRules'>>, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         categoryId,
@@ -1515,7 +1525,7 @@ export class EventCatalogService {
     ], onCompleteStep);
   }
 
-  public async deleteCategory(eventId: EventId, categoryId: CategoryId, onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  public async deleteCategory(eventId: EventId, categoryId: CategoryId, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const event = this.state.events.find((item) => item.id === eventId);
 
     return this.appendMutations([
@@ -1537,7 +1547,7 @@ export class EventCatalogService {
     ], onCompleteStep);
   }
 
-  public async createEntrant(eventId: EventId, entrantType: EntrantType = 'rider', onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  public async createEntrant(eventId: EventId, entrantType: EntrantType = 'rider', onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const entrantId = createEventEntrantId();
     const event = this.state.events.find((item) => item.id === eventId);
     const categoryId = event?.categoryIds[0];
@@ -1572,7 +1582,7 @@ export class EventCatalogService {
     ], onCompleteStep);
   }
 
-  public async updateEntrant(entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>, onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  public async updateEntrant(entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes: normalizeEntrantChanges(changes),
@@ -1584,7 +1594,7 @@ export class EventCatalogService {
     ], onCompleteStep);
   }
 
-  public async deleteEntrant(eventId: EventId, entrantId: EventEntrantId, onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  public async deleteEntrant(eventId: EventId, entrantId: EventEntrantId, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const event = this.state.events.find((item) => item.id === eventId);
     if (this.importedRaceStateReferencesEntrant(eventId, entrantId)) {
       throw new Error(`Cannot delete entrant ${entrantId} because imported participants still reference it.`);
@@ -1609,7 +1619,7 @@ export class EventCatalogService {
     ], onCompleteStep);
   }
 
-  private async appendMutations(mutations: EventCatalogLedger['mutations'], onCompleteStep: (currentTask: string, index: number) => Promise<void>): Promise<EventCatalogState> {
+  private async appendMutations(mutations: EventCatalogLedger['mutations'], onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const nextMutations = await removeDuplicateAndNoopMutations(this.ledger.mutations, mutations, onCompleteStep); 
     if (nextMutations.length === this.ledger.mutations.length) {
       return this.state;

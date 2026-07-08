@@ -1,33 +1,32 @@
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { validate as validateUuid } from 'uuid';
+import {
+  type EventCatalogState,
+  getCategoriesForEvent,
+  getCategoryAssignedSessionIds,
+  getEntrantAssignedSessionIds,
+  getEntrantsForCategory,
+  getEntrantsForEvent,
+  getParticipantEntrantMemberships,
+  getSessionAssignedCategoryIds,
+  getSessionsForEvent,
+  getTeamsForParticipant,
+} from '../catalog/eventCatalog.js';
 import { readApicalExcelBuffer } from '../controllers/apical/apicalSpreadsheetProcessor.js';
-import { convertDataToRaceState } from '../parsers/apical.js';
 import { createSeedEventCatalogLedger } from '../ledger/createSeedEventCatalogLedger.js';
 import {
-    type EventCatalogState,
-    getCategoryAssignedSessionIds,
-    getCategoriesForEvent,
-    getEntrantAssignedSessionIds,
-    getEntrantsForCategory,
-    getEntrantsForEvent,
-    getParticipantEntrantMemberships,
-    getSessionAssignedCategoryIds,
-    getSessionsForEvent,
-    getTeamsForParticipant,
-} from '../catalog/eventCatalog.js';
-import {
-    type EventCatalogLedger,
-    applyEventCatalogLedger,
-    createDefaultEventCatalogLedger,
+  type EventCatalogLedger,
+  applyEventCatalogLedger,
+  createDefaultEventCatalogLedger,
 } from '../ledger/eventCatalogLedger.js';
+import { convertDataToRaceState } from '../parsers/apical.js';
 
-import type { EventParticipant, ParticipateRacePlate, ParticipantTransponder } from '../model/eventparticipant.js';
+import type { EventParticipant, ParticipantTransponder, ParticipateRacePlate } from '../model/eventparticipant.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
-import { RECORD_TX_CROSSING, type EventTimeRecord } from '../model/timerecord.js';
-import { createApicalTeamNameDisplayWorkbookBuffer } from '../testing/apicalTeamWorkbook.js';
+import { type EventTimeRecord, RECORD_TX_CROSSING } from '../model/timerecord.js';
 import type { EventCatalogPersistence } from '../persistence/eventCatalogPersistence.js';
 import { EventCatalogService } from '../service/eventCatalogService.js';
+import { createApicalTeamNameDisplayWorkbookBuffer } from '../testing/apicalTeamWorkbook.js';
 
 const createPersistence = (initial = createDefaultEventCatalogLedger()): EventCatalogPersistence => {
   let ledger = initial;
@@ -2616,26 +2615,27 @@ describe('EventCatalogService', () => {
   });
 
   it('creates and deletes session/category/entrant through immutable mutations', async () => {
+    const onCompleteStep = vi.fn(async () => undefined);
     const seededPersistence = createPersistence(createSeedEventCatalogLedger());
     const service = await EventCatalogService.create(seededPersistence);
 
-    await service.createSession(SEED_EVENT_ID);
+    await service.createSession(SEED_EVENT_ID, onCompleteStep);
     let sessions = getSessionsForEvent(service.catalog, SEED_EVENT_ID);
     const createdSessionId = sessions.find((session) => session.name === 'New Session')?.id;
     expect(createdSessionId).toBeDefined();
-    await service.deleteSession(SEED_EVENT_ID, createdSessionId!);
+    await service.deleteSession(SEED_EVENT_ID, createdSessionId!, onCompleteStep);
 
-    await service.createCategory(SEED_EVENT_ID);
+    await service.createCategory(SEED_EVENT_ID, onCompleteStep);
     let categories = getCategoriesForEvent(service.catalog, SEED_EVENT_ID);
     const createdCategoryId = categories.find((category) => category.name === 'New Category')?.id;
     expect(createdCategoryId).toBeDefined();
-    await service.deleteCategory(SEED_EVENT_ID, createdCategoryId!.toString());
+    await service.deleteCategory(SEED_EVENT_ID, createdCategoryId!.toString(), onCompleteStep);
 
-    await service.createEntrant(SEED_EVENT_ID);
+    await service.createEntrant(SEED_EVENT_ID, 'rider', onCompleteStep);
     let entrants = getEntrantsForEvent(service.catalog, SEED_EVENT_ID);
     const createdEntrantId = entrants.find((entrant) => entrant.name === 'New Entrant')?.id;
     expect(createdEntrantId).toBeDefined();
-    await service.deleteEntrant(SEED_EVENT_ID, createdEntrantId!);
+    await service.deleteEntrant(SEED_EVENT_ID, createdEntrantId!, onCompleteStep);
 
     sessions = getSessionsForEvent(service.catalog, SEED_EVENT_ID);
     categories = getCategoriesForEvent(service.catalog, SEED_EVENT_ID);
