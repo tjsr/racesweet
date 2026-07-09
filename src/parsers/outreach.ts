@@ -17,7 +17,7 @@ const simpleTransponderTimeRecord: RegExp = /^(?<chipCode>\d+)[\s,;]+"?(?<dateTi
 
 export type OutreachChipCrossingData = ChipCrossingData & {
   id: unknown;
-  antenna?: string | number | undefined;
+  antenna?: number | undefined;
   hexChipCode?: string | undefined;
   lineNumber?: number | undefined;
 };

@@ -523,9 +523,10 @@ describe('MR-SCATS catalog import parser', () => {
       new Date('1997-06-29T11:01:00.000Z'),
     ]);
     expect(crossings[0]).toEqual(expect.objectContaining({
-      antenna: 'Line 3 Loop 9',
       chipCode: 1001,
       isLapCompletion: false,
+      lineNumber: 3,
+      loopNumber: 9,
       plateNumber: '42',
     }));
     expect(crossings[1]).toEqual(expect.objectContaining({
@@ -561,9 +562,9 @@ describe('MR-SCATS catalog import parser', () => {
 
     expect(records).toHaveLength(3);
     expect(crossings.map((crossing) => crossing.chipCode)).toEqual([1234, 1234]);
-    expect(crossings.map((crossing) => crossing.antenna)).toEqual([
-      'Line 3 Loop 2',
-      'Line 4 Loop 1',
+    expect(crossings.map((crossing) => [crossing.lineNumber, crossing.loopNumber])).toEqual([
+      [3, 2],
+      [4, 1],
     ]);
     expect(crossings.map((crossing) => crossing.source)).toEqual([
       createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.SRT'),
@@ -705,10 +706,10 @@ describe('MR-SCATS catalog import parser', () => {
     const crossings = (imported.raceState.records || []).slice(1) as unknown as Array<Record<string, unknown>>;
 
     expect(crossings).toHaveLength(3);
-    expect(crossings.map((crossing) => crossing.antenna)).toEqual([
-      'Line 5 Loop 1',
-      'Line 6 Loop 2',
-      undefined,
+    expect(crossings.map((crossing) => [crossing.lineNumber, crossing.loopNumber])).toEqual([
+      [5, 1],
+      [6, 2],
+      [undefined, undefined],
     ]);
     expect(crossings.map((crossing) => crossing.isLapCompletion)).toEqual([false, false, true]);
     expect(crossings.map((crossing) => crossing.time)).toEqual([

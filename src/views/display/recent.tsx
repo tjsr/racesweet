@@ -193,12 +193,15 @@ const buildManualPassingRecord = (
   time: Date,
   txNo: string,
   plate: string,
-  antenna: string,
+  lineNumberText: string,
+  loopNumberText: string,
   existingRecord?: EventTimeRecord
 ): ParticipantPassingRecord => {
   const trimmedTxNo = txNo.trim();
   const trimmedPlate = plate.trim();
-  const record: ParticipantPassingRecord & { antenna?: string; chipCode?: number; plateNumber?: string } = {
+  const trimmedLineNumber = lineNumberText.trim();
+  const trimmedLoopNumber = loopNumberText.trim();
+  const record: ParticipantPassingRecord & { chipCode?: number; plateNumber?: string } = {
     eventId: currentEventId || existingRecord?.eventId || anchorRecord.eventId,
     id: existingRecord?.id || createTimeRecordId(),
     recordType: RECORD_TX_CROSSING,
@@ -214,8 +217,11 @@ const buildManualPassingRecord = (
   if (trimmedPlate.length > 0) {
     record.plateNumber = trimmedPlate;
   }
-  if (antenna.trim().length > 0) {
-    record.antenna = antenna.trim();
+  if (/^\d+$/.test(trimmedLineNumber)) {
+    record.lineNumber = Number(trimmedLineNumber);
+  }
+  if (/^\d+$/.test(trimmedLoopNumber)) {
+    record.loopNumber = Number(trimmedLoopNumber);
   }
 
   return record;
@@ -243,18 +249,31 @@ const getEditablePassingPlate = (record: EventTimeRecord, raceStateLookup: RaceS
   return plateNumber !== undefined ? plateNumber.toString() : '';
 };
 
-const getEditablePassingAntenna = (record: EventTimeRecord): string => {
-  return ((record as ParticipantPassingRecord & { antenna?: string }).antenna || '').toString();
-};
-
 const formatOptionalNumber = (value: number | undefined): string => {
   return value === undefined ? '' : value.toString();
+};
+
+const formatPassingTimingPoint = (record: ParticipantPassingRecord): string => {
+  const lineNumber = getPassingLineNumber(record);
+  const loopNumber = getPassingLoopNumber(record);
+  if (lineNumber !== undefined) {
+    return `Line ${lineNumber}${loopNumber !== undefined ? ` Loop ${loopNumber}` : ''}`;
+  }
+
+  const antenna = (record as ParticipantPassingRecord & { antenna?: number }).antenna;
+  return typeof antenna === 'number' && Number.isInteger(antenna) && antenna > 0
+    ? `Antenna ${antenna}`
+    : '';
 };
 
 const getEditablePassingSourceFile = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): string => {
   return raceStateLookup.getTimeRecordSourceById?.(record.source)?.filePath ||
     raceStateLookup.getTimeRecordSourceById?.(record.source)?.name ||
     '';
+};
+
+const formatRecordJson = (record: EventTimeRecord | undefined): string => {
+  return record ? JSON.stringify(record, null, 2) || '' : '';
 };
 
 const formatFinishLineNumbers = (raceStateLookup: RaceStateLookup): string => {
@@ -727,7 +746,7 @@ export const PassingRecordRow = (
   let categoryStr = undefined;
   const timeString = tableTimeString(passing.time, props.timeZone);
   const identifier: string = txNo !== undefined ? `Tx${txNo}` : '';
-  const antenna = (passing as ParticipantPassingRecord & { antenna?: string }).antenna || '';
+  const timingPoint = formatPassingTimingPoint(passing);
   const participantMap = participantMapFromLookup(rs);
   const entrant = passing.participantId
     ? rs.getParticipantById(passing.participantId)
@@ -826,7 +845,7 @@ export const PassingRecordRow = (
         title={formatRecordIdTitle(passing.id)}
         onClick={handleSelect}>
         <TableCell className={cellClasses}>{passing.sequence}</TableCell>
-        <TableCell className={cellClasses}>{antenna}</TableCell>
+        <TableCell className={cellClasses}>{timingPoint}</TableCell>
         <TableCell className={cellClasses}>{identifier}</TableCell>
         <TableCell className={cellClasses}>{timeString}</TableCell>
         <TableCell className={cellClasses}>{plateNumber || normalizedRecordPlateNumber || '?'}</TableCell>
@@ -989,7 +1008,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
   return <UnknownChipRow
     sequenceNumber={record.sequence}
     timeRecordId={record.id}
-    antennae='?'
+    antennae={isCrossingRecord(record) ? formatPassingTimingPoint(record as ParticipantPassingRecord) : '?'}
     onOpenAddRecordDialog={props.onOpenAddRecordDialog}
     onOpenEditRecordDialog={props.onOpenEditRecordDialog}
     onSelectRecord={props.onSelectRecord}
@@ -1063,7 +1082,7 @@ export const Warnings = ({ warnings }: { warnings: string[] }): JSX.Element => {
 
 const getHeadings = (showSectorColumn: boolean): string[] => ([
   'Seq',
-  'Antenna',
+  'Timing',
   'TxNo',
   'Time',
   'Number',
@@ -1458,7 +1477,9 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   const [selectedFlagCategoryIds, setSelectedFlagCategoryIds] = React.useState<EventCategoryId[]>([]);
   const [passingTxNo, setPassingTxNo] = React.useState<string>('');
   const [passingPlate, setPassingPlate] = React.useState<string>('');
-  const [passingAntenna, setPassingAntenna] = React.useState<string>('');
+  const [passingLineNumber, setPassingLineNumber] = React.useState<string>('');
+  const [passingLoopNumber, setPassingLoopNumber] = React.useState<string>('');
+  const [showRawRecordJson, setShowRawRecordJson] = React.useState<boolean>(false);
   const [timeError, setTimeError] = React.useState<string>('');
 
   React.useEffect(() => {
@@ -1472,7 +1493,8 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       setSelectedFlagCategoryIds(getEditableFlagCategoryIds(editingRecord));
       setPassingTxNo(getEditablePassingTxNo(editingRecord));
       setPassingPlate(getEditablePassingPlate(editingRecord, props.raceStateLookup));
-      setPassingAntenna(getEditablePassingAntenna(editingRecord));
+      setPassingLineNumber(formatOptionalNumber(getPassingLineNumber(editingRecord as ParticipantPassingRecord)));
+      setPassingLoopNumber(formatOptionalNumber(getPassingLoopNumber(editingRecord as ParticipantPassingRecord)));
     } else {
       setTimeOfDay(formatManualTimeOfDay(anchorRecord.time));
       setRecordType('passing');
@@ -1480,10 +1502,14 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       setSelectedFlagCategoryIds([]);
       setPassingTxNo('');
       setPassingPlate('');
-      setPassingAntenna('');
+      setPassingLineNumber('');
+      setPassingLoopNumber('');
     }
     setTimeError('');
   }, [anchorRecord, dialogMode, editingRecord, props.raceStateLookup]);
+  React.useEffect(() => {
+    setShowRawRecordJson(false);
+  }, [props.openState]);
 
   const txOptions = React.useMemo(() => {
     return participants
@@ -1511,11 +1537,10 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   const resolvedTeamName = getParticipantTeamName(resolvedParticipant, props.raceStateLookup);
   const resolvedCategoryName = resolvedCategory?.name || '';
   const editablePassingRecord = editingRecord && isCrossingRecord(editingRecord) ? editingRecord : undefined;
-  const editablePassingLineNumber = editablePassingRecord ? getPassingLineNumber(editablePassingRecord) : undefined;
-  const editablePassingLoopNumber = editablePassingRecord ? getPassingLoopNumber(editablePassingRecord) : undefined;
   const editablePassingLapControl = editablePassingRecord ? (isLapControlCrossing(editablePassingRecord, props.raceStateLookup) ? 'Yes' : 'No') : '';
   const editableFinishLineNumbers = editablePassingRecord ? formatFinishLineNumbers(props.raceStateLookup) : '';
   const editablePassingSourceFile = editablePassingRecord ? getEditablePassingSourceFile(editablePassingRecord, props.raceStateLookup) : '';
+  const editableRecordJson = React.useMemo(() => formatRecordJson(editingRecord), [editingRecord]);
 
   const handleTxNoChange = (value: string): void => {
     setPassingTxNo(value);
@@ -1559,7 +1584,8 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
         parsedTime,
         passingTxNo,
         passingPlate,
-        passingAntenna,
+        passingLineNumber,
+        passingLoopNumber,
         editingRecord
       );
     props.onSave(record, dialogMode);
@@ -1590,6 +1616,13 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
               sx={{ gridColumn: 'span 2', minWidth: 520 }}
               value={editingRecordId}
             />
+          ) : null}
+          {dialogMode === 'edit' && editingRecord ? (
+            <div style={{ gridColumn: '1 / -1' }}>
+              <Button onClick={() => setShowRawRecordJson((current) => !current)} size="small" variant="outlined">
+                {showRawRecordJson ? 'Hide record JSON' : 'Show record JSON'}
+              </Button>
+            </div>
           ) : null}
           <div className="event-details-form-row">
             <label className="page-filter-label">
@@ -1665,11 +1698,18 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
                   value={passingPlate}
                 />
                 <TextField
-                  label="Antenna"
+                  label="Timing line"
                   margin="dense"
-                  onChange={(event) => setPassingAntenna(event.target.value)}
-                  slotProps={{ htmlInput: { 'aria-label': 'Antenna' } }}
-                  value={passingAntenna}
+                  onChange={(event) => setPassingLineNumber(event.target.value)}
+                  slotProps={{ htmlInput: { 'aria-label': 'Timing line' } }}
+                  value={passingLineNumber}
+                />
+                <TextField
+                  label="Timing loop"
+                  margin="dense"
+                  onChange={(event) => setPassingLoopNumber(event.target.value)}
+                  slotProps={{ htmlInput: { 'aria-label': 'Timing loop' } }}
+                  value={passingLoopNumber}
                 />
               </div>
               <datalist id="manual-record-tx-options">
@@ -1685,8 +1725,6 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
               </div>
               {dialogMode === 'edit' && editablePassingRecord ? (
                 <div className="event-details-form-row">
-                  <TextField disabled label="Timing line" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Timing line' } }} value={formatOptionalNumber(editablePassingLineNumber)} />
-                  <TextField disabled label="Timing loop" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Timing loop' } }} value={formatOptionalNumber(editablePassingLoopNumber)} />
                   <TextField disabled label="Lap control lines" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Lap control lines' } }} value={editableFinishLineNumbers} />
                   <TextField disabled label="Lap crossing" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Lap crossing' } }} value={editablePassingLapControl} />
                   <TextField disabled label="Source file" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Source file' } }} value={editablePassingSourceFile} />
@@ -1694,6 +1732,18 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
               ) : null}
             </>
           )}
+          {dialogMode === 'edit' && editingRecord && showRawRecordJson ? (
+            <TextField
+              fullWidth
+              label="Record JSON"
+              margin="dense"
+              minRows={10}
+              multiline
+              slotProps={{ htmlInput: { 'aria-label': 'Record JSON', readOnly: true } }}
+              sx={{ gridColumn: '1 / -1' }}
+              value={editableRecordJson}
+            />
+          ) : null}
         </div>
       </DialogContent>
       <DialogActions>

@@ -261,9 +261,10 @@ describe('Session team lap processing', () => {
     });
     const sectorCrossing = {
       ...chipCrossing('1001', 1001, 2, '2026-05-30T10:01:00.000Z'),
-      antenna: 'Line 3 Loop 9',
       isLapCompletion: false,
-    } as ParticipantPassingRecord & { antenna: string };
+      lineNumber: 3,
+      loopNumber: 9,
+    } as ParticipantPassingRecord;
     const finishCrossing = chipCrossing('1002', 1001, 3, '2026-05-30T10:02:00.000Z');
 
     await session.addRecords([
@@ -284,11 +285,12 @@ describe('Session team lap processing', () => {
 
     expect(laps.map((record) => record.id)).toEqual(['1001', '1002']);
     expect(laps[0]).toMatchObject({
-      antenna: 'Line 3 Loop 9',
       isExcluded: false,
       isLapCompletion: false,
       isValid: true,
       lapNo: 0,
+      lineNumber: 3,
+      loopNumber: 9,
       lapTime: 60000,
       startingLapRecordId: '1',
     });

@@ -87,27 +87,23 @@ export const normalizeFinishLineNumbers = (finishLineNumbers: number[] | undefin
   return normalizedNumbers.length > 0 ? normalizedNumbers : [...DEFAULT_FINISH_LINE_NUMBERS];
 };
 
-const getAntennaString = (passing: ParticipantPassingRecord): string | undefined => {
-  const antenna = (passing as ParticipantPassingRecord & { antenna?: string }).antenna;
-  return typeof antenna === 'string' ? antenna : undefined;
+const getPositiveInteger = (value: number | string | undefined): number | undefined => {
+  if (typeof value === 'number') {
+    return Number.isInteger(value) && value > 0 ? value : undefined;
+  }
+  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+    const parsed = Number(value.trim());
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+  }
+  return undefined;
 };
 
 export const getPassingLineNumber = (passing: ParticipantPassingRecord): number | undefined => {
-  if (typeof passing.lineNumber === 'number' && Number.isInteger(passing.lineNumber) && passing.lineNumber > 0) {
-    return passing.lineNumber;
-  }
-
-  const lineMatch = getAntennaString(passing)?.match(/line\s+(\d+)/i);
-  return lineMatch ? Number(lineMatch[1]) : undefined;
+  return getPositiveInteger(passing.lineNumber);
 };
 
 export const getPassingLoopNumber = (passing: ParticipantPassingRecord): number | undefined => {
-  if (typeof passing.loopNumber === 'number' && Number.isInteger(passing.loopNumber) && passing.loopNumber > 0) {
-    return passing.loopNumber;
-  }
-
-  const loopMatch = getAntennaString(passing)?.match(/(?:loop|lane)\s+(\d+)/i);
-  return loopMatch ? Number(loopMatch[1]) : undefined;
+  return getPositiveInteger(passing.loopNumber);
 };
 
 export const isFinishLinePassing = (

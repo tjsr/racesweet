@@ -822,15 +822,11 @@ const getNoFileLineNumber = (fileName: string): number | undefined => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 };
 
-const getCrossingAntenna = (record: MrScatsDbfRecord, fileName: string): string | undefined => {
-  const lineNumber = getFirstPositiveInteger(record, CROSSING_LINE_FIELDS) || getNoFileLineNumber(fileName);
-  const loopNumber = getFirstPositiveInteger(record, CROSSING_LOOP_FIELDS);
-  if (lineNumber === undefined) {
-    return undefined;
-  }
+const getCrossingLineNumber = (record: MrScatsDbfRecord, fileName: string): number | undefined =>
+  getFirstPositiveInteger(record, CROSSING_LINE_FIELDS) || getNoFileLineNumber(fileName);
 
-  return `Line ${lineNumber}${loopNumber !== undefined ? ` Loop ${loopNumber}` : ''}`;
-};
+const getCrossingLoopNumber = (record: MrScatsDbfRecord): number | undefined =>
+  getFirstPositiveInteger(record, CROSSING_LOOP_FIELDS);
 
 const createSessionGreenFlag = (
   meetingCode: string,
@@ -950,13 +946,14 @@ const createCrossingRecord = (
     plateNumber,
     crossingTime.elapsedMilliseconds.toString(),
   ].join(':');
-  const baseRecord: ParticipantPassingRecord & { antenna?: string } = {
-    antenna: getCrossingAntenna(record, fileName),
+  const baseRecord: ParticipantPassingRecord = {
     dataLine: JSON.stringify(record),
     elapsedTime: null,
     eventId: createEventId(`mr-scats:${meetingCode}:event`),
     id: createTimeRecordId(stableRecordKey),
     isLapCompletion: options.isLapCompletion,
+    lineNumber: getCrossingLineNumber(record, fileName),
+    loopNumber: getCrossingLoopNumber(record),
     originRecordNumber: rowIndex + 1,
     recordType: RECORD_TX_CROSSING,
     sequence,
@@ -1013,14 +1010,10 @@ const createRawCrossingRecord = (
     record.rawTimeTicks.toString(),
   ].join(':');
   const baseRecord: ParticipantPassingRecord & {
-    antenna?: string;
     confidence?: string;
     drtCode?: string;
     rawStatus?: string;
   } = {
-    antenna: record.lineNumber !== undefined
-      ? `Line ${record.lineNumber}${record.laneNumber !== undefined ? ` Loop ${record.laneNumber}` : ''}`
-      : undefined,
     confidence: record.confidence,
     dataLine: record.raw,
     drtCode: record.drtCode,

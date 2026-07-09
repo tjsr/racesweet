@@ -3407,15 +3407,18 @@ describe('RecentRecords integration', () => {
 
     const timeInput = document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement | null;
     const txInput = document.querySelector('input[aria-label="TxNo"]') as HTMLInputElement | null;
-    const antennaInput = document.querySelector('input[aria-label="Antenna"]') as HTMLInputElement | null;
+    const timingLineInput = document.querySelector('input[aria-label="Timing line"]') as HTMLInputElement | null;
+    const timingLoopInput = document.querySelector('input[aria-label="Timing loop"]') as HTMLInputElement | null;
     expect(timeInput).toBeTruthy();
     expect(txInput).toBeTruthy();
-    expect(antennaInput).toBeTruthy();
+    expect(timingLineInput).toBeTruthy();
+    expect(timingLoopInput).toBeTruthy();
 
     await act(async () => {
       setInputValue(timeInput!, '10:07:30.250');
       setInputValue(txInput!, '100101');
-      setInputValue(antennaInput!, 'Loop A');
+      setInputValue(timingLineInput!, '1');
+      setInputValue(timingLoopInput!, '4');
     });
 
     expect((document.querySelector('input[aria-label="Plate"]') as HTMLInputElement).value).toBe('101');
@@ -3432,9 +3435,10 @@ describe('RecentRecords integration', () => {
 
     expect(onAddRecord).toHaveBeenCalledTimes(1);
     expect(onAddRecord).toHaveBeenCalledWith(expect.objectContaining({
-      antenna: 'Loop A',
       chipCode: 100101,
       eventId: 'event-1',
+      lineNumber: 1,
+      loopNumber: 4,
       plateNumber: '101',
       recordType: RECORD_TX_CROSSING,
       sessionId: 'session-1',
@@ -3566,7 +3570,6 @@ describe('RecentRecords integration', () => {
       surname: 'Rider',
     };
     const crossing = {
-      antenna: 'Loop A',
       chipCode: 100101,
       id: 'crossing-1',
       isValid: true,
@@ -3578,7 +3581,7 @@ describe('RecentRecords integration', () => {
       sequence: 1,
       source: createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.DBF'),
       time: new Date('2026-05-29T10:06:00.000Z'),
-    } as ParticipantPassingRecord & { antenna: string; plateNumber: string };
+    } as ParticipantPassingRecord & { plateNumber: string };
     const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
       categories: [categoryA],
       countTransponderCrossings: () => 1,
@@ -3643,15 +3646,32 @@ describe('RecentRecords integration', () => {
     expect((document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement).value).toBe('10:06:00.000');
     expect((document.querySelector('input[aria-label="TxNo"]') as HTMLInputElement).value).toBe('100101');
     expect((document.querySelector('input[aria-label="Plate"]') as HTMLInputElement).value).toBe('101');
-    expect((document.querySelector('input[aria-label="Antenna"]') as HTMLInputElement).value).toBe('Loop A');
     expect((document.querySelector('input[aria-label="Timing line"]') as HTMLInputElement).value).toBe('8');
     expect((document.querySelector('input[aria-label="Timing loop"]') as HTMLInputElement).value).toBe('2');
     expect((document.querySelector('input[aria-label="Lap control lines"]') as HTMLInputElement).value).toBe('1, 7');
     expect((document.querySelector('input[aria-label="Lap crossing"]') as HTMLInputElement).value).toBe('No');
     expect((document.querySelector('input[aria-label="Source file"]') as HTMLInputElement).value).toBe('W9721R01.DBF');
+    expect(document.querySelector('textarea[aria-label="Record JSON"]')).toBeNull();
+
+    const showRecordJsonButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Show record JSON');
+    expect(showRecordJsonButton).toBeDefined();
 
     await act(async () => {
-      setInputValue(document.querySelector('input[aria-label="Antenna"]') as HTMLInputElement, 'Loop B');
+      showRecordJsonButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const recordJsonField = document.querySelector('textarea[aria-label="Record JSON"]') as HTMLTextAreaElement | null;
+    expect(recordJsonField).not.toBeNull();
+    expect(recordJsonField?.readOnly).toBe(true);
+    expect(recordJsonField?.disabled).toBe(false);
+    expect(recordJsonField?.value).toContain('"id": "crossing-1"');
+    expect(recordJsonField?.value).toContain('"lineNumber": 8');
+    expect(recordJsonField?.value).toContain('"loopNumber": 2');
+    expect(recordJsonField?.value).toContain('"time": "2026-05-29T10:06:00.000Z"');
+
+    await act(async () => {
+      setInputValue(document.querySelector('input[aria-label="Timing line"]') as HTMLInputElement, '9');
+      setInputValue(document.querySelector('input[aria-label="Timing loop"]') as HTMLInputElement, '3');
       setInputValue(document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement, '10:06:30.500');
     });
 
@@ -3665,9 +3685,10 @@ describe('RecentRecords integration', () => {
     expect(onAddRecord).not.toHaveBeenCalled();
     expect(onEditRecord).toHaveBeenCalledTimes(1);
     expect(onEditRecord).toHaveBeenCalledWith(expect.objectContaining({
-      antenna: 'Loop B',
       chipCode: 100101,
       id: 'crossing-1',
+      lineNumber: 9,
+      loopNumber: 3,
       plateNumber: '101',
       sequence: 1,
       sessionId: 'session-1',
