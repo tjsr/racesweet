@@ -5,7 +5,7 @@ import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { EventTeam } from '../model/eventteam.js';
 import { Session } from '../model/racestate.js';
-import { RECORD_TX_CROSSING, type ParticipantPassingRecord, type TimeRecord } from '../model/timerecord.js';
+import { RECORD_TX_CROSSING, type ParticipantPassingRecord, type TimeRecord, type TimeRecordSource } from '../model/timerecord.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
 import type { EventCatalogState } from '../catalog/eventCatalog.js';
 
@@ -64,8 +64,14 @@ describe('sourceApplication', () => {
     const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
     const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
     const addTeams = vi.fn((_teams: EventTeam[]) => undefined);
+    const addTimeRecordSources = vi.fn((_timeRecordSources: TimeRecordSource[]) => undefined);
     const beginBulkProcess = vi.fn(async () => true);
     const endBulkProcess = vi.fn(async () => undefined);
+    const source = {
+      filePath: 'T9743R10.DBF',
+      id: createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.DBF'),
+      name: 'T9743R10.DBF',
+    };
 
     await applyPulledRaceStateToSession(
       {
@@ -73,6 +79,7 @@ describe('sourceApplication', () => {
         addParticipants,
         addRecords,
         addTeams,
+        addTimeRecordSources,
         beginBulkProcess,
         categories: existingCategories,
         endBulkProcess,
@@ -82,6 +89,7 @@ describe('sourceApplication', () => {
         categories: incomingCategoriesWithDuplicates,
         participants: [],
         records: [],
+        timeRecordSources: [source],
       }
     );
 
@@ -96,9 +104,51 @@ describe('sourceApplication', () => {
     expect(addParticipants).toHaveBeenCalledTimes(1);
     expect(addTeams).toHaveBeenCalledTimes(1);
     expect(addTeams).toHaveBeenCalledWith([]);
+    expect(addTimeRecordSources).toHaveBeenCalledTimes(1);
+    expect(addTimeRecordSources).toHaveBeenCalledWith([source]);
     expect(addRecords).toHaveBeenCalledTimes(1);
     expect(beginBulkProcess).toHaveBeenCalledTimes(1);
     expect(endBulkProcess).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies imported source-file lookups to the target session for edit-dialog provenance', async () => {
+    const sourceId = createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.SRT');
+    const session = new Session({
+      categories: [],
+      participants: [],
+      records: [],
+      teams: [],
+    });
+
+    await applyPulledRaceStateToSession(
+      session,
+      {
+        categories: [],
+        participants: [],
+        records: [
+          {
+            id: createTimeRecordId('t9743-source-record'),
+            recordType: RECORD_TX_CROSSING,
+            sequence: 1,
+            source: sourceId,
+            time: new Date('1997-12-06T09:02:32.413Z'),
+          } as TimeRecord,
+        ],
+        timeRecordSources: [
+          {
+            filePath: 'T9743R10.SRT',
+            id: sourceId,
+            name: 'T9743R10.SRT',
+          },
+        ],
+      }
+    );
+
+    expect(session.records[0]?.source).toBe(sourceId);
+    expect(session.getTimeRecordSourceById(sourceId)).toEqual(expect.objectContaining({
+      filePath: 'T9743R10.SRT',
+      name: 'T9743R10.SRT',
+    }));
   });
 
   it('applies the session minimum lap time override when loading pulled race state', async () => {

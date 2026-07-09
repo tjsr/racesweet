@@ -7,7 +7,7 @@ import type { GreenFlagRecord, YellowFlagRecord } from '../../model/flag.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
 import type { EventId, SessionId } from '../../model/raceevent.js';
 import type { RaceState } from '../../model/racestate.js';
-import { EVENT_FLAG_DISPLAYED, RECORD_TX_CROSSING, type EventTimeRecord, type ParticipantPassingRecord } from '../../model/timerecord.js';
+import { EVENT_FLAG_DISPLAYED, RECORD_TX_CROSSING, type EventTimeRecord, type ParticipantPassingRecord, type TimeRecordSource } from '../../model/timerecord.js';
 import { parseCtcRawCrossingFile, type CtcRawCrossingRecord } from '../ctc/rawCrossing.js';
 import { readMrScatsDbfTable, readMrScatsDbfTableAsync, type MrScatsDbfRecord } from './dbf.js';
 import { parseMrScatsDbfSummary, readMrScatsZipEntryBuffers } from './fileInventory.js';
@@ -106,6 +106,11 @@ const CROSSING_GREEN_FLAG_FIELDS = ['FLAG', 'SYNCMARK', 'STARTFIN'];
 const AUXILIARY_DBF_EXTENSIONS = ['.AT1', '.AT2'];
 const RAW_CROSSING_EXTENSIONS = ['.SRT', '.ERF'];
 
+interface MrScatsSessionRecordBuildResult {
+  records: EventTimeRecord[];
+  timeRecordSources: TimeRecordSource[];
+}
+
 const createProgressTracker = (total: number, onProgress: MrScatsCatalogLoadOptions['onProgress']): MrScatsLoadProgressTracker => {
   let completed = 0;
   const fixedTotal = Math.max(1, total);
@@ -137,6 +142,28 @@ const createProgressTracker = (total: number, onProgress: MrScatsCatalogLoadOpti
 const asString = (value: unknown): string => value === undefined || value === null ? '' : String(value).trim();
 
 const normalizeBaseName = (fileName: string): string => path.basename(fileName, path.extname(fileName)).toUpperCase();
+
+const createMrScatsSessionSourceId = (meetingCode: string, session: MrScatsImportedSession): ReturnType<typeof createTimeRecordSourceId> => {
+  return createTimeRecordSourceId(`mr-scats:${meetingCode}:source:${session.eventCode}`);
+};
+
+const createMrScatsFileSourceId = (meetingCode: string, session: MrScatsImportedSession, fileName: string): ReturnType<typeof createTimeRecordSourceId> => {
+  return createTimeRecordSourceId(`mr-scats:${meetingCode}:source:${session.eventCode}:${path.basename(fileName)}`);
+};
+
+const createMrScatsFileSource = (meetingCode: string, session: MrScatsImportedSession, fileName: string): TimeRecordSource => {
+  const baseName = path.basename(fileName);
+  return {
+    description: `Imported MR-SCATS timing records from ${baseName}.`,
+    filePath: fileName,
+    id: createMrScatsFileSourceId(meetingCode, session, fileName),
+    name: baseName,
+  };
+};
+
+const addTimeRecordSource = (sourcesById: Map<string, TimeRecordSource>, source: TimeRecordSource): void => {
+  sourcesById.set(source.id.toString(), source);
+};
 
 const findCoreTableFileNames = (files: string[], baseNames: string[], extensions: string[] = CORE_TABLE_READABLE_EXTENSIONS): string[] => {
   const normalizedBaseNames = new Set(baseNames.map((baseName) => baseName.toUpperCase()));
@@ -1022,12 +1049,13 @@ const buildSessionRecords = async (
   participants: EventParticipant[],
   loadPlan: MrScatsLoadPlan,
   progress?: MrScatsLoadProgressTracker
-): Promise<EventTimeRecord[]> => {
+): Promise<MrScatsSessionRecordBuildResult> => {
   const participantsByPlate = buildParticipantsByPlate(participants);
   const sessionRecords: EventTimeRecord[] = [];
+  const timeRecordSourcesById = new Map<string, TimeRecordSource>();
 
   for (const session of sessions) {
-    const source = createTimeRecordSourceId(`mr-scats:${meetingCode}:source:${session.eventCode}`);
+    const sessionSource = createMrScatsSessionSourceId(meetingCode, session);
     const sessionPlan = loadPlan.sessionPlansById.get(session.id.toString()) || {
       auxiliaryDbfFileNames: [],
       dbfFileNames: [],
@@ -1066,19 +1094,23 @@ const buildSessionRecords = async (
     const greenElapsedMilliseconds = getGreenElapsedMilliseconds(crossingRows);
     const sessionElapsedZeroTime = new Date(scheduledStartTime.getTime() - greenElapsedMilliseconds);
     const dbfCrossingRecords = sessionFileTables.flatMap((table) => table.records
-      .map((record, rowIndex) => createCrossingRecord(
-        meetingCode,
-        session,
-        source,
-        table.fileName,
-        record,
-        rowIndex,
-        scheduledStartTime,
-        sessionElapsedZeroTime,
-        rowIndex + 2,
-        participantsByPlate,
-        { isLapCompletion: table.isLapCompletion }
-      ))
+      .map((record, rowIndex) => {
+        const source = createMrScatsFileSource(meetingCode, session, table.fileName);
+        addTimeRecordSource(timeRecordSourcesById, source);
+        return createCrossingRecord(
+          meetingCode,
+          session,
+          source.id,
+          table.fileName,
+          record,
+          rowIndex,
+          scheduledStartTime,
+          sessionElapsedZeroTime,
+          rowIndex + 2,
+          participantsByPlate,
+          { isLapCompletion: table.isLapCompletion }
+        );
+      })
       .filter((record): record is EventTimeRecord => record !== undefined));
     const rawCrossingRecords: EventTimeRecord[] = [];
     const rawFlagRecords: EventTimeRecord[] = [];
@@ -1091,13 +1123,15 @@ const buildSessionRecords = async (
       }
       const rawRecords = rawFile.records;
       const baseSequence = sessionFileTables.reduce((total, table) => total + table.records.length, 0) + (fileIndex * 100000) + 2;
+      const rawSource = createMrScatsFileSource(meetingCode, session, fileName);
+      addTimeRecordSource(timeRecordSourcesById, rawSource);
 
       rawFlagRecords.push(...rawRecords.flatMap((record, rowIndex): EventTimeRecord[] => {
         if (record.specialType === 'yellow-flag') {
-          return [createSessionYellowFlag(meetingCode, session, source, fileName, record, baseSequence + rowIndex)];
+          return [createSessionYellowFlag(meetingCode, session, rawSource.id, fileName, record, baseSequence + rowIndex)];
         }
         if (record.specialType === 'yellow-end') {
-          return [createSessionGreenResumeFlag(meetingCode, session, source, fileName, record, baseSequence + rowIndex)];
+          return [createSessionGreenResumeFlag(meetingCode, session, rawSource.id, fileName, record, baseSequence + rowIndex)];
         }
         return [];
       }));
@@ -1106,7 +1140,7 @@ const buildSessionRecords = async (
         .map((record, rowIndex) => createRawCrossingRecord(
           meetingCode,
           session,
-          source,
+          rawSource.id,
           fileName,
           record,
           sessionElapsedZeroTime,
@@ -1127,12 +1161,15 @@ const buildSessionRecords = async (
     }
 
     sessionRecords.push(
-      createSessionGreenFlag(meetingCode, session, source, scheduledStartTime, 1),
+      createSessionGreenFlag(meetingCode, session, sessionSource, scheduledStartTime, 1),
       ...crossingRecords,
     );
   }
 
-  return sessionRecords;
+  return {
+    records: sessionRecords,
+    timeRecordSources: Array.from(timeRecordSourcesById.values()),
+  };
 };
 
 const splitDriverName = (name: string): { firstname: string; surname: string } => {
@@ -1217,7 +1254,7 @@ export const loadMrScatsCatalogFromLocation = async (
   const categoryIdByName = new Map(categories.map((category) => [category.name, category.id]));
   const participants = buildParticipants(meetingCode, drivers, categoryIdByName);
   const sessions = inferSessionCategoryIds(buffers, buildSessions(meetingCode, programme, categoryIdByName), participants);
-  const records = await buildSessionRecords(meetingCode, buffers, sessions, participants, loadPlan, progress);
+  const sessionRecordBuildResult = await buildSessionRecords(meetingCode, buffers, sessions, participants, loadPlan, progress);
   const eventDate = getEventDate(programme);
 
   return {
@@ -1227,8 +1264,9 @@ export const loadMrScatsCatalogFromLocation = async (
     raceState: {
       categories,
       participants,
-      records,
+      records: sessionRecordBuildResult.records,
       teams: [],
+      timeRecordSources: sessionRecordBuildResult.timeRecordSources,
     },
     sessions,
   };

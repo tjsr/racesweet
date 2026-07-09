@@ -8,7 +8,7 @@ import { FlagReferencesUnknownCategoryError, InvalidFlagRecordError } from "./er
 import type { EventCategory, EventCategoryId } from "./eventcategory.js";
 import type { EventParticipant, EventParticipantId, ParticipantIdentifier, ParticipantIdentifierUpdate } from "./eventparticipant.js";
 import type { FlagRecord, GreenFlagRecord } from "./flag.js";
-import type { EventTimeRecord, ParticipantPassingRecord, TimeRecord, TimeRecordId, Validated } from "./timerecord.js";
+import type { EventTimeRecord, ParticipantPassingRecord, TimeRecord, TimeRecordId, TimeRecordSource, Validated } from "./timerecord.js";
 
 import { isPlaceholderCatgegory } from "../controllers/category.js";
 import { isParsedChipCrossing } from "../controllers/chipCrossing.js";
@@ -19,7 +19,7 @@ import { isValidId } from "../validators/isValidId.js";
 import type { ChipCrossingData } from "./chipcrossing.js";
 import type { EventEntrantId } from "./entrant.js";
 import type { EventTeam } from "./eventteam.js";
-import type { MapOf } from "./types.js";
+import type { MapOf, TimeRecordSourceId } from "./types.js";
 
 export interface RaceStateLookup {
   getParticipantById(participantId: EventParticipantId): EventParticipant | undefined;
@@ -27,6 +27,7 @@ export interface RaceStateLookup {
   getFinishLineNumbers?(): number[] | undefined;
   getParticipantLaps(participantId: EventParticipantId): ParticipantPassingRecord[] | null | undefined;
   getEntrantIdForParticipant(participantId: EventParticipantId): EventEntrantId | undefined;
+  getTimeRecordSourceById?(sourceId: TimeRecordSourceId): TimeRecordSource | undefined;
   countTransponderCrossings(txNo: ChipCrossingData['chipCode'], untilTime?: Date): number;
   getTransponderCrossings(txNo: ChipCrossingData['chipCode'], untilTime?: Date): ChipCrossingData[];
   excludeCrossing(crossingId: TimeRecordId, exclude: boolean): void;
@@ -45,6 +46,7 @@ export interface RaceStateLookup {
 
 export interface RaceState {
   records: TimeRecord[];
+  timeRecordSources?: TimeRecordSource[];
   participants: EventParticipant[];
   categories: EventCategory[];
   teams: EventTeam[];
@@ -58,6 +60,7 @@ export class Session implements RaceState, RaceStateLookup {
   private _participants!: MapOf<EventParticipant>;
   private _categories!: MapOf<EventCategory>;
   private _teams!: MapOf<EventTeam>;
+  private _timeRecordSources!: MapOf<TimeRecordSource>;
   private _cachedParticipantLaps: Map<TimeRecordId, ParticipantPassingRecord[]> | undefined;
   // private __currentBulkProcess: Barrier<void>|undefined;
   private _bulkProcess: boolean = false;
@@ -72,6 +75,7 @@ export class Session implements RaceState, RaceStateLookup {
     this._categories = listToMap(state.categories);
     this._participants = listToMap(state.participants);
     this._teams = listToMap(state.teams);
+    this._timeRecordSources = listToMap(state.timeRecordSources || []);
     this._records = listToMap(state.records);
     this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
     if (this._records.size > 0 || this._participants.size > 0) {
@@ -119,6 +123,20 @@ export class Session implements RaceState, RaceStateLookup {
   public get teams(): EventTeam[] {
     return [...this._teams.values()];
   };
+
+  public get timeRecordSources(): TimeRecordSource[] {
+    return [...this._timeRecordSources.values()];
+  }
+
+  public getTimeRecordSourceById(sourceId: TimeRecordSourceId): TimeRecordSource | undefined {
+    return this._timeRecordSources.get(sourceId.toString());
+  }
+
+  public addTimeRecordSources(timeRecordSources: TimeRecordSource[]): void {
+    timeRecordSources.forEach((source) => {
+      this._timeRecordSources.set(source.id.toString(), source);
+    });
+  }
 
   public async beginBulkProcess(): Promise<boolean> {
     incrementLoadingMetric('Begin session bulk process');

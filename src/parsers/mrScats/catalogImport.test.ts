@@ -1,6 +1,7 @@
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { createTimeRecordSourceId } from '../../model/ids.js';
 import { loadMrScatsCatalogFromLocation } from './catalogImport.js';
 
 interface DbfField {
@@ -275,13 +276,22 @@ describe('MR-SCATS catalog import parser', () => {
       originRecordNumber: 1,
       plateNumber: '42',
       sessionId: firstImport.sessions[0]?.id,
+      source: createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.DBF'),
       time: new Date('1997-06-28T23:04:59.000Z'),
     }));
     expect(records[2]).toEqual(expect.objectContaining({
       chipCode: 1001,
       originRecordNumber: 2,
+      source: createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.DBF'),
       time: new Date('1997-06-28T23:05:00.500Z'),
     }));
+    expect(firstImport.raceState.timeRecordSources).toEqual([
+      expect.objectContaining({
+        filePath: 'W9721R01.DBF',
+        id: createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.DBF'),
+        name: 'W9721R01.DBF',
+      }),
+    ]);
   });
 
   it('reports load progress for parsed files and rows', async () => {
@@ -555,10 +565,94 @@ describe('MR-SCATS catalog import parser', () => {
       'Line 3 Loop 2',
       'Line 4 Loop 1',
     ]);
+    expect(crossings.map((crossing) => crossing.source)).toEqual([
+      createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.SRT'),
+      createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.ERF'),
+    ]);
+    expect(imported.raceState.timeRecordSources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        filePath: 'W9721R01.SRT',
+        id: createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.SRT'),
+        name: 'W9721R01.SRT',
+      }),
+      expect.objectContaining({
+        filePath: 'W9721R01.ERF',
+        id: createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.ERF'),
+        name: 'W9721R01.ERF',
+      }),
+    ]));
     expect(crossings.map((crossing) => crossing.time)).toEqual([
       new Date('1997-06-28T23:00:10.000Z'),
       new Date('1997-06-28T23:00:20.000Z'),
     ]);
+  });
+
+  it('tags T9743R10 SRT, NO1, and DBF crossings with their original source files', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+      { length: 8, name: 'ACTUALSTRT', type: 'C' },
+    ], [
+      { ACTUALSTRT: '20:02:29', CATEGORY: 'CAT-A', EVENTNAME: 'Race 10', EV_CODE: 'T9743R10', STARTDATE: '19971206' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 13, DRIVER: 'Race Ten Driver', DRIV_CLASS: 'CAT-A', TXNUM: 1234 },
+    ]));
+    await writeFile(path.join(tempDir, 'T9743R10.SRT'), '040000000010000012340302064000\r');
+    await writeFile(path.join(tempDir, 'T9743R10.NO1'), createDbfBuffer([
+      { length: 4, name: 'CAR', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 9, name: 'ELAPSED', type: 'N' },
+      { length: 3, name: 'LINE_NO', type: 'N' },
+      { length: 3, name: 'LANE_NO', type: 'N' },
+    ], [
+      { CAR: 13, ELAPSED: 200000, LANE_NO: 2, LINE_NO: 3, TXNUM: 1234 },
+    ]));
+    await writeFile(path.join(tempDir, 'T9743R10.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 9, name: 'ELAPSED', type: 'N' },
+      { length: 4, name: 'COUNTER', type: 'N' },
+    ], [
+      { CARNUMBER: 13, COUNTER: 1, ELAPSED: 300000, TXNUM: 1234 },
+    ]));
+
+    const imported = await loadMrScatsCatalogFromLocation(tempDir);
+    const sourceFileById = new Map((imported.raceState.timeRecordSources || []).map((source) => [source.id, source.filePath || source.name]));
+    const crossings = ((imported.raceState.records || []) as unknown as Array<Record<string, unknown>>)
+      .filter((record) => record.recordType === 16);
+
+    expect(crossings).toHaveLength(3);
+    expect(crossings.map((crossing) => sourceFileById.get(crossing.source as string))).toEqual([
+      'T9743R10.SRT',
+      'T9743R10.NO1',
+      'T9743R10.DBF',
+    ]);
+    expect(imported.raceState.timeRecordSources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        filePath: 'T9743R10.SRT',
+        id: createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.SRT'),
+        name: 'T9743R10.SRT',
+      }),
+      expect.objectContaining({
+        filePath: 'T9743R10.NO1',
+        id: createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.NO1'),
+        name: 'T9743R10.NO1',
+      }),
+      expect.objectContaining({
+        filePath: 'T9743R10.DBF',
+        id: createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.DBF'),
+        name: 'T9743R10.DBF',
+      }),
+    ]));
   });
 
   it('imports AT1 and AT2 files as non-lap DBF crossings', async () => {

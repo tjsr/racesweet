@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import React, { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import { updateCategorySelectionsForChangedParticipant } from '../../app/categoryChangeState.js';
@@ -16,8 +19,15 @@ import { createCategoryId, createEventEntrantId, createEventParticipantId, creat
 import type { EventTimeRecord } from '../../model/index.js';
 import { type RaceStateLookup, Session } from '../../model/racestate.js';
 import { type ParticipantPassingRecord, RECORD_TX_CROSSING, TimeRecordId } from '../../model/timerecord.js';
+import { loadMrScatsCatalogFromLocation } from '../../parsers/mrScats/catalogImport.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 import { RecentRecords } from './recent.js';
+
+interface DbfField {
+  length: number;
+  name: string;
+  type: string;
+}
 
 class MemoryRaceAdminPersistence implements RaceAdminPersistence {
   private changes: AdministrativeChanges;
@@ -38,6 +48,43 @@ class MemoryRaceAdminPersistence implements RaceAdminPersistence {
     return this.changes;
   }
 }
+
+const createDbfBuffer = (fields: DbfField[], rows: Record<string, string | number | undefined>[]): Buffer => {
+  const headerLength = 32 + (fields.length * 32) + 1;
+  const recordLength = 1 + fields.reduce((total, field) => total + field.length, 0);
+  const buffer = Buffer.alloc(headerLength + (recordLength * rows.length), 0x20);
+  buffer[0] = 3;
+  buffer[1] = 97;
+  buffer[2] = 6;
+  buffer[3] = 28;
+  buffer.writeUInt32LE(rows.length, 4);
+  buffer.writeUInt16LE(headerLength, 8);
+  buffer.writeUInt16LE(recordLength, 10);
+
+  fields.forEach((field, index) => {
+    const offset = 32 + (index * 32);
+    buffer.write(field.name, offset, 'latin1');
+    buffer.write(field.type, offset + 11, 'latin1');
+    buffer[offset + 16] = field.length;
+  });
+  buffer[headerLength - 1] = 0x0d;
+
+  rows.forEach((row, rowIndex) => {
+    const recordOffset = headerLength + (rowIndex * recordLength);
+    buffer[recordOffset] = 0x20;
+    let fieldOffset = recordOffset + 1;
+    fields.forEach((field) => {
+      const rawValue = row[field.name] === undefined ? '' : String(row[field.name]);
+      const value = field.type === 'N'
+        ? rawValue.padStart(field.length, ' ')
+        : rawValue.padEnd(field.length, ' ');
+      buffer.write(value.slice(0, field.length), fieldOffset, 'latin1');
+      fieldOffset += field.length;
+    });
+  });
+
+  return buffer;
+};
 
 const ensureMatchMedia = (): void => {
   if (!window.matchMedia) {
@@ -3529,7 +3576,7 @@ describe('RecentRecords integration', () => {
       plateNumber: '101',
       recordType: RECORD_TX_CROSSING,
       sequence: 1,
-      source: 'test-source',
+      source: createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.DBF'),
       time: new Date('2026-05-29T10:06:00.000Z'),
     } as ParticipantPassingRecord & { antenna: string; plateNumber: string };
     const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
@@ -3541,6 +3588,13 @@ describe('RecentRecords integration', () => {
       getFinishLineNumbers: () => [1, 7],
       getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
       getParticipantLaps: () => [crossing],
+      getTimeRecordSourceById: (sourceId) => sourceId === crossing.source
+        ? {
+          filePath: 'W9721R01.DBF',
+          id: crossing.source,
+          name: 'W9721R01.DBF',
+        }
+        : undefined,
       getTransponderCrossings: () => [],
       participants: [participant],
       updateCategoryDetails: () => undefined,
@@ -3594,6 +3648,7 @@ describe('RecentRecords integration', () => {
     expect((document.querySelector('input[aria-label="Timing loop"]') as HTMLInputElement).value).toBe('2');
     expect((document.querySelector('input[aria-label="Lap control lines"]') as HTMLInputElement).value).toBe('1, 7');
     expect((document.querySelector('input[aria-label="Lap crossing"]') as HTMLInputElement).value).toBe('No');
+    expect((document.querySelector('input[aria-label="Source file"]') as HTMLInputElement).value).toBe('W9721R01.DBF');
 
     await act(async () => {
       setInputValue(document.querySelector('input[aria-label="Antenna"]') as HTMLInputElement, 'Loop B');
@@ -3616,10 +3671,106 @@ describe('RecentRecords integration', () => {
       plateNumber: '101',
       sequence: 1,
       sessionId: 'session-1',
-      source: 'test-source',
+      source: createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.DBF'),
     }));
     expect((onEditRecord.mock.calls[0]?.[0] as ParticipantPassingRecord & { time?: Date }).time?.toISOString()).toBe('2026-05-29T10:06:30.500Z');
   });
+
+  it('shows original T9743R10 SRT, NO1, and DBF filenames in the edit-record source file field', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-recent-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+      { length: 8, name: 'ACTUALSTRT', type: 'C' },
+    ], [
+      { ACTUALSTRT: '20:02:29', CATEGORY: 'CAT-A', EVENTNAME: 'Race 10', EV_CODE: 'T9743R10', STARTDATE: '19971206' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 13, DRIVER: 'Race Ten Driver', DRIV_CLASS: 'CAT-A', TXNUM: 1234 },
+    ]));
+    await writeFile(path.join(tempDir, 'T9743R10.SRT'), '040000000010000012340302064000\r');
+    await writeFile(path.join(tempDir, 'T9743R10.NO1'), createDbfBuffer([
+      { length: 4, name: 'CAR', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 9, name: 'ELAPSED', type: 'N' },
+      { length: 3, name: 'LINE_NO', type: 'N' },
+      { length: 3, name: 'LANE_NO', type: 'N' },
+    ], [
+      { CAR: 13, ELAPSED: 200000, LANE_NO: 2, LINE_NO: 3, TXNUM: 1234 },
+    ]));
+    await writeFile(path.join(tempDir, 'T9743R10.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 9, name: 'ELAPSED', type: 'N' },
+      { length: 4, name: 'COUNTER', type: 'N' },
+    ], [
+      { CARNUMBER: 13, COUNTER: 1, ELAPSED: 300000, TXNUM: 1234 },
+    ]));
+    const imported = await loadMrScatsCatalogFromLocation(tempDir);
+    const session = new Session({
+      categories: imported.raceState.categories || [],
+      participants: imported.raceState.participants || [],
+      records: imported.raceState.records || [],
+      teams: imported.raceState.teams || [],
+      timeRecordSources: imported.raceState.timeRecordSources || [],
+    });
+    const sourceFileById = new Map(session.timeRecordSources.map((source) => [source.id, source.filePath || source.name]));
+    const crossingBySourceFile = new Map(
+      (session.records as ParticipantPassingRecord[])
+        .filter((record) => record.recordType === RECORD_TX_CROSSING)
+        .map((record) => [sourceFileById.get(record.source), record] as const)
+    );
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={session}
+          records={session.records as EventTimeRecord[]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    for (const expectedFileName of ['T9743R10.SRT', 'T9743R10.NO1', 'T9743R10.DBF']) {
+      const record = crossingBySourceFile.get(expectedFileName);
+      expect(record).toBeDefined();
+      const row = container.querySelector(`tr[data-record-id="${record!.id}"]`);
+      expect(row).not.toBeNull();
+
+      await act(async () => {
+        row!.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 100,
+          clientY: 100,
+        }));
+      });
+
+      const editRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Edit record');
+      expect(editRecordMenuItem).toBeDefined();
+
+      await act(async () => {
+        editRecordMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect((document.querySelector('input[aria-label="Source file"]') as HTMLInputElement).value).toBe(expectedFileName);
+
+      const cancelButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Cancel');
+      expect(cancelButton).toBeDefined();
+      await act(async () => {
+        cancelButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+    }
+  });
+
   it('shows an exclusion reason marker on unrelated lap-time records', async () => {
     const category: EventCategory = { id: 'category-1', name: 'Category A' };
     const participant: EventParticipant = {

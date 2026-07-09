@@ -367,11 +367,13 @@ export const mergePulledRaceStates = (raceStates: Partial<RaceState>[]): Partial
     participants: [...(merged.participants || []), ...(raceState.participants || [])],
     records: [...(merged.records || []), ...(raceState.records || [])],
     teams: [...(merged.teams || []), ...(raceState.teams || [])],
+    timeRecordSources: [...(merged.timeRecordSources || []), ...(raceState.timeRecordSources || [])],
   }), {
     categories: [],
     participants: [],
     records: [],
     teams: [],
+    timeRecordSources: [],
   });
 
   return addMissingLinkedCategoryPlaceholders(mergedRaceState);
@@ -392,6 +394,7 @@ export const mergeRaceStateForReload = (
       participants: reloadedRaceState.participants || [],
       records: reloadedRaceState.records || [],
       teams: reloadedRaceState.teams || [],
+      timeRecordSources: reloadedRaceState.timeRecordSources || [],
     }), options);
   }
 
@@ -399,6 +402,7 @@ export const mergeRaceStateForReload = (
   const nextParticipants = mode === 'entrants' ? reloadedRaceState.participants || [] : existing.participants || [];
   const nextRecords = mode === 'time-records' ? reloadedRaceState.records || [] : existing.records || [];
   const nextTeams = mode === 'entrants' ? reloadedRaceState.teams || [] : existing.teams || [];
+  const nextTimeRecordSources = mode === 'time-records' ? reloadedRaceState.timeRecordSources || [] : existing.timeRecordSources || [];
   const categorySnapshotCandidates = mode === 'categories'
     ? existing.categories || []
     : reloadedRaceState.categories || [];
@@ -418,5 +422,6 @@ export const mergeRaceStateForReload = (
     participants: nextParticipants,
     records: nextRecords,
     teams: nextTeams,
+    timeRecordSources: nextTimeRecordSources,
   }), options);
 };

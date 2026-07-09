@@ -1434,6 +1434,18 @@ describe('EventCatalogService', () => {
           } as EventTimeRecord & { chipCode: number; plateNumber: string },
         ],
         teams: [],
+        timeRecordSources: [
+          {
+            filePath: 'W9721R01.DBF',
+            id: raceSourceId,
+            name: 'W9721R01.DBF',
+          },
+          {
+            filePath: 'W9721Q01.DBF',
+            id: qualifyingSourceId,
+            name: 'W9721Q01.DBF',
+          },
+        ],
       },
       sessions: [
         {
@@ -1506,6 +1518,18 @@ describe('EventCatalogService', () => {
         sessionId: raceSessionId,
       }),
     ]);
+    expect(raceState?.timeRecordSources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        filePath: 'W9721R01.DBF',
+        id: raceSourceId,
+        name: 'W9721R01.DBF',
+      }),
+      expect.objectContaining({
+        filePath: 'W9721Q01.DBF',
+        id: qualifyingSourceId,
+        name: 'W9721Q01.DBF',
+      }),
+    ]));
     expect(qualifyingRaceState?.records).toEqual([
       expect.objectContaining({
         id: qualifyingRecordId,
@@ -1589,6 +1613,18 @@ describe('EventCatalogService', () => {
           } as EventTimeRecord & { chipCode: number; plateNumber: string },
         ],
         teams: [],
+        timeRecordSources: [
+          {
+            filePath: 'W9721R01.DBF',
+            id: raceSourceId,
+            name: 'W9721R01.DBF',
+          },
+          {
+            filePath: 'W9721Q01.DBF',
+            id: qualifyingSourceId,
+            name: 'W9721Q01.DBF',
+          },
+        ],
       },
       sessions: [
         {

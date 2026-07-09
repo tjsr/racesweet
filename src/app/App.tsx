@@ -228,6 +228,7 @@ const raceStateSnapshot = (raceState: RaceState): RaceState => ({
   participants: [...raceState.participants],
   records: [...raceState.records],
   teams: [...raceState.teams],
+  timeRecordSources: [...(raceState.timeRecordSources || [])],
 });
 
 const sessionFromPartialRaceState = (raceState: Partial<RaceState>): Session => new Session({
@@ -236,6 +237,7 @@ const sessionFromPartialRaceState = (raceState: Partial<RaceState>): Session => 
   participants: raceState.participants || [],
   records: raceState.records || [],
   teams: raceState.teams || [],
+  timeRecordSources: raceState.timeRecordSources || [],
 });
 
 const applyCatalogMinimumLapTimeToRaceState = (
@@ -266,6 +268,7 @@ const filterMrScatsRaceStateForSession = (
       return !recordSessionId || recordSessionId === sessionId.toString();
     }),
     teams: raceState.teams || [],
+    timeRecordSources: raceState.timeRecordSources || [],
   };
 };
 

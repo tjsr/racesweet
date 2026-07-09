@@ -251,6 +251,12 @@ const formatOptionalNumber = (value: number | undefined): string => {
   return value === undefined ? '' : value.toString();
 };
 
+const getEditablePassingSourceFile = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): string => {
+  return raceStateLookup.getTimeRecordSourceById?.(record.source)?.filePath ||
+    raceStateLookup.getTimeRecordSourceById?.(record.source)?.name ||
+    '';
+};
+
 const formatFinishLineNumbers = (raceStateLookup: RaceStateLookup): string => {
   return (raceStateLookup.getFinishLineNumbers?.() || [1]).join(', ');
 };
@@ -1509,6 +1515,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   const editablePassingLoopNumber = editablePassingRecord ? getPassingLoopNumber(editablePassingRecord) : undefined;
   const editablePassingLapControl = editablePassingRecord ? (isLapControlCrossing(editablePassingRecord, props.raceStateLookup) ? 'Yes' : 'No') : '';
   const editableFinishLineNumbers = editablePassingRecord ? formatFinishLineNumbers(props.raceStateLookup) : '';
+  const editablePassingSourceFile = editablePassingRecord ? getEditablePassingSourceFile(editablePassingRecord, props.raceStateLookup) : '';
 
   const handleTxNoChange = (value: string): void => {
     setPassingTxNo(value);
@@ -1682,6 +1689,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
                   <TextField disabled label="Timing loop" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Timing loop' } }} value={formatOptionalNumber(editablePassingLoopNumber)} />
                   <TextField disabled label="Lap control lines" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Lap control lines' } }} value={editableFinishLineNumbers} />
                   <TextField disabled label="Lap crossing" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Lap crossing' } }} value={editablePassingLapControl} />
+                  <TextField disabled label="Source file" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Source file' } }} value={editablePassingSourceFile} />
                 </div>
               ) : null}
             </>

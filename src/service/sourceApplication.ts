@@ -5,7 +5,7 @@ import type { EventParticipant } from '../model/eventparticipant.js';
 import type { EventTeam } from '../model/eventteam.js';
 import { rewriteImportedObjectIds } from '../model/ids.js';
 import type { RaceState } from '../model/racestate.js';
-import type { TimeRecord } from '../model/timerecord.js';
+import type { TimeRecord, TimeRecordSource } from '../model/timerecord.js';
 import { incrementLoadingMetric } from '../loadingMetrics.js';
 import type { EventCatalogEntrant, EventCatalogEvent, EventCatalogSession, EventCatalogState, EventSessionKind } from '../catalog/eventCatalog.js';
 import { addMissingLinkedCategoryPlaceholders } from '../service/sessionSourceReload.js';
@@ -15,6 +15,7 @@ interface SessionSourceSink {
   addParticipants(participants: EventParticipant[]): void;
   addRecords(records: TimeRecord[], validate?: boolean): Promise<void>;
   addTeams?(teams: EventTeam[]): void;
+  addTimeRecordSources?(timeRecordSources: TimeRecordSource[]): void;
   beginBulkProcess?(): Promise<boolean>;
   categories: EventCategory[];
   endBulkProcess?(): Promise<void>;
@@ -343,6 +344,7 @@ export const applyPulledRaceStateToSession = async (
   (normalizedRaceState.categories || []).forEach((category) => incrementLoadingMetric('Normalize pulled category', category.name || category.id.toString()));
   (normalizedRaceState.participants || []).forEach((participant) => incrementLoadingMetric('Normalize pulled participant', participant.id.toString()));
   (normalizedRaceState.teams || []).forEach((team) => incrementLoadingMetric('Normalize pulled team', team.id.toString()));
+  (normalizedRaceState.timeRecordSources || []).forEach((source) => incrementLoadingMetric('Normalize pulled source', source.name || source.id.toString()));
   ((normalizedRaceState.records as TimeRecord[]) || []).forEach((record) => incrementLoadingMetric('Normalize pulled record', record.id.toString()));
   const bulkStarted = await sessionState.beginBulkProcess?.() === true;
   try {
@@ -370,6 +372,7 @@ export const applyPulledRaceStateToSession = async (
 
     sessionState.addParticipants(normalizedRaceState.participants || []);
     sessionState.addTeams?.(normalizedRaceState.teams || []);
+    sessionState.addTimeRecordSources?.(normalizedRaceState.timeRecordSources || []);
     const incomingRecords = (normalizedRaceState.records as TimeRecord[]) || [];
     await sessionState.addRecords(incomingRecords, false);
   } finally {
