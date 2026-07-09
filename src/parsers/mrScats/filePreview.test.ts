@@ -169,7 +169,7 @@ describe('MR-SCATS file preview', () => {
       { length: 3, name: 'LINE_NO', type: 'N' },
       { length: 3, name: 'LANE_NO', type: 'N' },
     ], [
-      { CARNUMBER: 42, ELAPSED: 15001, LANE_NO: 9, LINE_NO: 1, TXNUM: 1234 },
+      { CARNUMBER: 42, ELAPSED: 803311, LANE_NO: 9, LINE_NO: 1, TXNUM: 1234 },
     ]));
 
     const preview = await previewMrScatsDataFile(tempDir, 'W9721R10.DBF', 'dbf-table');
@@ -178,14 +178,53 @@ describe('MR-SCATS file preview', () => {
     expect(preview.rows).toEqual([
       {
         CARNUMBER: 42,
-        ELAPSED: 15001,
+        ELAPSED: 803311,
         LANE_NO: 9,
         LINE_NO: 1,
         TXNUM: 1234,
-        'Time of day': '09:05:01.5001',
+        'Time of day': '01:20.3311 (09:06:20.3311)',
       },
     ]);
+    expect(preview.calculatedCells).toEqual([{ column: 'Time of day', rowIndex: 0 }]);
     expect(preview.warnings.join(' ')).toContain('ELAPSED / 10000');
+  });
+
+  it('derives NO1 preview time of day from PRGMME start and ENTRYTIME instead of ELAPSED', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-preview-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+      { length: 8, name: 'STARTTIME', type: 'C' },
+      { length: 8, name: 'ACTUALSTRT', type: 'C' },
+    ], [
+      { ACTUALSTRT: '12:50:40', EV_CODE: 'C9743R10', STARTDATE: '19971206', STARTTIME: '12:50:00' },
+    ]));
+    await writeFile(path.join(tempDir, 'C9743R10.NO1'), createDbfBuffer([
+      { length: 4, name: 'CAR', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'ENTRYTIME', type: 'N' },
+      { length: 9, name: 'ELAPSED', type: 'N' },
+      { length: 3, name: 'LINE_NO', type: 'N' },
+      { length: 3, name: 'LANE_NO', type: 'N' },
+    ], [
+      { CAR: 42, ELAPSED: 756300006, ENTRYTIME: 803311, LANE_NO: 9, LINE_NO: 3, TXNUM: 1001 },
+    ]));
+
+    const preview = await previewMrScatsDataFile(tempDir, 'C9743R10.NO1', 'no1-report');
+
+    expect(preview.columns).toEqual(['CAR', 'TXNUM', 'ENTRYTIME', 'Time of day', 'ELAPSED', 'LINE_NO', 'LANE_NO']);
+    expect(preview.rows).toEqual([
+      {
+        CAR: 42,
+        ELAPSED: 756300006,
+        ENTRYTIME: 803311,
+        LANE_NO: 9,
+        LINE_NO: 3,
+        TXNUM: 1001,
+        'Time of day': '01:20.3311 (12:52:00.3311)',
+      },
+    ]);
+    expect(preview.calculatedCells).toEqual([{ column: 'Time of day', rowIndex: 0 }]);
   });
 
   it('resolves DBF memo fields through the linked DBT memo file when present', async () => {

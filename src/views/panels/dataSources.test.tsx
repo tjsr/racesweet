@@ -252,13 +252,14 @@ describe('DataSourcesPanel', () => {
 
   it('opens an MR-SCATS file preview dialog from the file inventory table', async () => {
     const onPreviewMrScatsDataFile = vi.fn(async () => ({
-      columns: ['CARNUMBER', 'DRIVER'],
+      calculatedCells: [{ column: 'Time of day', rowIndex: 0 }],
+      columns: ['CARNUMBER', 'Time of day', 'DRIVER'],
       displayedRowCount: 1,
       fileKind: 'dbf-table' as const,
       fileName: 'DRIVERS.DBF',
       parser: 'dbf' as const,
       recordCount: 1,
-      rows: [{ CARNUMBER: 42, DRIVER: 'Alice Rider' }],
+      rows: [{ CARNUMBER: 42, DRIVER: 'Alice Rider', 'Time of day': '01:20.3311 (12:52:00.3311)' }],
       warnings: [],
     }));
     container = document.createElement('div');
@@ -328,5 +329,6 @@ describe('DataSourcesPanel', () => {
     expect(previewDialog?.querySelector('.mr-scats-preview-content')).toBeTruthy();
     expect(previewDialog?.textContent).toContain('DRIVERS.DBF');
     expect(previewDialog?.textContent).toContain('Alice Rider');
+    expect(previewDialog?.querySelector('.mr-scats-preview-calculated-cell')?.textContent).toBe('01:20.3311 (12:52:00.3311)');
   });
 });

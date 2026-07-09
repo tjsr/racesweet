@@ -519,7 +519,7 @@ describe('MR-SCATS catalog import parser', () => {
 
     expect(crossings).toHaveLength(2);
     expect(crossings.map((crossing) => crossing.time)).toEqual([
-      new Date('1997-06-29T11:00:30.001Z'),
+      new Date('1997-06-29T07:00:30.000Z'),
       new Date('1997-06-29T11:01:00.000Z'),
     ]);
     expect(crossings[0]).toEqual(expect.objectContaining({

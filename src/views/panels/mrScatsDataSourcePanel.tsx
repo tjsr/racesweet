@@ -28,6 +28,10 @@ const formatPreviewValue = (value: MrScatsPreviewValue): string => {
   return String(value);
 };
 
+const isCalculatedPreviewCell = (preview: MrScatsDataFilePreview, rowIndex: number, column: string): boolean => {
+  return (preview.calculatedCells || []).some((cell) => cell.rowIndex === rowIndex && cell.column === column);
+};
+
 const parseFinishLineNumbers = (value: string): number[] => {
   return value
     .split(',')
@@ -246,7 +250,9 @@ export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): Reac
                       {preview.rows.map((row, rowIndex) => (
                         <tr key={`${preview.fileName}-${rowIndex}`}>
                           {preview.columns.map((column) => (
-                            <td key={column}>{formatPreviewValue(row[column])}</td>
+                            <td className={isCalculatedPreviewCell(preview, rowIndex, column) ? 'mr-scats-preview-calculated-cell' : undefined} key={column}>
+                              {formatPreviewValue(row[column])}
+                            </td>
                           ))}
                         </tr>
                       ))}

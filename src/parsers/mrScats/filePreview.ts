@@ -6,7 +6,13 @@ import { parseMrScatsDbfSummary, readMrScatsZipEntryBuffers, type MrScatsDataFil
 
 export type MrScatsPreviewValue = boolean | number | string | undefined;
 
+export interface MrScatsCalculatedCell {
+  column: string;
+  rowIndex: number;
+}
+
 export interface MrScatsDataFilePreview {
+  calculatedCells?: MrScatsCalculatedCell[];
   columns: string[];
   displayedRowCount: number;
   fileKind: MrScatsDataFileKind | 'binary-preview';
@@ -140,6 +146,24 @@ const formatTimeOfDayFromElapsedTicks = (sessionStart: Date, elapsedTicks: numbe
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(tenThousandths).padStart(4, '0')}`;
 };
 
+const formatElapsedTicks = (elapsedTicks: number): string => {
+  const roundedTicks = Math.round(elapsedTicks);
+  const sign = roundedTicks < 0 ? '-' : '';
+  const absoluteTicks = Math.abs(roundedTicks);
+  const totalSeconds = Math.floor(absoluteTicks / TICKS_PER_SECOND);
+  const tenThousandths = absoluteTicks % TICKS_PER_SECOND;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const fractional = String(tenThousandths).padStart(4, '0');
+
+  if (hours > 0) {
+    return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${fractional}`;
+  }
+
+  return `${sign}${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${fractional}`;
+};
+
 const findEventCodeStart = (records: MrScatsDbfRecord[], eventCode: string): Date | undefined => {
   const normalizedEventCode = eventCode.toUpperCase();
   const matchingRecord = records.find((record) => {
@@ -193,13 +217,32 @@ const getElapsedTicks = (record: MrScatsDbfRecord): number | undefined => {
   return undefined;
 };
 
+const getTimeOfDaySourceTicks = (columns: string[], record: MrScatsDbfRecord): number | undefined => {
+  if (columns.includes('ENTRYTIME')) {
+    const entryTimeValue = record.ENTRYTIME;
+    if (typeof entryTimeValue === 'number' && Number.isFinite(entryTimeValue)) {
+      return entryTimeValue;
+    }
+    if (typeof entryTimeValue === 'string') {
+      const parsed = Number(entryTimeValue.trim());
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+  }
+
+  return getElapsedTicks(record);
+};
+
+const getTimeOfDaySourceField = (columns: string[]): 'ELAPSED' | 'ENTRYTIME' => {
+  return columns.includes('ENTRYTIME') ? 'ENTRYTIME' : 'ELAPSED';
+};
+
 const addElapsedDerivedColumns = (
   columns: string[],
   records: MrScatsDbfRecord[],
   sessionStart: Date | undefined,
-): { columns: string[]; records: MrScatsDbfRecord[] } => {
+): { calculatedCells: MrScatsCalculatedCell[]; columns: string[]; records: MrScatsDbfRecord[] } => {
   if (!sessionStart || !columns.includes('ELAPSED')) {
-    return { columns, records };
+    return { calculatedCells: [], columns, records };
   }
 
   const derivedColumn = 'Time of day';
@@ -207,18 +250,22 @@ const addElapsedDerivedColumns = (
   const derivedColumns = columns.includes(derivedColumn)
     ? columns
     : [...columns.slice(0, elapsedIndex), derivedColumn, ...columns.slice(elapsedIndex)];
-  const derivedRecords = records.map((record) => {
-    const elapsedTicks = getElapsedTicks(record);
+  const calculatedCells: MrScatsCalculatedCell[] = [];
+  const derivedRecords = records.map((record, rowIndex) => {
+    const elapsedTicks = getTimeOfDaySourceTicks(columns, record);
     if (elapsedTicks === undefined) {
       return record;
     }
+    const derivedTimeOfDay = formatTimeOfDayFromElapsedTicks(sessionStart, elapsedTicks);
+    calculatedCells.push({ column: derivedColumn, rowIndex });
     return {
       ...record,
-      [derivedColumn]: formatTimeOfDayFromElapsedTicks(sessionStart, elapsedTicks),
+      [derivedColumn]: `${formatElapsedTicks(elapsedTicks)} (${derivedTimeOfDay})`,
     };
   });
 
   return {
+    calculatedCells,
     columns: derivedColumns,
     records: derivedRecords,
   };
@@ -305,6 +352,7 @@ const createDbfPreview = async (
   });
 
   return {
+    calculatedCells: derived.calculatedCells,
     columns: derived.columns,
     displayedRowCount: rows.length,
     fileKind,
@@ -320,7 +368,7 @@ const createDbfPreview = async (
           : `Memo fields ${memoFieldNames.join(', ')} store external DBT block pointers, but no linked memo file was found.`,
       ]),
       ...(sessionStart ? [
-        `Derived Time of day from ${sessionStart.programmeFile} event ${sessionStart.eventCode} start time plus ELAPSED / 10000 seconds.`,
+        `Derived Time of day from ${sessionStart.programmeFile} event ${sessionStart.eventCode} start time plus ${getTimeOfDaySourceField(baseColumns)} / 10000 seconds.`,
       ] : []),
     ],
   };

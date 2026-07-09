@@ -782,6 +782,15 @@ const getCrossingTime = (
   scheduledStartTime: Date,
   sessionElapsedZeroTime: Date
 ): { elapsedMilliseconds: number; time: Date } | undefined => {
+  const entryTimeMatch = getFirstNumberMatch(record, ['ENTRYTIME']);
+  if (entryTimeMatch) {
+    const elapsedMilliseconds = (entryTimeMatch.value / CROSSING_ELAPSED_TICKS_PER_SECOND) * 1000;
+    return {
+      elapsedMilliseconds,
+      time: new Date(sessionElapsedZeroTime.getTime() + elapsedMilliseconds),
+    };
+  }
+
   const elapsedClockMatch = getFirstNumberMatch(record, ['ELAPSED']);
   if (elapsedClockMatch && shouldTreatElapsedTicksAsTimeOfDay(scheduledStartTime, elapsedClockMatch.value)) {
     const elapsedMilliseconds = (elapsedClockMatch.value / CROSSING_ELAPSED_TICKS_PER_SECOND) * 1000;

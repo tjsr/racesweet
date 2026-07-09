@@ -728,6 +728,10 @@
   flex: 0 0 auto;
 }
 
+.mr-scats-preview-calculated-cell {
+  color: #7f1d1d;
+}
+
 .reload-summary-table {
   border-collapse: collapse;
   width: 100%;
