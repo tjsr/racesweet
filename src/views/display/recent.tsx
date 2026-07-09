@@ -56,6 +56,10 @@ const manualFlagLabelByType: Record<AddableFlagType, string> = {
   yellow: 'Yellow',
 };
 
+const formatRecordIdTitle = (recordId: TimeRecordId): string => {
+  return `Record ID: ${recordId}`;
+};
+
 const formatManualTimeOfDay = (time: Date | undefined): string => {
   if (!time) {
     return '';
@@ -399,6 +403,7 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
       key={record.id || props.index}
       onContextMenu={handleContextMenu}
       style={{ cursor: 'context-menu' }}
+      title={formatRecordIdTitle(record.id)}
       onClick={() => {
         props.onSelectRecord?.(record.id);
         if (props.onSelect) {
@@ -595,6 +600,7 @@ const UnknownChipRow = (
         onContextMenu={handleContextMenu}
         onClick={handleSelect}
         style={{ cursor: 'context-menu' }}
+        title={formatRecordIdTitle(timeRecordId)}
       >
         <TableCell>{sequenceNumber}</TableCell>
         <TableCell>{antennae}</TableCell>
@@ -811,6 +817,7 @@ export const PassingRecordRow = (
         className={className}
         onContextMenu={handleContextMenu}
         style={{ cursor: 'context-menu' }}
+        title={formatRecordIdTitle(passing.id)}
         onClick={handleSelect}>
         <TableCell className={cellClasses}>{passing.sequence}</TableCell>
         <TableCell className={cellClasses}>{antenna}</TableCell>
@@ -1435,6 +1442,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   const anchorRecord = props.openState?.anchorRecord;
   const dialogMode = props.openState?.mode || 'add';
   const editingRecord = props.openState?.existingRecord;
+  const editingRecordId = editingRecord?.id?.toString() || '';
   const categories = (props.raceStateLookup as unknown as { categories?: EventCategory[] }).categories || [];
   const participantMap = React.useMemo(() => participantMapFromLookup(props.raceStateLookup), [props.raceStateLookup]);
   const participants = React.useMemo(() => participantArrayFromLookup(props.raceStateLookup), [props.raceStateLookup]);
@@ -1566,6 +1574,16 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
             slotProps={{ htmlInput: { 'aria-label': 'Time of day' } }}
             value={timeOfDay}
           />
+          {dialogMode === 'edit' ? (
+            <TextField
+              disabled
+              label="Record ID"
+              margin="dense"
+              slotProps={{ htmlInput: { 'aria-label': 'Record ID' } }}
+              sx={{ gridColumn: 'span 2', minWidth: 520 }}
+              value={editingRecordId}
+            />
+          ) : null}
           <div className="event-details-form-row">
             <label className="page-filter-label">
               Record type

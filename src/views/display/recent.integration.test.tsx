@@ -3340,6 +3340,7 @@ describe('RecentRecords integration', () => {
 
     const row = container.querySelector('tr[data-record-id="crossing-1"]');
     expect(row).not.toBeNull();
+    expect(row?.getAttribute('title')).toBe('Record ID: crossing-1');
 
     await act(async () => {
       row!.dispatchEvent(new MouseEvent('contextmenu', {
@@ -3584,6 +3585,7 @@ describe('RecentRecords integration', () => {
     });
 
     expect(document.body.textContent).toContain('Edit record');
+    expect((document.querySelector('input[aria-label="Record ID"]') as HTMLInputElement).value).toBe('crossing-1');
     expect((document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement).value).toBe('10:06:00.000');
     expect((document.querySelector('input[aria-label="TxNo"]') as HTMLInputElement).value).toBe('100101');
     expect((document.querySelector('input[aria-label="Plate"]') as HTMLInputElement).value).toBe('101');
