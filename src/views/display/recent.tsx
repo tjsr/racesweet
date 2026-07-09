@@ -5,7 +5,7 @@ import { type MillisecondsDuration, type TimeDisplayZoneMode, millisecondsToTime
 import type { EventSessionKind } from '../../catalog/eventCatalog.ts';
 import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../controllers/category.ts';
 import { createGreenFlagEvent, createRedFlagEvent, isFlagRecord } from '../../controllers/flag';
-import { getLapTimeCell, getTimingLineKey } from '../../controllers/laps.ts';
+import { getLapTimeCell, getPassingLineNumber, getPassingLoopNumber, getTimingLineKey, isFinishLinePassing } from '../../controllers/laps.ts';
 import { getParticipantNumber, getParticipantTransponders } from '../../controllers/participant.ts';
 import { findEntrantByChipCode, findEntrantByPlateNumber } from '../../controllers/participantSearch.ts';
 import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
@@ -21,7 +21,7 @@ import { InvalidCategoryIdError, NoCrossingError, NoParticipantError, Participan
 import "./recent.css";
 
 type RecentRecordsFilterMode = 'all' | 'category' | 'participant' | 'team';
-type RecentRecordsIgnoreMode = 'outsideEventWindow' | 'unrecognised';
+type RecentRecordsIgnoreMode = 'outsideEventWindow' | 'sectorLoops' | 'unrecognised';
 
 interface LapTimeIndicators {
   entrantFaster: boolean;
@@ -32,6 +32,7 @@ interface LapTimeIndicators {
 
 const ignoreModeLabels: Record<RecentRecordsIgnoreMode, string> = {
   outsideEventWindow: 'Outside event window',
+  sectorLoops: 'Sector loops',
   unrecognised: 'Unrecognised',
 };
 
@@ -240,6 +241,30 @@ const getEditablePassingPlate = (record: EventTimeRecord, raceStateLookup: RaceS
 
 const getEditablePassingAntenna = (record: EventTimeRecord): string => {
   return ((record as ParticipantPassingRecord & { antenna?: string }).antenna || '').toString();
+};
+
+const formatOptionalNumber = (value: number | undefined): string => {
+  return value === undefined ? '' : value.toString();
+};
+
+const formatFinishLineNumbers = (raceStateLookup: RaceStateLookup): string => {
+  return (raceStateLookup.getFinishLineNumbers?.() || [1]).join(', ');
+};
+
+const isLapControlCrossing = (
+  record: EventTimeRecord,
+  raceStateLookup: RaceStateLookup
+): boolean => {
+  if (!isCrossingRecord(record)) {
+    return false;
+  }
+
+  const effectiveLoopNumber = getPassingLoopNumber(record) ?? getPassingLineNumber(record);
+  if (effectiveLoopNumber !== undefined) {
+    return effectiveLoopNumber === 1 || isFinishLinePassing(record, raceStateLookup.getFinishLineNumbers?.());
+  }
+
+  return record.isLapCompletion !== false;
 };
 
 const getCrossingUnrelatedReason = (passing: ParticipantPassingRecord): string | undefined => {
@@ -1372,7 +1397,28 @@ const shouldIgnoreRecord = (
   if (ignoreModes.includes('outsideEventWindow') && ignoredRecordIds.has(record.id.toString())) {
     return true;
   }
+  if (ignoreModes.includes('sectorLoops') && isNonLapCrossing(record, raceStateLookup)) {
+    return true;
+  }
   return ignoreModes.includes('unrecognised') && isUnrecognisedCrossing(record, raceStateLookup);
+};
+
+const isNonLapCrossing = (
+  record: EventTimeRecord,
+  raceStateLookup: RaceStateLookup
+): boolean => {
+  if (!isCrossingRecord(record)) {
+    return false;
+  }
+  if (record.isLapCompletion === false) {
+    return true;
+  }
+  const effectiveLoopNumber = getPassingLoopNumber(record) ?? getPassingLineNumber(record);
+  if (effectiveLoopNumber === undefined) {
+    return false;
+  }
+
+  return effectiveLoopNumber !== 1 && !isFinishLinePassing(record, raceStateLookup.getFinishLineNumbers?.());
 };
 
 interface AddRecordDialogProps {
@@ -1450,6 +1496,11 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   const resolvedEntrantName = resolvedParticipant ? `${resolvedParticipant.firstname || ''} ${resolvedParticipant.surname || ''}`.trim() : '';
   const resolvedTeamName = getParticipantTeamName(resolvedParticipant, props.raceStateLookup);
   const resolvedCategoryName = resolvedCategory?.name || '';
+  const editablePassingRecord = editingRecord && isCrossingRecord(editingRecord) ? editingRecord : undefined;
+  const editablePassingLineNumber = editablePassingRecord ? getPassingLineNumber(editablePassingRecord) : undefined;
+  const editablePassingLoopNumber = editablePassingRecord ? getPassingLoopNumber(editablePassingRecord) : undefined;
+  const editablePassingLapControl = editablePassingRecord ? (isLapControlCrossing(editablePassingRecord, props.raceStateLookup) ? 'Yes' : 'No') : '';
+  const editableFinishLineNumbers = editablePassingRecord ? formatFinishLineNumbers(props.raceStateLookup) : '';
 
   const handleTxNoChange = (value: string): void => {
     setPassingTxNo(value);
@@ -1607,6 +1658,14 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
                 <TextField disabled label="Team name" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Team name' } }} value={resolvedTeamName} />
                 <TextField disabled label="Category name" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Category name' } }} value={resolvedCategoryName} />
               </div>
+              {dialogMode === 'edit' && editablePassingRecord ? (
+                <div className="event-details-form-row">
+                  <TextField disabled label="Timing line" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Timing line' } }} value={formatOptionalNumber(editablePassingLineNumber)} />
+                  <TextField disabled label="Timing loop" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Timing loop' } }} value={formatOptionalNumber(editablePassingLoopNumber)} />
+                  <TextField disabled label="Lap control lines" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Lap control lines' } }} value={editableFinishLineNumbers} />
+                  <TextField disabled label="Lap crossing" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Lap crossing' } }} value={editablePassingLapControl} />
+                </div>
+              ) : null}
             </>
           )}
         </div>

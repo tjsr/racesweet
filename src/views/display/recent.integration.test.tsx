@@ -2100,6 +2100,178 @@ describe('RecentRecords integration', () => {
     ]);
   });
 
+  it('ignores sector loop crossings while keeping lap crossings and flags visible', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const participant: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: '101',
+      firstname: 'Pat',
+      id: '101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const startFinishCrossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'start-finish-crossing',
+      isValid: true,
+      lineNumber: 1,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:01:00.000Z'),
+    } as ParticipantPassingRecord;
+    const noLoopCrossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'no-loop-crossing',
+      isValid: true,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:01:10.000Z'),
+    } as ParticipantPassingRecord;
+    const speedTrapCrossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'speed-trap-crossing',
+      isValid: true,
+      lineNumber: 2,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 3,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:01:20.000Z'),
+    } as ParticipantPassingRecord;
+    const sectorLoopCrossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'sector-loop-crossing',
+      isValid: true,
+      lineNumber: 5,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 4,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:01:30.000Z'),
+    } as ParticipantPassingRecord;
+    const explicitNonLapCrossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'explicit-non-lap-crossing',
+      isLapCompletion: false,
+      isValid: true,
+      lineNumber: 3,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 5,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:01:40.000Z'),
+    } as ParticipantPassingRecord;
+    const pitEntryLapCrossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'pit-entry-lap-crossing',
+      isValid: true,
+      lineNumber: 7,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 6,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:01:50.000Z'),
+    } as ParticipantPassingRecord;
+    const tableMarkedLineCrossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'table-marked-line-crossing',
+      isLapCompletion: true,
+      isValid: true,
+      lineNumber: 8,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 7,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:01:55.000Z'),
+    } as ParticipantPassingRecord;
+    const explicitLapCrossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'explicit-lap-crossing',
+      isLapCompletion: true,
+      isValid: true,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 8,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:01:57.000Z'),
+    } as ParticipantPassingRecord;
+    const flag: FlagRecord = {
+      categoryIds: [categoryA.id],
+      flagType: 'chequered',
+      flagValue: 'course',
+      id: 'finish-flag',
+      recordType: 4,
+      sequence: 9,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:02:00.000Z'),
+    };
+    const crossings = [
+      startFinishCrossing,
+      noLoopCrossing,
+      speedTrapCrossing,
+      sectorLoopCrossing,
+      explicitNonLapCrossing,
+      pitEntryLapCrossing,
+      tableMarkedLineCrossing,
+      explicitLapCrossing,
+    ];
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [categoryA],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getFinishLineNumbers: () => [1, 7],
+      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantLaps: () => crossings,
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[...crossings, flag as unknown as ParticipantPassingRecord]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    expect(getDisplayedRecordIds(container)).toEqual([
+      'start-finish-crossing',
+      'no-loop-crossing',
+      'speed-trap-crossing',
+      'sector-loop-crossing',
+      'explicit-non-lap-crossing',
+      'pit-entry-lap-crossing',
+      'table-marked-line-crossing',
+      'explicit-lap-crossing',
+      'finish-flag',
+    ]);
+
+    await toggleIgnoreRecordsFilter('Sector loops');
+    await expectIgnoreRecordsFilterChecked('Sector loops');
+
+    expect(getDisplayedRecordIds(container)).toEqual([
+      'start-finish-crossing',
+      'no-loop-crossing',
+      'pit-entry-lap-crossing',
+      'explicit-lap-crossing',
+      'finish-flag',
+    ]);
+  });
+
   it('keeps excluded-result category crossings visible but unrelated to selected category filters', async () => {
     const timingErrorCategory: EventCategory = { excludeFromResults: true, id: 'error-cat', name: 'Timing Error List' };
     const participant: EventParticipant = {
@@ -3350,6 +3522,8 @@ describe('RecentRecords integration', () => {
       chipCode: 100101,
       id: 'crossing-1',
       isValid: true,
+      lineNumber: 8,
+      loopNumber: 2,
       participantId: participant.id,
       plateNumber: '101',
       recordType: RECORD_TX_CROSSING,
@@ -3363,6 +3537,7 @@ describe('RecentRecords integration', () => {
       excludeCrossing: () => undefined,
       getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
       getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getFinishLineNumbers: () => [1, 7],
       getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
       getParticipantLaps: () => [crossing],
       getTransponderCrossings: () => [],
@@ -3413,6 +3588,10 @@ describe('RecentRecords integration', () => {
     expect((document.querySelector('input[aria-label="TxNo"]') as HTMLInputElement).value).toBe('100101');
     expect((document.querySelector('input[aria-label="Plate"]') as HTMLInputElement).value).toBe('101');
     expect((document.querySelector('input[aria-label="Antenna"]') as HTMLInputElement).value).toBe('Loop A');
+    expect((document.querySelector('input[aria-label="Timing line"]') as HTMLInputElement).value).toBe('8');
+    expect((document.querySelector('input[aria-label="Timing loop"]') as HTMLInputElement).value).toBe('2');
+    expect((document.querySelector('input[aria-label="Lap control lines"]') as HTMLInputElement).value).toBe('1, 7');
+    expect((document.querySelector('input[aria-label="Lap crossing"]') as HTMLInputElement).value).toBe('No');
 
     await act(async () => {
       setInputValue(document.querySelector('input[aria-label="Antenna"]') as HTMLInputElement, 'Loop B');
