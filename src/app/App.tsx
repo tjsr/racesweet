@@ -304,6 +304,27 @@ const getSessionAssignedCategoryIds = (
   return assignedCategoryIds.length > 0 ? new Set<EventCategoryId>(assignedCategoryIds) : undefined;
 };
 
+const sortSessionsByScheduledStart = (
+  sessions: EventCatalogState['sessions']
+): EventCatalogState['sessions'] => {
+  return [...sessions].sort((left, right) => {
+    const leftTime = Date.parse(left.scheduledStart);
+    const rightTime = Date.parse(right.scheduledStart);
+    const leftHasValidTime = Number.isFinite(leftTime);
+    const rightHasValidTime = Number.isFinite(rightTime);
+
+    if (leftHasValidTime && rightHasValidTime && leftTime !== rightTime) {
+      return leftTime - rightTime;
+    }
+
+    if (leftHasValidTime !== rightHasValidTime) {
+      return leftHasValidTime ? -1 : 1;
+    }
+
+    return left.name.localeCompare(right.name);
+  });
+};
+
 export const RaceSweetMainApp = () => {
   const [activeSection, setActiveSection] = useState<AppSection>('System');
   const [adminService, setAdminService] = useState<RaceAdminService|undefined>(undefined);
@@ -940,7 +961,7 @@ export const RaceSweetMainApp = () => {
       return;
     }
 
-    const nextSessions = getSessionsForEvent(eventCatalogState, eventId);
+    const nextSessions = sortSessionsByScheduledStart(getSessionsForEvent(eventCatalogState, eventId));
     const nextSessionId = nextSessions.find((session) => session.id === selectedTimingSessionId)?.id || nextSessions[0]?.id;
     setTimingSessionSelection('session');
     setSelectedTimingEventId(eventId);
@@ -1265,7 +1286,7 @@ export const RaceSweetMainApp = () => {
   const timingEvent = eventCatalogState.events.find((event) => event.id === timingEventId) ??
     eventCatalogState.events.find((event) => event.id === eventCatalogState.activeEventId) ??
     eventCatalogState.events[0];
-  const timingSessions = getSessionsForEvent(eventCatalogState, timingEvent?.id);
+  const timingSessions = sortSessionsByScheduledStart(getSessionsForEvent(eventCatalogState, timingEvent?.id));
   const timingSessionValue = timingSessionSelection === 'active'
     ? 'active'
     : selectedTimingSessionId || timingSessions[0]?.id || '';

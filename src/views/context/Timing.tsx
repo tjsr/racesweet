@@ -46,9 +46,60 @@ interface TimingContextProps {
 }
 
 export const TimingContext = (props: TimingContextProps): React.ReactElement => {
+  const sortedSessions = [...props.sessions].sort((left, right) => {
+    const leftTime = Date.parse(left.scheduledStart);
+    const rightTime = Date.parse(right.scheduledStart);
+    const leftHasValidTime = Number.isFinite(leftTime);
+    const rightHasValidTime = Number.isFinite(rightTime);
+
+    if (leftHasValidTime && rightHasValidTime && leftTime !== rightTime) {
+      return leftTime - rightTime;
+    }
+    if (leftHasValidTime !== rightHasValidTime) {
+      return leftHasValidTime ? -1 : 1;
+    }
+    return left.name.localeCompare(right.name);
+  });
+  const sessionDayKeyFormatter = new Intl.DateTimeFormat('en-AU', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: props.eventTimeZone,
+    weekday: 'short',
+    year: 'numeric',
+  });
+  const sessionTimeFormatter = new Intl.DateTimeFormat('en-AU', {
+    hour: '2-digit',
+    hour12: false,
+    minute: '2-digit',
+    timeZone: props.eventTimeZone,
+  });
+  const sessionWeekdayFormatter = new Intl.DateTimeFormat('en-AU', {
+    timeZone: props.eventTimeZone,
+    weekday: 'short',
+  });
+  const multipleSessionDays = new Set(
+    sortedSessions
+      .map((session) => {
+        const parsed = new Date(session.scheduledStart);
+        return Number.isNaN(parsed.getTime()) ? undefined : sessionDayKeyFormatter.format(parsed);
+      })
+      .filter((value): value is string => value !== undefined)
+  ).size > 1;
+  const formatTimingSessionOption = (session: EventCatalogSession): string => {
+    const parsed = new Date(session.scheduledStart);
+    if (Number.isNaN(parsed.getTime())) {
+      return session.name;
+    }
+
+    const timeLabel = sessionTimeFormatter.format(parsed);
+    const prefix = multipleSessionDays
+      ? `${sessionWeekdayFormatter.format(parsed)} ${timeLabel}`
+      : timeLabel;
+    return `[${prefix}] ${session.name}`;
+  };
   const selectedTimingSession = props.timingSessionValue === 'active'
     ? props.activeSession
-    : props.sessions.find((session) => session.id === props.timingSessionValue);
+    : sortedSessions.find((session) => session.id === props.timingSessionValue);
 
   return (
     <>
@@ -80,8 +131,8 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
               onChange={(event) => props.onSelectSession(event.target.value)}
             >
               <option value="active">Active session ({props.activeSession?.name || 'None'})</option>
-              {props.sessions.map((session) => (
-                <option key={session.id} value={session.id}>{session.name}{props.activeSession?.id == session.id ? ' (Active)' : ''}</option>
+              {sortedSessions.map((session) => (
+                <option key={session.id} value={session.id}>{formatTimingSessionOption(session)}{props.activeSession?.id == session.id ? ' (Active)' : ''}</option>
               ))}
             </select>
             {props.timingSelectionLoading ? (

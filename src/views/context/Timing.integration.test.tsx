@@ -175,6 +175,100 @@ describe('TimingContext integration', () => {
     expect(selectedCategoryState()).toBe(categoryB.name);
   });
 
+  it('sorts timing sessions by start time and prefixes labels with local session times', async () => {
+    const event: EventCatalogState['events'][number] = {
+      categoryIds: [],
+      date: '2026-05-29',
+      entrantIds: [],
+      format: 'race-weekend',
+      id: 'event-1',
+      name: 'RaceSweet Test Event',
+      sessionIds: ['session-2', 'session-3', 'session-1'],
+    };
+    const sessions: EventCatalogState['sessions'] = [
+      {
+        categoryIds: [],
+        eventId: event.id,
+        id: 'session-1',
+        kind: 'race',
+        name: 'Saturday Race',
+        scheduledStart: '2026-05-30T00:30:00.000Z',
+        status: 'scheduled',
+      },
+      {
+        categoryIds: [],
+        eventId: event.id,
+        id: 'session-2',
+        kind: 'practice',
+        name: 'Friday Practice',
+        scheduledStart: '2026-05-29T01:00:00.000Z',
+        status: 'scheduled',
+      },
+      {
+        categoryIds: [],
+        eventId: event.id,
+        id: 'session-3',
+        kind: 'qualifying',
+        name: 'Friday Qualifying',
+        scheduledStart: '2026-05-29T03:00:00.000Z',
+        status: 'scheduled',
+      },
+    ];
+    const raceState: RaceStateLookup & { categories: EventCategory[]; records: ParticipantPassingRecord[] } = {
+      categories: [],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: () => undefined,
+      getEntrantIdForParticipant: () => undefined,
+      getParticipantById: () => undefined,
+      getParticipantLaps: () => [],
+      getTransponderCrossings: () => [],
+      records: [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <TimingContext
+          activeSession={sessions[2]}
+          categoryListSelected={() => undefined}
+          eventTimeZone="Australia/Sydney"
+          events={[event]}
+          onAddRecord={() => undefined}
+          onEditRecord={() => undefined}
+          onAssignFlagCategory={() => undefined}
+          onChangeCategory={() => undefined}
+          onExclude={() => undefined}
+          onMarkFlagDeleted={() => undefined}
+          onRemoveFlagCategory={() => undefined}
+          onSelectEvent={() => undefined}
+          onSelectSession={() => undefined}
+          onTimeDisplayZoneModeChange={() => undefined}
+          participantSelected={() => undefined}
+          raceState={raceState}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+          sessions={sessions}
+          timeDisplayZoneMode="event"
+          timingEvent={event}
+          timingSessionValue="active"
+        />
+      );
+    });
+
+    const timingSessionSelect = container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement;
+    const optionLabels = Array.from(timingSessionSelect.options).map((option) => option.text);
+
+    expect(optionLabels).toEqual([
+      'Active session (Friday Qualifying)',
+      '[Fri 11:00] Friday Practice',
+      '[Fri 13:00] Friday Qualifying (Active)',
+      '[Sat 10:30] Saturday Race',
+    ]);
+  });
+
   it('shows loading spinners next to the event and session selectors while timing selection is loading', async () => {
     const event: EventCatalogState['events'][number] = {
       categoryIds: [],
