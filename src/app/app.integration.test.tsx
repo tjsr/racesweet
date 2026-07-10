@@ -2347,8 +2347,12 @@ describe('RaceSweetMainApp integration', () => {
     const appShellStyle = getComputedStyle(appShell);
     const sectionNavStyle = getComputedStyle(sectionNav);
     expect(appShellStyle.display).toBe('flex');
+    expect(appShellStyle.height).toBe('100vh');
+    expect(appShellStyle.overflow).toBe('hidden');
     expect(sectionNavStyle.display).toBe('flex');
     expect(sectionNavStyle.flexDirection).toBe('column');
+    expect(sectionNavStyle.overflowY).toBe('auto');
+    expect(sectionNavStyle.scrollbarWidth).toBe('none');
 
     await clickSectionButton(container, 'Events');
     const eventsLayout = container.querySelector('.events-layout') as HTMLElement;
@@ -2360,6 +2364,8 @@ describe('RaceSweetMainApp integration', () => {
     expect(loadedCssText).toContain('.error pre');
     expect(loadedCssText).toContain('white-space: pre-wrap');
     expect(loadedCssText).toContain('overflow-wrap: anywhere');
+    expect(loadedCssText).toContain('.section-nav::-webkit-scrollbar');
+    expect(loadedCssText).toContain('display: none');
     expect(loadedCssText).toContain('@media (prefers-color-scheme: dark)');
   });
 
