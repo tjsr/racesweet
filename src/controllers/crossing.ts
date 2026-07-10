@@ -3,7 +3,7 @@ import { assignParticipantNumber, createEntrant, createEntrantForUnmatchedChipCo
 import { findEntrantByChipCode, findEntrantByPlateNumber } from "./participantSearch.js";
 
 import type { ChipCrossingData } from "../model/chipcrossing.js";
-import type { EventCategory } from "../model/eventcategory.js";
+import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
 import type { PlateCrossingData } from "../model/platecrossing.js";
 import type { TimeRecord } from "../model/timerecord.js";
 import assert from "node:assert/strict";
@@ -13,14 +13,15 @@ export const assignEntrantToPlateCrossing = (
   entrants: Map<EventParticipantId, EventParticipant>,
   crossing: PlateCrossingData,
   createUnknownEntrants: boolean = false,
-  categoryList: EventCategory[] | undefined = undefined
+  categoryList: EventCategory[] | undefined = undefined,
+  preferredCategoryIds: Set<EventCategoryId> | EventCategoryId[] | undefined = undefined
 ): void => {
   validateCategoriesToCreate(categoryList, createUnknownEntrants);
   if (crossing.time === undefined) {
     console.error(`Crossing for plate ${crossing.plateNumber} has no time`);
     return;
   }
-  const entrant = findEntrantByPlateNumber(entrants, crossing.plateNumber, crossing.time);
+  const entrant = findEntrantByPlateNumber(entrants, crossing.plateNumber, crossing.time, preferredCategoryIds);
 
   if (!entrant && createUnknownEntrants) {
     const categoryName = 'Unknown Plate';
@@ -37,13 +38,14 @@ export const assignEntrantToTime = (
   entrants: Map<EventParticipantId, EventParticipant>,
   record: TimeRecord,
   createUnknownEntrants: boolean = false,
-  categoryList: EventCategory[] | undefined = undefined
+  categoryList: EventCategory[] | undefined = undefined,
+  preferredCategoryIds: Set<EventCategoryId> | EventCategoryId[] | undefined = undefined
 ): void => {
   if (Object.prototype.hasOwnProperty.call(record, 'chipCode')) {
     const crossing = record as ChipCrossingData;
-    assignEntrantToChipCrossing(entrants, crossing, createUnknownEntrants, categoryList);
+    assignEntrantToChipCrossing(entrants, crossing, createUnknownEntrants, categoryList, preferredCategoryIds);
     if (!crossing.participantId && Object.prototype.hasOwnProperty.call(record, 'plateNumber')) {
-      assignEntrantToPlateCrossing(entrants, record as PlateCrossingData, createUnknownEntrants);
+      assignEntrantToPlateCrossing(entrants, record as PlateCrossingData, createUnknownEntrants, categoryList, preferredCategoryIds);
     }
   } else if (Object.prototype.hasOwnProperty.call(record, 'plateNumber')) {
     const crossing = record as PlateCrossingData;
@@ -52,7 +54,7 @@ export const assignEntrantToTime = (
       console.error(`Crossing ${crossing.plateNumber} has no plate number`);
       return;
     }
-    assignEntrantToPlateCrossing(entrants, crossing, createUnknownEntrants);
+    assignEntrantToPlateCrossing(entrants, crossing, createUnknownEntrants, categoryList, preferredCategoryIds);
   } else {
     console.error(assignEntrantToTime.name, `Crossing ${record.dataLine} has no chip code or plate number - not assigne`);
   }
@@ -62,14 +64,15 @@ export const assignEntrantToChipCrossing = (
   entrants: Map<EventParticipantId, EventParticipant>,
   crossing: ChipCrossingData,
   createUnknownEntrants: boolean = false,
-  categoryList: EventCategory[] | undefined
+  categoryList: EventCategory[] | undefined,
+  preferredCategoryIds: Set<EventCategoryId> | EventCategoryId[] | undefined = undefined
 ): void => {
   validateCategoriesToCreate(categoryList, createUnknownEntrants);
   if (crossing.time === undefined) {
     console.error(`Crossing for chip ${crossing.chipCode} has no time`);
     return;
   }
-  let entrant = findEntrantByChipCode(entrants, crossing.chipCode, crossing.time);
+  let entrant = findEntrantByChipCode(entrants, crossing.chipCode, crossing.time, preferredCategoryIds);
   if (!entrant && createUnknownEntrants) {
     assert(categoryList !== undefined, 'Categories list must be passed when creating unnown entrants to create unknown entrants');
     entrant = createEntrantForUnmatchedChipCode(categoryList!, crossing.chipCode);

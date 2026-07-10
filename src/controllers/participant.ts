@@ -502,10 +502,14 @@ export class ParticipantNotFoundError extends Error {
   }
 }
 
-export const assignParticpantsToCrossings = (participants: Map<EventParticipantId, EventParticipant>, crossings: TimeRecord[]): void => {
+export const assignParticpantsToCrossings = (
+  participants: Map<EventParticipantId, EventParticipant>,
+  crossings: TimeRecord[],
+  preferredCategoryIds: Set<EventCategoryId> | EventCategoryId[] | undefined = undefined
+): void => {
   crossings.forEach((crossing: TimeRecord) => {
     if (isCrossingRecord(crossing)) {
-      assignEntrantToTime(participants, crossing);
+      assignEntrantToTime(participants, crossing, false, undefined, preferredCategoryIds);
     }
   });
 };

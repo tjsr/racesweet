@@ -370,6 +370,70 @@ describe('Session category change regressions', () => {
     debugSpy.mockRestore();
   });
 
+  it('reassigns shared-transponder crossings when the session category filter changes', async () => {
+    const sportsmanId = createCategoryId('shared-tx-sportsman');
+    const nascarId = createCategoryId('shared-tx-nascar');
+    const sportsmanParticipantId = createEventParticipantId('shared-tx-sportsman-participant');
+    const nascarParticipantId = createEventParticipantId('shared-tx-nascar-participant');
+    const source = createTimeRecordSourceId('shared-tx-source');
+    const sportsmanStartId = createTimeRecordId('shared-tx-sportsman-start');
+    const nascarStartId = createTimeRecordId('shared-tx-nascar-start');
+    const crossingId = createTimeRecordId('shared-tx-crossing');
+    const categories: EventCategory[] = [
+      createCategory(sportsmanId, 'SPORTSMN'),
+      createCategory(nascarId, 'NASCAR'),
+    ];
+    const sportsmanParticipant = createParticipant(sportsmanParticipantId, sportsmanId, 7300);
+    const nascarParticipant = createParticipant(nascarParticipantId, nascarId, 7300);
+    sportsmanParticipant.firstname = 'Darryl';
+    sportsmanParticipant.surname = 'Howden';
+    nascarParticipant.firstname = 'Darryl';
+    nascarParticipant.surname = 'Howden';
+    const sportsmanStart = createGreenFlagEvent({
+      categoryIds: [sportsmanId],
+      flagValue: 'course',
+      id: sportsmanStartId,
+      sequence: 1,
+      source,
+      time: new Date('2026-05-29T10:00:00.000Z'),
+    });
+    const nascarStart = createGreenFlagEvent({
+      categoryIds: [nascarId],
+      flagValue: 'course',
+      id: nascarStartId,
+      sequence: 2,
+      source,
+      time: new Date('2026-05-29T10:05:00.000Z'),
+    });
+    const crossing = createChipCrossing(crossingId, 7300, 3, new Date('2026-05-29T10:06:00.000Z'));
+    const session = new Session({
+      categories,
+      participants: [],
+      records: [],
+      teams: [],
+    });
+
+    await session.beginBulkProcess();
+    session.addParticipants([sportsmanParticipant, nascarParticipant]);
+    await session.addRecords([sportsmanStart, nascarStart, crossing]);
+    await session.endBulkProcess();
+
+    session.setSessionValidCategoryIds(new Set([nascarId]));
+
+    const nascarCrossing = session.records.find((record) => record.id === crossingId) as ParticipantPassingRecord | undefined;
+    expect(nascarCrossing).toBeDefined();
+    expect(nascarCrossing?.participantId).toBe(nascarParticipantId);
+    expect(nascarCrossing?.entrantId).toBe(nascarParticipant.entrantId);
+    expect(nascarCrossing?.participantStartRecordId).toBe(nascarStartId);
+
+    session.setSessionValidCategoryIds(new Set([sportsmanId]));
+
+    const sportsmanCrossing = session.records.find((record) => record.id === crossingId) as ParticipantPassingRecord | undefined;
+    expect(sportsmanCrossing?.participantId).toBe(sportsmanParticipantId);
+    expect(sportsmanCrossing?.entrantId).toBe(sportsmanParticipant.entrantId);
+    expect(sportsmanCrossing?.participantStartRecordId).toBe(sportsmanStartId);
+  });
+
   it('reprocesses laps when a start flag time changes', async () => {
     const categoryId = createCategoryId('retimed-flag-category');
     const participantId = createEventParticipantId('retimed-flag-participant');

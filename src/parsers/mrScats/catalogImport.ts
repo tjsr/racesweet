@@ -338,12 +338,12 @@ const mergeDriverRecords = (
   primaryDrivers: MrScatsDbfRecord[],
   supplementalSources: SupplementalDriverSource[]
 ): MrScatsDbfRecord[] => {
-  const driversByPlate = new Map<string, MrScatsDbfRecord>();
+  const driversByIdentity = new Map<string, MrScatsDbfRecord>();
 
   primaryDrivers.forEach((driver) => {
     const plateNumber = asString(driver.CARNUMBER);
     if (plateNumber.length > 0) {
-      driversByPlate.set(plateNumber, { ...driver });
+      driversByIdentity.set(getDriverIdentityKey(driver), { ...driver });
     }
   });
 
@@ -354,9 +354,9 @@ const mergeDriverRecords = (
         return;
       }
 
-      const existing = driversByPlate.get(plateNumber);
+      const existing = driversByIdentity.get(getDriverIdentityKey(driver));
       if (!existing) {
-        driversByPlate.set(plateNumber, { ...driver });
+        driversByIdentity.set(getDriverIdentityKey(driver), { ...driver });
         return;
       }
 
@@ -392,7 +392,7 @@ const mergeDriverRecords = (
     });
   });
 
-  return Array.from(driversByPlate.values());
+  return Array.from(driversByIdentity.values());
 };
 
 const getMergedDriverRecords = (
@@ -585,16 +585,19 @@ const getFirstNonNegativeInteger = (record: MrScatsDbfRecord, fields: string[]):
   return integer >= 0 ? integer : undefined;
 };
 
-const hasParticipantPlate = (participantsByPlate: Map<string, EventParticipant>, plateNumber: string): boolean =>
-  participantsByPlate.has(plateNumber);
+const hasParticipantPlate = (participantsByPlate: Map<string, EventParticipant[]>, plateNumber: string): boolean =>
+  (participantsByPlate.get(plateNumber)?.length || 0) > 0;
 
-const buildParticipantsByPlate = (participants: EventParticipant[]): Map<string, EventParticipant> => {
-  const participantsByPlate = new Map<string, EventParticipant>();
+const buildParticipantsByPlate = (participants: EventParticipant[]): Map<string, EventParticipant[]> => {
+  const participantsByPlate = new Map<string, EventParticipant[]>();
   participants.forEach((participant) => {
     participant.identifiers.forEach((identifier) => {
       const racePlate = (identifier as unknown as { racePlate?: unknown }).racePlate;
       if (racePlate !== undefined && racePlate !== null) {
-        participantsByPlate.set(racePlate.toString().trim(), participant);
+        const normalizedPlate = racePlate.toString().trim();
+        const existingParticipants = participantsByPlate.get(normalizedPlate) || [];
+        existingParticipants.push(participant);
+        participantsByPlate.set(normalizedPlate, existingParticipants);
       }
     });
   });
@@ -602,7 +605,7 @@ const buildParticipantsByPlate = (participants: EventParticipant[]): Map<string,
 };
 
 const hasParticipantTransponderForPlate = (
-  participantsByPlate: Map<string, EventParticipant>,
+  participantsByPlate: Map<string, EventParticipant[]>,
   plateNumber: string,
   transponder: number | undefined
 ): boolean => {
@@ -610,15 +613,15 @@ const hasParticipantTransponderForPlate = (
     return false;
   }
 
-  const participant = participantsByPlate.get(plateNumber);
-  if (!participant) {
+  const participants = participantsByPlate.get(plateNumber);
+  if (!participants || participants.length === 0) {
     return false;
   }
 
-  return participant.identifiers.some((identifier) => {
+  return participants.some((participant) => participant.identifiers.some((identifier) => {
     const txNo = (identifier as unknown as { txNo?: unknown }).txNo;
     return txNo !== undefined && txNo !== null && txNo.toString() === transponder.toString();
-  });
+  }));
 };
 
 const getFirstString = (record: MrScatsDbfRecord, fields: string[]): string => {
@@ -662,6 +665,10 @@ const getEventName = (programme: MrScatsDbfRecord[], meetingCode: string): strin
 const getCategoryName = (value: unknown): string => asString(value) || 'Unclassified';
 
 const getDriverCategoryName = (driver: MrScatsDbfRecord): string => getCategoryName(asString(driver.DRIV_CODE) || driver.DRIV_CLASS);
+
+const getDriverIdentityKey = (driver: MrScatsDbfRecord): string => {
+  return `${getDriverCategoryName(driver)}::${asString(driver.CARNUMBER)}`;
+};
 
 const buildCategories = (meetingCode: string, programme: MrScatsDbfRecord[], drivers: MrScatsDbfRecord[]): EventCategory[] => {
   const categoryNames = [
@@ -808,7 +815,7 @@ const findSessionRawCrossingFiles = (buffers: Map<string, Buffer>, session: MrSc
 const inferSessionCategoryIdsFromCrossings = (
   buffers: Map<string, Buffer>,
   session: MrScatsImportedSession,
-  participantsByPlate: Map<string, EventParticipant>,
+  participantsByPlate: Map<string, EventParticipant[]>,
   participantCountByCategoryId: Map<string, number>
 ): string[] => {
   const existingCategoryHasParticipants = session.categoryIds.some((categoryId) => {
@@ -823,10 +830,11 @@ const inferSessionCategoryIdsFromCrossings = (
     try {
       readMrScatsDbfTable(buffers.get(fileName)!).records.forEach((record) => {
         const plateNumber = getFirstString(record, CROSSING_PLATE_FIELDS);
-        const participant = participantsByPlate.get(plateNumber);
-        if (participant?.categoryId) {
-          inferredCategoryIds.add(participant.categoryId.toString());
-        }
+        (participantsByPlate.get(plateNumber) || []).forEach((participant) => {
+          if (participant.categoryId) {
+            inferredCategoryIds.add(participant.categoryId.toString());
+          }
+        });
       });
     } catch (_error) {
       // Ignore unreadable candidate files; record import will do the same.
@@ -1269,7 +1277,7 @@ const createCrossingRecord = (
   scheduledStartTime: Date,
   sessionElapsedZeroTime: Date,
   sequence: number,
-  participantsByPlate: Map<string, EventParticipant>,
+  participantsByPlate: Map<string, EventParticipant[]>,
   options: { isLapCompletion?: boolean } = {}
 ): EventTimeRecord | undefined => {
   const crossingTime = getCrossingTime(record, scheduledStartTime, sessionElapsedZeroTime);
@@ -1340,7 +1348,7 @@ const createRawCrossingRecord = (
   record: CtcRawCrossingRecord,
   sessionElapsedZeroTime: Date,
   sequence: number,
-  participantsByPlate: Map<string, EventParticipant>
+  participantsByPlate: Map<string, EventParticipant[]>
 ): EventTimeRecord | undefined => {
   const transponder = record.transmitter !== undefined && record.transmitter > 0 ? record.transmitter : undefined;
   if (transponder === undefined) {
@@ -1595,7 +1603,7 @@ const buildParticipants = (
 
     const categoryName = getDriverCategoryName(driver);
     const categoryId = categoryIdByName.get(categoryName) || createCategoryId(`mr-scats:${meetingCode}:category:${categoryName}`);
-    const entrantId = createEventEntrantId(`mr-scats:${meetingCode}:entrant:${plateNumber}`);
+    const entrantId = createEventEntrantId(`mr-scats:${meetingCode}:entrant:${categoryId}:${plateNumber}`);
     const driverNames = DRIVER_NAME_FIELDS.map((field) => asString(driver[field]))
       .filter((name, index, names) => name.length > 0 && names.indexOf(name) === index);
     const fallbackName = asString(driver.ENTRANT) || asString(driver.SCRN_NAME) || `Car ${plateNumber}`;
@@ -1608,7 +1616,7 @@ const buildParticipants = (
         currentResult: undefined,
         entrantId,
         firstname,
-        id: createEventParticipantId(`mr-scats:${meetingCode}:participant:${plateNumber}:${index + 1}`),
+        id: createEventParticipantId(`mr-scats:${meetingCode}:participant:${categoryId}:${plateNumber}:${index + 1}`),
         identifiers: buildIdentifiers(driver),
         lastRecordTime: null,
         resultDuration: null,

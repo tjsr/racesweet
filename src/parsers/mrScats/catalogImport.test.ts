@@ -338,6 +338,69 @@ describe('MR-SCATS catalog import parser', () => {
     ]));
   });
 
+  it('keeps T9743-style duplicate driver names separate across categories and plates', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 12, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+      { length: 8, name: 'ACTUALSTRT', type: 'C' },
+    ], [
+      { ACTUALSTRT: '18:00:00', CATEGORY: 'SPORTSMN', EVENTNAME: 'Sportsmen Heat', EV_CODE: 'T9743R09', STARTDATE: '19971206' },
+      { ACTUALSTRT: '19:00:00', CATEGORY: 'LEGENDS', EVENTNAME: 'Legends Heat', EV_CODE: 'T9743R10', STARTDATE: '19971206' },
+      { ACTUALSTRT: '20:00:00', CATEGORY: 'NASCAR', EVENTNAME: 'Nascar Heat', EV_CODE: 'T9743R11', STARTDATE: '19971206' },
+      { ACTUALSTRT: '21:00:00', CATEGORY: 'AUSCAR', EVENTNAME: 'Auscar Heat', EV_CODE: 'T9743R12', STARTDATE: '19971206' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 12, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 11, DRIVER: 'Tony Howlett', DRIV_CLASS: 'SPORTSMN', TXNUM: 1101 },
+      { CARNUMBER: 21, DRIVER: 'Tony Howlett', DRIV_CLASS: 'LEGENDS', TXNUM: 2101 },
+      { CARNUMBER: 12, DRIVER: 'Greame O\'Brien', DRIV_CLASS: 'SPORTSMN', TXNUM: 1201 },
+      { CARNUMBER: 22, DRIVER: 'Greame O\'Brien', DRIV_CLASS: 'LEGENDS', TXNUM: 2201 },
+      { CARNUMBER: 12, DRIVER: 'Greame O\'Brien', DRIV_CLASS: 'NASCAR', TXNUM: 3201 },
+      { CARNUMBER: 73, DRIVER: 'Darryl Howden', DRIV_CLASS: 'SPORTSMN', TXNUM: 7300 },
+      { CARNUMBER: 73, DRIVER: 'Darryl Howden', DRIV_CLASS: 'NASCAR', TXNUM: 7301 },
+      { CARNUMBER: 74, DRIVER: 'Neville Blight', DRIV_CLASS: 'SPORTSMN', TXNUM: 7400 },
+      { CARNUMBER: 74, DRIVER: 'Neville Blight', DRIV_CLASS: 'NASCAR', TXNUM: 7401 },
+      { CARNUMBER: 75, DRIVER: 'Luke Sheales', DRIV_CLASS: 'AUSCAR', TXNUM: 7500 },
+      { CARNUMBER: 76, DRIVER: 'Luke Sheales', DRIV_CLASS: 'NASCAR', TXNUM: 7600 },
+    ]));
+
+    const imported = await loadMrScatsCatalogFromLocation(tempDir);
+    const participantSummaries = (imported.raceState.participants || []).map((participant) => ({
+      categoryId: participant.categoryId.toString(),
+      name: `${participant.firstname} ${participant.surname}`.trim(),
+      racePlate: participant.identifiers.find((identifier) => 'racePlate' in identifier)?.racePlate?.toString(),
+      txNos: participant.identifiers
+        .filter((identifier) => 'txNo' in identifier)
+        .map((identifier) => identifier.txNo),
+    }));
+    const categoryIdsByName = new Map((imported.raceState.categories || []).map((category) => [category.name, category.id.toString()]));
+
+    expect(participantSummaries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ categoryId: categoryIdsByName.get('SPORTSMN'), name: 'Tony Howlett', racePlate: '11', txNos: [1101] }),
+      expect.objectContaining({ categoryId: categoryIdsByName.get('LEGENDS'), name: 'Tony Howlett', racePlate: '21', txNos: [2101] }),
+      expect.objectContaining({ categoryId: categoryIdsByName.get('SPORTSMN'), name: 'Greame O\'Brien', racePlate: '12', txNos: [1201] }),
+      expect.objectContaining({ categoryId: categoryIdsByName.get('LEGENDS'), name: 'Greame O\'Brien', racePlate: '22', txNos: [2201] }),
+      expect.objectContaining({ categoryId: categoryIdsByName.get('NASCAR'), name: 'Greame O\'Brien', racePlate: '12', txNos: [3201] }),
+      expect.objectContaining({ categoryId: categoryIdsByName.get('SPORTSMN'), name: 'Darryl Howden', racePlate: '73', txNos: [7300] }),
+      expect.objectContaining({ categoryId: categoryIdsByName.get('NASCAR'), name: 'Darryl Howden', racePlate: '73', txNos: [7301] }),
+      expect.objectContaining({ categoryId: categoryIdsByName.get('SPORTSMN'), name: 'Neville Blight', racePlate: '74', txNos: [7400] }),
+      expect.objectContaining({ categoryId: categoryIdsByName.get('NASCAR'), name: 'Neville Blight', racePlate: '74', txNos: [7401] }),
+      expect.objectContaining({ categoryId: categoryIdsByName.get('AUSCAR'), name: 'Luke Sheales', racePlate: '75', txNos: [7500] }),
+      expect.objectContaining({ categoryId: categoryIdsByName.get('NASCAR'), name: 'Luke Sheales', racePlate: '76', txNos: [7600] }),
+    ]));
+    expect(participantSummaries.filter((participant) => participant.name === 'Greame O\'Brien')).toHaveLength(3);
+    expect(participantSummaries.filter((participant) => participant.name === 'Darryl Howden')).toHaveLength(2);
+    expect(participantSummaries.filter((participant) => participant.name === 'Neville Blight')).toHaveLength(2);
+    expect(participantSummaries.filter((participant) => participant.name === 'Luke Sheales')).toHaveLength(2);
+  });
+
   it('loads session crossing DBFs with deterministic record IDs and derived pre-green crossing times', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
     await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([

@@ -81,7 +81,7 @@ export class Session implements RaceState, RaceStateLookup {
     this._records = listToMap(state.records);
     this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
     if (this._records.size > 0 || this._participants.size > 0) {
-      assignParticpantsToCrossings(this._participants, this.records);
+      assignParticpantsToCrossings(this._participants, this.records, this._sessionValidCategoryIds);
       this.__reprocessAllParticipantLaps();
     }
   }
@@ -104,6 +104,16 @@ export class Session implements RaceState, RaceStateLookup {
 
   public setSessionValidCategoryIds(sessionValidCategoryIds: Set<EventCategoryId> | undefined): void {
     this._sessionValidCategoryIds = sessionValidCategoryIds ? new Set(sessionValidCategoryIds) : undefined;
+    this.records
+      .filter((record) => isCrossingRecord(record))
+      .forEach((record) => {
+        const crossing = record as ParticipantPassingRecord;
+        crossing.entrantId = undefined;
+        crossing.participantId = undefined;
+        crossing.participantStartRecordId = undefined;
+        crossing.startingLapRecordId = undefined;
+      });
+    assignParticpantsToCrossings(this._participants, this.records, this._sessionValidCategoryIds);
     this._cachedParticipantLaps = undefined;
     if (!this._bulkProcess) {
       this.__reprocessAllParticipantLaps();
@@ -175,7 +185,7 @@ export class Session implements RaceState, RaceStateLookup {
 
       this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
       this._categoryGreenFlags = undefined;
-      assignParticpantsToCrossings(this._participants, this.records);
+      assignParticpantsToCrossings(this._participants, this.records, this._sessionValidCategoryIds);
       this.__reprocessAllParticipantLaps();
       this._bulkProcess = false;
     });
@@ -277,7 +287,7 @@ export class Session implements RaceState, RaceStateLookup {
       if (isParsedChipCrossing(record as ChipCrossingData)) {
         this.__cacheTransponderCrossing(record as ChipCrossingData);
       }
-      assignParticpantsToCrossings(this._participants, [record]);
+      assignParticpantsToCrossings(this._participants, [record], this._sessionValidCategoryIds);
       
       if (record.participantId) {
         this.__cacheParticipantLap(record.participantId, record as ParticipantPassingRecord);
@@ -398,7 +408,7 @@ export class Session implements RaceState, RaceStateLookup {
     this._categoryGreenFlags = undefined;
 
     if (isCrossingRecord(updatedRecord)) {
-      assignParticpantsToCrossings(this._participants, [updatedRecord]);
+      assignParticpantsToCrossings(this._participants, [updatedRecord], this._sessionValidCategoryIds);
     }
     this.__reprocessAllParticipantLaps();
   }
@@ -416,7 +426,7 @@ export class Session implements RaceState, RaceStateLookup {
       : false;
 
     if (!this._cachedParticipantLaps || (!this._cachedParticipantLaps.has(participantId) && hasMatchingCrossings)) {
-      assignParticpantsToCrossings(this._participants, this.records);
+      assignParticpantsToCrossings(this._participants, this.records, this._sessionValidCategoryIds);
       this.__reprocessAllParticipantLaps();
     }
 
@@ -641,7 +651,7 @@ export class Session implements RaceState, RaceStateLookup {
       });
     this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
     this._categoryGreenFlags = undefined;
-    assignParticpantsToCrossings(this._participants, this.records);
+    assignParticpantsToCrossings(this._participants, this.records, this._sessionValidCategoryIds);
     this.__reprocessAllParticipantLaps();
   }
 
