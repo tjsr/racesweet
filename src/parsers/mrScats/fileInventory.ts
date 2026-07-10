@@ -62,7 +62,6 @@ const classifyMrScatsFile = (extension: string): MrScatsDataFileKind => {
   }
 
   switch (extension.toLowerCase()) {
-  case '.car':
   case '.fst':
   case '.nt1':
   case '.ntt':
@@ -167,9 +166,14 @@ const createSummary = async (
   size: number,
 ): Promise<MrScatsDataFileSummary> => {
   const extension = path.extname(relativePath).toLowerCase();
+  const buffer = await readFile(path.join(rootPath, relativePath));
+  const dbfSummary = parseMrScatsDbfSummary(buffer);
+  const kind = extension === '.car'
+    ? (dbfSummary ? 'dbf-table' : 'index')
+    : classifyMrScatsFile(extension);
   const summary: MrScatsDataFileSummary = {
     extension,
-    kind: classifyMrScatsFile(extension),
+    kind,
     name: path.basename(relativePath),
     relativePath,
     size,
@@ -177,7 +181,7 @@ const createSummary = async (
   };
 
   if (isDbfCompatibleFileKind(summary.kind)) {
-    summary.dbf = parseMrScatsDbfSummary(await readFile(path.join(rootPath, relativePath)));
+    summary.dbf = dbfSummary;
   }
 
   return summary;

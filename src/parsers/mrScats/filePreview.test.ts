@@ -108,7 +108,27 @@ describe('MR-SCATS file preview', () => {
     expect(preview.rows).toEqual([{ CARNUMBER: 42, DRIVER: 'Alice Rider' }]);
   });
 
-  it('previews CAR details files as indexed rows from the related DBF table', async () => {
+  it('previews DBF-compatible CAR files as columnar records before trying index fallback', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-preview-'));
+    await writeFile(path.join(tempDir, 'X0099A01.CAR'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 20, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 42, DRIVER: 'Alice Driver' },
+      { CARNUMBER: 9, DRIVER: 'Chris Driver' },
+    ]));
+
+    const preview = await previewMrScatsDataFile(tempDir, 'X0099A01.CAR', 'dbf-table');
+
+    expect(preview.parser).toBe('dbf');
+    expect(preview.columns).toEqual(['CARNUMBER', 'DRIVER']);
+    expect(preview.rows).toEqual([
+      { CARNUMBER: 42, DRIVER: 'Alice Driver' },
+      { CARNUMBER: 9, DRIVER: 'Chris Driver' },
+    ]);
+  });
+
+  it('falls back to index-style preview for non-DBF CAR files', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-preview-'));
     const carBuffer = Buffer.alloc(64, 0);
     carBuffer.write('FIELD->CARNUMBER', 16, 'latin1');

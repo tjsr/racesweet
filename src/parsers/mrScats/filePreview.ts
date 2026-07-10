@@ -712,6 +712,23 @@ export const previewMrScatsDataFile = async (
   const extension = path.extname(relativePath).toLowerCase();
   const fileName = path.basename(relativePath);
 
+  if (extension === '.car') {
+    try {
+      return await createDbfPreview(locationPath, relativePath, fileName, 'dbf-table', buffer, maxRows);
+    } catch (dbfError) {
+      try {
+        return await createNtxPreview(locationPath, relativePath, fileName, buffer, maxRows);
+      } catch (indexError) {
+        const dbfMessage = dbfError instanceof Error ? dbfError.message : String(dbfError);
+        const indexMessage = indexError instanceof Error ? indexError.message : String(indexError);
+        return createBinaryPreview(fileName, 'binary-preview', buffer, maxRows, [
+          `Tried to read ${fileName} as a DBF-compatible CAR table first: ${dbfMessage}`,
+          `Then tried to read ${fileName} as an index-style CAR file: ${indexMessage}`,
+        ]);
+      }
+    }
+  }
+
   if (extension === '.ntx' || fileKind === 'index') {
     return createNtxPreview(locationPath, relativePath, fileName, buffer, maxRows);
   }
