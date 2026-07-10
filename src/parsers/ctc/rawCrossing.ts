@@ -2,6 +2,7 @@ export interface CtcRawCrossingRecord {
   absoluteTimeTicks?: number;
   confidence?: string;
   drtCode: string;
+  hitCount?: number;
   laneNumber?: number;
   lineNumber?: number;
   raw: string;
@@ -26,6 +27,7 @@ const CONFIDENCE_START = 24;
 const CONFIDENCE_LENGTH = 3;
 const STATUS_START = 27;
 const STATUS_LENGTH = 3;
+const HITS_START = STATUS_START + STATUS_LENGTH;
 const LEGACY_VISIBLE_TIME_PATTERN = /^(?<prefix>\d+)\s+(?<sequence>\d+)\s+(?<time>\d{2}:\d{2}:\d{2}\.\d{4})\s+(?<status>\d{2,3})$/;
 const SPECIAL_EVENT_PATTERN = /^(?<code>[0-9A-F]{2})(?<absolute>\d{14})$/i;
 
@@ -160,10 +162,12 @@ export const parseCtcRawCrossingLine = (
   const laneNumber = parseInteger(readSlice(raw, LANE_START, LANE_LENGTH));
   const confidence = readSlice(raw, CONFIDENCE_START, CONFIDENCE_LENGTH).trim();
   const status = readSlice(raw, STATUS_START, STATUS_LENGTH).trim();
+  const hitCount = parseInteger(raw.slice(HITS_START).trim());
 
   return {
     confidence: confidence.length > 0 ? confidence : undefined,
     drtCode: readSlice(raw, 0, DRT_LENGTH),
+    hitCount,
     laneNumber,
     lineNumber,
     raw,

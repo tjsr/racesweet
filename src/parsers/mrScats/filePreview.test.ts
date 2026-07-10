@@ -280,7 +280,7 @@ describe('MR-SCATS file preview', () => {
     const preview = await previewMrScatsDataFile(tempDir, 'W9721R10.SRT', 'raw-crossing-text');
 
     expect(preview).toEqual(expect.objectContaining({
-      columns: ['Line number', 'Record type', 'Time of day', 'Time ticks', 'TxNo', 'Line', 'Loop', 'Confidence', 'Status', 'Raw crossing data'],
+      columns: ['Line number', 'Record type', 'Time of day', 'Time ticks', 'TxNo', 'Line', 'Loop', 'Confidence', 'Hits', 'Status', 'Raw crossing data'],
       displayedRowCount: 3,
       fileKind: 'raw-crossing-text',
       parser: 'text',
@@ -289,6 +289,7 @@ describe('MR-SCATS file preview', () => {
     expect(preview.rows).toEqual([
       {
         Confidence: '',
+        Hits: '',
         Line: '',
         'Line number': 1,
         Loop: '',
@@ -301,6 +302,7 @@ describe('MR-SCATS file preview', () => {
       },
       {
         Confidence: '255',
+        Hits: 2,
         Line: 1,
         'Line number': 2,
         Loop: 8,
@@ -313,6 +315,7 @@ describe('MR-SCATS file preview', () => {
       },
       {
         Confidence: '',
+        Hits: '',
         Line: '',
         'Line number': 3,
         Loop: '',

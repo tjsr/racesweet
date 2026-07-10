@@ -54,6 +54,8 @@ export type CrossingUnrelatedReasonCode =
 
 export interface ParticipantPassingRecord extends EventTimeRecord {
   id: PassingRecordId;
+  confidenceFactor?: number | undefined;
+  hitCount?: number | undefined;
   lineNumber?: number | undefined;
   loopNumber?: number | undefined;
   participantId?: EventParticipantId | null | undefined;

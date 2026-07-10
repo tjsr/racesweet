@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { millisecondsToTime, tableTimeStringInTimeZone } from './timeutils.js';
+import {
+  dateStringInTimeZone,
+  millisecondsToTime,
+  parseTimeOfDayInputInTimeZone,
+  tableDateTimeStringInTimeZone,
+  tableTimeStringInTimeZone,
+  timeOfDayInputStringInTimeZone,
+} from './timeutils.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -28,5 +35,35 @@ describe('tableTimeStringInTimeZone', () => {
 
     expect(() => tableTimeStringInTimeZone(invalidDate, 'Australia/Sydney')).toThrow(RangeError);
     expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('toString="Invalid Date", getTime=NaN'));
+  });
+});
+
+describe('timeOfDayInputStringInTimeZone', () => {
+  it('formats edit dialog values in the selected display timezone', () => {
+    expect(timeOfDayInputStringInTimeZone(new Date('2026-05-29T00:06:00.000Z'), 'Australia/Sydney')).toBe('10:06:00.000');
+    expect(timeOfDayInputStringInTimeZone(new Date('2026-05-29T00:06:00.000Z'), 'UTC')).toBe('00:06:00.000');
+  });
+});
+
+describe('parseTimeOfDayInputInTimeZone', () => {
+  it('parses edited times against the displayed timezone date', () => {
+    expect(parseTimeOfDayInputInTimeZone(
+      new Date('2026-05-29T00:06:00.000Z'),
+      '10:06:30.500',
+      'Australia/Sydney'
+    )?.toISOString()).toBe('2026-05-29T00:06:30.500Z');
+  });
+});
+
+describe('dateStringInTimeZone', () => {
+  it('formats the record date in the selected timezone', () => {
+    expect(dateStringInTimeZone(new Date('2026-05-29T00:06:00.000Z'), 'Australia/Sydney')).toBe('2026-05-29');
+    expect(dateStringInTimeZone(new Date('2026-05-29T00:06:00.000Z'), 'America/Los_Angeles')).toBe('2026-05-28');
+  });
+});
+
+describe('tableDateTimeStringInTimeZone', () => {
+  it('renders the date and time together in the selected timezone', () => {
+    expect(tableDateTimeStringInTimeZone(new Date('2026-06-07T00:15:30.250Z'), 'Australia/Sydney')).toBe('2026-06-07 10:15:30.250');
   });
 });

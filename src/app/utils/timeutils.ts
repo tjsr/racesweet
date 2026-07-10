@@ -124,6 +124,64 @@ export const tableTimeStringInTimeZone = (
   }
 };
 
+export const timeOfDayInputStringInTimeZone = (
+  time: Date | undefined,
+  timeZone: string | undefined
+): string => {
+  return tableTimeStringInTimeZone(time, timeZone);
+};
+
+export const parseTimeOfDayInputInTimeZone = (
+  anchorTime: Date | undefined,
+  value: string,
+  timeZone: string | undefined
+): Date | undefined => {
+  if (!anchorTime) {
+    return undefined;
+  }
+
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/);
+  if (!match) {
+    return undefined;
+  }
+
+  const [, hoursText, minutesText, secondsText = '0', millisecondsText = '0'] = match;
+  const normalizedTimeZone = normalizeTimeZone(timeZone);
+  const { day, month, year } = getDatePartsInTimeZone(anchorTime, normalizedTimeZone);
+  const zonedDate = new TZDate(
+    year,
+    month - 1,
+    day,
+    Number(hoursText),
+    Number(minutesText),
+    Number(secondsText),
+    Number(millisecondsText.padEnd(3, '0')),
+    normalizedTimeZone
+  );
+  return new Date(zonedDate.getTime());
+};
+
+export const dateStringInTimeZone = (date: Date | undefined, timeZone: string | undefined): string => {
+  if (!date) {
+    return '';
+  }
+
+  const { day, month, year } = getDatePartsInTimeZone(date, timeZone);
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
+
+export const tableDateTimeStringInTimeZone = (
+  time: Date | undefined,
+  timeZone: string | undefined,
+  timeTenthOfMillisecond?: number | null
+): string => {
+  if (!time) {
+    return 'Unknown time';
+  }
+
+  return `${dateStringInTimeZone(time, timeZone)} ${tableTimeStringInTimeZone(time, timeZone, timeTenthOfMillisecond)}`;
+};
+
 export const millisecondsToTime = (milliseconds: MillisecondsDuration): DurationString => {
   const seconds = Math.floor((milliseconds / 1000) % 60);
   const minutes = Math.floor((milliseconds / (1000 * 60)) % 60);

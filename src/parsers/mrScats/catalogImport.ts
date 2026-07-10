@@ -85,7 +85,7 @@ interface MrScatsLoadPlan {
   total: number;
 }
 
-const DEFAULT_TIME_ZONE = 'Australia/Sydney';
+const DEFAULT_TIME_ZONE = 'Australia/Melbourne';
 const FALLBACK_EVENT_DATE = '1970-01-01';
 const PROGRAMME_BASE_NAMES = ['PRGMME', 'PROG', 'PRG', 'PROGRAM', 'PROGRAMME', 'PRG1'];
 const DRIVER_BASE_NAMES = ['DRIVERS', 'DRIVER', 'DRIVE'];
@@ -101,6 +101,8 @@ const CROSSING_TRANSPONDER_FIELDS = ['TXNUM', 'TX_NO', 'TRANSPONDR', 'TRANSPONDE
 const CROSSING_PLATE_FIELDS = ['CARNUMBER', 'CAR', 'CAR_NO', 'CARNO'];
 const CROSSING_LINE_FIELDS = ['LINE_NO', 'LINE', 'LINENO', 'LINE_NUM', 'LINE_NUMBER'];
 const CROSSING_LOOP_FIELDS = ['LANE_NO', 'LANE', 'LANENO', 'LOOP', 'LOOP_NO', 'LOOPNO', 'LOOP_NUMBER'];
+const CROSSING_CONFIDENCE_FIELDS = ['CONFIDENCE', 'CONF_FACTOR', 'CONFID_FACT', 'CF', 'CONF'];
+const CROSSING_HIT_COUNT_FIELDS = ['HITCOUNT', 'HIT_COUNT', 'HITS', 'READCOUNT', 'READ_COUNT', 'READS'];
 const CROSSING_GREEN_ELAPSED_FIELDS = ['GREENELAPS', 'GREEN_ELAP', 'STARTELAP', 'START_ELAP', 'STARTELPSD'];
 const CROSSING_GREEN_FLAG_FIELDS = ['FLAG', 'SYNCMARK', 'STARTFIN'];
 const AUXILIARY_DBF_EXTENSIONS = ['.AT1', '.AT2'];
@@ -324,12 +326,22 @@ const parseDateTime = (dateValue: unknown, timeValue: unknown): string | undefin
   }
 
   const time = asString(timeValue);
-  const normalizedTime = /^\d{1,2}:\d{2}$/.test(time)
-    ? `${time.padStart(5, '0')}:00`
-    : /^\d{1,2}:\d{2}:\d{2}$/.test(time)
-      ? time.padStart(8, '0')
-      : '00:00:00';
-  const zonedDate = new TZDate(`${date}T${normalizedTime}`, DEFAULT_TIME_ZONE);
+  const timeMatch = /^(?<clock>\d{1,2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?)(?<offset>Z|[+-]\d{2}:\d{2})?$/u.exec(time);
+  const normalizedClock = !timeMatch
+    ? '00:00:00'
+    : /^\d{1,2}:\d{2}$/.test(timeMatch.groups!.clock)
+      ? `${timeMatch.groups!.clock.padStart(5, '0')}:00`
+      : timeMatch.groups!.clock.padStart(8, '0');
+  const millisecondsNormalizedClock = normalizedClock.includes('.')
+    ? normalizedClock.replace(/\.(\d{1,3})$/u, (_match: string, milliseconds: string) => `.${milliseconds.padEnd(3, '0')}`)
+    : `${normalizedClock}.000`;
+
+  if (timeMatch?.groups?.offset) {
+    const offsetDate = new Date(`${date}T${millisecondsNormalizedClock}${timeMatch.groups.offset}`);
+    return Number.isNaN(offsetDate.getTime()) ? undefined : offsetDate.toISOString();
+  }
+
+  const zonedDate = new TZDate(`${date}T${millisecondsNormalizedClock}`, DEFAULT_TIME_ZONE);
   return Number.isNaN(zonedDate.getTime()) ? undefined : new Date(zonedDate.getTime()).toISOString();
 };
 
@@ -389,6 +401,16 @@ const getFirstPositiveInteger = (record: MrScatsDbfRecord, fields: string[]): nu
 
   const integer = Math.trunc(parsed);
   return integer > 0 ? integer : undefined;
+};
+
+const getFirstNonNegativeInteger = (record: MrScatsDbfRecord, fields: string[]): number | undefined => {
+  const parsed = getFirstNumber(record, fields);
+  if (parsed === undefined) {
+    return undefined;
+  }
+
+  const integer = Math.trunc(parsed);
+  return integer >= 0 ? integer : undefined;
 };
 
 const hasParticipantPlate = (participantsByPlate: Map<string, EventParticipant>, plateNumber: string): boolean =>
@@ -842,6 +864,12 @@ const getCrossingLineNumber = (record: MrScatsDbfRecord, fileName: string): numb
 const getCrossingLoopNumber = (record: MrScatsDbfRecord): number | undefined =>
   getFirstPositiveInteger(record, CROSSING_LOOP_FIELDS);
 
+const getCrossingConfidenceFactor = (record: MrScatsDbfRecord): number | undefined =>
+  getFirstNonNegativeInteger(record, CROSSING_CONFIDENCE_FIELDS);
+
+const getCrossingHitCount = (record: MrScatsDbfRecord): number | undefined =>
+  getFirstNonNegativeInteger(record, CROSSING_HIT_COUNT_FIELDS);
+
 const createSessionGreenFlag = (
   meetingCode: string,
   session: MrScatsImportedSession,
@@ -970,9 +998,11 @@ const createCrossingRecord = (
     crossingTime.elapsedTicks.toString(),
   ].join(':');
   const baseRecord: ParticipantPassingRecord = {
+    confidenceFactor: getCrossingConfidenceFactor(record),
     dataLine: JSON.stringify(record),
     elapsedTime: null,
     eventId: createEventId(`mr-scats:${meetingCode}:event`),
+    hitCount: getCrossingHitCount(record),
     id: createTimeRecordId(stableRecordKey),
     isLapCompletion: options.isLapCompletion,
     lineNumber: getCrossingLineNumber(record, fileName),
@@ -1034,15 +1064,15 @@ const createRawCrossingRecord = (
     record.rawTimeTicks.toString(),
   ].join(':');
   const baseRecord: ParticipantPassingRecord & {
-    confidence?: string;
     drtCode?: string;
     rawStatus?: string;
   } = {
-    confidence: record.confidence,
+    confidenceFactor: record.confidence !== undefined ? Number.parseInt(record.confidence, 10) : undefined,
     dataLine: record.raw,
     drtCode: record.drtCode,
     elapsedTime: null,
     eventId: createEventId(`mr-scats:${meetingCode}:event`),
+    hitCount: record.hitCount,
     id: createTimeRecordId(stableRecordKey),
     lineNumber: record.lineNumber,
     loopNumber: record.laneNumber,

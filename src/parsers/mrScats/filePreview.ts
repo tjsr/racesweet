@@ -410,13 +410,14 @@ const createRawCrossingTextPreview = (
       Line: stringifyPreviewValue(parsedRecord?.lineNumber),
       Loop: stringifyPreviewValue(parsedRecord?.laneNumber),
       Confidence: stringifyPreviewValue(parsedRecord?.confidence),
+      Hits: stringifyPreviewValue(parsedRecord?.hitCount),
       Status: stringifyPreviewValue(parsedRecord?.status),
       'Raw crossing data': line,
     };
   });
 
   return {
-    columns: ['Line number', 'Record type', 'Time of day', 'Time ticks', 'TxNo', 'Line', 'Loop', 'Confidence', 'Status', 'Raw crossing data'],
+    columns: ['Line number', 'Record type', 'Time of day', 'Time ticks', 'TxNo', 'Line', 'Loop', 'Confidence', 'Hits', 'Status', 'Raw crossing data'],
     displayedRowCount: rows.length,
     fileKind: 'raw-crossing-text',
     fileName,

@@ -1434,7 +1434,7 @@ describe('RecentRecords integration', () => {
     });
 
     expect(container.textContent).toContain('Show times in');
-    expect(container.querySelector('tr[data-record-id="2001"]')?.textContent).toContain('10:15:30.250');
+    expect(container.querySelector('tr[data-record-id="2001"]')?.textContent).toContain('2026-06-07 10:15:30.250');
 
     const timeZoneSelect = Array.from(container.querySelectorAll('[role="combobox"]')).find((element) => {
       return element.textContent?.includes('Event time-zone');
@@ -1470,7 +1470,7 @@ describe('RecentRecords integration', () => {
       );
     });
 
-    expect(container.querySelector('tr[data-record-id="2001"]')?.textContent).toContain('00:15:30.250');
+    expect(container.querySelector('tr[data-record-id="2001"]')?.textContent).toContain('2026-06-07 00:15:30.250');
   });
 
   it('shows the team name only for crossings by a member of a team', async () => {
@@ -3505,7 +3505,7 @@ describe('RecentRecords integration', () => {
       sessionId: 'session-1',
       source: expect.any(String),
     }));
-    expect((onAddRecord.mock.calls[0]?.[0] as ParticipantPassingRecord & { time?: Date }).time?.toISOString()).toBe('2026-05-29T10:07:30.250Z');
+    expect((onAddRecord.mock.calls[0]?.[0] as ParticipantPassingRecord & { time?: Date }).time?.toISOString()).toBe('2026-05-29T00:07:30.250Z');
   });
 
   it('opens the add-record dialog from a flag row and builds a category-scoped flag record', async () => {
@@ -3673,12 +3673,14 @@ describe('RecentRecords integration', () => {
         <RecentRecords
           currentEventId="event-1"
           currentSessionId="session-1"
+          eventTimeZone="Australia/Sydney"
           onAddRecord={onAddRecord}
           onEditRecord={onEditRecord}
           raceStateLookup={raceStateLookup}
           records={[crossing]}
           selectedCategories={new Set()}
           selectedParticipants={new Set()}
+          timeDisplayZoneMode="event"
         />
       );
     });
@@ -3704,7 +3706,9 @@ describe('RecentRecords integration', () => {
 
     expect(document.body.textContent).toContain('Edit record');
     expect((document.querySelector('input[aria-label="Record ID"]') as HTMLInputElement).value).toBe('crossing-1');
-    expect((document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement).value).toBe('10:06:00.000');
+    expect((document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement).value).toBe('20:06:00.000');
+    expect((document.querySelector('input[aria-label="Displayed time zone"]') as HTMLInputElement).value).toBe('Time shown in Australia/Sydney');
+    expect((document.querySelector('input[aria-label="Record date"]') as HTMLInputElement).value).toBe('2026-05-29');
     expect((document.querySelector('input[aria-label="TxNo"]') as HTMLInputElement).value).toBe('100101');
     expect((document.querySelector('input[aria-label="Plate"]') as HTMLInputElement).value).toBe('101');
     expect((document.querySelector('input[aria-label="Timing line"]') as HTMLInputElement).value).toBe('8');
@@ -3733,7 +3737,7 @@ describe('RecentRecords integration', () => {
     await act(async () => {
       setInputValue(document.querySelector('input[aria-label="Timing line"]') as HTMLInputElement, '9');
       setInputValue(document.querySelector('input[aria-label="Timing loop"]') as HTMLInputElement, '3');
-      setInputValue(document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement, '10:06:30.500');
+      setInputValue(document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement, '20:06:30.500');
     });
 
     const saveButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Save record');
@@ -3756,6 +3760,83 @@ describe('RecentRecords integration', () => {
       source: createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.DBF'),
     }));
     expect((onEditRecord.mock.calls[0]?.[0] as ParticipantPassingRecord & { time?: Date }).time?.toISOString()).toBe('2026-05-29T10:06:30.500Z');
+  });
+
+  it('uses the selected recent-records display timezone inside the edit dialog', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const participant: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'entrant-101',
+      firstname: 'Pat',
+      id: 'participant-101',
+      identifiers: [{ fromTime: undefined, toTime: undefined, txNo: 100101 }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const crossing = {
+      chipCode: 100101,
+      id: 'crossing-utc-zone',
+      isValid: true,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
+      categories: [categoryA],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantLaps: () => [crossing],
+      getTransponderCrossings: () => [],
+      participants: [participant],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          eventTimeZone="Australia/Sydney"
+          raceStateLookup={raceStateLookup}
+          records={[crossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+          timeDisplayZoneMode="gmt"
+        />
+      );
+    });
+
+    expect(container.querySelector('tr[data-record-id="crossing-utc-zone"]')?.textContent).toContain('2026-05-29 10:06:00.000');
+
+    const row = container.querySelector('tr[data-record-id="crossing-utc-zone"]');
+    expect(row).not.toBeNull();
+
+    await act(async () => {
+      row!.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 100,
+        clientY: 100,
+      }));
+    });
+
+    const editRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Edit record');
+    expect(editRecordMenuItem).toBeDefined();
+
+    await act(async () => {
+      editRecordMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect((document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement).value).toBe('10:06:00.000');
+    expect((document.querySelector('input[aria-label="Displayed time zone"]') as HTMLInputElement).value).toBe('Time shown in UTC');
+    expect((document.querySelector('input[aria-label="Record date"]') as HTMLInputElement).value).toBe('2026-05-29');
   });
 
   it('shows original T9743R10 SRT, NO1, and DBF filenames in the edit-record source file field', async () => {
@@ -3851,6 +3932,68 @@ describe('RecentRecords integration', () => {
         cancelButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
     }
+  });
+
+  it('renders transmitter timing points with confidence factor and hit count in the antenna field', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const participant: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: 'entrant-101',
+      firstname: 'Pat',
+      id: 'participant-101',
+      identifiers: [
+        { fromTime: undefined, racePlate: '101', toTime: undefined },
+        { fromTime: undefined, toTime: undefined, txNo: 100101 },
+      ] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const crossing = {
+      chipCode: 100101,
+      confidenceFactor: 255,
+      hitCount: 4,
+      id: 'crossing-with-confidence',
+      isValid: true,
+      lineNumber: 3,
+      loopNumber: 6,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
+      categories: [categoryA],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantLaps: () => [crossing],
+      getTransponderCrossings: () => [],
+      participants: [participant],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[crossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const row = container.querySelector('tr[data-record-id="crossing-with-confidence"]');
+    expect(row).not.toBeNull();
+    const cells = Array.from(row!.querySelectorAll('td')).map((cell) => cell.textContent || '');
+    expect(cells[1]).toBe('3:6 (255.4)');
   });
 
   it('shows an exclusion reason marker on unrelated lap-time records', async () => {

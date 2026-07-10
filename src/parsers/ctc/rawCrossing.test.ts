@@ -67,6 +67,7 @@ describe('CTC raw crossing parser', () => {
       }),
       expect.objectContaining({
         drtCode: '04',
+        hitCount: 2,
         rawTimeTicks: 717496970,
         timeText: '19:55:49.6970',
         transmitter: 130,

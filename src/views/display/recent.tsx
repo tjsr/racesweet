@@ -1,7 +1,15 @@
 import { Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip } from '@mui/material';
 import React, { type JSX } from 'react';
 import { DEFAULT_FASTEST_TIME_INDICATOR_COLORS, type FastestTimeIndicatorColors } from '../../app/systemConfig.ts';
-import { type MillisecondsDuration, type TimeDisplayZoneMode, millisecondsToTime, resolveDisplayTimeZone, tableTimeString } from '../../app/utils/timeutils.ts';
+import {
+  dateStringInTimeZone,
+  millisecondsToTime,
+  parseTimeOfDayInputInTimeZone,
+  resolveDisplayTimeZone,
+  tableDateTimeStringInTimeZone,
+  timeOfDayInputStringInTimeZone,
+} from '../../app/utils/timeutils.ts';
+import type { MillisecondsDuration, TimeDisplayZoneMode } from '../../app/utils/timeutils.ts';
 import type { EventSessionKind } from '../../catalog/eventCatalog.ts';
 import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../controllers/category.ts';
 import { createGreenFlagEvent, createRedFlagEvent, isFlagRecord } from '../../controllers/flag';
@@ -58,36 +66,6 @@ const manualFlagLabelByType: Record<AddableFlagType, string> = {
 
 const formatRecordIdTitle = (recordId: TimeRecordId): string => {
   return `Record ID: ${recordId}`;
-};
-
-const formatManualTimeOfDay = (time: Date | undefined): string => {
-  if (!time) {
-    return '';
-  }
-  const hours = `${time.getUTCHours()}`.padStart(2, '0');
-  const minutes = `${time.getUTCMinutes()}`.padStart(2, '0');
-  const seconds = `${time.getUTCSeconds()}`.padStart(2, '0');
-  const milliseconds = `${time.getUTCMilliseconds()}`.padStart(3, '0');
-  return `${hours}:${minutes}:${seconds}.${milliseconds}`;
-};
-
-const parseManualTimeOfDay = (anchorTime: Date | undefined, value: string): Date | undefined => {
-  if (!anchorTime) {
-    return undefined;
-  }
-  const match = value.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/);
-  if (!match) {
-    return undefined;
-  }
-  const [, hoursText, minutesText, secondsText = '0', millisecondsText = '0'] = match;
-  const parsedTime = new Date(anchorTime);
-  parsedTime.setUTCHours(
-    Number(hoursText),
-    Number(minutesText),
-    Number(secondsText),
-    Number(millisecondsText.padEnd(3, '0'))
-  );
-  return parsedTime;
 };
 
 const participantArrayFromLookup = (raceStateLookup: RaceStateLookup): EventParticipant[] => {
@@ -282,13 +260,21 @@ const formatOptionalNumber = (value: number | undefined): string => {
 const formatPassingTimingPoint = (record: ParticipantPassingRecord): string => {
   const lineNumber = getPassingLineNumber(record);
   const loopNumber = getPassingLoopNumber(record);
+  const confidenceFactor = (record as ParticipantPassingRecord & { confidenceFactor?: number }).confidenceFactor;
+  const hitCount = (record as ParticipantPassingRecord & { hitCount?: number }).hitCount;
+  const detailText = confidenceFactor !== undefined || hitCount !== undefined
+    ? ` (${[
+      confidenceFactor !== undefined ? confidenceFactor.toString() : undefined,
+      hitCount !== undefined ? hitCount.toString() : undefined,
+    ].filter((value): value is string => value !== undefined).join('.')})`
+    : '';
   if (lineNumber !== undefined) {
-    return `Line ${lineNumber}${loopNumber !== undefined ? ` Loop ${loopNumber}` : ''}`;
+    return `${lineNumber}${loopNumber !== undefined ? `:${loopNumber}` : ''}${detailText}`;
   }
 
   const antenna = (record as ParticipantPassingRecord & { antenna?: number }).antenna;
   return typeof antenna === 'number' && Number.isInteger(antenna) && antenna > 0
-    ? `Antenna ${antenna}`
+    ? `${antenna}${detailText}`
     : '';
 };
 
@@ -463,7 +449,7 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
       }}>
       <TableCell colSpan={1}>{record.sequence}</TableCell>
       <TableCell colSpan={2}>{flagText}</TableCell>
-      <TableCell colSpan={1}>{tableTimeString(record.time, props.timeZone, record.timeTenthOfMillisecond)}</TableCell>
+      <TableCell colSpan={1}>{tableDateTimeStringInTimeZone(record.time, props.timeZone, record.timeTenthOfMillisecond)}</TableCell>
       <TableCell colSpan={4}>{categoryText}</TableCell>
       <TableCell colSpan={props.showSectorColumn ? 3 : 2}>{elapsedTime}</TableCell>
     </TableRow>
@@ -608,7 +594,7 @@ const UnknownChipRow = (
   const content = plateNumber
     ? `Unknown race number #${plateNumber}`
     : `Unknown transponder ${identifier} (${txCount})`;
-  const timeString = tableTimeString(passingTime, timeZone);
+  const timeString = tableDateTimeStringInTimeZone(passingTime, timeZone);
   const isSelectedPlate = plateNumber !== undefined && plateNumber.length > 0 && plateNumber === selectedPlateNumber;
   const rowClassName = [
     timeRecordId === selectedRecordId ? 'selected-row' : '',
@@ -772,7 +758,7 @@ export const PassingRecordRow = (
   };
 
   let categoryStr = undefined;
-  const timeString = tableTimeString(passing.time, props.timeZone, passing.timeTenthOfMillisecond);
+  const timeString = tableDateTimeStringInTimeZone(passing.time, props.timeZone, passing.timeTenthOfMillisecond);
   const identifier: string = txNo !== undefined ? `Tx${txNo}` : '';
   const timingPoint = formatPassingTimingPoint(passing);
   const entrant = resolvedParticipant;
@@ -1104,7 +1090,7 @@ const getHeadings = (showSectorColumn: boolean): string[] => ([
   'Seq',
   'Timing',
   'TxNo',
-  'Time',
+  'Date/time',
   'Number',
   'Entrant',
   'Category',
@@ -1476,6 +1462,7 @@ const isNonLapCrossing = (
 interface AddRecordDialogProps {
   currentEventId?: string;
   currentSessionId?: string;
+  displayTimeZone: string;
   onClose: () => void;
   onSave: (record: EventTimeRecord, mode: RecordDialogMode) => void;
   openState: AddRecordDialogState | null;
@@ -1507,7 +1494,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       return;
     }
     if (dialogMode === 'edit' && editingRecord) {
-      setTimeOfDay(formatManualTimeOfDay(editingRecord.time));
+      setTimeOfDay(timeOfDayInputStringInTimeZone(editingRecord.time, props.displayTimeZone));
       setRecordType(isFlagRecord(editingRecord) ? 'flag' : 'passing');
       setFlagType(isFlagRecord(editingRecord) ? editingRecord.flagType as AddableFlagType : 'green');
       setSelectedFlagCategoryIds(getEditableFlagCategoryIds(editingRecord));
@@ -1516,7 +1503,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       setPassingLineNumber(formatOptionalNumber(getPassingLineNumber(editingRecord as ParticipantPassingRecord)));
       setPassingLoopNumber(formatOptionalNumber(getPassingLoopNumber(editingRecord as ParticipantPassingRecord)));
     } else {
-      setTimeOfDay(formatManualTimeOfDay(anchorRecord.time));
+      setTimeOfDay(timeOfDayInputStringInTimeZone(anchorRecord.time, props.displayTimeZone));
       setRecordType('passing');
       setFlagType('green');
       setSelectedFlagCategoryIds([]);
@@ -1526,7 +1513,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       setPassingLoopNumber('');
     }
     setTimeError('');
-  }, [anchorRecord, dialogMode, editingRecord, props.raceStateLookup]);
+  }, [anchorRecord, dialogMode, editingRecord, props.displayTimeZone, props.raceStateLookup]);
   React.useEffect(() => {
     setShowRawRecordJson(false);
   }, [props.openState]);
@@ -1557,6 +1544,8 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   const resolvedTeamName = getParticipantTeamName(resolvedParticipant, props.raceStateLookup);
   const resolvedCategoryName = resolvedCategory?.name || '';
   const editablePassingRecord = editingRecord && isCrossingRecord(editingRecord) ? editingRecord : undefined;
+  const displayTimeZoneSummary = `Time shown in ${props.displayTimeZone}`;
+  const displayedRecordDate = dateStringInTimeZone(editingRecord?.time || anchorRecord?.time, props.displayTimeZone);
   const editablePassingLapControl = editablePassingRecord ? (isLapControlCrossing(editablePassingRecord, props.raceStateLookup) ? 'Yes' : 'No') : '';
   const editableFinishLineNumbers = editablePassingRecord ? formatFinishLineNumbers(props.raceStateLookup) : '';
   const editablePassingSourceFile = editablePassingRecord ? getEditablePassingSourceFile(editablePassingRecord, props.raceStateLookup) : '';
@@ -1575,7 +1564,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
     if (!anchorRecord) {
       return;
     }
-    const parsedTime = parseManualTimeOfDay(anchorRecord.time, timeOfDay);
+    const parsedTime = parseTimeOfDayInputInTimeZone(anchorRecord.time, timeOfDay, props.displayTimeZone);
     if (!parsedTime) {
       setTimeError('Enter a valid time of day like 09:15:03.250');
       return;
@@ -1626,6 +1615,20 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
             onChange={(event) => setTimeOfDay(event.target.value)}
             slotProps={{ htmlInput: { 'aria-label': 'Time of day' } }}
             value={timeOfDay}
+          />
+          <TextField
+            disabled
+            label="Shown in"
+            margin="dense"
+            slotProps={{ htmlInput: { 'aria-label': 'Displayed time zone' } }}
+            value={displayTimeZoneSummary}
+          />
+          <TextField
+            disabled
+            label="Record date"
+            margin="dense"
+            slotProps={{ htmlInput: { 'aria-label': 'Record date' } }}
+            value={displayedRecordDate}
           />
           {dialogMode === 'edit' ? (
             <TextField
@@ -1935,6 +1938,7 @@ export const RecentRecords = (props: RecordsProps & {
     <AddRecordDialog
       currentEventId={props.currentEventId}
       currentSessionId={props.currentSessionId}
+      displayTimeZone={displayTimeZone}
       onClose={() => setAddRecordDialogState(null)}
       onSave={(record, mode) => {
         if (mode === 'edit') {
