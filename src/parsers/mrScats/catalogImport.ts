@@ -97,6 +97,8 @@ const TRANSPONDER_FIELDS = ['TXNUM', 'TXNUM2', 'TXNUM3', 'TXNUM4', 'TXNUM5', 'TX
 const CROSSING_ELAPSED_TICKS_PER_SECOND = 10000;
 const CROSSING_MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 const CROSSING_TIME_OF_DAY_PROXIMITY_MILLISECONDS = 6 * 60 * 60 * 1000;
+const MINIMUM_TIME_OF_DAY_MILLISECONDS = 60 * 60 * 1000;
+const GREEN_TIME_OF_DAY_THRESHOLD_MILLISECONDS = 12 * 60 * 60 * 1000;
 const MR_SCATS_DEFAULT_MINIMUM_LAP_TIME_MILLISECONDS = 25_000;
 const CROSSING_ELAPSED_FIELDS = ['ELAPSED', 'ENTRYTIME'];
 const CROSSING_TRANSPONDER_FIELDS = ['TXNUM', 'TX_NO', 'TRANSPONDR', 'TRANSPONDER'];
@@ -326,6 +328,32 @@ const parseDate = (value: unknown): string | undefined => {
   return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
 };
 
+const parseDateParts = (dateText: string): { day: number; month: number; year: number } => ({
+  day: Number(dateText.slice(8, 10)),
+  month: Number(dateText.slice(5, 7)),
+  year: Number(dateText.slice(0, 4)),
+});
+
+const createTimeZoneDateTime = (dateText: string, millisecondsSinceMidnight: number): Date => {
+  const totalMilliseconds = Math.round(millisecondsSinceMidnight);
+  const hours = Math.floor(totalMilliseconds / (60 * 60 * 1000));
+  const minutes = Math.floor((totalMilliseconds % (60 * 60 * 1000)) / (60 * 1000));
+  const seconds = Math.floor((totalMilliseconds % (60 * 1000)) / 1000);
+  const milliseconds = totalMilliseconds % 1000;
+  const { day, month, year } = parseDateParts(dateText);
+
+  return new TZDate(
+    year,
+    month - 1,
+    day,
+    hours,
+    minutes,
+    seconds,
+    milliseconds,
+    DEFAULT_TIME_ZONE
+  );
+};
+
 const parseDateTime = (dateValue: unknown, timeValue: unknown): string | undefined => {
   const date = parseDate(dateValue);
   if (!date) {
@@ -348,7 +376,22 @@ const parseDateTime = (dateValue: unknown, timeValue: unknown): string | undefin
     return Number.isNaN(offsetDate.getTime()) ? undefined : offsetDate.toISOString();
   }
 
-  const zonedDate = new TZDate(`${date}T${millisecondsNormalizedClock}`, DEFAULT_TIME_ZONE);
+  const clockMatch = /^(?<hours>\d{2}):(?<minutes>\d{2}):(?<seconds>\d{2})\.(?<milliseconds>\d{3})$/u.exec(millisecondsNormalizedClock);
+  if (!clockMatch?.groups) {
+    return undefined;
+  }
+
+  const { day, month, year } = parseDateParts(date);
+  const zonedDate = new TZDate(
+    year,
+    month - 1,
+    day,
+    Number(clockMatch.groups.hours),
+    Number(clockMatch.groups.minutes),
+    Number(clockMatch.groups.seconds),
+    Number(clockMatch.groups.milliseconds),
+    DEFAULT_TIME_ZONE
+  );
   return Number.isNaN(zonedDate.getTime()) ? undefined : new Date(zonedDate.getTime()).toISOString();
 };
 
@@ -778,26 +821,52 @@ const getGreenElapsedMilliseconds = (records: MrScatsDbfRecord[]): number => {
   return flaggedRecord ? getElapsedMilliseconds(flaggedRecord) || 0 : 0;
 };
 
+const getTimeZoneParts = (date: Date): { day: number; hour: number; millisecond: number; minute: number; month: number; second: number; year: number } => {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    hour: '2-digit',
+    hourCycle: 'h23',
+    minute: '2-digit',
+    month: '2-digit',
+    second: '2-digit',
+    timeZone: DEFAULT_TIME_ZONE,
+    year: 'numeric',
+  });
+  const parts = Object.fromEntries(formatter.formatToParts(date).map((part) => [part.type, part.value]));
+
+  return {
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    millisecond: date.getUTCMilliseconds(),
+    minute: Number(parts.minute),
+    month: Number(parts.month),
+    second: Number(parts.second),
+    year: Number(parts.year),
+  };
+};
+
 const getTimeZoneDate = (date: Date): string => {
-  const zonedDate = TZDate.tz(DEFAULT_TIME_ZONE, date);
-  return `${zonedDate.getFullYear()}-${String(zonedDate.getMonth() + 1).padStart(2, '0')}-${String(zonedDate.getDate()).padStart(2, '0')}`;
+  const parts = getTimeZoneParts(date);
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
 };
 
 const getTimeZoneMillisecondsSinceMidnight = (date: Date): number => {
-  const zonedDate = TZDate.tz(DEFAULT_TIME_ZONE, date);
-  return (((zonedDate.getHours() * 60) + zonedDate.getMinutes()) * 60 + zonedDate.getSeconds()) * 1000 + zonedDate.getMilliseconds();
+  const parts = getTimeZoneParts(date);
+  return (((parts.hour * 60) + parts.minute) * 60 + parts.second) * 1000 + parts.millisecond;
 };
 
-const createTimeZoneDateTime = (dateText: string, millisecondsSinceMidnight: number): Date => {
-  const totalMilliseconds = Math.round(millisecondsSinceMidnight);
-  const hours = Math.floor(totalMilliseconds / (60 * 60 * 1000));
-  const minutes = Math.floor((totalMilliseconds % (60 * 60 * 1000)) / (60 * 1000));
-  const seconds = Math.floor((totalMilliseconds % (60 * 1000)) / 1000);
-  const milliseconds = totalMilliseconds % 1000;
-  return new TZDate(
-    `${dateText}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`,
-    DEFAULT_TIME_ZONE
-  );
+const shouldTreatMillisecondsAsTimeOfDay = (
+  scheduledStartTime: Date,
+  millisecondsSinceMidnight: number
+): boolean => {
+  if (millisecondsSinceMidnight < 0 || millisecondsSinceMidnight >= CROSSING_MILLISECONDS_PER_DAY) {
+    return false;
+  }
+
+  const scheduledMilliseconds = getTimeZoneMillisecondsSinceMidnight(scheduledStartTime);
+  const directDifference = Math.abs(millisecondsSinceMidnight - scheduledMilliseconds);
+  const wrappedDifference = CROSSING_MILLISECONDS_PER_DAY - directDifference;
+  return Math.min(directDifference, wrappedDifference) <= CROSSING_TIME_OF_DAY_PROXIMITY_MILLISECONDS;
 };
 
 const createTimeOfDayDateNearSession = (scheduledStartTime: Date, millisecondsSinceMidnight: number): Date => {
@@ -820,11 +889,12 @@ const shouldTreatElapsedTicksAsTimeOfDay = (
     return false;
   }
 
-  const millisecondsSinceMidnight = elapsedTicksToMilliseconds(elapsedTicks);
-  const scheduledMilliseconds = getTimeZoneMillisecondsSinceMidnight(scheduledStartTime);
-  const directDifference = Math.abs(millisecondsSinceMidnight - scheduledMilliseconds);
-  const wrappedDifference = CROSSING_MILLISECONDS_PER_DAY - directDifference;
-  return Math.min(directDifference, wrappedDifference) <= CROSSING_TIME_OF_DAY_PROXIMITY_MILLISECONDS;
+  const elapsedMilliseconds = elapsedTicksToMilliseconds(elapsedTicks);
+  if (elapsedMilliseconds < MINIMUM_TIME_OF_DAY_MILLISECONDS) {
+    return false;
+  }
+
+  return shouldTreatMillisecondsAsTimeOfDay(scheduledStartTime, elapsedMilliseconds);
 };
 
 const getCrossingTime = (
@@ -1258,7 +1328,12 @@ const buildSessionRecords = async (
       .filter((table) => table.isLapCompletion)
       .flatMap((table) => table.records);
     const greenElapsedMilliseconds = getGreenElapsedMilliseconds(crossingRows);
-    const dbfDerivedSessionElapsedZeroTime = new Date(scheduledStartTime.getTime() - greenElapsedMilliseconds);
+    const dbfDerivedSessionElapsedZeroTime = (
+      greenElapsedMilliseconds >= GREEN_TIME_OF_DAY_THRESHOLD_MILLISECONDS ||
+      shouldTreatMillisecondsAsTimeOfDay(scheduledStartTime, greenElapsedMilliseconds)
+    )
+      ? scheduledStartTime
+      : new Date(scheduledStartTime.getTime() - greenElapsedMilliseconds);
     const sessionElapsedZeroTime = deriveAnchoredSessionElapsedZeroTime(
       sessionFileTables,
       parsedRawFiles,

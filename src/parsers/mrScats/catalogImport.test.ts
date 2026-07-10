@@ -10,6 +10,23 @@ interface DbfField {
   type: string;
 }
 
+const getMelbourneDateParts = (value: Date): { date: string; hour: number } => {
+  const formatter = new Intl.DateTimeFormat('en-AU', {
+    day: '2-digit',
+    hour: '2-digit',
+    hourCycle: 'h23',
+    month: '2-digit',
+    timeZone: 'Australia/Melbourne',
+    year: 'numeric',
+  });
+  const parts = Object.fromEntries(formatter.formatToParts(value).map((part) => [part.type, part.value]));
+
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    hour: Number(parts.hour),
+  };
+};
+
 const createDbfBuffer = (fields: DbfField[], rows: Record<string, string | number | undefined>[]): Buffer => {
   const headerLength = 32 + (fields.length * 32) + 1;
   const recordLength = 1 + fields.reduce((total, field) => total + field.length, 0);
@@ -742,6 +759,56 @@ describe('MR-SCATS catalog import parser', () => {
       time: new Date('1997-12-06T09:27:45.000Z'),
       timeTenthOfMillisecond: 6,
     }));
+    expect(crossings.map((crossing) => getMelbourneDateParts(crossing.time as Date))).toEqual([
+      { date: '1997-12-06', hour: 20 },
+      { date: '1997-12-06', hour: 20 },
+    ]);
+  });
+
+  it('keeps DBF-only T9743R10 crossings on 1997-12-06 Melbourne time instead of drifting into the next day', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+      { length: 8, name: 'ACTUALSTRT', type: 'C' },
+    ], [
+      { ACTUALSTRT: '20:27:35', CATEGORY: 'CAT-A', EVENTNAME: 'Race 10', EV_CODE: 'T9743R10', STARTDATE: '19971206' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 13, DRIVER: 'Race Ten Driver', DRIV_CLASS: 'CAT-A', TXNUM: 1234 },
+    ]));
+    await writeFile(path.join(tempDir, 'T9743R10.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 9, name: 'ELAPSED', type: 'N' },
+      { length: 9, name: 'STARTELAP', type: 'N' },
+      { length: 4, name: 'COUNTER', type: 'N' },
+      { length: 3, name: 'LINE_NO', type: 'N' },
+      { length: 3, name: 'LANE_NO', type: 'N' },
+    ], [
+      { CARNUMBER: 13, COUNTER: 1, ELAPSED: 300000, LANE_NO: 2, LINE_NO: 3, STARTELAP: 736550000, TXNUM: 1234 },
+      { CARNUMBER: 13, COUNTER: 2, ELAPSED: 350000, LANE_NO: 2, LINE_NO: 3, STARTELAP: 736550000, TXNUM: 1234 },
+    ]));
+
+    const imported = await loadMrScatsCatalogFromLocation(tempDir);
+    const crossings = ((imported.raceState.records || []) as unknown as Array<Record<string, unknown>>)
+      .filter((record) => record.recordType === 16);
+    const melbourneTimes = crossings.map((crossing) => getMelbourneDateParts(crossing.time as Date));
+
+    expect(imported.sessions[0]?.scheduledStart).toBe('1997-12-06T09:27:35.000Z');
+    expect(crossings.map((crossing) => crossing.time)).toEqual([
+      new Date('1997-12-06T09:28:05.000Z'),
+      new Date('1997-12-06T09:28:10.000Z'),
+    ]);
+    expect(melbourneTimes.every((crossing) => crossing.date === '1997-12-06')).toBe(true);
+    expect(melbourneTimes.every((crossing) => crossing.hour >= 19 && crossing.hour <= 22)).toBe(true);
   });
 
   it('imports raw crossing confidence factors and hit counts separately', async () => {
