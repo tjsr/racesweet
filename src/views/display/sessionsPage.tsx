@@ -6,6 +6,7 @@ import {
   getCategoriesForEvent,
   getSessionsForEvent,
 } from '../../catalog/eventCatalog.js';
+import { formatMinimumLapTimeInput, parseMinimumLapTimeInputToMilliseconds } from '../../app/utils/timeutils.js';
 import { type SessionSourceReloadMode } from '../../service/sessionSourceReload.js';
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
 import { type EventCategoryId } from '../../model/eventcategory.js';
@@ -36,33 +37,19 @@ interface SessionsPageProps {
 
 const getSessionDraft = (session: EventCatalogSession | undefined): {
   kind: EventCatalogSession['kind'];
-  minimumLapTimeSeconds: string;
+  minimumLapTime: string;
   name: string;
   notes: string;
   scheduledStart: string;
   status: EventCatalogSession['status'];
 } => ({
   kind: session?.kind || 'practice',
-  minimumLapTimeSeconds: session?.minimumLapTimeMilliseconds == null
-    ? ''
-    : String(session.minimumLapTimeMilliseconds / 1000),
+  minimumLapTime: formatMinimumLapTimeInput(session?.minimumLapTimeMilliseconds),
   name: session?.name || '',
   notes: session?.notes || '',
   scheduledStart: session?.scheduledStart || '',
   status: session?.status || 'draft',
 });
-
-const parseMinimumLapTimeMilliseconds = (seconds: string): number | null => {
-  const trimmedValue = seconds.trim();
-  if (!trimmedValue) {
-    return null;
-  }
-
-  const parsedValue = Number(trimmedValue);
-  return Number.isFinite(parsedValue) && parsedValue >= 0
-    ? Math.round(parsedValue * 1000)
-    : null;
-};
 
 export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
   const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId) ??
@@ -96,7 +83,7 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
 
     await props.onUpdateSession(selectedSession.id, {
       kind: sessionDraft.kind,
-      minimumLapTimeMilliseconds: parseMinimumLapTimeMilliseconds(sessionDraft.minimumLapTimeSeconds),
+      minimumLapTimeMilliseconds: parseMinimumLapTimeInputToMilliseconds(sessionDraft.minimumLapTime),
       name: sessionDraft.name,
       notes: sessionDraft.notes,
       scheduledStart: sessionDraft.scheduledStart,

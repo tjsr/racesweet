@@ -17,6 +17,7 @@ export interface MrScatsImportedSession {
   eventCode: string;
   eventType?: string;
   id: SessionId;
+  minimumLapTimeMilliseconds: number;
   name: string;
   scheduledStart: string;
 }
@@ -96,6 +97,7 @@ const TRANSPONDER_FIELDS = ['TXNUM', 'TXNUM2', 'TXNUM3', 'TXNUM4', 'TXNUM5', 'TX
 const CROSSING_ELAPSED_TICKS_PER_SECOND = 10000;
 const CROSSING_MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 const CROSSING_TIME_OF_DAY_PROXIMITY_MILLISECONDS = 6 * 60 * 60 * 1000;
+const MR_SCATS_DEFAULT_MINIMUM_LAP_TIME_MILLISECONDS = 25_000;
 const CROSSING_ELAPSED_FIELDS = ['ELAPSED', 'ENTRYTIME'];
 const CROSSING_TRANSPONDER_FIELDS = ['TXNUM', 'TX_NO', 'TRANSPONDR', 'TRANSPONDER'];
 const CROSSING_PLATE_FIELDS = ['CARNUMBER', 'CAR', 'CAR_NO', 'CARNO'];
@@ -526,6 +528,7 @@ const buildSessions = (meetingCode: string, programme: MrScatsDbfRecord[], categ
         eventCode,
         eventType: asString(row.EVENTTYPE) || eventCodeType,
         id: createSessionId(`mr-scats:${meetingCode}:session:${eventCode}`),
+        minimumLapTimeMilliseconds: MR_SCATS_DEFAULT_MINIMUM_LAP_TIME_MILLISECONDS,
         name: asString(row.EVENTNAME) || eventCode,
         scheduledStart,
       };
@@ -1450,3 +1453,4 @@ export const loadMrScatsCatalogFromLocation = async (
 };
 
 export const MR_SCATS_DEFAULT_TIME_ZONE = DEFAULT_TIME_ZONE;
+export const MR_SCATS_DEFAULT_MINIMUM_LAP_TIME = MR_SCATS_DEFAULT_MINIMUM_LAP_TIME_MILLISECONDS;

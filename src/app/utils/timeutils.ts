@@ -194,6 +194,47 @@ export const millisecondsToTime = (milliseconds: MillisecondsDuration): Duration
   return formattedTime as DurationString;
 };
 
+export const formatMinimumLapTimeInput = (milliseconds: number | null | undefined): string => {
+  if (milliseconds === null || milliseconds === undefined || !Number.isFinite(milliseconds) || milliseconds < 0) {
+    return '';
+  }
+
+  const wholeMilliseconds = Math.round(milliseconds);
+  const hours = Math.floor(wholeMilliseconds / 3_600_000);
+  const minutes = Math.floor((wholeMilliseconds % 3_600_000) / 60_000);
+  const seconds = Math.floor((wholeMilliseconds % 60_000) / 1_000);
+  const fractionalDigits = String((wholeMilliseconds % 1_000) * 10).padStart(4, '0');
+
+  return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${fractionalDigits}`;
+};
+
+export const parseMinimumLapTimeInputToMilliseconds = (value: string): number | null => {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const durationMatch = /^(?:(?<hours>\d+):)?(?<minutes>\d{1,2}):(?<seconds>\d{2})(?:\.(?<fraction>\d{1,4}))?$/u.exec(trimmedValue);
+  if (durationMatch?.groups) {
+    const hours = Number(durationMatch.groups.hours || '0');
+    const minutes = Number(durationMatch.groups.minutes);
+    const seconds = Number(durationMatch.groups.seconds);
+    const normalizedFraction = (durationMatch.groups.fraction || '').padEnd(4, '0');
+    const milliseconds = Math.round(Number(normalizedFraction || '0') / 10);
+
+    if (minutes >= 60 || seconds >= 60) {
+      return null;
+    }
+
+    return (((hours * 60) + minutes) * 60 * 1000) + (seconds * 1000) + milliseconds;
+  }
+
+  const numericSeconds = Number(trimmedValue);
+  return Number.isFinite(numericSeconds) && numericSeconds >= 0
+    ? Math.round(numericSeconds * 1000)
+    : null;
+};
+
 export const elapsedTimeMilliseconds = (start: Date, end: Date): MillisecondsDuration => {
   const startTime = start.getTime();
   const endTime = end.getTime();

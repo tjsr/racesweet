@@ -209,10 +209,10 @@ describe('EventsScreen integration', () => {
     expect(onSelectEvent).toHaveBeenCalledWith('event-2');
 
     const eventNameInput = container.querySelector('input[aria-label="Event Name"]') as HTMLInputElement;
-    const eventMinimumLapTimeInput = container.querySelector('input[aria-label="Event Minimum Lap Time Seconds"]') as HTMLInputElement;
+    const eventMinimumLapTimeInput = container.querySelector('input[aria-label="Event Minimum Lap Time"]') as HTMLInputElement;
     await act(async () => {
       setInputValue(eventNameInput, 'Winter Championship Round');
-      setInputValue(eventMinimumLapTimeInput, '75');
+      setInputValue(eventMinimumLapTimeInput, '0:01:15.0000');
     });
 
     const saveEventButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Event Details');

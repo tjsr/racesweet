@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatMinimumLapTimeInput } from '../../app/utils/timeutils.js';
 import { type EventCatalogSession, type EventCatalogState } from '../../catalog/eventCatalog.js';
 import { SESSION_SOURCE_RELOAD_OPTIONS, type SessionSourceReloadMode } from '../../service/sessionSourceReload.js';
 import { type SystemConfiguration } from '../../app/systemConfig.js';
@@ -6,7 +7,7 @@ import { type EventId } from '../../model/raceevent.js';
 
 interface SessionDraft {
   kind: EventCatalogSession['kind'];
-  minimumLapTimeSeconds: string;
+  minimumLapTime: string;
   name: string;
   notes: string;
   scheduledStart: string;
@@ -97,13 +98,11 @@ export const SessionDetailsPanel = (props: SessionDetailsPanelProps): React.Reac
           <label>
           Minimum Lap Time
             <input
-              aria-label="Sessions Page Minimum Lap Time Seconds"
-              min="0"
-              placeholder={props.selectedEvent?.minimumLapTimeMilliseconds == null ? 'Inherit event/default' : String(props.selectedEvent.minimumLapTimeMilliseconds / 1000)}
-              step="0.001"
-              type="number"
-              value={props.sessionDraft.minimumLapTimeSeconds}
-              onChange={(event) => props.onSetSessionDraft((current) => ({ ...current, minimumLapTimeSeconds: event.target.value }))}
+              aria-label="Sessions Page Minimum Lap Time"
+              placeholder={props.selectedEvent?.minimumLapTimeMilliseconds == null ? 'Inherit event/default' : formatMinimumLapTimeInput(props.selectedEvent.minimumLapTimeMilliseconds)}
+              type="text"
+              value={props.sessionDraft.minimumLapTime}
+              onChange={(event) => props.onSetSessionDraft((current) => ({ ...current, minimumLapTime: event.target.value }))}
             />
           </label>
           <label>

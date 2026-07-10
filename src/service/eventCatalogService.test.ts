@@ -1453,6 +1453,7 @@ describe('EventCatalogService', () => {
           eventCode: 'W9721R01',
           eventType: 'R',
           id: raceSessionId,
+          minimumLapTimeMilliseconds: 25_000,
           name: 'Feature Race',
           scheduledStart: '1997-06-28T23:05:00.000Z',
         },
@@ -1461,6 +1462,7 @@ describe('EventCatalogService', () => {
           eventCode: 'W9721Q01',
           eventType: 'Q',
           id: qualifyingSessionId,
+          minimumLapTimeMilliseconds: 25_000,
           name: 'Qualifying',
           scheduledStart: '1997-06-29T00:00:00.000Z',
         },
@@ -1479,17 +1481,19 @@ describe('EventCatalogService', () => {
       date: '1997-06-29',
       name: 'MR-SCATS Test Meeting',
       sessionIds: [raceSessionId, qualifyingSessionId],
-      timeZone: 'Australia/Sydney',
+      timeZone: 'Australia/Melbourne',
     }));
     expect(raceSession).toEqual(expect.objectContaining({
       categoryIds: [raceCategoryId],
       kind: 'race',
+      minimumLapTimeMilliseconds: 25_000,
       name: 'Feature Race',
       status: 'completed',
     }));
     expect(qualifyingSession).toEqual(expect.objectContaining({
       categoryIds: [qualifyingCategoryId],
       kind: 'qualifying',
+      minimumLapTimeMilliseconds: 25_000,
       name: 'Qualifying',
     }));
     expect(importedEntrants).toEqual(expect.arrayContaining([
@@ -1632,6 +1636,7 @@ describe('EventCatalogService', () => {
           eventCode: 'W9721R01',
           eventType: 'R',
           id: raceSessionId,
+          minimumLapTimeMilliseconds: 25_000,
           name: 'Feature Race',
           scheduledStart: '1997-06-28T23:05:00.000Z',
         },
@@ -1640,6 +1645,7 @@ describe('EventCatalogService', () => {
           eventCode: 'W9721Q01',
           eventType: 'Q',
           id: qualifyingSessionId,
+          minimumLapTimeMilliseconds: 25_000,
           name: 'Qualifying',
           scheduledStart: '1997-06-29T00:00:00.000Z',
         },

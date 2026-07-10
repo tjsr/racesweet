@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   dateStringInTimeZone,
+  formatMinimumLapTimeInput,
   millisecondsToTime,
+  parseMinimumLapTimeInputToMilliseconds,
   parseTimeOfDayInputInTimeZone,
   tableDateTimeStringInTimeZone,
   tableTimeStringInTimeZone,
@@ -21,6 +23,30 @@ describe('millisecondsToTime', () => {
   it('includes the hours portion for durations of one hour or more', () => {
     expect(millisecondsToTime(3_600_000)).toBe('01:00:00.000');
     expect(millisecondsToTime(3_690_250)).toBe('01:01:30.250');
+  });
+});
+
+describe('formatMinimumLapTimeInput', () => {
+  it('formats minimum lap times as h:mm:ss.ffff text', () => {
+    expect(formatMinimumLapTimeInput(25_000)).toBe('0:00:25.0000');
+    expect(formatMinimumLapTimeInput(3_723_123)).toBe('1:02:03.1230');
+  });
+});
+
+describe('parseMinimumLapTimeInputToMilliseconds', () => {
+  it('parses h:mm:ss.ffff minimum lap times into milliseconds', () => {
+    expect(parseMinimumLapTimeInputToMilliseconds('0:00:25.0000')).toBe(25_000);
+    expect(parseMinimumLapTimeInputToMilliseconds('1:02:03.1234')).toBe(3_723_123);
+  });
+
+  it('accepts m:ss and numeric-seconds fallbacks for existing values', () => {
+    expect(parseMinimumLapTimeInputToMilliseconds('1:15.5')).toBe(75_500);
+    expect(parseMinimumLapTimeInputToMilliseconds('75')).toBe(75_000);
+  });
+
+  it('rejects invalid values', () => {
+    expect(parseMinimumLapTimeInputToMilliseconds('1:99:00.0000')).toBeNull();
+    expect(parseMinimumLapTimeInputToMilliseconds('hello')).toBeNull();
   });
 });
 

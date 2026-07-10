@@ -5,7 +5,7 @@ import { type EventId } from '../../model/raceevent.js';
 interface EventDraft {
   date: string;
   format: EventCatalogEvent['format'];
-  minimumLapTimeSeconds: string;
+  minimumLapTime: string;
   name: string;
   timeZone: string;
 }
@@ -61,12 +61,11 @@ export const EventDetailsPanel = (props: EventDetailsPanelProps): React.ReactEle
         <label>
           Minimum Lap Time
           <input
-            aria-label="Event Minimum Lap Time Seconds"
-            min="0"
-            step="0.001"
-            type="number"
-            value={props.eventDraft.minimumLapTimeSeconds}
-            onChange={(event) => props.onUpdateEventDraft((current) => ({ ...current, minimumLapTimeSeconds: event.target.value }))}
+            aria-label="Event Minimum Lap Time"
+            placeholder="0:00:25.0000"
+            type="text"
+            value={props.eventDraft.minimumLapTime}
+            onChange={(event) => props.onUpdateEventDraft((current) => ({ ...current, minimumLapTime: event.target.value }))}
           />
         </label>
         <label>

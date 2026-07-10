@@ -6,7 +6,12 @@ import {
   getSessionsForEvent,
 } from '../../catalog/eventCatalog.js';
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
-import { getSupportedTimeZones, getSystemTimeZone } from '../../app/utils/timeutils.js';
+import {
+  formatMinimumLapTimeInput,
+  getSupportedTimeZones,
+  getSystemTimeZone,
+  parseMinimumLapTimeInputToMilliseconds,
+} from '../../app/utils/timeutils.js';
 import { type EventId, type SessionId } from '../../model/raceevent.js';
 import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
 import { CategoryListPanel } from '../panels/categoryList.js';
@@ -35,30 +40,16 @@ interface EventsScreenProps {
 const getEventDraft = (event: EventCatalogEvent | undefined, systemTimeZone: string): {
   date: string;
   format: EventCatalogEvent['format'];
-  minimumLapTimeSeconds: string;
+  minimumLapTime: string;
   name: string;
   timeZone: string;
 } => ({
   date: event?.date || '',
   format: event?.format || 'race-weekend',
-  minimumLapTimeSeconds: event?.minimumLapTimeMilliseconds == null
-    ? ''
-    : String(event.minimumLapTimeMilliseconds / 1000),
+  minimumLapTime: formatMinimumLapTimeInput(event?.minimumLapTimeMilliseconds),
   name: event?.name || '',
   timeZone: event?.timeZone || systemTimeZone,
 });
-
-const parseMinimumLapTimeMilliseconds = (seconds: string): number | null => {
-  const trimmedValue = seconds.trim();
-  if (!trimmedValue) {
-    return null;
-  }
-
-  const parsedValue = Number(trimmedValue);
-  return Number.isFinite(parsedValue) && parsedValue >= 0
-    ? Math.round(parsedValue * 1000)
-    : null;
-};
 
 export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
   const selectedEvent = props.catalog.events.find((event) => event.id === props.selectedEventId) ??
@@ -91,7 +82,7 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
     await props.onUpdateEvent(selectedEvent.id, {
       date: eventDraft.date,
       format: eventDraft.format,
-      minimumLapTimeMilliseconds: parseMinimumLapTimeMilliseconds(eventDraft.minimumLapTimeSeconds),
+      minimumLapTimeMilliseconds: parseMinimumLapTimeInputToMilliseconds(eventDraft.minimumLapTime),
       name: eventDraft.name,
       timeZone: eventDraft.timeZone,
     });

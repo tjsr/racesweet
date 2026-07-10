@@ -260,10 +260,10 @@ describe('SessionsPage integration', () => {
     expect(onMoveSessionToEvent).toHaveBeenCalledWith('session-3', 'event-1');
 
     const sessionNameInput = container.querySelector('input[aria-label="Sessions Page Name"]') as HTMLInputElement;
-    const sessionMinimumLapTimeInput = container.querySelector('input[aria-label="Sessions Page Minimum Lap Time Seconds"]') as HTMLInputElement;
+    const sessionMinimumLapTimeInput = container.querySelector('input[aria-label="Sessions Page Minimum Lap Time"]') as HTMLInputElement;
     await act(async () => {
       setInputValue(sessionNameInput, 'Updated Test Session');
-      setInputValue(sessionMinimumLapTimeInput, '45');
+      setInputValue(sessionMinimumLapTimeInput, '0:00:45.0000');
     });
 
     const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Session');

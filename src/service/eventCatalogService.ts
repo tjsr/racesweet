@@ -1182,6 +1182,7 @@ export class EventCatalogService {
             eventId: normalizedImportData.eventId,
             id: session.id,
             kind: getMrScatsSessionKind(session.eventType),
+            minimumLapTimeMilliseconds: session.minimumLapTimeMilliseconds,
             name: session.name,
             notes: 'Imported from MR-SCATS data files.',
             scheduledStart: session.scheduledStart,
@@ -1197,6 +1198,7 @@ export class EventCatalogService {
         changes: {
           categoryIds: session.categoryIds,
           kind: getMrScatsSessionKind(session.eventType),
+          minimumLapTimeMilliseconds: session.minimumLapTimeMilliseconds,
           name: session.name,
           scheduledStart: session.scheduledStart,
           status: 'completed',

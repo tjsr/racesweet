@@ -2,7 +2,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createTimeRecordSourceId } from '../../model/ids.js';
-import { loadMrScatsCatalogFromLocation, MR_SCATS_DEFAULT_TIME_ZONE } from './catalogImport.js';
+import { loadMrScatsCatalogFromLocation, MR_SCATS_DEFAULT_MINIMUM_LAP_TIME, MR_SCATS_DEFAULT_TIME_ZONE } from './catalogImport.js';
 
 interface DbfField {
   length: number;
@@ -50,6 +50,32 @@ const createDbfBuffer = (fields: DbfField[], rows: Record<string, string | numbe
 describe('MR-SCATS catalog import parser', () => {
   it('defaults timezone-less legacy imports to Australia/Melbourne', () => {
     expect(MR_SCATS_DEFAULT_TIME_ZONE).toBe('Australia/Melbourne');
+  });
+
+  it('defaults imported MR-SCATS sessions to a 25 second minimum lap time', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 5, name: 'STARTTIME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+    ], [
+      { CATEGORY: 'CAT-A', EVENTNAME: 'Race 1', EV_CODE: 'W9721R01', STARTDATE: '19970629', STARTTIME: '09:00' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 42, DRIVER: 'Alice Rider', DRIV_CLASS: 'CAT-A', TXNUM: 1001 },
+    ]));
+
+    const imported = await loadMrScatsCatalogFromLocation(tempDir);
+
+    expect(MR_SCATS_DEFAULT_MINIMUM_LAP_TIME).toBe(25_000);
+    expect(imported.sessions[0]?.minimumLapTimeMilliseconds).toBe(25_000);
   });
 
   it('loads sessions, categories, entrants, participants, plates, and transponders from core DBF files', async () => {
