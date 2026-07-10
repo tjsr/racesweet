@@ -5,6 +5,7 @@ import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { EventTeam } from '../model/eventteam.js';
 import { Session } from '../model/racestate.js';
+import { isPassingExcluded, isPassingValid } from '../model/timerecord.js';
 import { RECORD_TX_CROSSING, type ParticipantPassingRecord, type TimeRecord, type TimeRecordSource } from '../model/timerecord.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
 import type { EventCatalogState } from '../catalog/eventCatalog.js';
@@ -349,8 +350,8 @@ describe('sourceApplication', () => {
     const laps = session.getParticipantLaps(participantId);
     expect(laps?.map((lap) => ({
       id: lap.id,
-      isExcluded: lap.isExcluded,
-      isValid: lap.isValid,
+      isExcluded: isPassingExcluded(lap),
+      isValid: isPassingValid(lap),
       lapTime: lap.lapTime,
       startingLapRecordId: lap.startingLapRecordId,
     }))).toEqual([

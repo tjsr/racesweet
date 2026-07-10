@@ -4,7 +4,7 @@ import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.t
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { EventCategory } from '../../model/eventcategory.ts';
-import type { ParticipantPassingRecord } from '../../model/timerecord.ts';
+import { type ParticipantPassingRecord, isPassingExcluded } from '../../model/timerecord.ts';
 
 export type ShowAs = 'individual' | 'table';
 
@@ -64,7 +64,7 @@ const IndividualView = ({ participant, laps }: IndividualViewProps) => {
             {validLaps.map((lap) => (
               <tr
                 key={lap.id}
-                className={lap.isExcluded ? 'excluded' : undefined}
+                className={isPassingExcluded(lap) ? 'excluded' : undefined}
               >
                 <td>{lap.lapNo}</td>
                 <td>{formatMs(lap.lapTime)}</td>

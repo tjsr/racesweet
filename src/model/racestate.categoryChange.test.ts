@@ -1,7 +1,7 @@
 import type { EventCategory } from './eventcategory.js';
 import type { EventParticipant } from './eventparticipant.js';
 import type { FlagRecord } from './flag.js';
-import type { ParticipantPassingRecord } from './timerecord.js';
+import { isPassingExcluded, isPassingValid, type ParticipantPassingRecord } from './timerecord.js';
 import { createCategoryId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from './ids.js';
 import { RECORD_TX_CROSSING } from './timerecord.js';
 import { Session } from './racestate.js';
@@ -184,7 +184,14 @@ describe('Session category change regressions', () => {
     await session.addRecords([editableStart, crossing]);
     await session.endBulkProcess();
 
-    expect(session.getParticipantLaps(participantId)).toBeNull();
+    expect(session.getParticipantLaps(participantId)?.[0]).toMatchObject({
+      elapsedTime: undefined,
+      lapNo: undefined,
+      lapTime: undefined,
+      participantStartRecordId: undefined,
+    });
+    expect(isPassingExcluded(session.getParticipantLaps(participantId)?.[0]!)).toBe(true);
+    expect(isPassingValid(session.getParticipantLaps(participantId)?.[0]!)).toBe(false);
 
     session.assignFlagCategory(editableFlagId, categoryBId);
 
@@ -192,7 +199,14 @@ describe('Session category change regressions', () => {
 
     session.removeFlagCategory(editableFlagId, categoryBId);
 
-    expect(session.getParticipantLaps(participantId)).toBeNull();
+    expect(session.getParticipantLaps(participantId)?.[0]).toMatchObject({
+      elapsedTime: undefined,
+      lapNo: undefined,
+      lapTime: undefined,
+      participantStartRecordId: undefined,
+    });
+    expect(isPassingExcluded(session.getParticipantLaps(participantId)?.[0]!)).toBe(true);
+    expect(isPassingValid(session.getParticipantLaps(participantId)?.[0]!)).toBe(false);
 
     debugSpy.mockRestore();
   });
@@ -228,23 +242,23 @@ describe('Session category change regressions', () => {
 
     expect(session.getParticipantLaps(participantId)?.[0]).toMatchObject({
       elapsedTime: undefined,
-      isExcluded: true,
-      isValid: false,
       lapNo: undefined,
       lapTime: undefined,
       participantStartRecordId: undefined,
     });
+    expect(isPassingExcluded(session.getParticipantLaps(participantId)?.[0]!)).toBe(true);
+    expect(isPassingValid(session.getParticipantLaps(participantId)?.[0]!)).toBe(false);
 
     await session.addRecords([startFlag]);
 
     expect(session.getParticipantLaps(participantId)?.[0]).toMatchObject({
       elapsedTime: 60000,
-      isExcluded: false,
-      isValid: true,
       lapNo: 1,
       lapTime: 60000,
       participantStartRecordId: flagId,
     });
+    expect(isPassingExcluded(session.getParticipantLaps(participantId)?.[0]!)).toBe(false);
+    expect(isPassingValid(session.getParticipantLaps(participantId)?.[0]!)).toBe(true);
     warnSpy.mockRestore();
   });
 
@@ -339,13 +353,13 @@ describe('Session category change regressions', () => {
 
     expect(session.getParticipantLaps(participantId)?.[0]).toMatchObject({
       elapsedTime: undefined,
-      isExcluded: true,
-      isValid: false,
       lapNo: undefined,
       lapTime: undefined,
       participantStartRecordId: undefined,
       startingLapRecordId: undefined,
     });
+    expect(isPassingExcluded(session.getParticipantLaps(participantId)?.[0]!)).toBe(true);
+    expect(isPassingValid(session.getParticipantLaps(participantId)?.[0]!)).toBe(false);
     expect((session.records.find((record) => record.id === flagId) as FlagRecord | undefined)?.deleted).toBe(true);
 
     session.markFlagDeleted(flagId, false);
@@ -394,11 +408,11 @@ describe('Session category change regressions', () => {
 
     expect(session.getParticipantLaps(participantId)?.[0]).toMatchObject({
       elapsedTime: 60000,
-      isExcluded: false,
-      isValid: true,
       lapNo: 1,
       lapTime: 60000,
       participantStartRecordId: flagId,
     });
+    expect(isPassingExcluded(session.getParticipantLaps(participantId)?.[0]!)).toBe(false);
+    expect(isPassingValid(session.getParticipantLaps(participantId)?.[0]!)).toBe(true);
   });
 });

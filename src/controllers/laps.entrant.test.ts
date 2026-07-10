@@ -1,7 +1,7 @@
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { FlagRecord } from '../model/flag.js';
-import type { ParticipantPassingRecord } from '../model/timerecord.js';
+import { isPassingExcluded, isPassingValid, type ParticipantPassingRecord } from '../model/timerecord.js';
 import { createGreenFlagEvent } from './flag.js';
 import { processAllParticipantLaps } from './laps.js';
 
@@ -127,15 +127,20 @@ describe('processAllParticipantLaps entrant sequencing', () => {
     const riderPassings = processed.get('p1') || [];
 
     expect(riderPassings.map((record) => record.id)).toEqual(['c1', 'c2', 'c3']);
-    expect(riderPassings[0]).toMatchObject({ isExcluded: false, isValid: true, lapNo: 1 });
-    expect(riderPassings[1]).toMatchObject({ isExcluded: true, isManuallyExcluded: true, isValid: false, lapNo: undefined });
+    expect(riderPassings[0]).toMatchObject({ lapNo: 1 });
+    expect(isPassingExcluded(riderPassings[0]!)).toBe(false);
+    expect(isPassingValid(riderPassings[0]!)).toBe(true);
+    expect(riderPassings[1]).toMatchObject({ isExcluded: true, isManuallyExcluded: true, lapNo: undefined });
+    expect(riderPassings[1]).not.toHaveProperty('isValid');
+    expect(isPassingExcluded(riderPassings[1]!)).toBe(true);
+    expect(isPassingValid(riderPassings[1]!)).toBe(false);
     expect(riderPassings[2]).toMatchObject({
-      isExcluded: false,
-      isValid: true,
       lapNo: 2,
       lapTime: 720000,
       startingLapRecordId: 'c1',
     });
+    expect(isPassingExcluded(riderPassings[2]!)).toBe(false);
+    expect(isPassingValid(riderPassings[2]!)).toBe(true);
   });
 
   it('does not count crossings before the category green flag time', () => {
@@ -160,10 +165,12 @@ describe('processAllParticipantLaps entrant sequencing', () => {
     const processed = processAllParticipantLaps(records, participants, 300000, true);
     const riderPassings = processed.get('p1') || [];
 
-    expect(riderPassings[0].isValid).toBe(false);
-    expect(riderPassings[0].isExcluded).toBe(true);
+    expect(riderPassings[0]).not.toHaveProperty('isValid');
+    expect(riderPassings[0]).not.toHaveProperty('isExcluded');
+    expect(isPassingValid(riderPassings[0]!)).toBe(false);
+    expect(isPassingExcluded(riderPassings[0]!)).toBe(true);
     expect(riderPassings[0].lapNo).toBeUndefined();
-    expect(riderPassings[1].isValid).toBe(true);
+    expect(isPassingValid(riderPassings[1]!)).toBe(true);
     expect(riderPassings[1].lapNo).toBe(1);
   });
 
@@ -180,13 +187,15 @@ describe('processAllParticipantLaps entrant sequencing', () => {
     expect(riderPassings).toHaveLength(1);
     expect(riderPassings[0]).toMatchObject({
       elapsedTime: undefined,
-      isExcluded: true,
-      isValid: false,
       lapNo: undefined,
       lapTime: undefined,
       participantStartRecordId: undefined,
       startingLapRecordId: undefined,
     });
+    expect(riderPassings[0]).not.toHaveProperty('isExcluded');
+    expect(riderPassings[0]).not.toHaveProperty('isValid');
+    expect(isPassingExcluded(riderPassings[0]!)).toBe(true);
+    expect(isPassingValid(riderPassings[0]!)).toBe(false);
     warnSpy.mockRestore();
   });
 
@@ -222,10 +231,12 @@ describe('processAllParticipantLaps entrant sequencing', () => {
     const processed = processAllParticipantLaps(records, participants, 300000, true);
     const riderPassings = processed.get('p1') || [];
 
-    expect(riderPassings[0].isValid).toBe(false);
-    expect(riderPassings[0].isExcluded).toBe(true);
+    expect(riderPassings[0]).not.toHaveProperty('isValid');
+    expect(riderPassings[0]).not.toHaveProperty('isExcluded');
+    expect(isPassingValid(riderPassings[0]!)).toBe(false);
+    expect(isPassingExcluded(riderPassings[0]!)).toBe(true);
     expect(riderPassings[0].lapNo).toBeUndefined();
-    expect(riderPassings[1].isValid).toBe(true);
+    expect(isPassingValid(riderPassings[1]!)).toBe(true);
     expect(riderPassings[1].lapNo).toBe(1);
   });
 
@@ -253,8 +264,10 @@ describe('processAllParticipantLaps entrant sequencing', () => {
 
     expect(processed.has('p1')).toBe(true);
     expect(crossing.elapsedTime).toBeUndefined();
-    expect(crossing.isExcluded).toBe(true);
-    expect(crossing.isValid).toBe(false);
+    expect(crossing).not.toHaveProperty('isExcluded');
+    expect(crossing).not.toHaveProperty('isValid');
+    expect(isPassingExcluded(crossing)).toBe(true);
+    expect(isPassingValid(crossing)).toBe(false);
     expect(crossing.lapNo).toBeUndefined();
     expect(crossing.lapTime).toBeUndefined();
     expect(crossing.participantStartRecordId).toBeUndefined();
@@ -292,9 +305,9 @@ describe('processAllParticipantLaps entrant sequencing', () => {
     const processed = processAllParticipantLaps(records, participants, 300000, true);
     const riderPassings = processed.get('p1') || [];
 
-    expect(riderPassings[0].isValid).toBe(false);
+    expect(isPassingValid(riderPassings[0]!)).toBe(false);
     expect(riderPassings[0].elapsedTime).toBeUndefined();
-    expect(riderPassings[1].isValid).toBe(true);
+    expect(isPassingValid(riderPassings[1]!)).toBe(true);
     expect(riderPassings[1].elapsedTime).toBe(360000);
     expect(riderPassings[1].participantStartRecordId).toBe('flag-late');
   });
@@ -335,12 +348,12 @@ describe('processAllParticipantLaps entrant sequencing', () => {
     const riderPassings = processed.get('p1') || [];
 
     expect(riderPassings.map((record) => record.id)).toEqual(['c1', 'c2', 'c3']);
-    expect(riderPassings[0].isValid).toBe(true);
+    expect(isPassingValid(riderPassings[0]!)).toBe(true);
     expect(riderPassings[0].lapNo).toBe(1);
-    expect(riderPassings[1].isValid).toBe(true);
+    expect(isPassingValid(riderPassings[1]!)).toBe(true);
     expect(riderPassings[1].lapNo).toBe(2);
-    expect(riderPassings[2].isValid).toBe(false);
-    expect(riderPassings[2].isExcluded).toBe(true);
+    expect(isPassingValid(riderPassings[2]!)).toBe(false);
+    expect(isPassingExcluded(riderPassings[2]!)).toBe(true);
   });
 
   it('treats configured line 3 passings as finish-line crossings for pit-finish sessions', () => {
@@ -372,7 +385,7 @@ describe('processAllParticipantLaps entrant sequencing', () => {
 
     expect(riderPassings.map((record) => ({
       id: record.id,
-      isValid: record.isValid,
+      isValid: isPassingValid(record),
       lapNo: record.lapNo,
       lapTime: record.lapTime,
     }))).toEqual([

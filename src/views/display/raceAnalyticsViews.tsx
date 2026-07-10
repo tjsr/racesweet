@@ -9,7 +9,7 @@ import { EventEntrantId } from '../../model/entrant.js';
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
 import { EventCategoryId } from '../../model/index.js';
 import { EventId, SessionId } from '../../model/raceevent.js';
-import type { ParticipantPassingRecord } from '../../model/timerecord.js';
+import { type ParticipantPassingRecord, isPassingExcluded } from '../../model/timerecord.js';
 import { LapTimesReport } from '../reports/LapTimesReport.js';
 import { HandicapView } from './handicap.js';
 
@@ -203,7 +203,7 @@ const formatDuration = (duration?: number): string => {
 };
 
 const isValidLap = (lap: ParticipantPassingRecord): boolean => {
-  return (lap.lapNo || 0) > 0 && lap.isExcluded !== true && typeof lap.elapsedTime === 'number' && lap.elapsedTime >= 0;
+  return (lap.lapNo || 0) > 0 && !isPassingExcluded(lap) && typeof lap.elapsedTime === 'number' && lap.elapsedTime >= 0;
 };
 
 const findEntrantName = (entrantId: EventEntrantId, members: EventParticipant[], catalogEntrantsById: Map<EventEntrantId, EventCatalogEntrant>): string => {

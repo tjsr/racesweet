@@ -2,7 +2,7 @@ import type { ChipCrossingData } from './chipcrossing.js';
 import type { EventCategory } from './eventcategory.js';
 import type { EventParticipant } from './eventparticipant.js';
 import { Session } from './racestate.js';
-import { CROSSING_UNRELATED_LAP_UNDER_MINIMUM, type ParticipantPassingRecord } from './timerecord.js';
+import { CROSSING_UNRELATED_LAP_UNDER_MINIMUM, isPassingExcluded, isPassingValid, type ParticipantPassingRecord } from './timerecord.js';
 import { createGreenFlagEvent } from '../controllers/flag.js';
 
 const category: EventCategory = { id: '1', name: 'Team Category' };
@@ -120,12 +120,14 @@ describe('Session team lap processing', () => {
     const riderOneLaps = session.getParticipantLaps('101') || [];
     const riderTwoLaps = session.getParticipantLaps('102') || [];
 
-    expect(riderOneLaps[0].isValid).toBe(false);
-    expect(riderOneLaps[0].isExcluded).toBe(true);
+    expect(riderOneLaps[0]).not.toHaveProperty('isValid');
+    expect(riderOneLaps[0]).not.toHaveProperty('isExcluded');
+    expect(isPassingValid(riderOneLaps[0]!)).toBe(false);
+    expect(isPassingExcluded(riderOneLaps[0]!)).toBe(true);
     expect(riderOneLaps[0].elapsedTime).toBeUndefined();
     expect(riderOneLaps[0].lapNo).toBeUndefined();
     expect(riderOneLaps[0].lapTime).toBeUndefined();
-    expect(riderTwoLaps[0].isValid).toBe(true);
+    expect(isPassingValid(riderTwoLaps[0]!)).toBe(true);
     expect(riderTwoLaps[0].lapNo).toBe(1);
     expect(riderTwoLaps[0].lapTime).toBe(360000);
   });
@@ -157,14 +159,25 @@ describe('Session team lap processing', () => {
 
     let laps = session.getParticipantLaps('101') || [];
     expect(laps.map((record) => record.id)).toEqual(['1001', '1002', '1003']);
-    expect(laps[1]).toMatchObject({ isExcluded: true, isManuallyExcluded: true, isValid: false, lapNo: undefined });
-    expect(laps[2]).toMatchObject({ isExcluded: false, isValid: true, lapNo: 2, lapTime: 720000, startingLapRecordId: '1001' });
+    expect(laps[1]).toMatchObject({ isExcluded: true, isManuallyExcluded: true, lapNo: undefined });
+    expect(laps[1]).not.toHaveProperty('isValid');
+    expect(isPassingExcluded(laps[1]!)).toBe(true);
+    expect(isPassingValid(laps[1]!)).toBe(false);
+    expect(laps[2]).toMatchObject({ lapNo: 2, lapTime: 720000, startingLapRecordId: '1001' });
+    expect(isPassingExcluded(laps[2]!)).toBe(false);
+    expect(isPassingValid(laps[2]!)).toBe(true);
 
     session.excludeCrossing('1002', false);
 
     laps = session.getParticipantLaps('101') || [];
-    expect(laps[1]).toMatchObject({ isExcluded: false, isManuallyExcluded: false, isValid: true, lapNo: 2, lapTime: 360000, startingLapRecordId: '1001' });
-    expect(laps[2]).toMatchObject({ isExcluded: false, isValid: true, lapNo: 3, lapTime: 360000, startingLapRecordId: '1002' });
+    expect(laps[1]).toMatchObject({ isManuallyExcluded: false, lapNo: 2, lapTime: 360000, startingLapRecordId: '1001' });
+    expect(laps[1]).not.toHaveProperty('isExcluded');
+    expect(laps[1]).not.toHaveProperty('isValid');
+    expect(isPassingExcluded(laps[1]!)).toBe(false);
+    expect(isPassingValid(laps[1]!)).toBe(true);
+    expect(laps[2]).toMatchObject({ lapNo: 3, lapTime: 360000, startingLapRecordId: '1002' });
+    expect(isPassingExcluded(laps[2]!)).toBe(false);
+    expect(isPassingValid(laps[2]!)).toBe(true);
   });
 
   it('reassigns unmatched crossings and recalculates laps when participant identifiers change', async () => {
@@ -285,22 +298,22 @@ describe('Session team lap processing', () => {
 
     expect(laps.map((record) => record.id)).toEqual(['1001', '1002']);
     expect(laps[0]).toMatchObject({
-      isExcluded: false,
       isLapCompletion: false,
-      isValid: true,
       lapNo: 0,
       lineNumber: 3,
       loopNumber: 9,
       lapTime: 60000,
       startingLapRecordId: '1',
     });
+    expect(isPassingExcluded(laps[0]!)).toBe(false);
+    expect(isPassingValid(laps[0]!)).toBe(true);
     expect(laps[1]).toMatchObject({
-      isExcluded: false,
-      isValid: true,
       lapNo: 1,
       lapTime: 120000,
       startingLapRecordId: '1',
     });
+    expect(isPassingExcluded(laps[1]!)).toBe(false);
+    expect(isPassingValid(laps[1]!)).toBe(true);
   });
 
   it('only warns for short sector crossings when the same line is repeated too quickly', async () => {
@@ -329,15 +342,14 @@ describe('Session team lap processing', () => {
 
     const laps = session.getParticipantLaps('101') || [];
     expect(laps[0]?.unrelatedReasonCode).toBeUndefined();
-    expect(laps[1]).toMatchObject({
-      isExcluded: false,
-      isValid: true,
-      unrelatedReasonCode: CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
-    });
+    expect(laps[1]?.unrelatedReasonCode).toBeUndefined();
+    expect(isPassingExcluded(laps[1]!)).toBe(false);
+    expect(isPassingValid(laps[1]!)).toBe(true);
     expect(laps[2]).toMatchObject({
-      isExcluded: false,
       lapNo: 1,
       startingLapRecordId: '1',
     });
+    expect(isPassingExcluded(laps[2]!)).toBe(false);
+    expect(isPassingValid(laps[2]!)).toBe(true);
   });
 });

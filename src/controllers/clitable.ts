@@ -1,4 +1,4 @@
-import type { ParticipantPassingRecord, TimeRecord } from "../model/timerecord.js";
+import { isPassingValid, type ParticipantPassingRecord, type TimeRecord } from "../model/timerecord.js";
 import type { RaceStateLookup, Session } from "../model/racestate.js";
 import { categoryTextString, findCategoryById, getElapsedTimeForCategory } from "./category.js";
 import { isFlagRecord, isGreenFlag } from "./flag.js";
@@ -44,7 +44,7 @@ export const crossingTableRow = (passing: ParticipantPassingRecord, categoryList
     const entrantLaps: ParticipantPassingRecord[] | undefined |null = rs.getParticipantLaps(entrant.id);
     if (entrantLaps) {
       // const lap = entrantLaps.find((l) => l.timeRecordId === evt.id);
-      lapNo = passing.isValid ? passing?.lapNo?.toString() || '' : '';
+      lapNo = isPassingValid(passing) ? passing?.lapNo?.toString() || '' : '';
       elapsedTime = passing?.elapsedTime ? millisecondsToTime(passing.elapsedTime) : '--:--:--.---';
       lapTime = getLapTimeCell(passing);
     }

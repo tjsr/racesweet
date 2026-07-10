@@ -1,4 +1,4 @@
-import { EntrantPassingRecord, ParticipantPassingRecord } from "../model/timerecord.js";
+import { EntrantPassingRecord, ParticipantPassingRecord, isPassingExcluded } from "../model/timerecord.js";
 
 import { EventEntrantId } from "../model/entrant.js";
 import { elapsedTimeSort } from "./timerecord.js";
@@ -16,7 +16,7 @@ export const filterPassingsByTime = (passings: EntrantPassingRecord[], upToTime:
     if (record.time === undefined) {
       return false; // Skip records without a time
     }
-    return record.time <= upToTime && record.isExcluded !== true;
+    return record.time <= upToTime && !isPassingExcluded(record);
   });
 
 const isValidLapPassing = (record: ParticipantPassingRecord): boolean => {
@@ -39,7 +39,7 @@ export const getLapsOnly = (sortedRecords: EntrantPassingRecord[]): ParticipantP
 const getIncludedLapsOnly = (
   entrantPassings: EntrantPassingRecord[]
 ): EntrantPassingRecord[] => entrantPassings
-  .filter((record) => record.isExcluded !== true)
+  .filter((record) => !isPassingExcluded(record))
   .filter(isValidLapPassing);
 
 const getFastestLap = (passings: ParticipantPassingRecord[]): ParticipantPassingRecord | undefined => 

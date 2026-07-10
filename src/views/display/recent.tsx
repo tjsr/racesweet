@@ -13,7 +13,7 @@ import type { MillisecondsDuration, TimeDisplayZoneMode } from '../../app/utils/
 import type { EventSessionKind } from '../../catalog/eventCatalog.ts';
 import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../controllers/category.ts';
 import { createGreenFlagEvent, createRedFlagEvent, isFlagRecord } from '../../controllers/flag';
-import { getLapTimeCell, getPassingLineNumber, getPassingLoopNumber, getTimingLineKey, isFinishLinePassing } from '../../controllers/laps.ts';
+import { getLapTimeCell, getPassingLineNumber, getPassingLoopNumber, getTimingLineKey, isFinishLinePassing, isLapCompletionPassing } from '../../controllers/laps.ts';
 import { getParticipantNumber, getParticipantTransponders } from '../../controllers/participant.ts';
 import { findEntrantByChipCode, findEntrantByPlateNumber } from '../../controllers/participantSearch.ts';
 import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
@@ -24,7 +24,15 @@ import { FlagRecord } from '../../model/flag';
 import { createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.ts';
 import { EventId, SessionId } from '../../model/raceevent.ts';
 import { RaceStateLookup } from '../../model/racestate.ts';
-import { EVENT_FLAG_DISPLAYED, EVENT_SESSION_END, ParticipantPassingRecord, RECORD_TX_CROSSING, TimeRecordId } from '../../model/timerecord.ts';
+import {
+  EVENT_FLAG_DISPLAYED,
+  EVENT_SESSION_END,
+  ParticipantPassingRecord,
+  RECORD_TX_CROSSING,
+  TimeRecordId,
+  isPassingExcluded,
+  isPassingValid,
+} from '../../model/timerecord.ts';
 import { InvalidCategoryIdError, NoCrossingError, NoParticipantError, ParticipantNotFoundError } from '../../validators/errors.ts';
 import "./recent.css";
 
@@ -38,11 +46,30 @@ interface LapTimeIndicators {
   overallFastest: boolean;
 }
 
+interface RowIndexRange {
+  end: number;
+  start: number;
+}
+
+interface RowSelectionState {
+  selectedCategories: Set<EventCategoryId>;
+  selectedCategoryKey: string;
+  selectedParticipants: Set<EventParticipantId>;
+  selectedParticipantKey: string;
+  selectedPlateNumber?: string;
+  selectedRecordId?: TimeRecordId;
+}
+
 const ignoreModeLabels: Record<RecentRecordsIgnoreMode, string> = {
   outsideEventWindow: 'Outside event window',
   sectorLoops: 'Sector loops',
   unrecognised: 'Unrecognised',
 };
+
+const DEFERRED_SELECTION_UPDATE_DELAY_MS = 0;
+const EMPTY_ROW_RANGE: RowIndexRange = { end: -1, start: 0 };
+const ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX = 36;
+const IMMEDIATE_SELECTION_ROW_BUFFER = 100;
 
 type AddableRecordType = 'passing' | 'flag';
 type AddableFlagType = 'green' | 'yellow' | 'white' | 'red' | 'chequered';
@@ -66,6 +93,54 @@ const manualFlagLabelByType: Record<AddableFlagType, string> = {
 
 const formatRecordIdTitle = (recordId: TimeRecordId): string => {
   return `Record ID: ${recordId}`;
+};
+
+const buildSelectionKey = <IdType extends string>(ids: Set<IdType>): string => {
+  return Array.from(ids).sort().join('\0');
+};
+
+const cloneSelectionState = (selectionState: RowSelectionState): RowSelectionState => {
+  return {
+    selectedCategories: new Set<EventCategoryId>(selectionState.selectedCategories),
+    selectedCategoryKey: selectionState.selectedCategoryKey,
+    selectedParticipantKey: selectionState.selectedParticipantKey,
+    selectedParticipants: new Set<EventParticipantId>(selectionState.selectedParticipants),
+    selectedPlateNumber: selectionState.selectedPlateNumber,
+    selectedRecordId: selectionState.selectedRecordId,
+  };
+};
+
+const selectionStateMatches = (left: RowSelectionState, right: RowSelectionState): boolean => {
+  return left.selectedCategoryKey === right.selectedCategoryKey &&
+    left.selectedParticipantKey === right.selectedParticipantKey &&
+    left.selectedPlateNumber === right.selectedPlateNumber &&
+    left.selectedRecordId === right.selectedRecordId;
+};
+
+const buildImmediateSelectionWindow = (
+  totalRows: number,
+  visibleRowRange: RowIndexRange,
+  rowBuffer: number = IMMEDIATE_SELECTION_ROW_BUFFER,
+): RowIndexRange => {
+  if (totalRows <= 0) {
+    return EMPTY_ROW_RANGE;
+  }
+
+  if (visibleRowRange.end < visibleRowRange.start) {
+    return {
+      end: Math.min(totalRows - 1, rowBuffer),
+      start: 0,
+    };
+  }
+
+  return {
+    end: Math.min(totalRows - 1, visibleRowRange.end + rowBuffer),
+    start: Math.max(0, visibleRowRange.start - rowBuffer),
+  };
+};
+
+const isRowIndexWithinRange = (index: number, rowRange: RowIndexRange): boolean => {
+  return index >= rowRange.start && index <= rowRange.end;
 };
 
 const participantArrayFromLookup = (raceStateLookup: RaceStateLookup): EventParticipant[] => {
@@ -300,12 +375,7 @@ const isLapControlCrossing = (
     return false;
   }
 
-  const effectiveLoopNumber = getPassingLoopNumber(record) ?? getPassingLineNumber(record);
-  if (effectiveLoopNumber !== undefined) {
-    return effectiveLoopNumber === 1 || isFinishLinePassing(record, raceStateLookup.getFinishLineNumbers?.());
-  }
-
-  return record.isLapCompletion !== false;
+  return isLapCompletionPassing(record, raceStateLookup.getFinishLineNumbers?.());
 };
 
 const getCrossingUnrelatedReason = (passing: ParticipantPassingRecord): string | undefined => {
@@ -354,6 +424,8 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   onSelectRecord?: (recordId: TimeRecordId | undefined) => void;
   onSelectUnrecognisedPlateNumber?: (plateNumber: string | undefined) => void;
   sectorTimesByRecordId?: Map<TimeRecordId, number>;
+  selectedCategoryKey?: string;
+  selectedParticipantKey?: string;
   timeZone?: string;
   showSectorColumn?: boolean;
 }
@@ -737,7 +809,7 @@ export const PassingRecordRow = (
 
   const handleExclude = () => {
     if (props.onExclude) {
-      props.onExclude(passing.id, !passing.isExcluded);
+      props.onExclude(passing.id, passing.isExcluded !== true);
     }
     handleClose();
   };
@@ -769,7 +841,9 @@ export const PassingRecordRow = (
   let lapTime = '';
   const sectorTime = props.sectorTime !== undefined ? millisecondsToTime(props.sectorTime) : '';
 
-  let className = passing.isValid ? 'passing' : 'invalid-passing';
+  const passingIsExcluded = isPassingExcluded(passing);
+  const passingIsValid = isPassingValid(passing);
+  let className = passingIsValid ? 'passing' : 'invalid-passing';
   let cellClasses = '';
   let isUnrelatedToSession = false;
 
@@ -788,7 +862,7 @@ export const PassingRecordRow = (
     const entrantLaps: ParticipantPassingRecord[] | undefined |null = rs.getParticipantLaps(entrant.id);
     if (entrantLaps) {
       // const lap = entrantLaps.find((l) => l.timeRecordId === evt.id);
-      lapNo = passing.isValid ? passing?.lapNo?.toString() || '' : '';
+      lapNo = passingIsValid ? passing?.lapNo?.toString() || '' : '';
       elapsedTime = passing?.elapsedTime ? millisecondsToTime(passing.elapsedTime) : '--:--:--.---';
       lapTime = getLapTimeCell(passing);
     }
@@ -819,7 +893,7 @@ export const PassingRecordRow = (
     }
   }
 
-  if (passing.isExcluded || isUnrelatedToSession) {
+  if (passingIsExcluded || isUnrelatedToSession) {
     className += ' excluded';
   }
   if (passing.id === props.selectedRecordId) {
@@ -895,7 +969,7 @@ export const PassingRecordRow = (
           Edit record
         </MenuItem>
         <MenuItem onClick={handleExclude}>
-          {passing.isExcluded ? 'Include crossing' : 'Exclude crossing'}
+          {passing.isExcluded === true ? 'Include crossing' : 'Exclude crossing'}
         </MenuItem>
         
         {resolvedParticipant && allCategories.length > 0 && [
@@ -919,7 +993,7 @@ export const PassingRecordRow = (
 };
 
 
-export const RecordRow = (props: RecentRecordRowProps) => {
+const RecordRowComponent = (props: RecentRecordRowProps) => {
   const flagRecordSelected = (record: FlagRecord): void => {
     if (props.categorySelected) {
       props.categorySelected(new Set<EventCategoryId>(record.categoryIds));
@@ -1057,6 +1131,34 @@ export const RecordRow = (props: RecentRecordRowProps) => {
   //   </TableRow>
   // </>);
 };
+
+const recordRowPropsAreEqual = (previousProps: RecentRecordRowProps, nextProps: RecentRecordRowProps): boolean => {
+  return previousProps.record === nextProps.record &&
+    previousProps.index === nextProps.index &&
+    previousProps.raceStateLookup === nextProps.raceStateLookup &&
+    previousProps.lapTimeIndicators === nextProps.lapTimeIndicators &&
+    previousProps.selectedRecordId === nextProps.selectedRecordId &&
+    previousProps.selectedCategoryKey === nextProps.selectedCategoryKey &&
+    previousProps.selectedParticipantKey === nextProps.selectedParticipantKey &&
+    previousProps.selectedPlateNumber === nextProps.selectedPlateNumber &&
+    previousProps.sessionValidCategoryIds === nextProps.sessionValidCategoryIds &&
+    previousProps.categorySelected === nextProps.categorySelected &&
+    previousProps.participantSelected === nextProps.participantSelected &&
+    previousProps.onAssignFlagCategory === nextProps.onAssignFlagCategory &&
+    previousProps.onOpenAddRecordDialog === nextProps.onOpenAddRecordDialog &&
+    previousProps.onOpenEditRecordDialog === nextProps.onOpenEditRecordDialog &&
+    previousProps.onExclude === nextProps.onExclude &&
+    previousProps.onChangeCategory === nextProps.onChangeCategory &&
+    previousProps.onMarkFlagDeleted === nextProps.onMarkFlagDeleted &&
+    previousProps.onRemoveFlagCategory === nextProps.onRemoveFlagCategory &&
+    previousProps.onSelectRecord === nextProps.onSelectRecord &&
+    previousProps.onSelectUnrecognisedPlateNumber === nextProps.onSelectUnrecognisedPlateNumber &&
+    previousProps.sectorTimesByRecordId === nextProps.sectorTimesByRecordId &&
+    previousProps.showSectorColumn === nextProps.showSectorColumn &&
+    previousProps.timeZone === nextProps.timeZone;
+};
+
+export const RecordRow = React.memo(RecordRowComponent, recordRowPropsAreEqual);
 
 const warnings: string[] = [];
 
@@ -1268,6 +1370,7 @@ const buildLapTimeIndicatorMap = (
   const bestLapTimeByEntrant = new Map<string, MillisecondsDuration>();
   const previousLapTimeByEntrant = new Map<string, MillisecondsDuration>();
   const leadingLapNumbers = new Set<number>();
+  const finishLineNumbers = raceStateLookup.getFinishLineNumbers?.();
   const isRaceSession = sessionKind === undefined || sessionKind === 'race';
   let overallBestLapTime: MillisecondsDuration | undefined = undefined;
 
@@ -1275,7 +1378,7 @@ const buildLapTimeIndicatorMap = (
     .map((record, index) => ({ index, record }))
     .sort(compareRecordsByTimeAndInputOrder)
     .forEach(({ record }) => {
-      if (!isCrossingRecord(record) || !record.participantId || !record.isValid || record.isExcluded || record.isLapCompletion === false) {
+      if (!isCrossingRecord(record) || !record.participantId || !isPassingValid(record) || isPassingExcluded(record) || !isLapCompletionPassing(record, finishLineNumbers)) {
         return;
       }
 
@@ -1448,7 +1551,7 @@ const isNonLapCrossing = (
   if (!isCrossingRecord(record)) {
     return false;
   }
-  if (record.isLapCompletion === false) {
+  if (!isLapCompletionPassing(record, raceStateLookup.getFinishLineNumbers?.())) {
     return true;
   }
   const effectiveLoopNumber = getPassingLoopNumber(record) ?? getPassingLineNumber(record);
@@ -1796,8 +1899,10 @@ export const RecentRecords = (props: RecordsProps & {
   const [ignoreModes, setIgnoreModes] = React.useState<RecentRecordsIgnoreMode[]>([]);
   const [selectedPlateNumber, setSelectedPlateNumber] = React.useState<string | undefined>(undefined);
   const [selectedRecordId, setSelectedRecordId] = React.useState<TimeRecordId | undefined>(undefined);
+  const tableContainerRef = React.useRef<HTMLDivElement>(null);
   const toolbarAnchorRef = React.useRef<HTMLDivElement>(null);
   const toolbarRef = React.useRef<HTMLDivElement>(null);
+  const [visibleRowRange, setVisibleRowRange] = React.useState<RowIndexRange>(EMPTY_ROW_RANGE);
   const [toolbarDock, setToolbarDock] = React.useState({
     height: 0,
     isDocked: false,
@@ -1806,10 +1911,12 @@ export const RecentRecords = (props: RecordsProps & {
   });
   const timeDisplayZoneMode = props.timeDisplayZoneMode || 'event';
   const displayTimeZone = resolveDisplayTimeZone(timeDisplayZoneMode, props.eventTimeZone);
-  const selectedCategories = props.selectedCategories || new Set<EventCategoryId>();
+  const emptySelectedCategories = React.useMemo(() => new Set<EventCategoryId>(), []);
+  const selectedCategories = props.selectedCategories || emptySelectedCategories;
+  const selectedCategoryKey = React.useMemo(() => buildSelectionKey(selectedCategories), [selectedCategories]);
   const emptySelectedParticipants = React.useMemo(() => new Set<EventParticipantId>(), []);
   const propSelectedParticipants = props.selectedParticipants || emptySelectedParticipants;
-  const propSelectedParticipantKey = Array.from(propSelectedParticipants).sort().join('\0');
+  const propSelectedParticipantKey = React.useMemo(() => buildSelectionKey(propSelectedParticipants), [propSelectedParticipants]);
   const [localSelectedParticipants, setLocalSelectedParticipants] = React.useState<Set<EventParticipantId>>(
     () => new Set<EventParticipantId>(propSelectedParticipants)
   );
@@ -1817,16 +1924,44 @@ export const RecentRecords = (props: RecordsProps & {
     setLocalSelectedParticipants(new Set<EventParticipantId>(propSelectedParticipants));
   }, [propSelectedParticipantKey]);
   const selectedParticipants = localSelectedParticipants;
-  const teamMemberIds = selectedTeamMemberIds(props.raceStateLookup, selectedParticipants);
-  const highlightedParticipantIds = new Set<EventParticipantId>([
-    ...selectedParticipants,
-    ...teamMemberIds,
+  const selectedParticipantKey = React.useMemo(() => buildSelectionKey(selectedParticipants), [selectedParticipants]);
+  const teamMemberIds = React.useMemo(() => {
+    return selectedTeamMemberIds(props.raceStateLookup, selectedParticipants);
+  }, [props.raceStateLookup, selectedParticipantKey, selectedParticipants]);
+  const highlightedParticipantIds = React.useMemo(() => {
+    return new Set<EventParticipantId>([
+      ...selectedParticipants,
+      ...teamMemberIds,
+    ]);
+  }, [selectedParticipantKey, teamMemberIds]);
+  const highlightedParticipantKey = React.useMemo(() => buildSelectionKey(highlightedParticipantIds), [highlightedParticipantIds]);
+  const immediateSelectionState = React.useMemo<RowSelectionState>(() => {
+    return {
+      selectedCategories,
+      selectedCategoryKey,
+      selectedParticipantKey: highlightedParticipantKey,
+      selectedParticipants: highlightedParticipantIds,
+      selectedPlateNumber,
+      selectedRecordId,
+    };
+  }, [
+    highlightedParticipantIds,
+    highlightedParticipantKey,
+    selectedCategories,
+    selectedCategoryKey,
+    selectedPlateNumber,
+    selectedRecordId,
   ]);
-  const selectableCategories = (props.raceStateLookup as unknown as { categories?: EventCategory[] }).categories || [];
-  const selectedCategoryIds = Array.from(selectedCategories);
-  const selectedCategoryNames = selectedCategoryIds.map((categoryId) => {
-    return selectableCategories.find((category) => category.id === categoryId)?.name || categoryId;
+  const [deferredSelectionState, setDeferredSelectionState] = React.useState<RowSelectionState>(() => {
+    return cloneSelectionState(immediateSelectionState);
   });
+  const selectableCategories = (props.raceStateLookup as unknown as { categories?: EventCategory[] }).categories || [];
+  const selectedCategoryIds = React.useMemo(() => Array.from(selectedCategories), [selectedCategories]);
+  const selectedCategoryNames = React.useMemo(() => {
+    return selectedCategoryIds.map((categoryId) => {
+      return selectableCategories.find((category) => category.id === categoryId)?.name || categoryId;
+    });
+  }, [selectableCategories, selectedCategoryIds]);
   const outsideEventWindowIgnoredRecordIds = React.useMemo(() => {
     return getOutsideEventWindowIgnoredRecordIds(props.records || [], props.raceStateLookup);
   }, [props.records, props.raceStateLookup]);
@@ -1840,6 +1975,21 @@ export const RecentRecords = (props: RecordsProps & {
       setFilterMode('all');
     }
   }, [filterMode, selectedCategories, selectedParticipants, teamMemberIds]);
+  React.useEffect(() => {
+    if (selectionStateMatches(deferredSelectionState, immediateSelectionState)) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      React.startTransition(() => {
+        setDeferredSelectionState(cloneSelectionState(immediateSelectionState));
+      });
+    }, DEFERRED_SELECTION_UPDATE_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [deferredSelectionState, immediateSelectionState]);
   React.useLayoutEffect(() => {
     const updateToolbarDock = (): void => {
       const anchor = toolbarAnchorRef.current;
@@ -1876,63 +2026,133 @@ export const RecentRecords = (props: RecordsProps & {
       window.removeEventListener('scroll', updateToolbarDock, true);
     };
   }, []);
+  const filteredRecords = React.useMemo(() => {
+    return (props.records || []).filter((record) => {
+      if (isSystemGeneratedFlag(record)) {
+        return false;
+      }
+      if (shouldIgnoreRecord(record, outsideEventWindowIgnoredRecordIds, ignoreModes, props.raceStateLookup)) {
+        return false;
+      }
+      if (filterMode === 'all') {
+        return true;
+      }
+      if (filterMode === 'category') {
+        return recordMatchesSelectedCategory(record, props.raceStateLookup, selectedCategories);
+      }
+      if (filterMode === 'participant') {
+        return recordMatchesSelectedParticipants(record, props.raceStateLookup, selectedParticipants);
+      }
+      return recordMatchesSelectedParticipants(record, props.raceStateLookup, teamMemberIds);
+    });
+  }, [
+    filterMode,
+    ignoreModes,
+    outsideEventWindowIgnoredRecordIds,
+    props.raceStateLookup,
+    props.records,
+    selectedCategories,
+    selectedParticipants,
+    teamMemberIds,
+  ]);
+  const sortedRecords = React.useMemo(() => {
+    return [...filteredRecords].sort((a, b) => {
+      const leftTime = a.time?.getTime() || 0;
+      const rightTime = b.time?.getTime() || 0;
+      const leftTenth = a.timeTenthOfMillisecond || 0;
+      const rightTenth = b.timeTenthOfMillisecond || 0;
 
-  const filteredRecords = (props.records || []).filter((record) => {
-    if (isSystemGeneratedFlag(record)) {
-      return false;
-    }
-    if (shouldIgnoreRecord(record, outsideEventWindowIgnoredRecordIds, ignoreModes, props.raceStateLookup)) {
-      return false;
-    }
-    if (filterMode === 'all') {
-      return true;
-    }
-    if (filterMode === 'category') {
-      return recordMatchesSelectedCategory(record, props.raceStateLookup, selectedCategories);
-    }
-    if (filterMode === 'participant') {
-      return recordMatchesSelectedParticipants(record, props.raceStateLookup, selectedParticipants);
-    }
-    return recordMatchesSelectedParticipants(record, props.raceStateLookup, teamMemberIds);
-  });
-  const sortedRecords = [...filteredRecords].sort((a, b) => {
-    const leftTime = a.time?.getTime() || 0;
-    const rightTime = b.time?.getTime() || 0;
-    const leftTenth = a.timeTenthOfMillisecond || 0;
-    const rightTenth = b.timeTenthOfMillisecond || 0;
+      if (leftTime === rightTime && leftTenth !== rightTenth) {
+        return recentFirst ? rightTenth - leftTenth : leftTenth - rightTenth;
+      }
 
-    if (leftTime === rightTime && leftTenth !== rightTenth) {
-      return recentFirst ? rightTenth - leftTenth : leftTenth - rightTenth;
-    }
-
-    if (recentFirst) {
-      return rightTime - leftTime;
-    } else {
+      if (recentFirst) {
+        return rightTime - leftTime;
+      }
       return leftTime - rightTime;
-    }
-  });
-  const lapTimeIndicators = buildLapTimeIndicatorMap(filteredRecords, props.raceStateLookup, props.sessionKind);
-  const showSectorColumn = shouldShowSectorColumnForLookup(filteredRecords, props.raceStateLookup);
-  const sectorTimesByRecordId = showSectorColumn ? buildSectorTimesByRecordId(filteredRecords, props.raceStateLookup) : new Map<TimeRecordId, number>();
-  const headings = getHeadings(showSectorColumn);
+    });
+  }, [filteredRecords, recentFirst]);
+  const lapTimeIndicators = React.useMemo(() => {
+    return buildLapTimeIndicatorMap(filteredRecords, props.raceStateLookup, props.sessionKind);
+  }, [filteredRecords, props.raceStateLookup, props.sessionKind]);
+  const showSectorColumn = React.useMemo(() => {
+    return shouldShowSectorColumnForLookup(filteredRecords, props.raceStateLookup);
+  }, [filteredRecords, props.raceStateLookup]);
+  const sectorTimesByRecordId = React.useMemo(() => {
+    return showSectorColumn ? buildSectorTimesByRecordId(filteredRecords, props.raceStateLookup) : new Map<TimeRecordId, number>();
+  }, [filteredRecords, props.raceStateLookup, showSectorColumn]);
+  const headings = React.useMemo(() => getHeadings(showSectorColumn), [showSectorColumn]);
+  const immediateSelectionWindow = React.useMemo(() => {
+    return buildImmediateSelectionWindow(sortedRecords.length, visibleRowRange);
+  }, [sortedRecords.length, visibleRowRange]);
   const fastestTimeIndicatorColors = props.fastestTimeIndicatorColors || DEFAULT_FASTEST_TIME_INDICATOR_COLORS;
-  const tableContainerStyle = {
-    '--entrant-faster-time-color': fastestTimeIndicatorColors.entrantFasterTime,
-    '--entrant-fastest-time-color': fastestTimeIndicatorColors.entrantFastestTime,
-    '--recent-records-table-header-top': toolbarDock.isDocked ? `${toolbarDock.height}px` : '0px',
-    '--session-fastest-time-color': fastestTimeIndicatorColors.sessionFastestTime,
-  } as React.CSSProperties;
-  const openAddRecordDialog = (record: EventTimeRecord): void => {
+  const tableContainerStyle = React.useMemo(() => {
+    return {
+      '--entrant-faster-time-color': fastestTimeIndicatorColors.entrantFasterTime,
+      '--entrant-fastest-time-color': fastestTimeIndicatorColors.entrantFastestTime,
+      '--recent-records-table-header-top': toolbarDock.isDocked ? `${toolbarDock.height}px` : '0px',
+      '--session-fastest-time-color': fastestTimeIndicatorColors.sessionFastestTime,
+    } as React.CSSProperties;
+  }, [fastestTimeIndicatorColors, toolbarDock.height, toolbarDock.isDocked]);
+  const updateVisibleRowRange = React.useCallback((): void => {
+    const container = tableContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const rowElement = container.querySelector('tbody tr[data-record-id]') as HTMLTableRowElement | null;
+    const measuredRowHeight = rowElement?.getBoundingClientRect().height || ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX;
+    const safeRowHeight = measuredRowHeight > 0 ? measuredRowHeight : ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX;
+    const scrollTop = container.scrollTop;
+    const viewportHeight = container.clientHeight || container.getBoundingClientRect().height || safeRowHeight;
+    const start = Math.max(0, Math.floor(scrollTop / safeRowHeight));
+    const visibleCount = Math.max(1, Math.ceil(viewportHeight / safeRowHeight));
+    const end = Math.min(Math.max(0, sortedRecords.length - 1), start + visibleCount - 1);
+
+    setVisibleRowRange((current) => {
+      return current.start === start && current.end === end
+        ? current
+        : { end, start };
+    });
+  }, [sortedRecords.length]);
+  React.useLayoutEffect(() => {
+    updateVisibleRowRange();
+  }, [sortedRecords.length, updateVisibleRowRange]);
+  React.useEffect(() => {
+    const container = tableContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const handleVisibleRowRangeChange = (): void => {
+      updateVisibleRowRange();
+    };
+
+    container.addEventListener('scroll', handleVisibleRowRangeChange, { passive: true });
+    window.addEventListener('resize', handleVisibleRowRangeChange);
+
+    return () => {
+      container.removeEventListener('scroll', handleVisibleRowRangeChange);
+      window.removeEventListener('resize', handleVisibleRowRangeChange);
+    };
+  }, [updateVisibleRowRange]);
+  const openAddRecordDialog = React.useCallback((record: EventTimeRecord): void => {
     setAddRecordDialogState({ anchorRecord: record, mode: 'add' });
-  };
-  const openEditRecordDialog = (record: EventTimeRecord): void => {
+  }, []);
+  const openEditRecordDialog = React.useCallback((record: EventTimeRecord): void => {
     setAddRecordDialogState({ anchorRecord: record, existingRecord: record, mode: 'edit' });
-  };
-  const handleParticipantSelected = (participantIds: Set<EventParticipantId>): void => {
+  }, []);
+  const handleParticipantSelected = React.useCallback((participantIds: Set<EventParticipantId>): void => {
     setSelectedPlateNumber(undefined);
     setLocalSelectedParticipants(new Set<EventParticipantId>(participantIds));
     props.participantSelected?.(participantIds);
-  };
+  }, [props.participantSelected]);
+  const handleSelectRecord = React.useCallback((recordId: TimeRecordId | undefined): void => {
+    setSelectedRecordId(recordId);
+  }, []);
+  const handleSelectUnrecognisedPlateNumber = React.useCallback((plateNumber: string | undefined): void => {
+    setSelectedPlateNumber(plateNumber);
+  }, []);
 
   return <>
     <AddRecordDialog
@@ -2078,7 +2298,7 @@ export const RecentRecords = (props: RecordsProps & {
     {
       !(sortedRecords.length > 0) ? <p>No records available.</p>
         : <Box sx={{ flexGrow: 1, width: '100%' }}>
-          <TableContainer className="recent-records-table-container" component={Paper} style={tableContainerStyle}>
+          <TableContainer className="recent-records-table-container" component={Paper} ref={tableContainerRef} style={tableContainerStyle}>
             <Table stickyHeader sx={{ minWidth: 650 }} size="small">
               <TableHead>
                 <TableRow>
@@ -2086,34 +2306,42 @@ export const RecentRecords = (props: RecordsProps & {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {sortedRecords.map((record, index) => (
-                  <RecordRow
-                    key={record.id}
-                    lapTimeIndicators={lapTimeIndicators.get(record.id)}
-                    record={record}
-                    index={index}
-                    raceStateLookup={props.raceStateLookup}
-                    selectedRecordId={selectedRecordId}
-                    selectedCategories={props.selectedCategories}
-                    selectedPlateNumber={selectedPlateNumber}
-                    selectedParticipants={highlightedParticipantIds}
-                    sessionValidCategoryIds={props.sessionValidCategoryIds}
-                    categorySelected={props.categorySelected}
-                    participantSelected={handleParticipantSelected}
-                    onAssignFlagCategory={props.onAssignFlagCategory}
-                    onOpenAddRecordDialog={openAddRecordDialog}
-                    onOpenEditRecordDialog={openEditRecordDialog}
-                    onExclude={props.onExclude}
-                    onChangeCategory={props.onChangeCategory}
-                    onMarkFlagDeleted={props.onMarkFlagDeleted}
-                    onRemoveFlagCategory={props.onRemoveFlagCategory}
-                    onSelectRecord={setSelectedRecordId}
-                    onSelectUnrecognisedPlateNumber={setSelectedPlateNumber}
-                    sectorTimesByRecordId={sectorTimesByRecordId}
-                    showSectorColumn={showSectorColumn}
-                    timeZone={displayTimeZone}
-                  />
-                ))}
+                {sortedRecords.map((record, index) => {
+                  const rowSelectionState = isRowIndexWithinRange(index, immediateSelectionWindow)
+                    ? immediateSelectionState
+                    : deferredSelectionState;
+
+                  return (
+                    <RecordRow
+                      key={record.id}
+                      lapTimeIndicators={lapTimeIndicators.get(record.id)}
+                      record={record}
+                      index={index}
+                      raceStateLookup={props.raceStateLookup}
+                      selectedRecordId={rowSelectionState.selectedRecordId}
+                      selectedCategories={rowSelectionState.selectedCategories}
+                      selectedCategoryKey={rowSelectionState.selectedCategoryKey}
+                      selectedPlateNumber={rowSelectionState.selectedPlateNumber}
+                      selectedParticipants={rowSelectionState.selectedParticipants}
+                      selectedParticipantKey={rowSelectionState.selectedParticipantKey}
+                      sessionValidCategoryIds={props.sessionValidCategoryIds}
+                      categorySelected={props.categorySelected}
+                      participantSelected={handleParticipantSelected}
+                      onAssignFlagCategory={props.onAssignFlagCategory}
+                      onOpenAddRecordDialog={openAddRecordDialog}
+                      onOpenEditRecordDialog={openEditRecordDialog}
+                      onExclude={props.onExclude}
+                      onChangeCategory={props.onChangeCategory}
+                      onMarkFlagDeleted={props.onMarkFlagDeleted}
+                      onRemoveFlagCategory={props.onRemoveFlagCategory}
+                      onSelectRecord={handleSelectRecord}
+                      onSelectUnrecognisedPlateNumber={handleSelectUnrecognisedPlateNumber}
+                      sectorTimesByRecordId={sectorTimesByRecordId}
+                      showSectorColumn={showSectorColumn}
+                      timeZone={displayTimeZone}
+                    />
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>

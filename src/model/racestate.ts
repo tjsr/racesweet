@@ -430,7 +430,11 @@ export class Session implements RaceState, RaceStateLookup {
     const record = this._records.get(crossingId.toString());
     if (record && isCrossingRecord(record)) {
       const crossing = record as ParticipantPassingRecord;
-      crossing.isExcluded = exclude;
+      if (exclude) {
+        crossing.isExcluded = true;
+      } else {
+        delete crossing.isExcluded;
+      }
       crossing.isManuallyExcluded = exclude;
       if (record.participantId) {
         this.__reprocessParticipantLaps(record.participantId);

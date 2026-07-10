@@ -10,7 +10,19 @@ import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.js";
 
 import type { EventEntrantId } from "../model/entrant.js";
 import type { EventCategoryId } from "../model/eventcategory.js";
-import { CROSSING_FLAG_LAP_UNDER_MINIMUM, CROSSING_FLAG_NON_LAP_COMPLETION, CROSSING_UNRELATED_LAP_UNDER_MINIMUM, CROSSING_UNRELATED_NON_LAP_COMPLETION, CROSSING_UNRELATED_SESSION_CATEGORY, EVENT_SESSION_END } from "../model/timerecord.js";
+import {
+  CROSSING_FLAG_LAP_UNDER_MINIMUM,
+  CROSSING_FLAG_NON_LAP_COMPLETION,
+  CROSSING_UNRELATED_AFTER_FINISH,
+  CROSSING_UNRELATED_BEFORE_START,
+  CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
+  CROSSING_UNRELATED_NO_START,
+  CROSSING_UNRELATED_NON_LAP_COMPLETION,
+  CROSSING_UNRELATED_SESSION_CATEGORY,
+  EVENT_SESSION_END,
+  isPassingExcluded,
+  isPassingValid,
+} from "../model/timerecord.js";
 import { warn } from "../utils.js";
 import { setCategoryStartForPassings } from "./category.js";
 import { entrantHasAnyTx } from "./participantMatch.js";
@@ -67,10 +79,25 @@ const setPassingLapUnderMinimum = (
   );
 };
 
+const setPassingBeforeStart = (passing: ParticipantPassingRecord): void => {
+  setPassingUnrelatedReason(passing, CROSSING_UNRELATED_BEFORE_START, undefined);
+};
+
+const setPassingAfterFinish = (passing: ParticipantPassingRecord): void => {
+  setPassingUnrelatedReason(passing, CROSSING_UNRELATED_AFTER_FINISH, undefined);
+};
+
+const setPassingNoStart = (passing: ParticipantPassingRecord): void => {
+  setPassingUnrelatedReason(passing, CROSSING_UNRELATED_NO_START, undefined);
+};
+
 const clearCalculatedUnrelatedReason = (passing: ParticipantPassingRecord): void => {
   passing.infoFlags = (passing.infoFlags || 0) & ~CROSSING_FLAG_LAP_UNDER_MINIMUM & ~CROSSING_FLAG_NON_LAP_COMPLETION;
   if (
+    passing.unrelatedReasonCode === CROSSING_UNRELATED_AFTER_FINISH ||
+    passing.unrelatedReasonCode === CROSSING_UNRELATED_BEFORE_START ||
     passing.unrelatedReasonCode === CROSSING_UNRELATED_LAP_UNDER_MINIMUM ||
+    passing.unrelatedReasonCode === CROSSING_UNRELATED_NO_START ||
     passing.unrelatedReasonCode === CROSSING_UNRELATED_NON_LAP_COMPLETION ||
     passing.unrelatedReasonCode === CROSSING_UNRELATED_SESSION_CATEGORY
   ) {
@@ -102,7 +129,20 @@ const excludeParticipantPassingsForSessionCategory = (
   });
 };
 
-const isLapCompletionPassing = (passing: ParticipantPassingRecord): boolean => passing.isLapCompletion !== false;
+export const isLapCompletionPassing = (
+  passing: ParticipantPassingRecord,
+  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS
+): boolean => {
+  if (typeof passing.isLapCompletion === 'boolean') {
+    return passing.isLapCompletion;
+  }
+
+  if (getPassingLineNumber(passing) !== undefined) {
+    return isFinishLinePassing(passing, finishLineNumbers);
+  }
+
+  return true;
+};
 
 export const normalizeFinishLineNumbers = (finishLineNumbers: number[] | undefined): number[] => {
   const normalizedNumbers = Array.from(new Set(
@@ -155,8 +195,6 @@ export const getTimingLineKey = (
 
 const resetPassingLapState = (passing: ParticipantPassingRecord): void => {
   passing.elapsedTime = undefined;
-  passing.isExcluded = true;
-  passing.isValid = false;
   passing.lapNo = undefined;
   passing.lapTime = undefined;
   passing.participantStartRecordId = undefined;
@@ -169,14 +207,7 @@ const keepManuallyExcludedPassingOutOfResults = (passing: ParticipantPassingReco
     return false;
   }
 
-  passing.elapsedTime = undefined;
-  passing.isExcluded = true;
-  passing.isValid = false;
-  passing.lapNo = undefined;
-  passing.lapTime = undefined;
-  passing.participantStartRecordId = undefined;
-  passing.startingLapRecordId = undefined;
-  clearCalculatedUnrelatedReason(passing);
+  resetPassingLapState(passing);
   return true;
 };
 
@@ -312,13 +343,17 @@ export const processAllParticipantLaps = (
     } catch (err: unknown) {
       if (err instanceof EventFlagsError || err instanceof NoStartFlagError) {
         console.debug(`No start flag found for participant ${getParticipantNumber(participant)} category ${participant.categoryId} when processing laps.`, err);
+        entrantPassings.forEach(setPassingNoStart);
+        members.forEach((member) => {
+          participantTimesMap.set(member.id, entrantPassings.filter((passing) => passing.participantId === member.id));
+        });
         return;
       } else {
         throw err;
       }
     }
 
-    if (eventFlags?.length > 0 && participantCategoryStartFlag) {
+    if (participantCategoryStartFlag) {
       try {
         validateParticipantStartFlag(participantCategoryStartFlag, participant);
         const finishFlag = getFinishFlagForCategory(participant.categoryId);
@@ -333,10 +368,16 @@ export const processAllParticipantLaps = (
       } catch (error: unknown) {
         if (error instanceof ParticipantStartFlagError || error instanceof StartFlagHasNoTimeError) {
           console.error(processAllParticipantLaps.name, error.message);
+          entrantPassings.forEach(setPassingNoStart);
+          members.forEach((member) => {
+            participantTimesMap.set(member.id, entrantPassings.filter((passing) => passing.participantId === member.id));
+          });
           return;
         }
         throw error;
       }
+    } else {
+      entrantPassings.forEach(setPassingNoStart);
     }
 
     members.forEach((member) => {
@@ -378,9 +419,8 @@ const processEntrantLaps = (
       passing.elapsedTime = undefined;
       passing.lapNo = undefined;
       passing.lapTime = undefined;
-      passing.isValid = false;
-      passing.isExcluded = true;
       clearCalculatedUnrelatedReason(passing);
+      setPassingBeforeStart(passing);
       return;
     }
 
@@ -389,9 +429,8 @@ const processEntrantLaps = (
       passing.elapsedTime = elapsedTimeMilliseconds(entrantCategoryStartFlag.time!, passing.time);
       passing.lapNo = lapNo;
       passing.lapTime = validTimeAfterLastLap(passing, previousFinishPassing);
-      passing.isValid = false;
-      passing.isExcluded = true;
       clearCalculatedUnrelatedReason(passing);
+      setPassingAfterFinish(passing);
       return;
     }
 
@@ -410,15 +449,9 @@ const processEntrantLaps = (
     passing.lapTime = lapTime;
     passing.startingLapRecordId = (finishLine ? previousPassingOnLine?.id : previousFinishPassing?.id) || entrantCategoryStartFlag.id;
 
-    if (!isLapCompletionPassing(passing)) {
+    if (!isLapCompletionPassing(passing, finishLineNumbers)) {
       previousPassingByLine.set(timingLineKey, passing);
-      passing.isValid = true;
-      passing.isExcluded = false;
       clearCalculatedUnrelatedReason(passing);
-      const sectorLineDuration = validTimeAfterLastLap(passing, previousPassingOnLine);
-      if (sectorLineDuration !== undefined && sectorLineDuration < minimumLapTimeMilliseconds) {
-        setPassingLapUnderMinimum(passing, minimumLapTimeMilliseconds);
-      }
       passing.lapNo = lapNo;
       return;
     }
@@ -428,15 +461,11 @@ const processEntrantLaps = (
       lapNo += 1;
       previousFinishPassing = passing;
       previousPassingByLine.set(timingLineKey, passing);
-      passing.isValid = true;
-      passing.isExcluded = false;
       clearCalculatedUnrelatedReason(passing);
       if (isAfterFinish) {
         hasCountedFirstPassingAfterFinish = true;
       }
     } else {
-      passing.isValid = false;
-      passing.isExcluded = true;
       setPassingLapUnderMinimum(passing, minimumLapTimeMilliseconds);
       if (!isRaceSession) {
         previousFinishPassing = passing;
@@ -501,9 +530,8 @@ export const calculateParticipantLapTimes = (
       passing.lapNo = undefined;
       passing.lapTime = undefined;
       passing.elapsedTime = undefined;
-      passing.isExcluded = true;
-      passing.isValid = false;
       clearCalculatedUnrelatedReason(passing);
+      setPassingBeforeStart(passing);
       return;
     }
     const timingLineKey = getTimingLineKey(passing, finishLineNumbers);
@@ -514,15 +542,9 @@ export const calculateParticipantLapTimes = (
       ? (previousPassingOnLine ? validTimeAfterLastLap(passing, previousPassingOnLine) : passing.elapsedTime)
       : elapsedTimeMilliseconds(lapStartReference.time!, passing.time);
     passing.startingLapRecordId = (finishLine ? previousPassingOnLine?.id : prevFinishPassing?.id) || participantCategoryStartFlag?.id || null;
-    if (!isLapCompletionPassing(passing)) {
+    if (!isLapCompletionPassing(passing, finishLineNumbers)) {
       previousPassingByLine.set(timingLineKey, passing);
-      passing.isExcluded = false;
-      passing.isValid = true;
       clearCalculatedUnrelatedReason(passing);
-      const sectorLineDuration = validTimeAfterLastLap(passing, previousPassingOnLine);
-      if (sectorLineDuration !== undefined && sectorLineDuration < minimumLapTimeMilliseconds) {
-        setPassingLapUnderMinimum(passing, minimumLapTimeMilliseconds);
-      }
       passing.lapNo = onLapNumber;
       passing.lapTime = lapTime;
       return;
@@ -532,12 +554,8 @@ export const calculateParticipantLapTimes = (
       onLapNumber++;
       prevFinishPassing = passing;
       previousPassingByLine.set(timingLineKey, passing);
-      passing.isValid = true;
-      passing.isExcluded = false;
       clearCalculatedUnrelatedReason(passing);
     } else {
-      passing.isExcluded = true;
-      passing.isValid = false;
       setPassingLapUnderMinimum(passing, minimumLapTimeMilliseconds);
       if (!isRaceSession) {
         prevFinishPassing = passing;
@@ -555,7 +573,7 @@ export const getLapTimeCell = (crossing: ParticipantPassingRecord): string => {
   };
   const str = millisecondsToTime(crossing.lapTime!);
 
-  if (crossing.isValid === false || crossing.isExcluded === true) {
+  if (!isPassingValid(crossing) || isPassingExcluded(crossing)) {
     return str.red;
   }
 

@@ -771,6 +771,106 @@ describe('RecentRecords integration', () => {
     expect(secondRow!.className).toContain('selected-category');
   });
 
+  it('updates visible row selection styles before deferring off-screen rows', async () => {
+    vi.useFakeTimers();
+    try {
+      const categoryA: EventCategory = { id: '1', name: 'Category A' };
+      const baseTime = new Date('2026-05-29T10:00:00.000Z').getTime();
+      const records: ParticipantPassingRecord[] = [];
+      const participants = new Map<string, EventParticipant>();
+      const lapsByParticipantId = new Map<string, ParticipantPassingRecord[]>();
+
+      for (let index = 0; index < 160; index += 1) {
+        const participantId = `${index + 1}`;
+        const participant: EventParticipant = {
+          categoryId: categoryA.id,
+          currentResult: undefined,
+          entrantId: participantId,
+          firstname: `Rider ${index + 1}`,
+          id: participantId,
+          identifiers: [{ fromTime: undefined, racePlate: participantId, toTime: undefined }] as unknown as EventParticipant['identifiers'],
+          lastRecordTime: null,
+          resultDuration: null,
+          surname: 'Test',
+        };
+        const crossing: ParticipantPassingRecord = {
+          chipCode: 100000 + index,
+          id: `${2000 + index}`,
+          isValid: true,
+          participantId,
+          recordType: RECORD_TX_CROSSING,
+          sequence: index + 1,
+          source: 'test-source',
+          time: new Date(baseTime + (index * 60000)),
+        } as ParticipantPassingRecord;
+
+        participants.set(participantId, participant);
+        lapsByParticipantId.set(participantId, [crossing]);
+        records.push(crossing);
+      }
+
+      const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+        categories: [categoryA],
+        countTransponderCrossings: () => 1,
+        excludeCrossing: () => undefined,
+        getCategoryById: () => categoryA,
+        getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+        getParticipantById: (participantId) => participants.get(participantId),
+        getParticipantLaps: (participantId) => lapsByParticipantId.get(participantId) || [],
+        getTransponderCrossings: () => [],
+        updateCategoryDetails: () => undefined,
+        updateEntrantCategory: () => undefined,
+        updateParticipantCategory: () => undefined,
+      };
+
+      await act(async () => {
+        root.render(
+          <RecentRecords
+            raceStateLookup={raceStateLookup}
+            records={records}
+            selectedCategories={new Set()}
+            selectedParticipants={new Set()}
+          />
+        );
+      });
+
+      const tableContainer = container.querySelector('.recent-records-table-container') as HTMLDivElement;
+      Object.defineProperty(tableContainer, 'clientHeight', {
+        configurable: true,
+        value: 72,
+      });
+
+      await act(async () => {
+        window.dispatchEvent(new Event('resize'));
+      });
+
+      await act(async () => {
+        root.render(
+          <RecentRecords
+            raceStateLookup={raceStateLookup}
+            records={records}
+            selectedCategories={new Set([categoryA.id])}
+            selectedParticipants={new Set()}
+          />
+        );
+      });
+
+      const firstVisibleRow = container.querySelector(`tr[data-record-id="${records[0]!.id}"]`) as HTMLTableRowElement;
+      const deferredRow = container.querySelector(`tr[data-record-id="${records[150]!.id}"]`) as HTMLTableRowElement;
+
+      expect(firstVisibleRow.className).toContain('selected-category');
+      expect(deferredRow.className).not.toContain('selected-category');
+
+      await act(async () => {
+        vi.runAllTimers();
+      });
+
+      expect(deferredRow.className).toContain('selected-category');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('toggles crossing exclusion from the row context menu while keeping the crossing visible', async () => {
     const categoryA: EventCategory = { id: '1', name: 'Category A' };
     const participant: EventParticipant = {
@@ -1229,7 +1329,7 @@ describe('RecentRecords integration', () => {
     });
     expect(getCrossingCells()[7]?.textContent).toBe('');
     expect(getCrossingCells()[8]?.textContent).toBe('--:--:--.---');
-    expect(getCrossingCells()[9]?.textContent).toBe('');
+    expect(getCrossingCells()[9]?.textContent).toBe('--:--:--.---');
 
     await openFlagMenu();
     await clickMenuItem('Category B');
@@ -2203,6 +2303,18 @@ describe('RecentRecords integration', () => {
       source: 'test-source',
       time: new Date('2026-05-29T10:01:30.000Z'),
     } as ParticipantPassingRecord;
+    const sectorLoopOneCrossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'sector-loop-one-crossing',
+      isValid: true,
+      lineNumber: 5,
+      loopNumber: 1,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 4.5,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:01:35.000Z'),
+    } as ParticipantPassingRecord;
     const explicitNonLapCrossing: ParticipantPassingRecord = {
       chipCode: 100101,
       id: 'explicit-non-lap-crossing',
@@ -2264,6 +2376,7 @@ describe('RecentRecords integration', () => {
       noLoopCrossing,
       speedTrapCrossing,
       sectorLoopCrossing,
+      sectorLoopOneCrossing,
       explicitNonLapCrossing,
       pitEntryLapCrossing,
       tableMarkedLineCrossing,
@@ -2300,6 +2413,7 @@ describe('RecentRecords integration', () => {
       'no-loop-crossing',
       'speed-trap-crossing',
       'sector-loop-crossing',
+      'sector-loop-one-crossing',
       'explicit-non-lap-crossing',
       'pit-entry-lap-crossing',
       'table-marked-line-crossing',
@@ -4052,5 +4166,164 @@ describe('RecentRecords integration', () => {
     expect(row?.className).toContain('excluded');
     expect(row?.querySelector('.unrelated-reason-marker')?.textContent).toBe('!');
     expect(row?.querySelector('.unrelated-reason-marker')?.getAttribute('aria-label')).toBe('Lap time is below minimum of 1:00.0000.');
+  });
+
+  it('shows sector crossing elapsed lap time without an under-minimum warning marker', async () => {
+    const category: EventCategory = { id: 'category-1', name: 'Category A' };
+    const participant: EventParticipant = {
+      categoryId: category.id,
+      currentResult: undefined,
+      entrantId: 'entrant-101',
+      firstname: 'Pat',
+      id: 'participant-101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const crossing = {
+      chipCode: 100101,
+      elapsedTime: 30000,
+      id: 'sector-under-minimum-crossing',
+      isExcluded: false,
+      isLapCompletion: false,
+      isValid: true,
+      lapNo: 0,
+      lapTime: 30000,
+      lineNumber: 5,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      startingLapRecordId: 'start-flag',
+      time: new Date('2026-05-29T10:00:30.000Z'),
+    } as ParticipantPassingRecord;
+    const finishLineCrossing = {
+      chipCode: 100101,
+      elapsedTime: 90000,
+      id: 'finish-line-crossing',
+      isValid: true,
+      lapNo: 1,
+      lapTime: 90000,
+      lineNumber: 1,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source: 'test-source',
+      startingLapRecordId: 'start-flag',
+      time: new Date('2026-05-29T10:01:30.000Z'),
+    } as ParticipantPassingRecord;
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [category],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === category.id ? category : undefined,
+      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getFinishLineNumbers: () => [1],
+      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantLaps: () => [crossing, finishLineCrossing],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[crossing, finishLineCrossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const row = container.querySelector('tr[data-record-id="sector-under-minimum-crossing"]');
+    const cells = Array.from(row?.querySelectorAll('td') || []).map((cell) => cell.textContent || '');
+
+    expect(row?.className).not.toContain('excluded');
+    expect(row?.querySelector('.unrelated-reason-marker')).toBeNull();
+    expect(cells[8]).toBe('0:30.000');
+    expect(cells[cells.length - 1]).toBe('0:30.000');
+  });
+
+  it('shows a non-finish loop 1 crossing as lap time so far when no lap flag is set', async () => {
+    const category: EventCategory = { id: 'category-1', name: 'Category A' };
+    const participant: EventParticipant = {
+      categoryId: category.id,
+      currentResult: undefined,
+      entrantId: 'entrant-101',
+      firstname: 'Pat',
+      id: 'participant-101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const crossing = {
+      chipCode: 100101,
+      elapsedTime: 30000,
+      id: 'sector-loop-one-no-lap-flag-crossing',
+      isValid: true,
+      lapNo: 0,
+      lapTime: 30000,
+      lineNumber: 5,
+      loopNumber: 1,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      startingLapRecordId: 'start-flag',
+      time: new Date('2026-05-29T10:00:30.000Z'),
+    } as ParticipantPassingRecord;
+    const finishLineCrossing = {
+      chipCode: 100101,
+      elapsedTime: 90000,
+      id: 'sector-loop-one-finish-line-reference',
+      isValid: true,
+      lapNo: 1,
+      lapTime: 90000,
+      lineNumber: 1,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source: 'test-source',
+      startingLapRecordId: 'start-flag',
+      time: new Date('2026-05-29T10:01:30.000Z'),
+    } as ParticipantPassingRecord;
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [category],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === category.id ? category : undefined,
+      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getFinishLineNumbers: () => [1],
+      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantLaps: () => [crossing, finishLineCrossing],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[crossing, finishLineCrossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const row = container.querySelector('tr[data-record-id="sector-loop-one-no-lap-flag-crossing"]');
+    const cells = Array.from(row?.querySelectorAll('td') || []).map((cell) => cell.textContent || '');
+
+    expect(row?.className).not.toContain('excluded');
+    expect(row?.querySelector('.unrelated-reason-marker')).toBeNull();
+    expect(cells[8]).toBe('0:30.000');
+    expect(cells[cells.length - 1]).toBe('0:30.000');
   });
 });

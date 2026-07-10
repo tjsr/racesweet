@@ -46,10 +46,16 @@ export const CROSSING_FLAG_NON_LAP_COMPLETION = 0x10; // Indicates a crossing is
 export const CROSSING_UNRELATED_LAP_UNDER_MINIMUM = 'lap-under-minimum';
 export const CROSSING_UNRELATED_NON_LAP_COMPLETION = 'non-lap-completion';
 export const CROSSING_UNRELATED_SESSION_CATEGORY = 'session-category';
+export const CROSSING_UNRELATED_AFTER_FINISH = 'after-finish';
+export const CROSSING_UNRELATED_BEFORE_START = 'before-start';
+export const CROSSING_UNRELATED_NO_START = 'no-start';
 
 export type CrossingUnrelatedReasonCode =
+  | typeof CROSSING_UNRELATED_AFTER_FINISH
+  | typeof CROSSING_UNRELATED_BEFORE_START
   | typeof CROSSING_UNRELATED_LAP_UNDER_MINIMUM
   | typeof CROSSING_UNRELATED_NON_LAP_COMPLETION
+  | typeof CROSSING_UNRELATED_NO_START
   | typeof CROSSING_UNRELATED_SESSION_CATEGORY;
 
 export interface ParticipantPassingRecord extends EventTimeRecord {
@@ -80,6 +86,44 @@ export interface ParticipantPassingRecord extends EventTimeRecord {
 export interface EntrantPassingRecord extends ParticipantPassingRecord {
   entrantId?: EventEntrantId | null | undefined;
 }
+
+const hasCalculatedLapState = (passing: ParticipantPassingRecord): boolean => {
+  return typeof passing.elapsedTime === 'number' ||
+    typeof passing.lapNo === 'number' ||
+    typeof passing.lapTime === 'number' ||
+    passing.startingLapRecordId !== undefined;
+};
+
+export const isPassingExcluded = (passing: ParticipantPassingRecord): boolean => {
+  if (typeof passing.isExcluded === 'boolean') {
+    return passing.isExcluded;
+  }
+
+  if (passing.isManuallyExcluded) {
+    return true;
+  }
+
+  if (passing.unrelatedReasonCode === CROSSING_UNRELATED_LAP_UNDER_MINIMUM) {
+    return passing.isLapCompletion !== false;
+  }
+
+  return passing.unrelatedReasonCode === CROSSING_UNRELATED_AFTER_FINISH ||
+    passing.unrelatedReasonCode === CROSSING_UNRELATED_BEFORE_START ||
+    passing.unrelatedReasonCode === CROSSING_UNRELATED_NO_START ||
+    passing.unrelatedReasonCode === CROSSING_UNRELATED_SESSION_CATEGORY;
+};
+
+export const isPassingValid = (passing: ParticipantPassingRecord): boolean => {
+  if (isPassingExcluded(passing)) {
+    return false;
+  }
+
+  if (typeof passing.isValid === 'boolean') {
+    return passing.isValid;
+  }
+
+  return hasCalculatedLapState(passing);
+};
 
 // export type UnparsedTimeRecord<TE extends TimeRecord> = Omit<TE, 'time'> & {
 //   timeString: string;

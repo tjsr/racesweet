@@ -2,7 +2,16 @@ import type { EventParticipant } from '../model/eventparticipant.js';
 import type { GreenFlagRecord } from '../model/flag.js';
 import { createCategoryId, createEventEntrantId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
 import { calculateParticipantLapTimes, processAllParticipantLaps } from './laps.js';
-import { CROSSING_FLAG_LAP_UNDER_MINIMUM, CROSSING_UNRELATED_LAP_UNDER_MINIMUM, CROSSING_UNRELATED_SESSION_CATEGORY, EVENT_FLAG_DISPLAYED, RECORD_TX_CROSSING, type ParticipantPassingRecord } from '../model/timerecord.js';
+import {
+  CROSSING_FLAG_LAP_UNDER_MINIMUM,
+  CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
+  CROSSING_UNRELATED_SESSION_CATEGORY,
+  EVENT_FLAG_DISPLAYED,
+  RECORD_TX_CROSSING,
+  isPassingExcluded,
+  isPassingValid,
+  type ParticipantPassingRecord,
+} from '../model/timerecord.js';
 
 describe('lap calculation exclusion reasons', () => {
   const createLapCalculationFixture = (): {
@@ -61,12 +70,14 @@ describe('lap calculation exclusion reasons', () => {
 
     expect(passings[0]).toEqual(expect.objectContaining({
       infoFlags: CROSSING_FLAG_LAP_UNDER_MINIMUM,
-      isExcluded: true,
-      isValid: false,
       lapTime: 59999,
       unrelatedReason: 'Lap time is below minimum of 1:00.0000.',
       unrelatedReasonCode: CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
     }));
+    expect(passings[0]).not.toHaveProperty('isExcluded');
+    expect(passings[0]).not.toHaveProperty('isValid');
+    expect(isPassingExcluded(passings[0]!)).toBe(true);
+    expect(isPassingValid(passings[0]!)).toBe(false);
   });
 
   it('ignores race crossings under the minimum lap time when calculating the next lap', () => {
@@ -95,19 +106,23 @@ describe('lap calculation exclusion reasons', () => {
     calculateParticipantLapTimes(startFlag, passings, participant, 60000, 'race');
 
     expect(passings[0]).toEqual(expect.objectContaining({
-      isExcluded: true,
-      isValid: false,
       lapTime: 30000,
       startingLapRecordId: startFlag.id,
       unrelatedReasonCode: CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
     }));
     expect(passings[1]).toEqual(expect.objectContaining({
-      isExcluded: false,
-      isValid: true,
       lapNo: 1,
       lapTime: 90000,
       startingLapRecordId: startFlag.id,
     }));
+    expect(passings[0]).not.toHaveProperty('isExcluded');
+    expect(passings[0]).not.toHaveProperty('isValid');
+    expect(isPassingExcluded(passings[0]!)).toBe(true);
+    expect(isPassingValid(passings[0]!)).toBe(false);
+    expect(passings[1]).not.toHaveProperty('isExcluded');
+    expect(passings[1]).not.toHaveProperty('isValid');
+    expect(isPassingExcluded(passings[1]!)).toBe(false);
+    expect(isPassingValid(passings[1]!)).toBe(true);
   });
 
   it('uses non-race crossings under the minimum lap time as the next lap start reference', () => {
@@ -136,19 +151,90 @@ describe('lap calculation exclusion reasons', () => {
     calculateParticipantLapTimes(startFlag, passings, participant, 60000, 'qualifying');
 
     expect(passings[0]).toEqual(expect.objectContaining({
-      isExcluded: true,
-      isValid: false,
       lapTime: 30000,
       startingLapRecordId: startFlag.id,
       unrelatedReasonCode: CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
     }));
     expect(passings[1]).toEqual(expect.objectContaining({
-      isExcluded: false,
-      isValid: true,
       lapNo: 1,
       lapTime: 60000,
       startingLapRecordId: passings[0]?.id,
     }));
+    expect(passings[0]).not.toHaveProperty('isExcluded');
+    expect(passings[0]).not.toHaveProperty('isValid');
+    expect(isPassingExcluded(passings[0]!)).toBe(true);
+    expect(isPassingValid(passings[0]!)).toBe(false);
+    expect(passings[1]).not.toHaveProperty('isExcluded');
+    expect(passings[1]).not.toHaveProperty('isValid');
+    expect(isPassingExcluded(passings[1]!)).toBe(false);
+    expect(isPassingValid(passings[1]!)).toBe(true);
+  });
+
+  it('keeps sector crossings below the minimum lap time visible without a warning', () => {
+    const { participant, source, startFlag } = createLapCalculationFixture();
+    const passings: ParticipantPassingRecord[] = [
+      {
+        elapsedTime: 30000,
+        id: createTimeRecordId('sector-passing-under-minimum'),
+        isLapCompletion: false,
+        lineNumber: 5,
+        participantId: participant.id,
+        recordType: RECORD_TX_CROSSING,
+        sequence: 2,
+        source,
+        time: new Date('2026-05-29T10:00:30.000Z'),
+      },
+    ];
+
+    calculateParticipantLapTimes(startFlag, passings, participant, 60000, 'race', [1]);
+
+    expect(passings[0]).toEqual(expect.objectContaining({
+      elapsedTime: 30000,
+      lapNo: 0,
+      lapTime: 30000,
+      startingLapRecordId: startFlag.id,
+    }));
+    expect(((passings[0]?.infoFlags ?? 0) & CROSSING_FLAG_LAP_UNDER_MINIMUM)).toBe(0);
+    expect(passings[0]).not.toHaveProperty('unrelatedReason');
+    expect(passings[0]).not.toHaveProperty('unrelatedReasonCode');
+    expect(passings[0]).not.toHaveProperty('isExcluded');
+    expect(passings[0]).not.toHaveProperty('isValid');
+    expect(isPassingExcluded(passings[0]!)).toBe(false);
+    expect(isPassingValid(passings[0]!)).toBe(true);
+  });
+
+  it('treats an unset non-finish loop crossing as sector time so far', () => {
+    const { participant, source, startFlag } = createLapCalculationFixture();
+    const passings: ParticipantPassingRecord[] = [
+      {
+        elapsedTime: 30000,
+        id: createTimeRecordId('sector-passing-without-lap-flag'),
+        lineNumber: 5,
+        loopNumber: 1,
+        participantId: participant.id,
+        recordType: RECORD_TX_CROSSING,
+        sequence: 2,
+        source,
+        time: new Date('2026-05-29T10:00:30.000Z'),
+      },
+    ];
+
+    calculateParticipantLapTimes(startFlag, passings, participant, 60000, 'race', [1]);
+
+    expect(passings[0]).toEqual(expect.objectContaining({
+      elapsedTime: 30000,
+      lapNo: 0,
+      lapTime: 30000,
+      loopNumber: 1,
+      startingLapRecordId: startFlag.id,
+    }));
+    expect(((passings[0]?.infoFlags ?? 0) & CROSSING_FLAG_LAP_UNDER_MINIMUM)).toBe(0);
+    expect(passings[0]).not.toHaveProperty('unrelatedReason');
+    expect(passings[0]).not.toHaveProperty('unrelatedReasonCode');
+    expect(passings[0]).not.toHaveProperty('isExcluded');
+    expect(passings[0]).not.toHaveProperty('isValid');
+    expect(isPassingExcluded(passings[0]!)).toBe(false);
+    expect(isPassingValid(passings[0]!)).toBe(true);
   });
 
   it('excludes participant laps when the participant category is not assigned to the session', () => {
@@ -175,12 +261,12 @@ describe('lap calculation exclusion reasons', () => {
 
     expect(laps.get(participant.id)).toEqual([expect.objectContaining({
       id: crossing.id,
-      isExcluded: true,
-      isValid: false,
       lapNo: undefined,
       unrelatedReason: 'Participant category is not assigned to this session.',
       unrelatedReasonCode: CROSSING_UNRELATED_SESSION_CATEGORY,
     })]);
+    expect(isPassingExcluded(laps.get(participant.id)?.[0]!)).toBe(true);
+    expect(isPassingValid(laps.get(participant.id)?.[0]!)).toBe(false);
     expect(categoryId).not.toBe(otherCategoryId);
   });
 });
