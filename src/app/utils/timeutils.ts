@@ -17,6 +17,19 @@ export type TimeStringOrError = DurationString | 'Unknown time' | 'Invalid time'
 
 export type TimeDisplayZoneMode = 'event' | 'system' | 'gmt';
 
+const isValidTimeTenthOfMillisecond = (value: number | null | undefined): value is number => {
+  return value !== null && value !== undefined && Number.isInteger(value) && value >= 0 && value <= 9;
+};
+
+const appendTimeTenthOfMillisecond = (
+  formattedTime: string,
+  timeTenthOfMillisecond: number | null | undefined
+): string => {
+  return isValidTimeTenthOfMillisecond(timeTenthOfMillisecond)
+    ? `${formattedTime}${timeTenthOfMillisecond}`
+    : formattedTime;
+};
+
 export const getSystemTimeZone = (): string => {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 };
@@ -82,7 +95,11 @@ const describeTimeValue = (time: Date | undefined): string => {
   return `toString="${time.toString()}", getTime=${time.getTime()}`;
 };
 
-export const tableTimeStringInTimeZone = (time: Date | undefined, timeZone: string | undefined): string => {
+export const tableTimeStringInTimeZone = (
+  time: Date | undefined,
+  timeZone: string | undefined,
+  timeTenthOfMillisecond?: number | null
+): string => {
   if (!time) {
     return 'Unknown time';
   }
@@ -97,7 +114,10 @@ export const tableTimeStringInTimeZone = (time: Date | undefined, timeZone: stri
       timeZone: normalizeTimeZone(timeZone),
     });
     const parts = Object.fromEntries(formatter.formatToParts(time).map((part) => [part.type, part.value]));
-    return `${parts.hour}:${parts.minute}:${parts.second}.${parts.fractionalSecond}`;
+    return appendTimeTenthOfMillisecond(
+      `${parts.hour}:${parts.minute}:${parts.second}.${parts.fractionalSecond}`,
+      timeTenthOfMillisecond
+    );
   } catch (error) {
     console.error(`Error formatting time value ${describeTimeValue(time)} for time zone ${timeZone}`);
     throw error;
@@ -155,12 +175,16 @@ export const getElapsedTimeStart = (
   return startTime.time;
 };
 
-export const tableTimeString = (time: Date | undefined, timeZone?: string): string => {
+export const tableTimeString = (
+  time: Date | undefined,
+  timeZone?: string,
+  timeTenthOfMillisecond?: number | null
+): string => {
   if (!time) {
     return 'Unknown time';
   }
   if (timeZone) {
-    return tableTimeStringInTimeZone(time, timeZone);
+    return tableTimeStringInTimeZone(time, timeZone, timeTenthOfMillisecond);
   }
   let timeString: TimeStringOrError = !time ? 'Undefined time' : 'Invalid time';
   try {
@@ -169,7 +193,7 @@ export const tableTimeString = (time: Date | undefined, timeZone?: string): stri
       // Now re-format in a shorter format.
       timeString = tmpTimeString.replace(/(.*T)/, '').replace(/([Z+].*)$/, '') as DurationString;
     }
-    return timeString;
+    return appendTimeTenthOfMillisecond(timeString, timeTenthOfMillisecond);
   } catch (error) {
     console.error(`Error formatting time value ${describeTimeValue(time)} for green flag ${timeString}`);
     throw error;

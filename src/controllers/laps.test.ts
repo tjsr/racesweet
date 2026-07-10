@@ -1,9 +1,8 @@
-import { calculateParticipantLapTimes } from './laps.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { GreenFlagRecord } from '../model/flag.js';
 import { createCategoryId, createEventEntrantId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
-import { EVENT_FLAG_DISPLAYED, RECORD_TX_CROSSING, type ParticipantPassingRecord } from '../model/timerecord.js';
-import { CROSSING_FLAG_LAP_UNDER_MINIMUM, CROSSING_UNRELATED_LAP_UNDER_MINIMUM } from '../model/timerecord.js';
+import { calculateParticipantLapTimes, processAllParticipantLaps } from './laps.js';
+import { CROSSING_FLAG_LAP_UNDER_MINIMUM, CROSSING_UNRELATED_LAP_UNDER_MINIMUM, CROSSING_UNRELATED_SESSION_CATEGORY, EVENT_FLAG_DISPLAYED, RECORD_TX_CROSSING, type ParticipantPassingRecord } from '../model/timerecord.js';
 
 describe('lap calculation exclusion reasons', () => {
   const createLapCalculationFixture = (): {
@@ -150,5 +149,38 @@ describe('lap calculation exclusion reasons', () => {
       lapTime: 60000,
       startingLapRecordId: passings[0]?.id,
     }));
+  });
+
+  it('excludes participant laps when the participant category is not assigned to the session', () => {
+    const { categoryId, participant, source, startFlag } = createLapCalculationFixture();
+    const otherCategoryId = createCategoryId('other-session-category');
+    const crossing: ParticipantPassingRecord = {
+      id: createTimeRecordId('session-category-crossing'),
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source,
+      time: new Date('2026-05-29T10:01:30.000Z'),
+    };
+
+    const laps = processAllParticipantLaps(
+      [startFlag, crossing],
+      new Map([[participant.id, participant]]),
+      60000,
+      true,
+      'race',
+      [1],
+      new Set([otherCategoryId])
+    );
+
+    expect(laps.get(participant.id)).toEqual([expect.objectContaining({
+      id: crossing.id,
+      isExcluded: true,
+      isValid: false,
+      lapNo: undefined,
+      unrelatedReason: 'Participant category is not assigned to this session.',
+      unrelatedReasonCode: CROSSING_UNRELATED_SESSION_CATEGORY,
+    })]);
+    expect(categoryId).not.toBe(otherCategoryId);
   });
 });

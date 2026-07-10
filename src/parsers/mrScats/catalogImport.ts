@@ -707,7 +707,15 @@ const getElapsedMilliseconds = (record: MrScatsDbfRecord, fields: string[] = CRO
 };
 
 const getRawElapsedMilliseconds = (record: CtcRawCrossingRecord): number => {
-  return (record.rawTimeTicks / CROSSING_ELAPSED_TICKS_PER_SECOND) * 1000;
+  return Math.trunc(record.rawTimeTicks / (CROSSING_ELAPSED_TICKS_PER_SECOND / 1000));
+};
+
+const elapsedTicksToMilliseconds = (elapsedTicks: number): number => {
+  return Math.trunc(elapsedTicks / (CROSSING_ELAPSED_TICKS_PER_SECOND / 1000));
+};
+
+const getTimeTenthOfMillisecond = (elapsedTicks: number): number => {
+  return Math.abs(Math.trunc(elapsedTicks)) % 10;
 };
 
 const getGreenElapsedMilliseconds = (records: MrScatsDbfRecord[]): number => {
@@ -715,7 +723,7 @@ const getGreenElapsedMilliseconds = (records: MrScatsDbfRecord[]): number => {
     .map((record) => getFirstNumber(record, CROSSING_GREEN_ELAPSED_FIELDS))
     .find((value): value is number => value !== undefined);
   if (explicitElapsed !== undefined) {
-    return (explicitElapsed / CROSSING_ELAPSED_TICKS_PER_SECOND) * 1000;
+    return elapsedTicksToMilliseconds(explicitElapsed);
   }
 
   const flaggedRecord = records.find((record) => {
@@ -770,7 +778,7 @@ const shouldTreatElapsedTicksAsTimeOfDay = (
     return false;
   }
 
-  const millisecondsSinceMidnight = (elapsedTicks / CROSSING_ELAPSED_TICKS_PER_SECOND) * 1000;
+  const millisecondsSinceMidnight = elapsedTicksToMilliseconds(elapsedTicks);
   const scheduledMilliseconds = getTimeZoneMillisecondsSinceMidnight(scheduledStartTime);
   const directDifference = Math.abs(millisecondsSinceMidnight - scheduledMilliseconds);
   const wrappedDifference = CROSSING_MILLISECONDS_PER_DAY - directDifference;
@@ -781,22 +789,26 @@ const getCrossingTime = (
   record: MrScatsDbfRecord,
   scheduledStartTime: Date,
   sessionElapsedZeroTime: Date
-): { elapsedMilliseconds: number; time: Date } | undefined => {
+): { elapsedMilliseconds: number; elapsedTicks: number; time: Date; timeTenthOfMillisecond: number } | undefined => {
   const entryTimeMatch = getFirstNumberMatch(record, ['ENTRYTIME']);
   if (entryTimeMatch) {
-    const elapsedMilliseconds = (entryTimeMatch.value / CROSSING_ELAPSED_TICKS_PER_SECOND) * 1000;
+    const elapsedMilliseconds = elapsedTicksToMilliseconds(entryTimeMatch.value);
     return {
       elapsedMilliseconds,
+      elapsedTicks: entryTimeMatch.value,
       time: new Date(sessionElapsedZeroTime.getTime() + elapsedMilliseconds),
+      timeTenthOfMillisecond: getTimeTenthOfMillisecond(entryTimeMatch.value),
     };
   }
 
   const elapsedClockMatch = getFirstNumberMatch(record, ['ELAPSED']);
   if (elapsedClockMatch && shouldTreatElapsedTicksAsTimeOfDay(scheduledStartTime, elapsedClockMatch.value)) {
-    const elapsedMilliseconds = (elapsedClockMatch.value / CROSSING_ELAPSED_TICKS_PER_SECOND) * 1000;
+    const elapsedMilliseconds = elapsedTicksToMilliseconds(elapsedClockMatch.value);
     return {
       elapsedMilliseconds,
+      elapsedTicks: elapsedClockMatch.value,
       time: createTimeOfDayDateNearSession(scheduledStartTime, elapsedMilliseconds),
+      timeTenthOfMillisecond: getTimeTenthOfMillisecond(elapsedClockMatch.value),
     };
   }
 
@@ -805,10 +817,12 @@ const getCrossingTime = (
     return undefined;
   }
 
-  const elapsedMilliseconds = (elapsedMatch.value / CROSSING_ELAPSED_TICKS_PER_SECOND) * 1000;
+  const elapsedMilliseconds = elapsedTicksToMilliseconds(elapsedMatch.value);
   return {
     elapsedMilliseconds,
+    elapsedTicks: elapsedMatch.value,
     time: new Date(sessionElapsedZeroTime.getTime() + elapsedMilliseconds),
+    timeTenthOfMillisecond: getTimeTenthOfMillisecond(elapsedMatch.value),
   };
 };
 
@@ -859,6 +873,15 @@ const parseRawTimeOfDay = (timeText: string | undefined, fallbackTime: Date): Da
   return explicitTimeOfDayMilliseconds === undefined
     ? fallbackTime
     : createTimeOfDayDateNearSession(fallbackTime, explicitTimeOfDayMilliseconds);
+};
+
+const getRawTimeTenthOfMillisecond = (timeText: string | undefined, fallbackTicks: number): number => {
+  const explicitTimeMatch = timeText ? /^(\d{2}):(\d{2}):(\d{2})\.(\d{4})$/.exec(timeText) : undefined;
+  if (explicitTimeMatch) {
+    return Number(explicitTimeMatch[4]) % 10;
+  }
+
+  return getTimeTenthOfMillisecond(fallbackTicks);
 };
 
 const createSessionGreenResumeFlag = (
@@ -944,7 +967,7 @@ const createCrossingRecord = (
     asString(record.COUNTER) || `${rowIndex + 1}`,
     transponder === undefined ? '' : transponder.toString(),
     plateNumber,
-    crossingTime.elapsedMilliseconds.toString(),
+    crossingTime.elapsedTicks.toString(),
   ].join(':');
   const baseRecord: ParticipantPassingRecord = {
     dataLine: JSON.stringify(record),
@@ -960,6 +983,7 @@ const createCrossingRecord = (
     sessionId: session.id,
     source,
     time: crossingTime.time,
+    timeTenthOfMillisecond: crossingTime.timeTenthOfMillisecond,
   };
 
   if (transponder !== undefined) {
@@ -1029,6 +1053,7 @@ const createRawCrossingRecord = (
     sessionId: session.id,
     source,
     time,
+    timeTenthOfMillisecond: getRawTimeTenthOfMillisecond(record.timeText, record.rawTimeTicks),
   };
 
   if (transponderLooksLikePlateNumber) {
@@ -1152,7 +1177,15 @@ const buildSessionRecords = async (
         .filter((record): record is EventTimeRecord => record !== undefined));
     }
     const crossingRecords = [...dbfCrossingRecords, ...rawFlagRecords, ...rawCrossingRecords]
-      .sort((left, right) => (left.time?.getTime() || 0) - (right.time?.getTime() || 0))
+      .sort((left, right) => {
+        const leftTime = left.time?.getTime() || 0;
+        const rightTime = right.time?.getTime() || 0;
+        if (leftTime !== rightTime) {
+          return leftTime - rightTime;
+        }
+
+        return (left.timeTenthOfMillisecond || 0) - (right.timeTenthOfMillisecond || 0);
+      })
       .map((record, index): EventTimeRecord => ({
         ...record,
         sequence: index + 2,

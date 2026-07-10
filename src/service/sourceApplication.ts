@@ -22,6 +22,7 @@ interface SessionSourceSink {
   records: TimeRecord[];
   setFinishLineNumbers?(finishLineNumbers: number[] | undefined): void;
   setMinimumLapTimeMilliseconds?(minimumLapTimeMilliseconds: number | undefined): void;
+  setSessionValidCategoryIds?(sessionValidCategoryIds: Set<string> | undefined): void;
   setSessionKind?(sessionKind: EventSessionKind | undefined): void;
 }
 
@@ -48,6 +49,21 @@ export const getSessionKindForSession = (
   sessionId: string | undefined
 ): EventSessionKind | undefined => {
   return catalog?.sessions.find((item) => item.id === sessionId)?.kind;
+};
+
+export const getSessionAssignedCategoryIds = (
+  catalog: EventCatalogState | undefined,
+  eventId: string | undefined,
+  sessionId: string | undefined
+): Set<string> | undefined => {
+  if (!catalog || !eventId || !sessionId) {
+    return undefined;
+  }
+
+  const session = catalog.sessions.find((item) => item.id === sessionId && item.eventId === eventId);
+  const assignedCategoryIds = (session?.categoryIds || []).map((categoryId) => categoryId.toString());
+
+  return assignedCategoryIds.length > 0 ? new Set(assignedCategoryIds) : undefined;
 };
 
 interface EntrantCatalogMatch {
@@ -349,6 +365,11 @@ export const applyPulledRaceStateToSession = async (
   const bulkStarted = await sessionState.beginBulkProcess?.() === true;
   try {
     sessionState.setMinimumLapTimeMilliseconds?.(getMinimumLapTimeMillisecondsForSession(
+      options.catalog,
+      options.eventId,
+      options.sessionId
+    ));
+    sessionState.setSessionValidCategoryIds?.(getSessionAssignedCategoryIds(
       options.catalog,
       options.eventId,
       options.sessionId

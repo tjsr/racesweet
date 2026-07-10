@@ -3169,6 +3169,67 @@ describe('RecentRecords integration', () => {
     expect(cells[6]).toBe('Category A');
   });
 
+  it('resolves transmitter-only crossings to recognised entrants and marks other-session rows excluded', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const categoryB: EventCategory = { id: '2', name: 'Category B' };
+    const participant: EventParticipant = {
+      categoryId: categoryB.id,
+      currentResult: undefined,
+      entrantId: 'entrant-404',
+      firstname: 'Previous',
+      id: 'participant-404',
+      identifiers: [{ fromTime: undefined, toTime: undefined, txNo: 404404 }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Competitor',
+    };
+    const crossing = {
+      chipCode: 404404,
+      id: 'tx-only-crossing',
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    } as ParticipantPassingRecord;
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
+      categories: [categoryA, categoryB],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => [categoryA, categoryB].find((category) => category.id === categoryId),
+      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantLaps: () => undefined,
+      getTransponderCrossings: () => [],
+      participants: [participant],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[crossing]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+          sessionValidCategoryIds={new Set([categoryA.id])}
+        />
+      );
+    });
+
+    const row = container.querySelector('tr[data-record-id="tx-only-crossing"]');
+    expect(row).not.toBeNull();
+    const cells = Array.from(row!.querySelectorAll('td')).map((cell) => cell.textContent || '');
+
+    expect(row!.className).toContain('unrelated');
+    expect(row!.className).toContain('excluded');
+    expect(cells[2]).toBe('Tx404404');
+    expect(cells[4]).toBe('?');
+    expect(cells[5]).toBe('Previous Competitor');
+    expect(cells[6]).toContain('Category B (unrelated)');
+  });
+
   it('selects unrecognised plate crossings, opens edit actions, and highlights matching plate rows', async () => {
     const categoryA: EventCategory = { id: '1', name: 'Category A' };
     const firstCrossing = {

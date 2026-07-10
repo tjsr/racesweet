@@ -269,6 +269,81 @@ describe('TimingContext integration', () => {
     ]);
   });
 
+  it('displays passing times with four decimal places when tenth-millisecond precision is present', async () => {
+    const event: EventCatalogState['events'][number] = {
+      categoryIds: [],
+      date: '2026-05-29',
+      entrantIds: [],
+      format: 'race-weekend',
+      id: 'event-1',
+      name: 'RaceSweet Test Event',
+      sessionIds: ['session-1'],
+    };
+    const session: EventCatalogState['sessions'][number] = {
+      categoryIds: [],
+      eventId: event.id,
+      id: 'session-1',
+      kind: 'race',
+      name: 'Feature Race',
+      scheduledStart: '2026-05-29T00:00:00.000Z',
+      status: 'scheduled',
+    };
+    const crossing: ParticipantPassingRecord = {
+      chipCode: 100101,
+      id: 'crossing-precision',
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source: 'test-source',
+      time: new Date('2026-05-29T00:06:00.123Z'),
+      timeTenthOfMillisecond: 4,
+    } as ParticipantPassingRecord;
+    const raceState: RaceStateLookup & { categories: EventCategory[]; records: ParticipantPassingRecord[] } = {
+      categories: [],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: () => undefined,
+      getEntrantIdForParticipant: () => undefined,
+      getParticipantById: () => undefined,
+      getParticipantLaps: () => [crossing],
+      getTransponderCrossings: () => [],
+      records: [crossing],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <TimingContext
+          activeSession={session}
+          categoryListSelected={() => undefined}
+          eventTimeZone="Australia/Sydney"
+          events={[event]}
+          onAddRecord={() => undefined}
+          onEditRecord={() => undefined}
+          onAssignFlagCategory={() => undefined}
+          onChangeCategory={() => undefined}
+          onExclude={() => undefined}
+          onMarkFlagDeleted={() => undefined}
+          onRemoveFlagCategory={() => undefined}
+          onSelectEvent={() => undefined}
+          onSelectSession={() => undefined}
+          onTimeDisplayZoneModeChange={() => undefined}
+          participantSelected={() => undefined}
+          raceState={raceState}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+          sessions={[session]}
+          timeDisplayZoneMode="event"
+          timingEvent={event}
+          timingSessionValue="active"
+        />
+      );
+    });
+
+    expect(container.textContent).toContain('10:06:00.1234');
+  });
+
   it('shows loading spinners next to the event and session selectors while timing selection is loading', async () => {
     const event: EventCatalogState['events'][number] = {
       categoryIds: [],

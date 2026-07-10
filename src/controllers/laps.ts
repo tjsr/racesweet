@@ -10,7 +10,7 @@ import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.js";
 
 import type { EventEntrantId } from "../model/entrant.js";
 import type { EventCategoryId } from "../model/eventcategory.js";
-import { CROSSING_FLAG_LAP_UNDER_MINIMUM, CROSSING_FLAG_NON_LAP_COMPLETION, CROSSING_UNRELATED_LAP_UNDER_MINIMUM, CROSSING_UNRELATED_NON_LAP_COMPLETION, EVENT_SESSION_END } from "../model/timerecord.js";
+import { CROSSING_FLAG_LAP_UNDER_MINIMUM, CROSSING_FLAG_NON_LAP_COMPLETION, CROSSING_UNRELATED_LAP_UNDER_MINIMUM, CROSSING_UNRELATED_NON_LAP_COMPLETION, CROSSING_UNRELATED_SESSION_CATEGORY, EVENT_SESSION_END } from "../model/timerecord.js";
 import { warn } from "../utils.js";
 import { setCategoryStartForPassings } from "./category.js";
 import { entrantHasAnyTx } from "./participantMatch.js";
@@ -18,6 +18,7 @@ import { compareByTime } from './timerecord.js';
 
 const MINIMUM_LAP_TIME_SECONDS = 300;
 const DEFAULT_FINISH_LINE_NUMBERS = [1];
+const SESSION_CATEGORY_UNRELATED_REASON = 'Participant category is not assigned to this session.';
 
 const isRaceSessionKind = (sessionKind: EventSessionKind | undefined): boolean => {
   return sessionKind === undefined || sessionKind === 'race';
@@ -70,10 +71,35 @@ const clearCalculatedUnrelatedReason = (passing: ParticipantPassingRecord): void
   passing.infoFlags = (passing.infoFlags || 0) & ~CROSSING_FLAG_LAP_UNDER_MINIMUM & ~CROSSING_FLAG_NON_LAP_COMPLETION;
   if (
     passing.unrelatedReasonCode === CROSSING_UNRELATED_LAP_UNDER_MINIMUM ||
-    passing.unrelatedReasonCode === CROSSING_UNRELATED_NON_LAP_COMPLETION
+    passing.unrelatedReasonCode === CROSSING_UNRELATED_NON_LAP_COMPLETION ||
+    passing.unrelatedReasonCode === CROSSING_UNRELATED_SESSION_CATEGORY
   ) {
     setPassingUnrelatedReason(passing, undefined, undefined);
   }
+};
+
+const isParticipantAssignedToSession = (
+  participant: EventParticipant,
+  sessionValidCategoryIds: Set<EventCategoryId> | undefined
+): boolean => {
+  if (!sessionValidCategoryIds || sessionValidCategoryIds.size === 0) {
+    return true;
+  }
+
+  return !!participant.categoryId && sessionValidCategoryIds.has(participant.categoryId);
+};
+
+const excludeParticipantPassingsForSessionCategory = (
+  participantPassings: ParticipantPassingRecord[]
+): void => {
+  participantPassings.forEach((passing) => {
+    resetPassingLapState(passing);
+    setPassingUnrelatedReason(
+      passing,
+      CROSSING_UNRELATED_SESSION_CATEGORY,
+      SESSION_CATEGORY_UNRELATED_REASON
+    );
+  });
 };
 
 const isLapCompletionPassing = (passing: ParticipantPassingRecord): boolean => passing.isLapCompletion !== false;
@@ -208,7 +234,8 @@ export const processAllParticipantLaps = (
   minimumLapTimeMilliseconds: number = MINIMUM_LAP_TIME_SECONDS * 1000, // Default to 60 seconds if not provided
   silenceWarnings: boolean = false,
   sessionKind: EventSessionKind | undefined = 'race',
-  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS
+  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS,
+  sessionValidCategoryIds: Set<EventCategoryId> | undefined = undefined
 ): Map<EventParticipantId, ParticipantPassingRecord[]> => {
   const participantTimesMap = new Map<EventParticipantId, ParticipantPassingRecord[]>();
   const entrantParticipantMap = new Map<EventEntrantId, EventParticipant[]>();
@@ -247,6 +274,11 @@ export const processAllParticipantLaps = (
     }
     const participantPassings = getPassingsForParticipant(participantId, allTimeRecords);
     participantPassings.forEach(resetPassingLapState);
+    if (!isParticipantAssignedToSession(participant, sessionValidCategoryIds)) {
+      excludeParticipantPassingsForSessionCategory(participantPassings);
+      participantTimesMap.set(participantId, participantPassings);
+      return;
+    }
     if (participantPassings.length === 0) {
       const txpart = entrantHasAnyTx(participant) ? `Tx${getParticipantTransponders(participant)}` : 'no assigned timing devices';
       const msg = `Participant ${getParticipantNumber(participant)} with ${txpart} has no passings.  Has assignParticpantsToCrossings() been called?`;

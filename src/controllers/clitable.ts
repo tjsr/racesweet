@@ -30,7 +30,7 @@ export const getTable = (): Table.Table => {
 export const crossingTableRow = (passing: ParticipantPassingRecord, categoryList: EventCategory[], rs: RaceStateLookup): Cell[] => {
   const ant = ''; // (crossing as unknown as any).antenna ?? '';
 
-  const timeString = tableTimeString(passing.time);
+  const timeString = tableTimeString(passing.time, undefined, passing.timeTenthOfMillisecond);
   const identifier: string = getTimeRecordIdentifier(passing, true);
   const entrant = passing.participantId ? rs.getParticipantById(passing.participantId) : undefined;
   let plateNumber: string | number | undefined = undefined;
@@ -83,7 +83,7 @@ export const crossingTableRow = (passing: ParticipantPassingRecord, categoryList
 };
 
 export const flagTableRow = (record: FlagRecord, categoryList: EventCategory[]): Cell[] => {
-  let timeString = tableTimeString(record.time);
+  let timeString = tableTimeString(record.time, undefined, record.timeTenthOfMillisecond);
   let flagText = 'Flag event';
   let categoryText = categoryTextString(record.categoryIds || [], categoryList);
   if (isGreenFlag(record)) {

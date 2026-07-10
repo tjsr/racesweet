@@ -18,6 +18,10 @@ describe('millisecondsToTime', () => {
 });
 
 describe('tableTimeStringInTimeZone', () => {
+  it('renders a fourth fractional digit when present on the record', () => {
+    expect(tableTimeStringInTimeZone(new Date('2026-05-29T00:06:00.123Z'), 'Australia/Sydney', 4)).toBe('10:06:00.1234');
+  });
+
   it('logs the invalid date value when formatting fails', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const invalidDate = new Date('not-a-date');

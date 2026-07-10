@@ -159,17 +159,24 @@ describe('sourceApplication', () => {
     const endBulkProcess = vi.fn(async () => undefined);
     const setFinishLineNumbers = vi.fn();
     const setMinimumLapTimeMilliseconds = vi.fn();
+    const setSessionValidCategoryIds = vi.fn();
     const setSessionKind = vi.fn();
     const eventId = createEventId('11111111-1111-4111-8111-111111111111');
     const sessionId = createSessionId('22222222-2222-4222-8222-222222222222');
+    const categoryId = createCategoryId('session-assigned-category');
     const catalog: EventCatalogState = {
       activeEventId: eventId,
       activeSessionId: sessionId,
-      categories: [],
+      categories: [{
+        code: 'CAT',
+        eventId,
+        id: categoryId,
+        name: 'Assigned Category',
+      }],
       deletedEventIds: [],
       entrants: [],
       events: [{
-        categoryIds: [],
+        categoryIds: [categoryId],
         date: '2026-07-07',
         entrantIds: [],
         format: 'race-weekend',
@@ -179,7 +186,7 @@ describe('sourceApplication', () => {
         sessionIds: [sessionId],
       }],
       sessions: [{
-        categoryIds: [],
+        categoryIds: [categoryId],
         eventId,
         id: sessionId,
         kind: 'race',
@@ -201,6 +208,7 @@ describe('sourceApplication', () => {
         records: [],
         setFinishLineNumbers,
         setMinimumLapTimeMilliseconds,
+        setSessionValidCategoryIds,
         setSessionKind,
       },
       {
@@ -220,6 +228,7 @@ describe('sourceApplication', () => {
     expect(getSessionKindForSession(catalog, sessionId)).toBe('race');
     expect(setFinishLineNumbers).toHaveBeenCalledWith([2, 7]);
     expect(setMinimumLapTimeMilliseconds).toHaveBeenCalledWith(45000);
+    expect(setSessionValidCategoryIds).toHaveBeenCalledWith(new Set([categoryId]));
     expect(setSessionKind).toHaveBeenCalledWith('race');
     expect(endBulkProcess).toHaveBeenCalledTimes(1);
   });

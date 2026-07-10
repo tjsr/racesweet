@@ -26,6 +26,7 @@ export interface TimeRecord extends WithId<TimeRecordId> {
   recordType: number;
   source: TimeRecordSourceId;
   time?: Date;
+  timeTenthOfMillisecond?: number | null | undefined;
   timeString?: string | null | undefined;
   dataLine?: string | null | undefined;
   originRecordNumber?: number;
@@ -44,10 +45,12 @@ export const CROSSING_FLAG_NON_LAP_COMPLETION = 0x10; // Indicates a crossing is
 
 export const CROSSING_UNRELATED_LAP_UNDER_MINIMUM = 'lap-under-minimum';
 export const CROSSING_UNRELATED_NON_LAP_COMPLETION = 'non-lap-completion';
+export const CROSSING_UNRELATED_SESSION_CATEGORY = 'session-category';
 
 export type CrossingUnrelatedReasonCode =
   | typeof CROSSING_UNRELATED_LAP_UNDER_MINIMUM
-  | typeof CROSSING_UNRELATED_NON_LAP_COMPLETION;
+  | typeof CROSSING_UNRELATED_NON_LAP_COMPLETION
+  | typeof CROSSING_UNRELATED_SESSION_CATEGORY;
 
 export interface ParticipantPassingRecord extends EventTimeRecord {
   id: PassingRecordId;

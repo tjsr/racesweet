@@ -255,8 +255,8 @@ describe('MR-SCATS catalog import parser', () => {
       { length: 8, name: 'STARTELAP', type: 'N' },
       { length: 4, name: 'COUNTER', type: 'N' },
     ], [
-      { CARNUMBER: 42, COUNTER: 7, ELAPSED: 10000, STARTELAP: 20000, TXNUM: 1001 },
-      { CARNUMBER: 42, COUNTER: 8, ELAPSED: 25000, STARTELAP: 20000, TXNUM: 1001 },
+      { CARNUMBER: 42, COUNTER: 7, ELAPSED: 10006, STARTELAP: 20009, TXNUM: 1001 },
+      { CARNUMBER: 42, COUNTER: 8, ELAPSED: 25009, STARTELAP: 20009, TXNUM: 1001 },
     ]));
 
     const firstImport = await loadMrScatsCatalogFromLocation(tempDir);
@@ -278,12 +278,14 @@ describe('MR-SCATS catalog import parser', () => {
       sessionId: firstImport.sessions[0]?.id,
       source: createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.DBF'),
       time: new Date('1997-06-28T23:04:59.000Z'),
+      timeTenthOfMillisecond: 6,
     }));
     expect(records[2]).toEqual(expect.objectContaining({
       chipCode: 1001,
       originRecordNumber: 2,
       source: createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.DBF'),
       time: new Date('1997-06-28T23:05:00.500Z'),
+      timeTenthOfMillisecond: 9,
     }));
     expect(firstImport.raceState.timeRecordSources).toEqual([
       expect.objectContaining({
@@ -511,7 +513,7 @@ describe('MR-SCATS catalog import parser', () => {
       { length: 3, name: 'LINE_NO', type: 'N' },
       { length: 3, name: 'LANE_NO', type: 'N' },
     ], [
-      { CAR: 42, ELAPSED: 756300006, ENTRYTIME: 300000, LANE_NO: 9, LINE_NO: 3, TXNUM: 1001 },
+      { CAR: 42, ELAPSED: 756300006, ENTRYTIME: 300006, LANE_NO: 9, LINE_NO: 3, TXNUM: 1001 },
     ]));
 
     const imported = await loadMrScatsCatalogFromLocation(tempDir);
@@ -528,6 +530,7 @@ describe('MR-SCATS catalog import parser', () => {
       lineNumber: 3,
       loopNumber: 9,
       plateNumber: '42',
+      timeTenthOfMillisecond: 6,
     }));
     expect(crossings[1]).toEqual(expect.objectContaining({
       isLapCompletion: true,
@@ -767,7 +770,7 @@ describe('MR-SCATS catalog import parser', () => {
     ], [
       { CARNUMBER: 8, DRIVER: 'Legacy Raw', DRIV_CLASS: 'CAT-A', TXNUM: 6008 },
     ]));
-    await writeFile(path.join(tempDir, 'W9721R01.SRT'), '600817997112730008179971116300 071 13:25:11.6300 00\r');
+    await writeFile(path.join(tempDir, 'W9721R01.SRT'), '600817997112730108179971116301 071 13:25:11.6301 00\r');
 
     const imported = await loadMrScatsCatalogFromLocation(tempDir);
     const crossing = imported.raceState.records?.[1] as Record<string, unknown> | undefined;
@@ -775,6 +778,7 @@ describe('MR-SCATS catalog import parser', () => {
     expect(crossing).toEqual(expect.objectContaining({
       chipCode: 6008,
       time: new Date('1997-06-29T03:25:11.630Z'),
+      timeTenthOfMillisecond: 1,
     }));
   });
 

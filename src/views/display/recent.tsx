@@ -98,6 +98,32 @@ const participantMapFromLookup = (raceStateLookup: RaceStateLookup): Map<EventPa
   return new Map(participantArrayFromLookup(raceStateLookup).map((participant) => [participant.id, participant]));
 };
 
+const resolveCrossingParticipant = (
+  passing: ParticipantPassingRecord,
+  raceStateLookup: RaceStateLookup
+): EventParticipant | undefined => {
+  if (passing.participantId) {
+    return raceStateLookup.getParticipantById(passing.participantId);
+  }
+
+  const participantMap = participantMapFromLookup(raceStateLookup);
+  const automaticIdentifier = getAutomaticIdentifier(passing);
+  if (automaticIdentifier !== undefined && automaticIdentifier > 0) {
+    const txMatch = findEntrantByChipCode(participantMap, automaticIdentifier, passing.time);
+    if (txMatch) {
+      return txMatch;
+    }
+  }
+
+  const recordPlateNumber = (passing as ParticipantPassingRecord & { plateNumber?: string | number }).plateNumber;
+  const normalizedRecordPlateNumber = recordPlateNumber === undefined || recordPlateNumber === null ? undefined : recordPlateNumber.toString().trim();
+  if (normalizedRecordPlateNumber) {
+    return findEntrantByPlateNumber(participantMap, normalizedRecordPlateNumber, passing.time);
+  }
+
+  return undefined;
+};
+
 const resolveParticipantForManualEntry = (
   participantMap: Map<EventParticipantId, EventParticipant>,
   txNo: string,
@@ -437,7 +463,7 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
       }}>
       <TableCell colSpan={1}>{record.sequence}</TableCell>
       <TableCell colSpan={2}>{flagText}</TableCell>
-      <TableCell colSpan={1}>{tableTimeString(record.time, props.timeZone)}</TableCell>
+      <TableCell colSpan={1}>{tableTimeString(record.time, props.timeZone, record.timeTenthOfMillisecond)}</TableCell>
       <TableCell colSpan={4}>{categoryText}</TableCell>
       <TableCell colSpan={props.showSectorColumn ? 3 : 2}>{elapsedTime}</TableCell>
     </TableRow>
@@ -659,6 +685,7 @@ interface PassingRecordRowProps {
   lapTimeIndicators?: LapTimeIndicators;
   passing: ParticipantPassingRecord;
   raceStateLookup: RaceStateLookup;
+  resolvedParticipant?: EventParticipant;
   selectedCategories: Set<EventCategoryId> | undefined;
   selectedPlateNumber?: string;
   selectedParticipants: Set<EventParticipantId> | undefined;
@@ -691,9 +718,10 @@ export const PassingRecordRow = (
   const normalizedRecordPlateNumber = recordPlateNumber === undefined || recordPlateNumber === null ? undefined : recordPlateNumber.toString().trim();
   const automaticIdentifier = getAutomaticIdentifier(passing);
   const txNo = automaticIdentifier !== undefined && automaticIdentifier > 0 ? automaticIdentifier : undefined;
+  const resolvedParticipant = props.resolvedParticipant || resolveCrossingParticipant(passing, rs);
   const handleSelect = (): void => {
     props.onSelectRecord?.(passing.id);
-    if (passing.participantId) {
+    if (resolvedParticipant) {
       props.onSelectUnrecognisedPlateNumber?.(undefined);
     } else {
       props.onSelectUnrecognisedPlateNumber?.(normalizedRecordPlateNumber);
@@ -729,8 +757,8 @@ export const PassingRecordRow = (
   };
 
   const handleChangeCategory = (categoryId: EventCategoryId) => {
-    if (props.onChangeCategory && passing.participantId) {
-      props.onChangeCategory(passing.participantId, categoryId);
+    if (props.onChangeCategory && resolvedParticipant) {
+      props.onChangeCategory(resolvedParticipant.id, categoryId);
     }
     handleClose();
   };
@@ -744,15 +772,10 @@ export const PassingRecordRow = (
   };
 
   let categoryStr = undefined;
-  const timeString = tableTimeString(passing.time, props.timeZone);
+  const timeString = tableTimeString(passing.time, props.timeZone, passing.timeTenthOfMillisecond);
   const identifier: string = txNo !== undefined ? `Tx${txNo}` : '';
   const timingPoint = formatPassingTimingPoint(passing);
-  const participantMap = participantMapFromLookup(rs);
-  const entrant = passing.participantId
-    ? rs.getParticipantById(passing.participantId)
-    : normalizedRecordPlateNumber
-      ? findEntrantByPlateNumber(participantMap, normalizedRecordPlateNumber, passing.time)
-      : undefined;
+  const entrant = resolvedParticipant;
   let plateNumber: string | number | undefined = undefined;
   let entrantName: string | undefined = undefined;
   let lapNo: string = '';
@@ -762,11 +785,11 @@ export const PassingRecordRow = (
 
   let className = passing.isValid ? 'passing' : 'invalid-passing';
   let cellClasses = '';
+  let isUnrelatedToSession = false;
 
-  if (passing.participantId) {
-    const participant = props.raceStateLookup.getParticipantById(passing.participantId);
+  if (resolvedParticipant) {
     const categoryLookup = props.raceStateLookup.getCategoryById.bind(props.raceStateLookup);
-    categoryStr = participant ? categoryStringFromParticipant(participant, categoryLookup) : undefined;
+    categoryStr = categoryStringFromParticipant(resolvedParticipant, categoryLookup);
   }
 
   if (entrant) {
@@ -801,8 +824,8 @@ export const PassingRecordRow = (
 
     if (props.sessionValidCategoryIds) {
       const entrantCategoryIds = getParticipantSessionCategoryIds(entrant, rs);
-      const isRelatedToSession = entrantCategoryIds.some((categoryId) => props.sessionValidCategoryIds?.has(categoryId));
-      if (!isRelatedToSession) {
+      isUnrelatedToSession = !entrantCategoryIds.some((categoryId) => props.sessionValidCategoryIds?.has(categoryId));
+      if (isUnrelatedToSession) {
         className += ' unrelated';
         cellClasses += ' unrelated';
         categoryStr = categoryStr ? `${categoryStr} (unrelated)` : 'Unrelated';
@@ -810,13 +833,13 @@ export const PassingRecordRow = (
     }
   }
 
-  if (passing.isExcluded) {
+  if (passing.isExcluded || isUnrelatedToSession) {
     className += ' excluded';
   }
   if (passing.id === props.selectedRecordId) {
     className += ' selected-row';
   }
-  if (!passing.participantId && normalizedRecordPlateNumber && normalizedRecordPlateNumber === props.selectedPlateNumber) {
+  if (!resolvedParticipant && normalizedRecordPlateNumber && normalizedRecordPlateNumber === props.selectedPlateNumber) {
     className += ' selected-plate-number';
     cellClasses += ' selected-plate-number';
   }
@@ -889,7 +912,7 @@ export const PassingRecordRow = (
           {passing.isExcluded ? 'Include crossing' : 'Exclude crossing'}
         </MenuItem>
         
-        {passing.participantId && allCategories.length > 0 && [
+        {resolvedParticipant && allCategories.length > 0 && [
           <MenuItem key="cat-header" disabled sx={{ fontWeight: 'bold', opacity: '1 !important' }}>
             Change Category
           </MenuItem>,
@@ -897,7 +920,7 @@ export const PassingRecordRow = (
             <MenuItem 
               key={cat.id} 
               onClick={() => handleChangeCategory(cat.id)}
-              selected={entrant?.categoryId === cat.id}
+              selected={resolvedParticipant.categoryId === cat.id}
               sx={{ pl: 4 }}
             >
               {cat.name}
@@ -943,11 +966,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
     passing = record as ParticipantPassingRecord;
 
     const passingRecordSelected = (passingRecord: ParticipantPassingRecord): void => {
-      if (!passingRecord.participantId) {
-        return;
-      }
-
-      const selectionParticipant: EventParticipant|undefined = props.raceStateLookup.getParticipantById(passingRecord.participantId);
+      const selectionParticipant = resolveCrossingParticipant(passingRecord, props.raceStateLookup);
       if (!selectionParticipant) {
         return;
       }
@@ -981,6 +1000,7 @@ export const RecordRow = (props: RecentRecordRowProps) => {
       lapTimeIndicators={props.lapTimeIndicators}
       raceStateLookup={props.raceStateLookup}
       passing={passing}
+      resolvedParticipant={resolveCrossingParticipant(passing, props.raceStateLookup)}
       selectedCategories={props.selectedCategories}
       selectedPlateNumber={props.selectedPlateNumber}
       selectedParticipants={props.selectedParticipants}
@@ -1107,11 +1127,11 @@ const recordMatchesSelectedCategory = (
     return record.categoryIds?.some((categoryId) => selectedCategories.has(categoryId)) || false;
   }
 
-  if (!isCrossingRecord(record) || !record.participantId) {
+  if (!isCrossingRecord(record)) {
     return false;
   }
 
-  const participant = raceStateLookup.getParticipantById(record.participantId);
+  const participant = resolveCrossingParticipant(record, raceStateLookup);
   const category = participant?.categoryId ? raceStateLookup.getCategoryById(participant.categoryId) : undefined;
   return !!participant?.categoryId && selectedCategories.has(participant.categoryId) && !shouldExcludeCategoryFromResults(category);
 };
@@ -1128,9 +1148,10 @@ const selectedTeamMemberIds = (
 
 const recordMatchesSelectedParticipants = (
   record: EventTimeRecord,
+  raceStateLookup: RaceStateLookup,
   selectedParticipants: Set<EventParticipantId>
 ): boolean => {
-  return isCrossingRecord(record) && !!record.participantId && selectedParticipants.has(record.participantId);
+  return isCrossingRecord(record) && !!resolveCrossingParticipant(record, raceStateLookup)?.id && selectedParticipants.has(resolveCrossingParticipant(record, raceStateLookup)!.id);
 };
 
 const getFlagCategoryIds = (flag: FlagRecord): EventCategoryId[] => {
@@ -1207,11 +1228,10 @@ const isUnrecognisedCrossing = (
   if (isFlagRecord(record) || !isCrossingRecord(record)) {
     return false;
   }
-  if (!record.participantId) {
+  const participant = resolveCrossingParticipant(record, raceStateLookup);
+  if (!participant) {
     return true;
   }
-
-  const participant = raceStateLookup.getParticipantById(record.participantId);
   if (!participant?.categoryId) {
     return true;
   }
@@ -1868,15 +1888,24 @@ export const RecentRecords = (props: RecordsProps & {
       return recordMatchesSelectedCategory(record, props.raceStateLookup, selectedCategories);
     }
     if (filterMode === 'participant') {
-      return recordMatchesSelectedParticipants(record, selectedParticipants);
+      return recordMatchesSelectedParticipants(record, props.raceStateLookup, selectedParticipants);
     }
-    return recordMatchesSelectedParticipants(record, teamMemberIds);
+    return recordMatchesSelectedParticipants(record, props.raceStateLookup, teamMemberIds);
   });
   const sortedRecords = [...filteredRecords].sort((a, b) => {
+    const leftTime = a.time?.getTime() || 0;
+    const rightTime = b.time?.getTime() || 0;
+    const leftTenth = a.timeTenthOfMillisecond || 0;
+    const rightTenth = b.timeTenthOfMillisecond || 0;
+
+    if (leftTime === rightTime && leftTenth !== rightTenth) {
+      return recentFirst ? rightTenth - leftTenth : leftTenth - rightTenth;
+    }
+
     if (recentFirst) {
-      return b.time!.getTime() - a.time!.getTime();
+      return rightTime - leftTime;
     } else {
-      return a.time!.getTime() - b.time!.getTime();
+      return leftTime - rightTime;
     }
   });
   const lapTimeIndicators = buildLapTimeIndicatorMap(filteredRecords, props.raceStateLookup, props.sessionKind);

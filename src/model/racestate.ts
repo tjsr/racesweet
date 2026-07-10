@@ -41,6 +41,7 @@ export interface RaceStateLookup {
   updateParticipantIdentifiers?(participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: ParticipantIdentifierUpdate[]): void;
   setFinishLineNumbers?(finishLineNumbers: number[] | undefined): void;
   setMinimumLapTimeMilliseconds?(minimumLapTimeMilliseconds: number | undefined): void;
+  setSessionValidCategoryIds?(sessionValidCategoryIds: Set<EventCategoryId> | undefined): void;
   setSessionKind?(sessionKind: EventSessionKind | undefined): void;
 }
 
@@ -69,6 +70,7 @@ export class Session implements RaceState, RaceStateLookup {
   private _finishLineNumbers: number[] | undefined = [1];
   private _minimumLapTimeMilliseconds: number | undefined = 60000;
   private _sessionKind: EventSessionKind | undefined = 'race';
+  private _sessionValidCategoryIds: Set<EventCategoryId> | undefined;
   private _cachedTransponderCrossings: Map<ChipCrossingData["chipCode"], ChipCrossingData[]>;
 
   public constructor(state: RaceState) {
@@ -94,6 +96,14 @@ export class Session implements RaceState, RaceStateLookup {
 
   public setMinimumLapTimeMilliseconds(minimumLapTimeMilliseconds: number | undefined): void {
     this._minimumLapTimeMilliseconds = minimumLapTimeMilliseconds;
+    this._cachedParticipantLaps = undefined;
+    if (!this._bulkProcess) {
+      this.__reprocessAllParticipantLaps();
+    }
+  }
+
+  public setSessionValidCategoryIds(sessionValidCategoryIds: Set<EventCategoryId> | undefined): void {
+    this._sessionValidCategoryIds = sessionValidCategoryIds ? new Set(sessionValidCategoryIds) : undefined;
     this._cachedParticipantLaps = undefined;
     if (!this._bulkProcess) {
       this.__reprocessAllParticipantLaps();
@@ -551,7 +561,8 @@ export class Session implements RaceState, RaceStateLookup {
       this._minimumLapTimeMilliseconds,
       true,
       this._sessionKind,
-      this._finishLineNumbers
+      this._finishLineNumbers,
+      this._sessionValidCategoryIds
     );
 
     this._cachedParticipantLaps = processedLaps;

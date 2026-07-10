@@ -5,8 +5,9 @@ import { fetchApicalEvents } from '../controllers/apical/getResultListJson.ts';
 import { CategoryId } from '../controllers/category.ts';
 import { type LoadingMetricsState, getLoadingMetricsSnapshot, incrementLoadingMetric, resetLoadingMetrics, subscribeLoadingMetrics } from '../loadingMetrics.ts';
 import { type LoadingProgressState, completeLoadingProgressStage, createLoadingProgressState, updateLoadingProgressStage } from '../loadingProgress.ts';
-import { EventCategoryId } from '../model/eventcategory.ts';
+import { type EventCategory, EventCategoryId } from '../model/eventcategory.ts';
 import { type EventParticipant, type EventParticipantId } from '../model/eventparticipant.ts';
+import type { EventTeam } from '../model/eventteam.ts';
 import { EventId, SessionId } from '../model/raceevent.ts';
 import { type RaceState, RaceStateLookup, Session } from '../model/racestate.ts';
 import { type EventTimeRecord, type TimeRecordId } from '../model/timerecord.ts';
@@ -19,7 +20,7 @@ import { ElectronJsonSystemConfigPersistence } from '../persistence/systemConfig
 import { EventCatalogService } from '../service/eventCatalogService.ts';
 import { RaceAdminService } from '../service/raceAdminService.ts';
 import { type SessionSourceReloadMode, type SessionSourceReloadSummary, addSessionSourceReloadSummaries, createEmptySessionSourceReloadSummary, isMissingLinkedCategoryPlaceholder, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload } from '../service/sessionSourceReload.ts';
-import { applyPulledRaceStateToSession, getMinimumLapTimeMillisecondsForSession } from '../service/sourceApplication.ts';
+import { applyPulledRaceStateToSession, getMinimumLapTimeMillisecondsForSession, getSessionAssignedCategoryIds } from '../service/sourceApplication.ts';
 import { SystemConfigService } from '../service/systemConfigService.ts';
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
 import { TestSession } from '../testdata/testsession.ts';
@@ -240,7 +241,7 @@ const sessionFromPartialRaceState = (raceState: Partial<RaceState>): Session => 
   timeRecordSources: raceState.timeRecordSources || [],
 });
 
-const applyCatalogMinimumLapTimeToRaceState = (
+const applyCatalogSessionScopeToRaceState = (
   raceState: (Session & RaceStateLookup) | undefined,
   catalog: EventCatalogState,
   eventId: EventId | undefined,
@@ -251,6 +252,7 @@ const applyCatalogMinimumLapTimeToRaceState = (
   }
 
   raceState.setMinimumLapTimeMilliseconds?.(getMinimumLapTimeMillisecondsForSession(catalog, eventId, sessionId));
+  raceState.setSessionValidCategoryIds?.(getSessionAssignedCategoryIds(catalog, eventId, sessionId));
 };
 
 const filterMrScatsRaceStateForSession = (
@@ -286,23 +288,6 @@ const createParticipantFromEntrant = (
   resultDuration: null,
   surname: entrant.lastName || '',
 });
-
-const getSessionAssignedCategoryIds = (
-  catalog: EventCatalogState,
-  eventId: EventId | undefined,
-  sessionId: SessionId | undefined
-): Set<EventCategoryId> | undefined => {
-  if (!eventId || !sessionId) {
-    return undefined;
-  }
-
-  const eventCategoryIds = new Set(getCategoriesForEvent(catalog, eventId).map((category) => category.id));
-  const assignedCategoryIds = (getSessionsForEvent(catalog, eventId)
-    .find((session) => session.id === sessionId)?.categoryIds || [])
-    .filter((categoryId) => eventCategoryIds.has(categoryId));
-
-  return assignedCategoryIds.length > 0 ? new Set<EventCategoryId>(assignedCategoryIds) : undefined;
-};
 
 const sortSessionsByScheduledStart = (
   sessions: EventCatalogState['sessions']
@@ -629,9 +614,9 @@ export const RaceSweetMainApp = () => {
     setSelectedCategoryId(nextCategoryId);
     setSelectedAnalyticsEventId(nextEventId);
     setSelectedAnalyticsSessionId(nextSessionId);
-    applyCatalogMinimumLapTimeToRaceState(sessionState, catalog, catalog.activeEventId, catalog.activeSessionId);
-    applyCatalogMinimumLapTimeToRaceState(timingRaceState, catalog, selectedTimingEventId, selectedTimingSessionId);
-    applyCatalogMinimumLapTimeToRaceState(analyticsRaceState, catalog, selectedAnalyticsEventId, selectedAnalyticsSessionId);
+    applyCatalogSessionScopeToRaceState(sessionState, catalog, catalog.activeEventId, catalog.activeSessionId);
+    applyCatalogSessionScopeToRaceState(timingRaceState, catalog, selectedTimingEventId, selectedTimingSessionId);
+    applyCatalogSessionScopeToRaceState(analyticsRaceState, catalog, selectedAnalyticsEventId, selectedAnalyticsSessionId);
     if (nextEventId === catalog.activeEventId && nextSessionId === catalog.activeSessionId) {
       setAnalyticsRaceState(sessionState);
     }
@@ -1055,7 +1040,7 @@ export const RaceSweetMainApp = () => {
     }).then((loadedState) => {
       const hydratedState = loadedState || targetSessionState;
       const analyticsSessionState = sessionFromPartialRaceState(raceStateSnapshot(hydratedState));
-      applyCatalogMinimumLapTimeToRaceState(analyticsSessionState, eventCatalogService?.catalog || eventCatalogState, nextEventId, nextSessionId);
+      applyCatalogSessionScopeToRaceState(analyticsSessionState, eventCatalogService?.catalog || eventCatalogState, nextEventId, nextSessionId);
       setAnalyticsRaceState(analyticsSessionState);
     }).catch((error: unknown) => {
       setErrorState(error as Error);
@@ -1152,6 +1137,86 @@ export const RaceSweetMainApp = () => {
       ) : null}
     </div>
   );
+
+  const displayedTimingRaceState = timingRaceState || sessionState;
+  const timingRaceStateLookup: RaceStateLookup & {
+    categories: EventCategory[];
+    participants: EventParticipant[];
+    records: EventTimeRecord[];
+    teams: EventTeam[] | undefined;
+    timeRecordSources: Session['timeRecordSources'] | undefined;
+  } = (() => {
+    if (!displayedTimingRaceState || !eventCatalogState) {
+      return {
+        categories: [],
+        countTransponderCrossings: () => 0,
+        excludeCrossing: () => undefined,
+        getCategoryById: () => undefined,
+        getEntrantIdForParticipant: () => undefined,
+        getFinishLineNumbers: () => undefined,
+        getParticipantById: () => undefined,
+        getParticipantLaps: () => undefined,
+        getTimeRecordSourceById: () => undefined,
+        getTransponderCrossings: () => [],
+        participants: [],
+        records: [],
+        teams: undefined,
+        timeRecordSources: undefined,
+        updateCategoryDetails: () => undefined,
+        updateEntrantCategory: () => undefined,
+        updateParticipantCategory: () => undefined,
+      };
+    }
+
+    const timingEventId = timingSessionSelection === 'active'
+      ? eventCatalogState.activeEventId
+      : selectedTimingEventId || eventCatalogState.activeEventId;
+    const participantById = new Map<EventParticipantId, EventParticipant>(
+      displayedTimingRaceState.participants.map((participant) => [participant.id, participant])
+    );
+
+    getEntrantsForEvent(eventCatalogState, timingEventId).forEach((entrant) => {
+      if (entrant.entrantType !== 'rider') {
+        return;
+      }
+
+      const fallbackParticipantId = entrant.memberParticipantIds[0] || entrant.id;
+      if (!participantById.has(fallbackParticipantId)) {
+        participantById.set(fallbackParticipantId, createParticipantFromEntrant(entrant, fallbackParticipantId));
+      }
+    });
+
+    const categories = getCategoriesForEvent(eventCatalogState, timingEventId);
+    const categoriesById = new Map<EventCategoryId, EventCategory>(
+      [...displayedTimingRaceState.categories, ...categories].map((category) => [category.id, category])
+    );
+
+    return {
+      categories: Array.from(categoriesById.values()),
+      countTransponderCrossings: (txNo, untilTime) => displayedTimingRaceState.countTransponderCrossings(txNo, untilTime),
+      excludeCrossing: (crossingId, exclude) => displayedTimingRaceState.excludeCrossing(crossingId, exclude),
+      getCategoryById: (categoryId) => categoriesById.get(categoryId),
+      getEntrantIdForParticipant: (participantId) => participantById.get(participantId)?.entrantId || displayedTimingRaceState.getEntrantIdForParticipant(participantId),
+      getFinishLineNumbers: () => displayedTimingRaceState.getFinishLineNumbers?.(),
+      getParticipantById: (participantId) => participantById.get(participantId),
+      getParticipantLaps: (participantId) => displayedTimingRaceState.getParticipantLaps(participantId),
+      getTimeRecordSourceById: (sourceId) => displayedTimingRaceState.getTimeRecordSourceById?.(sourceId),
+      getTransponderCrossings: (txNo, untilTime) => displayedTimingRaceState.getTransponderCrossings(txNo, untilTime),
+      participants: Array.from(participantById.values()),
+      records: displayedTimingRaceState.records as EventTimeRecord[],
+      teams: displayedTimingRaceState.teams,
+      timeRecordSources: displayedTimingRaceState.timeRecordSources,
+      updateCategoryDetails: (categoryId, changes) => displayedTimingRaceState.updateCategoryDetails(categoryId, changes),
+      updateEntrantCategory: (entrantId, categoryId) => displayedTimingRaceState.updateEntrantCategory(entrantId, categoryId),
+      updateParticipantCategory: (participantId, categoryId) => displayedTimingRaceState.updateParticipantCategory(participantId, categoryId),
+      updateParticipantIdentifiers: displayedTimingRaceState.updateParticipantIdentifiers
+        ? (participantId, identifierType, values) => displayedTimingRaceState.updateParticipantIdentifiers?.(participantId, identifierType, values)
+        : undefined,
+      updateRecord: displayedTimingRaceState.updateRecord
+        ? (record) => displayedTimingRaceState.updateRecord?.(record)
+        : undefined,
+    };
+  })();
 
   if (errorState) {
     return renderShell(<PageErrorFallback error={errorState} onDismiss={() => setErrorState(undefined)} />);
@@ -1279,7 +1344,6 @@ export const RaceSweetMainApp = () => {
     });
   }
 
-  const displayedTimingRaceState = timingRaceState || sessionState;
   const timingEventId = timingSessionSelection === 'active'
     ? eventCatalogState.activeEventId
     : selectedTimingEventId || eventCatalogState.activeEventId;
@@ -1294,7 +1358,7 @@ export const RaceSweetMainApp = () => {
   const timingSessionId = timingSessionValue === 'active'
     ? activeSession?.id
     : timingSessionValue || undefined;
-  const timingSessionValidCategoryIds = getSessionAssignedCategoryIds(eventCatalogState, timingEvent?.id, timingSessionId);
+  const timingSessionValidCategoryIds = getSessionAssignedCategoryIds(eventCatalogState, timingEvent?.id, timingSessionId) as Set<EventCategoryId> | undefined;
   const timingTimeDisplayZoneMode = (timingEvent?.id ? systemConfigState.eventOptions[timingEvent.id]?.timeDisplayZoneMode : undefined) || 'event';
   const updateTimingTimeDisplayZoneMode = (mode: EventTimeDisplayZoneMode): void => {
     if (!timingEvent?.id || !systemConfigService) {
@@ -1331,7 +1395,7 @@ export const RaceSweetMainApp = () => {
           onSelectSession={selectTimingSession}
           onTimeDisplayZoneModeChange={updateTimingTimeDisplayZoneMode}
           participantSelected={handleParticipantSelected}
-          raceState={displayedTimingRaceState}
+          raceState={timingRaceStateLookup}
           selectedCategories={hilightCategories}
           selectedParticipants={recordSelectedParticipants}
           sessions={timingSessions}
