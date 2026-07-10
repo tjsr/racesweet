@@ -133,5 +133,6 @@ Use this file for durable knowledge about RaceTime, MR-SCATS, and related timing
 - `.DBT` memo files are previewed as block-number plus memo text rows and should mention the likely linked same-basename `.DBF` table when present.
 - DBF previews resolve `M` memo fields from a linked same-basename `.DBT` file where available; without the DBT, show a warning that the DBF value is only an external memo pointer.
 - Unknown/non-core extensions are attempted as DBF-compatible tables first because MR-SCATS uses several DBF-format files with non-DBF extensions, such as report/fastest-lap style files.
+- Unrecognised MR-SCATS bundle files should be treated as DBF-compatible tables in inventory and preview by default; `X0099A01.CAR` is a confirmed car-details example.
 - Confirmed CTC/Data-1 raw crossing files bypass DBF parsing and are previewed as plain text rows with line number and raw crossing data. See `src/parsers/ctc/AGENTS.md` for the raw file format.
 - If DBF parsing fails, preview falls back to a binary hex/text table with a warning.

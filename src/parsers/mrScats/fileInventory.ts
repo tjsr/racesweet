@@ -92,8 +92,12 @@ const classifyMrScatsFile = (extension: string): MrScatsDataFileKind => {
   case '.rsn':
     return 'reason';
   default:
-    return 'unknown';
+    return 'dbf-table';
   }
+};
+
+const isDbfCompatibleFileKind = (kind: MrScatsDataFileKind): boolean => {
+  return !['archive', 'checksum', 'dbt-memo', 'index', 'raw-crossing-text'].includes(kind);
 };
 
 const extractSessionParts = (name: string): Pick<MrScatsDataFileSummary, 'meetingCode' | 'sessionCode' | 'sessionNumber'> => {
@@ -171,7 +175,7 @@ const createSummary = async (
     ...extractSessionParts(relativePath),
   };
 
-  if (summary.kind === 'dbf-table' || summary.kind === 'no1-report') {
+  if (isDbfCompatibleFileKind(summary.kind)) {
     summary.dbf = parseMrScatsDbfSummary(await readFile(path.join(rootPath, relativePath)));
   }
 

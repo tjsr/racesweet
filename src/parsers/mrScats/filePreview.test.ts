@@ -108,6 +108,27 @@ describe('MR-SCATS file preview', () => {
     expect(preview.rows).toEqual([{ CARNUMBER: 42, DRIVER: 'Alice Rider' }]);
   });
 
+  it('previews CAR details files as DBF-compatible tables', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-preview-'));
+    await writeFile(path.join(tempDir, 'X0099A01.CAR'), createDbfBuffer([
+      { length: 4, name: 'CAR', type: 'N' },
+      { length: 20, name: 'DRIVER', type: 'C' },
+    ], [
+      { CAR: 9, DRIVER: 'Chris Driver' },
+    ]));
+
+    const preview = await previewMrScatsDataFile(tempDir, 'X0099A01.CAR', 'dbf-table');
+
+    expect(preview).toEqual(expect.objectContaining({
+      columns: ['CAR', 'DRIVER'],
+      displayedRowCount: 1,
+      fileKind: 'dbf-table',
+      parser: 'dbf',
+      recordCount: 1,
+    }));
+    expect(preview.rows).toEqual([{ CAR: 9, DRIVER: 'Chris Driver' }]);
+  });
+
   it('previews NTX files as indexed rows from the related DBF table', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-preview-'));
     const buffer = Buffer.alloc(64, 0);
