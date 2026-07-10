@@ -250,6 +250,119 @@ describe('DataSourcesPanel', () => {
     expect(container.querySelector('[role="status"][aria-label="Loading MR-SCATS event"]')).toBeNull();
   });
 
+  it('groups MR-SCATS data files into an open General section and collapsed per-session sections', () => {
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <DataSourcesPanel
+          dataSources={dataSources.map((source) => source.id === 'source-mr-scats'
+            ? {
+              ...source,
+              mrScatsConfig: {
+                dataLocationPath: 'C:/RaceTime/timing-data/T9743',
+                files: [
+                  {
+                    dbf: {
+                      fields: [{ decimals: 0, length: 4, name: 'CARNUMBER', type: 'N' }],
+                      headerLength: 65,
+                      recordCount: 1,
+                      recordLength: 5,
+                      version: 3,
+                    },
+                    extension: '.dbf',
+                    kind: 'dbf-table' as const,
+                    name: 'DRIVERS.DBF',
+                    relativePath: 'DRIVERS.DBF',
+                    size: 120,
+                  },
+                  {
+                    extension: '.dbt',
+                    kind: 'dbt-memo' as const,
+                    name: 'PRGMME.DBT',
+                    relativePath: 'PRGMME.DBT',
+                    size: 240,
+                  },
+                  {
+                    dbf: {
+                      fields: [{ decimals: 0, length: 4, name: 'CARNUMBER', type: 'N' }],
+                      headerLength: 65,
+                      recordCount: 3,
+                      recordLength: 5,
+                      version: 3,
+                    },
+                    extension: '.dbf',
+                    kind: 'dbf-table' as const,
+                    meetingCode: 'T9743',
+                    name: 'T9743S01.DBF',
+                    relativePath: 'T9743S01.DBF',
+                    sessionCode: 'S',
+                    sessionNumber: 1,
+                    size: 360,
+                  },
+                  {
+                    extension: '.pit',
+                    kind: 'pit' as const,
+                    meetingCode: 'T9743',
+                    name: 'T9743S01.PIT',
+                    relativePath: 'T9743S01.PIT',
+                    sessionCode: 'S',
+                    sessionNumber: 1,
+                    size: 36,
+                  },
+                  {
+                    extension: '.no1',
+                    kind: 'no1-report' as const,
+                    meetingCode: 'T9743',
+                    name: 'T9743R03.NO1',
+                    relativePath: 'T9743R03.NO1',
+                    sessionCode: 'R',
+                    sessionNumber: 3,
+                    size: 420,
+                  },
+                ],
+                sourceKind: 'directory',
+              },
+            }
+            : source)}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={vi.fn()}
+          onReprocessApicalData={vi.fn()}
+          onSaveSource={vi.fn()}
+        />,
+      );
+    });
+
+    const mrScatsRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('MR-SCATS Source'));
+    expect(mrScatsRow).toBeDefined();
+    flushSync(() => {
+      mrScatsRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const details = Array.from(container.querySelectorAll('details'));
+    const generalDetails = details.find((item) => item.querySelector('summary')?.textContent?.includes('General')) as HTMLDetailsElement | undefined;
+    const sessionOneDetails = details.find((item) => item.querySelector('summary')?.textContent?.includes('T9743 S01')) as HTMLDetailsElement | undefined;
+    const sessionTwoDetails = details.find((item) => item.querySelector('summary')?.textContent?.includes('T9743 R03')) as HTMLDetailsElement | undefined;
+
+    expect(generalDetails).toBeDefined();
+    expect(generalDetails?.open).toBe(true);
+    expect(generalDetails?.textContent).toContain('DRIVERS.DBF');
+    expect(generalDetails?.textContent).toContain('PRGMME.DBT');
+
+    expect(sessionOneDetails).toBeDefined();
+    expect(sessionOneDetails?.open).toBe(false);
+    expect(sessionOneDetails?.textContent).toContain('T9743S01.DBF');
+    expect(sessionOneDetails?.textContent).toContain('T9743S01.PIT');
+
+    expect(sessionTwoDetails).toBeDefined();
+    expect(sessionTwoDetails?.open).toBe(false);
+    expect(sessionTwoDetails?.textContent).toContain('T9743R03.NO1');
+  });
+
   it('opens an MR-SCATS file preview dialog from the file inventory table', async () => {
     const onPreviewMrScatsDataFile = vi.fn(async () => ({
       calculatedCells: [{ column: 'Time of day', rowIndex: 0 }],

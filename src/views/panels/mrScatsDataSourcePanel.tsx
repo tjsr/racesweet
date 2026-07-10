@@ -13,6 +13,12 @@ interface MrScatsDataSourcePanelProps {
   source: DataSourceConfig;
 }
 
+interface MrScatsFileGroup {
+  files: MrScatsDataFileSummary[];
+  key: string;
+  label: string;
+}
+
 const formatFileCount = (inventory: MrScatsDataFileInventory | undefined): string => {
   if (!inventory) {
     return 'No data files loaded.';
@@ -37,6 +43,63 @@ const parseFinishLineNumbers = (value: string): number[] => {
     .split(',')
     .map((item) => Number(item.trim()))
     .filter((item) => Number.isInteger(item) && item > 0);
+};
+
+const formatSessionNumber = (sessionNumber: number): string => {
+  return sessionNumber.toString().padStart(2, '0');
+};
+
+const getMrScatsSessionGroupKey = (file: MrScatsDataFileSummary): string | undefined => {
+  if (!file.meetingCode || !file.sessionCode || file.sessionNumber === undefined) {
+    return undefined;
+  }
+
+  return `${file.meetingCode}-${file.sessionCode}-${formatSessionNumber(file.sessionNumber)}`;
+};
+
+const getMrScatsSessionGroupLabel = (file: MrScatsDataFileSummary): string | undefined => {
+  if (!file.meetingCode || !file.sessionCode || file.sessionNumber === undefined) {
+    return undefined;
+  }
+
+  return `${file.meetingCode} ${file.sessionCode}${formatSessionNumber(file.sessionNumber)}`;
+};
+
+const groupMrScatsFiles = (files: MrScatsDataFileSummary[]): {
+  generalFiles: MrScatsDataFileSummary[];
+  sessionGroups: MrScatsFileGroup[];
+} => {
+  const generalFiles: MrScatsDataFileSummary[] = [];
+  const sessionGroupsByKey = new Map<string, MrScatsFileGroup>();
+
+  files.forEach((file) => {
+    const sessionGroupKey = getMrScatsSessionGroupKey(file);
+    const sessionGroupLabel = getMrScatsSessionGroupLabel(file);
+
+    if (!sessionGroupKey || !sessionGroupLabel) {
+      generalFiles.push(file);
+      return;
+    }
+
+    const existingGroup = sessionGroupsByKey.get(sessionGroupKey);
+    if (existingGroup) {
+      existingGroup.files.push(file);
+      return;
+    }
+
+    sessionGroupsByKey.set(sessionGroupKey, {
+      files: [file],
+      key: sessionGroupKey,
+      label: sessionGroupLabel,
+    });
+  });
+
+  const sessionGroups = Array.from(sessionGroupsByKey.values()).sort((left, right) => left.label.localeCompare(right.label));
+
+  return {
+    generalFiles,
+    sessionGroups,
+  };
 };
 
 const waitForInlineProgressPaint = async (): Promise<void> => {
@@ -133,6 +196,41 @@ export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): Reac
   };
 
   const previewTitle = preview?.fileName || previewLoadingFile || 'MR-SCATS file preview';
+  const { generalFiles, sessionGroups } = groupMrScatsFiles(config.files);
+
+  const renderFileTable = (files: MrScatsDataFileSummary[], ariaLabel: string): React.ReactElement => (
+    <table aria-label={ariaLabel}>
+      <thead>
+        <tr>
+          <th>File</th>
+          <th>Kind</th>
+          <th>Size</th>
+          <th>Records</th>
+        </tr>
+      </thead>
+      <tbody>
+        {files.map((file) => (
+          <tr key={file.relativePath}>
+            <td>
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => {
+                  void handlePreviewFile(file);
+                }}
+                disabled={!props.onPreviewDataFile}
+              >
+                {file.relativePath}
+              </button>
+            </td>
+            <td>{file.kind}</td>
+            <td>{file.size}</td>
+            <td>{file.dbf?.recordCount ?? '-'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 
   return (
     <>
@@ -182,37 +280,20 @@ export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): Reac
       </div>
       <p>{formatFileCount(inventory)}</p>
       {config.files.length > 0 ? (
-        <table aria-label={`MR-SCATS Data Files ${props.source.id}`}>
-          <thead>
-            <tr>
-              <th>File</th>
-              <th>Kind</th>
-              <th>Size</th>
-              <th>Records</th>
-            </tr>
-          </thead>
-          <tbody>
-            {config.files.map((file) => (
-              <tr key={file.relativePath}>
-                <td>
-                  <button
-                    type="button"
-                    className="link-button"
-                    onClick={() => {
-                      void handlePreviewFile(file);
-                    }}
-                    disabled={!props.onPreviewDataFile}
-                  >
-                    {file.relativePath}
-                  </button>
-                </td>
-                <td>{file.kind}</td>
-                <td>{file.size}</td>
-                <td>{file.dbf?.recordCount ?? '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="mr-scats-file-groups">
+          <details open>
+            <summary>General ({generalFiles.length})</summary>
+            {generalFiles.length > 0
+              ? renderFileTable(generalFiles, `MR-SCATS General Data Files ${props.source.id}`)
+              : <p>No general data files found.</p>}
+          </details>
+          {sessionGroups.map((group) => (
+            <details key={group.key}>
+              <summary>{group.label} ({group.files.length})</summary>
+              {renderFileTable(group.files, `MR-SCATS Session Data Files ${group.label} ${props.source.id}`)}
+            </details>
+          ))}
+        </div>
       ) : null}
       {preview || previewError || previewLoadingFile ? (
         <div className="warning-modal-backdrop">
