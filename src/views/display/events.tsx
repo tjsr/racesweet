@@ -2,6 +2,7 @@ import React from 'react';
 import {
   type EventCatalogEvent,
   type EventCatalogState,
+  type EventDiscipline,
   getCategoriesForEvent,
   getSessionsForEvent,
 } from '../../catalog/eventCatalog.js';
@@ -32,19 +33,21 @@ interface EventsScreenProps {
   onSelectSession: (sessionId: SessionId) => void;
   onMakeSessionActive: (eventId: EventId, sessionId: SessionId) => void | Promise<void>;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
-  onUpdateEvent: (eventId: EventId, changes: { date?: string; format?: EventCatalogEvent['format']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string }) => void | Promise<void>;
+  onUpdateEvent: (eventId: EventId, changes: { date?: string; discipline?: EventDiscipline; format?: EventCatalogEvent['format']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string }) => void | Promise<void>;
   selectedEventId?: EventId;
   selectedSessionId?: SessionId;
 }
 
 const getEventDraft = (event: EventCatalogEvent | undefined, systemTimeZone: string): {
   date: string;
+  discipline: EventDiscipline;
   format: EventCatalogEvent['format'];
   minimumLapTime: string;
   name: string;
   timeZone: string;
 } => ({
   date: event?.date || '',
+  discipline: event?.discipline || 'motorsport',
   format: event?.format || 'race-weekend',
   minimumLapTime: formatMinimumLapTimeInput(event?.minimumLapTimeMilliseconds),
   name: event?.name || '',
@@ -81,6 +84,7 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
 
     await props.onUpdateEvent(selectedEvent.id, {
       date: eventDraft.date,
+      discipline: eventDraft.discipline,
       format: eventDraft.format,
       minimumLapTimeMilliseconds: parseMinimumLapTimeInputToMilliseconds(eventDraft.minimumLapTime),
       name: eventDraft.name,

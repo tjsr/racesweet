@@ -1,9 +1,10 @@
 import React from 'react';
-import { type EventCatalogEvent } from '../../catalog/eventCatalog.js';
+import { type EventCatalogEvent, type EventDiscipline } from '../../catalog/eventCatalog.js';
 import { type EventId } from '../../model/raceevent.js';
 
 interface EventDraft {
   date: string;
+  discipline: EventDiscipline;
   format: EventCatalogEvent['format'];
   minimumLapTime: string;
   name: string;
@@ -35,6 +36,17 @@ export const EventDetailsPanel = (props: EventDetailsPanelProps): React.ReactEle
             value={props.eventDraft.name}
             onChange={(event) => props.onUpdateEventDraft((current) => ({ ...current, name: event.target.value }))}
           />
+        </label>
+        <label>
+          Event Type
+          <select
+            aria-label="Event Type"
+            value={props.eventDraft.discipline}
+            onChange={(event) => props.onUpdateEventDraft((current) => ({ ...current, discipline: event.target.value as EventDiscipline }))}
+          >
+            <option value="motorsport">Motorsport</option>
+            <option value="cycling">Cycling</option>
+          </select>
         </label>
         <label>
           Event Format

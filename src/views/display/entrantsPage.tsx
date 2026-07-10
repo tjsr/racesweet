@@ -6,6 +6,7 @@ import {
   getCategoriesForEvent,
   getEntrantAssignedSessionIds,
   getEntrantsForEvent,
+  getEventDisciplineLabels,
   getSessionsForEvent,
 } from '../../catalog/eventCatalog.js';
 import { EventEntrantId } from '../../model/entrant.js';
@@ -87,9 +88,9 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   const raceStateParticipants = props.raceState?.participants || [];
   const [selectedCategoryFilter, setSelectedCategoryFilter] = React.useState<string>(CATEGORY_FILTER_ALL);
   const teamEntrants = eventEntrants.filter((entrant) => entrant.entrantType === 'team');
-  const teamEntrantById = new Map(teamEntrants.map((entrant) => [entrant.id.toString(), entrant]));
   const eventCategoryIds = new Set(eventCategories.map((category) => category.id.toString()));
   const eventCategoryKey = eventCategories.map((category) => category.id.toString()).join('|');
+  const disciplineLabels = getEventDisciplineLabels(selectedEvent?.discipline);
 
   React.useEffect(() => {
     const validCategoryIds = new Set(eventCategoryKey.split('|').filter((categoryId) => categoryId.length > 0));
@@ -104,20 +105,10 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   }, [eventCategoryKey, selectedCategoryFilter]);
 
   const getEntrantCategoryIds = (entrant: EventCatalogEntrant): string[] => {
-    const ids = [
+    return Array.from(new Set([
       entrant.categoryId?.toString() || '',
       ...entrant.categoryIds.map((categoryId) => categoryId.toString()),
-    ];
-
-    if (entrant.teamEntrantId) {
-      const team = teamEntrantById.get(entrant.teamEntrantId.toString());
-      if (team) {
-        ids.push(team.categoryId?.toString() || '');
-        ids.push(...team.categoryIds.map((categoryId) => categoryId.toString()));
-      }
-    }
-
-    return Array.from(new Set(ids.filter((categoryId) => eventCategoryIds.has(categoryId))));
+    ].filter((categoryId) => eventCategoryIds.has(categoryId))));
   };
 
   const entrantMatchesCategoryFilter = (entrant: EventCatalogEntrant): boolean => {
@@ -258,11 +249,14 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           riderEntrants={riderEntrants}
           selectedEntrant={selectedEntrant}
           selectedEventId={selectedEvent?.id}
+          singularLabel={disciplineLabels.singular}
+          pluralLabel={disciplineLabels.plural}
           setCreateKind={setCreateKind}
           teamEntrants={teamEntrants}
           teamsEnabled={teamsEnabled}
         />
         <EntrantDetailsPanel
+          entrantLabel={disciplineLabels.singular}
           entrantDraft={entrantDraft}
           eventCategories={eventCategories}
           onDeleteEntrant={deleteEntrant}
@@ -272,6 +266,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           onSetEntrantDraft={setEntrantDraft}
           selectedEntrant={selectedEntrant}
           selectedTeamName={selectedTeamName}
+          teamMemberLabel={disciplineLabels.plural}
           teamEntrants={teamEntrants}
           teamMembers={selectedTeamMembers}
           warningModal={warningModal}

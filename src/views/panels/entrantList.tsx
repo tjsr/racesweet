@@ -18,6 +18,8 @@ interface EntrantListPanelProps {
   riderEntrants: EventCatalogEntrant[];
   selectedEntrant?: EventCatalogEntrant;
   selectedEventId?: EventId;
+  singularLabel?: string;
+  pluralLabel?: string;
   setCreateKind: React.Dispatch<React.SetStateAction<EntrantType>>;
   teamEntrants: EventCatalogEntrant[];
   teamsEnabled: boolean;
@@ -163,6 +165,8 @@ export const getParticipantsForEntrant = (
 
 export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactElement => {
   const [sortOrder, setSortOrder] = React.useState<EntrantListSortOrder>('surname');
+  const singularLabel = props.singularLabel || 'Driver';
+  const pluralLabel = props.pluralLabel || 'Drivers';
   const sortedRiderEntrants = React.useMemo(() => sortEntrants(
     props.riderEntrants,
     sortOrder,
@@ -190,7 +194,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
               value={props.createKind}
               onChange={(event) => props.setCreateKind(event.target.value as EntrantType)}
             >
-              <option value="rider">Create entrant</option>
+              <option value="rider">Create {singularLabel.toLowerCase()}</option>
               <option value="team">Create team</option>
             </select>
           </label>
@@ -210,7 +214,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
           }}
           disabled={!props.selectedEventId}
         >
-          {props.teamsEnabled && props.createKind === 'team' ? 'Create Team' : 'Create Entrant'}
+          {props.teamsEnabled && props.createKind === 'team' ? 'Create Team' : `Create ${singularLabel}`}
         </button>
         <label className="compact-action-label">
           Sort
@@ -228,7 +232,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
       <div className="events-list" role="listbox" aria-label="Entrants for selected event">
         {sortedRiderEntrants.length > 0 ? (
           <>
-            {props.teamsEnabled ? <h3 className="events-list-subheading">Individual Entrants</h3> : null}
+            {props.teamsEnabled ? <h3 className="events-list-subheading">Individual {pluralLabel}</h3> : null}
             {sortedRiderEntrants.map((entrant) => {
               const participant = getEntrantParticipant(entrant, props.raceStateParticipants, props.teamEntrants);
               const teamName = entrant.teamEntrantId
@@ -240,6 +244,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
                 <EntrantListCard
                   key={entrant.id}
                   entrant={entrant}
+                  entrantLabel={singularLabel}
                   categoryName={getCategoryName(props.catalog, categoryId)}
                   isSelected={entrant.id === props.selectedEntrant?.id}
                   raceNumber={participant ? getParticipantNumber(participant) : undefined}
@@ -261,6 +266,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
                 <EntrantListCard
                   key={entrant.id}
                   entrant={entrant}
+                  entrantLabel={singularLabel}
                   isSelected={entrant.id === props.selectedEntrant?.id}
                   onSelect={() => props.requestFormExit(() => props.onSelectEntrant(entrant.id))}
                   raceNumber={participant ? getParticipantNumber(participant) : undefined}

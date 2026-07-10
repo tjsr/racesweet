@@ -6,6 +6,7 @@ import {
   type CategoryTeamRules,
   type EntrantType,
   type EventCatalogCategory,
+  getEventDisciplineLabels,
   type EventCatalogEntrant,
   type EventCatalogSession,
   type EventCatalogState,
@@ -166,6 +167,138 @@ const deriveDistanceRule = (category: EventCategory): CategoryDistanceRule | und
 const normalizeCategoriesForResultExclusion = (categories: EventCategory[]): EventCategory[] =>
   categories.map((category) => normalizeCategoryResultExclusion(category));
 
+const getIdentifierValues = (
+  identifiers: EventParticipant['identifiers'] | undefined,
+  identifierType: 'racePlate' | 'txNo'
+): string[] => {
+  return (identifiers || [])
+    .flatMap((identifier) => {
+      if (!(identifierType in identifier)) {
+        return [];
+      }
+
+      const value = (identifier as EventParticipant['identifiers'][number] & Record<'racePlate' | 'txNo', string | number | undefined>)[identifierType];
+      return value === undefined || value === null ? [] : [value.toString().trim()];
+    })
+    .filter((value) => value.length > 0)
+    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }));
+};
+
+const normalizeIdentityPart = (value: string | undefined): string => {
+  return value?.trim().toLowerCase() || '';
+};
+
+const buildParticipantIdentity = (participant: EventParticipant): string => {
+  const identity = buildRiderIdentity({
+    categoryId: participant.categoryId?.toString() || '',
+    firstName: participant.firstname,
+    identifiers: participant.identifiers,
+    lastName: participant.surname,
+    name: `${participant.firstname} ${participant.surname}`.trim(),
+  });
+
+  return identity === 'fallback|'
+    ? `fallback|${participant.entrantId?.toString() || ''}|${participant.id.toString()}`
+    : identity;
+};
+
+const buildRiderIdentity = (values: {
+  categoryId?: string;
+  firstName?: string;
+  identifiers?: EventParticipant['identifiers'];
+  lastName?: string;
+  name?: string;
+}): string => {
+  const categoryId = values.categoryId || '';
+  const firstName = normalizeIdentityPart(values.firstName);
+  const lastName = normalizeIdentityPart(values.lastName);
+  const name = normalizeIdentityPart(values.name);
+  const racePlates = getIdentifierValues(values.identifiers, 'racePlate');
+  const transponders = getIdentifierValues(values.identifiers, 'txNo');
+  const identityCore = [
+    categoryId,
+    firstName,
+    lastName,
+    racePlates.join(','),
+    transponders.join(','),
+  ].join('|');
+
+  if (identityCore !== '||||') {
+    return identityCore;
+  }
+
+  return `fallback|${name}`;
+};
+
+const buildRiderEntrantIdentity = (entrant: EventCatalogEntrant): string => {
+  return buildRiderIdentity({
+    categoryId: entrant.categoryId?.toString() || entrant.categoryIds[0]?.toString() || '',
+    firstName: entrant.firstName,
+    identifiers: entrant.identifiers,
+    lastName: entrant.lastName,
+    name: entrant.name,
+  }) || `fallback|${entrant.id.toString()}`;
+};
+
+const buildTeamIdentity = (team: { categoryId?: string; id: string; name: string }): string => {
+  const categoryId = team.categoryId?.toString() || '';
+  const name = normalizeIdentityPart(team.name);
+  return `${categoryId}|${name || team.id.toString()}`;
+};
+
+const mergeParticipantIdentifiers = (
+  left: EventParticipant['identifiers'] = [],
+  right: EventParticipant['identifiers'] = []
+): EventParticipant['identifiers'] => {
+  const mergedByKey = new Map<string, EventParticipant['identifiers'][number]>();
+
+  [...left, ...right].forEach((identifier) => {
+    const racePlate = 'racePlate' in identifier && identifier.racePlate != null
+      ? identifier.racePlate.toString().trim()
+      : '';
+    const txNo = 'txNo' in identifier && identifier.txNo != null
+      ? identifier.txNo.toString().trim()
+      : '';
+    const key = [
+      racePlate,
+      txNo,
+      identifier.fromTime instanceof Date ? identifier.fromTime.toISOString() : '',
+      identifier.toTime instanceof Date ? identifier.toTime.toISOString() : '',
+    ].join('|');
+
+    if (!mergedByKey.has(key)) {
+      mergedByKey.set(key, identifier);
+    }
+  });
+
+  return Array.from(mergedByKey.values());
+};
+
+const mergeImportedParticipant = (primary: EventParticipant, duplicate: EventParticipant): EventParticipant => {
+  return {
+    ...primary,
+    categoryId: primary.categoryId || duplicate.categoryId,
+    currentResult: primary.currentResult ?? duplicate.currentResult,
+    entrantId: primary.entrantId || duplicate.entrantId,
+    firstname: primary.firstname || duplicate.firstname,
+    identifiers: mergeParticipantIdentifiers(primary.identifiers, duplicate.identifiers),
+    lastRecordTime: primary.lastRecordTime ?? duplicate.lastRecordTime,
+    lastRecordTimingPoint: primary.lastRecordTimingPoint ?? duplicate.lastRecordTimingPoint,
+    resultDuration: primary.resultDuration ?? duplicate.resultDuration,
+    surname: primary.surname || duplicate.surname,
+  };
+};
+
+const mergeImportedTeam = (primary: EventTeam, duplicate: EventTeam): EventTeam => {
+  return {
+    ...primary,
+    categoryId: primary.categoryId || duplicate.categoryId,
+    description: primary.description || duplicate.description,
+    members: unique([...primary.members.map((member) => member.toString()), ...duplicate.members.map((member) => member.toString())]) as EventTeam['members'],
+    name: primary.name || duplicate.name,
+  };
+};
+
 const getTeamEntrantIdsByParticipantId = (teams: EventTeam[]): Map<string, string> => {
   const teamEntrantIdsByParticipantId = new Map<string, string>();
 
@@ -210,6 +343,117 @@ const normalizeImportedRaceStateForCatalog = (raceState: Partial<RaceState>): Pa
     ...parentSafeRaceState,
     categories: normalizeCategoriesForResultExclusion(parentSafeRaceState.categories || []),
   });
+};
+
+const normalizeImportedRaceStateForEvent = (
+  raceState: Partial<RaceState>,
+  existingImportedRaceStates: Partial<RaceState>[],
+  existingEventEntrants: EventCatalogEntrant[]
+): Partial<RaceState> => {
+  const normalizedRaceState = normalizeImportedRaceStateForCatalog(raceState);
+  const existingParticipants = existingImportedRaceStates.flatMap((state) => state.participants || []);
+  const existingRiderEntrants = existingEventEntrants.filter((entrant) => entrant.entrantType === 'rider');
+  const existingTeamEntrants = existingEventEntrants.filter((entrant) => entrant.entrantType === 'team');
+  const participantIdMap = new Map<string, string>();
+  const entrantIdMap = new Map<string, string>();
+  const teamCanonicalIdByIdentity = new Map<string, string>();
+
+  existingTeamEntrants.forEach((entrant) => {
+    const identity = buildTeamIdentity({
+      categoryId: entrant.categoryId,
+      id: entrant.id,
+      name: entrant.name,
+    });
+    if (!teamCanonicalIdByIdentity.has(identity)) {
+      teamCanonicalIdByIdentity.set(identity, entrant.id.toString());
+    }
+  });
+
+  (normalizedRaceState.teams || []).forEach((team) => {
+    const identity = buildTeamIdentity(team);
+    const canonicalId = teamCanonicalIdByIdentity.get(identity) || team.id.toString();
+    teamCanonicalIdByIdentity.set(identity, canonicalId);
+    entrantIdMap.set(team.id.toString(), canonicalId);
+  });
+
+  const existingParticipantIdByIdentity = new Map<string, string>();
+  existingParticipants.forEach((participant) => {
+    const identity = buildParticipantIdentity(participant);
+    if (!existingParticipantIdByIdentity.has(identity)) {
+      existingParticipantIdByIdentity.set(identity, participant.id.toString());
+    }
+  });
+
+  const existingRiderEntrantIdByIdentity = new Map<string, string>();
+  existingRiderEntrants.forEach((entrant) => {
+    const identity = buildRiderEntrantIdentity(entrant);
+    if (!existingRiderEntrantIdByIdentity.has(identity)) {
+      existingRiderEntrantIdByIdentity.set(identity, entrant.id.toString());
+    }
+  });
+
+  const participantCanonicalIdByIdentity = new Map<string, string>();
+  const entrantCanonicalIdByParticipantIdentity = new Map<string, string>();
+  const participantsByCanonicalId = new Map<string, EventParticipant>();
+
+  (normalizedRaceState.participants || []).forEach((participant) => {
+    const participantIdentity = buildParticipantIdentity(participant);
+    const oldParticipantId = participant.id.toString();
+    const oldEntrantId = nonEmpty(participant.entrantId?.toString()) || oldParticipantId;
+    const canonicalParticipantId = existingParticipantIdByIdentity.get(participantIdentity) ||
+      participantCanonicalIdByIdentity.get(participantIdentity) ||
+      oldParticipantId;
+    const canonicalTeamEntrantId = entrantIdMap.get(oldEntrantId);
+    const canonicalEntrantId = canonicalTeamEntrantId ||
+      existingRiderEntrantIdByIdentity.get(participantIdentity) ||
+      entrantCanonicalIdByParticipantIdentity.get(participantIdentity) ||
+      oldEntrantId;
+    const remappedParticipant: EventParticipant = {
+      ...participant,
+      entrantId: canonicalEntrantId,
+      id: canonicalParticipantId,
+    };
+    const existingParticipant = participantsByCanonicalId.get(canonicalParticipantId);
+
+    participantIdMap.set(oldParticipantId, canonicalParticipantId);
+    entrantIdMap.set(oldEntrantId, canonicalEntrantId);
+    participantCanonicalIdByIdentity.set(participantIdentity, canonicalParticipantId);
+    entrantCanonicalIdByParticipantIdentity.set(participantIdentity, canonicalEntrantId);
+    participantsByCanonicalId.set(
+      canonicalParticipantId,
+      existingParticipant ? mergeImportedParticipant(existingParticipant, remappedParticipant) : remappedParticipant,
+    );
+  });
+
+  const teamsByCanonicalId = new Map<string, EventTeam>();
+  (normalizedRaceState.teams || []).forEach((team) => {
+    const canonicalId = entrantIdMap.get(team.id.toString()) || team.id.toString();
+    const remappedTeam: EventTeam = {
+      ...team,
+      id: canonicalId,
+      members: unique(team.members.map((member) => participantIdMap.get(member.toString()) || member.toString())) as EventTeam['members'],
+    };
+    const existingTeam = teamsByCanonicalId.get(canonicalId);
+    teamsByCanonicalId.set(canonicalId, existingTeam ? mergeImportedTeam(existingTeam, remappedTeam) : remappedTeam);
+  });
+
+  return {
+    ...normalizedRaceState,
+    participants: Array.from(participantsByCanonicalId.values()),
+    records: (normalizedRaceState.records || []).map((record): TimeRecord => {
+      const remappedRecord = { ...record } as TimeRecord & { entrantId?: EventEntrantId; participantId?: EventParticipant['id'] };
+
+      if ('entrantId' in remappedRecord && remappedRecord.entrantId) {
+        remappedRecord.entrantId = entrantIdMap.get(remappedRecord.entrantId.toString()) || remappedRecord.entrantId;
+      }
+      if ('participantId' in remappedRecord && remappedRecord.participantId) {
+        remappedRecord.participantId = participantIdMap.get(remappedRecord.participantId.toString()) || remappedRecord.participantId;
+      }
+
+      return remappedRecord;
+    }),
+    teams: Array.from(teamsByCanonicalId.values()),
+  };
 };
 
 const deriveMaxTeamSizesByCategory = (teams: EventTeam[], participants: EventParticipant[]): Map<string, number> => {
@@ -541,6 +785,44 @@ const mergeLinkedCatalogEntrant = (
   teamMembers: derivedEntrant.teamMembers || existingEntrant.teamMembers,
 });
 
+const mergeDerivedEntrants = (primary: EventCatalogEntrant, duplicate: EventCatalogEntrant): EventCatalogEntrant => ({
+  ...primary,
+  categoryId: primary.categoryId || duplicate.categoryId,
+  categoryIds: unique([...primary.categoryIds, ...duplicate.categoryIds]),
+  identifiers: mergeParticipantIdentifiers(primary.identifiers, duplicate.identifiers),
+  memberParticipantIds: unique([...primary.memberParticipantIds, ...duplicate.memberParticipantIds]),
+  teamMembers: primary.teamMembers || duplicate.teamMembers,
+});
+
+const buildCatalogEntrantIdentity = (entrant: EventCatalogEntrant): string => {
+  if (entrant.entrantType === 'team') {
+    return buildTeamIdentity({
+      categoryId: entrant.categoryId,
+      id: entrant.id,
+      name: entrant.name,
+    });
+  }
+
+  return buildRiderEntrantIdentity(entrant);
+};
+
+const deduplicateCatalogEntrants = (entrants: EventCatalogEntrant[]): EventCatalogEntrant[] => {
+  const entrantsByIdentity = new Map<string, EventCatalogEntrant>();
+
+  entrants.forEach((entrant) => {
+    const identity = buildCatalogEntrantIdentity(entrant);
+    const existingEntrant = entrantsByIdentity.get(identity);
+    if (!existingEntrant) {
+      entrantsByIdentity.set(identity, entrant);
+      return;
+    }
+
+    entrantsByIdentity.set(identity, mergeDerivedEntrants(existingEntrant, entrant));
+  });
+
+  return Array.from(entrantsByIdentity.values());
+};
+
 const assertUuid = (errors: string[], label: string, value: string | undefined): void => {
   if (!value || !validateUuid(value)) {
     errors.push(`${label} "${value || ''}" is not a valid UUID.`);
@@ -778,6 +1060,7 @@ export class EventCatalogService {
         event: {
           categoryIds: [],
           date: createTimestamp().slice(0, 10),
+          discipline: 'motorsport',
           entrantIds: [],
           format: 'race-weekend',
           id: eventId,
@@ -803,7 +1086,7 @@ export class EventCatalogService {
     ], onCompleteStep);
   }
 
-  public async updateEvent(eventId: EventId, changes: { date?: string; format?: EventCatalogState['events'][number]['format']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string; }, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
+  public async updateEvent(eventId: EventId, changes: { date?: string; discipline?: EventCatalogState['events'][number]['discipline']; format?: EventCatalogState['events'][number]['format']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string; }, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes,
@@ -847,14 +1130,14 @@ export class EventCatalogService {
 
     const scaffoldCategories = deriveCategoriesFromEventData(eventId, categories, participants, teams);
     const categoryIds = scaffoldCategories.map((category) => category.id.toString());
-    const derivedEntrants = await deriveEntrantsFromParticipants(eventId, participants, masterProfiles, teams);
+    const derivedEntrants = deduplicateCatalogEntrants(await deriveEntrantsFromParticipants(eventId, participants, masterProfiles, teams));
     const existingEventEntrantsById = new Map(getEntrantsForEvent(this.state, eventId).map((entrant) => [entrant.id.toString(), entrant] as const));
     const linkedGlobalEntrantsById = new Map(this.state.entrants
       .filter((entrant) => entrant.eventId !== eventId)
       .filter((entrant) => !existingEventEntrantsById.has(entrant.id.toString()))
       .map((entrant) => [entrant.id.toString(), entrant] as const));
     const linkedEntrantIds = new Set<string>();
-    const entrants = derivedEntrants.map((entrant) => {
+    const entrants = deduplicateCatalogEntrants(derivedEntrants.map((entrant) => {
       const linkedEntrant = linkedGlobalEntrantsById.get(entrant.id.toString());
       if (!linkedEntrant) {
         return entrant;
@@ -862,7 +1145,7 @@ export class EventCatalogService {
 
       linkedEntrantIds.add(entrant.id.toString());
       return mergeLinkedCatalogEntrant(linkedEntrant, entrant, eventId);
-    });
+    }));
 
     const existingCategoriesById = new Map(this.state.categories
       .filter((category) => category.eventId === eventId)
@@ -955,11 +1238,22 @@ export class EventCatalogService {
       }];
     });
 
+    const staleDuplicateEntrants = getEntrantsForEvent(this.state, eventId).filter((existingEntrant) => {
+      const matchingEntrant = entrants.find((entrant) => buildCatalogEntrantIdentity(entrant) === buildCatalogEntrantIdentity(existingEntrant));
+      return !!matchingEntrant && matchingEntrant.id !== existingEntrant.id;
+    });
+    const staleDuplicateEntrantMutations = staleDuplicateEntrants.map((entrant) => ({
+      entrantId: entrant.id,
+      id: createMutationId(),
+      timestamp: createTimestamp(),
+      type: 'entrant-deleted' as const,
+    }));
+
     const eventCategoryIds = [...(event?.categoryIds || [])];
     const eventEntrantIds = [...(event?.entrantIds || [])];
     const eventSessionIds = [...(event?.sessionIds || [])];
     const nextEventCategoryIds = unique([...eventCategoryIds, ...categoryIds]);
-    const nextEventEntrantIds = entrants.map((entrant) => entrant.id);
+    const nextEventEntrantIds = unique(entrants.map((entrant) => entrant.id.toString()));
     const nextEventSessionIds = eventSessionIds;
     const eventChanges = event && (
       !hasSameMembers(eventCategoryIds, nextEventCategoryIds) ||
@@ -971,7 +1265,7 @@ export class EventCatalogService {
       sessionIds: nextEventSessionIds,
     } : undefined;
 
-    if (categoryMutations.length === 0 && entrantMutations.length === 0 && !eventChanges) {
+    if (categoryMutations.length === 0 && entrantMutations.length === 0 && staleDuplicateEntrantMutations.length === 0 && !eventChanges) {
       if (!sessionCategoryMutation) {
         return this.state;
       }
@@ -980,6 +1274,7 @@ export class EventCatalogService {
     return this.appendMutations([
       ...categoryMutations,
       ...entrantMutations,
+      ...staleDuplicateEntrantMutations,
       ...(sessionCategoryMutation ? [sessionCategoryMutation] : []),
       ...(eventChanges ? [{
         changes: eventChanges,
@@ -997,7 +1292,11 @@ export class EventCatalogService {
 
   private async importApicalRaceStateUnbatched(importData: ApicalCatalogImport, masterProfiles: MasterEntrantProfile[] = [], onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const normalizedImportData = rewriteImportedObjectIds(importData).value;
-    normalizedImportData.raceState = normalizeImportedRaceStateForCatalog(normalizedImportData.raceState);
+    normalizedImportData.raceState = normalizeImportedRaceStateForEvent(
+      normalizedImportData.raceState,
+      this.getLatestImportedRaceStatesForEvent(normalizedImportData.eventId),
+      getEntrantsForEvent(this.state, normalizedImportData.eventId),
+    );
     const existingEvent = this.state.events.find((event) => event.id === normalizedImportData.eventId);
     const existingSession = this.state.sessions.find((session) => session.id === normalizedImportData.sessionId);
     const sessionIds = Array.from(new Set([...(existingEvent?.sessionIds || []), normalizedImportData.sessionId]));
@@ -1046,6 +1345,7 @@ export class EventCatalogService {
         event: {
           categoryIds: [],
           date: scheduledStart.slice(0, 10),
+          discipline: 'motorsport',
           entrantIds: [],
           format: 'race-weekend',
           id: normalizedImportData.eventId,
@@ -1132,7 +1432,11 @@ export class EventCatalogService {
 
   private async importMrScatsCatalogUnbatched(importData: MrScatsCatalogImport, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const normalizedImportData = rewriteImportedObjectIds(importData).value;
-    normalizedImportData.raceState = normalizeImportedRaceStateForCatalog(normalizedImportData.raceState);
+    normalizedImportData.raceState = normalizeImportedRaceStateForEvent(
+      normalizedImportData.raceState,
+      this.getLatestImportedRaceStatesForEvent(normalizedImportData.eventId),
+      getEntrantsForEvent(this.state, normalizedImportData.eventId),
+    );
 
     const existingEvent = this.state.events.find((event) => event.id === normalizedImportData.eventId);
     const existingSessions = new Map(this.state.sessions.map((session) => [session.id, session] as const));
@@ -1146,6 +1450,7 @@ export class EventCatalogService {
         event: {
           categoryIds: [],
           date: eventDate,
+          discipline: 'motorsport',
           entrantIds: [],
           format: 'race-weekend',
           id: normalizedImportData.eventId,
@@ -1161,6 +1466,7 @@ export class EventCatalogService {
       mutations.push({
         changes: {
           date: eventDate,
+          discipline: 'motorsport',
           name: normalizedImportData.eventName,
           sessionIds: Array.from(new Set([...existingEvent.sessionIds, ...sessionIds])),
           timeZone,
@@ -1252,7 +1558,11 @@ export class EventCatalogService {
     onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP,
     apicalDataFilePath?: string
   ): Promise<EventCatalogState> {
-    const normalizedRaceState = normalizeImportedRaceStateForCatalog(rewriteImportedObjectIds(raceState).value);
+    const normalizedRaceState = normalizeImportedRaceStateForEvent(
+      rewriteImportedObjectIds(raceState).value,
+      this.getLatestImportedRaceStatesForEvent(eventId),
+      getEntrantsForEvent(this.state, eventId),
+    );
     const existingMetadata = this.getImportedRaceStateMetadata(eventId, sessionId);
     const existingEvent = this.state.events.find((event) => event.id === eventId);
 
@@ -1302,7 +1612,11 @@ export class EventCatalogService {
     apicalDataFilePath?: string,
     masterProfiles: MasterEntrantProfile[] = []
   ): Promise<EventCatalogState> {
-    const linkedCategorySafeRaceState = normalizeImportedRaceStateForCatalog(rewriteImportedObjectIds(raceState).value);
+    const linkedCategorySafeRaceState = normalizeImportedRaceStateForEvent(
+      rewriteImportedObjectIds(raceState).value,
+      this.getLatestImportedRaceStatesForEvent(eventId),
+      getEntrantsForEvent(this.state, eventId),
+    );
     const existingMetadata = this.getImportedRaceStateMetadata(eventId, sessionId);
     const replayMutations = await this.getManualScaffoldMutationsAfterLatestImport(eventId, sessionId, masterProfiles);
 
@@ -1553,6 +1867,7 @@ export class EventCatalogService {
     const entrantId = createEventEntrantId();
     const event = this.state.events.find((item) => item.id === eventId);
     const categoryId = event?.categoryIds[0];
+    const entrantLabels = getEventDisciplineLabels(event?.discipline);
     const entrant: EventCatalogEntrant = {
       categoryId,
       categoryIds: categoryId ? [categoryId] : [],
@@ -1560,7 +1875,7 @@ export class EventCatalogService {
       eventId,
       id: entrantId,
       memberParticipantIds: [],
-      name: entrantType === 'team' ? 'New Team' : 'New Entrant',
+      name: entrantType === 'team' ? 'New Team' : `New ${entrantLabels.singular}`,
       notes: '',
       teamMembers: entrantType === 'team' ? [] : undefined,
     };

@@ -2537,6 +2537,192 @@ describe('EventCatalogService', () => {
     }));
   });
 
+  it('deduplicates duplicate imported participants and purges duplicate entrants during reload', async () => {
+    const importedEventId = createEventId('reload-deduplicate-event');
+    const importedSessionId = createSessionId('reload-deduplicate-session');
+    const importedCategoryId = createCategoryId('reload-deduplicate-category');
+    const importedEntrantId = createEventEntrantId('reload-deduplicate-entrant');
+    const importedParticipantId = createEventParticipantId('reload-deduplicate-participant');
+    const duplicateEntrantId = createEventEntrantId('reload-deduplicate-entrant-duplicate');
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+
+    await service.importApicalRaceState({
+      eventDate: '2026-06-07T01:30:00.000Z',
+      eventId: importedEventId,
+      eventName: 'Reload Deduplicate Round',
+      raceState: {
+        categories: [{ code: 'A', description: '', id: importedCategoryId, name: 'A' }],
+        participants: [
+          {
+            categoryId: importedCategoryId,
+            currentResult: undefined,
+            entrantId: importedEntrantId,
+            firstname: 'Casey',
+            id: importedParticipantId,
+            identifiers: [
+              { fromTime: undefined, racePlate: '18', toTime: undefined } as ParticipateRacePlate,
+              { fromTime: undefined, txNo: '7001', toTime: undefined } as ParticipantTransponder,
+            ],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'Driver',
+          },
+        ],
+        records: [
+          {
+            entrantId: importedEntrantId,
+            id: createTimeRecordId('reload-deduplicate-record-initial'),
+            participantId: importedParticipantId,
+            recordType: RECORD_TX_CROSSING,
+            sequence: 1,
+            source: createTimeRecordSourceId('reload-deduplicate-source-initial'),
+            time: new Date('2026-06-07T01:45:00.000Z'),
+          } as EventTimeRecord,
+        ],
+        teams: [],
+      },
+      sessionId: importedSessionId,
+      timeZone: 'Australia/Sydney',
+    });
+
+    const importedLedger = vi.mocked(seededPersistence.save).mock.calls.at(-1)?.[0] as EventCatalogLedger;
+    const ledgerWithDuplicateEntrant: EventCatalogLedger = {
+      ...importedLedger,
+      mutations: [
+        ...importedLedger.mutations,
+        {
+          entrant: {
+            categoryId: importedCategoryId,
+            categoryIds: [importedCategoryId],
+            entrantType: 'rider',
+            eventId: importedEventId,
+            firstName: 'Casey',
+            id: duplicateEntrantId,
+            identifiers: [
+              { fromTime: undefined, racePlate: '18', toTime: undefined } as ParticipateRacePlate,
+              { fromTime: undefined, txNo: '7001', toTime: undefined } as ParticipantTransponder,
+            ],
+            lastName: 'Driver',
+            memberParticipantIds: [importedParticipantId],
+            name: 'Casey Driver',
+          },
+          id: createId('reload-deduplicate-duplicate-entrant-created'),
+          timestamp: '2026-06-07T02:00:00.000Z',
+          type: 'entrant-created',
+        },
+        {
+          changes: {
+            entrantIds: [importedEntrantId, duplicateEntrantId],
+          },
+          eventId: importedEventId,
+          id: createId('reload-deduplicate-event-updated'),
+          timestamp: '2026-06-07T02:00:01.000Z',
+          type: 'event-updated',
+        },
+      ],
+    };
+    const reloadedPersistence = createPersistence(ledgerWithDuplicateEntrant);
+    const reloadedService = await EventCatalogService.create(reloadedPersistence);
+    const duplicateIncomingParticipantIdA = createEventParticipantId('reload-deduplicate-incoming-a');
+    const duplicateIncomingParticipantIdB = createEventParticipantId('reload-deduplicate-incoming-b');
+    const duplicateIncomingEntrantIdA = createEventEntrantId('reload-deduplicate-incoming-entrant-a');
+    const duplicateIncomingEntrantIdB = createEventEntrantId('reload-deduplicate-incoming-entrant-b');
+
+    await reloadedService.reloadImportedRaceState(importedEventId, importedSessionId, {
+      categories: [{ code: 'A', description: '', id: importedCategoryId, name: 'A refreshed' }],
+      participants: [
+        {
+          categoryId: importedCategoryId,
+          currentResult: undefined,
+          entrantId: duplicateIncomingEntrantIdA,
+          firstname: 'Casey',
+          id: duplicateIncomingParticipantIdA,
+          identifiers: [
+            { fromTime: undefined, racePlate: '18', toTime: undefined } as ParticipateRacePlate,
+            { fromTime: undefined, txNo: '7001', toTime: undefined } as ParticipantTransponder,
+          ],
+          lastRecordTime: null,
+          resultDuration: null,
+          surname: 'Driver',
+        },
+        {
+          categoryId: importedCategoryId,
+          currentResult: undefined,
+          entrantId: duplicateIncomingEntrantIdB,
+          firstname: 'Casey',
+          id: duplicateIncomingParticipantIdB,
+          identifiers: [
+            { fromTime: undefined, racePlate: '18', toTime: undefined } as ParticipateRacePlate,
+            { fromTime: undefined, txNo: '7001', toTime: undefined } as ParticipantTransponder,
+          ],
+          lastRecordTime: null,
+          resultDuration: null,
+          surname: 'Driver',
+        },
+      ],
+      records: [
+        {
+          entrantId: duplicateIncomingEntrantIdA,
+          id: createTimeRecordId('reload-deduplicate-record-a'),
+          participantId: duplicateIncomingParticipantIdA,
+          recordType: RECORD_TX_CROSSING,
+          sequence: 1,
+          source: createTimeRecordSourceId('reload-deduplicate-source-a'),
+          time: new Date('2026-06-07T01:55:00.000Z'),
+        } as EventTimeRecord,
+        {
+          entrantId: duplicateIncomingEntrantIdB,
+          id: createTimeRecordId('reload-deduplicate-record-b'),
+          participantId: duplicateIncomingParticipantIdB,
+          recordType: RECORD_TX_CROSSING,
+          sequence: 2,
+          source: createTimeRecordSourceId('reload-deduplicate-source-b'),
+          time: new Date('2026-06-07T01:56:00.000Z'),
+        } as EventTimeRecord,
+      ],
+      teams: [],
+    });
+
+    const savedLedger = vi.mocked(reloadedPersistence.save).mock.calls.at(-1)?.[0] as EventCatalogLedger;
+    const eventEntrants = getEntrantsForEvent(reloadedService.catalog, importedEventId);
+    const importedRaceState = reloadedService.getImportedRaceState(importedEventId, importedSessionId);
+    const canonicalEntrant = eventEntrants.find((entrant) => entrant.id === importedEntrantId);
+
+    expect(canonicalEntrant).toEqual(expect.objectContaining({
+      categoryId: importedCategoryId,
+      id: importedEntrantId,
+      memberParticipantIds: [importedParticipantId],
+      name: 'Casey Driver',
+    }));
+    expect(eventEntrants.find((entrant) => entrant.id === duplicateEntrantId)).toBeUndefined();
+    expect(eventEntrants.filter((entrant) => entrant.name === 'Casey Driver')).toHaveLength(1);
+    expect(importedRaceState?.participants).toEqual([
+      expect.objectContaining({
+        entrantId: importedEntrantId,
+        id: importedParticipantId,
+      }),
+    ]);
+    expect(importedRaceState?.records).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        entrantId: importedEntrantId,
+        participantId: importedParticipantId,
+      }),
+    ]));
+    expect(savedLedger.mutations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        entrantId: duplicateEntrantId,
+        type: 'entrant-deleted',
+      }),
+      expect.objectContaining({
+        raceState: expect.objectContaining({
+          participants: [expect.objectContaining({ entrantId: importedEntrantId, id: importedParticipantId })],
+        }),
+        type: 'race-state-imported',
+      }),
+    ]));
+  });
+
   it('supports entrant detail edits for rider fields and category updates', async () => {
     const seededPersistence = createPersistence(createSeedEventCatalogLedger());
     const service = await EventCatalogService.create(seededPersistence);
@@ -2675,7 +2861,7 @@ describe('EventCatalogService', () => {
 
     await service.createEntrant(SEED_EVENT_ID, 'rider', onCompleteStep);
     let entrants = getEntrantsForEvent(service.catalog, SEED_EVENT_ID);
-    const createdEntrantId = entrants.find((entrant) => entrant.name === 'New Entrant')?.id;
+    const createdEntrantId = entrants.find((entrant) => entrant.name === 'New Driver')?.id;
     expect(createdEntrantId).toBeDefined();
     await service.deleteEntrant(SEED_EVENT_ID, createdEntrantId!, onCompleteStep);
 

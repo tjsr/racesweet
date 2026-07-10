@@ -318,7 +318,7 @@ describe('EntrantsPage integration', () => {
     expect(sessionsForEntrantPanel.textContent).not.toContain('Practice');
     const entrantList = container.querySelector('[aria-label="Entrants for selected event"]');
     expect(entrantList?.textContent).not.toContain('ent-1');
-    expect(entrantList?.querySelector('.entrant-list-type')?.textContent).toBe('rider');
+    expect(entrantList?.querySelector('.entrant-list-type')?.textContent).toBe('driver');
 
     await act(async () => {
       eventSelect.value = 'event-2';
@@ -330,11 +330,11 @@ describe('EntrantsPage integration', () => {
     expect(sessionsForEntrantPanel.textContent).toContain('Teams Race');
     expect(sessionsForEntrantPanel.textContent).not.toContain('Premier Race');
     const switchedEntrantList = container.querySelector('[aria-label="Entrants for selected event"]');
-    expect(switchedEntrantList?.textContent).toContain('Individual Entrants');
+    expect(switchedEntrantList?.textContent).toContain('Individual Drivers');
     expect(switchedEntrantList?.textContent).toContain('Teams');
     expect(switchedEntrantList?.textContent).toContain('Blue One');
     expect(switchedEntrantList?.textContent).toContain('Team: Team Blue');
-    expect(switchedEntrantList?.textContent?.indexOf('Individual Entrants')).toBeLessThan(switchedEntrantList?.textContent?.indexOf('Teams') ?? 0);
+    expect(switchedEntrantList?.textContent?.indexOf('Individual Drivers')).toBeLessThan(switchedEntrantList?.textContent?.indexOf('Teams') ?? 0);
     expect(switchedEntrantList?.textContent?.indexOf('Blue One')).toBeLessThan(switchedEntrantList?.textContent?.indexOf('Team Blue') ?? 0);
 
     const categoryFilter = container.querySelector('select[aria-label="Entrants Category"]') as HTMLSelectElement;
@@ -346,7 +346,7 @@ describe('EntrantsPage integration', () => {
 
     expect(switchedEntrantList?.textContent).toContain('Team Blue');
     expect(switchedEntrantList?.textContent).toContain('Blue One');
-    expect(switchedEntrantList?.textContent).toContain('Blue Two');
+    expect(switchedEntrantList?.textContent).not.toContain('Blue Two');
     expect(switchedEntrantList?.textContent).not.toContain('No Category');
 
     await act(async () => {
@@ -368,7 +368,7 @@ describe('EntrantsPage integration', () => {
       setSelectValue(categoryFilter, 'all');
     });
 
-    const createButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Create Entrant');
+    const createButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Create Driver');
     expect(createButton).toBeDefined();
 
     await act(async () => {
@@ -871,6 +871,7 @@ describe('EntrantsPage integration', () => {
     await renderCatalog(applyEventCatalogLedger(createLedger(createdTeamMutations)));
     entrantList = container.querySelector('[aria-label="Entrants for selected event"]');
     expect(entrantList?.textContent).toContain('Live Rider');
+    expect(entrantList?.textContent).toContain('Individual Drivers');
     expect(entrantList?.textContent).toContain('Teams');
     expect(entrantList?.textContent).toContain('Team Relay');
 

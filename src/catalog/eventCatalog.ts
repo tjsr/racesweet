@@ -8,6 +8,7 @@ import { IdType } from '../model/types.js';
 import { isValidId } from '../validators/isValidId.js';
 
 export type EventFormat = 'race-weekend' | 'test-day' | 'track-day' | 'other';
+export type EventDiscipline = 'cycling' | 'motorsport';
 export type EventSessionKind = 'practice' | 'qualifying' | 'race' | 'warmup' | 'other';
 export type EventSessionStatus = 'draft' | 'scheduled' | 'live' | 'completed';
 export type EntrantType = 'rider' | 'team';
@@ -81,6 +82,7 @@ export interface EventCatalogEntrant {
 export interface EventCatalogEvent {
   categoryIds: EventCategoryId[];
   date: string;
+  discipline?: EventDiscipline;
   entrantIds: EventEntrantId[];
   format: EventFormat;
   id: EventId;
@@ -133,6 +135,23 @@ export const createDefaultEventCatalogState = (): EventCatalogState => ({
   events: [],
   sessions: [],
 });
+
+export interface EventDisciplineLabels {
+  plural: string;
+  singular: string;
+}
+
+export const getEventDisciplineLabels = (discipline: EventDiscipline | undefined): EventDisciplineLabels => {
+  return discipline === 'cycling'
+    ? {
+      plural: 'Riders',
+      singular: 'Rider',
+    }
+    : {
+      plural: 'Drivers',
+      singular: 'Driver',
+    };
+};
 
 const isActiveCategory = (category: EventCatalogCategory): boolean => category.deleted !== true;
 const getLegacyCategorySessionAssignments = (category: EventCatalogCategory | undefined): CategorySessionAssignment[] => {

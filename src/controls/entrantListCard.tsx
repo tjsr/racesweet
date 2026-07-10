@@ -4,6 +4,7 @@ import { type EventCatalogEntrant } from '../catalog/eventCatalog.js';
 interface EntrantListCartProps {
   categoryName?: string;
   entrant: EventCatalogEntrant;
+  entrantLabel?: string;
   isSelected: boolean;
   onSelect: () => void;
   raceNumber?: string | number;
@@ -53,7 +54,7 @@ export const EntrantListCard = (props: EntrantListCartProps): React.ReactElement
             Team: {props.teamName}
           </span>
         ) : null}
-        <span className="entrant-list-type">{props.entrant.entrantType}</span>
+        <span className="entrant-list-type">{props.entrant.entrantType === 'rider' ? (props.entrantLabel || 'Driver').toLowerCase() : props.entrant.entrantType}</span>
       </div>
     </button>
   );
