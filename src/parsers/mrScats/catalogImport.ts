@@ -43,6 +43,11 @@ interface CoreTableSource {
   records: MrScatsDbfRecord[];
 }
 
+interface SupplementalDriverSource {
+  fileName: string;
+  records: MrScatsDbfRecord[];
+}
+
 export interface MrScatsCatalogLoadProgress {
   callerName?: string;
   completed: number;
@@ -93,6 +98,7 @@ const DRIVER_BASE_NAMES = ['DRIVERS', 'DRIVER', 'DRIVE'];
 const CORE_TABLE_READABLE_EXTENSIONS = ['.DBF', '.DAT'];
 const CORE_TABLE_RELATED_EXTENSIONS = ['.DBF', '.DAT', '.TXT'];
 const DRIVER_NAME_FIELDS = ['DRIVER', 'DRIVER_2', 'DRIVER_3', 'DRIVER_4'];
+const DRIVER_METADATA_FIELDS = ['DRIV_CLASS', 'DRIV_CODE', 'ENTRANT', 'SCRN_NAME'];
 const TRANSPONDER_FIELDS = ['TXNUM', 'TXNUM2', 'TXNUM3', 'TXNUM4', 'TXNUM5', 'TXNUM6', 'TXNUM7', 'TXNUM8'];
 const CROSSING_ELAPSED_TICKS_PER_SECOND = 10000;
 const CROSSING_MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -281,6 +287,122 @@ const readCoreTableSource = (
   const errorDetails = errors.length > 0 ? ` Last DBF parse errors: ${errors.join('; ')}.` : '';
   throw new Error(`MR-SCATS ${label} table could not be read. Tried ${tried}. Found related files: ${related}.${errorDetails}`);
 };
+
+const hasDriverIdentityField = (record: MrScatsDbfRecord): boolean =>
+  [...DRIVER_NAME_FIELDS, ...DRIVER_METADATA_FIELDS].some((field) => asString(record[field]).length > 0);
+
+const hasDriverTransponderField = (record: MrScatsDbfRecord): boolean =>
+  TRANSPONDER_FIELDS.some((field) => {
+    const value = parseInteger(asString(record[field]));
+    return value !== undefined && value > 0;
+  });
+
+const isSupplementalDriverRecord = (record: MrScatsDbfRecord): boolean =>
+  asString(record.CARNUMBER).length > 0 && (hasDriverIdentityField(record) || hasDriverTransponderField(record));
+
+const readSupplementalDriverSources = (
+  buffers: Map<string, Buffer>,
+  programmeRecords: MrScatsDbfRecord[],
+  primaryDriverFileName: string
+): SupplementalDriverSource[] => {
+  const sessionEventCodes = new Set(
+    programmeRecords
+      .map((record) => asString(record.EV_CODE).toUpperCase())
+      .filter((value) => value.length > 0)
+  );
+
+  return Array.from(buffers.entries()).flatMap(([fileName, buffer]): SupplementalDriverSource[] => {
+    if (fileName === primaryDriverFileName) {
+      return [];
+    }
+
+    if (!CORE_TABLE_READABLE_EXTENSIONS.includes(path.extname(fileName).toUpperCase())) {
+      return [];
+    }
+
+    const upperBaseName = normalizeBaseName(fileName);
+    if (PROGRAMME_BASE_NAMES.includes(upperBaseName) || DRIVER_BASE_NAMES.includes(upperBaseName) || sessionEventCodes.has(upperBaseName)) {
+      return [];
+    }
+
+    try {
+      const records = readMrScatsDbfTable(buffer).records.filter(isSupplementalDriverRecord);
+      return records.length > 0 ? [{ fileName, records }] : [];
+    } catch (_error) {
+      return [];
+    }
+  });
+};
+
+const mergeDriverRecords = (
+  primaryDrivers: MrScatsDbfRecord[],
+  supplementalSources: SupplementalDriverSource[]
+): MrScatsDbfRecord[] => {
+  const driversByPlate = new Map<string, MrScatsDbfRecord>();
+
+  primaryDrivers.forEach((driver) => {
+    const plateNumber = asString(driver.CARNUMBER);
+    if (plateNumber.length > 0) {
+      driversByPlate.set(plateNumber, { ...driver });
+    }
+  });
+
+  supplementalSources.forEach((source) => {
+    source.records.forEach((driver) => {
+      const plateNumber = asString(driver.CARNUMBER);
+      if (plateNumber.length === 0) {
+        return;
+      }
+
+      const existing = driversByPlate.get(plateNumber);
+      if (!existing) {
+        driversByPlate.set(plateNumber, { ...driver });
+        return;
+      }
+
+      [...DRIVER_NAME_FIELDS, ...DRIVER_METADATA_FIELDS].forEach((field) => {
+        if (asString(existing[field]).length === 0 && asString(driver[field]).length > 0) {
+          existing[field] = driver[field];
+        }
+      });
+
+      const existingTransponders = new Set(
+        TRANSPONDER_FIELDS
+          .map((field) => parseInteger(asString(existing[field])))
+          .filter((value): value is number => value !== undefined && value > 0)
+      );
+
+      TRANSPONDER_FIELDS.forEach((field) => {
+        const transponder = parseInteger(asString(driver[field]));
+        if (transponder === undefined || transponder <= 0 || existingTransponders.has(transponder)) {
+          return;
+        }
+
+        const targetField = TRANSPONDER_FIELDS.find((candidateField) => {
+          const candidateValue = parseInteger(asString(existing[candidateField]));
+          return candidateValue === undefined || candidateValue <= 0;
+        });
+        if (!targetField) {
+          return;
+        }
+
+        existing[targetField] = transponder;
+        existingTransponders.add(transponder);
+      });
+    });
+  });
+
+  return Array.from(driversByPlate.values());
+};
+
+const getMergedDriverRecords = (
+  buffers: Map<string, Buffer>,
+  programmeRecords: MrScatsDbfRecord[],
+  primaryDriverSource: CoreTableSource
+): MrScatsDbfRecord[] => mergeDriverRecords(
+  primaryDriverSource.records,
+  readSupplementalDriverSources(buffers, programmeRecords, primaryDriverSource.fileName)
+);
 
 const readPlannedCoreTableSource = async (
   buffers: Map<string, Buffer>,
@@ -735,10 +857,11 @@ const inferSessionCategoryIds = (
 const createLoadPlan = (buffers: Map<string, Buffer>, locationPath: string, extraSteps: number): MrScatsLoadPlan => {
   const programme = readCoreTableSource(buffers, PROGRAMME_BASE_NAMES, 'programme');
   const drivers = readCoreTableSource(buffers, DRIVER_BASE_NAMES, 'driver');
+  const mergedDrivers = getMergedDriverRecords(buffers, programme.records, drivers);
   const meetingCode = getMeetingCode(programme.records, locationPath);
-  const categories = buildCategories(meetingCode, programme.records, drivers.records);
+  const categories = buildCategories(meetingCode, programme.records, mergedDrivers);
   const categoryIdByName = new Map(categories.map((category) => [category.name, category.id]));
-  const participants = buildParticipants(meetingCode, drivers.records, categoryIdByName);
+  const participants = buildParticipants(meetingCode, mergedDrivers, categoryIdByName);
   const sessions = inferSessionCategoryIds(buffers, buildSessions(meetingCode, programme.records, categoryIdByName), participants);
   const sessionPlansById = new Map<string, MrScatsSessionLoadPlan>();
   let sessionFileCount = 0;
@@ -1504,10 +1627,14 @@ export const loadMrScatsCatalogFromLocation = async (
   options: MrScatsCatalogLoadOptions = {}
 ): Promise<MrScatsCatalogImport> => {
   const { buffers, drivers, loadPlan, programme, progress } = await readCoreTables(locationPath, options);
+  const mergedDrivers = getMergedDriverRecords(buffers, programme, {
+    fileName: loadPlan.drivers.fileName,
+    records: drivers,
+  });
   const meetingCode = getMeetingCode(programme, locationPath);
-  const categories = buildCategories(meetingCode, programme, drivers);
+  const categories = buildCategories(meetingCode, programme, mergedDrivers);
   const categoryIdByName = new Map(categories.map((category) => [category.name, category.id]));
-  const participants = buildParticipants(meetingCode, drivers, categoryIdByName);
+  const participants = buildParticipants(meetingCode, mergedDrivers, categoryIdByName);
   const sessions = inferSessionCategoryIds(buffers, buildSessions(meetingCode, programme, categoryIdByName), participants);
   const sessionRecordBuildResult = await buildSessionRecords(meetingCode, buffers, sessions, participants, loadPlan, progress);
   const eventDate = getEventDate(programme);

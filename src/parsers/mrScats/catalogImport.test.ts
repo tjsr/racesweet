@@ -274,6 +274,70 @@ describe('MR-SCATS catalog import parser', () => {
     ]);
   });
 
+  it('merges supplemental driver tables so T9743-style transmitter assignments are preserved for reloads', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+      { length: 8, name: 'ACTUALSTRT', type: 'C' },
+    ], [
+      { ACTUALSTRT: '20:02:29', CATEGORY: 'CAT-A', EVENTNAME: 'Race 10', EV_CODE: 'T9743R10', STARTDATE: '19971206' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 13, DRIVER: 'Race Ten Driver', DRIV_CLASS: 'CAT-A', TXNUM: 1300 },
+    ]));
+    await writeFile(path.join(tempDir, 'X9743A01.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 4, name: 'TXNUM2', type: 'N' },
+      { length: 8, name: 'DRIV_CLASS', type: 'C' },
+      { length: 45, name: 'ENTRANT', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 13, DRIVER: 'Race Ten Driver', DRIV_CLASS: 'CAT-A', ENTRANT: 'Car 13 Team', TXNUM: 130 },
+      { CARNUMBER: 33, DRIVER: 'Race Nine Driver', DRIV_CLASS: 'CAT-A', ENTRANT: 'Car 33 Team', TXNUM: 3355, TXNUM2: 3344 },
+    ]));
+    await writeFile(path.join(tempDir, 'T9743R10.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 9, name: 'ELAPSED', type: 'N' },
+      { length: 4, name: 'COUNTER', type: 'N' },
+    ], [
+      { CARNUMBER: 13, COUNTER: 1, ELAPSED: 100000, TXNUM: 130 },
+      { CARNUMBER: 33, COUNTER: 2, ELAPSED: 200000, TXNUM: 3355 },
+    ]));
+
+    const imported = await loadMrScatsCatalogFromLocation(tempDir);
+
+    expect(imported.raceState.participants).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        identifiers: expect.arrayContaining([
+          expect.objectContaining({ racePlate: '13' }),
+          expect.objectContaining({ txNo: 1300 }),
+          expect.objectContaining({ txNo: 130 }),
+        ]),
+      }),
+      expect.objectContaining({
+        identifiers: expect.arrayContaining([
+          expect.objectContaining({ racePlate: '33' }),
+          expect.objectContaining({ txNo: 3355 }),
+          expect.objectContaining({ txNo: 3344 }),
+        ]),
+      }),
+    ]));
+    expect((imported.raceState.records || []).slice(1)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ chipCode: 130, plateNumber: '13' }),
+      expect.objectContaining({ chipCode: 3355, plateNumber: '33' }),
+    ]));
+  });
+
   it('loads session crossing DBFs with deterministic record IDs and derived pre-green crossing times', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
     await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
