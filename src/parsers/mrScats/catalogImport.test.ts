@@ -669,6 +669,55 @@ describe('MR-SCATS catalog import parser', () => {
     ]));
   });
 
+  it('anchors DBF offset times to raw SRT visible times when DBF green-offset metadata drifts toward midnight', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+      { length: 8, name: 'ACTUALSTRT', type: 'C' },
+    ], [
+      { ACTUALSTRT: '20:27:35', CATEGORY: 'CAT-A', EVENTNAME: 'Race 10', EV_CODE: 'T9743R10', STARTDATE: '19971206' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 13, DRIVER: 'Race Ten Driver', DRIV_CLASS: 'CAT-A', TXNUM: 1234 },
+    ]));
+    await writeFile(path.join(tempDir, 'T9743R10.SRT'), '12348814387450006 071 20:27:45.0006 00\r');
+    await writeFile(path.join(tempDir, 'T9743R10.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'ENTRYTIME', type: 'N' },
+      { length: 9, name: 'STARTELAP', type: 'N' },
+      { length: 4, name: 'COUNTER', type: 'N' },
+      { length: 3, name: 'LINE_NO', type: 'N' },
+      { length: 3, name: 'LANE_NO', type: 'N' },
+    ], [
+      { CARNUMBER: 13, COUNTER: 1, ENTRYTIME: 300006, LANE_NO: 2, LINE_NO: 3, STARTELAP: 736550000, TXNUM: 1234 },
+    ]));
+
+    const imported = await loadMrScatsCatalogFromLocation(tempDir);
+    const crossings = ((imported.raceState.records || []) as unknown as Array<Record<string, unknown>>)
+      .filter((record) => record.recordType === 16);
+    const crossingsBySource = new Map(crossings.map((crossing) => [crossing.source, crossing] as const));
+
+    expect(crossings).toHaveLength(2);
+    expect(crossingsBySource.get(createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.SRT'))).toEqual(expect.objectContaining({
+      source: createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.SRT'),
+      time: new Date('1997-12-06T09:27:45.000Z'),
+    }));
+    expect(crossingsBySource.get(createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.DBF'))).toEqual(expect.objectContaining({
+      source: createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.DBF'),
+      time: new Date('1997-12-06T09:27:45.000Z'),
+      timeTenthOfMillisecond: 6,
+    }));
+  });
+
   it('imports raw crossing confidence factors and hit counts separately', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
     await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([

@@ -342,4 +342,52 @@ describe('processAllParticipantLaps entrant sequencing', () => {
     expect(riderPassings[2].isValid).toBe(false);
     expect(riderPassings[2].isExcluded).toBe(true);
   });
+
+  it('treats configured line 3 passings as finish-line crossings for pit-finish sessions', () => {
+    const participants = new Map<string, EventParticipant>([
+      ['p1', participant('p1', '101', 'team-a')],
+    ]);
+
+    const firstFinish = passing('c1', 'p1', 'team-a', 2, '2026-05-30T10:06:00.000Z');
+    firstFinish.lineNumber = 3;
+    const secondFinish = passing('c2', 'p1', 'team-a', 3, '2026-05-30T10:12:00.000Z');
+    secondFinish.lineNumber = 3;
+
+    const records = [
+      createGreenFlagEvent({
+        categoryIds: [category.id],
+        flagValue: 'course',
+        id: 'flag-start',
+        recordType: 4,
+        sequence: 1,
+        source: 'test',
+        time: new Date('2026-05-30T10:00:00.000Z'),
+      }),
+      firstFinish,
+      secondFinish,
+    ];
+
+    const processed = processAllParticipantLaps(records, participants, 300000, true, 'race', [3]);
+    const riderPassings = processed.get('p1') || [];
+
+    expect(riderPassings.map((record) => ({
+      id: record.id,
+      isValid: record.isValid,
+      lapNo: record.lapNo,
+      lapTime: record.lapTime,
+    }))).toEqual([
+      {
+        id: 'c1',
+        isValid: true,
+        lapNo: 1,
+        lapTime: 360000,
+      },
+      {
+        id: 'c2',
+        isValid: true,
+        lapNo: 2,
+        lapTime: 360000,
+      },
+    ]);
+  });
 });
