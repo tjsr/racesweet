@@ -98,6 +98,14 @@ export interface FastestTimeIndicatorColors {
   sessionFastestTime: string;
 }
 
+export type TimingContextSelectionMode = 'active' | 'session';
+
+export interface TimingContextSelectionConfig {
+  eventId?: EventId;
+  selectionMode: TimingContextSelectionMode;
+  sessionId?: SessionId;
+}
+
 export interface SystemConfiguration {
   apicalListedEvents?: ApicalListedEvent[];
   dataSources: DataSourceConfig[];
@@ -107,6 +115,7 @@ export interface SystemConfiguration {
   localStorageDirectoryPath: string;
   schemaVersion: 1;
   sessionSourceAssignments: Record<string, SessionSourceAssignment>;
+  timingContextSelection: TimingContextSelectionConfig;
 }
 
 export const DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH = path.resolve('src/generated');
@@ -136,6 +145,9 @@ export const createDefaultSystemConfiguration = (): SystemConfiguration => ({
   localStorageDirectoryPath: DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH,
   schemaVersion: 1,
   sessionSourceAssignments: {},
+  timingContextSelection: {
+    selectionMode: 'active',
+  },
 });
 
 const normalizeLocalStorageDirectoryPath = (
@@ -183,6 +195,22 @@ const normalizeMrScatsSourceConfig = (config: MrScatsSourceConfig | undefined): 
 
 const normalizeApicalListedEvents = (listedEvents: ApicalListedEvent[] | undefined): ApicalListedEvent[] => {
   return (listedEvents || []).map((event) => ({ ...event }));
+};
+
+const normalizeTimingContextSelection = (
+  selection: Partial<TimingContextSelectionConfig> | undefined
+): TimingContextSelectionConfig => {
+  if (selection?.selectionMode === 'session') {
+    return {
+      eventId: selection.eventId,
+      selectionMode: 'session',
+      sessionId: selection.sessionId,
+    };
+  }
+
+  return {
+    selectionMode: 'active',
+  };
 };
 
 export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListedEvents: ApicalListedEvent[] = []): DataSourceConfig => {
@@ -262,6 +290,7 @@ export const normalizeSystemConfiguration = (
     localStorageDirectoryPath: normalizeLocalStorageDirectoryPath(config.localStorageDirectoryPath, config.apicalExcelCacheDirectoryPath),
     schemaVersion: 1,
     sessionSourceAssignments: config.sessionSourceAssignments || {},
+    timingContextSelection: normalizeTimingContextSelection(config.timingContextSelection),
   };
 };
 

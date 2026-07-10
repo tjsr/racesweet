@@ -6,6 +6,7 @@ import {
     type DataSourceType,
     type SessionSourceAssignment,
     type SystemConfiguration,
+    type TimingContextSelectionConfig,
     createDefaultSystemConfiguration,
     getDataSourceTypeLabel,
     normalizeOptionalSystemFilePath,
@@ -232,6 +233,17 @@ export class SystemConfigService {
     this.config = {
       ...this.config,
       localStorageDirectoryPath: normalizeSystemDirectoryPath(directoryPath),
+    };
+    await this.persist();
+    return this.config;
+  }
+
+  public async updateTimingContextSelection(selection: TimingContextSelectionConfig): Promise<SystemConfiguration> {
+    this.config = {
+      ...this.config,
+      timingContextSelection: {
+        ...selection,
+      },
     };
     await this.persist();
     return this.config;

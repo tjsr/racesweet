@@ -1457,6 +1457,70 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.textContent).toContain('Recent Records (0)');
   });
 
+  it('persists the last viewed Timing event and session and restores them after reload', async () => {
+    let persistedSystemConfigContent: string | undefined;
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer: readFixtureBuffer,
+      requestFileContent: ((filePath: string, _dataType: string): Promise<string> => {
+        if (filePath.includes('system-config.json')) {
+          return Promise.resolve(persistedSystemConfigContent ?? readGeneratedFixture(filePath));
+        }
+
+        return Promise.resolve(readGeneratedFixture(filePath));
+      }) as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async (filePath: string, content: string) => {
+        if (filePath.includes('system-config.json')) {
+          persistedSystemConfigContent = content;
+        }
+      },
+    };
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    await clickSectionButton(container, 'Timing');
+    const timingEventSelect = container.querySelector('select[aria-label="Timing Event"]') as HTMLSelectElement;
+    const timingSessionSelect = container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement;
+    expect(timingEventSelect).toBeTruthy();
+    expect(timingSessionSelect).toBeTruthy();
+
+    await act(async () => {
+      timingSessionSelect.value = SEED_QUALIFYING_SESSION_ID;
+      timingSessionSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    await waitForInputValue(container, 'select[aria-label="Timing Session"]', SEED_QUALIFYING_SESSION_ID);
+    expect(persistedSystemConfigContent).toBeTruthy();
+    expect(JSON.parse(persistedSystemConfigContent!).timingContextSelection).toEqual({
+      eventId: timingEventSelect.value,
+      selectionMode: 'session',
+      sessionId: SEED_QUALIFYING_SESSION_ID,
+    });
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.innerHTML = '';
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    await clickSectionButton(container, 'Timing');
+    await waitForInputValue(container, 'select[aria-label="Timing Session"]', SEED_QUALIFYING_SESSION_ID);
+    expect((container.querySelector('select[aria-label="Timing Event"]') as HTMLSelectElement).value).toBe(timingEventSelect.value);
+  });
+
   it('keeps navigation visible, dismisses Timing errors when navigating away, and saves them to the System log', async () => {
     const requestFileContent = async (filePath: string, _dataType: string): Promise<string> => {
       return readGeneratedFixtureWithTimingAssignedApicalSource(filePath);

@@ -40,7 +40,7 @@ import { updateCategorySelectionsForChangedParticipant } from './categoryChangeS
 import './index.css';
 import { selectedCategoriesForParticipants } from './selectionState.ts';
 import { formatErrorForDisplay } from './stackTrace.ts';
-import { type DataSourceConfig, type EventTimeDisplayZoneMode, type SystemConfiguration, createDefaultSystemConfiguration, getFinishLineNumbersForSession, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
+import { type DataSourceConfig, type EventTimeDisplayZoneMode, type SystemConfiguration, type TimingContextSelectionConfig, createDefaultSystemConfiguration, getFinishLineNumbersForSession, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
 import { getSystemTimeZone } from './utils/timeutils.ts';
 import { type EventSessionOption } from './views/results/resultsPage.tsx';
 
@@ -310,6 +310,34 @@ const sortSessionsByScheduledStart = (
   });
 };
 
+const resolveTimingContextSelection = (
+  catalog: EventCatalogState,
+  savedSelection: TimingContextSelectionConfig | undefined
+): {
+  eventId: EventId | undefined;
+  selectionMode: TimingSessionSelection;
+  sessionId: SessionId | undefined;
+} => {
+  if (savedSelection?.selectionMode === 'session' && savedSelection.eventId) {
+    const savedEvent = catalog.events.find((event) => event.id === savedSelection.eventId);
+    if (savedEvent) {
+      const sessions = sortSessionsByScheduledStart(getSessionsForEvent(catalog, savedEvent.id));
+      const sessionId = sessions.find((session) => session.id === savedSelection.sessionId)?.id ?? sessions[0]?.id;
+      return {
+        eventId: savedEvent.id,
+        selectionMode: 'session',
+        sessionId,
+      };
+    }
+  }
+
+  return {
+    eventId: catalog.activeEventId || catalog.events[0]?.id,
+    selectionMode: 'active',
+    sessionId: catalog.activeSessionId,
+  };
+};
+
 export const RaceSweetMainApp = () => {
   const [activeSection, setActiveSection] = useState<AppSection>('System');
   const [adminService, setAdminService] = useState<RaceAdminService|undefined>(undefined);
@@ -344,6 +372,7 @@ export const RaceSweetMainApp = () => {
   const [timingSelectionLoading, setTimingSelectionLoading] = useState<boolean>(false);
   const [timingErrorState, setTimingErrorState] = useState<Error|undefined>(undefined);
   const [reloadSummary, setReloadSummary] = useState<SessionSourceReloadSummary|undefined>(undefined);
+  const initialTimingSelectionHydrated = useRef<boolean>(false);
   const unsavedChangesGuards = useRef<Partial<Record<AppSection, UnsavedChangesGuard>>>({});
   const setUnsavedChangesGuard = useCallback((section: AppSection, guard: UnsavedChangesGuard | undefined): void => {
     unsavedChangesGuards.current[section] = guard;
@@ -361,6 +390,18 @@ export const RaceSweetMainApp = () => {
       },
     ]);
   }, []);
+
+  const persistTimingContextSelection = useCallback((
+    selection: TimingContextSelectionConfig
+  ): void => {
+    if (!systemConfigService) {
+      return;
+    }
+
+    systemConfigService.updateTimingContextSelection(selection)
+      .then(setSystemConfigState)
+      .catch((error: unknown) => setErrorState(error as Error));
+  }, [systemConfigService]);
 
   useEffect(() => {
     return subscribeLoadingMetrics(() => {
@@ -524,12 +565,15 @@ export const RaceSweetMainApp = () => {
           setSelectedEntrantId(entrantList[0]?.id);
           setSelectedSessionsEventId(initialEventId);
           setSelectedSessionId(initialSessionId);
-          setSelectedTimingEventId(initialEventId);
-          setSelectedTimingSessionId(initialSessionId);
+          const restoredTimingSelection = resolveTimingContextSelection(catalog, initialSystemConfig.timingContextSelection);
+          setTimingSessionSelection(restoredTimingSelection.selectionMode);
+          setSelectedTimingEventId(restoredTimingSelection.eventId);
+          setSelectedTimingSessionId(restoredTimingSelection.sessionId);
           setSelectedAnalyticsEventId(initialEventId);
           setSelectedAnalyticsSessionId(initialSessionId);
           setAnalyticsRaceState(session);
-          setTimingRaceState(session);
+          setTimingRaceState(restoredTimingSelection.selectionMode === 'active' ? session : createEmptySessionState());
+          initialTimingSelectionHydrated.current = restoredTimingSelection.selectionMode === 'active';
           setErrorState(undefined);
           updateProgressStage('publish', 1, 1);
         };
@@ -951,6 +995,11 @@ export const RaceSweetMainApp = () => {
     setTimingSessionSelection('session');
     setSelectedTimingEventId(eventId);
     setSelectedTimingSessionId(nextSessionId);
+    persistTimingContextSelection({
+      eventId,
+      selectionMode: 'session',
+      sessionId: nextSessionId,
+    });
     setTimingSelectionLoading(true);
     setTimingRaceState(createEmptySessionState());
 
@@ -975,6 +1024,9 @@ export const RaceSweetMainApp = () => {
         setTimingSessionSelection('active');
         setSelectedTimingEventId(eventCatalogState?.activeEventId);
         setSelectedTimingSessionId(eventCatalogState?.activeSessionId);
+        persistTimingContextSelection({
+          selectionMode: 'active',
+        });
         setTimingRaceState(sessionState);
         setTimingErrorState(undefined);
         setTimingSelectionLoading(false);
@@ -990,6 +1042,11 @@ export const RaceSweetMainApp = () => {
 
     setTimingSessionSelection('session');
     setSelectedTimingSessionId(sessionId);
+    persistTimingContextSelection({
+      eventId,
+      selectionMode: 'session',
+      sessionId,
+    });
     setTimingRaceState(createEmptySessionState());
     runAfterTimingLoadingPaint(() => {
       loadTimingSession(eventId, sessionId).catch((error: unknown) => {
@@ -1058,6 +1115,23 @@ export const RaceSweetMainApp = () => {
     setTimingErrorState(undefined);
     setTimingSelectionLoading(false);
   }, [eventCatalogState?.activeEventId, eventCatalogState?.activeSessionId, sessionState, timingSessionSelection]);
+
+  useEffect(() => {
+    if (initialTimingSelectionHydrated.current ||
+      timingSessionSelection !== 'session' ||
+      !selectedTimingEventId ||
+      !selectedTimingSessionId) {
+      return;
+    }
+
+    initialTimingSelectionHydrated.current = true;
+    setTimingSelectionLoading(true);
+    loadTimingSession(selectedTimingEventId, selectedTimingSessionId).catch((error: unknown) => {
+      setTimingErrorState(error as Error);
+    }).finally(() => {
+      setTimingSelectionLoading(false);
+    });
+  }, [loadTimingSession, selectedTimingEventId, selectedTimingSessionId, timingSessionSelection]);
 
   useEffect(() => {
     if (selectedAnalyticsEventId === eventCatalogState?.activeEventId && selectedAnalyticsSessionId === eventCatalogState?.activeSessionId) {

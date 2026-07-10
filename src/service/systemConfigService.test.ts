@@ -274,6 +274,30 @@ describe('SystemConfigService', () => {
     }));
   });
 
+  it('persists the Timing context selection', async () => {
+    const persistence = createPersistence();
+    const service = await SystemConfigService.create(persistence);
+
+    await service.updateTimingContextSelection({
+      eventId: 'event-1',
+      selectionMode: 'session',
+      sessionId: 'session-1',
+    });
+
+    expect(service.state.timingContextSelection).toEqual({
+      eventId: 'event-1',
+      selectionMode: 'session',
+      sessionId: 'session-1',
+    });
+    expect(persistence.save).toHaveBeenCalledWith(expect.objectContaining({
+      timingContextSelection: {
+        eventId: 'event-1',
+        selectionMode: 'session',
+        sessionId: 'session-1',
+      },
+    }));
+  });
+
   it('persists cached Apical events and clears selections that are not in the dropdown options', async () => {
     const persistence = createPersistence();
     const service = await SystemConfigService.create(persistence);

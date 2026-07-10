@@ -62,7 +62,7 @@ describe('MR-SCATS file inventory', () => {
     await writeFile(path.join(tempDir, 'W9721Q01.DBF'), createDbfBuffer());
     await writeFile(path.join(tempDir, 'W9721Q01.NTX'), Buffer.alloc(4));
     await writeFile(path.join(tempDir, 'W9721Q01.AT1'), createDbfBuffer());
-    await writeFile(path.join(tempDir, 'X0099A01.CAR'), createDbfBuffer());
+    await writeFile(path.join(tempDir, 'X0099A01.CAR'), Buffer.from('FIELD->CARNUMBER', 'latin1'));
     await writeFile(path.join(tempDir, 'W9721Q01.NO2'), createDbfBuffer());
     await writeFile(path.join(tempDir, 'W9721Q01.SRT'), '123456\r789012\r\n345678');
 
@@ -71,8 +71,7 @@ describe('MR-SCATS file inventory', () => {
     expect(inventory.sourceKind).toBe('directory');
     expect(inventory.files).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        dbf: expect.objectContaining({ recordCount: 1 }),
-        kind: 'dbf-table',
+        kind: 'index',
         meetingCode: 'X0099',
         relativePath: 'X0099A01.CAR',
         sessionCode: 'A',

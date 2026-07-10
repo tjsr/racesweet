@@ -589,6 +589,10 @@ const findRelatedDbfCandidates = (relativePath: string): string[] => {
     return [inSameDirectory(`${baseName}.NO1`), inSameDirectory(`${baseName}.DBF`)];
   }
 
+  if (extension.toLowerCase() === '.car') {
+    return [inSameDirectory(`${baseName}.DBF`)];
+  }
+
   return [inSameDirectory(`${baseName}.DBF`), inSameDirectory(`${baseName}.NO1`)];
 };
 

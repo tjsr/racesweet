@@ -62,15 +62,16 @@ const classifyMrScatsFile = (extension: string): MrScatsDataFileKind => {
   }
 
   switch (extension.toLowerCase()) {
-  case '.at1':
-  case '.at2':
-    return 'dbf-table';
+  case '.car':
   case '.fst':
   case '.nt1':
   case '.ntt':
   case '.ttx':
   case '.ntx':
     return 'index';
+  case '.at1':
+  case '.at2':
+    return 'dbf-table';
   case '.zip':
   case '.arj':
     return 'archive';
