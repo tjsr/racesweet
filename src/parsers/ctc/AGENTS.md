@@ -24,7 +24,8 @@ Use this file for durable knowledge about CTC/Data-1 raw crossing files and pars
   - `E1...`: event/control marker; preserve for preview even if not yet imported as a flag.
 - When visible-time SRT rows are present, treat them as authoritative and derive the compact/control-row time-of-day from the same absolute-tick offset.
 - Per-session raw crossing files whose basename matches a loaded session code should be imported as crossings when the parser confirms they are raw text data.
-- If a session SRT file is missing, look for the same extension on the previous numbered session and use the next `40` start-of-race segment. Example: if `T9743R10.SRT` is missing, use the second `40`-delimited segment inside `T9743R09.SRT`.
+- If a session SRT file is missing, a previous numbered session file may contain the target session's raw segment. Choose the segment whose derived `40` start-of-race time is closest to the target session's programme start; do not blindly use a segment by ordinal index when visible times are available.
+- If a direct session SRT file also contains earlier-session rows before the target session's `40` start marker, exclude those pre-start rows from the target session import.
 - Imported raw crossing `antenna` text should be derived from the raw line/loop fields.
 
 ## Parser Scope

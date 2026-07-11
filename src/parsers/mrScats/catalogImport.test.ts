@@ -64,6 +64,44 @@ const createDbfBuffer = (fields: DbfField[], rows: Record<string, string | numbe
   return buffer;
 };
 
+const TEST_RAW_ABSOLUTE_TIME_OFFSET = 880_705_955_000;
+
+const getTestRawTimeTicks = (timeText: string): number => {
+  const match = /^(?<hours>\d{2}):(?<minutes>\d{2}):(?<seconds>\d{2})\.(?<fraction>\d{4})$/.exec(timeText);
+  if (!match?.groups) {
+    throw new Error(`Invalid test raw time: ${timeText}`);
+  }
+
+  return (
+    (((Number(match.groups.hours) * 60) + Number(match.groups.minutes)) * 60) +
+    Number(match.groups.seconds)
+  ) * 10_000 + Number(match.groups.fraction);
+};
+
+const createTestRawVisibleTimeLine = (transmitter: number, timeText: string): string => {
+  const absoluteTicks = TEST_RAW_ABSOLUTE_TIME_OFFSET + getTestRawTimeTicks(timeText);
+  return `${String(transmitter).padStart(4, '0')}${String(absoluteTicks).padStart(14, '0')} 071 ${timeText} 00`;
+};
+
+const createTestRawCompactCrossingLine = (
+  transmitter: number,
+  timeText: string,
+  lineNumber: number,
+  laneNumber: number = 6
+): string => {
+  const absoluteTicks = TEST_RAW_ABSOLUTE_TIME_OFFSET + getTestRawTimeTicks(timeText);
+  return [
+    '04',
+    String(absoluteTicks).padStart(14, '0'),
+    String(transmitter).padStart(4, '0'),
+    String(lineNumber).padStart(2, '0'),
+    String(laneNumber).padStart(2, '0'),
+    '255',
+    '000',
+    '004',
+  ].join('');
+};
+
 describe('MR-SCATS catalog import parser', () => {
   it('defaults timezone-less legacy imports to Australia/Melbourne', () => {
     expect(MR_SCATS_DEFAULT_TIME_ZONE).toBe('Australia/Melbourne');
@@ -876,18 +914,15 @@ describe('MR-SCATS catalog import parser', () => {
       .filter((record) => record.recordType === 16);
     const crossingsBySource = new Map(crossings.map((crossing) => [crossing.source, crossing] as const));
 
-    expect(crossings).toHaveLength(2);
-    expect(crossingsBySource.get(createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.SRT'))).toEqual(expect.objectContaining({
-      source: createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.SRT'),
-      time: new Date('1997-12-06T09:27:45.000Z'),
-    }));
+    expect(crossings).toHaveLength(1);
+    expect(crossingsBySource.has(createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.SRT'))).toBe(false);
     expect(crossingsBySource.get(createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.DBF'))).toEqual(expect.objectContaining({
+      lineNumber: 3,
       source: createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.DBF'),
       time: new Date('1997-12-06T09:27:45.000Z'),
       timeTenthOfMillisecond: 6,
     }));
     expect(crossings.map((crossing) => getMelbourneDateParts(crossing.time as Date))).toEqual([
-      { date: '1997-12-06', hour: 20 },
       { date: '1997-12-06', hour: 20 },
     ]);
   });
@@ -1231,5 +1266,178 @@ describe('MR-SCATS catalog import parser', () => {
         time: new Date('1997-12-06T09:02:32.413Z'),
       }),
     ]));
+  });
+
+  it('selects the R10 SRT segment by the derived green flag time and excludes earlier R09 crossings', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+      { length: 8, name: 'ACTUALSTRT', type: 'C' },
+    ], [
+      { ACTUALSTRT: '20:22:15', CATEGORY: 'NASCAR', EVENTNAME: 'Race 10', EV_CODE: 'T9743R10', STARTDATE: '19971206' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 4, name: 'TXNUM2', type: 'N' },
+      { length: 8, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 34, DRIVER: 'Kevin Schwantz', DRIV_CLASS: 'NASCAR', TXNUM: 51, TXNUM2: 3344 },
+    ]));
+    await writeFile(path.join(tempDir, 'T9743R10.SRT'), [
+      '999908814381863332 071 20:03:06.3332 00',
+      '040881438186333233440106255000004',
+      '040881438186555533440306255000004',
+      '4008814393350000',
+      '040881439338333200510306255000004',
+    ].join('\r'));
+
+    const imported = await loadMrScatsCatalogFromLocation(tempDir);
+    const raceTenSession = imported.sessions.find((session) => session.eventCode === 'T9743R10');
+    const raceTenRecords = ((imported.raceState.records || []) as unknown as Array<Record<string, unknown> & { sessionId?: string }>)
+      .filter((record) => record.sessionId === raceTenSession?.id);
+    const crossings = raceTenRecords.filter((record) => record.recordType === 16);
+
+    expect(raceTenRecords[0]).toEqual(expect.objectContaining({
+      flagType: 'green',
+      indicatesRaceStart: true,
+      time: new Date('1997-12-06T09:22:15.000Z'),
+    }));
+    expect(crossings).toEqual([
+      expect.objectContaining({
+        chipCode: 51,
+        lineNumber: 3,
+        loopNumber: 6,
+        time: new Date('1997-12-06T09:22:18.333Z'),
+      }),
+    ]);
+    expect(crossings).toEqual(expect.not.arrayContaining([
+      expect.objectContaining({ chipCode: 3344 }),
+    ]));
+  });
+
+  it('anchors MR-SCATS crossing times from the longest SRT and DBF run for the median line-one transmitter', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+      { length: 8, name: 'ACTUALSTRT', type: 'C' },
+    ], [
+      { ACTUALSTRT: '20:22:00', CATEGORY: 'NASCAR', EVENTNAME: 'Race 10', EV_CODE: 'T9743R10', STARTDATE: '19971206' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 11, DRIVER: 'Line One Low', DRIV_CLASS: 'NASCAR', TXNUM: 101 },
+      { CARNUMBER: 22, DRIVER: 'Median Runner', DRIV_CLASS: 'NASCAR', TXNUM: 202 },
+      { CARNUMBER: 33, DRIVER: 'Line One High', DRIV_CLASS: 'NASCAR', TXNUM: 303 },
+    ]));
+    await writeFile(path.join(tempDir, 'T9743R10.SRT'), [
+      createTestRawVisibleTimeLine(0, '20:00:00.0000'),
+      createTestRawCompactCrossingLine(101, '20:21:59.0000', 1),
+      createTestRawCompactCrossingLine(202, '20:03:10.0000', 1),
+      createTestRawCompactCrossingLine(303, '20:21:55.0000', 1),
+      createTestRawCompactCrossingLine(303, '20:22:55.0000', 1),
+      createTestRawCompactCrossingLine(303, '20:23:55.0000', 1),
+      createTestRawCompactCrossingLine(202, '20:22:10.0000', 1),
+      createTestRawCompactCrossingLine(202, '20:23:10.0000', 3),
+      createTestRawCompactCrossingLine(202, '20:24:10.0000', 7),
+    ].join('\r'));
+    await writeFile(path.join(tempDir, 'T9743R10.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'ENTRYTIME', type: 'N' },
+      { length: 4, name: 'COUNTER', type: 'N' },
+    ], [
+      { CARNUMBER: 22, COUNTER: 1, ENTRYTIME: 100000, TXNUM: 202 },
+      { CARNUMBER: 22, COUNTER: 2, ENTRYTIME: 700000, TXNUM: 202 },
+      { CARNUMBER: 22, COUNTER: 3, ENTRYTIME: 1300000, TXNUM: 202 },
+    ]));
+
+    const imported = await loadMrScatsCatalogFromLocation(tempDir);
+    const crossings = ((imported.raceState.records || []) as unknown as Array<Record<string, unknown>>)
+      .filter((record) => record.recordType === 16 && record.source === createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.DBF'));
+
+    expect((imported.raceState.records || [])[0]).toEqual(expect.objectContaining({
+      flagType: 'green',
+      indicatesRaceStart: true,
+      time: new Date('1997-12-06T09:22:00.000Z'),
+    }));
+    expect(crossings).toEqual([
+      expect.objectContaining({
+        chipCode: 202,
+        lineNumber: 1,
+        time: new Date('1997-12-06T09:22:10.000Z'),
+      }),
+      expect.objectContaining({
+        chipCode: 202,
+        lineNumber: 3,
+        time: new Date('1997-12-06T09:23:10.000Z'),
+      }),
+      expect.objectContaining({
+        chipCode: 202,
+        lineNumber: 7,
+        time: new Date('1997-12-06T09:24:10.000Z'),
+      }),
+    ]);
+  });
+
+  it('uses matching SRT data to enrich DBF crossings and skips the duplicate raw crossing', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+      { length: 8, name: 'ACTUALSTRT', type: 'C' },
+    ], [
+      { ACTUALSTRT: '20:02:00', CATEGORY: 'NASCAR', EVENTNAME: 'Race 10', EV_CODE: 'T9743R10', STARTDATE: '19971206' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 34, DRIVER: 'Kevin Schwantz', DRIV_CLASS: 'NASCAR', TXNUM: 51 },
+    ]));
+    await writeFile(path.join(tempDir, 'T9743R10.SRT'), [
+      '000008814393383332 071 20:22:18.3332 00',
+      '040881439338333200510306255000004',
+    ].join('\r'));
+    await writeFile(path.join(tempDir, 'T9743R10.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'ENTRYTIME', type: 'N' },
+      { length: 4, name: 'COUNTER', type: 'N' },
+    ], [
+      { CARNUMBER: 34, COUNTER: 1, ENTRYTIME: 33332, TXNUM: 51 },
+    ]));
+
+    const imported = await loadMrScatsCatalogFromLocation(tempDir);
+    const crossings = ((imported.raceState.records || []) as unknown as Array<Record<string, unknown>>)
+      .filter((record) => record.recordType === 16);
+
+    expect(crossings).toEqual([
+      expect.objectContaining({
+        chipCode: 51,
+        confidenceFactor: 255,
+        hitCount: 4,
+        lineNumber: 3,
+        loopNumber: 6,
+        source: createTimeRecordSourceId('mr-scats:T9743:source:T9743R10:T9743R10.DBF'),
+        time: new Date('1997-12-06T09:22:18.333Z'),
+        timeTenthOfMillisecond: 2,
+      }),
+    ]);
   });
 });

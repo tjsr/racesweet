@@ -124,8 +124,30 @@ interface MrScatsSessionRecordBuildResult {
 }
 
 interface RawCrossingTimeAnchor {
+  fileName: string;
   key: string;
+  record: CtcRawCrossingRecord;
   time: Date;
+}
+
+interface DbfCrossingTimeAnchor {
+  elapsedMilliseconds: number;
+  record: MrScatsDbfRecord;
+  transmitter: number;
+}
+
+interface SessionElapsedZeroCandidateScore {
+  candidateTime: number;
+  longestRunLength: number;
+  matchedCrossingCount: number;
+  totalDeltaMilliseconds: number;
+}
+
+interface SrtCrossingTimeAnchor {
+  fileName: string;
+  record: CtcRawCrossingRecord;
+  time: Date;
+  transmitter: number;
 }
 
 const createProgressTracker = (total: number, onProgress: MrScatsCatalogLoadOptions['onProgress']): MrScatsLoadProgressTracker => {
@@ -735,6 +757,13 @@ const splitRawRecordsByStartRecords = (records: CtcRawCrossingRecord[]): CtcRawC
 
   records.forEach((record) => {
     const isStartRecord = record.specialType === 'start-of-race';
+    if (isStartRecord && !seenStartRecord && currentSegment.length > 0) {
+      segments.push(currentSegment);
+      currentSegment = [record];
+      seenStartRecord = true;
+      return;
+    }
+
     if (isStartRecord && seenStartRecord && currentSegment.length > 0) {
       segments.push(currentSegment);
       currentSegment = [record];
@@ -752,6 +781,46 @@ const splitRawRecordsByStartRecords = (records: CtcRawCrossingRecord[]): CtcRawC
   }
 
   return segments;
+};
+
+const getRawSegmentStartTime = (segment: CtcRawCrossingRecord[], session: MrScatsImportedSession): Date | undefined => {
+  const startRecord = segment.find((record) => record.specialType === 'start-of-race' && record.timeText !== undefined);
+  return startRecord?.timeText ? parseRawTimeOfDay(startRecord.timeText, new Date(session.scheduledStart)) : undefined;
+};
+
+const selectSessionRawSegment = (
+  records: CtcRawCrossingRecord[],
+  session: MrScatsImportedSession,
+  preferredSegmentIndex: number
+): { records: CtcRawCrossingRecord[]; segmentIndex: number } => {
+  const segments = splitRawRecordsByStartRecords(records);
+  const scheduledStartTime = new Date(session.scheduledStart);
+  const timedSegments = segments
+    .map((segment, segmentIndex) => ({
+      segment,
+      segmentIndex,
+      startTime: getRawSegmentStartTime(segment, session),
+    }))
+    .filter((candidate): candidate is { segment: CtcRawCrossingRecord[]; segmentIndex: number; startTime: Date } =>
+      candidate.startTime !== undefined
+    )
+    .sort((left, right) =>
+      Math.abs(left.startTime.getTime() - scheduledStartTime.getTime()) -
+      Math.abs(right.startTime.getTime() - scheduledStartTime.getTime())
+    );
+
+  const selectedTimedSegment = timedSegments[0];
+  if (selectedTimedSegment) {
+    return {
+      records: selectedTimedSegment.segment,
+      segmentIndex: selectedTimedSegment.segmentIndex,
+    };
+  }
+
+  return {
+    records: segments[preferredSegmentIndex] || [],
+    segmentIndex: preferredSegmentIndex,
+  };
 };
 
 const parseSessionNumberFromEventCode = (eventCode: string): number | undefined => {
@@ -795,14 +864,14 @@ const findSessionRawCrossingFiles = (buffers: Map<string, Buffer>, session: MrSc
         ? 0
         : targetSessionNumber - candidateSessionNumber;
       const allRecords = parseCtcRawCrossingFile(buffers.get(fileName)!);
-      const segments = splitRawRecordsByStartRecords(allRecords);
-      const records = segments[segmentIndex] || [];
+      const selectedSegment = selectSessionRawSegment(allRecords, session, segmentIndex);
+      const records = selectedSegment.records;
       if (records.length > 0) {
         rawFiles.push({
           fileName,
           lines: records.map((record) => record.raw),
           records,
-          segmentIndex,
+          segmentIndex: selectedSegment.segmentIndex,
         });
       }
       break;
@@ -1091,6 +1160,225 @@ const getCrossingConfidenceFactor = (record: MrScatsDbfRecord): number | undefin
 const getCrossingHitCount = (record: MrScatsDbfRecord): number | undefined =>
   getFirstNonNegativeInteger(record, CROSSING_HIT_COUNT_FIELDS);
 
+const getSessionTransponderNumbers = (
+  participants: EventParticipant[],
+  session: MrScatsImportedSession
+): Set<number> => {
+  const sessionCategoryIds = new Set(session.categoryIds.map((categoryId) => categoryId.toString()));
+  return participants.reduce<Set<number>>((transponders, participant) => {
+    if (!sessionCategoryIds.has(participant.categoryId.toString())) {
+      return transponders;
+    }
+
+    participant.identifiers.forEach((identifier) => {
+      const txNo = (identifier as unknown as { txNo?: unknown }).txNo;
+      const parsedTxNo = parseInteger(txNo);
+      if (parsedTxNo !== undefined && parsedTxNo > 0) {
+        transponders.add(parsedTxNo);
+      }
+    });
+
+    return transponders;
+  }, new Set<number>());
+};
+
+const getDbfElapsedMillisecondsForAlignment = (record: MrScatsDbfRecord): number | undefined => {
+  const elapsedMatch = getFirstNumberMatch(record, CROSSING_ELAPSED_FIELDS);
+  return elapsedMatch ? elapsedTicksToMilliseconds(elapsedMatch.value) : undefined;
+};
+
+const buildDbfCrossingTimeAnchors = (
+  sessionFileTables: Array<CoreTableSource & { isLapCompletion: boolean }>,
+  competitorTransponders: Set<number>
+): DbfCrossingTimeAnchor[] => {
+  return sessionFileTables.flatMap((table) => table.records.flatMap((record): DbfCrossingTimeAnchor[] => {
+    const transmitter = getFirstPositiveInteger(record, CROSSING_TRANSPONDER_FIELDS);
+    const elapsedMilliseconds = getDbfElapsedMillisecondsForAlignment(record);
+    if (transmitter === undefined || elapsedMilliseconds === undefined || !competitorTransponders.has(transmitter)) {
+      return [];
+    }
+
+    return [{
+      elapsedMilliseconds,
+      record,
+      transmitter,
+    }];
+  }));
+};
+
+const buildSrtCrossingTimeAnchors = (
+  parsedRawFiles: MrScatsRawFilePlan[],
+  session: MrScatsImportedSession,
+  competitorTransponders: Set<number>
+): SrtCrossingTimeAnchor[] => {
+  return parsedRawFiles.flatMap((rawFile) => rawFile.records.flatMap((record): SrtCrossingTimeAnchor[] => {
+    const transmitter = record.transmitter;
+    if (transmitter === undefined || transmitter <= 0 || !competitorTransponders.has(transmitter) || record.timeText === undefined) {
+      return [];
+    }
+
+    return [{
+      fileName: rawFile.fileName,
+      record,
+      time: parseRawTimeOfDay(record.timeText, new Date(session.scheduledStart)),
+      transmitter,
+    }];
+  }));
+};
+
+const buildSrtLineOneCrossingTimeAnchors = (
+  parsedRawFiles: MrScatsRawFilePlan[],
+  session: MrScatsImportedSession,
+  competitorTransponders: Set<number>
+): SrtCrossingTimeAnchor[] => {
+  return buildSrtCrossingTimeAnchors(parsedRawFiles, session, competitorTransponders)
+    .filter((anchor) => anchor.record.lineNumber === 1);
+};
+
+const selectMedianLineOneTransponder = (
+  srtAnchors: SrtCrossingTimeAnchor[],
+): number | undefined => {
+  const lineOneCounts = srtAnchors.reduce<Map<number, number>>((counts, anchor) => {
+    counts.set(anchor.transmitter, (counts.get(anchor.transmitter) || 0) + 1);
+    return counts;
+  }, new Map<number, number>());
+
+  const sortedCounts = Array.from(lineOneCounts.entries()).sort((left, right) => {
+    if (left[1] !== right[1]) {
+      return left[1] - right[1];
+    }
+
+    return left[0] - right[0];
+  });
+  return sortedCounts[Math.floor(sortedCounts.length / 2)]?.[0];
+};
+
+const getLongestRunLengthForCandidate = (
+  candidateTime: number,
+  dbfAnchors: DbfCrossingTimeAnchor[],
+  srtTimeSet: Set<number>
+): number => {
+  let currentRunLength = 0;
+  let longestRunLength = 0;
+
+  dbfAnchors.forEach((dbfAnchor) => {
+    const candidateCrossingTime = candidateTime + dbfAnchor.elapsedMilliseconds;
+    const hasMatch = srtTimeSet.has(candidateCrossingTime);
+    currentRunLength = hasMatch ? currentRunLength + 1 : 0;
+    longestRunLength = Math.max(longestRunLength, currentRunLength);
+  });
+
+  return longestRunLength;
+};
+
+const scoreCandidateSessionElapsedZeroTime = (
+  candidateTime: number,
+  dbfAnchors: DbfCrossingTimeAnchor[],
+  srtTimeSet: Set<number>
+): SessionElapsedZeroCandidateScore => {
+  let matchedCrossingCount = 0;
+  let totalDeltaMilliseconds = 0;
+
+  dbfAnchors.forEach((dbfAnchor) => {
+    const candidateCrossingTime = candidateTime + dbfAnchor.elapsedMilliseconds;
+    if (srtTimeSet.has(candidateCrossingTime)) {
+      matchedCrossingCount += 1;
+      return;
+    }
+
+    if (srtTimeSet.has(candidateCrossingTime - 1) || srtTimeSet.has(candidateCrossingTime + 1)) {
+      matchedCrossingCount += 1;
+      totalDeltaMilliseconds += 1;
+    }
+  });
+
+  return {
+    candidateTime,
+    longestRunLength: getLongestRunLengthForCandidate(candidateTime, dbfAnchors, srtTimeSet),
+    matchedCrossingCount,
+    totalDeltaMilliseconds,
+  };
+};
+
+const getMiddleWindow = <T>(values: T[], windowSize: number): T[] => {
+  if (values.length <= windowSize) {
+    return values;
+  }
+
+  const middleIndex = Math.floor(values.length / 2);
+  const startIndex = Math.max(0, middleIndex - Math.floor(windowSize / 2));
+  return values.slice(startIndex, Math.min(values.length, startIndex + windowSize));
+};
+
+const buildCandidateSessionElapsedZeroTimes = (
+  selectedDbfAnchors: DbfCrossingTimeAnchor[],
+  selectedSrtAnchors: SrtCrossingTimeAnchor[]
+): Set<number> => {
+  const candidateTimes = new Set<number>();
+  const middleSrtAnchors = getMiddleWindow(selectedSrtAnchors, 6);
+
+  middleSrtAnchors.forEach((srtAnchor) => {
+    selectedDbfAnchors.forEach((dbfAnchor) => {
+      candidateTimes.add(srtAnchor.time.getTime() - dbfAnchor.elapsedMilliseconds);
+    });
+  });
+
+  return candidateTimes;
+};
+
+const deriveScoredSessionElapsedZeroTime = (
+  sessionFileTables: Array<CoreTableSource & { isLapCompletion: boolean }>,
+  parsedRawFiles: MrScatsRawFilePlan[],
+  session: MrScatsImportedSession,
+  participants: EventParticipant[]
+): Date | undefined => {
+  const competitorTransponders = getSessionTransponderNumbers(participants, session);
+  if (competitorTransponders.size === 0) {
+    return undefined;
+  }
+
+  const srtLineOneAnchors = buildSrtLineOneCrossingTimeAnchors(parsedRawFiles, session, competitorTransponders);
+  const selectedTransponder = selectMedianLineOneTransponder(srtLineOneAnchors);
+  if (srtLineOneAnchors.length === 0 || selectedTransponder === undefined) {
+    return undefined;
+  }
+
+  const selectedTransponders = new Set([selectedTransponder]);
+  const selectedDbfAnchors = buildDbfCrossingTimeAnchors(sessionFileTables, selectedTransponders)
+    .sort((left, right) => left.elapsedMilliseconds - right.elapsedMilliseconds);
+  const selectedSrtAnchors = buildSrtCrossingTimeAnchors(parsedRawFiles, session, selectedTransponders)
+    .sort((left, right) => left.time.getTime() - right.time.getTime());
+  if (selectedDbfAnchors.length === 0 || selectedSrtAnchors.length === 0) {
+    return undefined;
+  }
+
+  const selectedSrtTimeSet = new Set(selectedSrtAnchors.map((anchor) => anchor.time.getTime()));
+  const candidateTimes = buildCandidateSessionElapsedZeroTimes(selectedDbfAnchors, selectedSrtAnchors);
+
+  const bestScore = Array.from(candidateTimes)
+    .map((candidateTime) => scoreCandidateSessionElapsedZeroTime(
+      candidateTime,
+      selectedDbfAnchors,
+      selectedSrtTimeSet
+    ))
+    .sort((left, right) => {
+      if (left.longestRunLength !== right.longestRunLength) {
+        return right.longestRunLength - left.longestRunLength;
+      }
+      if (left.matchedCrossingCount !== right.matchedCrossingCount) {
+        return right.matchedCrossingCount - left.matchedCrossingCount;
+      }
+      if (left.totalDeltaMilliseconds !== right.totalDeltaMilliseconds) {
+        return left.totalDeltaMilliseconds - right.totalDeltaMilliseconds;
+      }
+
+      const scheduledStartTime = new Date(session.scheduledStart).getTime();
+      return Math.abs(left.candidateTime - scheduledStartTime) - Math.abs(right.candidateTime - scheduledStartTime);
+    })[0];
+
+  return bestScore ? new Date(bestScore.candidateTime) : undefined;
+};
+
 const buildRawCrossingTimeAnchors = (
   parsedRawFiles: MrScatsRawFilePlan[],
   session: MrScatsImportedSession
@@ -1113,7 +1401,9 @@ const buildRawCrossingTimeAnchors = (
       const time = parseRawTimeOfDay(record.timeText, new Date(session.scheduledStart));
       const existingAnchors = anchorsByKey.get(key) || [];
       existingAnchors.push({
+        fileName: rawFile.fileName,
         key,
+        record,
         time,
       });
       anchorsByKey.set(key, existingAnchors);
@@ -1178,6 +1468,87 @@ const deriveAnchoredSessionElapsedZeroTime = (
 
   const sortedZeroTimes = [...anchoredZeroTimes].sort((left, right) => left - right);
   return new Date(sortedZeroTimes[Math.floor(sortedZeroTimes.length / 2)]!);
+};
+
+const createRawRecordKey = (fileName: string, record: CtcRawCrossingRecord): string =>
+  `${fileName}:${record.recordNumber}:${record.raw}`;
+
+const findMatchingRawCrossingRecord = (
+  record: MrScatsDbfRecord,
+  scheduledStartTime: Date,
+  sessionElapsedZeroTime: Date,
+  anchorsByKey: Map<string, RawCrossingTimeAnchor[]>,
+  anchorIndexByKey: Map<string, number>,
+  matchedRawRecordKeys: Set<string>
+): CtcRawCrossingRecord | undefined => {
+  const key = getRawCrossingAnchorKey({
+    plateNumber: getFirstString(record, CROSSING_PLATE_FIELDS),
+    transmitter: getFirstPositiveInteger(record, CROSSING_TRANSPONDER_FIELDS),
+  });
+  const crossingTime = getCrossingTime(record, scheduledStartTime, sessionElapsedZeroTime);
+  const anchors = key ? anchorsByKey.get(key) : undefined;
+  if (!key || !crossingTime || !anchors) {
+    return undefined;
+  }
+
+  const startIndex = anchorIndexByKey.get(key) || 0;
+  const matchingAnchorIndex = anchors.findIndex((anchor, index) =>
+    index >= startIndex &&
+    Math.abs(anchor.time.getTime() - crossingTime.time.getTime()) <= 1 &&
+    !matchedRawRecordKeys.has(createRawRecordKey(anchor.fileName, anchor.record))
+  );
+  if (matchingAnchorIndex < 0) {
+    return undefined;
+  }
+
+  const matchingAnchor = anchors[matchingAnchorIndex]!;
+  anchorIndexByKey.set(key, matchingAnchorIndex + 1);
+  matchedRawRecordKeys.add(createRawRecordKey(matchingAnchor.fileName, matchingAnchor.record));
+  return matchingAnchor.record;
+};
+
+const mergeRawCrossingDataIntoDbfRecord = (
+  record: MrScatsDbfRecord,
+  rawRecord: CtcRawCrossingRecord | undefined
+): MrScatsDbfRecord => {
+  if (!rawRecord) {
+    return record;
+  }
+
+  return {
+    ...record,
+    ...(getCrossingLineNumber(record, '') === undefined && rawRecord.lineNumber !== undefined ? { LINE_NO: rawRecord.lineNumber } : {}),
+    ...(getCrossingLoopNumber(record) === undefined && rawRecord.laneNumber !== undefined ? { LANE_NO: rawRecord.laneNumber } : {}),
+    ...(getCrossingConfidenceFactor(record) === undefined && rawRecord.confidence !== undefined ? { CONFIDENCE: rawRecord.confidence } : {}),
+    ...(getCrossingHitCount(record) === undefined && rawRecord.hitCount !== undefined ? { HITS: rawRecord.hitCount } : {}),
+  };
+};
+
+const mergeRawCrossingDataIntoSessionTables = (
+  sessionFileTables: Array<CoreTableSource & { isLapCompletion: boolean }>,
+  parsedRawFiles: MrScatsRawFilePlan[],
+  session: MrScatsImportedSession,
+  scheduledStartTime: Date,
+  sessionElapsedZeroTime: Date,
+  matchedRawRecordKeys: Set<string>
+): Array<CoreTableSource & { isLapCompletion: boolean }> => {
+  const anchorsByKey = buildRawCrossingTimeAnchors(parsedRawFiles, session);
+  const anchorIndexByKey = new Map<string, number>();
+
+  return sessionFileTables.map((table) => ({
+    ...table,
+    records: table.records.map((record) => mergeRawCrossingDataIntoDbfRecord(
+      record,
+      findMatchingRawCrossingRecord(
+        record,
+        scheduledStartTime,
+        sessionElapsedZeroTime,
+        anchorsByKey,
+        anchorIndexByKey,
+        matchedRawRecordKeys
+      )
+    )),
+  }));
 };
 
 const createSessionGreenFlag = (
@@ -1465,13 +1836,31 @@ const buildSessionRecords = async (
     )
       ? scheduledStartTime
       : new Date(scheduledStartTime.getTime() - greenElapsedMilliseconds);
-    const sessionElapsedZeroTime = deriveAnchoredSessionElapsedZeroTime(
+    const anchoredSessionElapsedZeroTime = deriveScoredSessionElapsedZeroTime(
+      sessionFileTables,
+      parsedRawFiles,
+      session,
+      participants
+    ) || deriveAnchoredSessionElapsedZeroTime(
       sessionFileTables,
       parsedRawFiles,
       session,
       scheduledStartTime
-    ) || dbfDerivedSessionElapsedZeroTime;
-    const dbfCrossingRecords = sessionFileTables.flatMap((table) => table.records
+    );
+    const sessionElapsedZeroTime = anchoredSessionElapsedZeroTime || dbfDerivedSessionElapsedZeroTime;
+    const greenFlagTime = anchoredSessionElapsedZeroTime
+      ? new Date(anchoredSessionElapsedZeroTime.getTime() + greenElapsedMilliseconds)
+      : scheduledStartTime;
+    const matchedRawRecordKeys = new Set<string>();
+    const mergedSessionFileTables = mergeRawCrossingDataIntoSessionTables(
+      sessionFileTables,
+      parsedRawFiles,
+      session,
+      scheduledStartTime,
+      sessionElapsedZeroTime,
+      matchedRawRecordKeys
+    );
+    const dbfCrossingRecords = mergedSessionFileTables.flatMap((table) => table.records
       .map((record, rowIndex) => {
         const source = createMrScatsFileSource(meetingCode, session, table.fileName);
         addTimeRecordSource(timeRecordSourcesById, source);
@@ -1515,6 +1904,7 @@ const buildSessionRecords = async (
       }));
 
       rawCrossingRecords.push(...rawRecords
+        .filter((record) => !matchedRawRecordKeys.has(createRawRecordKey(fileName, record)))
         .map((record, rowIndex) => createRawCrossingRecord(
           meetingCode,
           session,
@@ -1547,7 +1937,7 @@ const buildSessionRecords = async (
     }
 
     sessionRecords.push(
-      createSessionGreenFlag(meetingCode, session, sessionSource, scheduledStartTime, 1),
+      createSessionGreenFlag(meetingCode, session, sessionSource, greenFlagTime, 1),
       ...crossingRecords,
     );
   }
