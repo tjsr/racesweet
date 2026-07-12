@@ -1852,6 +1852,64 @@ describe('EventCatalogService', () => {
     }));
   });
 
+  it('compacts superseded imported race state mutations for the same event session', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+    const importedEventId = createEventId('compacted-import-event');
+    const importedSessionId = createSessionId('compacted-import-session');
+    const importedCategoryId = createCategoryId('compacted-import-category');
+    const importedEntrantId = createEventEntrantId('compacted-import-entrant');
+    const importedParticipantId = createEventParticipantId('compacted-import-participant');
+    const createImportData = (recordId: string, recordTime: string): Parameters<typeof service.importApicalRaceState>[0] => ({
+      eventDate: '2026-06-07T01:30:00.000Z',
+      eventId: importedEventId,
+      eventName: 'Compacted Import Round',
+      raceState: {
+        categories: [{ code: 'A', description: '', id: importedCategoryId, name: 'A' }],
+        participants: [
+          {
+            categoryId: importedCategoryId,
+            currentResult: undefined,
+            entrantId: importedEntrantId,
+            firstname: 'Compact',
+            id: importedParticipantId,
+            identifiers: [],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: 'Import',
+          },
+        ],
+        records: [
+          {
+            id: createTimeRecordId(recordId),
+            recordType: RECORD_TX_CROSSING,
+            sequence: 1,
+            source: createTimeRecordSourceId('compacted-import-source'),
+            time: new Date(recordTime),
+          } as EventTimeRecord,
+        ],
+        teams: [],
+      },
+      sessionId: importedSessionId,
+      timeZone: 'Australia/Sydney',
+    });
+
+    await service.importApicalRaceState(createImportData('compacted-import-record-old', '2026-06-07T01:45:00.000Z'));
+    await service.importApicalRaceState(createImportData('compacted-import-record-new', '2026-06-07T01:46:00.000Z'));
+
+    const savedLedger = vi.mocked(seededPersistence.save).mock.calls.at(-1)?.[0] as EventCatalogLedger;
+    const importMutations = savedLedger.mutations.filter((mutation): mutation is Extract<EventCatalogLedger['mutations'][number], { type: 'race-state-imported' }> =>
+      mutation.type === 'race-state-imported' &&
+      mutation.eventId === importedEventId &&
+      mutation.sessionId === importedSessionId
+    );
+
+    expect(importMutations).toHaveLength(1);
+    expect(importMutations[0]?.raceState.records).toEqual([
+      expect.objectContaining({ id: createTimeRecordId('compacted-import-record-new') }),
+    ]);
+  });
+
   it('scaffolds imported Apical teams using the imported team name and category', async () => {
     const seededPersistence = createPersistence(createDefaultEventCatalogLedger());
     const service = await EventCatalogService.create(seededPersistence);

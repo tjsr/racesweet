@@ -822,6 +822,24 @@ export const RaceSweetMainApp = () => {
     const pulledRaceStates: Partial<RaceState>[] = [];
 
     for (const source of sources) {
+      if (source.type === 'file-mr-scats-data') {
+        const locationPath = source.mrScatsConfig?.dataLocationPath;
+        if (!locationPath) {
+          continue;
+        }
+
+        const mrScatsImport = await loadMrScatsCatalogFromLocation(locationPath);
+        const importedSession = mrScatsImport.sessions.find((session) => session.id === sessionId);
+        if (importedSession) {
+          pulledRaceStates.push(filterMrScatsRaceStateForSession(
+            mrScatsImport.raceState,
+            sessionId,
+            importedSession.categoryIds
+          ));
+        }
+        continue;
+      }
+
       if (source.type !== 'api-apical-data-file' && source.type !== 'api-apical-excel-file') {
         continue;
       }

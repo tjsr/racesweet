@@ -633,7 +633,33 @@ const normalizeEntrantChanges = (
 const hasSameMembers = (left: string[], right: string[]): boolean =>
   left.length === right.length && left.every((value, index) => value === right[index]);
 
-const hasSameSerializedValue = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right);
+const hasSameSerializedValue = (left: unknown, right: unknown): boolean => {
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch (_error) {
+    return false;
+  }
+};
+
+const getRaceStateImportMutationKey = (
+  mutation: Extract<EventCatalogMutation, { type: 'race-state-imported' }>
+): string => `${mutation.eventId.toString()}:${mutation.sessionId.toString()}`;
+
+const compactSupersededRaceStateImportMutations = (
+  mutations: EventCatalogLedger['mutations']
+): EventCatalogLedger['mutations'] => {
+  const latestImportIndexByKey = new Map<string, number>();
+  mutations.forEach((mutation, index) => {
+    if (mutation.type === 'race-state-imported') {
+      latestImportIndexByKey.set(getRaceStateImportMutationKey(mutation), index);
+    }
+  });
+
+  return mutations.filter((mutation, index) =>
+    mutation.type !== 'race-state-imported' ||
+    latestImportIndexByKey.get(getRaceStateImportMutationKey(mutation)) === index
+  );
+};
 
 const findLatestRaceStateImportMutation = (
   mutations: EventCatalogLedger['mutations'],
@@ -689,12 +715,18 @@ const removeDuplicateMutationIds = (mutations: EventCatalogLedger['mutations']):
   return acceptedMutations;
 };
 
+const hasSameMutationSequence = (
+  left: EventCatalogLedger['mutations'],
+  right: EventCatalogLedger['mutations']
+): boolean => left.length === right.length &&
+  left.every((mutation, index) => mutation.id === right[index]?.id);
+
 const removeDuplicateAndNoopMutations = async (
   existingMutations: EventCatalogLedger['mutations'],
   proposedMutations: EventCatalogLedger['mutations'],
   onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP,
 ): Promise<EventCatalogLedger['mutations']> => {
-  const acceptedMutations = removeDuplicateMutationIds(existingMutations);
+  const acceptedMutations = compactSupersededRaceStateImportMutations(removeDuplicateMutationIds(existingMutations));
   const acceptedMutationIds = new Set(acceptedMutations.map((mutation) => mutation.id));
 
   for (const [index, mutation] of proposedMutations.entries()) {
@@ -711,7 +743,7 @@ const removeDuplicateAndNoopMutations = async (
     await onCompleteStep('removeDuplicateAndNoopMutations', index);
   }
 
-  return acceptedMutations;
+  return compactSupersededRaceStateImportMutations(acceptedMutations);
 };
 
 const hasSameCategoryScaffold = (existing: EventCatalogCategory, next: EventCatalogCategory): boolean => {
@@ -964,7 +996,7 @@ const repairAndValidateLoadedLedger = async (ledger: EventCatalogLedger): Promis
   const rewrittenLedger = rewriteImportedObjectIds(ledger).value;
   let repairedLedger: EventCatalogLedger = {
     ...rewrittenLedger,
-    mutations: removeDuplicateMutationIds(rewrittenLedger.mutations),
+    mutations: compactSupersededRaceStateImportMutations(removeDuplicateMutationIds(rewrittenLedger.mutations)),
   };
   const repairMutations = createLedgerRelationshipRepairMutations(applyEventCatalogLedger(repairedLedger));
   if (repairMutations.length > 0) {
@@ -1938,7 +1970,7 @@ export class EventCatalogService {
 
   private async appendMutations(mutations: EventCatalogLedger['mutations'], onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const nextMutations = await removeDuplicateAndNoopMutations(this.ledger.mutations, mutations, onCompleteStep); 
-    if (nextMutations.length === this.ledger.mutations.length) {
+    if (hasSameMutationSequence(nextMutations, this.ledger.mutations)) {
       return this.state;
     }
 

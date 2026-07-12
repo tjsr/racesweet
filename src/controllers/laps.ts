@@ -20,8 +20,6 @@ import {
   CROSSING_UNRELATED_NON_LAP_COMPLETION,
   CROSSING_UNRELATED_SESSION_CATEGORY,
   EVENT_SESSION_END,
-  isPassingExcluded,
-  isPassingValid,
 } from "../model/timerecord.js";
 import { warn } from "../utils.js";
 import { setCategoryStartForPassings } from "./category.js";
@@ -571,12 +569,6 @@ export const getLapTimeCell = (crossing: ParticipantPassingRecord): string => {
   if (crossing.lapTime === undefined) {
     return '--:--:--.---';
   };
-  const str = millisecondsToTime(crossing.lapTime!);
-
-  if (!isPassingValid(crossing) || isPassingExcluded(crossing)) {
-    return str.red;
-  }
-
-  return str;
+  return millisecondsToTime(crossing.lapTime!);
 };
 

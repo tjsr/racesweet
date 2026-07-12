@@ -30,6 +30,7 @@ import {
   ParticipantPassingRecord,
   RECORD_TX_CROSSING,
   TimeRecordId,
+  type TimeRecordSource,
   isPassingExcluded,
   isPassingValid,
 } from '../../model/timerecord.ts';
@@ -424,10 +425,37 @@ const formatPassingTimingPoint = (record: ParticipantPassingRecord): string => {
     : '';
 };
 
+const getRecordSource = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): TimeRecordSource | undefined =>
+  raceStateLookup.getTimeRecordSourceById?.(record.source);
+
+const getRecordSourceName = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): string => {
+  const source = getRecordSource(record, raceStateLookup);
+  return source?.name || record.source?.toString() || '';
+};
+
 const getEditablePassingSourceFile = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): string => {
-  return raceStateLookup.getTimeRecordSourceById?.(record.source)?.filePath ||
-    raceStateLookup.getTimeRecordSourceById?.(record.source)?.name ||
+  const source = getRecordSource(record, raceStateLookup);
+  return source?.filePath ||
+    source?.name ||
     '';
+};
+
+const getRecordSourceLocation = (record: EventTimeRecord): string => {
+  return record.originRecordNumber !== undefined
+    ? `Record/line ${record.originRecordNumber}`
+    : '';
+};
+
+const getRecordSourceTooltip = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): string => {
+  const sourceName = getRecordSourceName(record, raceStateLookup);
+  const sourceFile = getEditablePassingSourceFile(record, raceStateLookup);
+  const sourceLocation = getRecordSourceLocation(record);
+
+  return [
+    sourceName ? `Data source: ${sourceName}` : undefined,
+    sourceFile && sourceFile !== sourceName ? `File: ${sourceFile}` : undefined,
+    sourceLocation || undefined,
+  ].filter((value): value is string => value !== undefined).join('\n');
 };
 
 const formatRecordJson = (record: EventTimeRecord | undefined): string => {
@@ -904,6 +932,7 @@ export const PassingRecordRow = (
   const timeString = tableDateTimeStringInTimeZone(passing.time, props.timeZone, passing.timeTenthOfMillisecond);
   const identifier: string = txNo !== undefined ? `Tx${txNo}` : '';
   const timingPoint = formatPassingTimingPoint(passing);
+  const sourceTooltip = getRecordSourceTooltip(passing, rs);
   const entrant = resolvedParticipant;
   let plateNumber: string | number | undefined = undefined;
   let entrantName: string | undefined = undefined;
@@ -999,7 +1028,7 @@ export const PassingRecordRow = (
         title={formatRecordIdTitle(passing.id)}
         onClick={handleSelect}>
         <TableCell className={cellClasses}>{passing.sequence}</TableCell>
-        <TableCell className={cellClasses}>{timingPoint}</TableCell>
+        <TableCell className={cellClasses} title={sourceTooltip}>{timingPoint}</TableCell>
         <TableCell className={cellClasses}>{identifier}</TableCell>
         <TableCell className={cellClasses}>{timeString}</TableCell>
         <TableCell className={cellClasses}>{plateNumber || normalizedRecordPlateNumber || '?'}</TableCell>
@@ -1721,7 +1750,9 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   const displayedRecordDate = dateStringInTimeZone(editingRecord?.time || anchorRecord?.time, props.displayTimeZone);
   const editablePassingLapControl = editablePassingRecord ? (isLapControlCrossing(editablePassingRecord, props.raceStateLookup) ? 'Yes' : 'No') : '';
   const editableFinishLineNumbers = editablePassingRecord ? formatFinishLineNumbers(props.raceStateLookup) : '';
+  const editablePassingSourceName = editablePassingRecord ? getRecordSourceName(editablePassingRecord, props.raceStateLookup) : '';
   const editablePassingSourceFile = editablePassingRecord ? getEditablePassingSourceFile(editablePassingRecord, props.raceStateLookup) : '';
+  const editablePassingSourceLocation = editablePassingRecord ? getRecordSourceLocation(editablePassingRecord) : '';
   const editableRecordJson = React.useMemo(() => formatRecordJson(editingRecord), [editingRecord]);
 
   const handleTxNoChange = (value: string): void => {
@@ -1923,7 +1954,9 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
                 <div className="event-details-form-row">
                   <TextField disabled label="Lap control lines" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Lap control lines' } }} value={editableFinishLineNumbers} />
                   <TextField disabled label="Lap crossing" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Lap crossing' } }} value={editablePassingLapControl} />
+                  <TextField disabled label="Source" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Source' } }} value={editablePassingSourceName} />
                   <TextField disabled label="Source file" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Source file' } }} value={editablePassingSourceFile} />
+                  <TextField disabled label="Source record" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Source record' } }} value={editablePassingSourceLocation} />
                 </div>
               ) : null}
             </>

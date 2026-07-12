@@ -4046,7 +4046,9 @@ describe('RecentRecords integration', () => {
         editRecordMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
+      expect((document.querySelector('input[aria-label="Source"]') as HTMLInputElement).value).toBe(expectedFileName);
       expect((document.querySelector('input[aria-label="Source file"]') as HTMLInputElement).value).toBe(expectedFileName);
+      expect((document.querySelector('input[aria-label="Source record"]') as HTMLInputElement).value).toBe('Record/line 1');
 
       const cancelButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Cancel');
       expect(cancelButton).toBeDefined();
@@ -4080,6 +4082,7 @@ describe('RecentRecords integration', () => {
       isValid: true,
       lineNumber: 3,
       loopNumber: 6,
+      originRecordNumber: 17,
       participantId: participant.id,
       recordType: RECORD_TX_CROSSING,
       sequence: 1,
@@ -4094,6 +4097,12 @@ describe('RecentRecords integration', () => {
       getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
       getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
       getParticipantLaps: () => [crossing],
+      getTimeRecordSourceById: (sourceId) => sourceId === crossing.source ? {
+        description: 'Imported MR-SCATS timing records from T9743R10.DBF.',
+        filePath: 'T9743R10.DBF',
+        id: crossing.source,
+        name: 'MR-SCATS T9743R10.DBF',
+      } : undefined,
       getTransponderCrossings: () => [],
       participants: [participant],
       updateCategoryDetails: () => undefined,
@@ -4114,8 +4123,13 @@ describe('RecentRecords integration', () => {
 
     const row = container.querySelector('tr[data-record-id="crossing-with-confidence"]');
     expect(row).not.toBeNull();
-    const cells = Array.from(row!.querySelectorAll('td')).map((cell) => cell.textContent || '');
-    expect(cells[1]).toBe('3:6 (255.4)');
+    const cells = Array.from(row!.querySelectorAll('td'));
+    expect(cells[1]?.textContent).toBe('3:6 (255.4)');
+    expect(cells[1]?.getAttribute('title')).toBe([
+      'Data source: MR-SCATS T9743R10.DBF',
+      'File: T9743R10.DBF',
+      'Record/line 17',
+    ].join('\n'));
   });
 
   it('shows an exclusion reason marker on unrelated lap-time records', async () => {
@@ -4171,7 +4185,9 @@ describe('RecentRecords integration', () => {
     });
 
     const row = container.querySelector('tr[data-record-id="under-minimum-crossing"]');
+    const cells = Array.from(row?.querySelectorAll('td') || []).map((cell) => cell.textContent || '');
     expect(row?.className).toContain('excluded');
+    expect(cells[cells.length - 1]).toContain('0:59.999');
     expect(row?.querySelector('.unrelated-reason-marker')?.textContent).toBe('!');
     expect(row?.querySelector('.unrelated-reason-marker')?.getAttribute('aria-label')).toBe('Lap time is below minimum of 1:00.0000.');
   });
