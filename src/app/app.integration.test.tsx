@@ -136,6 +136,111 @@ const SEED_QUALIFYING_SESSION_ID = createSessionId('session-1-qualifying');
 const SEED_RACE_SESSION_ID = createSessionId('session-1-race');
 const UUID_TEXT_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+interface CatalogWrite {
+  content: string;
+  dataType?: string;
+  filePath: string;
+}
+
+interface PersistedCatalogMutation {
+  apicalDataFilePath?: string;
+  eventId?: string;
+  id: number | string;
+  sessionId?: string;
+  type: string;
+  [key: string]: unknown;
+}
+
+interface PersistedCatalogManifest {
+  eventFiles: Array<{
+    eventId: string;
+    fileName: string;
+  }>;
+  globalMutations: PersistedCatalogMutation[];
+  mutationOrder: Array<{
+    eventId?: string;
+    mutationId: string;
+  }>;
+  schemaVersion: number;
+}
+
+interface PersistedEventCatalogFile {
+  eventId: string;
+  mutations: PersistedCatalogMutation[];
+  schemaVersion: number;
+}
+
+const getCatalogWriteFileName = (filePath: string): string => {
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  return normalizedPath.slice(normalizedPath.lastIndexOf('/') + 1);
+};
+
+const getPersistedCatalogLedger = (writtenFiles: CatalogWrite[]): { mutations: PersistedCatalogMutation[] } | undefined => {
+  const latestCatalogWrite = writtenFiles
+    .filter((write) => getCatalogWriteFileName(write.filePath) === 'event-catalog.json')
+    .at(-1);
+  if (!latestCatalogWrite) {
+    return undefined;
+  }
+
+  const parsedCatalog = JSON.parse(latestCatalogWrite.content) as Partial<PersistedCatalogManifest> & {
+    mutations?: PersistedCatalogMutation[];
+  };
+  if (Array.isArray(parsedCatalog.mutations)) {
+    return {
+      mutations: parsedCatalog.mutations,
+    };
+  }
+
+  if (parsedCatalog.schemaVersion !== 2 || !Array.isArray(parsedCatalog.eventFiles) || !Array.isArray(parsedCatalog.mutationOrder)) {
+    return undefined;
+  }
+
+  const mutationsById = new Map<string, PersistedCatalogMutation>();
+  (parsedCatalog.globalMutations || []).forEach((mutation) => {
+    mutationsById.set(mutation.id.toString(), mutation);
+  });
+  parsedCatalog.eventFiles.forEach((eventFile) => {
+    const eventWrite = writtenFiles
+      .filter((write) => getCatalogWriteFileName(write.filePath) === eventFile.fileName)
+      .at(-1);
+    if (!eventWrite) {
+      return;
+    }
+
+    const eventCatalog = JSON.parse(eventWrite.content) as PersistedEventCatalogFile;
+    eventCatalog.mutations.forEach((mutation) => {
+      mutationsById.set(mutation.id.toString(), mutation);
+    });
+  });
+
+  return {
+    mutations: parsedCatalog.mutationOrder
+      .map((entry) => mutationsById.get(entry.mutationId))
+      .filter((mutation): mutation is PersistedCatalogMutation => mutation !== undefined),
+  };
+};
+
+const waitForPersistedCatalogLedger = async (
+  writtenFiles: CatalogWrite[],
+  predicate: (ledger: { mutations: PersistedCatalogMutation[] }) => boolean
+): Promise<{ mutations: PersistedCatalogMutation[] }> => {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const ledger = getPersistedCatalogLedger(writtenFiles);
+    if (ledger && predicate(ledger)) {
+      return ledger;
+    }
+
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 10);
+      });
+    });
+  }
+
+  throw new Error('Timed out waiting for persisted catalog ledger');
+};
+
 const readFixtureBuffer = async (filePath: string): Promise<Buffer> => {
   const fileName = path.basename(filePath);
   const fixturePath = path.join(process.cwd(), 'src', 'testdata', fileName);
@@ -403,7 +508,7 @@ const clickButtonByText = async (container: HTMLDivElement, label: string): Prom
 
 const getIndividualEntrantCards = (container: HTMLDivElement): HTMLButtonElement[] => {
   return Array.from(container.querySelectorAll<HTMLButtonElement>('button.events-list-item'))
-    .filter((button) => button.querySelector('.entrant-list-type')?.textContent === 'rider');
+    .filter((button) => button.querySelector('.entrant-list-type')?.textContent === 'driver');
 };
 
 const getEntrantCardName = (card: HTMLButtonElement): string => {
@@ -709,7 +814,7 @@ describe('RaceSweetMainApp integration', () => {
 
     await clickSectionButton(container, 'Entrants');
     expect(container.querySelector('h1')?.textContent).toBe('Entrants');
-    expect(container.textContent).toContain('Create Entrant');
+    expect(container.textContent).toContain('Create Driver');
     expect(container.querySelector('input[aria-label="Entrant Name"]')).toBeTruthy();
 
     await clickSectionButton(container, 'Categories');
@@ -822,17 +927,17 @@ describe('RaceSweetMainApp integration', () => {
     expect(selectedRacePlateInput?.getAttribute('aria-label')).toContain(secondCardName);
   });
 
-  it('adds identifiers for a selected rider before that rider has a race-state participant', async () => {
+  it('adds identifiers for a selected driver before that driver has a race-state participant', async () => {
     await act(async () => {
       root.render(<RaceSweetMainApp />);
     });
 
     await waitForLoadedApp(container);
     await clickSectionButton(container, 'Entrants');
-    await clickButtonByText(container, 'Create Entrant');
-    await waitForInputValue(container, 'input[aria-label="Entrant Name"]', 'New Entrant');
+    await clickButtonByText(container, 'Create Driver');
+    await waitForInputValue(container, 'input[aria-label="Entrant Name"]', 'New Driver');
 
-    const racePlateInput = container.querySelector('input[aria-label="Race plate New Entrant 1"]') as HTMLInputElement | null;
+    const racePlateInput = container.querySelector('input[aria-label="Race plate New Driver 1"]') as HTMLInputElement | null;
     expect(racePlateInput).toBeTruthy();
 
     await act(async () => {
@@ -1256,29 +1361,18 @@ describe('RaceSweetMainApp integration', () => {
 
     await clickButtonByText(container, 'Save Category');
 
-    let latestCatalogWrite: { content: string; filePath: string } | undefined;
-    for (let attempt = 0; attempt < 120; attempt += 1) {
-      latestCatalogWrite = writtenFiles
-        .filter((write) => write.filePath.includes('event-catalog.json'))
-        .at(-1);
-      if (latestCatalogWrite?.content.includes('"excludeFromResults":true')) {
-        break;
-      }
-
-      await act(async () => {
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, 10);
-        });
-      });
-    }
-
-    expect(latestCatalogWrite).toBeDefined();
+    const categoryLedger = await waitForPersistedCatalogLedger(writtenFiles, (ledger) => {
+      return ledger.mutations.some((mutation) => (
+        mutation.type === 'category-updated' &&
+        (mutation.changes as { excludeFromResults?: boolean } | undefined)?.excludeFromResults === true
+      ));
+    });
     await act(async () => {
       await new Promise<void>((resolve) => {
         setTimeout(resolve, 10);
       });
     });
-    expect(JSON.parse(latestCatalogWrite!.content)).toEqual(expect.objectContaining({
+    expect(categoryLedger).toEqual(expect.objectContaining({
       mutations: expect.arrayContaining([
         expect.objectContaining({
           changes: expect.objectContaining({
@@ -1322,11 +1416,11 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.textContent).not.toContain('Error loading content');
 
     await clickSectionButton(container, 'Entrants');
-    await clickButtonByText(container, 'Create Entrant');
-    await waitForText(container, 'New Entrant');
+    await clickButtonByText(container, 'Create Driver');
+    await waitForText(container, 'New Driver');
 
     await clickButtonByText(container, 'Delete Entrant');
-    await waitForTextNotPresent(container, 'New Entrant');
+    await waitForTextNotPresent(container, 'New Driver');
 
     await clickSectionButton(container, 'Sessions');
     await clickButtonByText(container, 'Create Session');
@@ -1390,12 +1484,9 @@ describe('RaceSweetMainApp integration', () => {
     await clickButtonByText(container, 'Make Active');
     await waitForText(container, 'Active Session');
 
-    const latestCatalogWrite = writtenFiles
-      .filter((write) => write.filePath.includes('event-catalog.json'))
-      .at(-1);
-    expect(latestCatalogWrite).toBeDefined();
-
-    const ledger = JSON.parse(latestCatalogWrite!.content) as { mutations: Array<{ eventId?: string; sessionId?: string; type: string }> };
+    const ledger = await waitForPersistedCatalogLedger(writtenFiles, (persistedLedger) => {
+      return persistedLedger.mutations.some((mutation) => mutation.type === 'session-activated');
+    });
     const sessionActivation = ledger.mutations.find((mutation) => mutation.type === 'session-activated');
     expect(sessionActivation).toEqual(expect.objectContaining({
       eventId: expect.stringMatching(UUID_TEXT_PATTERN),
@@ -1687,11 +1778,13 @@ describe('RaceSweetMainApp integration', () => {
       mode: 'specific',
       sourceIds: ['source-apical'],
     });
-    const latestCatalogWrite = writtenFiles
-      .filter((write) => write.filePath.includes('event-catalog.json'))
-      .at(-1);
-    expect(latestCatalogWrite).toBeDefined();
-    expect(JSON.parse(latestCatalogWrite!.content)).toEqual(expect.objectContaining({
+    const importedLedger = await waitForPersistedCatalogLedger(writtenFiles, (ledger) => {
+      return ledger.mutations.some((mutation) => (
+        mutation.apicalDataFilePath === getCachedApicalExcelFilePath(1001) &&
+        mutation.type === 'race-state-imported'
+      ));
+    });
+    expect(importedLedger).toEqual(expect.objectContaining({
       mutations: expect.arrayContaining([
         expect.objectContaining({
           apicalDataFilePath: getCachedApicalExcelFilePath(1001),
@@ -1813,29 +1906,12 @@ describe('RaceSweetMainApp integration', () => {
     await waitForLoadedApp(container);
     await clickButtonByText(container, 'Reprocess data');
 
-    let latestCatalogWrite: { content: string; dataType?: string; filePath: string } | undefined;
-    for (let attempt = 0; attempt < 120; attempt += 1) {
-      latestCatalogWrite = writtenFiles
-        .filter((write) => write.filePath.includes('event-catalog.json'))
-        .at(-1);
-
-      if (
-        latestCatalogWrite?.content.includes('"type":"race-state-imported"') &&
-        latestCatalogWrite.content.includes(SEED_QUALIFYING_SESSION_ID) &&
-        latestCatalogWrite.content.includes(SEED_RACE_SESSION_ID)
-      ) {
-        break;
-      }
-
-      await act(async () => {
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, 10);
-        });
-      });
-    }
-
-    expect(latestCatalogWrite).toBeDefined();
-    const persistedLedger = JSON.parse(latestCatalogWrite!.content) as { mutations: Array<{ sessionId?: string; type: string }> };
+    const persistedLedger = await waitForPersistedCatalogLedger(writtenFiles, (ledger) => {
+      const reloadedSessionIds = ledger.mutations
+        .filter((mutation) => mutation.type === 'race-state-imported')
+        .map((mutation) => mutation.sessionId);
+      return reloadedSessionIds.includes(SEED_QUALIFYING_SESSION_ID) && reloadedSessionIds.includes(SEED_RACE_SESSION_ID);
+    });
     const reloadedSessionIds = persistedLedger.mutations
       .filter((mutation) => mutation.type === 'race-state-imported')
       .map((mutation) => mutation.sessionId);
@@ -2315,23 +2391,9 @@ describe('RaceSweetMainApp integration', () => {
 
     await clickButtonByText(container, 'Save Category');
 
-    let latestCatalogWrite: { content: string; dataType?: string; filePath: string } | undefined;
-    for (let attempt = 0; attempt < 120; attempt += 1) {
-      latestCatalogWrite = writtenFiles
-        .filter((write) => write.filePath.includes('event-catalog.json'))
-        .at(-1);
-      if (latestCatalogWrite?.content.includes('"type":"category-updated"')) {
-        break;
-      }
-
-      await act(async () => {
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, 10);
-        });
-      });
-    }
-
-    expect(latestCatalogWrite).toBeDefined();
+    await waitForPersistedCatalogLedger(writtenFiles, (ledger) => {
+      return ledger.mutations.some((mutation) => mutation.type === 'category-updated');
+    });
     expect(container.textContent).not.toContain('does not exist');
     expect((container.querySelector('select[aria-label="Categories Event"]') as HTMLSelectElement).value).toBe(importedEventId);
     expect(container.querySelector('input[aria-label="Category Name"]')).toBeTruthy();

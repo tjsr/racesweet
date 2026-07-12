@@ -110,7 +110,7 @@ describe('EntrantListPanel', () => {
       root?.render(<Harness />);
     });
 
-    expect(container.textContent).toContain('Individual Entrants');
+    expect(container.textContent).toContain('Individual Drivers');
     expect(container.textContent).toContain('Teams');
     expect(container.textContent).toContain('Rider One');
     expect(container.textContent).toContain('Premier');
@@ -177,7 +177,7 @@ describe('EntrantListPanel', () => {
     });
 
     const riderCard = Array.from(container.querySelectorAll<HTMLButtonElement>('button.events-list-item'))
-      .find((button) => button.querySelector('.entrant-list-type')?.textContent === 'rider');
+      .find((button) => button.querySelector('.entrant-list-type')?.textContent === 'driver');
     expect(riderCard).not.toBeUndefined();
     riderCard!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 

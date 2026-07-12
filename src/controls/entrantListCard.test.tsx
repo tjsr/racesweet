@@ -63,6 +63,6 @@ describe('EntrantListCard', () => {
     expect(teamRow?.children[0]).toBe(teamName);
     expect(teamRow?.children[1]).toBe(entrantType);
     expect(teamName?.textContent).toBe('Team: Fast Friends');
-    expect(entrantType?.textContent).toBe('rider');
+    expect(entrantType?.textContent).toBe('driver');
   });
 });

@@ -1,6 +1,6 @@
 import { Component, type ReactElement, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { validate as validateUuid } from 'uuid';
-import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getSessionsForEvent } from '../catalog/eventCatalog.ts';
+import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getEventDisciplineLabels, getSessionsForEvent } from '../catalog/eventCatalog.ts';
 import { fetchApicalEvents } from '../controllers/apical/getResultListJson.ts';
 import { CategoryId } from '../controllers/category.ts';
 import { type LoadingMetricsState, getLoadingMetricsSnapshot, incrementLoadingMetric, resetLoadingMetrics, subscribeLoadingMetrics } from '../loadingMetrics.ts';
@@ -2045,7 +2045,9 @@ export const RaceSweetMainApp = () => {
               return;
             }
             eventCatalogService.createEntrant(eventId, entrantType).then((catalog) => {
-              const entrantName = entrantType === 'team' ? 'New Team' : 'New Entrant';
+              const event = catalog.events.find((item) => item.id === eventId);
+              const entrantLabels = getEventDisciplineLabels(event?.discipline);
+              const entrantName = entrantType === 'team' ? 'New Team' : `New ${entrantLabels.singular}`;
               const entrant = getEntrantsForEvent(catalog, eventId).find((item) => item.name === entrantName);
               updateEventCatalogState(catalog, eventId, selectedSessionId, selectedCategoryId);
               setSelectedEntrantId(entrant?.id);

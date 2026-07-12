@@ -1,6 +1,7 @@
 import { Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip } from '@mui/material';
 import React, { type JSX } from 'react';
 import { DEFAULT_FASTEST_TIME_INDICATOR_COLORS, type FastestTimeIndicatorColors } from '../../app/systemConfig.ts';
+import type { MillisecondsDuration, TimeDisplayZoneMode } from '../../app/utils/timeutils.ts';
 import {
   dateStringInTimeZone,
   millisecondsToTime,
@@ -9,7 +10,6 @@ import {
   tableDateTimeStringInTimeZone,
   timeOfDayInputStringInTimeZone,
 } from '../../app/utils/timeutils.ts';
-import type { MillisecondsDuration, TimeDisplayZoneMode } from '../../app/utils/timeutils.ts';
 import type { EventSessionKind } from '../../catalog/eventCatalog.ts';
 import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../controllers/category.ts';
 import { createGreenFlagEvent, createRedFlagEvent, isFlagRecord } from '../../controllers/flag';
@@ -60,6 +60,19 @@ interface RowSelectionState {
   selectedRecordId?: TimeRecordId;
 }
 
+interface VirtualRecordRow {
+  index: number;
+  record: EventTimeRecord;
+}
+
+interface VirtualRecordRowWindow {
+  end: number;
+  paddingBottom: number;
+  paddingTop: number;
+  rows: VirtualRecordRow[];
+  start: number;
+}
+
 const ignoreModeLabels: Record<RecentRecordsIgnoreMode, string> = {
   outsideEventWindow: 'Outside event window',
   sectorLoops: 'Sector loops',
@@ -70,6 +83,9 @@ const DEFERRED_SELECTION_UPDATE_DELAY_MS = 0;
 const EMPTY_ROW_RANGE: RowIndexRange = { end: -1, start: 0 };
 const ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX = 36;
 const IMMEDIATE_SELECTION_ROW_BUFFER = 100;
+const INITIAL_RECENT_RECORD_RENDER_COUNT = 60;
+const RECENT_RECORD_ROW_OVERSCAN = 8;
+const RECENT_RECORD_VIRTUALIZATION_MIN_ROWS = 100;
 
 type AddableRecordType = 'passing' | 'flag';
 type AddableFlagType = 'green' | 'yellow' | 'white' | 'red' | 'chequered';
@@ -141,6 +157,61 @@ const buildImmediateSelectionWindow = (
 
 const isRowIndexWithinRange = (index: number, rowRange: RowIndexRange): boolean => {
   return index >= rowRange.start && index <= rowRange.end;
+};
+
+const buildVirtualRecordRowWindow = (
+  records: EventTimeRecord[],
+  visibleRowRange: RowIndexRange,
+  rowHeight: number
+): VirtualRecordRowWindow => {
+  if (records.length === 0) {
+    return {
+      end: -1,
+      paddingBottom: 0,
+      paddingTop: 0,
+      rows: [],
+      start: 0,
+    };
+  }
+
+  if (records.length <= RECENT_RECORD_VIRTUALIZATION_MIN_ROWS) {
+    return {
+      end: records.length - 1,
+      paddingBottom: 0,
+      paddingTop: 0,
+      rows: records.map((record, index): VirtualRecordRow => ({ index, record })),
+      start: 0,
+    };
+  }
+
+  const hasVisibleRange = visibleRowRange.end >= visibleRowRange.start;
+  const start = hasVisibleRange
+    ? Math.max(0, visibleRowRange.start - RECENT_RECORD_ROW_OVERSCAN)
+    : 0;
+  const end = hasVisibleRange
+    ? Math.min(records.length - 1, visibleRowRange.end + RECENT_RECORD_ROW_OVERSCAN)
+    : Math.min(records.length - 1, INITIAL_RECENT_RECORD_RENDER_COUNT - 1);
+  const rows = records.slice(start, end + 1).map((record, offset): VirtualRecordRow => {
+    return {
+      index: start + offset,
+      record,
+    };
+  });
+
+  return {
+    end,
+    paddingBottom: Math.max(0, records.length - end - 1) * rowHeight,
+    paddingTop: start * rowHeight,
+    rows,
+    start,
+  };
+};
+
+const isElementVerticallyScrollable = (element: HTMLElement): boolean => {
+  const overflowY = typeof window !== 'undefined' && window.getComputedStyle
+    ? window.getComputedStyle(element).overflowY
+    : '';
+  return element.scrollHeight > element.clientHeight && (overflowY === 'auto' || overflowY === 'scroll');
 };
 
 const participantArrayFromLookup = (raceStateLookup: RaceStateLookup): EventParticipant[] => {
@@ -1647,7 +1718,6 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   const resolvedTeamName = getParticipantTeamName(resolvedParticipant, props.raceStateLookup);
   const resolvedCategoryName = resolvedCategory?.name || '';
   const editablePassingRecord = editingRecord && isCrossingRecord(editingRecord) ? editingRecord : undefined;
-  const displayTimeZoneSummary = `Time shown in ${props.displayTimeZone}`;
   const displayedRecordDate = dateStringInTimeZone(editingRecord?.time || anchorRecord?.time, props.displayTimeZone);
   const editablePassingLapControl = editablePassingRecord ? (isLapControlCrossing(editablePassingRecord, props.raceStateLookup) ? 'Yes' : 'No') : '';
   const editableFinishLineNumbers = editablePassingRecord ? formatFinishLineNumbers(props.raceStateLookup) : '';
@@ -1724,7 +1794,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
             label="Shown in"
             margin="dense"
             slotProps={{ htmlInput: { 'aria-label': 'Displayed time zone' } }}
-            value={displayTimeZoneSummary}
+            value={props.displayTimeZone}
           />
           <TextField
             disabled
@@ -1903,6 +1973,7 @@ export const RecentRecords = (props: RecordsProps & {
   const toolbarAnchorRef = React.useRef<HTMLDivElement>(null);
   const toolbarRef = React.useRef<HTMLDivElement>(null);
   const [visibleRowRange, setVisibleRowRange] = React.useState<RowIndexRange>(EMPTY_ROW_RANGE);
+  const [recentRecordRowHeight, setRecentRecordRowHeight] = React.useState<number>(ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX);
   const [toolbarDock, setToolbarDock] = React.useState({
     height: 0,
     isDocked: false,
@@ -2085,6 +2156,9 @@ export const RecentRecords = (props: RecordsProps & {
   const immediateSelectionWindow = React.useMemo(() => {
     return buildImmediateSelectionWindow(sortedRecords.length, visibleRowRange);
   }, [sortedRecords.length, visibleRowRange]);
+  const virtualRowWindow = React.useMemo(() => {
+    return buildVirtualRecordRowWindow(sortedRecords, visibleRowRange, recentRecordRowHeight);
+  }, [recentRecordRowHeight, sortedRecords, visibleRowRange]);
   const fastestTimeIndicatorColors = props.fastestTimeIndicatorColors || DEFAULT_FASTEST_TIME_INDICATOR_COLORS;
   const tableContainerStyle = React.useMemo(() => {
     return {
@@ -2103,10 +2177,21 @@ export const RecentRecords = (props: RecordsProps & {
     const rowElement = container.querySelector('tbody tr[data-record-id]') as HTMLTableRowElement | null;
     const measuredRowHeight = rowElement?.getBoundingClientRect().height || ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX;
     const safeRowHeight = measuredRowHeight > 0 ? measuredRowHeight : ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX;
-    const scrollTop = container.scrollTop;
-    const viewportHeight = container.clientHeight || container.getBoundingClientRect().height || safeRowHeight;
-    const start = Math.max(0, Math.floor(scrollTop / safeRowHeight));
-    const visibleCount = Math.max(1, Math.ceil(viewportHeight / safeRowHeight));
+    setRecentRecordRowHeight((current) => Math.abs(current - safeRowHeight) < 0.5 ? current : safeRowHeight);
+    const containerOwnsVerticalScroll = isElementVerticallyScrollable(container);
+    const containerRect = container.getBoundingClientRect();
+    const viewportHeight = containerOwnsVerticalScroll
+      ? container.clientHeight || containerRect.height || safeRowHeight
+      : window.innerHeight || document.documentElement.clientHeight || safeRowHeight;
+    const visibleTop = containerOwnsVerticalScroll
+      ? container.scrollTop
+      : Math.max(0, -containerRect.top);
+    const visibleBottom = containerOwnsVerticalScroll
+      ? container.scrollTop + viewportHeight
+      : Math.min(containerRect.height || sortedRecords.length * safeRowHeight, viewportHeight - containerRect.top);
+    const visibleHeight = Math.max(safeRowHeight, visibleBottom - visibleTop);
+    const start = Math.max(0, Math.floor(visibleTop / safeRowHeight));
+    const visibleCount = Math.max(1, Math.ceil(visibleHeight / safeRowHeight));
     const end = Math.min(Math.max(0, sortedRecords.length - 1), start + visibleCount - 1);
 
     setVisibleRowRange((current) => {
@@ -2129,10 +2214,12 @@ export const RecentRecords = (props: RecordsProps & {
     };
 
     container.addEventListener('scroll', handleVisibleRowRangeChange, { passive: true });
+    window.addEventListener('scroll', handleVisibleRowRangeChange, true);
     window.addEventListener('resize', handleVisibleRowRangeChange);
 
     return () => {
       container.removeEventListener('scroll', handleVisibleRowRangeChange);
+      window.removeEventListener('scroll', handleVisibleRowRangeChange, true);
       window.removeEventListener('resize', handleVisibleRowRangeChange);
     };
   }, [updateVisibleRowRange]);
@@ -2142,10 +2229,19 @@ export const RecentRecords = (props: RecordsProps & {
   const openEditRecordDialog = React.useCallback((record: EventTimeRecord): void => {
     setAddRecordDialogState({ anchorRecord: record, existingRecord: record, mode: 'edit' });
   }, []);
+  const handleCategorySelected = React.useCallback((categoryIds: Set<EventCategoryId>): void => {
+    const nextCategoryIds = new Set<EventCategoryId>(categoryIds);
+    React.startTransition(() => {
+      props.categorySelected?.(nextCategoryIds);
+    });
+  }, [props.categorySelected]);
   const handleParticipantSelected = React.useCallback((participantIds: Set<EventParticipantId>): void => {
+    const nextParticipantIds = new Set<EventParticipantId>(participantIds);
     setSelectedPlateNumber(undefined);
-    setLocalSelectedParticipants(new Set<EventParticipantId>(participantIds));
-    props.participantSelected?.(participantIds);
+    setLocalSelectedParticipants(nextParticipantIds);
+    React.startTransition(() => {
+      props.participantSelected?.(new Set<EventParticipantId>(nextParticipantIds));
+    });
   }, [props.participantSelected]);
   const handleSelectRecord = React.useCallback((recordId: TimeRecordId | undefined): void => {
     setSelectedRecordId(recordId);
@@ -2199,7 +2295,7 @@ export const RecentRecords = (props: RecordsProps & {
               const value = event.target.value;
               const categoryIds = typeof value === 'string' ? value.split(',') : value;
               setLocalSelectedParticipants(new Set<EventParticipantId>());
-              props.categorySelected?.(new Set<EventCategoryId>(categoryIds as EventCategoryId[]));
+              handleCategorySelected(new Set<EventCategoryId>(categoryIds as EventCategoryId[]));
             }}
             renderValue={() => selectedCategoryNames.length > 0 ? selectedCategoryNames.join(', ') : 'All categories'}>
             {selectableCategories.map((category) => (
@@ -2306,7 +2402,12 @@ export const RecentRecords = (props: RecordsProps & {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {sortedRecords.map((record, index) => {
+                {virtualRowWindow.paddingTop > 0 && (
+                  <TableRow aria-hidden="true" className="recent-records-virtual-spacer-row">
+                    <TableCell colSpan={headings.length} sx={{ border: 0, height: virtualRowWindow.paddingTop, padding: 0 }} />
+                  </TableRow>
+                )}
+                {virtualRowWindow.rows.map(({ record, index }) => {
                   const rowSelectionState = isRowIndexWithinRange(index, immediateSelectionWindow)
                     ? immediateSelectionState
                     : deferredSelectionState;
@@ -2325,7 +2426,7 @@ export const RecentRecords = (props: RecordsProps & {
                       selectedParticipants={rowSelectionState.selectedParticipants}
                       selectedParticipantKey={rowSelectionState.selectedParticipantKey}
                       sessionValidCategoryIds={props.sessionValidCategoryIds}
-                      categorySelected={props.categorySelected}
+                      categorySelected={handleCategorySelected}
                       participantSelected={handleParticipantSelected}
                       onAssignFlagCategory={props.onAssignFlagCategory}
                       onOpenAddRecordDialog={openAddRecordDialog}
@@ -2342,6 +2443,11 @@ export const RecentRecords = (props: RecordsProps & {
                     />
                   );
                 })}
+                {virtualRowWindow.paddingBottom > 0 && (
+                  <TableRow aria-hidden="true" className="recent-records-virtual-spacer-row">
+                    <TableCell colSpan={headings.length} sx={{ border: 0, height: virtualRowWindow.paddingBottom, padding: 0 }} />
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </TableContainer>

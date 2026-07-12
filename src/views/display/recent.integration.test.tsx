@@ -6,9 +6,6 @@ import path from 'node:path';
 import React, { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import { updateCategorySelectionsForChangedParticipant } from '../../app/categoryChangeState.js';
-import { applyPulledRaceStateToSession } from '../../service/sourceApplication.js';
-import { type AdministrativeChanges, type RaceAdminPersistence, createDefaultAdministrativeChanges } from '../../persistence/raceAdminPersistence.js';
-import { RaceAdminService } from '../../service/raceAdminService.js';
 import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
 import { createGreenFlagEvent } from '../../controllers/flag.js';
 import type { EventCategory } from '../../model/eventcategory.js';
@@ -20,6 +17,9 @@ import type { EventTimeRecord } from '../../model/index.js';
 import { type RaceStateLookup, Session } from '../../model/racestate.js';
 import { type ParticipantPassingRecord, RECORD_TX_CROSSING, TimeRecordId } from '../../model/timerecord.js';
 import { loadMrScatsCatalogFromLocation } from '../../parsers/mrScats/catalogImport.js';
+import { type AdministrativeChanges, type RaceAdminPersistence, createDefaultAdministrativeChanges } from '../../persistence/raceAdminPersistence.js';
+import { RaceAdminService } from '../../service/raceAdminService.js';
+import { applyPulledRaceStateToSession } from '../../service/sourceApplication.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 import { RecentRecords } from './recent.js';
 
@@ -771,104 +771,112 @@ describe('RecentRecords integration', () => {
     expect(secondRow!.className).toContain('selected-category');
   });
 
-  it('updates visible row selection styles before deferring off-screen rows', async () => {
-    vi.useFakeTimers();
-    try {
-      const categoryA: EventCategory = { id: '1', name: 'Category A' };
-      const baseTime = new Date('2026-05-29T10:00:00.000Z').getTime();
-      const records: ParticipantPassingRecord[] = [];
-      const participants = new Map<string, EventParticipant>();
-      const lapsByParticipantId = new Map<string, ParticipantPassingRecord[]>();
+  it('renders only the visible recent record rows as the table scrolls', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const baseTime = new Date('2026-05-29T10:00:00.000Z').getTime();
+    const records: ParticipantPassingRecord[] = [];
+    const participants = new Map<string, EventParticipant>();
+    const lapsByParticipantId = new Map<string, ParticipantPassingRecord[]>();
 
-      for (let index = 0; index < 160; index += 1) {
-        const participantId = `${index + 1}`;
-        const participant: EventParticipant = {
-          categoryId: categoryA.id,
-          currentResult: undefined,
-          entrantId: participantId,
-          firstname: `Rider ${index + 1}`,
-          id: participantId,
-          identifiers: [{ fromTime: undefined, racePlate: participantId, toTime: undefined }] as unknown as EventParticipant['identifiers'],
-          lastRecordTime: null,
-          resultDuration: null,
-          surname: 'Test',
-        };
-        const crossing: ParticipantPassingRecord = {
-          chipCode: 100000 + index,
-          id: `${2000 + index}`,
-          isValid: true,
-          participantId,
-          recordType: RECORD_TX_CROSSING,
-          sequence: index + 1,
-          source: 'test-source',
-          time: new Date(baseTime + (index * 60000)),
-        } as ParticipantPassingRecord;
-
-        participants.set(participantId, participant);
-        lapsByParticipantId.set(participantId, [crossing]);
-        records.push(crossing);
-      }
-
-      const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
-        categories: [categoryA],
-        countTransponderCrossings: () => 1,
-        excludeCrossing: () => undefined,
-        getCategoryById: () => categoryA,
-        getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
-        getParticipantById: (participantId) => participants.get(participantId),
-        getParticipantLaps: (participantId) => lapsByParticipantId.get(participantId) || [],
-        getTransponderCrossings: () => [],
-        updateCategoryDetails: () => undefined,
-        updateEntrantCategory: () => undefined,
-        updateParticipantCategory: () => undefined,
+    for (let index = 0; index < 160; index += 1) {
+      const participantId = `${index + 1}`;
+      const participant: EventParticipant = {
+        categoryId: categoryA.id,
+        currentResult: undefined,
+        entrantId: participantId,
+        firstname: `Rider ${index + 1}`,
+        id: participantId,
+        identifiers: [{ fromTime: undefined, racePlate: participantId, toTime: undefined }] as unknown as EventParticipant['identifiers'],
+        lastRecordTime: null,
+        resultDuration: null,
+        surname: 'Test',
       };
+      const crossing: ParticipantPassingRecord = {
+        chipCode: 100000 + index,
+        id: `${2000 + index}`,
+        isValid: true,
+        participantId,
+        recordType: RECORD_TX_CROSSING,
+        sequence: index + 1,
+        source: 'test-source',
+        time: new Date(baseTime + (index * 60000)),
+      } as ParticipantPassingRecord;
 
-      await act(async () => {
-        root.render(
-          <RecentRecords
-            raceStateLookup={raceStateLookup}
-            records={records}
-            selectedCategories={new Set()}
-            selectedParticipants={new Set()}
-          />
-        );
-      });
-
-      const tableContainer = container.querySelector('.recent-records-table-container') as HTMLDivElement;
-      Object.defineProperty(tableContainer, 'clientHeight', {
-        configurable: true,
-        value: 72,
-      });
-
-      await act(async () => {
-        window.dispatchEvent(new Event('resize'));
-      });
-
-      await act(async () => {
-        root.render(
-          <RecentRecords
-            raceStateLookup={raceStateLookup}
-            records={records}
-            selectedCategories={new Set([categoryA.id])}
-            selectedParticipants={new Set()}
-          />
-        );
-      });
-
-      const firstVisibleRow = container.querySelector(`tr[data-record-id="${records[0]!.id}"]`) as HTMLTableRowElement;
-      const deferredRow = container.querySelector(`tr[data-record-id="${records[150]!.id}"]`) as HTMLTableRowElement;
-
-      expect(firstVisibleRow.className).toContain('selected-category');
-      expect(deferredRow.className).not.toContain('selected-category');
-
-      await act(async () => {
-        vi.runAllTimers();
-      });
-
-      expect(deferredRow.className).toContain('selected-category');
-    } finally {
-      vi.useRealTimers();
+      participants.set(participantId, participant);
+      lapsByParticipantId.set(participantId, [crossing]);
+      records.push(crossing);
     }
+
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [categoryA],
+      countTransponderCrossings: () => 1,
+      excludeCrossing: () => undefined,
+      getCategoryById: () => categoryA,
+      getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+      getParticipantById: (participantId) => participants.get(participantId),
+      getParticipantLaps: (participantId) => lapsByParticipantId.get(participantId) || [],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={records}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const tableContainer = container.querySelector('.recent-records-table-container') as HTMLDivElement;
+    let tableTop = 0;
+    const tableHeight = records.length * 36;
+    tableContainer.getBoundingClientRect = (): DOMRect => ({
+      bottom: tableTop + tableHeight,
+      height: tableHeight,
+      left: 0,
+      right: 1200,
+      toJSON: () => undefined,
+      top: tableTop,
+      width: 1200,
+      x: 0,
+      y: tableTop,
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={records}
+          selectedCategories={new Set([categoryA.id])}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const firstVisibleRow = container.querySelector(`tr[data-record-id="${records[0]!.id}"]`) as HTMLTableRowElement;
+    const initialRenderedRows = container.querySelectorAll('tr[data-record-id]');
+
+    expect(firstVisibleRow.className).toContain('selected-category');
+    expect(initialRenderedRows.length).toBeLessThan(records.length);
+    expect(container.querySelector(`tr[data-record-id="${records[150]!.id}"]`)).toBeNull();
+
+    await act(async () => {
+      tableTop = -(150 * 36);
+      document.body.dispatchEvent(new Event('scroll'));
+    });
+
+    const scrolledRow = container.querySelector(`tr[data-record-id="${records[150]!.id}"]`) as HTMLTableRowElement;
+    expect(scrolledRow).not.toBeNull();
+    expect(scrolledRow.className).toContain('selected-category');
   });
 
   it('toggles crossing exclusion from the row context menu while keeping the crossing visible', async () => {
@@ -3821,7 +3829,7 @@ describe('RecentRecords integration', () => {
     expect(document.body.textContent).toContain('Edit record');
     expect((document.querySelector('input[aria-label="Record ID"]') as HTMLInputElement).value).toBe('crossing-1');
     expect((document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement).value).toBe('20:06:00.000');
-    expect((document.querySelector('input[aria-label="Displayed time zone"]') as HTMLInputElement).value).toBe('Time shown in Australia/Sydney');
+    expect((document.querySelector('input[aria-label="Displayed time zone"]') as HTMLInputElement).value).toBe('Australia/Sydney');
     expect((document.querySelector('input[aria-label="Record date"]') as HTMLInputElement).value).toBe('2026-05-29');
     expect((document.querySelector('input[aria-label="TxNo"]') as HTMLInputElement).value).toBe('100101');
     expect((document.querySelector('input[aria-label="Plate"]') as HTMLInputElement).value).toBe('101');
@@ -3949,7 +3957,7 @@ describe('RecentRecords integration', () => {
     });
 
     expect((document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement).value).toBe('10:06:00.000');
-    expect((document.querySelector('input[aria-label="Displayed time zone"]') as HTMLInputElement).value).toBe('Time shown in UTC');
+    expect((document.querySelector('input[aria-label="Displayed time zone"]') as HTMLInputElement).value).toBe('UTC');
     expect((document.querySelector('input[aria-label="Record date"]') as HTMLInputElement).value).toBe('2026-05-29');
   });
 

@@ -87,7 +87,7 @@ describe('EntrantDetailsPanel', () => {
       );
     });
 
-    expect(container.textContent).toContain('Entrant Details');
+    expect(container.textContent).toContain('Driver Details');
     expect(container.textContent).toContain('First Name');
     expect(container.textContent).toContain('Team: Fast Friends');
 
