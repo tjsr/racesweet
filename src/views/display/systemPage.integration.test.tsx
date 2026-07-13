@@ -638,6 +638,7 @@ describe('SystemPage integration', () => {
             relativePath: 'W9721Q01.DBF',
           }),
         ],
+        ignoreLineOneNo1CrossingsWhenDbfPresent: true,
         sourceKind: 'directory',
       },
     });

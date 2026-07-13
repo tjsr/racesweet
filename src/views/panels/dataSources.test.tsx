@@ -131,6 +131,16 @@ describe('DataSourcesPanel', () => {
     const locationInput = container.querySelector('input[aria-label="MR-SCATS Data Files Location source-mr-scats"]') as HTMLInputElement;
     expect(locationInput).toBeTruthy();
     expect(locationInput.placeholder).toBe('No file or directory selected');
+    const ignoreLineOneCheckbox = container.querySelector('input[aria-label="MR-SCATS Ignore Line 1 NO1 Crossings source-mr-scats"]') as HTMLInputElement;
+    expect(ignoreLineOneCheckbox?.checked).toBe(true);
+    ignoreLineOneCheckbox.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+    expect(onSaveSource).toHaveBeenCalledWith('source-mr-scats', {
+      mrScatsConfig: {
+        files: [],
+        ignoreLineOneNo1CrossingsWhenDbfPresent: false,
+      },
+    });
     const disabledLoadEventButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Load event') as HTMLButtonElement | undefined;
     expect(disabledLoadEventButton?.disabled).toBe(true);
 
@@ -151,6 +161,7 @@ describe('DataSourcesPanel', () => {
             relativePath: 'W9721Q01.DBF',
           }),
         ],
+        ignoreLineOneNo1CrossingsWhenDbfPresent: true,
         sourceKind: 'directory',
       },
     });

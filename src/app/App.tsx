@@ -828,7 +828,9 @@ export const RaceSweetMainApp = () => {
           continue;
         }
 
-        const mrScatsImport = await loadMrScatsCatalogFromLocation(locationPath);
+        const mrScatsImport = await loadMrScatsCatalogFromLocation(locationPath, {
+          ignoreLineOneNo1CrossingsWhenDbfPresent: source.mrScatsConfig?.ignoreLineOneNo1CrossingsWhenDbfPresent,
+        });
         const importedSession = mrScatsImport.sessions.find((session) => session.id === sessionId);
         if (importedSession) {
           pulledRaceStates.push(filterMrScatsRaceStateForSession(
@@ -1688,6 +1690,7 @@ export const RaceSweetMainApp = () => {
 
             return loadMrScatsCatalogFromLocation(locationPath, {
               extraSteps: postParseStepCount,
+              ignoreLineOneNo1CrossingsWhenDbfPresent: source.mrScatsConfig?.ignoreLineOneNo1CrossingsWhenDbfPresent,
               onProgress: publishProgress,
             })
               .then(async (importData) => {

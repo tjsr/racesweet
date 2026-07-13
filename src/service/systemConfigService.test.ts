@@ -461,7 +461,10 @@ describe('SystemConfigService', () => {
     expect(source).toBeDefined();
     expect(source.finishLineNumbers).toEqual([1]);
     expect(source.type).toBe('file-mr-scats-data');
-    expect(source.mrScatsConfig).toEqual({ files: [] });
+    expect(source.mrScatsConfig).toEqual({
+      files: [],
+      ignoreLineOneNo1CrossingsWhenDbfPresent: true,
+    });
 
     await service.updateSource(source.id, {
       mrScatsConfig: {
@@ -490,6 +493,7 @@ describe('SystemConfigService', () => {
           size: 7067,
         },
       ],
+      ignoreLineOneNo1CrossingsWhenDbfPresent: true,
       sourceKind: 'directory',
     });
     expect(persistence.save).toHaveBeenCalledWith(expect.objectContaining({

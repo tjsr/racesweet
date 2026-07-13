@@ -37,6 +37,7 @@ export interface LocalFileSourceConfig {
 export interface MrScatsSourceConfig {
   dataLocationPath?: string;
   files: MrScatsDataFileSummary[];
+  ignoreLineOneNo1CrossingsWhenDbfPresent?: boolean;
   sourceKind?: 'archive' | 'directory';
 }
 
@@ -190,6 +191,7 @@ const normalizeMrScatsSourceConfig = (config: MrScatsSourceConfig | undefined): 
     ...config,
     dataLocationPath: normalizeOptionalSystemFilePath(config.dataLocationPath),
     files: config.files || [],
+    ignoreLineOneNo1CrossingsWhenDbfPresent: config.ignoreLineOneNo1CrossingsWhenDbfPresent !== false,
   };
 };
 

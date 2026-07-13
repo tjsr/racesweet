@@ -73,6 +73,7 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
       finishLineNumbers: [1],
       mrScatsConfig: {
         files: [],
+        ignoreLineOneNo1CrossingsWhenDbfPresent: true,
       },
       name: 'MR-SCATS Data',
     };

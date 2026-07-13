@@ -111,6 +111,7 @@ const waitForInlineProgressPaint = async (): Promise<void> => {
 export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): React.ReactElement => {
   const config = props.source.mrScatsConfig || { files: [] };
   const finishLineNumbersValue = (props.source.finishLineNumbers || [1]).join(', ');
+  const ignoreLineOneNo1CrossingsWhenDbfPresent = config.ignoreLineOneNo1CrossingsWhenDbfPresent !== false;
   const [isLoadingEvent, setIsLoadingEvent] = React.useState<boolean>(false);
   const [loadEventProgress, setLoadEventProgress] = React.useState<InlineLoadingProgress>({ completed: 0, total: 1 });
   const [preview, setPreview] = React.useState<MrScatsDataFilePreview | undefined>();
@@ -129,8 +130,10 @@ export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): Reac
 
     await props.onSaveSource(props.source.id, {
       mrScatsConfig: {
+        ...config,
         dataLocationPath: selectedInventory.locationPath,
         files: selectedInventory.files,
+        ignoreLineOneNo1CrossingsWhenDbfPresent,
         sourceKind: selectedInventory.sourceKind,
       },
     });
@@ -257,6 +260,22 @@ export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): Reac
           }}
           type="text"
         />
+      </label>
+      <label>
+        <input
+          aria-label={`MR-SCATS Ignore Line 1 NO1 Crossings ${props.source.id}`}
+          checked={ignoreLineOneNo1CrossingsWhenDbfPresent}
+          onChange={(event) => {
+            void props.onSaveSource(props.source.id, {
+              mrScatsConfig: {
+                ...config,
+                ignoreLineOneNo1CrossingsWhenDbfPresent: event.target.checked,
+              },
+            });
+          }}
+          type="checkbox"
+        />
+        ignore Line 1 from NO1 files if DBF file is present
       </label>
       <div className="events-actions">
         <button type="button" onClick={handleSelectDataDirectory} disabled={!props.onSelectDataDirectory}>
