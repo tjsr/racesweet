@@ -3,11 +3,11 @@ import path from 'node:path';
 import { TZDate } from '@date-fns/tz';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
-import type { GreenFlagRecord, YellowFlagRecord } from '../../model/flag.js';
+import type { ChequeredFlagRecord, FlagRecord, GreenFlagRecord, WhiteFlagRecord, YellowFlagRecord } from '../../model/flag.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
 import type { EventId, SessionId } from '../../model/raceevent.js';
 import type { RaceState } from '../../model/racestate.js';
-import { EVENT_FLAG_DISPLAYED, RECORD_TX_CROSSING, type EventTimeRecord, type ParticipantPassingRecord, type TimeRecordSource } from '../../model/timerecord.js';
+import { EVENT_FLAG_DISPLAYED, EVENT_SESSION_END, RECORD_TX_CROSSING, type EventTimeRecord, type ParticipantPassingRecord, type TimeRecordSource } from '../../model/timerecord.js';
 import { parseCtcRawCrossingFile, type CtcRawCrossingRecord } from '../ctc/rawCrossing.js';
 import { readMrScatsDbfTable, readMrScatsDbfTableAsync, type MrScatsDbfRecord } from './dbf.js';
 import { parseMrScatsDbfSummary, readMrScatsZipEntryBuffers } from './fileInventory.js';
@@ -122,6 +122,7 @@ const CROSSING_CONFIDENCE_FIELDS = ['CONFIDENCE', 'CONF_FACTOR', 'CONFID_FACT', 
 const CROSSING_HIT_COUNT_FIELDS = ['HITCOUNT', 'HIT_COUNT', 'HITS', 'READCOUNT', 'READ_COUNT', 'READS'];
 const CROSSING_GREEN_ELAPSED_FIELDS = ['GREENELAPS', 'GREEN_ELAP', 'STARTELAP', 'START_ELAP', 'STARTELPSD'];
 const CROSSING_GREEN_FLAG_FIELDS = ['FLAG', 'SYNCMARK', 'STARTFIN'];
+const CROSSING_VISIBLE_FLAG_FIELDS = ['FLAG', 'SYNCMARK', 'STARTFIN'];
 const RAW_CROSSING_EXTENSIONS = ['.SRT', '.ERF'];
 
 interface MrScatsSessionRecordBuildResult {
@@ -148,6 +149,11 @@ interface SessionElapsedAlignment {
   sessionElapsedZeroTime: Date;
 }
 
+interface DbfEventStartAnchor {
+  elapsedMilliseconds: number;
+  time: Date;
+}
+
 interface SrtCrossingTimeAnchor {
   fileName: string;
   record: CtcRawCrossingRecord;
@@ -164,10 +170,17 @@ interface SrtRawRecordTimeAnchor {
 }
 
 interface TableCrossingTimeAnchor {
+  elapsedMilliseconds: number;
   key: string;
+  lineNumber?: number;
   sequence: number;
   time: Date;
   timeTenthOfMillisecond: number;
+  transmitter?: number;
+}
+
+interface DbfNo1SessionAlignment extends SessionElapsedAlignment {
+  dbfTimeOffsetMilliseconds: number;
 }
 
 interface CrossingTime {
@@ -1075,6 +1088,70 @@ const getTimeTenthOfMillisecond = (elapsedTicks: number): number => {
   return Math.abs(Math.trunc(elapsedTicks)) % 10;
 };
 
+const isDbfEventStartRecord = (record: MrScatsDbfRecord): boolean => {
+  const flagValue = record.FLAG;
+  const numericFlag = parseInteger(flagValue);
+  if (numericFlag === 8) {
+    return true;
+  }
+
+  const normalizedFlag = asString(flagValue).toUpperCase().replace(/[_-]+/gu, ' ');
+  return normalizedFlag === 'EVENTSTART' || normalizedFlag === 'EVENT START';
+};
+
+const getDbfEventStartAnchor = (
+  record: MrScatsDbfRecord,
+  scheduledStartTime: Date
+): DbfEventStartAnchor | undefined => {
+  if (!isDbfEventStartRecord(record)) {
+    return undefined;
+  }
+
+  const elapsedMatch = getFirstNumberMatch(record, CROSSING_ELAPSED_FIELDS);
+  const entryTimeOfDayMatch = getFirstTimeOfDayMatch(record, ['ENTRYTIME']);
+  if (entryTimeOfDayMatch) {
+    return {
+      elapsedMilliseconds: elapsedMatch
+        ? elapsedTicksToMilliseconds(elapsedMatch.value)
+        : entryTimeOfDayMatch.elapsedMilliseconds,
+      time: createTimeOfDayDateNearSession(scheduledStartTime, entryTimeOfDayMatch.elapsedMilliseconds),
+    };
+  }
+
+  if (!elapsedMatch || !shouldTreatElapsedTicksAsTimeOfDay(scheduledStartTime, elapsedMatch.value)) {
+    return undefined;
+  }
+
+  const elapsedMilliseconds = elapsedTicksToMilliseconds(elapsedMatch.value);
+  return {
+    elapsedMilliseconds,
+    time: createTimeOfDayDateNearSession(scheduledStartTime, elapsedMilliseconds),
+  };
+};
+
+const deriveDbfEventStartSessionAlignment = (
+  sessionFileTables: SessionFileTable[],
+  scheduledStartTime: Date
+): SessionElapsedAlignment | undefined => {
+  const anchors = sessionFileTables
+    .flatMap((table) => table.records)
+    .map((record) => getDbfEventStartAnchor(record, scheduledStartTime))
+    .filter((anchor): anchor is DbfEventStartAnchor => anchor !== undefined)
+    .sort((left, right) =>
+      Math.abs(left.time.getTime() - scheduledStartTime.getTime()) -
+      Math.abs(right.time.getTime() - scheduledStartTime.getTime())
+    );
+  const selectedAnchor = anchors[0];
+  if (!selectedAnchor) {
+    return undefined;
+  }
+
+  return {
+    greenFlagTime: selectedAnchor.time,
+    sessionElapsedZeroTime: new Date(selectedAnchor.time.getTime() - selectedAnchor.elapsedMilliseconds),
+  };
+};
+
 const getGreenElapsedMilliseconds = (records: MrScatsDbfRecord[]): number => {
   const explicitElapsed = records
     .map((record) => getFirstNumber(record, CROSSING_GREEN_ELAPSED_FIELDS))
@@ -1546,13 +1623,15 @@ const findMatchingRawCrossingRecord = (
   sessionElapsedZeroTime: Date,
   anchorsByKey: Map<string, RawCrossingTimeAnchor[]>,
   anchorIndexByKey: Map<string, number>,
-  matchedRawRecordKeys: Set<string>
+  matchedRawRecordKeys: Set<string>,
+  timeOffsetMilliseconds: number | undefined
 ): CtcRawCrossingRecord | undefined => {
   const key = getRawCrossingAnchorKey({
     plateNumber: getFirstString(record, CROSSING_PLATE_FIELDS),
     transmitter: getFirstPositiveInteger(record, CROSSING_TRANSPONDER_FIELDS),
   });
-  const crossingTime = getCrossingTime(record, scheduledStartTime, sessionElapsedZeroTime);
+  const baseCrossingTime = getCrossingTime(record, scheduledStartTime, sessionElapsedZeroTime);
+  const crossingTime = baseCrossingTime ? applyCrossingTimeOffset(baseCrossingTime, timeOffsetMilliseconds) : undefined;
   const anchors = key ? anchorsByKey.get(key) : undefined;
   if (!key || !crossingTime || !anchors) {
     return undefined;
@@ -1612,7 +1691,8 @@ const mergeRawCrossingDataIntoSessionTables = (
         sessionElapsedZeroTime,
         anchorsByKey,
         anchorIndexByKey,
-        matchedRawRecordKeys
+        matchedRawRecordKeys,
+        table.timeOffsetMilliseconds
       )
     )),
   }));
@@ -1620,6 +1700,9 @@ const mergeRawCrossingDataIntoSessionTables = (
 
 const isNoCrossingFileName = (fileName: string): boolean =>
   /^\.NO\d+$/i.test(path.extname(fileName));
+
+const isNo1CrossingFileName = (fileName: string): boolean =>
+  path.extname(fileName).toUpperCase() === '.NO1';
 
 const getCrossingIdentityKey = (record: MrScatsDbfRecord): string | undefined => {
   const transmitter = getFirstPositiveInteger(record, CROSSING_TRANSPONDER_FIELDS);
@@ -1669,12 +1752,83 @@ const buildLineOneCrossingTimeAnchors = (
     }
 
     return [{
+      elapsedMilliseconds: crossingTime.elapsedMilliseconds,
       key,
+      lineNumber: getTableRecordLineNumber(table, record),
       sequence: rowIndex,
       time: crossingTime.time,
       timeTenthOfMillisecond: crossingTime.timeTenthOfMillisecond,
+      transmitter: getFirstPositiveInteger(record, CROSSING_TRANSPONDER_FIELDS),
     }];
   });
+};
+
+const buildTableCrossingTimeAnchors = (
+  table: SessionFileTable,
+  scheduledStartTime: Date,
+  sessionElapsedZeroTime: Date
+): TableCrossingTimeAnchor[] => {
+  return table.records.flatMap((record, rowIndex): TableCrossingTimeAnchor[] => {
+    const key = getCrossingIdentityKey(record);
+    const crossingTime = getCrossingTime(record, scheduledStartTime, sessionElapsedZeroTime);
+    if (!key || !crossingTime) {
+      return [];
+    }
+
+    return [{
+      elapsedMilliseconds: crossingTime.elapsedMilliseconds,
+      key,
+      lineNumber: getTableRecordLineNumber(table, record),
+      sequence: rowIndex,
+      time: crossingTime.time,
+      timeTenthOfMillisecond: crossingTime.timeTenthOfMillisecond,
+      transmitter: getFirstPositiveInteger(record, CROSSING_TRANSPONDER_FIELDS),
+    }];
+  });
+};
+
+const deriveDbfNo1SessionAlignment = (
+  sessionFileTables: SessionFileTable[],
+  programmeStartTime: Date
+): DbfNo1SessionAlignment | undefined => {
+  const firstDbfAnchor = sessionFileTables
+    .filter((table) => table.isLapCompletion)
+    .flatMap((table) => buildTableCrossingTimeAnchors(table, programmeStartTime, programmeStartTime))
+    .find((anchor) => anchor.transmitter !== undefined);
+  if (!firstDbfAnchor?.transmitter) {
+    return undefined;
+  }
+
+  const firstNo1Anchor = sessionFileTables
+    .filter((table) => isNo1CrossingFileName(table.fileName))
+    .flatMap((table) => buildTableCrossingTimeAnchors(table, programmeStartTime, programmeStartTime))
+    .find((anchor) => anchor.transmitter === firstDbfAnchor.transmitter && anchor.lineNumber === 1);
+  if (!firstNo1Anchor) {
+    return undefined;
+  }
+
+  const dbfTimeOffsetMilliseconds = firstNo1Anchor.time.getTime() - programmeStartTime.getTime() - firstDbfAnchor.elapsedMilliseconds;
+  return {
+    dbfTimeOffsetMilliseconds,
+    greenFlagTime: new Date(programmeStartTime.getTime() + dbfTimeOffsetMilliseconds),
+    sessionElapsedZeroTime: programmeStartTime,
+  };
+};
+
+const applyDbfTimeOffset = (
+  sessionFileTables: SessionFileTable[],
+  dbfTimeOffsetMilliseconds: number | undefined
+): SessionFileTable[] => {
+  if (dbfTimeOffsetMilliseconds === undefined || Math.abs(dbfTimeOffsetMilliseconds) <= 1) {
+    return sessionFileTables;
+  }
+
+  return sessionFileTables.map((table) => isNoCrossingFileName(table.fileName)
+    ? table
+    : {
+      ...table,
+      timeOffsetMilliseconds: (table.timeOffsetMilliseconds || 0) + dbfTimeOffsetMilliseconds,
+    });
 };
 
 const buildCrossingTimeAnchorsByKey = (
@@ -1837,7 +1991,9 @@ const getCrossingRecordMergeKey = (record: EventTimeRecord): string | undefined 
   }
 
   const crossing = record as ParticipantPassingRecord & { chipCode?: number; plateNumber?: string | number };
-  if (crossing.isExcluded) {
+  const isIgnoredLineOneMetadata = crossing.isExcluded === true &&
+    crossing.unrelatedReason?.startsWith('Line 1 imported from ') === true;
+  if (crossing.isExcluded && !isIgnoredLineOneMetadata) {
     return undefined;
   }
 
@@ -1853,7 +2009,6 @@ const getCrossingRecordMergeKey = (record: EventTimeRecord): string | undefined 
   return [
     identifier,
     record.time.getTime().toString(),
-    (record.timeTenthOfMillisecond || 0).toString(),
   ].join(':');
 };
 
@@ -1873,6 +2028,7 @@ const mergeCrossingRecordMetadata = (
     ...(primary.loopNumber === undefined && secondary.loopNumber !== undefined ? { loopNumber: secondary.loopNumber } : {}),
     ...(primary.confidenceFactor === undefined && secondary.confidenceFactor !== undefined ? { confidenceFactor: secondary.confidenceFactor } : {}),
     ...(primary.hitCount === undefined && secondary.hitCount !== undefined ? { hitCount: secondary.hitCount } : {}),
+    ...(secondary.timeTenthOfMillisecond !== undefined && secondary.timeTenthOfMillisecond !== null ? { timeTenthOfMillisecond: secondary.timeTenthOfMillisecond } : {}),
   } as EventTimeRecord;
 };
 
@@ -1923,6 +2079,135 @@ const createSessionGreenFlag = (
   time: scheduledStartTime,
 });
 
+type MrScatsDbfFlagKind = 'chequered' | 'green-resume' | 'white' | 'yellow-caution';
+
+const normalizeFlagMarker = (value: unknown): string => asString(value)
+  .toUpperCase()
+  .replace(/[^A-Z0-9]+/gu, ' ')
+  .trim();
+
+const getDbfFlagKind = (record: MrScatsDbfRecord): MrScatsDbfFlagKind | undefined => {
+  for (const field of CROSSING_VISIBLE_FLAG_FIELDS) {
+    const value = normalizeFlagMarker(record[field]);
+    if (value.length === 0) {
+      continue;
+    }
+
+    const tokens = new Set(value.split(/\s+/u));
+    if (value === 'W' || tokens.has('WHITE')) {
+      return 'white';
+    }
+    if (
+      value === 'C' ||
+      value === 'CHQ' ||
+      value === 'CHECKERED' ||
+      value === 'CHEQUERED' ||
+      tokens.has('CHECKERED') ||
+      tokens.has('CHEQUERED') ||
+      tokens.has('FINISH')
+    ) {
+      return 'chequered';
+    }
+    if (value === 'Y' || tokens.has('YELLOW') || tokens.has('CAUTION')) {
+      return 'yellow-caution';
+    }
+    if (
+      value === 'G' ||
+      value === 'GREEN' ||
+      tokens.has('GREEN') ||
+      value === 'CAUTION END' ||
+      value === 'CAUTION PERIOD END'
+    ) {
+      return 'green-resume';
+    }
+  }
+
+  return undefined;
+};
+
+const getDbfFlagDescription = (flagKind: MrScatsDbfFlagKind): string | undefined => {
+  if (flagKind === 'yellow-caution') {
+    return 'Caution Period Start';
+  }
+  if (flagKind === 'green-resume') {
+    return 'Caution period end';
+  }
+
+  return undefined;
+};
+
+const createDbfFlagRecord = (
+  meetingCode: string,
+  session: MrScatsImportedSession,
+  source: ReturnType<typeof createTimeRecordSourceId>,
+  fileName: string,
+  record: MrScatsDbfRecord,
+  rowIndex: number,
+  scheduledStartTime: Date,
+  sessionElapsedZeroTime: Date,
+  sequence: number,
+  timeOffsetMilliseconds: number | undefined
+): FlagRecord | undefined => {
+  const flagKind = getDbfFlagKind(record);
+  if (!flagKind) {
+    return undefined;
+  }
+
+  const baseCrossingTime = getCrossingTime(record, scheduledStartTime, sessionElapsedZeroTime);
+  if (!baseCrossingTime) {
+    return undefined;
+  }
+
+  const crossingTime = applyCrossingTimeOffset(baseCrossingTime, timeOffsetMilliseconds);
+  const baseRecord = {
+    categoryIds: session.categoryIds,
+    dataLine: JSON.stringify(record),
+    description: getDbfFlagDescription(flagKind),
+    eventId: createEventId(`mr-scats:${meetingCode}:event`),
+    id: createTimeRecordId(`mr-scats:${meetingCode}:session:${session.eventCode}:${path.basename(fileName)}:dbf-flag:${rowIndex + 1}:${flagKind}`),
+    originRecordNumber: rowIndex + 1,
+    sequence,
+    sessionId: session.id,
+    source,
+    systemGenerated: true,
+    time: crossingTime.time,
+    timeTenthOfMillisecond: crossingTime.timeTenthOfMillisecond,
+  };
+
+  if (flagKind === 'yellow-caution') {
+    return {
+      ...baseRecord,
+      flagType: 'yellow',
+      flagValue: 'caution',
+      recordType: EVENT_FLAG_DISPLAYED,
+    } as YellowFlagRecord;
+  }
+  if (flagKind === 'green-resume') {
+    return {
+      ...baseRecord,
+      flagType: 'green',
+      flagValue: 'course',
+      indicatesRaceStart: false,
+      recordType: EVENT_FLAG_DISPLAYED,
+    } as GreenFlagRecord;
+  }
+  if (flagKind === 'white') {
+    return {
+      ...baseRecord,
+      flagType: 'white',
+      flagValue: 'course',
+      recordType: EVENT_FLAG_DISPLAYED,
+    } as WhiteFlagRecord;
+  }
+
+  return {
+    ...baseRecord,
+    flagType: 'chequered',
+    flagValue: 'course',
+    recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_END,
+  } as ChequeredFlagRecord;
+};
+
 const parseRawTimeOfDay = (timeText: string | undefined, fallbackTime: Date): Date => {
   const explicitTimeMatch = timeText ? /^(\d{2}):(\d{2}):(\d{2})\.(\d{4})$/.exec(timeText) : undefined;
   const explicitTimeOfDayMilliseconds = explicitTimeMatch
@@ -1954,6 +2239,7 @@ const createSessionGreenResumeFlag = (
 ): GreenFlagRecord => ({
   categoryIds: session.categoryIds,
   dataLine: record.raw,
+  description: 'Caution period end',
   eventId: createEventId(`mr-scats:${meetingCode}:event`),
   flagType: 'green',
   flagValue: 'course',
@@ -1977,6 +2263,7 @@ const createSessionYellowFlag = (
 ): YellowFlagRecord => ({
   categoryIds: session.categoryIds,
   dataLine: record.raw,
+  description: 'Caution Period Start',
   eventId: createEventId(`mr-scats:${meetingCode}:event`),
   flagType: 'yellow',
   flagValue: 'caution',
@@ -2160,7 +2447,7 @@ const buildSessionRecords = async (
       .flatMap((rawFile) => rawFile.records)
       .find((record) => record.specialType === 'start-of-race' && record.timeText !== undefined);
     const programmeStartTime = new Date(session.scheduledStart);
-    const scheduledStartTime = rawStartRecord?.timeText
+    const rawScheduledStartTime = rawStartRecord?.timeText
       ? parseRawTimeOfDay(rawStartRecord.timeText, new Date(session.scheduledStart))
       : programmeStartTime;
     const sessionFileTables: SessionFileTable[] = [];
@@ -2187,9 +2474,12 @@ const buildSessionRecords = async (
         }
       }
     }
-    const sessionElapsedZeroTime = programmeStartTime;
-    const greenFlagTime = programmeStartTime;
-    const timeAlignedSessionFileTables = sessionFileTables;
+    const dbfNo1Alignment = deriveDbfNo1SessionAlignment(sessionFileTables, programmeStartTime);
+    const dbfStartAlignment = dbfNo1Alignment ?? deriveDbfEventStartSessionAlignment(sessionFileTables, rawScheduledStartTime);
+    const scheduledStartTime = dbfStartAlignment?.greenFlagTime ?? rawScheduledStartTime;
+    const sessionElapsedZeroTime = dbfStartAlignment?.sessionElapsedZeroTime ?? programmeStartTime;
+    const greenFlagTime = dbfStartAlignment?.greenFlagTime ?? programmeStartTime;
+    const timeAlignedSessionFileTables = applyDbfTimeOffset(sessionFileTables, dbfNo1Alignment?.dbfTimeOffsetMilliseconds);
     const matchedRawRecordKeys = new Set<string>();
     const mergedSessionFileTables = mergeRawCrossingDataIntoSessionTables(
       timeAlignedSessionFileTables,
@@ -2224,6 +2514,24 @@ const buildSessionRecords = async (
         );
       })
       .filter((record): record is EventTimeRecord => record !== undefined));
+    const dbfFlagRecords = mergedSessionFileTables.flatMap((table) => table.records
+      .map((record, rowIndex) => {
+        const source = createMrScatsFileSource(meetingCode, session, table.fileName);
+        addTimeRecordSource(timeRecordSourcesById, source);
+        return createDbfFlagRecord(
+          meetingCode,
+          session,
+          source.id,
+          table.fileName,
+          record,
+          rowIndex,
+          scheduledStartTime,
+          sessionElapsedZeroTime,
+          rowIndex + 2,
+          table.timeOffsetMilliseconds
+        );
+      })
+      .filter((record): record is FlagRecord => record !== undefined));
     const rawCrossingRecords: EventTimeRecord[] = [];
     const rawFlagRecords: EventTimeRecord[] = [];
     for (const [fileIndex, rawFile] of parsedRawFiles.entries()) {
@@ -2262,7 +2570,7 @@ const buildSessionRecords = async (
         ))
         .filter((record): record is EventTimeRecord => record !== undefined));
     }
-    const crossingRecords = mergeDuplicateCrossingRecords([...dbfCrossingRecords, ...rawFlagRecords, ...rawCrossingRecords])
+    const crossingRecords = mergeDuplicateCrossingRecords([...dbfCrossingRecords, ...dbfFlagRecords, ...rawFlagRecords, ...rawCrossingRecords])
       .sort((left, right) => {
         const leftTime = left.time?.getTime() || 0;
         const rightTime = right.time?.getTime() || 0;

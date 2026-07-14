@@ -12,6 +12,7 @@ const sourceTypeOptions: DataSourceType[] = [
   'timing-mylaps-decoder',
   'timing-dorian-data1-supernode',
   'file-rfid-timing-csv',
+  'file-dorian-ctc-srt',
   'file-mr-scats-data',
   'file-apical-data-file',
   'file-racesweet-ledger',

@@ -33,6 +33,7 @@ interface TimingContextProps {
   onSelectEvent: (eventId: EventId) => void;
   onSelectSession: (sessionId: SessionId) => void;
   onTimeDisplayZoneModeChange: (mode: TimeDisplayZoneMode) => void;
+  onUpdateSourceOffset?: (sourceId: string, previousTime: Date, nextTime: Date) => void;
   participantSelected: (participantId: Set<EventParticipantId>) => void;
   raceState: TimingRaceState;
   selectedCategories: Set<EventCategoryId>;
@@ -158,6 +159,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
         timeDisplayZoneMode={props.timeDisplayZoneMode}
         onAssignFlagCategory={props.onAssignFlagCategory}
         onTimeDisplayZoneModeChange={props.onTimeDisplayZoneModeChange}
+        onUpdateSourceOffset={props.onUpdateSourceOffset}
         participantSelected={props.participantSelected}
         onExclude={props.onExclude}
         onChangeCategory={props.onChangeCategory}

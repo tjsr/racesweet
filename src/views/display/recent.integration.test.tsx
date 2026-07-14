@@ -113,6 +113,7 @@ const getDisplayedRecordIds = (container: HTMLElement): Array<string | null> => 
 const getRecentRecordsFilterSelect = (): Element | undefined => {
   return Array.from(document.querySelectorAll('[role="combobox"]')).find((element) => {
     return element.textContent?.includes('All records') ||
+      element.textContent?.includes('Only flags') ||
       element.textContent?.includes('Only selected category') ||
       element.textContent?.includes('Only selected team') ||
       element.textContent?.includes('Only selected rider');
@@ -1795,6 +1796,16 @@ describe('RecentRecords integration', () => {
       source: 'test-source',
       time: new Date(`2026-05-29T10:0${index + 1}:00.000Z`),
     }) as ParticipantPassingRecord);
+    const flagRecord: FlagRecord = {
+      categoryIds: [categoryC.id],
+      flagType: 'yellow',
+      flagValue: 'caution',
+      id: 'flag-only',
+      recordType: 4,
+      sequence: 5,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:05:00.000Z'),
+    };
     const participants = new Map<EventParticipant['id'], EventParticipant>([
       [teamMemberOne.id, teamMemberOne],
       [teamMemberTwo.id, teamMemberTwo],
@@ -1820,14 +1831,20 @@ describe('RecentRecords integration', () => {
       root.render(
         <RecentRecords
           raceStateLookup={raceStateLookup}
-          records={crossings}
+          records={[...crossings, flagRecord]}
           selectedCategories={new Set([categoryA.id])}
           selectedParticipants={new Set([teamMemberOne.id])}
         />
       );
     });
 
-    const allRecordIds = ['2001', '2002', '2003', '2004'];
+    const allRecordIds = ['2001', '2002', '2003', '2004', 'flag-only'];
+    expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
+
+    await selectRecentRecordsFilter('Only flags');
+    expect(getDisplayedRecordIds(container)).toEqual(['flag-only']);
+
+    await selectRecentRecordsFilter('All records');
     expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
 
     await selectRecentRecordsFilter('Only selected category');
@@ -3233,6 +3250,95 @@ describe('RecentRecords integration', () => {
     expect(flagRow?.textContent).toContain('Chequered flag');
   });
 
+  it('renders MR-SCATS caution boundaries and highlights crossing timing cells during caution', async () => {
+    const categoryA: EventCategory = { id: '1', name: 'Category A' };
+    const participant: EventParticipant = {
+      categoryId: categoryA.id,
+      currentResult: undefined,
+      entrantId: '101',
+      firstname: 'Pat',
+      id: '101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Driver',
+    };
+    const createCrossing = (id: string, sequence: number, time: string): ParticipantPassingRecord => ({
+      chipCode: 100101,
+      id,
+      isValid: true,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence,
+      source: 'test-source',
+      time: new Date(time),
+    } as ParticipantPassingRecord);
+    const crossingBefore = createCrossing('crossing-before', 1, '2026-05-29T10:05:00.000Z');
+    const cautionStart: FlagRecord = {
+      categoryIds: [categoryA.id],
+      description: 'Caution Period Start',
+      flagType: 'yellow',
+      flagValue: 'caution',
+      id: 'caution-start',
+      recordType: 4,
+      sequence: 2,
+      source: 'test-source',
+      systemGenerated: true,
+      time: new Date('2026-05-29T10:06:00.000Z'),
+    };
+    const crossingDuring = createCrossing('crossing-during', 3, '2026-05-29T10:07:00.000Z');
+    const cautionEnd: FlagRecord = {
+      categoryIds: [categoryA.id],
+      description: 'Caution period end',
+      flagType: 'green',
+      flagValue: 'course',
+      id: 'caution-end',
+      indicatesRaceStart: false,
+      recordType: 4,
+      sequence: 4,
+      source: 'test-source',
+      systemGenerated: true,
+      time: new Date('2026-05-29T10:08:00.000Z'),
+    } as FlagRecord;
+    const crossingAfter = createCrossing('crossing-after', 5, '2026-05-29T10:09:00.000Z');
+    const categories = [categoryA];
+    const participants = new Map([[participant.id, participant]]);
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories,
+      countTransponderCrossings: () => 3,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categories.find((category) => category.id === categoryId),
+      getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
+      getParticipantById: (participantId) => participants.get(participantId),
+      getParticipantLaps: () => [crossingBefore, crossingDuring, crossingAfter],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[crossingBefore, cautionStart, crossingDuring, cautionEnd, crossingAfter]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    expect(container.querySelector('tr[data-record-id="caution-start"]')?.textContent).toContain('Caution Period Start');
+    expect(container.querySelector('tr[data-record-id="caution-end"]')?.textContent).toContain('Caution period end');
+    const duringCells = Array.from(container.querySelectorAll('tr[data-record-id="crossing-during"] td'));
+    expect(duringCells.slice(0, 4).every((cell) => cell.classList.contains('caution-period-cell'))).toBe(true);
+    expect(duringCells.slice(4).some((cell) => cell.classList.contains('caution-period-cell'))).toBe(false);
+    const beforeCells = Array.from(container.querySelectorAll('tr[data-record-id="crossing-before"] td'));
+    const afterCells = Array.from(container.querySelectorAll('tr[data-record-id="crossing-after"] td'));
+    expect(beforeCells.some((cell) => cell.classList.contains('caution-period-cell'))).toBe(false);
+    expect(afterCells.some((cell) => cell.classList.contains('caution-period-cell'))).toBe(false);
+  });
+
   it('renders plate-only crossings in the Number column and resolves entrants by racePlate', async () => {
     const categoryA: EventCategory = { id: '1', name: 'Category A' };
     const participant: EventParticipant = {
@@ -3961,7 +4067,7 @@ describe('RecentRecords integration', () => {
     expect((document.querySelector('input[aria-label="Record date"]') as HTMLInputElement).value).toBe('2026-05-29');
   });
 
-  it('shows original T9743R10 SRT, NO1, and DBF filenames in the edit-record source file field', async () => {
+  it('shows original T9743R10 DBF filename in the edit-record source file field after NO1 metadata merges', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-recent-'));
     await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
       { length: 8, name: 'EV_CODE', type: 'C' },
@@ -3980,7 +4086,7 @@ describe('RecentRecords integration', () => {
     ], [
       { CARNUMBER: 13, DRIVER: 'Race Ten Driver', DRIV_CLASS: 'CAT-A', TXNUM: 1234 },
     ]));
-    await writeFile(path.join(tempDir, 'T9743R10.SRT'), '040000000010000012340302064000\r');
+    await writeFile(path.join(tempDir, 'T9743R10.SRT'), '12348814387450006 071 20:27:45.0006 00\r');
     await writeFile(path.join(tempDir, 'T9743R10.NO1'), createDbfBuffer([
       { length: 4, name: 'CAR', type: 'N' },
       { length: 4, name: 'TXNUM', type: 'N' },
@@ -4024,9 +4130,9 @@ describe('RecentRecords integration', () => {
       );
     });
 
-    for (const expectedFileName of ['T9743R10.SRT', 'T9743R10.NO1', 'T9743R10.DBF']) {
+    for (const expectedFileName of ['T9743R10.DBF']) {
       const record = crossingBySourceFile.get(expectedFileName);
-      expect(record).toBeDefined();
+      expect(record, expectedFileName).toBeDefined();
       const row = container.querySelector(`tr[data-record-id="${record!.id}"]`);
       expect(row).not.toBeNull();
 

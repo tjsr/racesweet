@@ -21,6 +21,7 @@ interface SystemPageProps {
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onLoadMrScatsEvent?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
+  onLoadDorianCtcSrtFile?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onReprocessApicalData: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onPreviewMrScatsDataFile?: (sourceId: TimeRecordSourceId, file: MrScatsDataFileSummary) => Promise<MrScatsDataFilePreview>;
   onSaveFastestTimeIndicatorColors?: (changes: Partial<SystemConfiguration['fastestTimeIndicatorColors']>) => void | Promise<void>;
@@ -29,6 +30,7 @@ interface SystemPageProps {
   onSelectMrScatsDataArchive?: () => Promise<MrScatsDataFileInventory | undefined>;
   onSelectMrScatsDataDirectory?: () => Promise<MrScatsDataFileInventory | undefined>;
   onSelectLocalFile?: () => Promise<string | undefined>;
+  onSelectDorianCtcSrtFile?: () => Promise<string | undefined>;
 }
 
 export const SystemPage = (props: SystemPageProps): React.ReactElement => {
@@ -58,6 +60,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         onFetchApicalDataNow={props.onFetchApicalDataNow}
         onLoadApicalEvents={props.onLoadApicalEvents}
         onLoadMrScatsEvent={props.onLoadMrScatsEvent}
+        onLoadDorianCtcSrtFile={props.onLoadDorianCtcSrtFile}
         onOpenLocalFile={props.onOpenLocalFile}
         onPreviewMrScatsDataFile={props.onPreviewMrScatsDataFile}
         onReprocessApicalData={props.onReprocessApicalData}
@@ -65,6 +68,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         onSelectMrScatsDataArchive={props.onSelectMrScatsDataArchive}
         onSelectMrScatsDataDirectory={props.onSelectMrScatsDataDirectory}
         onSelectLocalFile={props.onSelectLocalFile}
+        onSelectDorianCtcSrtFile={props.onSelectDorianCtcSrtFile}
       />
 
       <LogPanel displayedErrorLog={props.displayedErrorLog} />

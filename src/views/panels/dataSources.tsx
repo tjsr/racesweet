@@ -16,6 +16,7 @@ interface DataSourcesPanelProps {
   onFetchApicalDataNow: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onLoadMrScatsEvent?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
+  onLoadDorianCtcSrtFile?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
   onPreviewMrScatsDataFile?: (sourceId: TimeRecordSourceId, file: MrScatsDataFileSummary) => Promise<MrScatsDataFilePreview>;
   onReprocessApicalData: (sourceId: TimeRecordSourceId) => void | Promise<void>;
@@ -23,6 +24,7 @@ interface DataSourcesPanelProps {
   onSelectMrScatsDataArchive?: () => Promise<MrScatsDataFileInventory | undefined>;
   onSelectMrScatsDataDirectory?: () => Promise<MrScatsDataFileInventory | undefined>;
   onSelectLocalFile?: () => Promise<string | undefined>;
+  onSelectDorianCtcSrtFile?: () => Promise<string | undefined>;
 }
 
 interface SourceFetchError {
@@ -175,6 +177,24 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
     });
   };
 
+  const handleSelectDorianCtcSrtFile = async (source: DataSourceConfig): Promise<void> => {
+    if (!props.onSelectDorianCtcSrtFile) {
+      return;
+    }
+
+    const filePath = await props.onSelectDorianCtcSrtFile();
+    if (!filePath) {
+      return;
+    }
+
+    await props.onSaveSource(source.id, {
+      fileConfig: {
+        ...source.fileConfig,
+        filePath,
+      },
+    });
+  };
+
   return (
     <section className="events-panel">
       <h2>Configured Data Sources</h2>
@@ -228,6 +248,7 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
               const isMasterEntrants = source.type === 'master-entrant-profiles';
               const isMrScatsData = source.type === 'file-mr-scats-data';
               const isRfidTimingCsv = source.type === 'file-rfid-timing-csv';
+              const isDorianCtcSrt = source.type === 'file-dorian-ctc-srt';
               const masterProfilesJson = JSON.stringify(source.masterEntrantConfig?.profiles || [], null, 2);
               const sourceFetchError = sourceFetchErrors[source.id];
 
@@ -278,6 +299,33 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                       <div className="events-actions">
                         <button type="button" onClick={() => handleSelectRfidCsvFile(source)}>
                           Edit File
+                        </button>
+                      </div>
+                    </>
+                  ) : isDorianCtcSrt ? (
+                    <>
+                      <h4>Dorian CTC SRT / ERF File</h4>
+                      <p>Imports raw crossing times and transponder metadata into one event session without creating competitors.</p>
+                      <label>
+                        File Path
+                        <input
+                          aria-label={`Dorian CTC SRT / ERF File Path ${source.id}`}
+                          readOnly
+                          type="text"
+                          value={source.fileConfig?.filePath || ''}
+                          placeholder="No file selected"
+                        />
+                      </label>
+                      <div className="events-actions">
+                        <button type="button" onClick={() => handleSelectDorianCtcSrtFile(source)}>
+                          Edit File
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!source.fileConfig?.filePath}
+                          onClick={() => props.onLoadDorianCtcSrtFile?.(source.id)}
+                        >
+                          Import CTC File
                         </button>
                       </div>
                     </>

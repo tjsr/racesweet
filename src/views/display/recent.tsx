@@ -1,4 +1,5 @@
 import { Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip } from '@mui/material';
+import { TZDate } from '@date-fns/tz';
 import React, { type JSX } from 'react';
 import { DEFAULT_FASTEST_TIME_INDICATOR_COLORS, type FastestTimeIndicatorColors } from '../../app/systemConfig.ts';
 import type { MillisecondsDuration, TimeDisplayZoneMode } from '../../app/utils/timeutils.ts';
@@ -37,7 +38,7 @@ import {
 import { InvalidCategoryIdError, NoCrossingError, NoParticipantError, ParticipantNotFoundError } from '../../validators/errors.ts';
 import "./recent.css";
 
-type RecentRecordsFilterMode = 'all' | 'category' | 'participant' | 'team';
+type RecentRecordsFilterMode = 'all' | 'category' | 'flags' | 'participant' | 'team';
 type RecentRecordsIgnoreMode = 'outsideEventWindow' | 'sectorLoops' | 'unrecognised';
 
 interface LapTimeIndicators {
@@ -72,6 +73,13 @@ interface VirtualRecordRowWindow {
   paddingTop: number;
   rows: VirtualRecordRow[];
   start: number;
+}
+
+interface EditableSourceOffset {
+  initialTime: Date;
+  sourceId: string;
+  sourceName: string;
+  timeZone: string;
 }
 
 const ignoreModeLabels: Record<RecentRecordsIgnoreMode, string> = {
@@ -446,6 +454,102 @@ const getRecordSourceLocation = (record: EventTimeRecord): string => {
     : '';
 };
 
+const getEditableSourceOffsets = (
+  records: EventTimeRecord[],
+  raceStateLookup: RaceStateLookup,
+  eventTimeZone: string | undefined
+): EditableSourceOffset[] => {
+  const firstRecordBySource = new Map<string, EventTimeRecord>();
+  records.forEach((record) => {
+    if (!record.time || firstRecordBySource.has(record.source.toString())) {
+      return;
+    }
+    firstRecordBySource.set(record.source.toString(), record);
+  });
+
+  return Array.from(firstRecordBySource.entries()).map(([sourceId, record]) => {
+    const source = raceStateLookup.getTimeRecordSourceById?.(record.source);
+    return {
+      initialTime: record.time!,
+      sourceId,
+      sourceName: source?.name || sourceId,
+      timeZone: source?.timezone || eventTimeZone || 'UTC',
+    };
+  }).sort((left, right) => left.sourceName.localeCompare(right.sourceName));
+};
+
+const SourceOffsetsDialog = ({
+  offsets,
+  onClose,
+  onUpdateOffset,
+  open,
+}: {
+  offsets: EditableSourceOffset[];
+  onClose: () => void;
+  onUpdateOffset?: (sourceId: string, previousTime: Date, nextTime: Date) => void;
+  open: boolean;
+}): JSX.Element => {
+  const [offsetTimes, setOffsetTimes] = React.useState<Map<string, Date>>(new Map());
+
+  React.useEffect(() => {
+    setOffsetTimes(new Map(offsets.map((offset) => [offset.sourceId, offset.initialTime])));
+  }, [offsets, open]);
+  const updateOffset = (sourceId: string, currentTime: Date, nextTime: Date | undefined): void => {
+    if (!nextTime || nextTime.getTime() === currentTime.getTime()) {
+      return;
+    }
+    setOffsetTimes((current) => new Map(current).set(sourceId, nextTime));
+    onUpdateOffset?.(sourceId, currentTime, nextTime);
+  };
+
+  return (
+    <Dialog fullWidth maxWidth="md" onClose={onClose} open={open}>
+      <DialogTitle>Edit offsets</DialogTitle>
+      <DialogContent>
+        {offsets.length === 0 ? <p>No data sources with time-of-day records are available.</p> : offsets.map((offset) => {
+          const currentTime = offsetTimes.get(offset.sourceId) || offset.initialTime;
+          return (
+            <Box key={offset.sourceId} sx={{ alignItems: 'center', display: 'flex', gap: 2, mt: 2 }}>
+              <span>{offset.sourceName}</span>
+              <TextField
+                label="Date"
+                slotProps={{ inputLabel: { shrink: true } }}
+                type="date"
+                value={dateStringInTimeZone(currentTime, offset.timeZone)}
+                onChange={(event) => {
+                  const dateParts = event.target.value.split('-').map((part) => Number(part));
+                  const timeParts = timeOfDayInputStringInTimeZone(currentTime, offset.timeZone).match(/^(\d{2}):(\d{2}):(\d{2})\.(\d{3})$/u);
+                  if (dateParts.length !== 3 || dateParts.some((part) => !Number.isInteger(part)) || !timeParts) {
+                    return;
+                  }
+                  const [year, month, day] = dateParts;
+                  const [, hour, minute, second, millisecond] = timeParts;
+                  updateOffset(offset.sourceId, currentTime, new Date(new TZDate(
+                    year!, month! - 1, day!, Number(hour), Number(minute), Number(second), Number(millisecond), offset.timeZone
+                  ).getTime()));
+                }}
+              />
+              <TextField
+                label="Time"
+                slotProps={{ inputLabel: { shrink: true } }}
+                type="time"
+                value={timeOfDayInputStringInTimeZone(currentTime, offset.timeZone)}
+                onChange={(event) => updateOffset(
+                  offset.sourceId,
+                  currentTime,
+                  parseTimeOfDayInputInTimeZone(currentTime, event.target.value, offset.timeZone)
+                )}
+              />
+              <span>{offset.timeZone}</span>
+            </Box>
+          );
+        })}
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
+    </Dialog>
+  );
+};
+
 const getRecordSourceTooltip = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): string => {
   const sourceName = getRecordSourceName(record, raceStateLookup);
   const sourceFile = getEditablePassingSourceFile(record, raceStateLookup);
@@ -523,6 +627,7 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   onSelectRecord?: (recordId: TimeRecordId | undefined) => void;
   onSelectUnrecognisedPlateNumber?: (plateNumber: string | undefined) => void;
   sectorTimesByRecordId?: Map<TimeRecordId, number>;
+  cautionRecordIds?: Set<string>;
   selectedCategoryKey?: string;
   selectedParticipantKey?: string;
   timeZone?: string;
@@ -547,7 +652,7 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
 
   const normalizedFlagType = (record.flagType || 'flag').toLowerCase();
   const prettyType = normalizedFlagType.charAt(0).toUpperCase() + normalizedFlagType.slice(1);
-  const flagText = `${prettyType} flag`;
+  const flagText = record.description || `${prettyType} flag`;
   let flagClass = `flag ${normalizedFlagType}`;
   
   if (record.categoryIds?.some((id: EventCategoryId) => props.selectedCategories?.has(id))) {
@@ -737,8 +842,9 @@ interface _CompletedLapProps {
 }
 
 const UnknownChipRow = (
-  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae, onOpenAddRecordDialog, onOpenEditRecordDialog, onSelectRecord, onSelectUnrecognisedPlateNumber, plateNumber, record, selectedPlateNumber, selectedRecordId, showSectorColumn, timeZone }: {
+  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae, cautionRecordIds, onOpenAddRecordDialog, onOpenEditRecordDialog, onSelectRecord, onSelectUnrecognisedPlateNumber, plateNumber, record, selectedPlateNumber, selectedRecordId, showSectorColumn, timeZone }: {
     antennae: string
+    cautionRecordIds?: Set<string>,
     onOpenAddRecordDialog?: (record: EventTimeRecord) => void,
     onOpenEditRecordDialog?: (record: EventTimeRecord) => void,
     onSelectRecord?: (recordId: TimeRecordId | undefined) => void,
@@ -767,6 +873,7 @@ const UnknownChipRow = (
     : `Unknown transponder ${identifier} (${txCount})`;
   const timeString = tableDateTimeStringInTimeZone(passingTime, timeZone);
   const isSelectedPlate = plateNumber !== undefined && plateNumber.length > 0 && plateNumber === selectedPlateNumber;
+  const cautionCellClassName = cautionRecordIds?.has(timeRecordId.toString()) ? 'caution-period-cell' : undefined;
   const rowClassName = [
     timeRecordId === selectedRecordId ? 'selected-row' : '',
     isSelectedPlate ? 'selected-plate-number' : '',
@@ -810,10 +917,10 @@ const UnknownChipRow = (
         style={{ cursor: 'context-menu' }}
         title={formatRecordIdTitle(timeRecordId)}
       >
-        <TableCell>{sequenceNumber}</TableCell>
-        <TableCell>{antennae}</TableCell>
-        <TableCell>{txNo ?? ''}</TableCell>
-        <TableCell>{timeString}</TableCell>
+        <TableCell className={cautionCellClassName}>{sequenceNumber}</TableCell>
+        <TableCell className={cautionCellClassName}>{antennae}</TableCell>
+        <TableCell className={cautionCellClassName}>{txNo ?? ''}</TableCell>
+        <TableCell className={cautionCellClassName}>{timeString}</TableCell>
         <TableCell>{plateNumber || ''}</TableCell>
         <TableCell colSpan={showSectorColumn ? 7 : 6}>{content}</TableCell>
       </TableRow>
@@ -842,6 +949,7 @@ interface PassingRecordRowProps {
   lapTimeIndicators?: LapTimeIndicators;
   passing: ParticipantPassingRecord;
   raceStateLookup: RaceStateLookup;
+  cautionRecordIds?: Set<string>;
   resolvedParticipant?: EventParticipant;
   selectedCategories: Set<EventCategoryId> | undefined;
   selectedPlateNumber?: string;
@@ -1015,6 +1123,10 @@ export const PassingRecordRow = (
     props.lapTimeIndicators?.entrantFastest ? 'entrantFastest' : '',
     props.lapTimeIndicators?.overallFastest ? 'overallFastest' : '',
   ].filter((classItem) => classItem.length > 0).join(' ');
+  const cautionCellClasses = [
+    cellClasses,
+    props.cautionRecordIds?.has(passing.id.toString()) ? 'caution-period-cell' : '',
+  ].filter((classItem) => classItem.length > 0).join(' ');
   const unrelatedReason = getCrossingUnrelatedReason(passing);
 
   return (
@@ -1027,10 +1139,10 @@ export const PassingRecordRow = (
         style={{ cursor: 'context-menu' }}
         title={formatRecordIdTitle(passing.id)}
         onClick={handleSelect}>
-        <TableCell className={cellClasses}>{passing.sequence}</TableCell>
-        <TableCell className={cellClasses} title={sourceTooltip}>{timingPoint}</TableCell>
-        <TableCell className={cellClasses}>{identifier}</TableCell>
-        <TableCell className={cellClasses}>{timeString}</TableCell>
+        <TableCell className={cautionCellClasses}>{passing.sequence}</TableCell>
+        <TableCell className={cautionCellClasses} title={sourceTooltip}>{timingPoint}</TableCell>
+        <TableCell className={cautionCellClasses}>{identifier}</TableCell>
+        <TableCell className={cautionCellClasses}>{timeString}</TableCell>
         <TableCell className={cellClasses}>{plateNumber || normalizedRecordPlateNumber || '?'}</TableCell>
         <TableCell className={cellClasses}>{entrantName}</TableCell>
         <TableCell className={cellClasses}>{categoryStr || ''}</TableCell>
@@ -1157,6 +1269,7 @@ const RecordRowComponent = (props: RecentRecordRowProps) => {
     };
 
     return <PassingRecordRow
+      cautionRecordIds={props.cautionRecordIds}
       lapTimeIndicators={props.lapTimeIndicators}
       raceStateLookup={props.raceStateLookup}
       passing={passing}
@@ -1199,6 +1312,7 @@ const RecordRowComponent = (props: RecentRecordRowProps) => {
     selectedPlateNumber={props.selectedPlateNumber}
     selectedRecordId={props.selectedRecordId}
     showSectorColumn={props.showSectorColumn}
+    cautionRecordIds={props.cautionRecordIds}
     txNo={txNo}
     identifier={identifier}
     rs={props.raceStateLookup}
@@ -1253,6 +1367,7 @@ const recordRowPropsAreEqual = (previousProps: RecentRecordRowProps, nextProps: 
     previousProps.onRemoveFlagCategory === nextProps.onRemoveFlagCategory &&
     previousProps.onSelectRecord === nextProps.onSelectRecord &&
     previousProps.onSelectUnrecognisedPlateNumber === nextProps.onSelectUnrecognisedPlateNumber &&
+    previousProps.cautionRecordIds === nextProps.cautionRecordIds &&
     previousProps.sectorTimesByRecordId === nextProps.sectorTimesByRecordId &&
     previousProps.showSectorColumn === nextProps.showSectorColumn &&
     previousProps.timeZone === nextProps.timeZone;
@@ -1352,13 +1467,59 @@ const isStartFlag = (flag: FlagRecord): boolean => {
   return normalizedFlagType === 'green' && (flag as FlagRecord & { indicatesRaceStart?: boolean }).indicatesRaceStart !== false;
 };
 
+const isCautionStartFlag = (flag: FlagRecord): boolean => {
+  const normalizedFlagType = flag.flagType?.toLowerCase();
+  return normalizedFlagType === 'yellow' && flag.flagValue?.toLowerCase() === 'caution';
+};
+
+const isCautionEndFlag = (flag: FlagRecord): boolean => {
+  const normalizedFlagType = flag.flagType?.toLowerCase();
+  return normalizedFlagType === 'green' && (flag as FlagRecord & { indicatesRaceStart?: boolean }).indicatesRaceStart === false;
+};
+
+const isCautionBoundaryFlag = (flag: FlagRecord): boolean => isCautionStartFlag(flag) || isCautionEndFlag(flag);
+
+const isWhiteFlag = (flag: FlagRecord): boolean => flag.flagType?.toLowerCase() === 'white';
+
 const isSystemGeneratedFlag = (record: EventTimeRecord): boolean => {
-  return isFlagRecord(record) && record.systemGenerated === true && !isStartFlag(record);
+  return isFlagRecord(record) &&
+    record.systemGenerated === true &&
+    !isStartFlag(record) &&
+    !isCautionBoundaryFlag(record) &&
+    !isFinishFlag(record) &&
+    !isWhiteFlag(record);
 };
 
 const isFinishFlag = (flag: FlagRecord): boolean => {
   const normalizedFlagType = flag.flagType?.toLowerCase();
   return normalizedFlagType === 'chequered' || normalizedFlagType === 'finish' || (flag.recordType & EVENT_SESSION_END) > 0;
+};
+
+const buildCautionRecordIds = (records: EventTimeRecord[]): Set<string> => {
+  const cautionRecordIds = new Set<string>();
+  let isCautionPeriodActive = false;
+
+  records
+    .map((record, index) => ({ index, record }))
+    .sort(compareRecordsByTimeAndInputOrder)
+    .forEach(({ record }) => {
+      if (isFlagRecord(record)) {
+        if (isCautionStartFlag(record)) {
+          isCautionPeriodActive = true;
+          return;
+        }
+        if (isCautionEndFlag(record)) {
+          isCautionPeriodActive = false;
+        }
+        return;
+      }
+
+      if (isCautionPeriodActive && isCrossingRecord(record)) {
+        cautionRecordIds.add(record.id.toString());
+      }
+    });
+
+  return cautionRecordIds;
 };
 
 const compareRecordsByTimeAndInputOrder = (
@@ -1994,9 +2155,11 @@ export const RecentRecords = (props: RecordsProps & {
   onExclude?: (crossingId: TimeRecordId, exclude: boolean) => void,
   onChangeCategory?: (participantId: EventParticipantId, categoryId: EventCategoryId) => void,
   onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void,
-  onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void
+  onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void,
+  onUpdateSourceOffset?: (sourceId: string, previousTime: Date, nextTime: Date) => void
 }) => {
   const [addRecordDialogState, setAddRecordDialogState] = React.useState<AddRecordDialogState | null>(null);
+  const [offsetsDialogOpen, setOffsetsDialogOpen] = React.useState<boolean>(false);
   const [recentFirst, setRecentFirst] = React.useState<boolean>(false);
   const [filterMode, setFilterMode] = React.useState<RecentRecordsFilterMode>('all');
   const [ignoreModes, setIgnoreModes] = React.useState<RecentRecordsIgnoreMode[]>([]);
@@ -2013,8 +2176,12 @@ export const RecentRecords = (props: RecordsProps & {
     left: 0,
     width: 0,
   });
+  const [isAtTop, setIsAtTop] = React.useState<boolean>(true);
   const timeDisplayZoneMode = props.timeDisplayZoneMode || 'event';
   const displayTimeZone = resolveDisplayTimeZone(timeDisplayZoneMode, props.eventTimeZone);
+  const editableSourceOffsets = React.useMemo(() => {
+    return getEditableSourceOffsets(props.records || [], props.raceStateLookup, props.eventTimeZone);
+  }, [props.eventTimeZone, props.raceStateLookup, props.records]);
   const emptySelectedCategories = React.useMemo(() => new Set<EventCategoryId>(), []);
   const selectedCategories = props.selectedCategories || emptySelectedCategories;
   const selectedCategoryKey = React.useMemo(() => buildSelectionKey(selectedCategories), [selectedCategories]);
@@ -2141,6 +2308,9 @@ export const RecentRecords = (props: RecordsProps & {
       if (filterMode === 'all') {
         return true;
       }
+      if (filterMode === 'flags') {
+        return isFlagRecord(record);
+      }
       if (filterMode === 'category') {
         return recordMatchesSelectedCategory(record, props.raceStateLookup, selectedCategories);
       }
@@ -2176,6 +2346,9 @@ export const RecentRecords = (props: RecordsProps & {
       return leftTime - rightTime;
     });
   }, [filteredRecords, recentFirst]);
+  const cautionRecordIds = React.useMemo(() => {
+    return buildCautionRecordIds(filteredRecords);
+  }, [filteredRecords]);
   const lapTimeIndicators = React.useMemo(() => {
     return buildLapTimeIndicatorMap(filteredRecords, props.raceStateLookup, props.sessionKind);
   }, [filteredRecords, props.raceStateLookup, props.sessionKind]);
@@ -2256,6 +2429,36 @@ export const RecentRecords = (props: RecordsProps & {
       window.removeEventListener('resize', handleVisibleRowRangeChange);
     };
   }, [updateVisibleRowRange]);
+  React.useEffect(() => {
+    const updateScrollPosition = (): void => {
+      const container = tableContainerRef.current;
+      const scrollTop = isElementVerticallyScrollable(container || document.documentElement)
+        ? (container?.scrollTop || 0)
+        : window.scrollY;
+      setIsAtTop(scrollTop <= 1);
+    };
+
+    updateScrollPosition();
+    window.addEventListener('scroll', updateScrollPosition, true);
+    return () => window.removeEventListener('scroll', updateScrollPosition, true);
+  }, []);
+  const handleJumpToBoundary = React.useCallback((): void => {
+    const container = tableContainerRef.current;
+    const target = container && isElementVerticallyScrollable(container) ? container : undefined;
+    if (isAtTop) {
+      if (target) {
+        target.scrollTo({ behavior: 'smooth', top: target.scrollHeight });
+      } else {
+        window.scrollTo({ behavior: 'smooth', top: document.documentElement.scrollHeight });
+      }
+      return;
+    }
+    if (target) {
+      target.scrollTo({ behavior: 'smooth', top: 0 });
+    } else {
+      window.scrollTo({ behavior: 'smooth', top: 0 });
+    }
+  }, [isAtTop]);
   const openAddRecordDialog = React.useCallback((record: EventTimeRecord): void => {
     setAddRecordDialogState({ anchorRecord: record, mode: 'add' });
   }, []);
@@ -2284,6 +2487,12 @@ export const RecentRecords = (props: RecordsProps & {
   }, []);
 
   return <>
+    <SourceOffsetsDialog
+      offsets={editableSourceOffsets}
+      onClose={() => setOffsetsDialogOpen(false)}
+      onUpdateOffset={props.onUpdateSourceOffset}
+      open={offsetsDialogOpen}
+    />
     <AddRecordDialog
       currentEventId={props.currentEventId}
       currentSessionId={props.currentSessionId}
@@ -2351,6 +2560,7 @@ export const RecentRecords = (props: RecordsProps & {
             onChange={(event) => setFilterMode(event.target.value as RecentRecordsFilterMode)}
             label="Record types">
             <MenuItem value="all">All records</MenuItem>
+            <MenuItem value="flags">Only flags</MenuItem>
             <MenuItem value="category">Only selected category</MenuItem>
             <MenuItem value="team">Only selected team</MenuItem>
             <MenuItem value="participant">Only selected rider</MenuItem>
@@ -2421,6 +2631,8 @@ export const RecentRecords = (props: RecordsProps & {
             <MenuItem value="recent">Recent first</MenuItem>
           </Select>
         </FormControl>
+        <Button onClick={() => setOffsetsDialogOpen(true)} variant="outlined">Edit offsets</Button>
+        <Button onClick={handleJumpToBoundary} variant="outlined">{isAtTop ? 'To last' : 'Back to top'}</Button>
       </div>
     </div>
     { warnings?.length > 0 && <Warnings warnings={warnings} />}
@@ -2470,6 +2682,7 @@ export const RecentRecords = (props: RecordsProps & {
                       onRemoveFlagCategory={props.onRemoveFlagCategory}
                       onSelectRecord={handleSelectRecord}
                       onSelectUnrecognisedPlateNumber={handleSelectUnrecognisedPlateNumber}
+                      cautionRecordIds={cautionRecordIds}
                       sectorTimesByRecordId={sectorTimesByRecordId}
                       showSectorColumn={showSectorColumn}
                       timeZone={displayTimeZone}

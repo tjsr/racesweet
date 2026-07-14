@@ -1,0 +1,49 @@
+{
+  "name": "srt-inspector",
+  "displayName": "SRT Inspector",
+  "description": "Browse and decode CTC/Data-1 SRT and ERF timing records.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:srtInspector.open"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "srtInspector.open",
+        "title": "Open SRT Inspector"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "srtInspector.open",
+          "when": "resourceExtname == .srt || resourceExtname == .erf",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "srtInspector.open",
+          "when": "resourceExtname == .srt || resourceExtname == .erf",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "test": "npm run compile && node --test out/parser.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.3"
+  }
+}

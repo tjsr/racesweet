@@ -67,6 +67,15 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
     };
   }
 
+  if (type === 'file-dorian-ctc-srt') {
+    return {
+      ...base,
+      fileConfig: {},
+      finishLineNumbers: [1],
+      name: 'Dorian CTC SRT / ERF File',
+    };
+  }
+
   if (type === 'file-mr-scats-data') {
     return {
       ...base,

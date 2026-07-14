@@ -3,6 +3,40 @@
   color: #e1e1e1; 
 }
 
+.flag.green {
+  background-color: #27a845;
+  color: #e1e1e1;
+}
+
+.flag.yellow {
+  background-color: #facc15;
+  color: #1f2937;
+  font-weight: 700;
+}
+
+.flag.white {
+  background-color: #ffffff;
+  color: #111827;
+  font-weight: 700;
+}
+
+.flag.chequered {
+  background: repeating-linear-gradient(
+    45deg,
+    #111827,
+    #111827 0.7rem,
+    #ffffff 0.7rem,
+    #ffffff 1.4rem
+  );
+  color: #facc15;
+  font-weight: 700;
+}
+
+.caution-period-cell {
+  background-color: #fef08a;
+  color: #1f2937;
+}
+
 .excluded {
   opacity: 0.5;
   background-color: #a0a0a0;

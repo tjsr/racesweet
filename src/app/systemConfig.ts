@@ -7,6 +7,7 @@ export type DataSourceType =
   | 'timing-mylaps-decoder'
   | 'timing-dorian-data1-supernode'
   | 'file-rfid-timing-csv'
+  | 'file-dorian-ctc-srt'
   | 'file-mr-scats-data'
   | 'file-apical-data-file'
   | 'file-racesweet-ledger'
@@ -224,6 +225,16 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListed
     };
   }
 
+  if (source.type === 'file-dorian-ctc-srt') {
+    return {
+      ...source,
+      fileConfig: {
+        filePath: normalizeOptionalSystemFilePath(source.fileConfig?.filePath),
+      },
+      finishLineNumbers: normalizeFinishLineNumbers(source.finishLineNumbers) || [1],
+    };
+  }
+
   if (source.type === 'timing-dorian-data1-supernode') {
     return {
       ...source,
@@ -306,6 +317,8 @@ export const getDataSourceTypeLabel = (type: DataSourceType): string => {
     return 'Dorian DATA-1 Supernode';
   case 'file-rfid-timing-csv':
     return 'RFID Timing CSV';
+  case 'file-dorian-ctc-srt':
+    return 'Dorian CTC SRT / ERF File';
   case 'file-mr-scats-data':
     return 'MR-SCATS Data';
   case 'file-apical-data-file':

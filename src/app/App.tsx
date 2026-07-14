@@ -12,6 +12,7 @@ import { EventId, SessionId } from '../model/raceevent.ts';
 import { type RaceState, RaceStateLookup, Session } from '../model/racestate.ts';
 import { type EventTimeRecord, type TimeRecordId } from '../model/timerecord.ts';
 import { type MrScatsCatalogImport, type MrScatsCatalogLoadProgress, loadMrScatsCatalogFromLocation } from '../parsers/mrScats/catalogImport.ts';
+import { loadDorianCtcSrtCatalog } from '../parsers/ctc/srtCatalogImport.ts';
 import { listMrScatsDataFiles } from '../parsers/mrScats/fileInventory.ts';
 import { previewMrScatsDataFile } from '../parsers/mrScats/filePreview.ts';
 import { ElectronJsonEventCatalogPersistence } from '../persistence/eventCatalogPersistence.ts';
@@ -1379,6 +1380,32 @@ export const RaceSweetMainApp = () => {
       .catch((error: unknown) => setTimingErrorState(error as Error));
   };
 
+  const handleUpdateSourceOffset = (sourceId: string, previousTime: Date, nextTime: Date): void => {
+    if (!adminService) {
+      return;
+    }
+
+    const targetRaceState = timingRaceState || sessionState;
+    const offsetMilliseconds = nextTime.getTime() - previousTime.getTime();
+    if (offsetMilliseconds === 0) {
+      return;
+    }
+
+    const recordsToUpdate = targetRaceState.records
+      .filter((record): record is EventTimeRecord => record.source.toString() === sourceId && record.time !== undefined)
+      .map((record) => ({
+        ...record,
+        time: new Date(record.time!.getTime() + offsetMilliseconds),
+      }));
+
+    Promise.all(recordsToUpdate.map((record) => {
+      const sessionId = record.sessionId || timingSessionId;
+      return sessionId ? adminService.updateRecordForSession(targetRaceState, sessionId, record) : Promise.resolve();
+    }))
+      .then(() => setRenderTick((tick) => tick + 1))
+      .catch((error: unknown) => setTimingErrorState(error as Error));
+  };
+
   const handleChangeCategory = (participantId: EventParticipantId, categoryId: EventCategoryId) => {
     if (!adminService) {
       return;
@@ -1488,6 +1515,7 @@ export const RaceSweetMainApp = () => {
           onSelectEvent={selectTimingEvent}
           onSelectSession={selectTimingSession}
           onTimeDisplayZoneModeChange={updateTimingTimeDisplayZoneMode}
+          onUpdateSourceOffset={handleUpdateSourceOffset}
           participantSelected={handleParticipantSelected}
           raceState={timingRaceStateLookup}
           selectedCategories={hilightCategories}
@@ -1717,6 +1745,34 @@ export const RaceSweetMainApp = () => {
                 throw error;
               });
           }}
+          onLoadDorianCtcSrtFile={(sourceId) => {
+            if (!eventCatalogService || !systemConfigService) {
+              return;
+            }
+
+            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+            const filePath = source?.fileConfig?.filePath;
+            if (!source || source.type !== 'file-dorian-ctc-srt' || !filePath) {
+              throw new Error('A Dorian CTC SRT or ERF file must be selected before importing.');
+            }
+
+            return window.api.requestBuffer(filePath)
+              .then((buffer) => loadDorianCtcSrtCatalog(filePath, buffer))
+              .then(async (importData) => {
+                const catalog = await eventCatalogService.importMrScatsCatalog(importData);
+                updateEventCatalogState(catalog, importData.eventId, importData.sessions[0]?.id);
+                const config = await systemConfigService.assignSourcesToEvent(importData.eventId, [sourceId]);
+                const session = importData.sessions[0];
+                const assignedConfig = session
+                  ? await systemConfigService.assignSourcesToSession(session.id, { mode: 'specific', sourceIds: [sourceId] })
+                  : config;
+                updateSystemConfigState(assignedConfig);
+              })
+              .catch((error: unknown) => {
+                setErrorState(error as Error);
+                throw error;
+              });
+          }}
           onOpenLocalFile={(filePath) => window.api.openLocalFile(filePath)}
           onSaveLocalStorageDirectoryPath={(directoryPath) => {
             if (!systemConfigService) {
@@ -1749,6 +1805,12 @@ export const RaceSweetMainApp = () => {
             return window.api.selectLocalFile({
               filters: [{ extensions: ['csv'], name: 'CSV files' }],
               title: 'Select RFID Timing CSV file',
+            });
+          }}
+          onSelectDorianCtcSrtFile={() => {
+            return window.api.selectLocalFile({
+              filters: [{ extensions: ['srt', 'erf'], name: 'Dorian CTC SRT or ERF files' }],
+              title: 'Select Dorian CTC SRT or ERF file',
             });
           }}
           onSelectMrScatsDataArchive={() => {
