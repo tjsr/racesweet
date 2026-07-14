@@ -1,13 +1,15 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { TZDate } from '@date-fns/tz';
+import { generateResult, type EntrantResult } from '../../controllers/result.js';
+import type { EventEntrantId } from '../../model/entrant.js';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
 import type { GreenFlagRecord, YellowFlagRecord } from '../../model/flag.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
 import type { EventId, SessionId } from '../../model/raceevent.js';
-import type { RaceState } from '../../model/racestate.js';
-import { EVENT_FLAG_DISPLAYED, RECORD_TX_CROSSING, type EventTimeRecord, type ParticipantPassingRecord, type TimeRecordSource } from '../../model/timerecord.js';
+import { Session, type RaceState } from '../../model/racestate.js';
+import { EVENT_FLAG_DISPLAYED, RECORD_TX_CROSSING, type EntrantPassingRecord, type EventTimeRecord, type ParticipantPassingRecord, type TimeRecordSource } from '../../model/timerecord.js';
 import { parseCtcRawCrossingFile, type CtcRawCrossingRecord } from '../ctc/rawCrossing.js';
 import { readMrScatsDbfTable, readMrScatsDbfTableAsync, type MrScatsDbfRecord } from './dbf.js';
 import { parseMrScatsDbfSummary, readMrScatsZipEntryBuffers } from './fileInventory.js';
@@ -28,6 +30,7 @@ export interface MrScatsCatalogImport {
   eventName: string;
   raceState: Partial<RaceState>;
   sessions: MrScatsImportedSession[];
+  validationMessages?: string[];
 }
 
 interface MrScatsCoreTables {
@@ -123,6 +126,16 @@ const CROSSING_HIT_COUNT_FIELDS = ['HITCOUNT', 'HIT_COUNT', 'HITS', 'READCOUNT',
 const CROSSING_GREEN_ELAPSED_FIELDS = ['GREENELAPS', 'GREEN_ELAP', 'STARTELAP', 'START_ELAP', 'STARTELPSD'];
 const CROSSING_GREEN_FLAG_FIELDS = ['FLAG', 'SYNCMARK', 'STARTFIN'];
 const RAW_CROSSING_EXTENSIONS = ['.SRT', '.ERF'];
+const COMPANION_IDENTITY_FIELDS = ['CARNUMBER', 'CAR', 'CAR_NO', 'CARNO', 'NUMBER', 'NO'];
+const COMPANION_DRIVER_FIELDS = ['DRIVER', 'NAME', 'SCRN_NAME', 'ENTRANT'];
+const COMPANION_ELAPSED_FIELDS = ['ELAPSED', 'TIME', 'TOTALTIME', 'TOTAL_TIME', 'RESULTTIME', 'RACETIME'];
+const COMPANION_FASTEST_LAP_FIELDS = ['LAPTIME', 'LAP_TIME', 'FASTTIME', 'FAST_TIME', 'FST_TIME', 'TIME', 'ELAPSED'];
+const COMPANION_LAP_COUNT_FIELDS = ['LAPS', 'LAPCOUNT', 'LAP_COUNT', 'NO_LAPS', 'NUMLAPS'];
+const COMPANION_LAP_NUMBER_FIELDS = ['LAP', 'LAPNO', 'LAP_NO', 'LAPNUM', 'LAP_NUMBER'];
+const COMPANION_LAP_FROM_FIELDS = ['LAP_FROM', 'FROM_LAP', 'FROM'];
+const COMPANION_LAP_TO_FIELDS = ['LAP_TO', 'TO_LAP', 'TO'];
+const COMPANION_POSITION_FIELDS = ['POS', 'POSITION', 'PLACE', 'FIN_POS', 'RESULTPOS'];
+const DURATION_COMPARE_TOLERANCE_MILLISECONDS = 1;
 
 interface MrScatsSessionRecordBuildResult {
   records: EventTimeRecord[];
@@ -2365,6 +2378,353 @@ const getEventDate = (programme: MrScatsDbfRecord[]): string => {
   return programme.map((row) => parseDate(row.STARTDATE)).find((date): date is string => !!date) || FALLBACK_EVENT_DATE;
 };
 
+interface MrScatsCompanionTable {
+  fileName: string;
+  records: MrScatsDbfRecord[];
+}
+
+interface MrScatsCalculatedEntrant {
+  driverNames: string[];
+  entrantId: EventEntrantId;
+  fastestLapMilliseconds?: number;
+  lapCount: number;
+  lapElapsedMillisecondsByLap: Map<number, number>;
+  plateNumbers: string[];
+  position: number;
+  totalElapsedMilliseconds: number;
+}
+
+interface MrScatsLeaderByLap {
+  entrant: MrScatsCalculatedEntrant;
+  lapNumber: number;
+}
+
+const findSessionCompanionFileNames = (
+  buffers: Map<string, Buffer>,
+  session: MrScatsImportedSession,
+  extension: string
+): string[] => {
+  const eventCode = session.eventCode.toUpperCase();
+  return Array.from(buffers.keys())
+    .filter((fileName) => normalizeBaseName(fileName) === eventCode)
+    .filter((fileName) => path.extname(fileName).toUpperCase() === extension.toUpperCase());
+};
+
+const readCompanionTables = (
+  buffers: Map<string, Buffer>,
+  session: MrScatsImportedSession,
+  extension: string,
+  validationMessages: string[]
+): MrScatsCompanionTable[] => findSessionCompanionFileNames(buffers, session, extension).flatMap((fileName): MrScatsCompanionTable[] => {
+  try {
+    return [{
+      fileName,
+      records: readMrScatsDbfTable(buffers.get(fileName)!).records,
+    }];
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    validationMessages.push(`MR-SCATS ${path.basename(fileName)} could not be compared for session ${session.eventCode}: ${message}`);
+    return [];
+  }
+});
+
+const getRecordIdentity = (record: MrScatsDbfRecord): string => {
+  const plateNumber = getFirstString(record, COMPANION_IDENTITY_FIELDS);
+  if (plateNumber.length > 0) {
+    return plateNumber;
+  }
+
+  return COMPANION_DRIVER_FIELDS.map((field) => asString(record[field])).find((value) => value.length > 0) || '';
+};
+
+const getRecordPosition = (record: MrScatsDbfRecord): number | undefined =>
+  getFirstNonNegativeInteger(record, COMPANION_POSITION_FIELDS);
+
+const getRecordLapCount = (record: MrScatsDbfRecord): number | undefined =>
+  getFirstNonNegativeInteger(record, COMPANION_LAP_COUNT_FIELDS);
+
+const getRecordLapNumber = (record: MrScatsDbfRecord): number | undefined =>
+  getFirstNonNegativeInteger(record, COMPANION_LAP_NUMBER_FIELDS);
+
+const parseDurationMilliseconds = (value: unknown): number | undefined => {
+  const timeOfDay = parseTimeOfDayMatch(value);
+  if (timeOfDay) {
+    return timeOfDay.elapsedMilliseconds;
+  }
+
+  const parsed = parseNumber(value);
+  if (parsed === undefined) {
+    return undefined;
+  }
+
+  return elapsedTicksToMilliseconds(parsed);
+};
+
+const getRecordDurationMilliseconds = (record: MrScatsDbfRecord, fields: string[]): number | undefined => {
+  for (const field of fields) {
+    const parsed = parseDurationMilliseconds(record[field]);
+    if (parsed !== undefined) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+};
+
+const getParticipantPlateNumbers = (participant: EventParticipant): string[] =>
+  participant.identifiers
+    .map((identifier) => (identifier as unknown as { racePlate?: unknown }).racePlate)
+    .filter((racePlate): racePlate is string | number => racePlate !== undefined && racePlate !== null)
+    .map((racePlate) => racePlate.toString().trim())
+    .filter((racePlate) => racePlate.length > 0);
+
+const getParticipantDisplayName = (participant: EventParticipant): string =>
+  `${participant.firstname} ${participant.surname}`.trim();
+
+const buildCalculatedEntrants = (
+  session: MrScatsImportedSession,
+  raceState: Partial<RaceState>
+): MrScatsCalculatedEntrant[] => {
+  const records = (raceState.records || []).filter((record) => (record as { sessionId?: SessionId }).sessionId === session.id);
+  const sessionState = new Session({
+    categories: raceState.categories || [],
+    participants: raceState.participants || [],
+    records,
+    teams: raceState.teams || [],
+    timeRecordSources: raceState.timeRecordSources || [],
+  });
+  sessionState.setMinimumLapTimeMilliseconds(session.minimumLapTimeMilliseconds);
+  sessionState.setSessionValidCategoryIds(new Set(session.categoryIds));
+
+  const participantsByEntrantId = (raceState.participants || []).reduce<Map<string, EventParticipant[]>>((map, participant) => {
+    const entrants = map.get(participant.entrantId.toString()) || [];
+    entrants.push(participant);
+    map.set(participant.entrantId.toString(), entrants);
+    return map;
+  }, new Map<string, EventParticipant[]>());
+  const passingsByEntrantId = new Map<EventEntrantId, EntrantPassingRecord[]>();
+
+  (raceState.participants || []).forEach((participant) => {
+    const participantLaps = sessionState.getParticipantLaps(participant.id) || [];
+    if (participantLaps.length === 0) {
+      return;
+    }
+
+    const entrantPassings = passingsByEntrantId.get(participant.entrantId) || [];
+    entrantPassings.push(...participantLaps);
+    passingsByEntrantId.set(participant.entrantId, entrantPassings);
+  });
+
+  return generateResult(passingsByEntrantId)
+    .sort((left, right) => {
+      if (left.lapCount !== right.lapCount) {
+        return right.lapCount - left.lapCount;
+      }
+
+      return left.totalTime - right.totalTime;
+    })
+    .map((result: EntrantResult, index): MrScatsCalculatedEntrant => {
+      const entrantParticipants = participantsByEntrantId.get(result.entrantId.toString()) || [];
+      const lapElapsedMillisecondsByLap = result.laps.reduce<Map<number, number>>((map, lap) => {
+        if (typeof lap.lapNo === 'number' && typeof lap.elapsedTime === 'number') {
+          map.set(lap.lapNo, lap.elapsedTime);
+        }
+        return map;
+      }, new Map<number, number>());
+
+      return {
+        driverNames: entrantParticipants.map(getParticipantDisplayName).filter((name) => name.length > 0),
+        entrantId: result.entrantId,
+        fastestLapMilliseconds: typeof result.fastestLap?.lapTime === 'number' ? result.fastestLap.lapTime : undefined,
+        lapCount: result.lapCount,
+        lapElapsedMillisecondsByLap,
+        plateNumbers: entrantParticipants.flatMap(getParticipantPlateNumbers),
+        position: index + 1,
+        totalElapsedMilliseconds: result.totalTime,
+      };
+    });
+};
+
+const calculatedEntrantMatchesRecord = (
+  entrant: MrScatsCalculatedEntrant,
+  record: MrScatsDbfRecord
+): boolean => {
+  const plateNumber = getFirstString(record, COMPANION_IDENTITY_FIELDS);
+  if (plateNumber.length > 0) {
+    return entrant.plateNumbers.includes(plateNumber);
+  }
+
+  const driverName = COMPANION_DRIVER_FIELDS.map((field) => asString(record[field]).toLowerCase()).find((value) => value.length > 0);
+  return driverName
+    ? entrant.driverNames.some((name) => name.toLowerCase() === driverName)
+    : false;
+};
+
+const findCalculatedEntrant = (
+  entrants: MrScatsCalculatedEntrant[],
+  record: MrScatsDbfRecord
+): MrScatsCalculatedEntrant | undefined =>
+  entrants.find((entrant) => calculatedEntrantMatchesRecord(entrant, record));
+
+const formatCalculatedEntrant = (entrant: MrScatsCalculatedEntrant | undefined): string => {
+  if (!entrant) {
+    return 'not found';
+  }
+
+  const plates = entrant.plateNumbers.length > 0 ? entrant.plateNumbers.join('/') : 'no plate';
+  const names = entrant.driverNames.length > 0 ? entrant.driverNames.join(' / ') : entrant.entrantId.toString();
+  return `${plates} ${names}`;
+};
+
+const formatDuration = (milliseconds: number | undefined): string =>
+  milliseconds === undefined ? 'missing' : `${milliseconds}ms`;
+
+const durationsMatch = (left: number | undefined, right: number | undefined): boolean =>
+  left !== undefined &&
+  right !== undefined &&
+  Math.abs(left - right) <= DURATION_COMPARE_TOLERANCE_MILLISECONDS;
+
+const appendResValidationMessages = (
+  table: MrScatsCompanionTable,
+  session: MrScatsImportedSession,
+  entrants: MrScatsCalculatedEntrant[],
+  validationMessages: string[]
+): void => {
+  table.records.forEach((record, rowIndex) => {
+    const expectedIdentity = getRecordIdentity(record);
+    const expectedElapsed = getRecordDurationMilliseconds(record, COMPANION_ELAPSED_FIELDS);
+    const expectedLaps = getRecordLapCount(record);
+    const expectedPosition = getRecordPosition(record);
+    const calculated = findCalculatedEntrant(entrants, record);
+    const mismatches: string[] = [];
+
+    if (!calculated) {
+      mismatches.push(`identity file=${expectedIdentity || 'missing'} calculated=not found`);
+    }
+    if (calculated && expectedElapsed !== undefined && !durationsMatch(expectedElapsed, calculated.totalElapsedMilliseconds)) {
+      mismatches.push(`elapsed file=${formatDuration(expectedElapsed)} calculated=${formatDuration(calculated.totalElapsedMilliseconds)}`);
+    }
+    if (calculated && expectedLaps !== undefined && expectedLaps !== calculated.lapCount) {
+      mismatches.push(`laps file=${expectedLaps} calculated=${calculated.lapCount}`);
+    }
+    if (calculated && expectedPosition !== undefined && expectedPosition !== calculated.position) {
+      mismatches.push(`position file=${expectedPosition} calculated=${calculated.position}`);
+    }
+
+    if (mismatches.length > 0) {
+      validationMessages.push(
+        `MR-SCATS ${path.basename(table.fileName)} row ${rowIndex + 1} results mismatch for session ${session.eventCode}: ` +
+        `${mismatches.join('; ')}; file identity=${expectedIdentity || 'missing'}; calculated identity=${formatCalculatedEntrant(calculated)}.`
+      );
+    }
+  });
+};
+
+const appendFstValidationMessages = (
+  table: MrScatsCompanionTable,
+  session: MrScatsImportedSession,
+  entrants: MrScatsCalculatedEntrant[],
+  validationMessages: string[]
+): void => {
+  const calculatedFastest = entrants
+    .filter((entrant) => entrant.fastestLapMilliseconds !== undefined)
+    .sort((left, right) => left.fastestLapMilliseconds! - right.fastestLapMilliseconds!)[0];
+
+  table.records.forEach((record, rowIndex) => {
+    const expectedIdentity = getRecordIdentity(record);
+    const expectedLapTime = getRecordDurationMilliseconds(record, COMPANION_FASTEST_LAP_FIELDS);
+    const calculatedMatchesIdentity = calculatedFastest ? calculatedEntrantMatchesRecord(calculatedFastest, record) : false;
+    const mismatches: string[] = [];
+
+    if (!calculatedFastest || !calculatedMatchesIdentity) {
+      mismatches.push(`identity file=${expectedIdentity || 'missing'} calculated=${formatCalculatedEntrant(calculatedFastest)}`);
+    }
+    if (!durationsMatch(expectedLapTime, calculatedFastest?.fastestLapMilliseconds)) {
+      mismatches.push(`fastest lap time file=${formatDuration(expectedLapTime)} calculated=${formatDuration(calculatedFastest?.fastestLapMilliseconds)}`);
+    }
+
+    if (mismatches.length > 0) {
+      validationMessages.push(
+        `MR-SCATS ${path.basename(table.fileName)} row ${rowIndex + 1} fastest-lap mismatch for session ${session.eventCode}: ${mismatches.join('; ')}.`
+      );
+    }
+  });
+};
+
+const buildLeaderByLap = (entrants: MrScatsCalculatedEntrant[]): Map<number, MrScatsLeaderByLap> => {
+  const maxLap = Math.max(0, ...entrants.map((entrant) => entrant.lapCount));
+  const leaders = new Map<number, MrScatsLeaderByLap>();
+
+  for (let lapNumber = 1; lapNumber <= maxLap; lapNumber += 1) {
+    const leader = entrants
+      .filter((entrant) => entrant.lapElapsedMillisecondsByLap.has(lapNumber))
+      .sort((left, right) => left.lapElapsedMillisecondsByLap.get(lapNumber)! - right.lapElapsedMillisecondsByLap.get(lapNumber)!)[0];
+    if (leader) {
+      leaders.set(lapNumber, { entrant: leader, lapNumber });
+    }
+  }
+
+  return leaders;
+};
+
+const appendLdrValidationMessages = (
+  table: MrScatsCompanionTable,
+  session: MrScatsImportedSession,
+  entrants: MrScatsCalculatedEntrant[],
+  validationMessages: string[]
+): void => {
+  const leaderByLap = buildLeaderByLap(entrants);
+
+  table.records.forEach((record, rowIndex) => {
+    const expectedIdentity = getRecordIdentity(record);
+    const lapFrom = getFirstNonNegativeInteger(record, COMPANION_LAP_FROM_FIELDS) || getRecordLapNumber(record);
+    const lapTo = getFirstNonNegativeInteger(record, COMPANION_LAP_TO_FIELDS) || lapFrom;
+    if (lapFrom === undefined || lapTo === undefined) {
+      validationMessages.push(
+        `MR-SCATS ${path.basename(table.fileName)} row ${rowIndex + 1} leader mismatch for session ${session.eventCode}: file lap range is missing; calculated leaders cannot be matched.`
+      );
+      return;
+    }
+
+    for (let lapNumber = lapFrom; lapNumber <= lapTo; lapNumber += 1) {
+      const calculatedLeader = leaderByLap.get(lapNumber)?.entrant;
+      if (!calculatedLeader || !calculatedEntrantMatchesRecord(calculatedLeader, record)) {
+        validationMessages.push(
+          `MR-SCATS ${path.basename(table.fileName)} row ${rowIndex + 1} leader mismatch for session ${session.eventCode} lap ${lapNumber}: ` +
+          `file identity=${expectedIdentity || 'missing'} lapFrom=${lapFrom} lapTo=${lapTo}; calculated identity=${formatCalculatedEntrant(calculatedLeader)}.`
+        );
+      }
+    }
+  });
+};
+
+const validateMrScatsCompanionFiles = (
+  buffers: Map<string, Buffer>,
+  sessions: MrScatsImportedSession[],
+  raceState: Partial<RaceState>
+): string[] => {
+  const validationMessages: string[] = [];
+
+  sessions.forEach((session) => {
+    const hasCompanionFiles = ['.RES', '.FST', '.LDR'].some((extension) =>
+      findSessionCompanionFileNames(buffers, session, extension).length > 0
+    );
+    if (!hasCompanionFiles) {
+      return;
+    }
+
+    const calculatedEntrants = buildCalculatedEntrants(session, raceState);
+    readCompanionTables(buffers, session, '.RES', validationMessages)
+      .forEach((table) => appendResValidationMessages(table, session, calculatedEntrants, validationMessages));
+    readCompanionTables(buffers, session, '.FST', validationMessages)
+      .forEach((table) => appendFstValidationMessages(table, session, calculatedEntrants, validationMessages));
+    readCompanionTables(buffers, session, '.LDR', validationMessages)
+      .forEach((table) => appendLdrValidationMessages(table, session, calculatedEntrants, validationMessages));
+  });
+
+  return validationMessages;
+};
+
 export const loadMrScatsCatalogFromLocation = async (
   locationPath: string,
   options: MrScatsCatalogLoadOptions = {}
@@ -2381,19 +2741,21 @@ export const loadMrScatsCatalogFromLocation = async (
   const sessions = inferSessionCategoryIds(buffers, buildSessions(meetingCode, programme, categoryIdByName), participants);
   const sessionRecordBuildResult = await buildSessionRecords(meetingCode, buffers, sessions, participants, loadPlan, progress, options);
   const eventDate = getEventDate(programme);
+  const raceState: Partial<RaceState> = {
+    categories,
+    participants,
+    records: sessionRecordBuildResult.records,
+    teams: [],
+    timeRecordSources: sessionRecordBuildResult.timeRecordSources,
+  };
 
   return {
     eventDate,
     eventId: createEventId(`mr-scats:${meetingCode}:event`),
     eventName: getEventName(programme, meetingCode),
-    raceState: {
-      categories,
-      participants,
-      records: sessionRecordBuildResult.records,
-      teams: [],
-      timeRecordSources: sessionRecordBuildResult.timeRecordSources,
-    },
+    raceState,
     sessions,
+    validationMessages: validateMrScatsCompanionFiles(buffers, sessions, raceState),
   };
 };
 
