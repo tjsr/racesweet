@@ -1973,4 +1973,131 @@ describe('MR-SCATS catalog import parser', () => {
       }),
     ]);
   });
+
+  it('compares imported session results with matching RES, FST, and LDR companion files', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+      { length: 8, name: 'ACTUALSTRT', type: 'C' },
+    ], [
+      { ACTUALSTRT: '09:00:00', CATEGORY: 'CAT-A', EVENTNAME: 'Race 1', EV_CODE: 'W9721R01', STARTDATE: '19970629' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 42, DRIVER: 'Alice Leader', DRIV_CLASS: 'CAT-A', TXNUM: 1042 },
+      { CARNUMBER: 77, DRIVER: 'Bob Chaser', DRIV_CLASS: 'CAT-A', TXNUM: 1077 },
+    ]));
+    await writeFile(path.join(tempDir, 'W9721R01.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 9, name: 'ELAPSED', type: 'N' },
+      { length: 4, name: 'COUNTER', type: 'N' },
+    ], [
+      { CARNUMBER: 42, COUNTER: 1, ELAPSED: 300000, TXNUM: 1042 },
+      { CARNUMBER: 77, COUNTER: 2, ELAPSED: 320000, TXNUM: 1077 },
+      { CARNUMBER: 42, COUNTER: 3, ELAPSED: 600000, TXNUM: 1042 },
+      { CARNUMBER: 77, COUNTER: 4, ELAPSED: 620000, TXNUM: 1077 },
+    ]));
+    await writeFile(path.join(tempDir, 'W9721R01.RES'), createDbfBuffer([
+      { length: 3, name: 'POS', type: 'N' },
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'LAPS', type: 'N' },
+      { length: 9, name: 'ELAPSED', type: 'N' },
+    ], [
+      { CARNUMBER: 42, ELAPSED: 600000, LAPS: 2, POS: 1 },
+      { CARNUMBER: 77, ELAPSED: 620000, LAPS: 2, POS: 2 },
+    ]));
+    await writeFile(path.join(tempDir, 'W9721R01.FST'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 9, name: 'LAPTIME', type: 'N' },
+    ], [
+      { CARNUMBER: 42, LAPTIME: 300000 },
+    ]));
+    await writeFile(path.join(tempDir, 'W9721R01.LDR'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 3, name: 'LAP_FROM', type: 'N' },
+      { length: 3, name: 'LAP_TO', type: 'N' },
+    ], [
+      { CARNUMBER: 42, LAP_FROM: 1, LAP_TO: 2 },
+    ]));
+
+    const imported = await loadMrScatsCatalogFromLocation(tempDir);
+
+    expect(imported.validationMessages).toEqual([]);
+  });
+
+  it('reports detailed RES, FST, and LDR companion file mismatches', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
+    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
+      { length: 8, name: 'EV_CODE', type: 'C' },
+      { length: 8, name: 'CATEGORY', type: 'C' },
+      { length: 60, name: 'EVENTNAME', type: 'C' },
+      { length: 8, name: 'STARTDATE', type: 'D' },
+      { length: 8, name: 'ACTUALSTRT', type: 'C' },
+    ], [
+      { ACTUALSTRT: '09:00:00', CATEGORY: 'CAT-A', EVENTNAME: 'Race 1', EV_CODE: 'W9721R01', STARTDATE: '19970629' },
+    ]));
+    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 8, name: 'DRIV_CLASS', type: 'C' },
+      { length: 50, name: 'DRIVER', type: 'C' },
+    ], [
+      { CARNUMBER: 42, DRIVER: 'Alice Leader', DRIV_CLASS: 'CAT-A', TXNUM: 1042 },
+      { CARNUMBER: 77, DRIVER: 'Bob Chaser', DRIV_CLASS: 'CAT-A', TXNUM: 1077 },
+    ]));
+    await writeFile(path.join(tempDir, 'W9721R01.DBF'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'TXNUM', type: 'N' },
+      { length: 9, name: 'ELAPSED', type: 'N' },
+      { length: 4, name: 'COUNTER', type: 'N' },
+    ], [
+      { CARNUMBER: 42, COUNTER: 1, ELAPSED: 300000, TXNUM: 1042 },
+      { CARNUMBER: 77, COUNTER: 2, ELAPSED: 320000, TXNUM: 1077 },
+      { CARNUMBER: 42, COUNTER: 3, ELAPSED: 600000, TXNUM: 1042 },
+      { CARNUMBER: 77, COUNTER: 4, ELAPSED: 620000, TXNUM: 1077 },
+    ]));
+    await writeFile(path.join(tempDir, 'W9721R01.RES'), createDbfBuffer([
+      { length: 3, name: 'POS', type: 'N' },
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 4, name: 'LAPS', type: 'N' },
+      { length: 9, name: 'ELAPSED', type: 'N' },
+    ], [
+      { CARNUMBER: 77, ELAPSED: 600000, LAPS: 1, POS: 1 },
+    ]));
+    await writeFile(path.join(tempDir, 'W9721R01.FST'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 9, name: 'LAPTIME', type: 'N' },
+    ], [
+      { CARNUMBER: 77, LAPTIME: 310000 },
+    ]));
+    await writeFile(path.join(tempDir, 'W9721R01.LDR'), createDbfBuffer([
+      { length: 4, name: 'CARNUMBER', type: 'N' },
+      { length: 3, name: 'LAP_FROM', type: 'N' },
+      { length: 3, name: 'LAP_TO', type: 'N' },
+    ], [
+      { CARNUMBER: 77, LAP_FROM: 1, LAP_TO: 2 },
+    ]));
+
+    const imported = await loadMrScatsCatalogFromLocation(tempDir);
+
+    expect(imported.validationMessages).toEqual(expect.arrayContaining([
+      expect.stringContaining('W9721R01.RES row 1 results mismatch'),
+      expect.stringContaining('elapsed file=60000ms calculated=62000ms'),
+      expect.stringContaining('laps file=1 calculated=2'),
+      expect.stringContaining('position file=1 calculated=2'),
+      expect.stringContaining('W9721R01.FST row 1 fastest-lap mismatch'),
+      expect.stringContaining('identity file=77 calculated=42 Alice Leader'),
+      expect.stringContaining('fastest lap time file=31000ms calculated=30000ms'),
+      expect.stringContaining('W9721R01.LDR row 1 leader mismatch'),
+      expect.stringContaining('file identity=77 lapFrom=1 lapTo=2; calculated identity=42 Alice Leader'),
+    ]));
+  });
 });

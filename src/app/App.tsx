@@ -1722,6 +1722,10 @@ export const RaceSweetMainApp = () => {
               onProgress: publishProgress,
             })
               .then(async (importData) => {
+                const validationMessages = importData.validationMessages || [];
+                if (validationMessages.length > 0) {
+                  logDisplayedError('MR-SCATS import validation', new Error(validationMessages.join('\n')));
+                }
                 await completeImportStep('Summarising MR-SCATS import', 1);
                 const importSummary = summarizeMrScatsImport(importData, completeImportStep);
                 await completeImportStep('Writing MR-SCATS event catalog', 2);
