@@ -11,10 +11,10 @@ import type { EventTeam } from '../model/eventteam.ts';
 import { EventId, SessionId } from '../model/raceevent.ts';
 import { type RaceState, RaceStateLookup, Session } from '../model/racestate.ts';
 import { type EventTimeRecord, type TimeRecordId } from '../model/timerecord.ts';
+import { loadDorianCtcSrtCatalogForSession } from '../parsers/ctc/srtCatalogImport.ts';
 import { type MrScatsCatalogImport, type MrScatsCatalogLoadProgress, loadMrScatsCatalogFromLocation } from '../parsers/mrScats/catalogImport.ts';
-import { loadDorianCtcSrtCatalog } from '../parsers/ctc/srtCatalogImport.ts';
 import { listMrScatsDataFiles } from '../parsers/mrScats/fileInventory.ts';
-import { previewMrScatsDataFile } from '../parsers/mrScats/filePreview.ts';
+import { previewCtcRawCrossingBuffer, previewMrScatsDataFile } from '../parsers/mrScats/filePreview.ts';
 import { ElectronJsonEventCatalogPersistence } from '../persistence/eventCatalogPersistence.ts';
 import { ElectronJsonRaceAdminPersistence } from '../persistence/raceAdminPersistence.ts';
 import { ElectronJsonSystemConfigPersistence } from '../persistence/systemConfigPersistence.ts';
@@ -1472,13 +1472,11 @@ export const RaceSweetMainApp = () => {
     eventCatalogState.events.find((event) => event.id === eventCatalogState.activeEventId) ??
     eventCatalogState.events[0];
   const timingSessions = sortSessionsByScheduledStart(getSessionsForEvent(eventCatalogState, timingEvent?.id));
-  const timingSessionValue = timingSessionSelection === 'active'
-    ? 'active'
-    : selectedTimingSessionId || timingSessions[0]?.id || '';
   const activeSession = eventCatalogState.sessions.find((session) => session.id === eventCatalogState.activeSessionId);
-  const timingSessionId = timingSessionValue === 'active'
-    ? activeSession?.id
-    : timingSessionValue || undefined;
+  const timingSessionValue = timingSessionSelection === 'active'
+    ? activeSession?.id || timingSessions[0]?.id || ''
+    : selectedTimingSessionId || timingSessions[0]?.id || '';
+  const timingSessionId = timingSessionValue || undefined;
   const timingSessionValidCategoryIds = getSessionAssignedCategoryIds(eventCatalogState, timingEvent?.id, timingSessionId) as Set<EventCategoryId> | undefined;
   const timingTimeDisplayZoneMode = (timingEvent?.id ? systemConfigState.eventOptions[timingEvent.id]?.timeDisplayZoneMode : undefined) || 'event';
   const updateTimingTimeDisplayZoneMode = (mode: EventTimeDisplayZoneMode): void => {
@@ -1749,7 +1747,7 @@ export const RaceSweetMainApp = () => {
                 throw error;
               });
           }}
-          onLoadDorianCtcSrtFile={(sourceId) => {
+          onLoadDorianCtcSrtFile={(sourceId, onProgress) => {
             if (!eventCatalogService || !systemConfigService) {
               return;
             }
@@ -1760,17 +1758,53 @@ export const RaceSweetMainApp = () => {
               throw new Error('A Dorian CTC SRT or ERF file must be selected before importing.');
             }
 
+            const eventId = selectedEventId;
+            const sessionId = selectedSessionId;
+            const event = eventCatalogState.events.find((item) => item.id === eventId);
+            const session = eventCatalogState.sessions.find((item) => item.id === sessionId && item.eventId === eventId);
+            if (!eventId || !sessionId || !event || !session) {
+              throw new Error('Select an event and session before importing a Dorian CTC SRT or ERF file.');
+            }
+
+            const isActiveSession = eventId === eventCatalogState.activeEventId && sessionId === eventCatalogState.activeSessionId;
+            const importMode = source.fileConfig?.importMode || 'import';
+            const existingRaceState = isActiveSession
+              ? raceStateSnapshot(sessionState)
+              : eventCatalogService.getImportedRaceState(eventId, sessionId) || {};
+            const targetSessionState = sessionFromPartialRaceState(importMode === 'import' ? {} : existingRaceState);
+
             return window.api.requestBuffer(filePath)
-              .then((buffer) => loadDorianCtcSrtCatalog(filePath, buffer))
-              .then(async (importData) => {
-                const catalog = await eventCatalogService.importMrScatsCatalog(importData);
-                updateEventCatalogState(catalog, importData.eventId, importData.sessions[0]?.id);
-                const config = await systemConfigService.assignSourcesToEvent(importData.eventId, [sourceId]);
-                const session = importData.sessions[0];
-                const assignedConfig = session
-                  ? await systemConfigService.assignSourcesToSession(session.id, { mode: 'specific', sourceIds: [sourceId] })
-                  : config;
-                updateSystemConfigState(assignedConfig);
+              .then((buffer) => loadDorianCtcSrtCatalogForSession(filePath, buffer, {
+                eventDate: event.date,
+                eventId,
+                onProgress,
+                sessionId,
+                timeZone: event.timeZone,
+              }))
+              .then(async (importedRaceState) => {
+                await applyPulledRaceStateToSession(targetSessionState, importedRaceState, {
+                  catalog: eventCatalogService.catalog || eventCatalogState,
+                  eventId,
+                  finishLineNumbers: getFinishLineNumbersForSession(systemConfigState, eventId, sessionId),
+                  sessionId,
+                });
+                const catalog = importMode === 'import'
+                  ? await eventCatalogService.replaceImportedRaceState(eventId, sessionId, raceStateSnapshot(targetSessionState))
+                  : await eventCatalogService.updateImportedRaceState(eventId, sessionId, raceStateSnapshot(targetSessionState));
+                updateEventCatalogState(catalog, eventId, sessionId);
+                if (isActiveSession) {
+                  setSessionState(targetSessionState);
+                  setRenderTick((tick) => tick + 1);
+                }
+                const timingShowsImportedSession =
+                  (timingSessionSelection === 'active' && isActiveSession) ||
+                  (selectedTimingEventId === eventId && selectedTimingSessionId === sessionId);
+                if (timingShowsImportedSession) {
+                  setTimingRaceState(targetSessionState);
+                }
+                const config = await systemConfigService.assignSourcesToEvent(eventId, [sourceId]);
+                const assignedConfig = await systemConfigService.assignSourcesToSession(sessionId, { mode: 'specific', sourceIds: [sourceId] });
+                updateSystemConfigState(assignedConfig || config);
               })
               .catch((error: unknown) => {
                 setErrorState(error as Error);
@@ -1804,6 +1838,16 @@ export const RaceSweetMainApp = () => {
             }
 
             return previewMrScatsDataFile(locationPath, file.relativePath, file.kind);
+          }}
+          onPreviewDorianCtcSrtFile={(sourceId) => {
+            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+            const filePath = source?.fileConfig?.filePath;
+            if (!filePath) {
+              throw new Error('A Dorian CTC SRT or ERF file must be selected before previewing.');
+            }
+
+            return window.api.requestBuffer(filePath)
+              .then((buffer) => previewCtcRawCrossingBuffer(filePath, buffer));
           }}
           onSelectLocalFile={() => {
             return window.api.selectLocalFile({

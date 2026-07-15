@@ -1,11 +1,11 @@
 import React from 'react';
 import { formatErrorForDisplay } from '../../app/stackTrace.js';
-import { type DataSourceConfig, type DataSourceType, getDataSourceTypeLabel } from '../../app/systemConfig.js';
+import { type DataImportMode, type DataSourceConfig, type DataSourceType, getDataSourceTypeLabel } from '../../app/systemConfig.js';
 import { TimeRecordSourceId } from '../../model/types.js';
 import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
 import type { MrScatsDataFilePreview } from '../../parsers/mrScats/filePreview.js';
 import { DataSourceTypesPanel } from './dataSourceTypes.js';
-import type { InlineLoadingProgress } from './InlineLoadingIndicator.js';
+import { InlineLoadingIndicator, type InlineLoadingProgress } from './InlineLoadingIndicator.js';
 import { MrScatsDataSourcePanel } from './mrScatsDataSourcePanel.js';
 
 interface DataSourcesPanelProps {
@@ -16,9 +16,10 @@ interface DataSourcesPanelProps {
   onFetchApicalDataNow: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onLoadMrScatsEvent?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
-  onLoadDorianCtcSrtFile?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
+  onLoadDorianCtcSrtFile?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
   onPreviewMrScatsDataFile?: (sourceId: TimeRecordSourceId, file: MrScatsDataFileSummary) => Promise<MrScatsDataFilePreview>;
+  onPreviewDorianCtcSrtFile?: (sourceId: TimeRecordSourceId) => Promise<MrScatsDataFilePreview>;
   onReprocessApicalData: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onSaveSource: (sourceId: TimeRecordSourceId, changes: Partial<DataSourceConfig>) => void | Promise<void>;
   onSelectMrScatsDataArchive?: () => Promise<MrScatsDataFileInventory | undefined>;
@@ -68,6 +69,11 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
   const [selectedSourceId, setSelectedSourceId] = React.useState<string | undefined>(props.dataSources[0]?.id);
   const [sourceFetchErrors, setSourceFetchErrors] = React.useState<Record<string, SourceFetchError>>({});
   const [masterProfileDraftErrors, setMasterProfileDraftErrors] = React.useState<Record<string, string>>({});
+  const [dorianCtcLoadProgress, setDorianCtcLoadProgress] = React.useState<InlineLoadingProgress>({ completed: 0, total: 1 });
+  const [isLoadingDorianCtc, setIsLoadingDorianCtc] = React.useState<boolean>(false);
+  const [dorianCtcPreview, setDorianCtcPreview] = React.useState<MrScatsDataFilePreview | undefined>();
+  const [dorianCtcPreviewError, setDorianCtcPreviewError] = React.useState<string | undefined>();
+  const [dorianCtcPreviewLoadingFile, setDorianCtcPreviewLoadingFile] = React.useState<string | undefined>();
 
   React.useEffect(() => {
     if (props.dataSources.length === 0) {
@@ -195,6 +201,59 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
     });
   };
 
+  const handleLoadDorianCtcSrtFile = async (sourceId: TimeRecordSourceId): Promise<void> => {
+    if (!props.onLoadDorianCtcSrtFile) {
+      return;
+    }
+
+    setIsLoadingDorianCtc(true);
+    setDorianCtcLoadProgress({
+      callerName: 'Importing CTC file',
+      completed: 0,
+      currentTask: 'Preparing CTC file import',
+      total: 0,
+    });
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    let lastProgressPaintAt = Date.now();
+    try {
+      await props.onLoadDorianCtcSrtFile(sourceId, async (progress) => {
+        setDorianCtcLoadProgress(progress);
+        if (Date.now() - lastProgressPaintAt > 50 || progress.completed >= progress.total) {
+          lastProgressPaintAt = Date.now();
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        }
+      });
+    } finally {
+      setIsLoadingDorianCtc(false);
+    }
+  };
+
+  const handleSaveDorianCtcImportMode = (source: DataSourceConfig, importMode: DataImportMode): void => {
+    void props.onSaveSource(source.id, {
+      fileConfig: {
+        ...source.fileConfig,
+        importMode,
+      },
+    });
+  };
+
+  const handlePreviewDorianCtcSrtFile = async (source: DataSourceConfig): Promise<void> => {
+    if (!props.onPreviewDorianCtcSrtFile || !source.fileConfig?.filePath) {
+      return;
+    }
+
+    setDorianCtcPreview(undefined);
+    setDorianCtcPreviewError(undefined);
+    setDorianCtcPreviewLoadingFile(source.fileConfig.filePath);
+    try {
+      setDorianCtcPreview(await props.onPreviewDorianCtcSrtFile(source.id));
+    } catch (error: unknown) {
+      setDorianCtcPreviewError(formatErrorForDisplay(error));
+    } finally {
+      setDorianCtcPreviewLoadingFile(undefined);
+    }
+  };
+
   return (
     <section className="events-panel">
       <h2>Configured Data Sources</h2>
@@ -305,7 +364,7 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                   ) : isDorianCtcSrt ? (
                     <>
                       <h4>Dorian CTC SRT / ERF File</h4>
-                      <p>Imports raw crossing times and transponder metadata into one event session without creating competitors.</p>
+                      <p>Imports raw crossing times and transponder metadata without creating competitors.</p>
                       <label>
                         File Path
                         <input
@@ -316,17 +375,52 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                           placeholder="No file selected"
                         />
                       </label>
+                      <fieldset>
+                        <legend>Data import mode</legend>
+                        <label>
+                          <input
+                            checked={(source.fileConfig?.importMode || 'import') === 'import'}
+                            name={`dorian-ctc-import-mode-${source.id}`}
+                            onChange={() => handleSaveDorianCtcImportMode(source, 'import')}
+                            type="radio"
+                          />
+                          Import — remove the selected session&apos;s existing imported data before loading the file.
+                        </label>
+                        <label>
+                          <input
+                            checked={source.fileConfig?.importMode === 'update'}
+                            name={`dorian-ctc-import-mode-${source.id}`}
+                            onChange={() => handleSaveDorianCtcImportMode(source, 'update')}
+                            type="radio"
+                          />
+                          Update — retain existing data and update or add matching file records where possible.
+                        </label>
+                      </fieldset>
                       <div className="events-actions">
                         <button type="button" onClick={() => handleSelectDorianCtcSrtFile(source)}>
                           Edit File
                         </button>
                         <button
                           type="button"
-                          disabled={!source.fileConfig?.filePath}
-                          onClick={() => props.onLoadDorianCtcSrtFile?.(source.id)}
+                          disabled={!source.fileConfig?.filePath || isLoadingDorianCtc}
+                          onClick={() => {
+                            void handleLoadDorianCtcSrtFile(source.id);
+                          }}
                         >
                           Import CTC File
                         </button>
+                        <button
+                          type="button"
+                          disabled={!source.fileConfig?.filePath || !props.onPreviewDorianCtcSrtFile}
+                          onClick={() => {
+                            void handlePreviewDorianCtcSrtFile(source);
+                          }}
+                        >
+                          Preview
+                        </button>
+                        {isLoadingDorianCtc ? (
+                          <InlineLoadingIndicator ariaLabel="Loading CTC file" progress={dorianCtcLoadProgress} />
+                        ) : null}
                       </div>
                     </>
                   ) : isApicalApi && source.apiConfig ? (
@@ -584,6 +678,36 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
           )}
         </section>
       </div>
+      {dorianCtcPreview || dorianCtcPreviewError || dorianCtcPreviewLoadingFile ? (
+        <div className="warning-modal-backdrop">
+          <section className="warning-modal reload-summary-dialog mr-scats-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="mr-scats-preview-title">
+            <div className="warning-modal-heading">
+              <h2 id="mr-scats-preview-title">{dorianCtcPreview?.fileName || dorianCtcPreviewLoadingFile || 'CTC file preview'}</h2>
+            </div>
+            <div className="mr-scats-preview-content">
+              {dorianCtcPreviewLoadingFile ? <p>Loading preview...</p> : null}
+              {dorianCtcPreviewError ? <div className="inline-error" role="alert"><pre>{dorianCtcPreviewError}</pre></div> : null}
+              {dorianCtcPreview ? (
+                <>
+                  <p>{dorianCtcPreview.parser.toUpperCase()} preview: {dorianCtcPreview.displayedRowCount}{dorianCtcPreview.recordCount === undefined ? ' rows' : ` of ${dorianCtcPreview.recordCount} records`}</p>
+                  {dorianCtcPreview.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+                  <table aria-label={`MR-SCATS File Preview ${dorianCtcPreview.fileName}`}>
+                    <thead><tr>{dorianCtcPreview.columns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
+                    <tbody>{dorianCtcPreview.rows.map((row, rowIndex) => <tr key={`${dorianCtcPreview.fileName}-${rowIndex}`}>{dorianCtcPreview.columns.map((column) => <td key={column}>{row[column]}</td>)}</tr>)}</tbody>
+                  </table>
+                </>
+              ) : null}
+            </div>
+            <div className="events-actions warning-modal-actions">
+              <button type="button" onClick={() => {
+                setDorianCtcPreview(undefined);
+                setDorianCtcPreviewError(undefined);
+                setDorianCtcPreviewLoadingFile(undefined);
+              }}>Close</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 };

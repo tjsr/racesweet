@@ -70,7 +70,7 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
   if (type === 'file-dorian-ctc-srt') {
     return {
       ...base,
-      fileConfig: {},
+      fileConfig: { importMode: 'import' },
       finishLineNumbers: [1],
       name: 'Dorian CTC SRT / ERF File',
     };

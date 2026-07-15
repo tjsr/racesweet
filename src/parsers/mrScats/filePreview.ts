@@ -1,6 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { parseCtcRawCrossingFile, splitCtcRawCrossingLines, type CtcRawCrossingRecord } from '../ctc/rawCrossing.js';
+import { parseCtcRawCrossingFile, splitCtcRawCrossingLines, type CtcRawCrossingFormat, type CtcRawCrossingInput, type CtcRawCrossingRecord } from '../ctc/rawCrossing.js';
 import { readMrScatsDbfTable, type MrScatsDbfRecord } from './dbf.js';
 import { parseMrScatsDbfSummary, readMrScatsZipEntryBuffers, type MrScatsDataFileKind } from './fileInventory.js';
 
@@ -393,31 +393,37 @@ const createBinaryRows = (buffer: Buffer, maxRows: number): Record<string, MrSca
 
 const createRawCrossingTextPreview = (
   fileName: string,
-  buffer: Buffer,
+  buffer: CtcRawCrossingInput,
   maxRows: number,
 ): MrScatsDataFilePreview => {
   const lines = splitCtcRawCrossingLines(buffer);
-  const parsedRecords = parseCtcRawCrossingFile(buffer);
+  const format: CtcRawCrossingFormat = path.extname(fileName).toLowerCase() === '.erf' ? 'erf' : 'srt';
+  const parsedRecords = parseCtcRawCrossingFile(buffer, format);
   const parsedRowsByLine = new Map(parsedRecords.map((record) => [record.recordNumber, record]));
   const rows = lines.slice(0, maxRows).map((line, index) => {
     const parsedRecord = parsedRowsByLine.get(index + 1);
     return {
       'Line number': index + 1,
       'Record type': parsedRecord?.specialType || parsedRecord?.drtCode || '',
+      'Source timestamp': stringifyPreviewValue(parsedRecord?.sourceTimestampTicks),
       'Time of day': parsedRecord?.timeText || '',
       'Time ticks': stringifyPreviewValue(parsedRecord?.rawTimeTicks),
+      'Time machine': stringifyPreviewValue(parsedRecord?.timeMachine),
       TxNo: stringifyPreviewValue(parsedRecord?.transmitter),
       Line: stringifyPreviewValue(parsedRecord?.lineNumber),
       Loop: stringifyPreviewValue(parsedRecord?.laneNumber),
       Confidence: stringifyPreviewValue(parsedRecord?.confidence),
+      Errors: stringifyPreviewValue(parsedRecord?.errors),
       Hits: stringifyPreviewValue(parsedRecord?.hitCount),
+      Sequence: stringifyPreviewValue(parsedRecord?.sequence),
       Status: stringifyPreviewValue(parsedRecord?.status),
-      'Raw crossing data': line,
+      'Secondary TxNo': stringifyPreviewValue(parsedRecord?.secondaryTransmitter),
+      'Source record': line,
     };
   });
 
   return {
-    columns: ['Line number', 'Record type', 'Time of day', 'Time ticks', 'TxNo', 'Line', 'Loop', 'Confidence', 'Hits', 'Status', 'Raw crossing data'],
+    columns: ['Line number', 'Record type', 'Source timestamp', 'Time of day', 'Time ticks', 'Time machine', 'TxNo', 'Line', 'Loop', 'Confidence', 'Sequence', 'Hits', 'Errors', 'Status', 'Secondary TxNo', 'Source record'],
     displayedRowCount: rows.length,
     fileKind: 'raw-crossing-text',
     fileName,
@@ -425,7 +431,11 @@ const createRawCrossingTextPreview = (
     recordCount: lines.length,
     rows,
     warnings: [
-      'CTC/Data-1 raw crossing files are plain-text records split by carriage-return style line breaks, not dBase tables.',
+      `CTC/Data-1 ${format.toUpperCase()} records are plain-text rows split by carriage-return style line breaks, not dBase tables.`,
+      format === 'erf'
+        ? 'Legacy ERF 04/05 crossings use a one-digit sequence field, a three-digit status, and a two-digit error count.'
+        : 'SRT crossings use the normalised three-digit status and trailing three-digit error field.',
+      'ERF type-60 rows are Time Machine clock readings, while types 00 and 01 carry three-digit transmitter and line identifiers.',
       'Where visible-time SRT rows are present, compact and control records derive authoritative time-of-day values from the same file offset.',
     ],
   };
@@ -594,6 +604,14 @@ const findRelatedDbfCandidates = (relativePath: string): string[] => {
   }
 
   return [inSameDirectory(`${baseName}.DBF`), inSameDirectory(`${baseName}.NO1`)];
+};
+
+export const previewCtcRawCrossingBuffer = (
+  filePath: string,
+  buffer: CtcRawCrossingInput,
+  maxRows: number = DEFAULT_MAX_ROWS
+): MrScatsDataFilePreview => {
+  return createRawCrossingTextPreview(path.basename(filePath), buffer, maxRows);
 };
 
 const readRelatedDbfBuffer = async (

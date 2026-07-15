@@ -1,4 +1,5 @@
-import { loadDorianCtcSrtCatalog } from './srtCatalogImport.js';
+import { createEventId, createSessionId } from '../../model/ids.js';
+import { loadDorianCtcSrtCatalog, loadDorianCtcSrtCatalogForSession } from './srtCatalogImport.js';
 
 describe('Dorian CTC SRT catalog import', () => {
   it('creates one competitor-free session while preserving raw crossing metadata', () => {
@@ -23,13 +24,6 @@ describe('Dorian CTC SRT catalog import', () => {
     expect(catalog.raceState.participants).toEqual([]);
     expect(catalog.raceState.records).toEqual([
       expect.objectContaining({
-        chipCode: 6008,
-        confidenceFactor: undefined,
-        dataLine: '600881437728440008814377286801 021 19:48:48.6801 00',
-        originRecordNumber: 1,
-        time: new Date('2026-07-14T19:48:48.680Z'),
-      }),
-      expect.objectContaining({
         chipCode: 130,
         confidenceFactor: 255,
         hitCount: 2,
@@ -39,5 +33,60 @@ describe('Dorian CTC SRT catalog import', () => {
         time: new Date('2026-07-14T19:55:49.697Z'),
       }),
     ]);
+  });
+
+  it('imports ERF records into the supplied event session and reports line progress', async () => {
+    const eventId = createEventId('event-under-import');
+    const sessionId = createSessionId('session-under-import');
+    const progress: Array<{ completed: number; total: number }> = [];
+
+    const raceState = await loadDorianCtcSrtCatalogForSession(
+      'C:/timing/race-2.erf',
+      Buffer.from([
+        '040000000010000012340302064000',
+        '040000000020000012340401063016',
+      ].join('\r')),
+      {
+        eventDate: '2026-07-14',
+        eventId,
+        onProgress: (update) => {
+          progress.push({ completed: update.completed, total: update.total });
+        },
+        sessionId,
+      }
+    );
+
+    expect(raceState.records).toEqual([
+      expect.objectContaining({ chipCode: 1234, eventId, sessionId }),
+      expect.objectContaining({ chipCode: 1234, eventId, sessionId }),
+    ]);
+    expect(raceState.records?.every((record) => !('participantId' in record) || record.participantId === undefined)).toBe(true);
+    expect(raceState.timeRecordSources).toEqual([expect.objectContaining({ name: 'race-2.erf' })]);
+    expect(progress).toContainEqual({ completed: 0, total: 2 });
+    expect(progress).toContainEqual({ completed: 2, total: 2 });
+  });
+
+  it('interprets SRT and ERF time-of-day records in the configured event time zone', async () => {
+    const eventId = createEventId('time-zone-event');
+    const sessionId = createSessionId('time-zone-session');
+
+    const raceState = await loadDorianCtcSrtCatalogForSession(
+      'C:/timing/race-3.erf',
+      Buffer.from([
+        '600881437728440008814377286801 021 19:48:48.6801 00',
+        '040881438149697001300108255000002',
+      ].join('\r')),
+      {
+        eventDate: '2026-07-14',
+        eventId,
+        sessionId,
+        timeZone: 'Australia/Perth',
+      }
+    );
+
+    expect(raceState.records?.[0]).toEqual(expect.objectContaining({
+      time: new Date('2026-07-14T11:55:49.697Z'),
+      timeTenthOfMillisecond: 0,
+    }));
   });
 });

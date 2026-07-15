@@ -31,8 +31,11 @@ export interface MasterEntrantSourceConfig {
   profiles: MasterEntrantProfile[];
 }
 
+export type DataImportMode = 'import' | 'update';
+
 export interface LocalFileSourceConfig {
   filePath?: string;
+  importMode?: DataImportMode;
 }
 
 export interface MrScatsSourceConfig {
@@ -230,6 +233,7 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListed
       ...source,
       fileConfig: {
         filePath: normalizeOptionalSystemFilePath(source.fileConfig?.filePath),
+        importMode: source.fileConfig?.importMode === 'update' ? 'update' : 'import',
       },
       finishLineNumbers: normalizeFinishLineNumbers(source.finishLineNumbers) || [1],
     };

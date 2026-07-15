@@ -151,6 +151,10 @@ const migrateLegacyCategoryAssignments = (state: EventCatalogState): EventCatalo
     sessions: state.sessions.map((session) => {
       const categoryIds = activeCategories.reduce<EventCategoryId[]>((assignedCategoryIds, category) => {
         const isAssigned = getLegacyCategorySessionAssignments(category).some((assignment) => {
+          if (category.eventId !== session.eventId) {
+            return false;
+          }
+
           if (isValidId(assignment.sessionId)) {
             return assignment.sessionId === session.id;
           }

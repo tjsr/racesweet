@@ -1,7 +1,7 @@
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { previewMrScatsDataFile } from './filePreview.js';
+import { previewCtcRawCrossingBuffer, previewMrScatsDataFile } from './filePreview.js';
 
 interface DbfField {
   length: number;
@@ -325,7 +325,7 @@ describe('MR-SCATS file preview', () => {
     const preview = await previewMrScatsDataFile(tempDir, 'W9721R10.SRT', 'raw-crossing-text');
 
     expect(preview).toEqual(expect.objectContaining({
-      columns: ['Line number', 'Record type', 'Time of day', 'Time ticks', 'TxNo', 'Line', 'Loop', 'Confidence', 'Hits', 'Status', 'Raw crossing data'],
+      columns: ['Line number', 'Record type', 'Source timestamp', 'Time of day', 'Time ticks', 'Time machine', 'TxNo', 'Line', 'Loop', 'Confidence', 'Sequence', 'Hits', 'Errors', 'Status', 'Secondary TxNo', 'Source record'],
       displayedRowCount: 3,
       fileKind: 'raw-crossing-text',
       parser: 'text',
@@ -334,46 +334,101 @@ describe('MR-SCATS file preview', () => {
     expect(preview.rows).toEqual([
       {
         Confidence: '',
+        Errors: '',
         Hits: '',
         Line: '',
         'Line number': 1,
         Loop: '',
-        'Raw crossing data': '600881437728440008814377286801 021 19:48:48.6801 00',
-        'Record type': 'SRT',
+        'Secondary TxNo': '',
+        'Source record': '600881437728440008814377286801 021 19:48:48.6801 00',
+        'Source timestamp': 8814377284400,
+        'Record type': '60',
+        Sequence: '',
         Status: '00',
         'Time of day': '19:48:48.6801',
+        'Time machine': '021',
         'Time ticks': 713286801,
-        TxNo: 6008,
+        TxNo: '',
       },
       {
         Confidence: '255',
+        Errors: '',
         Hits: 2,
         Line: 1,
         'Line number': 2,
         Loop: 8,
-        'Raw crossing data': '040881438149697001300108255000002',
+        'Secondary TxNo': '',
+        'Source record': '040881438149697001300108255000002',
+        'Source timestamp': '',
         'Record type': '04',
+        Sequence: '',
         Status: '000',
         'Time of day': '19:55:49.6970',
+        'Time machine': '',
         'Time ticks': 717496970,
         TxNo: 130,
       },
       {
         Confidence: '',
+        Errors: '',
         Hits: '',
         Line: '',
         'Line number': 3,
         Loop: '',
-        'Raw crossing data': '4D08814381718986',
+        'Secondary TxNo': '',
+        'Source record': '4D08814381718986',
+        'Source timestamp': '',
         'Record type': 'yellow-flag',
+        Sequence: '',
         Status: '',
         'Time of day': '19:56:11.8986',
+        'Time machine': '',
         'Time ticks': 717718986,
         TxNo: '',
       },
     ]);
     expect(preview.warnings.join(' ')).toContain('not dBase tables');
     expect(preview.warnings.join(' ')).toContain('authoritative time-of-day values');
+  });
+
+  it('previews a standalone selected ERF buffer with the raw crossing parser', () => {
+    const preview = previewCtcRawCrossingBuffer('C:/timing/INDY500.ERF', Buffer.from([
+      '600675258828590006752588285031 211 11:53:48.5031 00',
+      '000675258827810809201206219000000',
+    ].join('\r'), 'latin1'));
+
+    expect(preview).toEqual(expect.objectContaining({
+      fileName: 'INDY500.ERF',
+      parser: 'text',
+      recordCount: 2,
+    }));
+    expect(preview.rows[0]).toEqual(expect.objectContaining({
+      'Source timestamp': 6752588285900,
+      Status: '00',
+      'Time machine': '211',
+      TxNo: '',
+    }));
+    expect(preview.rows[1]).toEqual(expect.objectContaining({
+      Confidence: '219',
+      Line: 12,
+      Loop: 6,
+      'Secondary TxNo': 0,
+      TxNo: 92,
+    }));
+    expect(preview.warnings.join(' ')).toContain('Time Machine clock readings');
+  });
+
+  it('previews all Electron IPC Uint8Array ERF rows instead of one comma-separated byte row', () => {
+    const preview = previewCtcRawCrossingBuffer('C:/timing/INDY500.ERF', new Uint8Array(Buffer.from([
+      '000675258827810809201206219000000',
+      '000675258828748906501208213000000',
+    ].join('\r'), 'latin1')));
+
+    expect(preview.recordCount).toBe(2);
+    expect(preview.rows.map((row) => row['Source record'])).toEqual([
+      '000675258827810809201206219000000',
+      '000675258828748906501208213000000',
+    ]);
   });
 
   it('previews AT1 files as DBF-compatible tables instead of raw crossing text', async () => {

@@ -2,6 +2,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createTimeRecordSourceId } from '../../model/ids.js';
+import { RECORD_TX_CROSSING } from '../../model/timerecord.js';
 import { loadMrScatsCatalogFromLocation, MR_SCATS_DEFAULT_MINIMUM_LAP_TIME, MR_SCATS_DEFAULT_TIME_ZONE } from './catalogImport.js';
 
 interface DbfField {
@@ -1576,7 +1577,7 @@ describe('MR-SCATS catalog import parser', () => {
     expect(imported.sessions[0]?.scheduledStart).toBe('1997-12-06T20:27:35.000Z');
   });
 
-  it('uses explicit legacy SRT time-of-day text when present', async () => {
+  it('does not import legacy Time Machine clock rows as transmitter crossings', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-catalog-'));
     await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
       { length: 8, name: 'EV_CODE', type: 'C' },
@@ -1598,13 +1599,9 @@ describe('MR-SCATS catalog import parser', () => {
     await writeFile(path.join(tempDir, 'W9721R01.SRT'), '600817997112730108179971116301 071 13:25:11.6301 00\r');
 
     const imported = await loadMrScatsCatalogFromLocation(tempDir);
-    const crossing = imported.raceState.records?.[1] as Record<string, unknown> | undefined;
+    const crossings = imported.raceState.records?.filter((record) => record.recordType === RECORD_TX_CROSSING) || [];
 
-    expect(crossing).toEqual(expect.objectContaining({
-      chipCode: 6008,
-      time: new Date('1997-06-29T03:25:11.630Z'),
-      timeTenthOfMillisecond: 1,
-    }));
+    expect(crossings).toEqual([]);
   });
 
   it('falls back to the previous SRT file segment for missing race files and imports yellow plus green-resume flags', async () => {

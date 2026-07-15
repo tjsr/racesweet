@@ -864,7 +864,9 @@ const assertUuid = (errors: string[], label: string, value: string | undefined):
 const validateEventCatalogStateIds = (state: EventCatalogState): void => {
   const errors: string[] = [];
   const eventsById = new Map(state.events.map((event) => [event.id, event]));
-  const categoriesById = new Map(state.categories.map((category) => [category.id, category]));
+  const categoriesById = new Map(state.categories
+    .filter((category) => category.deleted !== true)
+    .map((category) => [category.id, category]));
   const entrantsById = new Map(state.entrants.map((entrant) => [entrant.id, entrant]));
   const sessionsById = new Map(state.sessions.map((session) => [session.id, session]));
   const deletedEventIds = new Set(state.deletedEventIds);
@@ -897,6 +899,12 @@ const validateEventCatalogStateIds = (state: EventCatalogState): void => {
     if (!eventsById.has(session.eventId) && !deletedEventIds.has(session.eventId)) {
       errors.push(`session ${session.id} references missing parent event ${session.eventId}.`);
     }
+    session.categoryIds.forEach((categoryId) => {
+      const category = categoriesById.get(categoryId);
+      if (!category || category.eventId !== session.eventId) {
+        errors.push(`session ${session.id} categoryIds contains ${categoryId}, but that category does not belong to the session event ${session.eventId}.`);
+      }
+    });
   });
   if (state.activeEventId) {
     assertUuid(errors, 'activeEventId', state.activeEventId);
@@ -945,7 +953,7 @@ const createLedgerRelationshipRepairMutations = (state: EventCatalogState): Even
   const entrantsByEventId = new Map<string, string[]>();
   const sessionsByEventId = new Map<string, string[]>();
 
-  state.categories.forEach((category) => {
+  state.categories.filter((category) => category.deleted !== true).forEach((category) => {
     categoriesByEventId.set(category.eventId, [...(categoriesByEventId.get(category.eventId) || []), category.id]);
   });
   state.entrants.forEach((entrant) => {
@@ -955,7 +963,7 @@ const createLedgerRelationshipRepairMutations = (state: EventCatalogState): Even
     sessionsByEventId.set(session.eventId, [...(sessionsByEventId.get(session.eventId) || []), session.id]);
   });
 
-  return state.events.flatMap((event) => {
+  const eventRelationshipRepairs = state.events.flatMap((event) => {
     const categoryIds = unique([
       ...event.categoryIds.filter((categoryId) => categoriesByEventId.get(event.id)?.includes(categoryId)),
       ...(categoriesByEventId.get(event.id) || []),
@@ -989,6 +997,47 @@ const createLedgerRelationshipRepairMutations = (state: EventCatalogState): Even
       type: 'event-updated' as const,
     }];
   });
+  const sessionRelationshipRepairs = state.sessions.flatMap((session) => {
+    const categoryIds = unique(session.categoryIds.filter((categoryId) => categoriesByEventId.get(session.eventId)?.includes(categoryId)));
+    if (hasSameMembers(session.categoryIds, categoryIds)) {
+      return [];
+    }
+
+    return [{
+      changes: {
+        categoryIds,
+      },
+      id: createMutationId(),
+      sessionId: session.id,
+      timestamp: createTimestamp(),
+      type: 'session-updated' as const,
+    }];
+  });
+
+  return [...eventRelationshipRepairs, ...sessionRelationshipRepairs];
+};
+
+const assertSessionCategoryIdsBelongToEvent = (
+  state: EventCatalogState,
+  sessionId: SessionId,
+  categoryIds: string[] | undefined
+): void => {
+  if (!categoryIds) {
+    return;
+  }
+
+  const session = state.sessions.find((candidate) => candidate.id === sessionId);
+  if (!session) {
+    throw new Error(`Cannot assign categories because session ${sessionId} does not exist.`);
+  }
+
+  const categoriesById = new Map(state.categories
+    .filter((category) => category.deleted !== true)
+    .map((category) => [category.id, category]));
+  const invalidCategoryIds = categoryIds.filter((categoryId) => categoriesById.get(categoryId)?.eventId !== session.eventId);
+  if (invalidCategoryIds.length > 0) {
+    throw new Error(`Cannot assign categories from another event to session ${sessionId}: ${invalidCategoryIds.join(', ')}.`);
+  }
 };
 
 const repairAndValidateLoadedLedger = async (ledger: EventCatalogLedger): Promise<EventCatalogLedger> => {
@@ -1148,7 +1197,8 @@ export class EventCatalogService {
     masterProfiles: MasterEntrantProfile[] = [],
     teams: EventTeam[] = [],
     assignedSessionId?: SessionId,
-    onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP
+    onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP,
+    replaceAssignedSessionScaffold = false
   ): Promise<EventCatalogState> {
     incrementLoadingMetric('Sync event scaffold', eventId);
     const event = this.state.events.find((item) => item.id === eventId);
@@ -1208,16 +1258,24 @@ export class EventCatalogService {
       };
     }).filter((mutation): mutation is NonNullable<typeof mutation> => mutation !== undefined);
 
+    const categoryIdsAssignedOutsideSession = new Set(this.state.sessions
+      .filter((session) => session.eventId === eventId && session.id !== assignedSessionId)
+      .flatMap((session) => session.categoryIds));
+    const removedSessionCategoryIds = replaceAssignedSessionScaffold && assignedSession
+      ? assignedSession.categoryIds.filter((categoryId) => !categoryIds.includes(categoryId) && !categoryIdsAssignedOutsideSession.has(categoryId))
+      : [];
+    const nextAssignedSessionCategoryIds = assignedSession
+      ? (replaceAssignedSessionScaffold ? categoryIds : mergeSessionCategoryIds(assignedSession.categoryIds, categoryIds))
+      : [];
     const sessionCategoryMutation = assignedSession
       ? (() => {
-        const nextCategoryIds = mergeSessionCategoryIds(assignedSession.categoryIds, categoryIds);
-        if (hasSameMembers(assignedSession.categoryIds || [], nextCategoryIds)) {
+        if (hasSameMembers(assignedSession.categoryIds || [], nextAssignedSessionCategoryIds)) {
           return undefined;
         }
 
         return {
           changes: {
-            categoryIds: nextCategoryIds,
+            categoryIds: nextAssignedSessionCategoryIds,
           },
           id: createMutationId(),
           sessionId: assignedSession.id,
@@ -1280,11 +1338,24 @@ export class EventCatalogService {
       timestamp: createTimestamp(),
       type: 'entrant-deleted' as const,
     }));
+    const removedEntrantMutations = replaceAssignedSessionScaffold
+      ? getEntrantsForEvent(this.state, eventId)
+        .filter((entrant) => !entrants.some((incomingEntrant) => incomingEntrant.id === entrant.id))
+        .filter((entrant) => !this.importedRaceStateReferencesEntrant(eventId, entrant.id))
+        .map((entrant) => ({
+          entrantId: entrant.id,
+          id: createMutationId(),
+          timestamp: createTimestamp(),
+          type: 'entrant-deleted' as const,
+        }))
+      : [];
 
     const eventCategoryIds = [...(event?.categoryIds || [])];
     const eventEntrantIds = [...(event?.entrantIds || [])];
     const eventSessionIds = [...(event?.sessionIds || [])];
-    const nextEventCategoryIds = unique([...eventCategoryIds, ...categoryIds]);
+    const nextEventCategoryIds = replaceAssignedSessionScaffold
+      ? unique([...eventCategoryIds.filter((categoryId) => !removedSessionCategoryIds.includes(categoryId)), ...categoryIds])
+      : unique([...eventCategoryIds, ...categoryIds]);
     const nextEventEntrantIds = unique(entrants.map((entrant) => entrant.id.toString()));
     const nextEventSessionIds = eventSessionIds;
     const eventChanges = event && (
@@ -1297,7 +1368,17 @@ export class EventCatalogService {
       sessionIds: nextEventSessionIds,
     } : undefined;
 
-    if (categoryMutations.length === 0 && entrantMutations.length === 0 && staleDuplicateEntrantMutations.length === 0 && !eventChanges) {
+    const removedCategoryMutations = removedSessionCategoryIds
+      .map((categoryId) => existingCategoriesById.get(categoryId))
+      .filter((category): category is EventCatalogCategory => category !== undefined)
+      .map((category) => ({
+        categoryId: category.id,
+        id: createMutationId(),
+        timestamp: createTimestamp(),
+        type: 'category-deleted' as const,
+      }));
+
+    if (categoryMutations.length === 0 && entrantMutations.length === 0 && staleDuplicateEntrantMutations.length === 0 && removedEntrantMutations.length === 0 && removedCategoryMutations.length === 0 && !eventChanges) {
       if (!sessionCategoryMutation) {
         return this.state;
       }
@@ -1305,8 +1386,10 @@ export class EventCatalogService {
 
     return this.appendMutations([
       ...categoryMutations,
+      ...removedCategoryMutations,
       ...entrantMutations,
       ...staleDuplicateEntrantMutations,
+      ...removedEntrantMutations,
       ...(sessionCategoryMutation ? [sessionCategoryMutation] : []),
       ...(eventChanges ? [{
         changes: eventChanges,
@@ -1583,12 +1666,30 @@ export class EventCatalogService {
     return this.runMutationBatch(async () => this.updateImportedRaceStateUnbatched(eventId, sessionId, raceState, onCompleteStep, apicalDataFilePath));
   }
 
+  public async replaceImportedRaceState(
+    eventId: EventId,
+    sessionId: SessionId,
+    raceState: Partial<RaceState>,
+    apicalDataFilePath?: string,
+    onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP
+  ): Promise<EventCatalogState> {
+    return this.runMutationBatch(async () => this.updateImportedRaceStateUnbatched(
+      eventId,
+      sessionId,
+      raceState,
+      onCompleteStep,
+      apicalDataFilePath,
+      true
+    ));
+  }
+
   private async updateImportedRaceStateUnbatched(
     eventId: EventId,
     sessionId: SessionId,
     raceState: Partial<RaceState>,
     onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP,
-    apicalDataFilePath?: string
+    apicalDataFilePath?: string,
+    replaceAssignedSessionScaffold = false
   ): Promise<EventCatalogState> {
     const normalizedRaceState = normalizeImportedRaceStateForEvent(
       rewriteImportedObjectIds(raceState).value,
@@ -1621,7 +1722,8 @@ export class EventCatalogService {
       [],
       normalizedRaceState.teams || [],
       sessionId,
-      onCompleteStep
+      onCompleteStep,
+      replaceAssignedSessionScaffold
     );
   }
 
@@ -1713,6 +1815,7 @@ export class EventCatalogService {
   }
 
   public async updateSession(sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'kind' | 'minimumLapTimeMilliseconds' | 'name' | 'notes' | 'scheduledStart' | 'status'>>, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
+    assertSessionCategoryIdsBelongToEvent(this.state, sessionId, changes.categoryIds);
     return this.appendMutations([
       {
         changes,
@@ -1730,6 +1833,7 @@ export class EventCatalogService {
       sessionId: SessionId;
     }>, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP
   ): Promise<EventCatalogState> {
+    updates.forEach((update) => assertSessionCategoryIdsBelongToEvent(this.state, update.sessionId, update.changes.categoryIds));
     return this.appendMutations(updates.map((update) => ({
       changes: update.changes,
       id: createMutationId(),

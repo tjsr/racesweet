@@ -1,20 +1,61 @@
 import path from 'node:path';
+import { TZDate } from '@date-fns/tz';
+import { normalizeTimeZone } from '../../app/utils/timeutils.js';
 import { createEventId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
-import type { EventId } from '../../model/raceevent.js';
+import type { EventId, SessionId } from '../../model/raceevent.js';
 import type { RaceState } from '../../model/racestate.js';
 import { RECORD_TX_CROSSING, type EventTimeRecord, type ParticipantPassingRecord } from '../../model/timerecord.js';
 import { MR_SCATS_DEFAULT_MINIMUM_LAP_TIME, type MrScatsCatalogImport } from '../mrScats/catalogImport.js';
-import { parseCtcRawCrossingFile, type CtcRawCrossingRecord } from './rawCrossing.js';
+import { parseCtcRawCrossingFile, splitCtcRawCrossingLines, type CtcRawCrossingFormat, type CtcRawCrossingRecord } from './rawCrossing.js';
 
 const DEFAULT_EVENT_DATE = '1970-01-01';
 const TICKS_PER_DAY = 24 * 60 * 60 * 10_000;
 
-const createTimeOfDay = (eventDate: string, record: CtcRawCrossingRecord): Date => {
+const getRawCrossingFormat = (filePath: string): CtcRawCrossingFormat => {
+  return path.extname(filePath).toLowerCase() === '.erf' ? 'erf' : 'srt';
+};
+
+export interface DorianCtcSrtLoadProgress {
+  completed: number;
+  currentFile: string;
+  currentTask: string;
+  total: number;
+}
+
+export interface DorianCtcSrtSessionLoadOptions {
+  eventDate: string;
+  eventId: EventId;
+  onProgress?: (progress: DorianCtcSrtLoadProgress) => void | Promise<void>;
+  sessionId: SessionId;
+  timeZone?: string;
+}
+
+const createTimeOfDay = (eventDate: string, record: CtcRawCrossingRecord, timeZone = 'UTC'): Date => {
   const ticks = record.rawTimeTicks % TICKS_PER_DAY;
   const milliseconds = Math.floor(ticks / 10);
-  const parsedDate = Date.parse(`${eventDate}T00:00:00.000Z`);
-  const midnight = Number.isNaN(parsedDate) ? Date.parse(`${DEFAULT_EVENT_DATE}T00:00:00.000Z`) : parsedDate;
-  return new Date(midnight + milliseconds);
+  const [yearText, monthText, dayText] = (eventDate || DEFAULT_EVENT_DATE).split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const fallbackDate = DEFAULT_EVENT_DATE.split('-').map(Number);
+  const dateYear = Number.isInteger(year) ? year : fallbackDate[0];
+  const dateMonth = Number.isInteger(month) ? month : fallbackDate[1];
+  const dateDay = Number.isInteger(day) ? day : fallbackDate[2];
+  const hours = Math.floor(milliseconds / 3_600_000);
+  const minutes = Math.floor((milliseconds % 3_600_000) / 60_000);
+  const seconds = Math.floor((milliseconds % 60_000) / 1_000);
+  const millisecond = milliseconds % 1_000;
+  const zonedDate = new TZDate(
+    dateYear,
+    dateMonth - 1,
+    dateDay,
+    hours,
+    minutes,
+    seconds,
+    millisecond,
+    normalizeTimeZone(timeZone)
+  );
+  return new Date(zonedDate.getTime());
 };
 
 const createCrossingRecord = (
@@ -23,6 +64,7 @@ const createCrossingRecord = (
   sourceId: ReturnType<typeof createTimeRecordSourceId>,
   filePath: string,
   eventDate: string,
+  timeZone: string | undefined,
   record: CtcRawCrossingRecord,
   sequence: number
 ): EventTimeRecord | undefined => {
@@ -47,22 +89,22 @@ const createCrossingRecord = (
     sequence,
     sessionId,
     source: sourceId,
-    time: createTimeOfDay(eventDate, record),
+    time: createTimeOfDay(eventDate, record, timeZone),
     timeTenthOfMillisecond: record.rawTimeTicks % 10,
   };
 
   return crossing;
 };
 
-export const loadDorianCtcSrtCatalog = (filePath: string, buffer: Buffer, eventDate = DEFAULT_EVENT_DATE): MrScatsCatalogImport => {
+export const loadDorianCtcSrtCatalog = (filePath: string, buffer: Buffer, eventDate = DEFAULT_EVENT_DATE, timeZone = 'UTC'): MrScatsCatalogImport => {
   const normalizedFilePath = path.resolve(filePath);
   const baseName = path.basename(normalizedFilePath, path.extname(normalizedFilePath));
   const eventId = createEventId(`dorian-ctc-srt:${normalizedFilePath}:event`);
   const sessionId = createSessionId(`dorian-ctc-srt:${normalizedFilePath}:session`);
   const sourceId = createTimeRecordSourceId(`dorian-ctc-srt:${normalizedFilePath}:source`);
-  const rawRecords = parseCtcRawCrossingFile(buffer);
+  const rawRecords = parseCtcRawCrossingFile(buffer, getRawCrossingFormat(normalizedFilePath));
   const records = rawRecords
-    .map((record, index) => createCrossingRecord(eventId, sessionId, sourceId, normalizedFilePath, eventDate, record, index + 1))
+    .map((record, index) => createCrossingRecord(eventId, sessionId, sourceId, normalizedFilePath, eventDate, timeZone, record, index + 1))
     .filter((record): record is EventTimeRecord => record !== undefined);
   const firstTime = records[0]?.time || new Date(`${eventDate}T00:00:00.000Z`);
   const raceState: Partial<RaceState> = {
@@ -91,6 +133,72 @@ export const loadDorianCtcSrtCatalog = (filePath: string, buffer: Buffer, eventD
       minimumLapTimeMilliseconds: MR_SCATS_DEFAULT_MINIMUM_LAP_TIME,
       name: baseName || 'Dorian CTC SRT Import',
       scheduledStart: firstTime.toISOString(),
+    }],
+  };
+};
+
+export const loadDorianCtcSrtCatalogForSession = async (
+  filePath: string,
+  buffer: Buffer,
+  options: DorianCtcSrtSessionLoadOptions
+): Promise<Partial<RaceState>> => {
+  const normalizedFilePath = path.resolve(filePath);
+  const sourceId = createTimeRecordSourceId(`dorian-ctc-srt:${normalizedFilePath}:source`);
+  const rawRecords = parseCtcRawCrossingFile(buffer, getRawCrossingFormat(normalizedFilePath));
+  const total = splitCtcRawCrossingLines(buffer).length;
+  const progressBase = {
+    currentFile: path.basename(normalizedFilePath),
+    total,
+  };
+  await options.onProgress?.({
+    ...progressBase,
+    completed: 0,
+    currentTask: 'Reading CTC crossing lines',
+  });
+
+  const records: EventTimeRecord[] = [];
+  let lastProgressAt = Date.now();
+  for (const [index, record] of rawRecords.entries()) {
+    const crossing = createCrossingRecord(
+      options.eventId,
+      options.sessionId,
+      sourceId,
+      normalizedFilePath,
+      options.eventDate,
+      options.timeZone,
+      record,
+      index + 1
+    );
+    if (crossing) {
+      records.push(crossing);
+    }
+
+    if (Date.now() - lastProgressAt >= 50 || record.recordNumber === total) {
+      lastProgressAt = Date.now();
+      await options.onProgress?.({
+        ...progressBase,
+        completed: record.recordNumber,
+        currentTask: 'Importing CTC crossing lines',
+      });
+    }
+  }
+
+  await options.onProgress?.({
+    ...progressBase,
+    completed: total,
+    currentTask: 'CTC file import complete',
+  });
+
+  return {
+    categories: [],
+    participants: [],
+    records,
+    teams: [],
+    timeRecordSources: [{
+      description: 'Imported Dorian CTC SRT/ERF raw crossing records.',
+      filePath: normalizedFilePath,
+      id: sourceId,
+      name: path.basename(normalizedFilePath),
     }],
   };
 };

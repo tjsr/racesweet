@@ -8,6 +8,22 @@ describe('CTC raw crossing parser', () => {
     ]);
   });
 
+  it('splits control-delimited legacy raw records into separate preview and import rows', () => {
+    expect(splitCtcRawCrossingLines('040000000010000012340302064000\u001e040000000020000056780101063016\u0000')).toEqual([
+      '040000000010000012340302064000',
+      '040000000020000056780101063016',
+    ]);
+  });
+
+  it('splits an Electron IPC Uint8Array payload by its carriage-return line boundaries', () => {
+    const payload = new Uint8Array(Buffer.from('000675258827810809201206219000000\r000675258828748906501208213000000\r', 'latin1'));
+
+    expect(splitCtcRawCrossingLines(payload)).toEqual([
+      '000675258827810809201206219000000',
+      '000675258828748906501208213000000',
+    ]);
+  });
+
   it('parses the compact CTC timing record layout from SRT files', () => {
     expect(parseCtcRawCrossingLine('040000000010000012340302064000', 7)).toEqual(expect.objectContaining({
       absoluteTimeTicks: 100000,
@@ -20,6 +36,45 @@ describe('CTC raw crossing parser', () => {
       recordNumber: 7,
       status: '000',
       transmitter: 1234,
+    }));
+  });
+
+  it('parses the legacy ERF 04 layout with its sequence, status, and error fields', () => {
+    expect(parseCtcRawCrossingLine('040787086535631800570206255400002', 4, 'erf')).toEqual(expect.objectContaining({
+      absoluteTimeTicks: 7870865356318,
+      confidence: '255',
+      drtCode: '04',
+      errors: 2,
+      hitCount: undefined,
+      laneNumber: 6,
+      lineNumber: 2,
+      sequence: 4,
+      status: '000',
+      transmitter: 57,
+    }));
+  });
+
+  it('parses INDY500 ERF type-60 Time Machine clock rows separately from crossings', () => {
+    expect(parseCtcRawCrossingLine('600675258828590006752588285031 211 11:53:48.5031 00', 1, 'erf')).toEqual(expect.objectContaining({
+      absoluteTimeTicks: 6752588285031,
+      drtCode: '60',
+      rawTimeTicks: 428285031,
+      sourceTimestampTicks: 6752588285900,
+      status: '00',
+      timeMachine: '211',
+      timeText: '11:53:48.5031',
+    }));
+  });
+
+  it('parses INDY500 ERF type-00 crossings with three-digit transmitter and line fields', () => {
+    expect(parseCtcRawCrossingLine('000675258827810809201206219000000', 2, 'erf')).toEqual(expect.objectContaining({
+      confidence: '219',
+      drtCode: '00',
+      laneNumber: 6,
+      lineNumber: 12,
+      secondaryTransmitter: 0,
+      status: '000',
+      transmitter: 92,
     }));
   });
 
@@ -40,15 +95,16 @@ describe('CTC raw crossing parser', () => {
     ]);
   });
 
-  it('parses legacy visible-time SRT records as authoritative time-of-day rows', () => {
+  it('parses legacy visible-time SRT records as Time Machine clock rows', () => {
     expect(parseCtcRawCrossingLine('600817997112730008179971116300 071 13:25:11.6300 00', 3)).toEqual(expect.objectContaining({
-      drtCode: 'SRT',
+      drtCode: '60',
       raw: '600817997112730008179971116300 071 13:25:11.6300 00',
       rawTimeTicks: 483116300,
       recordNumber: 3,
+      sourceTimestampTicks: 8179971127300,
       status: '00',
+      timeMachine: '071',
       timeText: '13:25:11.6300',
-      transmitter: 6008,
     }));
   });
 

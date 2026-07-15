@@ -718,7 +718,9 @@
 .mr-scats-preview-dialog {
   box-sizing: border-box;
   max-height: 90vh;
+  max-width: 90vw;
   overflow: hidden;
+  width: 90vw;
 }
 
 .mr-scats-preview-dialog .warning-modal-heading,
@@ -737,6 +739,28 @@
 
 .mr-scats-preview-content table {
   flex: 0 0 auto;
+  min-width: 100%;
+  table-layout: auto;
+  width: max-content;
+}
+
+.mr-scats-preview-content th,
+.mr-scats-preview-content td {
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.mr-scats-preview-content th:last-child,
+.mr-scats-preview-content td:last-child {
+  min-width: 32rem;
+}
+
+.mr-scats-preview-content tbody tr:nth-child(odd) {
+  background-color: transparent;
+}
+
+.mr-scats-preview-content tbody tr:nth-child(even) {
+  background-color: #e5e7eb;
 }
 
 .mr-scats-preview-calculated-cell {

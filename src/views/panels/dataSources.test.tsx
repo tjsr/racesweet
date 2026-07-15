@@ -77,6 +77,55 @@ describe('DataSourcesPanel', () => {
     expect(container.textContent).toContain('Add Data Source');
   });
 
+  it('persists the selected Dorian CTC Import or Update mode', () => {
+    const onSaveSource = vi.fn();
+    const ctcSource: DataSourceConfig = {
+      enabled: true,
+      fileConfig: {
+        filePath: 'C:/RaceTime/timing/INDY500.ERF',
+        importMode: 'import',
+      },
+      id: 'source-dorian-ctc',
+      name: 'CTC Source',
+      type: 'file-dorian-ctc-srt',
+    };
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <DataSourcesPanel
+          dataSources={[...dataSources, ctcSource]}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={vi.fn()}
+          onReprocessApicalData={vi.fn()}
+          onSaveSource={onSaveSource}
+        />,
+      );
+    });
+
+    const ctcRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('CTC Source'));
+    flushSync(() => {
+      ctcRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    const updateRadio = Array.from(container.querySelectorAll('input[type="radio"]')).find((input) => input.parentElement?.textContent?.includes('Update'));
+
+    expect(updateRadio).toBeTruthy();
+    flushSync(() => {
+      updateRadio?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onSaveSource).toHaveBeenCalledWith('source-dorian-ctc', {
+      fileConfig: {
+        filePath: 'C:/RaceTime/timing/INDY500.ERF',
+        importMode: 'update',
+      },
+    });
+  });
+
   it('selects an MR-SCATS data directory and persists the discovered file list', async () => {
     const onSaveSource = vi.fn();
     const onSelectMrScatsDataDirectory = vi.fn(async () => ({

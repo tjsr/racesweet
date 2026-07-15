@@ -452,6 +452,28 @@ describe('SystemConfigService', () => {
     }));
   });
 
+  it('creates and persists the Dorian CTC Import or Update mode', async () => {
+    const persistence = createPersistence();
+    const service = await SystemConfigService.create(persistence);
+
+    await service.createSource('file-dorian-ctc-srt');
+    const source = service.state.dataSources[0];
+
+    expect(source.fileConfig).toEqual({ importMode: 'import' });
+
+    await service.updateSource(source.id, {
+      fileConfig: {
+        filePath: 'C:/RaceTime/timing/INDY500.ERF',
+        importMode: 'update',
+      },
+    });
+
+    expect(service.state.dataSources[0]?.fileConfig).toEqual({
+      filePath: 'C:\\RaceTime\\timing\\INDY500.ERF',
+      importMode: 'update',
+    });
+  });
+
   it('creates and persists MR-SCATS data source inventory config', async () => {
     const persistence = createPersistence();
     const service = await SystemConfigService.create(persistence);

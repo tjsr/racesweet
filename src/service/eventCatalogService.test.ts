@@ -1096,6 +1096,95 @@ describe('EventCatalogService', () => {
     expect(seededPersistence.save).toHaveBeenCalledTimes(4);
   });
 
+  it('replaces a session import without retaining its stale categories or entrants', async () => {
+    const persistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(persistence);
+    const staleCategoryId = createCategoryId('stale-ctc-import-category');
+    const staleEntrantId = createEventEntrantId('stale-ctc-import-entrant');
+    const staleParticipantId = createEventParticipantId('stale-ctc-import-participant');
+
+    await service.updateImportedRaceState(SEED_EVENT_ID, SEED_PRACTICE_SESSION_ID, {
+      categories: [{ id: staleCategoryId, name: 'Stale CTC Category' }],
+      participants: [{
+        categoryId: staleCategoryId,
+        currentResult: undefined,
+        entrantId: staleEntrantId,
+        firstname: 'Stale',
+        id: staleParticipantId,
+        identifiers: [],
+        lastRecordTime: null,
+        resultDuration: null,
+        surname: 'Importer',
+      }],
+      records: [],
+      teams: [],
+    });
+
+    await service.replaceImportedRaceState(SEED_EVENT_ID, SEED_PRACTICE_SESSION_ID, {
+      categories: [],
+      participants: [],
+      records: [],
+      teams: [],
+      timeRecordSources: [],
+    });
+
+    const after = service.catalog.sessions.find((session) => session.id === SEED_PRACTICE_SESSION_ID);
+    const event = service.catalog.events.find((item) => item.id === SEED_EVENT_ID);
+
+    expect(after?.categoryIds).toEqual([]);
+    expect(getCategoriesForEvent(service.catalog, SEED_EVENT_ID).find((category) => category.id === staleCategoryId)).toBeUndefined();
+    expect(getEntrantsForEvent(service.catalog, SEED_EVENT_ID).find((entrant) => entrant.id === staleEntrantId)).toBeUndefined();
+    expect(event?.categoryIds).not.toContain(staleCategoryId);
+  });
+
+  it('repairs persisted cross-event category links and rejects future session assignments', async () => {
+    let ledger = createSeedEventCatalogLedger();
+    const persistence: EventCatalogPersistence = {
+      load: vi.fn(async () => ledger),
+      save: vi.fn(async (nextLedger) => {
+        ledger = nextLedger;
+      }),
+    };
+    const service = await EventCatalogService.create(persistence);
+    await service.createEvent();
+    const secondEventId = service.catalog.events.find((event) => event.id !== SEED_EVENT_ID)?.id;
+    expect(secondEventId).toBeDefined();
+    await service.createSession(secondEventId!);
+    const secondSessionId = service.catalog.sessions.find((session) => session.eventId === secondEventId)?.id;
+    expect(secondSessionId).toBeDefined();
+
+    ledger = {
+      ...ledger,
+      mutations: [
+        ...ledger.mutations,
+        {
+          changes: { categoryIds: [SEED_PREMIER_CATEGORY_ID] },
+          eventId: secondEventId!,
+          id: createId('cross-event-event-category-repair'),
+          timestamp: '2026-07-14T00:00:00.000Z',
+          type: 'event-updated',
+        },
+        {
+          changes: { categoryIds: [SEED_PREMIER_CATEGORY_ID] },
+          id: createId('cross-event-session-category-repair'),
+          sessionId: secondSessionId!,
+          timestamp: '2026-07-14T00:00:01.000Z',
+          type: 'session-updated',
+        },
+      ],
+    };
+
+    const repairedService = await EventCatalogService.create(persistence);
+    const repairedEvent = repairedService.catalog.events.find((event) => event.id === secondEventId);
+    const repairedSession = repairedService.catalog.sessions.find((session) => session.id === secondSessionId);
+
+    expect(repairedEvent?.categoryIds).toEqual([]);
+    expect(repairedSession?.categoryIds).toEqual([]);
+    await expect(repairedService.updateSession(secondSessionId!, {
+      categoryIds: [SEED_PREMIER_CATEGORY_ID],
+    })).rejects.toThrow('Cannot assign categories from another event');
+  });
+
   it('skips writing duplicate mutations that would not change the current object state', async () => {
     const seededPersistence = createPersistence(createSeedEventCatalogLedger());
     const service = await EventCatalogService.create(seededPersistence);

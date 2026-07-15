@@ -98,9 +98,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
       : timeLabel;
     return `[${prefix}] ${session.name}`;
   };
-  const selectedTimingSession = props.timingSessionValue === 'active'
-    ? props.activeSession
-    : sortedSessions.find((session) => session.id === props.timingSessionValue);
+  const selectedTimingSession = sortedSessions.find((session) => session.id === props.timingSessionValue) || props.activeSession;
 
   return (
     <>
@@ -131,9 +129,8 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
               value={props.timingSessionValue}
               onChange={(event) => props.onSelectSession(event.target.value)}
             >
-              <option value="active">Active session ({props.activeSession?.name || 'None'})</option>
               {sortedSessions.map((session) => (
-                <option key={session.id} value={session.id}>{formatTimingSessionOption(session)}{props.activeSession?.id == session.id ? ' (Active)' : ''}</option>
+                <option key={session.id} value={session.id}>{formatTimingSessionOption(session)}{props.activeSession?.id === session.id ? ' (active)' : ''}</option>
               ))}
             </select>
             {props.timingSelectionLoading ? (
@@ -144,7 +141,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
       </div>
       <RecentRecords
         currentEventId={props.timingEvent?.id}
-        currentSessionId={props.timingSessionValue === 'active' ? props.activeSession?.id : props.timingSessionValue}
+        currentSessionId={props.timingSessionValue}
         eventTimeZone={props.eventTimeZone}
         fastestTimeIndicatorColors={props.fastestTimeIndicatorColors}
         onAddRecord={props.onAddRecord}

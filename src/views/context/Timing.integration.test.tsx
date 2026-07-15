@@ -151,7 +151,7 @@ describe('TimingContext integration', () => {
           sessions={[session]}
           timeDisplayZoneMode="event"
           timingEvent={event}
-          timingSessionValue="active"
+          timingSessionValue={session.id}
         />
       );
     };
@@ -253,7 +253,7 @@ describe('TimingContext integration', () => {
           sessions={sessions}
           timeDisplayZoneMode="event"
           timingEvent={event}
-          timingSessionValue="active"
+          timingSessionValue={sessions[2].id}
         />
       );
     });
@@ -262,9 +262,8 @@ describe('TimingContext integration', () => {
     const optionLabels = Array.from(timingSessionSelect.options).map((option) => option.text);
 
     expect(optionLabels).toEqual([
-      'Active session (Friday Qualifying)',
       '[Fri 11:00] Friday Practice',
-      '[Fri 13:00] Friday Qualifying (Active)',
+      '[Fri 13:00] Friday Qualifying (active)',
       '[Sat 10:30] Saturday Race',
     ]);
   });
@@ -336,7 +335,7 @@ describe('TimingContext integration', () => {
           sessions={[session]}
           timeDisplayZoneMode="event"
           timingEvent={event}
-          timingSessionValue="active"
+          timingSessionValue={session.id}
         />
       );
     });
@@ -405,7 +404,7 @@ describe('TimingContext integration', () => {
           timeDisplayZoneMode="event"
           timingEvent={event}
           timingSelectionLoading
-          timingSessionValue="active"
+          timingSessionValue={session.id}
         />
       );
     });
@@ -425,6 +424,6 @@ describe('TimingContext integration', () => {
       timingSessionSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
-    expect(onSelectSession).toHaveBeenCalledWith('active');
+    expect(onSelectSession).toHaveBeenCalledWith(session.id);
   });
 });

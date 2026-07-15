@@ -1517,7 +1517,7 @@ describe('RaceSweetMainApp integration', () => {
     const timingSessionSelect = container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement;
     expect(timingEventSelect).toBeTruthy();
     expect(timingSessionSelect).toBeTruthy();
-    expect(timingSessionSelect.value).toBe('active');
+    expect(timingSessionSelect.value).not.toBe('active');
 
     await act(async () => {
       timingSessionSelect.value = SEED_QUALIFYING_SESSION_ID;
@@ -1544,7 +1544,7 @@ describe('RaceSweetMainApp integration', () => {
     const pinnedTimingSessionSelect = container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement;
     expect(pinnedTimingSessionSelect).toBeTruthy();
     expect(pinnedTimingSessionSelect.value).toBe(SEED_QUALIFYING_SESSION_ID);
-    expect(container.textContent).toContain('Active session (Feature Race)');
+    expect(container.textContent).toContain('Feature Race (active)');
     expect(container.textContent).toContain('Recent Records (0)');
   });
 

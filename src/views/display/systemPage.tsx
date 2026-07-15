@@ -21,9 +21,10 @@ interface SystemPageProps {
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onLoadMrScatsEvent?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
-  onLoadDorianCtcSrtFile?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
+  onLoadDorianCtcSrtFile?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
   onReprocessApicalData: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onPreviewMrScatsDataFile?: (sourceId: TimeRecordSourceId, file: MrScatsDataFileSummary) => Promise<MrScatsDataFilePreview>;
+  onPreviewDorianCtcSrtFile?: (sourceId: TimeRecordSourceId) => Promise<MrScatsDataFilePreview>;
   onSaveFastestTimeIndicatorColors?: (changes: Partial<SystemConfiguration['fastestTimeIndicatorColors']>) => void | Promise<void>;
   onSaveLocalStorageDirectoryPath: (directoryPath: string) => void | Promise<void>;
   onSaveSource: (sourceId: TimeRecordSourceId, changes: Partial<DataSourceConfig>) => void | Promise<void>;
@@ -63,6 +64,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         onLoadDorianCtcSrtFile={props.onLoadDorianCtcSrtFile}
         onOpenLocalFile={props.onOpenLocalFile}
         onPreviewMrScatsDataFile={props.onPreviewMrScatsDataFile}
+        onPreviewDorianCtcSrtFile={props.onPreviewDorianCtcSrtFile}
         onReprocessApicalData={props.onReprocessApicalData}
         onSaveSource={props.onSaveSource}
         onSelectMrScatsDataArchive={props.onSelectMrScatsDataArchive}
