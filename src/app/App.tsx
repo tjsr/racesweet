@@ -12,6 +12,7 @@ import { EventId, SessionId } from '../model/raceevent.ts';
 import { type RaceState, RaceStateLookup, Session } from '../model/racestate.ts';
 import { type EventTimeRecord, type TimeRecordId } from '../model/timerecord.ts';
 import { loadDorianCtcSrtCatalogForSession } from '../parsers/ctc/srtCatalogImport.ts';
+import { parseCtcTrackConfig } from '../parsers/ctc/trackConfig.ts';
 import { type MrScatsCatalogImport, type MrScatsCatalogLoadProgress, loadMrScatsCatalogFromLocation } from '../parsers/mrScats/catalogImport.ts';
 import { listMrScatsDataFiles } from '../parsers/mrScats/fileInventory.ts';
 import { previewCtcRawCrossingBuffer, previewMrScatsDataFile } from '../parsers/mrScats/filePreview.ts';
@@ -1793,16 +1794,35 @@ export const RaceSweetMainApp = () => {
                 .map((identifier) => (identifier as ParticipantTransponder).txNo))
               : [];
 
-            return window.api.requestBuffer(filePath)
-              .then((buffer) => loadDorianCtcSrtCatalogForSession(filePath, buffer, {
-                eventDate: event.date,
-                eventId,
-                importPlaceholderEntrantsForUnknownTransmitters: source.fileConfig?.importPlaceholderEntrantsForUnknownTransmitters === true,
-                knownTransmitterNumbers,
-                onProgress,
-                sessionId,
-                timeZone: event.timeZone,
-              }))
+            const trackConfigFilePath = source.fileConfig?.trackConfigFilePath;
+            const trackConfigPromise = trackConfigFilePath
+              ? window.api.requestBuffer(trackConfigFilePath)
+                .then((trackConfigBuffer) => parseCtcTrackConfig(trackConfigBuffer, trackConfigFilePath))
+              : Promise.resolve(source.fileConfig?.ctcTrackConfig);
+
+            return Promise.all([window.api.requestBuffer(filePath), trackConfigPromise])
+              .then(async ([buffer, trackConfig]) => {
+                if (trackConfigFilePath && trackConfig) {
+                  const updatedConfig = await systemConfigService.updateSource(sourceId, {
+                    fileConfig: {
+                      ...source.fileConfig,
+                      ctcTrackConfig: trackConfig,
+                    },
+                  });
+                  updateSystemConfigState(updatedConfig);
+                }
+
+                return loadDorianCtcSrtCatalogForSession(filePath, buffer, {
+                  eventDate: event.date,
+                  eventId,
+                  importPlaceholderEntrantsForUnknownTransmitters: source.fileConfig?.importPlaceholderEntrantsForUnknownTransmitters === true,
+                  knownTransmitterNumbers,
+                  onProgress,
+                  sessionId,
+                  timeZone: event.timeZone,
+                  trackConfig,
+                });
+              })
               .then(async (importedRaceState) => {
                 const scaffoldCatalog = await eventCatalogService.syncEventScaffold(
                   eventId,
@@ -1858,7 +1878,25 @@ export const RaceSweetMainApp = () => {
             if (!systemConfigService) {
               return;
             }
-            systemConfigService.updateSource(sourceId, changes).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+            const saveSource = async (): Promise<void> => {
+              const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+              const trackConfigFilePath = changes.fileConfig?.trackConfigFilePath;
+              const nextChanges = source?.type === 'file-dorian-ctc-srt' && trackConfigFilePath
+                ? {
+                  ...changes,
+                  fileConfig: {
+                    ...source.fileConfig,
+                    ...changes.fileConfig,
+                    ctcTrackConfig: parseCtcTrackConfig(await window.api.requestBuffer(trackConfigFilePath), trackConfigFilePath),
+                  },
+                }
+                : changes;
+
+              const config = await systemConfigService.updateSource(sourceId, nextChanges);
+              updateSystemConfigState(config);
+            };
+
+            saveSource().catch((error: unknown) => setErrorState(error as Error));
           }}
           onPreviewMrScatsDataFile={(sourceId, file) => {
             const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
@@ -1889,6 +1927,12 @@ export const RaceSweetMainApp = () => {
             return window.api.selectLocalFile({
               filters: [{ extensions: ['srt', 'erf'], name: 'Dorian CTC SRT or ERF files' }],
               title: 'Select Dorian CTC SRT or ERF file',
+            });
+          }}
+          onSelectDorianCtcTrackConfigFile={() => {
+            return window.api.selectLocalFile({
+              filters: [{ extensions: ['cfg'], name: 'CTC TRACK.CFG files' }],
+              title: 'Select CTC TRACK.CFG file',
             });
           }}
           onSelectMrScatsDataArchive={() => {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { formatErrorForDisplay } from '../../app/stackTrace.js';
 import { type DataImportMode, type DataSourceConfig, type DataSourceType, getDataSourceTypeLabel } from '../../app/systemConfig.js';
+import type { CtcTrackConfig } from '../../model/ctcTrackConfig.js';
 import { TimeRecordSourceId } from '../../model/types.js';
 import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
 import type { MrScatsDataFilePreview } from '../../parsers/mrScats/filePreview.js';
@@ -26,6 +27,7 @@ interface DataSourcesPanelProps {
   onSelectMrScatsDataDirectory?: () => Promise<MrScatsDataFileInventory | undefined>;
   onSelectLocalFile?: () => Promise<string | undefined>;
   onSelectDorianCtcSrtFile?: () => Promise<string | undefined>;
+  onSelectDorianCtcTrackConfigFile?: () => Promise<string | undefined>;
 }
 
 interface SourceFetchError {
@@ -61,6 +63,62 @@ const DraftInput = (props: DraftInputProps): React.ReactElement => {
       type={props.type || 'text'}
       value={draft}
     />
+  );
+};
+
+const countCtcTrackConfigLines = (trackConfig: CtcTrackConfig): number => (
+  trackConfig.networks.reduce((total, network) => total + network.lines.length, 0)
+);
+
+const countCtcTrackConfigLoops = (trackConfig: CtcTrackConfig): number => (
+  trackConfig.networks.reduce((networkTotal, network) => (
+    networkTotal + network.lines.reduce((lineTotal, line) => lineTotal + line.loops.length, 0)
+  ), 0)
+);
+
+const CtcTrackConfigDetails = ({ source }: { source: DataSourceConfig }): React.ReactElement | null => {
+  const trackConfig = source.fileConfig?.ctcTrackConfig;
+  if (!trackConfig) {
+    return source.fileConfig?.trackConfigFilePath ? (
+      <p>No TRACK.CFG metadata has been loaded for this source yet. Re-select the TRACK.CFG file or import the CTC file to parse it.</p>
+    ) : null;
+  }
+
+  const lineCount = countCtcTrackConfigLines(trackConfig);
+  const loopCount = countCtcTrackConfigLoops(trackConfig);
+
+  return (
+    <details open>
+      <summary>
+        TRACK.CFG metadata: {trackConfig.networks.length} network{trackConfig.networks.length === 1 ? '' : 's'}, {lineCount} line{lineCount === 1 ? '' : 's'}, {loopCount} loop{loopCount === 1 ? '' : 's'}
+      </summary>
+      <table aria-label={`Dorian CTC TRACK.CFG Metadata ${source.id}`}>
+        <thead>
+          <tr>
+            <th>Network</th>
+            <th>Line</th>
+            <th>Line name</th>
+            <th>Loop</th>
+            <th>Site address</th>
+            <th>Card</th>
+            <th>Com port</th>
+          </tr>
+        </thead>
+        <tbody>
+          {trackConfig.networks.flatMap((network) => network.lines.flatMap((line) => line.loops.map((loop) => (
+            <tr key={`${network.name}-${line.line}-${line.name}-${loop.loopNumber}-${loop.siteAddress}-${loop.card}-${loop.comPort}`}>
+              <td>{network.name}</td>
+              <td>{line.line}</td>
+              <td>{line.name}</td>
+              <td>{loop.loopNumber}</td>
+              <td>{loop.siteAddress}</td>
+              <td>{loop.card}</td>
+              <td>{loop.comPort}</td>
+            </tr>
+          ))))}
+        </tbody>
+      </table>
+    </details>
   );
 };
 
@@ -197,6 +255,24 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
       fileConfig: {
         ...source.fileConfig,
         filePath,
+      },
+    });
+  };
+
+  const handleSelectDorianCtcTrackConfigFile = async (source: DataSourceConfig): Promise<void> => {
+    if (!props.onSelectDorianCtcTrackConfigFile) {
+      return;
+    }
+
+    const trackConfigFilePath = await props.onSelectDorianCtcTrackConfigFile();
+    if (!trackConfigFilePath) {
+      return;
+    }
+
+    await props.onSaveSource(source.id, {
+      fileConfig: {
+        ...source.fileConfig,
+        trackConfigFilePath,
       },
     });
   };
@@ -384,6 +460,17 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                           placeholder="No file selected"
                         />
                       </label>
+                      <label>
+                        TRACK.CFG File Path (optional)
+                        <input
+                          aria-label={`Dorian CTC TRACK.CFG File Path ${source.id}`}
+                          readOnly
+                          type="text"
+                          value={source.fileConfig?.trackConfigFilePath || ''}
+                          placeholder="No TRACK.CFG selected"
+                        />
+                      </label>
+                      <CtcTrackConfigDetails source={source} />
                       <fieldset>
                         <legend>Data import mode</legend>
                         <label>
@@ -416,6 +503,9 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                       <div className="events-actions">
                         <button type="button" onClick={() => handleSelectDorianCtcSrtFile(source)}>
                           Edit File
+                        </button>
+                        <button type="button" onClick={() => handleSelectDorianCtcTrackConfigFile(source)}>
+                          Edit TRACK.CFG
                         </button>
                         <button
                           type="button"

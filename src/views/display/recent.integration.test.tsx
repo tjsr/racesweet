@@ -4237,6 +4237,17 @@ describe('RecentRecords integration', () => {
       getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
       getParticipantLaps: () => [crossing],
       getTimeRecordSourceById: (sourceId) => sourceId === crossing.source ? {
+        ctcTrackConfig: {
+          eventDescriptions: {},
+          networks: [{
+            lines: [{
+              line: 3,
+              loops: [{ card: 2, comPort: 1, loopNumber: 6, siteAddress: 64 }],
+              name: 'Pit Exit : Pits',
+            }],
+            name: 'South Network',
+          }],
+        },
         description: 'Imported MR-SCATS timing records from T9743R10.DBF.',
         filePath: 'T9743R10.DBF',
         id: crossing.source,
@@ -4263,7 +4274,8 @@ describe('RecentRecords integration', () => {
     const row = container.querySelector('tr[data-record-id="crossing-with-confidence"]');
     expect(row).not.toBeNull();
     const cells = Array.from(row!.querySelectorAll('td'));
-    expect(cells[1]?.textContent).toBe('3:6 (255.4)');
+    expect(cells[1]?.textContent).toBe('3:6 (255.4)Pit Exit : Pits');
+    expect(cells[1]?.querySelector('.recent-records-timing-line-name')?.textContent).toBe('Pit Exit : Pits');
     expect(cells[1]?.getAttribute('title')).toBe([
       'Data source: MR-SCATS T9743R10.DBF',
       'File: T9743R10.DBF',

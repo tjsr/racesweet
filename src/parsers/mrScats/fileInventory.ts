@@ -14,6 +14,7 @@ export type MrScatsDataFileKind =
   | 'pit'
   | 'raw-crossing-text'
   | 'reason'
+  | 'track-config'
   | 'unknown';
 
 export interface MrScatsDbfFieldSummary {
@@ -86,6 +87,8 @@ const classifyMrScatsFile = (extension: string): MrScatsDataFileKind => {
     return 'checksum';
   case '.pit':
     return 'pit';
+  case '.cfg':
+    return 'track-config';
   case '.erf':
   case '.srt':
     return 'raw-crossing-text';
@@ -97,7 +100,7 @@ const classifyMrScatsFile = (extension: string): MrScatsDataFileKind => {
 };
 
 const isDbfCompatibleFileKind = (kind: MrScatsDataFileKind): boolean => {
-  return !['archive', 'checksum', 'dbt-memo', 'index', 'raw-crossing-text'].includes(kind);
+  return !['archive', 'checksum', 'dbt-memo', 'index', 'raw-crossing-text', 'track-config'].includes(kind);
 };
 
 const extractSessionParts = (name: string): Pick<MrScatsDataFileSummary, 'meetingCode' | 'sessionCode' | 'sessionNumber'> => {

@@ -1,6 +1,7 @@
 import path from 'node:path';
-import type { MrScatsDataFileSummary } from '../parsers/mrScats/fileInventory';
 import { EventId, SessionId } from '../model/raceevent';
+import { getCtcFinishLineNumbers, type CtcTrackConfig } from '../model/ctcTrackConfig';
+import type { MrScatsDataFileSummary } from '../parsers/mrScats/fileInventory';
 
 export type DataSourceType =
   | 'timing-rfid-decoder'
@@ -34,9 +35,11 @@ export interface MasterEntrantSourceConfig {
 export type DataImportMode = 'import' | 'update';
 
 export interface LocalFileSourceConfig {
+  ctcTrackConfig?: CtcTrackConfig;
   filePath?: string;
   importPlaceholderEntrantsForUnknownTransmitters?: boolean;
   importMode?: DataImportMode;
+  trackConfigFilePath?: string;
 }
 
 export interface MrScatsSourceConfig {
@@ -230,14 +233,19 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListed
   }
 
   if (source.type === 'file-dorian-ctc-srt') {
+    const configuredFinishLines = normalizeFinishLineNumbers(source.finishLineNumbers) || [];
+    const ctcFinishLines = getCtcFinishLineNumbers(source.fileConfig?.ctcTrackConfig) || [];
+    const finishLineNumbers = Array.from(new Set([...configuredFinishLines, ...ctcFinishLines])).sort((left, right) => left - right);
     return {
       ...source,
       fileConfig: {
+        ctcTrackConfig: source.fileConfig?.ctcTrackConfig,
         filePath: normalizeOptionalSystemFilePath(source.fileConfig?.filePath),
         importPlaceholderEntrantsForUnknownTransmitters: source.fileConfig?.importPlaceholderEntrantsForUnknownTransmitters === true,
         importMode: source.fileConfig?.importMode === 'update' ? 'update' : 'import',
+        trackConfigFilePath: normalizeOptionalSystemFilePath(source.fileConfig?.trackConfigFilePath),
       },
-      finishLineNumbers: normalizeFinishLineNumbers(source.finishLineNumbers) || [1],
+      finishLineNumbers: finishLineNumbers.length > 0 ? finishLineNumbers : [1],
     };
   }
 
@@ -363,8 +371,18 @@ export const getFinishLineNumbersForSession = (
   sessionId: SessionId
 ): number[] | undefined => {
   const sourceIds = getSessionAssignedSourceIds(config, eventId, sessionId);
-  const source = config.dataSources.find((candidate) => candidate.enabled && sourceIds.includes(candidate.id) && (candidate.finishLineNumbers || []).length > 0);
-  return source?.finishLineNumbers;
+  const source = config.dataSources.find((candidate) => candidate.enabled && sourceIds.includes(candidate.id) && (
+    (candidate.finishLineNumbers || []).length > 0 || candidate.type === 'file-dorian-ctc-srt'
+  ));
+  if (!source) {
+    return undefined;
+  }
+  const configuredFinishLines = source.finishLineNumbers || [];
+  const ctcFinishLines = source.type === 'file-dorian-ctc-srt'
+    ? getCtcFinishLineNumbers(source.fileConfig?.ctcTrackConfig) || []
+    : [];
+  const finishLineNumbers = Array.from(new Set([...configuredFinishLines, ...ctcFinishLines]));
+  return finishLineNumbers.length > 0 ? finishLineNumbers : undefined;
 };
 
 export const getMasterEntrantProfilesForEvent = (config: SystemConfiguration, eventId: EventId): MasterEntrantProfile[] => {

@@ -1,6 +1,7 @@
 import type { IdType, TimeRecordSourceId, WithId } from "./types.js";
 
 import { v5 as uuidv5 } from "uuid";
+import type { CtcTrackConfig } from "./ctcTrackConfig.js";
 import { EventEntrantId } from "./entrant.js";
 import type { EventParticipantId } from "./eventparticipant.js";
 import { EventId, SessionId } from "./raceevent.js";
@@ -130,6 +131,7 @@ export const isPassingValid = (passing: ParticipantPassingRecord): boolean => {
 // }
 
 export interface TimeRecordSource {
+  ctcTrackConfig?: CtcTrackConfig;
   id: TimeRecordSourceId;
   name: string;
   description?: string | null | undefined;

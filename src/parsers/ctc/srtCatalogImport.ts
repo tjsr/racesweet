@@ -3,10 +3,12 @@ import { TZDate } from '@date-fns/tz';
 import { normalizeTimeZone } from '../../app/utils/timeutils.js';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant, ParticipantTransponder } from '../../model/eventparticipant.js';
+import type { FlagRecord } from '../../model/flag.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
 import type { EventId, SessionId } from '../../model/raceevent.js';
 import type { RaceState } from '../../model/racestate.js';
-import { RECORD_TX_CROSSING, type EventTimeRecord, type ParticipantPassingRecord } from '../../model/timerecord.js';
+import { EVENT_FLAG_DISPLAYED, EVENT_SESSION_START, RECORD_TX_CROSSING, type EventTimeRecord, type ParticipantPassingRecord } from '../../model/timerecord.js';
+import { findCtcTrackLoopBySiteAddress, type CtcTrackConfig } from '../../model/ctcTrackConfig.js';
 import { MR_SCATS_DEFAULT_MINIMUM_LAP_TIME, type MrScatsCatalogImport } from '../mrScats/catalogImport.js';
 import { parseCtcRawCrossingFile, splitCtcRawCrossingLines, type CtcRawCrossingFormat, type CtcRawCrossingRecord } from './rawCrossing.js';
 
@@ -31,6 +33,7 @@ export interface DorianCtcSrtSessionLoadOptions {
   knownTransmitterNumbers?: Iterable<number | string>;
   onProgress?: (progress: DorianCtcSrtLoadProgress) => void | Promise<void>;
   sessionId: SessionId;
+  trackConfig?: CtcTrackConfig;
   timeZone?: string;
 }
 
@@ -73,12 +76,14 @@ const createCrossingRecord = (
   timeZone: string | undefined,
   record: CtcRawCrossingRecord,
   sequence: number,
-  participantId?: ReturnType<typeof createEventParticipantId>
+  participantId?: ReturnType<typeof createEventParticipantId>,
+  trackConfig?: CtcTrackConfig
 ): EventTimeRecord | undefined => {
   if (record.transmitter === undefined || record.transmitter <= 0 || record.specialType) {
     return undefined;
   }
 
+  const trackLoop = findCtcTrackLoopBySiteAddress(trackConfig, record.lineNumber, record.laneNumber);
   const crossing: ParticipantPassingRecord & { chipCode: number; drtCode: string; rawStatus?: string } = {
     chipCode: record.transmitter,
     confidenceFactor: record.confidence === undefined ? undefined : Number.parseInt(record.confidence, 10),
@@ -88,8 +93,8 @@ const createCrossingRecord = (
     eventId,
     hitCount: record.hitCount,
     id: createTimeRecordId(`dorian-ctc-srt:${filePath}:record:${record.recordNumber}:${record.raw}`),
-    lineNumber: record.lineNumber,
-    loopNumber: record.laneNumber,
+    lineNumber: trackLoop?.line.line ?? record.lineNumber,
+    loopNumber: trackLoop?.loop.loopNumber ?? record.laneNumber,
     originRecordNumber: record.recordNumber,
     participantId,
     rawStatus: record.status,
@@ -102,6 +107,96 @@ const createCrossingRecord = (
   };
 
   return crossing;
+};
+
+const getTrackConfigEventDescription = (
+  trackConfig: CtcTrackConfig | undefined,
+  record: CtcRawCrossingRecord
+): { code: string; description: string } | undefined => {
+  if (!trackConfig) {
+    return undefined;
+  }
+
+  const eventCode = (record.transmitter === undefined ? record.status ?? record.drtCode : undefined)?.toUpperCase();
+  if (!eventCode) {
+    return undefined;
+  }
+
+  const description = trackConfig.eventDescriptions[eventCode];
+  return description ? { code: eventCode, description } : undefined;
+};
+
+interface CtcFlagSemantics {
+  flagType: string;
+  flagValue: string;
+  indicatesRaceStart?: boolean;
+  recordType: number;
+}
+
+const getCtcFlagSemantics = (
+  eventDescription: { code: string; description: string }
+): CtcFlagSemantics => {
+  const normalizedDescription = eventDescription.description.toLowerCase();
+
+  if (normalizedDescription.includes('green flag')) {
+    return {
+      flagType: 'green',
+      flagValue: 'course',
+      indicatesRaceStart: true,
+      recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_START,
+    };
+  }
+
+  if (normalizedDescription.includes('yellow flag') || normalizedDescription.includes('caution')) {
+    return {
+      flagType: 'yellow',
+      flagValue: 'caution',
+      recordType: EVENT_FLAG_DISPLAYED,
+    };
+  }
+
+  return {
+    flagType: 'unknown',
+    flagValue: eventDescription.code,
+    recordType: EVENT_FLAG_DISPLAYED,
+  };
+};
+
+const createFlagRecord = (
+  eventId: EventId,
+  sessionId: ReturnType<typeof createSessionId>,
+  sourceId: ReturnType<typeof createTimeRecordSourceId>,
+  filePath: string,
+  eventDate: string,
+  timeZone: string | undefined,
+  record: CtcRawCrossingRecord,
+  sequence: number,
+  trackConfig?: CtcTrackConfig
+): FlagRecord | undefined => {
+  const eventDescription = getTrackConfigEventDescription(trackConfig, record);
+  if (!eventDescription) {
+    return undefined;
+  }
+
+  const ctcFlagSemantics = getCtcFlagSemantics(eventDescription);
+  const flagRecord: FlagRecord = {
+    dataLine: record.raw,
+    description: eventDescription.description,
+    eventId,
+    flagType: ctcFlagSemantics.flagType,
+    flagValue: ctcFlagSemantics.flagValue,
+    ...(ctcFlagSemantics.indicatesRaceStart === undefined ? {} : { indicatesRaceStart: ctcFlagSemantics.indicatesRaceStart }),
+    id: createTimeRecordId(`dorian-ctc-srt:${filePath}:flag:${record.recordNumber}:${record.raw}`),
+    originRecordNumber: record.recordNumber,
+    recordType: ctcFlagSemantics.recordType,
+    sequence,
+    sessionId,
+    source: sourceId,
+    time: createTimeOfDay(eventDate, record, timeZone),
+    timeTenthOfMillisecond: record.rawTimeTicks % 10,
+  };
+
+  return flagRecord;
 };
 
 export const loadDorianCtcSrtCatalog = (filePath: string, buffer: Buffer, eventDate = DEFAULT_EVENT_DATE, timeZone = 'UTC'): MrScatsCatalogImport => {
@@ -121,6 +216,7 @@ export const loadDorianCtcSrtCatalog = (filePath: string, buffer: Buffer, eventD
     records,
     teams: [],
     timeRecordSources: [{
+      ctcTrackConfig: undefined,
       description: 'Imported Dorian CTC SRT raw crossing records.',
       filePath: normalizedFilePath,
       id: sourceId,
@@ -166,6 +262,7 @@ export const loadDorianCtcSrtCatalogForSession = async (
 
   const records: EventTimeRecord[] = [];
   let lastProgressAt = Date.now();
+  let hasImportedRaceStartFlag = false;
   for (const [index, record] of rawRecords.entries()) {
     const crossing = createCrossingRecord(
       options.eventId,
@@ -175,10 +272,35 @@ export const loadDorianCtcSrtCatalogForSession = async (
       options.eventDate,
       options.timeZone,
       record,
-      index + 1
+      index + 1,
+      undefined,
+      options.trackConfig
     );
     if (crossing) {
       records.push(crossing);
+    }
+    const flag = createFlagRecord(
+      options.eventId,
+      options.sessionId,
+      sourceId,
+      normalizedFilePath,
+      options.eventDate,
+      options.timeZone,
+      record,
+      index + 1,
+      options.trackConfig
+    );
+    if (flag) {
+      const ctcGreenFlag = flag as FlagRecord & { indicatesRaceStart?: boolean };
+      if (flag.flagType === 'green' && ctcGreenFlag.indicatesRaceStart === true) {
+        if (hasImportedRaceStartFlag) {
+          ctcGreenFlag.indicatesRaceStart = false;
+          flag.recordType &= ~EVENT_SESSION_START;
+        } else {
+          hasImportedRaceStartFlag = true;
+        }
+      }
+      records.push(flag);
     }
 
     if (Date.now() - lastProgressAt >= 50 || record.recordNumber === total) {
@@ -243,6 +365,7 @@ export const loadDorianCtcSrtCatalogForSession = async (
     records: recordsWithPlaceholders,
     teams: [],
     timeRecordSources: [{
+      ctcTrackConfig: options.trackConfig,
       description: 'Imported Dorian CTC SRT/ERF raw crossing records.',
       filePath: normalizedFilePath,
       id: sourceId,

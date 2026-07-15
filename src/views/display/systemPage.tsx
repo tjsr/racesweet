@@ -32,6 +32,7 @@ interface SystemPageProps {
   onSelectMrScatsDataDirectory?: () => Promise<MrScatsDataFileInventory | undefined>;
   onSelectLocalFile?: () => Promise<string | undefined>;
   onSelectDorianCtcSrtFile?: () => Promise<string | undefined>;
+  onSelectDorianCtcTrackConfigFile?: () => Promise<string | undefined>;
 }
 
 export const SystemPage = (props: SystemPageProps): React.ReactElement => {
@@ -71,6 +72,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         onSelectMrScatsDataDirectory={props.onSelectMrScatsDataDirectory}
         onSelectLocalFile={props.onSelectLocalFile}
         onSelectDorianCtcSrtFile={props.onSelectDorianCtcSrtFile}
+        onSelectDorianCtcTrackConfigFile={props.onSelectDorianCtcTrackConfigFile}
       />
 
       <LogPanel displayedErrorLog={props.displayedErrorLog} />

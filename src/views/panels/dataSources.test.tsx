@@ -77,8 +77,9 @@ describe('DataSourcesPanel', () => {
     expect(container.textContent).toContain('Add Data Source');
   });
 
-  it('persists the selected Dorian CTC Import or Update mode', () => {
+  it('persists the selected Dorian CTC Import or Update mode', async () => {
     const onSaveSource = vi.fn();
+    const onSelectDorianCtcTrackConfigFile = vi.fn(async () => 'C:/RaceTime/timing/TRACK.CFG');
     const ctcSource: DataSourceConfig = {
       enabled: true,
       fileConfig: {
@@ -103,6 +104,7 @@ describe('DataSourcesPanel', () => {
           onLoadApicalEvents={vi.fn()}
           onReprocessApicalData={vi.fn()}
           onSaveSource={onSaveSource}
+          onSelectDorianCtcTrackConfigFile={onSelectDorianCtcTrackConfigFile}
         />,
       );
     });
@@ -139,6 +141,84 @@ describe('DataSourcesPanel', () => {
         importPlaceholderEntrantsForUnknownTransmitters: true,
       },
     });
+
+    const trackConfigInput = container.querySelector('input[aria-label="Dorian CTC TRACK.CFG File Path source-dorian-ctc"]') as HTMLInputElement;
+    expect(trackConfigInput).toBeTruthy();
+    expect(trackConfigInput.placeholder).toBe('No TRACK.CFG selected');
+    const trackConfigButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Edit TRACK.CFG');
+    expect(trackConfigButton).toBeDefined();
+    trackConfigButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+    expect(onSelectDorianCtcTrackConfigFile).toHaveBeenCalled();
+    expect(onSaveSource).toHaveBeenCalledWith('source-dorian-ctc', {
+      fileConfig: {
+        filePath: 'C:/RaceTime/timing/INDY500.ERF',
+        importMode: 'import',
+        trackConfigFilePath: 'C:/RaceTime/timing/TRACK.CFG',
+      },
+    });
+  });
+
+  it('displays parsed Dorian CTC TRACK.CFG networks, lines, and loop mappings', () => {
+    const ctcSource: DataSourceConfig = {
+      enabled: true,
+      fileConfig: {
+        ctcTrackConfig: {
+          eventDescriptions: {},
+          filePath: 'C:/RaceTime/timing/TRACK.CFG',
+          networks: [{
+            lines: [{
+              line: 5,
+              loops: [
+                { card: 1, comPort: 2, loopNumber: 1, siteAddress: 35 },
+                { card: 1, comPort: 2, loopNumber: 2, siteAddress: 35 },
+                { card: 2, comPort: 2, loopNumber: 5, siteAddress: 35 },
+              ],
+              name: 'Pit Exit : Pits',
+            }],
+            name: 'South Network',
+          }],
+        },
+        filePath: 'C:/RaceTime/timing/INDY500.ERF',
+        importMode: 'import',
+        trackConfigFilePath: 'C:/RaceTime/timing/TRACK.CFG',
+      },
+      id: 'source-dorian-ctc',
+      name: 'CTC Source',
+      type: 'file-dorian-ctc-srt',
+    };
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <DataSourcesPanel
+          dataSources={[...dataSources, ctcSource]}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={vi.fn()}
+          onReprocessApicalData={vi.fn()}
+          onSaveSource={vi.fn()}
+        />,
+      );
+    });
+
+    const ctcRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('CTC Source'));
+    flushSync(() => {
+      ctcRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('TRACK.CFG metadata: 1 network, 1 line, 3 loops');
+    const metadataTable = container.querySelector('table[aria-label="Dorian CTC TRACK.CFG Metadata source-dorian-ctc"]');
+    expect(metadataTable).toBeTruthy();
+    const rows = Array.from(metadataTable!.querySelectorAll('tbody tr')).map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent));
+    expect(rows).toEqual([
+      ['South Network', '5', 'Pit Exit : Pits', '1', '35', '1', '2'],
+      ['South Network', '5', 'Pit Exit : Pits', '2', '35', '1', '2'],
+      ['South Network', '5', 'Pit Exit : Pits', '5', '35', '2', '2'],
+    ]);
   });
 
   it('selects an MR-SCATS data directory and persists the discovered file list', async () => {

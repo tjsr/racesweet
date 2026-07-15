@@ -19,6 +19,7 @@ import { getParticipantNumber, getParticipantTransponders } from '../../controll
 import { findEntrantByChipCode, findEntrantByPlateNumber } from '../../controllers/participantSearch.ts';
 import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
 import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../model';
+import { findCtcTrackLineName } from '../../model/ctcTrackConfig.ts';
 import { EventCategory, EventCategoryId } from '../../model/eventcategory';
 import { EventTeam } from '../../model/eventteam.ts';
 import { FlagRecord } from '../../model/flag';
@@ -485,6 +486,14 @@ const getEditablePassingSourceFile = (record: EventTimeRecord, raceStateLookup: 
   return source?.filePath ||
     source?.name ||
     '';
+};
+
+const getPassingTimingPointLineName = (
+  record: ParticipantPassingRecord,
+  raceStateLookup: RaceStateLookup
+): string | undefined => {
+  const source = getRecordSource(record, raceStateLookup);
+  return findCtcTrackLineName(source?.ctcTrackConfig, getPassingLineNumber(record), getPassingLoopNumber(record));
 };
 
 const getRecordSourceLocation = (record: EventTimeRecord): string => {
@@ -1072,6 +1081,7 @@ export const PassingRecordRow = (
   const timeString = tableDateTimeStringInTimeZone(passing.time, props.timeZone, passing.timeTenthOfMillisecond);
   const identifier: string = txNo !== undefined ? `Tx${txNo}` : '';
   const timingPoint = formatPassingTimingPoint(passing);
+  const timingPointLineName = getPassingTimingPointLineName(passing, rs);
   const sourceTooltip = getRecordSourceTooltip(passing, rs);
   const entrant = resolvedParticipant;
   let plateNumber: string | number | undefined = undefined;
@@ -1172,7 +1182,12 @@ export const PassingRecordRow = (
         title={formatRecordIdTitle(passing.id)}
         onClick={handleSelect}>
         <TableCell className={cautionCellClasses}>{passing.sequence}</TableCell>
-        <TableCell className={cautionCellClasses} title={sourceTooltip}>{timingPoint}</TableCell>
+        <TableCell className={cautionCellClasses} title={sourceTooltip}>
+          {timingPoint}
+          {timingPointLineName ? (
+            <div className="recent-records-timing-line-name">{timingPointLineName}</div>
+          ) : null}
+        </TableCell>
         <TableCell className={cautionCellClasses}>{identifier}</TableCell>
         <TableCell className={cautionCellClasses}>{timeString}</TableCell>
         <TableCell className={cellClasses}>{plateNumber || normalizedRecordPlateNumber || '?'}</TableCell>

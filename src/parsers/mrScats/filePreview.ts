@@ -1,6 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { parseCtcRawCrossingFile, splitCtcRawCrossingLines, type CtcRawCrossingFormat, type CtcRawCrossingInput, type CtcRawCrossingRecord } from '../ctc/rawCrossing.js';
+import { parseCtcTrackConfig } from '../ctc/trackConfig.js';
 import { readMrScatsDbfTable, type MrScatsDbfRecord } from './dbf.js';
 import { parseMrScatsDbfSummary, readMrScatsZipEntryBuffers, type MrScatsDataFileKind } from './fileInventory.js';
 
@@ -441,6 +442,50 @@ const createRawCrossingTextPreview = (
   };
 };
 
+const createTrackConfigPreview = (
+  fileName: string,
+  buffer: Buffer | string,
+  maxRows: number
+): MrScatsDataFilePreview => {
+  const trackConfig = parseCtcTrackConfig(buffer, fileName);
+  const lineCount = trackConfig.networks.reduce((total, network) => total + network.lines.length, 0);
+  const loopCount = trackConfig.networks.reduce((total, network) => total + network.lines.reduce((lineTotal, line) => lineTotal + line.loops.length, 0), 0);
+  const rows: Record<string, MrScatsPreviewValue>[] = [];
+
+  trackConfig.networks.forEach((network) => {
+    network.lines.forEach((line) => {
+      line.loops.forEach((loop) => {
+        if (rows.length >= maxRows) {
+          return;
+        }
+
+        rows.push({
+          'Card': loop.card,
+          'Com port': loop.comPort,
+          'Line': line.line,
+          'Line name': line.name,
+          'Loop': loop.loopNumber,
+          'Network': network.name,
+          'Site address': loop.siteAddress,
+        });
+      });
+    });
+  });
+
+  return {
+    columns: ['Network', 'Line', 'Line name', 'Loop', 'Site address', 'Card', 'Com port'],
+    displayedRowCount: rows.length,
+    fileKind: 'track-config',
+    fileName,
+    parser: 'text',
+    recordCount: loopCount,
+    rows,
+    warnings: [
+      `TRACK.CFG preview: ${trackConfig.networks.length} network${trackConfig.networks.length === 1 ? '' : 's'}, ${lineCount} line${lineCount === 1 ? '' : 's'}, ${loopCount} loop${loopCount === 1 ? '' : 's'}.`,
+    ],
+  };
+};
+
 const createDbtMemoPreview = async (
   locationPath: string,
   relativePath: string,
@@ -753,6 +798,18 @@ export const previewMrScatsDataFile = async (
 
   if (extension === '.srt' || extension === '.erf' || fileKind === 'raw-crossing-text') {
     return createRawCrossingTextPreview(fileName, buffer, maxRows);
+  }
+
+  if (extension === '.cfg' || fileKind === 'track-config') {
+    const dbfSummary = parseMrScatsDbfSummary(buffer);
+    if (dbfSummary) {
+      return await createDbfPreview(locationPath, relativePath, fileName, 'dbf-table', buffer, maxRows);
+    }
+
+    const trackConfigPreview = createTrackConfigPreview(fileName, buffer, maxRows);
+    if (trackConfigPreview.rows.length > 0) {
+      return trackConfigPreview;
+    }
   }
 
   if (extension === '.dbt' || fileKind === 'dbt-memo') {

@@ -149,6 +149,13 @@
   z-index: 7;
 }
 
+.recent-records-timing-line-name {
+  font-size: 0.72rem;
+  line-height: 1.05;
+  opacity: 0.78;
+  white-space: nowrap;
+}
+
 h2.recent-records {
   margin: 0;
 }

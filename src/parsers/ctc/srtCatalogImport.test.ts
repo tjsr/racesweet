@@ -1,5 +1,9 @@
+import { processAllParticipantLaps } from '../../controllers/laps.js';
+import type { EventParticipant } from '../../model/eventparticipant.js';
 import { createEventId, createSessionId } from '../../model/ids.js';
+import { EVENT_FLAG_DISPLAYED, EVENT_SESSION_START, isPassingValid } from '../../model/timerecord.js';
 import { loadDorianCtcSrtCatalog, loadDorianCtcSrtCatalogForSession } from './srtCatalogImport.js';
+import { parseCtcTrackConfig } from './trackConfig.js';
 
 describe('Dorian CTC SRT catalog import', () => {
   it('creates one competitor-free session while preserving raw crossing metadata', () => {
@@ -133,4 +137,118 @@ describe('Dorian CTC SRT catalog import', () => {
       ? updatedRaceState.records[0].participantId
       : undefined).toBeUndefined();
   });
+
+  it('imports configured CTC event codes as semantic flag records with source descriptions', async () => {
+    const eventId = createEventId('ctc-event-code-event');
+    const sessionId = createSessionId('ctc-event-code-session');
+    const trackConfig = parseCtcTrackConfig([
+      '40 Green Flag Light',
+      '41 Yellow Flag Light',
+      '51 Caution Light',
+    ].join('\n'));
+
+    const raceState = await loadDorianCtcSrtCatalogForSession(
+      'C:/timing/race-5.erf',
+      Buffer.from([
+        '4000000000100000',
+        '4100000000200000',
+        '5100000000300000',
+        '4000000000400000',
+      ].join('\r')),
+      {
+        eventDate: '2026-07-14',
+        eventId,
+        sessionId,
+        trackConfig,
+      }
+    );
+
+    expect(raceState.records).toEqual([
+      expect.objectContaining({
+      description: 'Green Flag Light',
+      eventId,
+        flagType: 'green',
+        flagValue: 'course',
+        indicatesRaceStart: true,
+        recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_START,
+      sessionId,
+      }),
+      expect.objectContaining({
+        description: 'Yellow Flag Light',
+        eventId,
+        flagType: 'yellow',
+        flagValue: 'caution',
+        recordType: EVENT_FLAG_DISPLAYED,
+        sessionId,
+      }),
+      expect.objectContaining({
+        description: 'Caution Light',
+        eventId,
+        flagType: 'yellow',
+        flagValue: 'caution',
+        recordType: EVENT_FLAG_DISPLAYED,
+        sessionId,
+      }),
+      expect.objectContaining({
+        description: 'Green Flag Light',
+        eventId,
+        flagType: 'green',
+        flagValue: 'course',
+        indicatesRaceStart: false,
+        recordType: EVENT_FLAG_DISPLAYED,
+        sessionId,
+      }),
+    ]);
+    expect(raceState.timeRecordSources).toEqual([expect.objectContaining({ ctcTrackConfig: trackConfig })]);
+  });
+
+  it('uses imported Green Flag Light records as the race start for lap calculation', async () => {
+    const eventId = createEventId('ctc-green-start-event');
+    const sessionId = createSessionId('ctc-green-start-session');
+    const trackConfig = parseCtcTrackConfig([
+      '#***************** Start/Finish : Track ******* North Network *****#',
+      'A     31     1       2               1,1     1,2     1,3     1,4',
+      '40 Green Flag Light',
+    ].join('\n'));
+
+    const raceState = await loadDorianCtcSrtCatalogForSession(
+      'C:/timing/race-6.erf',
+      Buffer.from([
+        '040000000005000012343101064000',
+        '4000000000100000',
+        '040000000020000012343101064000',
+      ].join('\r')),
+      {
+        eventDate: '2026-07-14',
+        eventId,
+        importPlaceholderEntrantsForUnknownTransmitters: true,
+        sessionId,
+        trackConfig,
+      }
+    );
+    const participant = raceState.participants?.[0] as EventParticipant;
+    const participantLaps = processAllParticipantLaps(
+      raceState.records || [],
+      new Map([[participant.id, participant]]),
+      0,
+      true,
+      'race'
+    ).get(participant.id);
+
+    expect(participantLaps?.[0]).toEqual(expect.objectContaining({
+      lapNo: undefined,
+      time: new Date('2026-07-14T00:00:05.000Z'),
+    }));
+    expect(isPassingValid(participantLaps?.[0]!)).toBe(false);
+    expect(participantLaps?.[1]).toEqual(expect.objectContaining({
+      lineNumber: 1,
+      lapNo: 1,
+      lapTime: 10000,
+      loopNumber: 1,
+      startingLapRecordId: raceState.records?.find((record) => 'flagType' in record)?.id,
+      time: new Date('2026-07-14T00:00:20.000Z'),
+    }));
+    expect(isPassingValid(participantLaps?.[1]!)).toBe(true);
+  });
+
 });
