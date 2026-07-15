@@ -48,11 +48,17 @@ interface LapTimeIndicators {
   entrantFastest: boolean;
   lapLeader: boolean;
   overallFastest: boolean;
+  sameLapAsLeader: boolean;
 }
 
 interface RowIndexRange {
   end: number;
   start: number;
+}
+
+interface FilterScrollAnchor {
+  previousIndex: number;
+  recordId: TimeRecordId;
 }
 
 interface RowSelectionState {
@@ -97,6 +103,20 @@ const IMMEDIATE_SELECTION_ROW_BUFFER = 100;
 const INITIAL_RECENT_RECORD_RENDER_COUNT = 60;
 const RECENT_RECORD_ROW_OVERSCAN = 8;
 const RECENT_RECORD_VIRTUALIZATION_MIN_ROWS = 100;
+
+const getRecordIndex = (records: EventTimeRecord[], recordId: TimeRecordId): number => {
+  return records.findIndex((record) => record.id === recordId);
+};
+
+const getSelectionVisibleRowRange = (recordIndex: number, currentRange: RowIndexRange, totalRows: number): RowIndexRange => {
+  const visibleRowCount = currentRange.end >= currentRange.start
+    ? currentRange.end - currentRange.start + 1
+    : 20;
+  return {
+    end: Math.min(totalRows - 1, recordIndex + visibleRowCount - 1),
+    start: recordIndex,
+  };
+};
 
 type AddableRecordType = 'passing' | 'flag';
 type AddableFlagType = 'green' | 'yellow' | 'white' | 'red' | 'chequered';
@@ -494,6 +514,20 @@ const getPassingTimingPointLineName = (
 ): string | undefined => {
   const source = getRecordSource(record, raceStateLookup);
   return findCtcTrackLineName(source?.ctcTrackConfig, getPassingLineNumber(record), getPassingLoopNumber(record));
+};
+
+const getPassingRecordDisplayClass = (
+  passing: ParticipantPassingRecord,
+  timingPointLineName: string | undefined,
+  raceStateLookup: RaceStateLookup
+): string => {
+  if (isFinishLinePassing(passing, raceStateLookup.getFinishLineNumbers?.())) {
+    return 'passing-finish';
+  }
+
+  return timingPointLineName?.toLowerCase().includes('pit')
+    ? 'passing-pit'
+    : 'passing-sector';
 };
 
 const getRecordSourceLocation = (record: EventTimeRecord): string => {
@@ -1093,7 +1127,8 @@ export const PassingRecordRow = (
 
   const passingIsExcluded = isPassingExcluded(passing);
   const passingIsValid = isPassingValid(passing);
-  let className = passingIsValid ? 'passing' : 'invalid-passing';
+  const displayClass = getPassingRecordDisplayClass(passing, timingPointLineName, rs);
+  let className = `${passingIsValid ? 'passing' : 'invalid-passing'} ${displayClass}`;
   let cellClasses = '';
   let isUnrelatedToSession = false;
 
@@ -1165,6 +1200,10 @@ export const PassingRecordRow = (
     props.lapTimeIndicators?.entrantFastest ? 'entrantFastest' : '',
     props.lapTimeIndicators?.overallFastest ? 'overallFastest' : '',
   ].filter((classItem) => classItem.length > 0).join(' ');
+  const lapNumberCellClasses = [
+    cellClasses,
+    props.lapTimeIndicators?.sameLapAsLeader ? 'same-lap-as-leader' : '',
+  ].filter((classItem) => classItem.length > 0).join(' ');
   const cautionCellClasses = [
     cellClasses,
     props.cautionRecordIds?.has(passing.id.toString()) ? 'caution-period-cell' : '',
@@ -1193,7 +1232,7 @@ export const PassingRecordRow = (
         <TableCell className={cellClasses}>{plateNumber || normalizedRecordPlateNumber || '?'}</TableCell>
         <TableCell className={cellClasses}>{entrantName}</TableCell>
         <TableCell className={cellClasses}>{categoryStr || ''}</TableCell>
-        <TableCell className={cellClasses}>{lapNo}</TableCell>
+        <TableCell className={lapNumberCellClasses}>{lapNo}</TableCell>
         <TableCell className={cellClasses}>{elapsedTime}</TableCell>
         {props.showSectorColumn ? <TableCell className={cellClasses}>{sectorTime}</TableCell> : null}
         <TableCell className={lapTimeCellClasses}>
@@ -1665,6 +1704,7 @@ const createEmptyLapTimeIndicators = (): LapTimeIndicators => ({
   entrantFastest: false,
   lapLeader: false,
   overallFastest: false,
+  sameLapAsLeader: false,
 });
 
 const buildLapTimeIndicatorMap = (
@@ -1679,19 +1719,19 @@ const buildLapTimeIndicatorMap = (
   const finishLineNumbers = raceStateLookup.getFinishLineNumbers?.();
   const isRaceSession = sessionKind === undefined || sessionKind === 'race';
   let overallBestLapTime: MillisecondsDuration | undefined = undefined;
+  let leaderLapNumber: number | undefined = undefined;
 
   records
     .map((record, index) => ({ index, record }))
     .sort(compareRecordsByTimeAndInputOrder)
     .forEach(({ record }) => {
-      if (!isCrossingRecord(record) || !record.participantId || !isPassingValid(record) || isPassingExcluded(record) || !isLapCompletionPassing(record, finishLineNumbers)) {
+      if (!isCrossingRecord(record) || !record.participantId || !isPassingValid(record) || isPassingExcluded(record)) {
         return;
       }
 
       const passingRecord = record as ParticipantPassingRecord;
       const lapNo = passingRecord.lapNo;
-      const lapTime = passingRecord.lapTime;
-      if (lapNo === undefined || lapNo === null || lapTime === undefined || lapTime === null || lapTime <= 0) {
+      if (lapNo === undefined || lapNo === null) {
         return;
       }
 
@@ -1702,29 +1742,41 @@ const buildLapTimeIndicatorMap = (
 
       const indicators = createEmptyLapTimeIndicators();
       const entrantKey = getEntrantKey(participant, raceStateLookup);
-      const previousLapTime = previousLapTimeByEntrant.get(entrantKey);
-      const entrantBestLapTime = bestLapTimeByEntrant.get(entrantKey);
+      const isLapCompletion = isLapCompletionPassing(record, finishLineNumbers);
 
-      if (isRaceSession && !leadingLapNumbers.has(lapNo)) {
-        indicators.lapLeader = true;
-        leadingLapNumbers.add(lapNo);
-      }
-      if (previousLapTime !== undefined && lapTime < previousLapTime) {
-        indicators.entrantFaster = true;
-      }
-      if (entrantBestLapTime === undefined || lapTime < entrantBestLapTime) {
-        indicators.entrantFastest = true;
-        bestLapTimeByEntrant.set(entrantKey, lapTime);
-      }
-      if (overallBestLapTime === undefined || lapTime < overallBestLapTime) {
-        indicators.overallFastest = true;
-        if (!isRaceSession) {
-          indicators.lapLeader = true;
+      if (isLapCompletion) {
+        const lapTime = passingRecord.lapTime;
+        if (lapTime === undefined || lapTime === null || lapTime <= 0) {
+          return;
         }
-        overallBestLapTime = lapTime;
+
+        const previousLapTime = previousLapTimeByEntrant.get(entrantKey);
+        const entrantBestLapTime = bestLapTimeByEntrant.get(entrantKey);
+
+        if (isRaceSession && !leadingLapNumbers.has(lapNo)) {
+          indicators.lapLeader = true;
+          leadingLapNumbers.add(lapNo);
+        }
+        leaderLapNumber = leaderLapNumber === undefined ? lapNo : Math.max(leaderLapNumber, lapNo);
+        if (previousLapTime !== undefined && lapTime < previousLapTime) {
+          indicators.entrantFaster = true;
+        }
+        if (entrantBestLapTime === undefined || lapTime < entrantBestLapTime) {
+          indicators.entrantFastest = true;
+          bestLapTimeByEntrant.set(entrantKey, lapTime);
+        }
+        if (overallBestLapTime === undefined || lapTime < overallBestLapTime) {
+          indicators.overallFastest = true;
+          if (!isRaceSession) {
+            indicators.lapLeader = true;
+          }
+          overallBestLapTime = lapTime;
+        }
+
+        previousLapTimeByEntrant.set(entrantKey, lapTime);
       }
 
-      previousLapTimeByEntrant.set(entrantKey, lapTime);
+      indicators.sameLapAsLeader = isRaceSession && leaderLapNumber !== undefined && lapNo === leaderLapNumber;
       indicatorsByRecordId.set(record.id, indicators);
     });
 
@@ -2210,6 +2262,7 @@ export const RecentRecords = (props: RecordsProps & {
   const [ignoreModes, setIgnoreModes] = React.useState<RecentRecordsIgnoreMode[]>([]);
   const [selectedPlateNumber, setSelectedPlateNumber] = React.useState<string | undefined>(undefined);
   const [selectedRecordId, setSelectedRecordId] = React.useState<TimeRecordId | undefined>(undefined);
+  const pendingFilterScrollAnchorRef = React.useRef<FilterScrollAnchor | undefined>(undefined);
   const tableContainerRef = React.useRef<HTMLDivElement>(null);
   const toolbarAnchorRef = React.useRef<HTMLDivElement>(null);
   const toolbarRef = React.useRef<HTMLDivElement>(null);
@@ -2441,7 +2494,8 @@ export const RecentRecords = (props: RecordsProps & {
       ? container.scrollTop + viewportHeight
       : Math.min(containerRect.height || sortedRecords.length * safeRowHeight, viewportHeight - containerRect.top);
     const visibleHeight = Math.max(safeRowHeight, visibleBottom - visibleTop);
-    const start = Math.max(0, Math.floor(visibleTop / safeRowHeight));
+    const maxRowIndex = Math.max(0, sortedRecords.length - 1);
+    const start = Math.min(maxRowIndex, Math.max(0, Math.floor(visibleTop / safeRowHeight)));
     const visibleCount = Math.max(1, Math.ceil(visibleHeight / safeRowHeight));
     const end = Math.min(Math.max(0, sortedRecords.length - 1), start + visibleCount - 1);
 
@@ -2454,6 +2508,45 @@ export const RecentRecords = (props: RecordsProps & {
   React.useLayoutEffect(() => {
     updateVisibleRowRange();
   }, [sortedRecords.length, updateVisibleRowRange]);
+  React.useLayoutEffect(() => {
+    const anchor = pendingFilterScrollAnchorRef.current;
+    if (anchor === undefined) {
+      return;
+    }
+    pendingFilterScrollAnchorRef.current = undefined;
+
+    if (sortedRecords.length === 0) {
+      const container = tableContainerRef.current;
+      if (container && isElementVerticallyScrollable(container)) {
+        container.scrollTo({ behavior: 'auto', top: 0 });
+      } else if (typeof window.scrollTo === 'function') {
+        window.scrollTo({ behavior: 'auto', top: 0 });
+      }
+      return;
+    }
+
+    const matchingRecordIndex = getRecordIndex(sortedRecords, anchor.recordId);
+    const recordIndex = matchingRecordIndex >= 0
+      ? matchingRecordIndex
+      : Math.min(sortedRecords.length - 1, Math.max(0, anchor.previousIndex));
+    const nextVisibleRowRange = getSelectionVisibleRowRange(recordIndex, visibleRowRange, sortedRecords.length);
+    setVisibleRowRange(nextVisibleRowRange);
+
+    const container = tableContainerRef.current;
+    const rowHeight = recentRecordRowHeight > 0 ? recentRecordRowHeight : ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX;
+    if (container && isElementVerticallyScrollable(container)) {
+      container.scrollTo({ behavior: 'auto', top: recordIndex * rowHeight });
+      return;
+    }
+
+    if (typeof window.scrollTo === 'function' && container) {
+      const containerTop = container.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({
+        behavior: 'auto',
+        top: Math.max(0, containerTop + recordIndex * rowHeight),
+      });
+    }
+  }, [recentRecordRowHeight, sortedRecords, visibleRowRange]);
   React.useEffect(() => {
     const container = tableContainerRef.current;
     if (!container) {
@@ -2530,6 +2623,15 @@ export const RecentRecords = (props: RecordsProps & {
   const handleSelectUnrecognisedPlateNumber = React.useCallback((plateNumber: string | undefined): void => {
     setSelectedPlateNumber(plateNumber);
   }, []);
+  const handleFilterModeChange = React.useCallback((nextFilterMode: RecentRecordsFilterMode): void => {
+    if (nextFilterMode !== filterMode && selectedRecordId !== undefined) {
+      pendingFilterScrollAnchorRef.current = {
+        previousIndex: getRecordIndex(sortedRecords, selectedRecordId),
+        recordId: selectedRecordId,
+      };
+    }
+    setFilterMode(nextFilterMode);
+  }, [filterMode, selectedRecordId, sortedRecords]);
 
   return <>
     <SourceOffsetsDialog
@@ -2604,7 +2706,7 @@ export const RecentRecords = (props: RecordsProps & {
           <Select
             id="show-recent-type"
             value={filterMode}
-            onChange={(event) => setFilterMode(event.target.value as RecentRecordsFilterMode)}
+            onChange={(event) => handleFilterModeChange(event.target.value as RecentRecordsFilterMode)}
             label="Record types">
             <MenuItem value="all">All records</MenuItem>
             <MenuItem value="flags">Only flags</MenuItem>

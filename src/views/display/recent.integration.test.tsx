@@ -393,6 +393,9 @@ describe('RecentRecords integration', () => {
 
     expect(firstLapLeader?.className).toContain('lapLeader');
     expect(container.querySelector('tr[data-record-id="participant-a-lap-1"].lapLeader > td')).not.toBeNull();
+    expect(firstLapLeader?.querySelectorAll('td')[7]?.className).toContain('same-lap-as-leader');
+    expect(sessionFastestRow?.querySelectorAll('td')[7]?.className).toContain('same-lap-as-leader');
+    expect(entrantImprovedRow?.querySelectorAll('td')[7]?.className).toContain('same-lap-as-leader');
     expect(getLapTimeCell(firstLapLeader).className).toContain('overallFastest');
     expect(sessionFastestRow?.className).not.toContain('lapLeader');
     expect(getLapTimeCell(sessionFastestRow).className).toContain('overallFastest');
@@ -1860,8 +1863,18 @@ describe('RecentRecords integration', () => {
     await selectRecentRecordsFilter('Only flags');
     expect(getDisplayedRecordIds(container)).toEqual(['flag-only']);
 
+    const selectedFlagRow = container.querySelector('tr[data-record-id="flag-only"]');
+    expect(selectedFlagRow).not.toBeNull();
+    await act(async () => {
+      selectedFlagRow!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+
     await selectRecentRecordsFilter('All records');
     expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
+    expect(container.querySelector('tr[data-record-id="flag-only"]')?.className).toContain('selected-row');
+    expect(scrollTo).toHaveBeenCalled();
 
     await selectRecentRecordsFilter('Only selected category');
     expect(getDisplayedRecordIds(container)).toEqual(['2001', '2002']);
@@ -1880,6 +1893,7 @@ describe('RecentRecords integration', () => {
 
     await selectRecentRecordsFilter('All records');
     expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
+    scrollTo.mockRestore();
   });
 
   it('returns to all records when the active show-only selection is deselected', async () => {
@@ -4281,6 +4295,7 @@ describe('RecentRecords integration', () => {
       'File: T9743R10.DBF',
       'Record/line 17',
     ].join('\n'));
+    expect(row?.className).toContain('passing-pit');
   });
 
   it('shows an exclusion reason marker on unrelated lap-time records', async () => {
@@ -4425,9 +4440,13 @@ describe('RecentRecords integration', () => {
     const cells = Array.from(row?.querySelectorAll('td') || []).map((cell) => cell.textContent || '');
 
     expect(row?.className).not.toContain('excluded');
+    expect(row?.className).toContain('passing-sector');
     expect(row?.querySelector('.unrelated-reason-marker')).toBeNull();
     expect(cells[8]).toBe('0:30.000');
     expect(cells[cells.length - 1]).toBe('0:30.000');
+
+    const finishRow = container.querySelector('tr[data-record-id="finish-line-crossing"]');
+    expect(finishRow?.className).toContain('passing-finish');
   });
 
   it('shows a non-finish loop 1 crossing as lap time so far when no lap flag is set', async () => {

@@ -37,6 +37,25 @@
   color: #1f2937;
 }
 
+/* Keep the primary finish-line records visually dominant over intermediate crossings. */
+.passing-sector,
+.passing-sector > .MuiTableCell-root {
+  background-color: #f8fafc;
+  color: #64748b;
+}
+
+.passing-pit,
+.passing-pit > .MuiTableCell-root {
+  background-color: #e2e8f0;
+  color: #475569;
+}
+
+.passing-finish,
+.passing-finish > .MuiTableCell-root {
+  background-color: #cbd5e1;
+  color: #1e293b;
+}
+
 .excluded {
   opacity: 0.5;
   background-color: #a0a0a0;
@@ -92,6 +111,11 @@
 
 .lapLeader > .MuiTableCell-root {
   font-weight: 700;
+}
+
+.same-lap-as-leader,
+.same-lap-as-leader.MuiTableCell-root {
+  background-color: #cbd5e1;
 }
 
 .lap-time-cell {
