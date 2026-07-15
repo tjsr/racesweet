@@ -6,7 +6,7 @@ import { CategoryId } from '../controllers/category.ts';
 import { type LoadingMetricsState, getLoadingMetricsSnapshot, incrementLoadingMetric, resetLoadingMetrics, subscribeLoadingMetrics } from '../loadingMetrics.ts';
 import { type LoadingProgressState, completeLoadingProgressStage, createLoadingProgressState, updateLoadingProgressStage } from '../loadingProgress.ts';
 import { type EventCategory, EventCategoryId } from '../model/eventcategory.ts';
-import { type EventParticipant, type EventParticipantId } from '../model/eventparticipant.ts';
+import { type EventParticipant, type EventParticipantId, type ParticipantTransponder } from '../model/eventparticipant.ts';
 import type { EventTeam } from '../model/eventteam.ts';
 import { EventId, SessionId } from '../model/raceevent.ts';
 import { type RaceState, RaceStateLookup, Session } from '../model/racestate.ts';
@@ -1772,18 +1772,33 @@ export const RaceSweetMainApp = () => {
               ? raceStateSnapshot(sessionState)
               : eventCatalogService.getImportedRaceState(eventId, sessionId) || {};
             const targetSessionState = sessionFromPartialRaceState(importMode === 'import' ? {} : existingRaceState);
+            const knownTransmitterNumbers = importMode === 'update'
+              ? (existingRaceState.participants || []).flatMap((participant) => participant.identifiers
+                .filter((identifier) => 'txNo' in identifier)
+                .map((identifier) => (identifier as ParticipantTransponder).txNo))
+              : [];
 
             return window.api.requestBuffer(filePath)
               .then((buffer) => loadDorianCtcSrtCatalogForSession(filePath, buffer, {
                 eventDate: event.date,
                 eventId,
+                importPlaceholderEntrantsForUnknownTransmitters: source.fileConfig?.importPlaceholderEntrantsForUnknownTransmitters === true,
+                knownTransmitterNumbers,
                 onProgress,
                 sessionId,
                 timeZone: event.timeZone,
               }))
               .then(async (importedRaceState) => {
+                const scaffoldCatalog = await eventCatalogService.syncEventScaffold(
+                  eventId,
+                  importedRaceState.categories || [],
+                  importedRaceState.participants || [],
+                  [],
+                  importedRaceState.teams || [],
+                  sessionId,
+                );
                 await applyPulledRaceStateToSession(targetSessionState, importedRaceState, {
-                  catalog: eventCatalogService.catalog || eventCatalogState,
+                  catalog: scaffoldCatalog,
                   eventId,
                   finishLineNumbers: getFinishLineNumbersForSession(systemConfigState, eventId, sessionId),
                   sessionId,

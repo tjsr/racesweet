@@ -525,6 +525,84 @@ describe('EventCatalogService', () => {
     }));
   });
 
+  it('creates a parent entrant for an imported unknown-transmitter participant', async () => {
+    const persistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(persistence);
+    const entrantId = createEventEntrantId('unknown-transmitter-entrant');
+    const participantId = createEventParticipantId('unknown-transmitter-participant');
+
+    await service.updateImportedRaceState(SEED_EVENT_ID, SEED_PRACTICE_SESSION_ID, {
+      categories: [{ id: TEST_CATEGORY_ID, name: 'Unknown participants' }],
+      participants: [
+        {
+          categoryId: TEST_CATEGORY_ID,
+          currentResult: undefined,
+          entrantId,
+          firstname: '',
+          id: participantId,
+          identifiers: [{ fromTime: undefined, toTime: undefined, txNo: 1234 } as ParticipantTransponder],
+          lastRecordTime: null,
+          resultDuration: null,
+          surname: '',
+        },
+      ],
+      records: [],
+      teams: [],
+    });
+
+    const entrant = getEntrantsForEvent(service.catalog, SEED_EVENT_ID).find((item) => item.id === entrantId);
+
+    expect(entrant).toEqual(expect.objectContaining({
+      categoryId: TEST_CATEGORY_ID,
+      id: entrantId,
+      identifiers: [{ fromTime: undefined, toTime: undefined, txNo: 1234 } as ParticipantTransponder],
+      memberParticipantIds: [participantId],
+      name: 'Unknown participant with Transponder #1234',
+    }));
+    expect(service.catalog.events.find((event) => event.id === SEED_EVENT_ID)?.entrantIds).toContain(entrantId);
+  });
+
+  it('adds unknown-transmitter placeholder entrants only to the imported event', async () => {
+    const persistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(persistence);
+    await service.createEvent();
+    const targetEvent = service.catalog.events.find((event) => event.id !== SEED_EVENT_ID);
+    expect(targetEvent).toBeDefined();
+    await service.createSession(targetEvent!.id);
+    const targetSession = getSessionsForEvent(service.catalog, targetEvent!.id)[0];
+    const categoryId = createCategoryId('target-event-unknown-transmitter-category');
+    const entrantId = createEventEntrantId('target-event-unknown-transmitter-entrant');
+    const participantId = createEventParticipantId('target-event-unknown-transmitter-participant');
+
+    await service.replaceImportedRaceState(targetEvent!.id, targetSession!.id, {
+      categories: [{ id: categoryId, name: 'Unknown participants' }],
+      participants: [
+        {
+          categoryId,
+          currentResult: undefined,
+          entrantId,
+          firstname: '',
+          id: participantId,
+          identifiers: [{ fromTime: undefined, toTime: undefined, txNo: 5678 } as ParticipantTransponder],
+          lastRecordTime: null,
+          resultDuration: null,
+          surname: '',
+        },
+      ],
+      records: [],
+      teams: [],
+    });
+
+    const placeholderEntrant = service.catalog.entrants.find((entrant) => entrant.id === entrantId);
+    const importedEvent = service.catalog.events.find((event) => event.id === targetEvent!.id);
+    const otherEvent = service.catalog.events.find((event) => event.id === SEED_EVENT_ID);
+
+    expect(placeholderEntrant?.eventId).toBe(targetEvent!.id);
+    expect(importedEvent?.entrantIds).toContain(entrantId);
+    expect(otherEvent?.entrantIds).not.toContain(entrantId);
+    expect(getEntrantsForEvent(service.catalog, targetEvent!.id).map((entrant) => entrant.id)).toContain(entrantId);
+  });
+
   it('does not delete imported parent entrants while participants still reference them', async () => {
     const persistence = createPersistence(createSeedEventCatalogLedger());
     const service = await EventCatalogService.create(persistence);

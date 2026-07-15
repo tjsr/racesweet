@@ -459,7 +459,7 @@ describe('SystemConfigService', () => {
     await service.createSource('file-dorian-ctc-srt');
     const source = service.state.dataSources[0];
 
-    expect(source.fileConfig).toEqual({ importMode: 'import' });
+    expect(source.fileConfig).toEqual({ importMode: 'import', importPlaceholderEntrantsForUnknownTransmitters: false });
 
     await service.updateSource(source.id, {
       fileConfig: {
@@ -471,6 +471,7 @@ describe('SystemConfigService', () => {
     expect(service.state.dataSources[0]?.fileConfig).toEqual({
       filePath: 'C:\\RaceTime\\timing\\INDY500.ERF',
       importMode: 'update',
+      importPlaceholderEntrantsForUnknownTransmitters: false,
     });
   });
 

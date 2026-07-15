@@ -4,6 +4,7 @@ import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { EventTeam } from '../model/eventteam.js';
 import { rewriteImportedObjectIds } from '../model/ids.js';
+import { getParticipantDisplayName } from '../model/participantDisplay.js';
 import type { RaceState } from '../model/racestate.js';
 import type { TimeRecord, TimeRecordSource } from '../model/timerecord.js';
 import { incrementLoadingMetric } from '../loadingMetrics.js';
@@ -235,7 +236,7 @@ const validateRaceStateIds = (
   (raceState.participants || []).forEach((participant) => {
     if (participant.entrantId && !teamIds.has(participant.entrantId) && !participantIds.has(participant.entrantId) && !catalogHasEntrantForEvent(options, participant.entrantId)) {
       errors.push(
-        `participant ${participant.id} (${participant.firstname} ${participant.surname?.toUpperCase()}) references missing entrant ${participant.entrantId}. ${formatEntrantCatalogSearch(options.catalog, participant.entrantId)}`
+        `participant ${participant.id} (${getParticipantDisplayName(participant)}) references missing entrant ${participant.entrantId}. ${formatEntrantCatalogSearch(options.catalog, participant.entrantId)}`
       );
     }
   });

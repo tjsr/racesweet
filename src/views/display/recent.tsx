@@ -23,6 +23,7 @@ import { EventCategory, EventCategoryId } from '../../model/eventcategory';
 import { EventTeam } from '../../model/eventteam.ts';
 import { FlagRecord } from '../../model/flag';
 import { createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.ts';
+import { getParticipantDisplayName } from '../../model/participantDisplay.js';
 import { EventId, SessionId } from '../../model/raceevent.ts';
 import { RaceStateLookup } from '../../model/racestate.ts';
 import {
@@ -280,7 +281,7 @@ const getParticipantTeamName = (participant: EventParticipant | undefined, raceS
   if (!participant) {
     return '';
   }
-  const participantName = `${participant.firstname || ''} ${participant.surname || ''}`.trim();
+  const participantName = getParticipantDisplayName(participant);
   const teams = (raceStateLookup as unknown as { teams?: EventTeam[] }).teams || [];
   const team = teams.find((candidate) => candidate.members.includes(participant.id) && candidate.name !== participantName);
   return team?.name || '';
@@ -828,7 +829,7 @@ const _categoriesFromCrossing = (
 };
 
 const getPassingEntrantName = (participant: EventParticipant, rs: RaceStateLookup): string => {
-  const participantName = `${participant.firstname} ${participant.surname}`;
+  const participantName = getParticipantDisplayName(participant);
   const teams = (rs as unknown as { teams?: EventTeam[] }).teams || [];
   const team = teams.find((candidate) => {
     return candidate.name !== participantName && candidate.members.includes(participant.id);
@@ -1904,7 +1905,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   }, [participantMap, passingPlate, passingTxNo]);
 
   const resolvedCategory = resolvedParticipant?.categoryId ? props.raceStateLookup.getCategoryById(resolvedParticipant.categoryId) : undefined;
-  const resolvedEntrantName = resolvedParticipant ? `${resolvedParticipant.firstname || ''} ${resolvedParticipant.surname || ''}`.trim() : '';
+  const resolvedEntrantName = resolvedParticipant ? getParticipantDisplayName(resolvedParticipant) : '';
   const resolvedTeamName = getParticipantTeamName(resolvedParticipant, props.raceStateLookup);
   const resolvedCategoryName = resolvedCategory?.name || '';
   const editablePassingRecord = editingRecord && isCrossingRecord(editingRecord) ? editingRecord : undefined;

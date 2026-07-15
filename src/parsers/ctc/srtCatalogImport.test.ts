@@ -89,4 +89,48 @@ describe('Dorian CTC SRT catalog import', () => {
       timeTenthOfMillisecond: 0,
     }));
   });
+
+  it('creates and links placeholder participants for unknown CTC transmitters when configured', async () => {
+    const eventId = createEventId('placeholder-event');
+    const sessionId = createSessionId('placeholder-session');
+
+    const raceState = await loadDorianCtcSrtCatalogForSession(
+      'C:/timing/race-4.erf',
+      Buffer.from([
+        '040000000010000012340302064000',
+        '040000000020000012340401063016',
+      ].join('\r')),
+      {
+        eventDate: '2026-07-14',
+        eventId,
+        importPlaceholderEntrantsForUnknownTransmitters: true,
+        sessionId,
+      }
+    );
+
+    expect(raceState.categories).toEqual([expect.objectContaining({ name: 'Unknown participants' })]);
+    expect(raceState.participants).toEqual([expect.objectContaining({
+      firstname: '',
+      identifiers: [expect.objectContaining({ txNo: 1234 })],
+      surname: '',
+    })]);
+    expect(raceState.records?.every((record) => 'participantId' in record && record.participantId === raceState.participants?.[0]?.id)).toBe(true);
+
+    const updatedRaceState = await loadDorianCtcSrtCatalogForSession(
+      'C:/timing/race-4.erf',
+      Buffer.from('040000000010000012340302064000\r'),
+      {
+        eventDate: '2026-07-14',
+        eventId,
+        importPlaceholderEntrantsForUnknownTransmitters: true,
+        knownTransmitterNumbers: [1234],
+        sessionId,
+      }
+    );
+
+    expect(updatedRaceState.participants).toEqual([]);
+    expect(updatedRaceState.records?.[0] && 'participantId' in updatedRaceState.records[0]
+      ? updatedRaceState.records[0].participantId
+      : undefined).toBeUndefined();
+  });
 });

@@ -4293,6 +4293,13 @@ describe('RecentRecords integration', () => {
     const row = container.querySelector('tr[data-record-id="under-minimum-crossing"]');
     const cells = Array.from(row?.querySelectorAll('td') || []).map((cell) => cell.textContent || '');
     expect(row?.className).toContain('excluded');
+
+    await act(async () => {
+      row?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(row?.className).toContain('selected-row');
+    expect(row?.className).toContain('excluded');
     expect(cells[cells.length - 1]).toContain('0:59.999');
     expect(row?.querySelector('.unrelated-reason-marker')?.textContent).toBe('!');
     expect(row?.querySelector('.unrelated-reason-marker')?.getAttribute('aria-label')).toBe('Lap time is below minimum of 1:00.0000.');

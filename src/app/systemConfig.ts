@@ -35,6 +35,7 @@ export type DataImportMode = 'import' | 'update';
 
 export interface LocalFileSourceConfig {
   filePath?: string;
+  importPlaceholderEntrantsForUnknownTransmitters?: boolean;
   importMode?: DataImportMode;
 }
 
@@ -233,6 +234,7 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListed
       ...source,
       fileConfig: {
         filePath: normalizeOptionalSystemFilePath(source.fileConfig?.filePath),
+        importPlaceholderEntrantsForUnknownTransmitters: source.fileConfig?.importPlaceholderEntrantsForUnknownTransmitters === true,
         importMode: source.fileConfig?.importMode === 'update' ? 'update' : 'import',
       },
       finishLineNumbers: normalizeFinishLineNumbers(source.finishLineNumbers) || [1],

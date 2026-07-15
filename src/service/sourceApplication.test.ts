@@ -917,12 +917,39 @@ describe('sourceApplication', () => {
             categoryId: EXISTING_CATEGORY_ID,
             currentResult: undefined,
             entrantId,
-            firstname: 'Pat',
+            firstname: '',
             id: participantId,
-            identifiers: [],
+            identifiers: [{ fromTime: undefined, toTime: undefined, txNo: 1234 }] as unknown as EventParticipant['identifiers'],
             lastRecordTime: null,
             resultDuration: null,
-            surname: 'Rider',
+            surname: '',
+          },
+        ],
+        records: [],
+      },
+      { catalog }
+    )).rejects.toThrow('Unknown participant with Transponder #1234');
+    await expect(applyPulledRaceStateToSession(
+      {
+        addCategories,
+        addParticipants,
+        addRecords,
+        categories: existingCategories,
+        records: [],
+      },
+      {
+        categories: [],
+        participants: [
+          {
+            categoryId: EXISTING_CATEGORY_ID,
+            currentResult: undefined,
+            entrantId,
+            firstname: '',
+            id: participantId,
+            identifiers: [{ fromTime: undefined, toTime: undefined, txNo: 1234 }] as unknown as EventParticipant['identifiers'],
+            lastRecordTime: null,
+            resultDuration: null,
+            surname: '',
           },
         ],
         records: [],

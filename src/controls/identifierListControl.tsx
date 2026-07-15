@@ -1,6 +1,7 @@
 import React from 'react';
 import { getParticipantIdentifiers } from '../controllers/participant.js';
 import { type EventParticipant, type ParticipantTransponder } from '../model/eventparticipant.js';
+import { getParticipantDisplayName } from '../model/participantDisplay.js';
 
 type IdentifierType = 'racePlate' | 'txNo';
 type IdentifierUpdateValues = string[] | ParticipantTransponder[];
@@ -24,8 +25,7 @@ interface IdentifierListControlProps {
 }
 
 const getParticipantLabel = (participant: EventParticipant): string => {
-  const label = `${participant.firstname} ${participant.surname}`.trim();
-  return label.length > 0 ? label : participant.id.toString();
+  return getParticipantDisplayName(participant);
 };
 
 const getInitialDraftRows = (

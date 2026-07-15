@@ -28,6 +28,7 @@ import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { EventTeam } from '../model/eventteam.js';
 import { createCategoryId, createEventEntrantId, createEventId, createId, createSessionId, rewriteImportedObjectIds } from '../model/ids.js';
+import { getParticipantDisplayName } from '../model/participantDisplay.js';
 import { EventId, SessionId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 import type { EventTimeRecord, TimeRecord } from '../model/timerecord.js';
@@ -119,7 +120,7 @@ const entrantNameFromMembers = (members: EventParticipant[]): string => {
     return 'Unassigned Entrant';
   }
   if (members.length === 1) {
-    return `${members[0].firstname} ${members[0].surname}`.trim();
+    return getParticipantDisplayName(members[0]);
   }
   return `Team ${members[0].entrantId}`;
 };
@@ -590,7 +591,7 @@ const deriveEntrantsFromParticipants = async (
         identifiers: [...member.identifiers],
         lastName: riderLastName,
         memberParticipantIds: [participantId],
-        name: riderName || `${member.firstname || ''} ${member.surname || ''}`.trim() || participantId,
+        name: riderName || getParticipantDisplayName(member),
         teamEntrantId: entrantType === 'team' ? entrantId : undefined,
       };
     });

@@ -237,6 +237,15 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
     });
   };
 
+  const handleSaveDorianCtcPlaceholderEntrants = (source: DataSourceConfig, importPlaceholderEntrantsForUnknownTransmitters: boolean): void => {
+    void props.onSaveSource(source.id, {
+      fileConfig: {
+        ...source.fileConfig,
+        importPlaceholderEntrantsForUnknownTransmitters,
+      },
+    });
+  };
+
   const handlePreviewDorianCtcSrtFile = async (source: DataSourceConfig): Promise<void> => {
     if (!props.onPreviewDorianCtcSrtFile || !source.fileConfig?.filePath) {
       return;
@@ -396,6 +405,14 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                           Update — retain existing data and update or add matching file records where possible.
                         </label>
                       </fieldset>
+                      <label>
+                        <input
+                          checked={source.fileConfig?.importPlaceholderEntrantsForUnknownTransmitters === true}
+                          onChange={(event) => handleSaveDorianCtcPlaceholderEntrants(source, event.target.checked)}
+                          type="checkbox"
+                        />
+                        Import placeholder entrant for unknown transmitters
+                      </label>
                       <div className="events-actions">
                         <button type="button" onClick={() => handleSelectDorianCtcSrtFile(source)}>
                           Edit File

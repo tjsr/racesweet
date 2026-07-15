@@ -124,6 +124,21 @@ describe('DataSourcesPanel', () => {
         importMode: 'update',
       },
     });
+
+    const placeholderCheckbox = Array.from(container.querySelectorAll('label'))
+      .find((label) => label.textContent?.includes('Import placeholder entrant for unknown transmitters'))
+      ?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+    expect(placeholderCheckbox).toBeTruthy();
+    flushSync(() => {
+      placeholderCheckbox?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(onSaveSource).toHaveBeenCalledWith('source-dorian-ctc', {
+      fileConfig: {
+        filePath: 'C:/RaceTime/timing/INDY500.ERF',
+        importMode: 'import',
+        importPlaceholderEntrantsForUnknownTransmitters: true,
+      },
+    });
   });
 
   it('selects an MR-SCATS data directory and persists the discovered file list', async () => {
