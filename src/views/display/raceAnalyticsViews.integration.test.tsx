@@ -10,7 +10,7 @@ import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordSourceId } from '../../model/ids.js';
 import type { RaceStateLookup, Session } from '../../model/racestate.js';
-import type { ParticipantPassingRecord } from '../../model/timerecord.js';
+import { CROSSING_UNRELATED_AFTER_FINISH, type ParticipantPassingRecord } from '../../model/timerecord.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 import { ReportsPage, ResultsPage } from './raceAnalyticsViews.js';
 
@@ -266,6 +266,100 @@ describe('race analytics views integration', () => {
 
     expect(container.querySelector('[aria-label="Lap Entry Details"]')).toBeTruthy();
     expect(container.textContent).toContain(`Entrant: Team Rocket (${createEventEntrantId('team-1')})`);
+  });
+
+  it('uses counted finish-line crossings only for results and reports', async () => {
+    const soloParticipantId = createEventParticipantId('p-rider-1');
+    const soloEntrantId = createEventEntrantId('rider-1');
+    const countedFinish = {
+      ...createLap('counted-finish', soloParticipantId, soloEntrantId, 1, 70000, 70000),
+      lineNumber: 1,
+    };
+    const sectorCrossing = {
+      ...createLap('sector-crossing', soloParticipantId, soloEntrantId, 1, 71000, 1000),
+      lineNumber: 2,
+    };
+    const speedTrapCrossing = {
+      ...createLap('speed-trap-crossing', soloParticipantId, soloEntrantId, 1, 72000, 500),
+      lineNumber: 3,
+    };
+    const countedPitFinish = {
+      ...createLap('counted-pit-finish', soloParticipantId, soloEntrantId, 2, 125000, 55000),
+      lineNumber: 9,
+    };
+    const excludedFinish = {
+      ...createLap('excluded-finish', soloParticipantId, soloEntrantId, 3, 126000, 1000),
+      isExcluded: true,
+      lineNumber: 1,
+    };
+    const afterFinishCrossing = {
+      ...createLap('after-finish', soloParticipantId, soloEntrantId, 3, 127000, 1000),
+      isExcluded: undefined,
+      lineNumber: 1,
+      unrelatedReasonCode: CROSSING_UNRELATED_AFTER_FINISH,
+    };
+    const raceStateWithMixedCrossings = {
+      ...raceState,
+      getFinishLineNumbers: () => [1, 9],
+      getParticipantLaps: (participantId: EventParticipantId) => participantId === soloParticipantId
+        ? [countedFinish, sectorCrossing, speedTrapCrossing, countedPitFinish, excludedFinish, afterFinishCrossing]
+        : lapsByParticipant.get(participantId) || [],
+    } as unknown as Session & RaceStateLookup;
+
+    await act(async () => {
+      root.render(
+        <ResultsPage
+          categories={categories}
+          catalogEntrants={catalogEntrants}
+          raceState={raceStateWithMixedCrossings}
+        />,
+      );
+    });
+
+    const resultsRows = Array.from(container.querySelectorAll('table[aria-label="Results Table"] tbody tr'));
+    const soloResult = resultsRows.find((row) => row.textContent?.includes('Solo Rider'));
+    expect(Array.from(soloResult!.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
+      '2',
+      'Solo Rider',
+      'Category B',
+      '2',
+      '2:05.000',
+      '0:55.000',
+    ]);
+
+    await act(async () => {
+      root.render(
+        <ReportsPage
+          categories={categories}
+          catalogEntrants={catalogEntrants}
+          raceState={raceStateWithMixedCrossings}
+        />,
+      );
+    });
+
+    const fastestRow = Array.from(container.querySelectorAll('table[aria-label="Fastest Laps Report Table"] tbody tr'))
+      .find((row) => row.textContent?.includes('Solo Rider'));
+    expect(Array.from(fastestRow!.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
+      soloParticipantId,
+      'Solo Rider',
+      'Category B',
+      '0:55.000',
+      '2',
+      '2',
+    ]);
+
+    const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
+    const categorySelect = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
+    await act(async () => {
+      setSelectValue(categorySelect, createCategoryId('cat-b'));
+      setSelectValue(reportSelect, 'lap-times');
+    });
+
+    const lapRows = Array.from(container.querySelectorAll('table[aria-label="Lap Times Report Table"] tbody tr'));
+    expect(lapRows).toHaveLength(2);
+    expect(lapRows.map((row) => row.querySelectorAll('td')[1]?.textContent)).toEqual(['1:10.000', '0:55.000']);
+    expect(container.textContent).toContain('0:55.000');
+    expect(container.textContent).not.toContain('0:00.500');
   });
 
   it('reports fastest laps and participant lap times correctly for team and individual entrants', async () => {

@@ -4,12 +4,13 @@ import React from 'react';
 import type { EventCatalogEntrant } from '../../catalog/eventCatalog.js';
 import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
 import { shouldExcludeCategoryFromResults } from '../../controllers/category.js';
+import { isCountedLapPassing } from '../../controllers/laps.js';
 import { getParticipantNumber } from '../../controllers/participant.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
 import { EventCategoryId } from '../../model/index.js';
 import { EventId, SessionId } from '../../model/raceevent.js';
-import { type ParticipantPassingRecord, isPassingExcluded } from '../../model/timerecord.js';
+import type { ParticipantPassingRecord } from '../../model/timerecord.js';
 import { LapTimesReport } from '../reports/LapTimesReport.js';
 import { HandicapView } from './handicap.js';
 
@@ -202,8 +203,11 @@ const formatDuration = (duration?: number): string => {
   return millisecondsToTime(duration);
 };
 
-const isValidLap = (lap: ParticipantPassingRecord): boolean => {
-  return (lap.lapNo || 0) > 0 && !isPassingExcluded(lap) && typeof lap.elapsedTime === 'number' && lap.elapsedTime >= 0;
+const isValidLap = (
+  lap: ParticipantPassingRecord,
+  finishLineNumbers: number[] | undefined
+): boolean => {
+  return isCountedLapPassing(lap, finishLineNumbers);
 };
 
 const findEntrantName = (entrantId: EventEntrantId, members: EventParticipant[], catalogEntrantsById: Map<EventEntrantId, EventCatalogEntrant>): string => {
@@ -251,6 +255,7 @@ const buildEntrantRows = (
 ): EntrantSummaryRow[] => {
   const catalogEntrantsById = new Map(catalogEntrants.map((entrant) => [entrant.id, entrant]));
   const participantGroups = new Map<EventEntrantId, EventParticipant[]>();
+  const finishLineNumbers = raceState.getFinishLineNumbers?.();
 
   raceState.participants.forEach((participant) => {
     const entrantId = participant.entrantId?.toString() || participant.id.toString();
@@ -269,7 +274,7 @@ const buildEntrantRows = (
 
     const laps = includedMembers
       .flatMap((member) => raceState.getParticipantLaps(member.id) || [])
-      .filter(isValidLap)
+      .filter((lap) => isValidLap(lap, finishLineNumbers))
       .sort((a, b) => {
         const at = a.time?.getTime() || Number.MAX_SAFE_INTEGER;
         const bt = b.time?.getTime() || Number.MAX_SAFE_INTEGER;
@@ -332,7 +337,7 @@ const buildLapChart = (rows: EntrantSummaryRow[]): LapChartColumn[] => {
   rows.forEach((row) => {
     const memberById = new Map(row.memberDetails.map((detail) => [detail.participantId, detail]));
     row.laps.forEach((lap) => {
-      if (!lap.lapNo || !lap.participantId || !isValidLap(lap)) {
+      if (!lap.lapNo || !lap.participantId) {
         return;
       }
       const detail = memberById.get(lap.participantId.toString());
@@ -407,8 +412,7 @@ const buildFastestLapTimeline = (rows: EntrantSummaryRow[], ignoreFirstLap: bool
 
     return row.laps
       .filter((lap) => {
-        return isValidLap(lap) &&
-          typeof lap.lapTime === 'number' &&
+        return typeof lap.lapTime === 'number' &&
           lap.lapTime > 0 &&
           !!lap.participantId &&
           !!lap.lapNo &&

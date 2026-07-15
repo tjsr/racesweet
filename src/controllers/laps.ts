@@ -2,7 +2,7 @@ import { elapsedTimeMilliseconds, millisecondsToTime } from "../app/utils/timeut
 import type { EventSessionKind } from "../catalog/eventCatalog.js";
 import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
 import type { FlagRecord, GreenFlagRecord } from "../model/flag.js";
-import type { CrossingUnrelatedReasonCode, ParticipantPassingRecord, TimeRecord } from "../model/timerecord.js";
+import { type CrossingUnrelatedReasonCode, type ParticipantPassingRecord, type TimeRecord, isPassingExcluded, isPassingValid } from "../model/timerecord.js";
 import { EventFlagsError, NoStartFlagError, ParticipantStartFlagError, StartFlagHasNoTimeError } from "../validators/errors.js";
 import { getCategoryFlags, getFlagEvents, getOrCacheGreenFlagForCategory } from "./flag.js";
 import { calculateParticipantElapsedTimes, getParticipantNumber, getParticipantTransponders, getPassingsForParticipant } from "./participant.js";
@@ -180,6 +180,20 @@ export const isFinishLinePassing = (
   }
 
   return normalizeFinishLineNumbers(finishLineNumbers).includes(lineNumber);
+};
+
+export const isCountedLapPassing = (
+  passing: ParticipantPassingRecord,
+  finishLineNumbers: number[] | undefined
+): boolean => {
+  return isPassingValid(passing) &&
+    !isPassingExcluded(passing) &&
+    isLapCompletionPassing(passing, finishLineNumbers) &&
+    (passing.lapNo || 0) > 0 &&
+    typeof passing.elapsedTime === 'number' &&
+    passing.elapsedTime >= 0 &&
+    typeof passing.lapTime === 'number' &&
+    passing.lapTime > 0;
 };
 
 export const getTimingLineKey = (

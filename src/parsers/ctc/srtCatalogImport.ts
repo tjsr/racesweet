@@ -93,6 +93,7 @@ const createCrossingRecord = (
     eventId,
     hitCount: record.hitCount,
     id: createTimeRecordId(`dorian-ctc-srt:${filePath}:record:${record.recordNumber}:${record.raw}`),
+    ...(trackLoop?.loop.isLapCompletion === undefined ? {} : { isLapCompletion: trackLoop.loop.isLapCompletion }),
     lineNumber: trackLoop?.line.line ?? record.lineNumber,
     loopNumber: trackLoop?.loop.loopNumber ?? record.laneNumber,
     originRecordNumber: record.recordNumber,

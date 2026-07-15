@@ -76,7 +76,7 @@ const countCtcTrackConfigLoops = (trackConfig: CtcTrackConfig): number => (
   ), 0)
 );
 
-const CtcTrackConfigDetails = ({ source }: { source: DataSourceConfig }): React.ReactElement | null => {
+const CtcTrackConfigDetails = ({ onSave, source }: { onSave: (trackConfig: CtcTrackConfig) => void; source: DataSourceConfig }): React.ReactElement | null => {
   const trackConfig = source.fileConfig?.ctcTrackConfig;
   if (!trackConfig) {
     return source.fileConfig?.trackConfigFilePath ? (
@@ -102,6 +102,7 @@ const CtcTrackConfigDetails = ({ source }: { source: DataSourceConfig }): React.
             <th>Site address</th>
             <th>Card</th>
             <th>Com port</th>
+            <th>Lap/finish</th>
           </tr>
         </thead>
         <tbody>
@@ -114,6 +115,28 @@ const CtcTrackConfigDetails = ({ source }: { source: DataSourceConfig }): React.
               <td>{loop.siteAddress}</td>
               <td>{loop.card}</td>
               <td>{loop.comPort}</td>
+              <td>
+                <input
+                  aria-label={`CTC ${network.name} line ${line.line} loop ${loop.loopNumber} lap finish`}
+                  checked={loop.isLapCompletion === true}
+                  onChange={(event) => {
+                    const nextTrackConfig: CtcTrackConfig = {
+                      ...trackConfig,
+                      networks: trackConfig.networks.map((candidateNetwork) => candidateNetwork === network ? {
+                        ...candidateNetwork,
+                        lines: candidateNetwork.lines.map((candidateLine) => candidateLine === line ? {
+                          ...candidateLine,
+                          loops: candidateLine.loops.map((candidateLoop) => candidateLoop === loop
+                            ? { ...candidateLoop, isLapCompletion: event.target.checked }
+                            : candidateLoop),
+                        } : candidateLine),
+                      } : candidateNetwork),
+                    };
+                    onSave(nextTrackConfig);
+                  }}
+                  type="checkbox"
+                />
+              </td>
             </tr>
           ))))}
         </tbody>
@@ -470,7 +493,22 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                           placeholder="No TRACK.CFG selected"
                         />
                       </label>
-                      <CtcTrackConfigDetails source={source} />
+                      <CtcTrackConfigDetails
+                        onSave={(ctcTrackConfig) => {
+                          const finishLineNumbers = ctcTrackConfig.networks
+                            .flatMap((network) => network.lines)
+                            .filter((line) => line.loops.some((loop) => loop.isLapCompletion === true))
+                            .map((line) => line.line);
+                          void props.onSaveSource(source.id, {
+                            fileConfig: {
+                              ...source.fileConfig,
+                              ctcTrackConfig,
+                            },
+                            finishLineNumbers: Array.from(new Set(finishLineNumbers)).sort((left, right) => left - right),
+                          });
+                        }}
+                        source={source}
+                      />
                       <fieldset>
                         <legend>Data import mode</legend>
                         <label>

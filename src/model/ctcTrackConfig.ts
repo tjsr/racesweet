@@ -1,6 +1,7 @@
 export interface CtcTrackConfigLoop {
   card: number;
   comPort: number;
+  isLapCompletion?: boolean;
   loopNumber: number;
   siteAddress: number;
 }

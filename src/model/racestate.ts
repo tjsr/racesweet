@@ -17,6 +17,7 @@ import { incrementLoadingMetric } from "../loadingMetrics.js";
 import { listToMap } from "../utils.js";
 import { isValidId } from "../validators/isValidId.js";
 import type { ChipCrossingData } from "./chipcrossing.js";
+import { findCtcTrackLoopBySiteAddress } from "./ctcTrackConfig.js";
 import type { EventEntrantId } from "./entrant.js";
 import type { EventTeam } from "./eventteam.js";
 import type { MapOf, TimeRecordSourceId } from "./types.js";
@@ -569,6 +570,7 @@ export class Session implements RaceState, RaceStateLookup {
   // }
 
   private __reprocessAllParticipantLaps(): void {
+    this.__applyCtcTrackConfigLoopFlags();
     const processedLaps: Map<EventParticipantId, ParticipantPassingRecord[]> = processAllParticipantLaps(
       this.records,
       this._participants,
@@ -580,6 +582,18 @@ export class Session implements RaceState, RaceStateLookup {
     );
 
     this._cachedParticipantLaps = processedLaps;
+  }
+
+  private __applyCtcTrackConfigLoopFlags(): void {
+    this.records
+      .filter((record): record is ParticipantPassingRecord => isCrossingRecord(record))
+      .forEach((crossing) => {
+        const source = this._timeRecordSources.get(crossing.source.toString());
+        const trackLoop = findCtcTrackLoopBySiteAddress(source?.ctcTrackConfig, crossing.lineNumber, crossing.loopNumber);
+        if (trackLoop?.loop.isLapCompletion !== undefined) {
+          crossing.isLapCompletion = trackLoop.loop.isLapCompletion;
+        }
+      });
   }
 
   public updateParticipantIdentifiers(

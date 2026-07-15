@@ -1,7 +1,7 @@
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { GreenFlagRecord } from '../model/flag.js';
 import { createCategoryId, createEventEntrantId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
-import { calculateParticipantLapTimes, processAllParticipantLaps } from './laps.js';
+import { calculateParticipantLapTimes, isCountedLapPassing, processAllParticipantLaps } from './laps.js';
 import {
   CROSSING_FLAG_LAP_UNDER_MINIMUM,
   CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
@@ -235,6 +235,37 @@ describe('lap calculation exclusion reasons', () => {
     expect(passings[0]).not.toHaveProperty('isValid');
     expect(isPassingExcluded(passings[0]!)).toBe(false);
     expect(isPassingValid(passings[0]!)).toBe(true);
+  });
+
+  it('counts only valid included crossings on configured finish lines as laps', () => {
+    const { participant, source } = createLapCalculationFixture();
+    const finishCrossing: ParticipantPassingRecord = {
+      elapsedTime: 60000,
+      id: createTimeRecordId('pit-finish-crossing'),
+      isValid: true,
+      lapNo: 1,
+      lapTime: 60000,
+      lineNumber: 9,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source,
+      time: new Date('2026-05-29T10:01:00.000Z'),
+    };
+    const sectorCrossing: ParticipantPassingRecord = {
+      ...finishCrossing,
+      id: createTimeRecordId('sector-crossing'),
+      lineNumber: 2,
+    };
+    const excludedFinishCrossing: ParticipantPassingRecord = {
+      ...finishCrossing,
+      id: createTimeRecordId('excluded-finish-crossing'),
+      isExcluded: true,
+    };
+
+    expect(isCountedLapPassing(finishCrossing, [1, 9])).toBe(true);
+    expect(isCountedLapPassing(sectorCrossing, [1, 9])).toBe(false);
+    expect(isCountedLapPassing(excludedFinishCrossing, [1, 9])).toBe(false);
   });
 
   it('excludes participant laps when the participant category is not assigned to the session', () => {

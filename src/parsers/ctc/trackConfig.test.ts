@@ -1,6 +1,18 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { findCtcTrackLineName, findCtcTrackLoopBySiteAddress, getCtcFinishLineNumbers } from '../../model/ctcTrackConfig.js';
+import type { CtcTrackConfig } from '../../model/ctcTrackConfig.js';
 import { parseCtcTrackConfig } from './trackConfig.js';
+
+const withoutLapCompletionFlags = (trackConfig: CtcTrackConfig): CtcTrackConfig => ({
+  ...trackConfig,
+  networks: trackConfig.networks.map((network) => ({
+    ...network,
+    lines: network.lines.map((line) => ({
+      ...line,
+      loops: line.loops.map(({ isLapCompletion: _isLapCompletion, ...loop }) => loop),
+    })),
+  })),
+});
 
 describe('CTC TRACK.CFG parsing', () => {
   it('extracts network line descriptions from comments above A records', () => {
@@ -12,7 +24,7 @@ describe('CTC TRACK.CFG parsing', () => {
     ].join('\r\n'), 'C:/timing/TRACK.CFG');
 
     expect(trackConfig.filePath).toBe('C:/timing/TRACK.CFG');
-    expect(trackConfig.networks).toEqual([{
+    expect(withoutLapCompletionFlags(trackConfig).networks).toEqual([{
       lines: [{
         line: 5,
         loops: [
@@ -57,7 +69,7 @@ describe('CTC TRACK.CFG parsing', () => {
     const northNetwork = trackConfig.networks.find((network) => network.name === 'North Network');
     const southNetwork = trackConfig.networks.find((network) => network.name === 'South Network');
 
-    expect(northNetwork?.lines).toEqual([
+    expect(withoutLapCompletionFlags(trackConfig).networks.find((network) => network.name === 'North Network')?.lines).toEqual([
       expect.objectContaining({
         line: 1,
         loops: [
@@ -107,7 +119,7 @@ describe('CTC TRACK.CFG parsing', () => {
         name: 'Pit Entry : Track',
       }),
     ]);
-    expect(southNetwork?.lines).toEqual([
+    expect(withoutLapCompletionFlags(trackConfig).networks.find((network) => network.name === 'South Network')?.lines).toEqual([
       expect.objectContaining({
         line: 3,
         loops: [
@@ -140,6 +152,7 @@ describe('CTC TRACK.CFG parsing', () => {
       loop: {
         card: 1,
         comPort: 2,
+        isLapCompletion: true,
         loopNumber: 1,
         siteAddress: 31,
       },
@@ -151,6 +164,8 @@ describe('CTC TRACK.CFG parsing', () => {
     expect(findCtcTrackLineName(trackConfig, 5, 4)).toBe('Pit Exit : Pits');
     expect(findCtcTrackLineName(trackConfig, 6, 1)).toBe('Pit Entry : Track');
     expect(getCtcFinishLineNumbers(trackConfig)).toEqual([1, 2]);
+    expect(northNetwork?.lines.find((line) => line.line === 1)?.loops.every((loop) => loop.isLapCompletion === true)).toBe(true);
+    expect(northNetwork?.lines.find((line) => line.line === 4)?.loops.every((loop) => loop.isLapCompletion === false)).toBe(true);
   });
 
   it('falls back from pit entry to pit exit when no pit start/finish line exists', () => {
@@ -204,6 +219,7 @@ describe('CTC TRACK.CFG parsing', () => {
       loop: {
         card: 1,
         comPort: 2,
+        isLapCompletion: true,
         loopNumber: 1,
         siteAddress: 31,
       },
@@ -212,12 +228,14 @@ describe('CTC TRACK.CFG parsing', () => {
     expect(trackConfig.networks.find((network) => network.name === 'North Network')?.lines.find((line) => line.line === 1)?.loops).toContainEqual({
       card: 3,
       comPort: 2,
+      isLapCompletion: true,
       loopNumber: 12,
       siteAddress: 31,
     });
     expect(trackConfig.networks.find((network) => network.name === 'South Network')?.lines.find((line) => line.line === 5)?.loops).toContainEqual({
       card: 3,
       comPort: 2,
+      isLapCompletion: false,
       loopNumber: 12,
       siteAddress: 35,
     });

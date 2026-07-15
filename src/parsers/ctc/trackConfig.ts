@@ -171,6 +171,11 @@ const getOrCreateLine = (
   return line;
 };
 
+const inferLapCompletionFromLineName = (lineName: string): boolean => {
+  const normalized = lineName.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return normalized.includes('start') && normalized.includes('finish');
+};
+
 const parseHeadingLabels = (line: string): string[] | undefined => {
   if (/^E\b/iu.test(line)) {
     return undefined;
@@ -271,8 +276,10 @@ export const parseCtcTrackConfig = (
       const lineName = pendingDescription?.lineName || `${DEFAULT_LINE_NAME_PREFIX} ${aRecord.lineNumber}`;
       const network = getOrCreateNetwork(networks, networkName);
       const trackLine = getOrCreateLine(network, aRecord.lineNumber, lineName);
-      if (!trackLine.loops.some((loop) => loop.loopNumber === aRecord.loop.loopNumber && loop.siteAddress === aRecord.loop.siteAddress && loop.card === aRecord.loop.card)) {
-        trackLine.loops.push(aRecord.loop);
+      const inferredLapCompletion = inferLapCompletionFromLineName(trackLine.name);
+      const loop = { ...aRecord.loop, isLapCompletion: inferredLapCompletion };
+      if (!trackLine.loops.some((candidate) => candidate.loopNumber === loop.loopNumber && candidate.siteAddress === loop.siteAddress && candidate.card === loop.card)) {
+        trackLine.loops.push(loop);
       }
     });
   });

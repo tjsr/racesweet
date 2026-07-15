@@ -276,11 +276,29 @@ const buildVirtualRecordRowWindow = (
   };
 };
 
-const isElementVerticallyScrollable = (element: HTMLElement): boolean => {
+const isElementConfiguredForVerticalScroll = (element: HTMLElement): boolean => {
   const overflowY = typeof window !== 'undefined' && window.getComputedStyle
     ? window.getComputedStyle(element).overflowY
     : '';
-  return element.scrollHeight > element.clientHeight && (overflowY === 'auto' || overflowY === 'scroll');
+  return overflowY === 'auto' || overflowY === 'scroll';
+};
+
+const findVerticalScrollContainer = (element: HTMLElement): HTMLElement | undefined => {
+  let candidate: HTMLElement | null = element;
+  let configuredFallback: HTMLElement | undefined;
+  while (candidate) {
+    if (isElementConfiguredForVerticalScroll(candidate)) {
+      configuredFallback = configuredFallback || candidate;
+      if (candidate !== element || candidate.scrollHeight > candidate.clientHeight) {
+        return candidate;
+      }
+    }
+    if (candidate === document.scrollingElement) {
+      return candidate;
+    }
+    candidate = candidate.parentElement;
+  }
+  return configuredFallback;
 };
 
 const participantArrayFromLookup = (raceStateLookup: RaceStateLookup): EventParticipant[] => {
@@ -2263,6 +2281,7 @@ export const RecentRecords = (props: RecordsProps & {
   const [selectedPlateNumber, setSelectedPlateNumber] = React.useState<string | undefined>(undefined);
   const [selectedRecordId, setSelectedRecordId] = React.useState<TimeRecordId | undefined>(undefined);
   const pendingFilterScrollAnchorRef = React.useRef<FilterScrollAnchor | undefined>(undefined);
+  const pendingFilterScrollIndexRef = React.useRef<number | undefined>(undefined);
   const tableContainerRef = React.useRef<HTMLDivElement>(null);
   const toolbarAnchorRef = React.useRef<HTMLDivElement>(null);
   const toolbarRef = React.useRef<HTMLDivElement>(null);
@@ -2477,21 +2496,24 @@ export const RecentRecords = (props: RecordsProps & {
     if (!container) {
       return;
     }
-
     const rowElement = container.querySelector('tbody tr[data-record-id]') as HTMLTableRowElement | null;
     const measuredRowHeight = rowElement?.getBoundingClientRect().height || ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX;
     const safeRowHeight = measuredRowHeight > 0 ? measuredRowHeight : ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX;
     setRecentRecordRowHeight((current) => Math.abs(current - safeRowHeight) < 0.5 ? current : safeRowHeight);
-    const containerOwnsVerticalScroll = isElementVerticallyScrollable(container);
+    const scrollContainer = findVerticalScrollContainer(container);
+    const containerOwnsVerticalScroll = scrollContainer === container;
     const containerRect = container.getBoundingClientRect();
-    const viewportHeight = containerOwnsVerticalScroll
-      ? container.clientHeight || containerRect.height || safeRowHeight
+    const scrollContainerRect = scrollContainer?.getBoundingClientRect();
+    const viewportHeight = scrollContainer
+      ? scrollContainer.clientHeight || scrollContainerRect?.height || safeRowHeight
       : window.innerHeight || document.documentElement.clientHeight || safeRowHeight;
     const visibleTop = containerOwnsVerticalScroll
       ? container.scrollTop
-      : Math.max(0, -containerRect.top);
-    const visibleBottom = containerOwnsVerticalScroll
-      ? container.scrollTop + viewportHeight
+      : scrollContainer
+        ? Math.max(0, (scrollContainerRect?.top || 0) - containerRect.top)
+        : Math.max(0, -containerRect.top);
+    const visibleBottom = scrollContainer
+      ? visibleTop + viewportHeight
       : Math.min(containerRect.height || sortedRecords.length * safeRowHeight, viewportHeight - containerRect.top);
     const visibleHeight = Math.max(safeRowHeight, visibleBottom - visibleTop);
     const maxRowIndex = Math.max(0, sortedRecords.length - 1);
@@ -2509,6 +2531,50 @@ export const RecentRecords = (props: RecordsProps & {
     updateVisibleRowRange();
   }, [sortedRecords.length, updateVisibleRowRange]);
   React.useLayoutEffect(() => {
+    const pendingScrollIndex = pendingFilterScrollIndexRef.current;
+    if (pendingScrollIndex !== undefined) {
+      const container = tableContainerRef.current;
+      const targetRecord = sortedRecords[pendingScrollIndex];
+      if (!container || !targetRecord) {
+        pendingFilterScrollIndexRef.current = undefined;
+        return;
+      }
+
+      const targetRow = Array.from(container.querySelectorAll('tr[data-record-id]'))
+        .find((row) => row.getAttribute('data-record-id') === targetRecord.id.toString());
+      if (!targetRow) {
+        return;
+      }
+      pendingFilterScrollIndexRef.current = undefined;
+
+      const scrollContainer = findVerticalScrollContainer(container);
+      const rowRect = targetRow.getBoundingClientRect();
+      const rowHeight = rowRect.height > 0 ? rowRect.height : recentRecordRowHeight;
+      if (scrollContainer === container) {
+        const containerRect = container.getBoundingClientRect();
+        container.scrollTo({
+          behavior: 'auto',
+          top: rowRect.top - containerRect.top + container.scrollTop,
+        });
+        return;
+      }
+      if (scrollContainer) {
+        const scrollContainerRect = scrollContainer.getBoundingClientRect();
+        scrollContainer.scrollTo({
+          behavior: 'auto',
+          top: rowRect.top - scrollContainerRect.top + scrollContainer.scrollTop,
+        });
+        return;
+      }
+      if (typeof window.scrollTo === 'function') {
+        window.scrollTo({
+          behavior: 'auto',
+          top: Math.max(0, rowRect.top + window.scrollY - rowHeight),
+        });
+      }
+      return;
+    }
+
     const anchor = pendingFilterScrollAnchorRef.current;
     if (anchor === undefined) {
       return;
@@ -2517,8 +2583,9 @@ export const RecentRecords = (props: RecordsProps & {
 
     if (sortedRecords.length === 0) {
       const container = tableContainerRef.current;
-      if (container && isElementVerticallyScrollable(container)) {
-        container.scrollTo({ behavior: 'auto', top: 0 });
+      const scrollContainer = container ? findVerticalScrollContainer(container) : undefined;
+      if (scrollContainer) {
+        scrollContainer.scrollTo({ behavior: 'auto', top: 0 });
       } else if (typeof window.scrollTo === 'function') {
         window.scrollTo({ behavior: 'auto', top: 0 });
       }
@@ -2531,38 +2598,27 @@ export const RecentRecords = (props: RecordsProps & {
       : Math.min(sortedRecords.length - 1, Math.max(0, anchor.previousIndex));
     const nextVisibleRowRange = getSelectionVisibleRowRange(recordIndex, visibleRowRange, sortedRecords.length);
     setVisibleRowRange(nextVisibleRowRange);
-
-    const container = tableContainerRef.current;
-    const rowHeight = recentRecordRowHeight > 0 ? recentRecordRowHeight : ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX;
-    if (container && isElementVerticallyScrollable(container)) {
-      container.scrollTo({ behavior: 'auto', top: recordIndex * rowHeight });
-      return;
-    }
-
-    if (typeof window.scrollTo === 'function' && container) {
-      const containerTop = container.getBoundingClientRect().top + window.scrollY;
-      window.scrollTo({
-        behavior: 'auto',
-        top: Math.max(0, containerTop + recordIndex * rowHeight),
-      });
-    }
+    pendingFilterScrollIndexRef.current = recordIndex;
   }, [recentRecordRowHeight, sortedRecords, visibleRowRange]);
   React.useEffect(() => {
     const container = tableContainerRef.current;
     if (!container) {
       return;
     }
+    const scrollContainer = findVerticalScrollContainer(container);
 
     const handleVisibleRowRangeChange = (): void => {
       updateVisibleRowRange();
     };
 
     container.addEventListener('scroll', handleVisibleRowRangeChange, { passive: true });
+    scrollContainer?.addEventListener('scroll', handleVisibleRowRangeChange, { passive: true });
     window.addEventListener('scroll', handleVisibleRowRangeChange, true);
     window.addEventListener('resize', handleVisibleRowRangeChange);
 
     return () => {
       container.removeEventListener('scroll', handleVisibleRowRangeChange);
+      scrollContainer?.removeEventListener('scroll', handleVisibleRowRangeChange);
       window.removeEventListener('scroll', handleVisibleRowRangeChange, true);
       window.removeEventListener('resize', handleVisibleRowRangeChange);
     };
@@ -2570,8 +2626,9 @@ export const RecentRecords = (props: RecordsProps & {
   React.useEffect(() => {
     const updateScrollPosition = (): void => {
       const container = tableContainerRef.current;
-      const scrollTop = isElementVerticallyScrollable(container || document.documentElement)
-        ? (container?.scrollTop || 0)
+      const scrollContainer = container ? findVerticalScrollContainer(container) : undefined;
+      const scrollTop = scrollContainer
+        ? scrollContainer.scrollTop
         : window.scrollY;
       setIsAtTop(scrollTop <= 1);
     };
@@ -2582,7 +2639,7 @@ export const RecentRecords = (props: RecordsProps & {
   }, []);
   const handleJumpToBoundary = React.useCallback((): void => {
     const container = tableContainerRef.current;
-    const target = container && isElementVerticallyScrollable(container) ? container : undefined;
+    const target = container ? findVerticalScrollContainer(container) : undefined;
     if (isAtTop) {
       if (target) {
         target.scrollTo({ behavior: 'smooth', top: target.scrollHeight });

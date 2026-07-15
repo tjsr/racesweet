@@ -160,6 +160,7 @@ describe('DataSourcesPanel', () => {
   });
 
   it('displays parsed Dorian CTC TRACK.CFG networks, lines, and loop mappings', () => {
+    const onSaveSource = vi.fn();
     const ctcSource: DataSourceConfig = {
       enabled: true,
       fileConfig: {
@@ -200,7 +201,7 @@ describe('DataSourcesPanel', () => {
           onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={vi.fn()}
           onReprocessApicalData={vi.fn()}
-          onSaveSource={vi.fn()}
+          onSaveSource={onSaveSource}
         />,
       );
     });
@@ -215,10 +216,31 @@ describe('DataSourcesPanel', () => {
     expect(metadataTable).toBeTruthy();
     const rows = Array.from(metadataTable!.querySelectorAll('tbody tr')).map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent));
     expect(rows).toEqual([
-      ['South Network', '5', 'Pit Exit : Pits', '1', '35', '1', '2'],
-      ['South Network', '5', 'Pit Exit : Pits', '2', '35', '1', '2'],
-      ['South Network', '5', 'Pit Exit : Pits', '5', '35', '2', '2'],
+      ['South Network', '5', 'Pit Exit : Pits', '1', '35', '1', '2', ''],
+      ['South Network', '5', 'Pit Exit : Pits', '2', '35', '1', '2', ''],
+      ['South Network', '5', 'Pit Exit : Pits', '5', '35', '2', '2', ''],
     ]);
+
+    const lapFinishCheckbox = container.querySelector('input[aria-label="CTC South Network line 5 loop 1 lap finish"]') as HTMLInputElement;
+    expect(lapFinishCheckbox.checked).toBe(false);
+    flushSync(() => {
+      lapFinishCheckbox.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(onSaveSource).toHaveBeenCalledWith('source-dorian-ctc', {
+      fileConfig: {
+        ctcTrackConfig: expect.objectContaining({
+          networks: [expect.objectContaining({
+            lines: [expect.objectContaining({
+              loops: expect.arrayContaining([expect.objectContaining({ isLapCompletion: true })]),
+            })],
+          })],
+        }),
+        filePath: 'C:/RaceTime/timing/INDY500.ERF',
+        importMode: 'import',
+        trackConfigFilePath: 'C:/RaceTime/timing/TRACK.CFG',
+      },
+      finishLineNumbers: [5],
+    });
   });
 
   it('selects an MR-SCATS data directory and persists the discovered file list', async () => {
