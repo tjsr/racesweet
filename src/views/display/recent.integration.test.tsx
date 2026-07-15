@@ -170,6 +170,22 @@ const setSelectValue = (select: HTMLSelectElement, value: string): void => {
   select.dispatchEvent(new Event('change', { bubbles: true }));
 };
 
+const waitForNoDialog = async (): Promise<void> => {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (!document.querySelector('div[role="dialog"]')) {
+      return;
+    }
+
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 25);
+      });
+    });
+  }
+
+  throw new Error('Timed out waiting for dialog to close');
+};
+
 const expectIgnoreRecordsFilterChecked = async (filterLabel: string): Promise<void> => {
   const ignoreSelect = document.querySelector('#recent-records-ignore-dropdown [role="combobox"]');
   expect(ignoreSelect).toBeDefined();
@@ -3543,7 +3559,7 @@ describe('RecentRecords integration', () => {
     expect(secondRow!.className).toContain('selected-row');
     expect(secondRow!.className).toContain('selected-plate-number');
     expect(Array.from(document.querySelectorAll('li[role="menuitem"]')).map((item) => item.textContent?.trim()))
-      .toEqual(expect.arrayContaining(['Add record', 'Edit record', 'Exclude crossing']));
+      .toEqual(expect.arrayContaining(['Insert record', 'Edit record', 'Exclude crossing']));
   });
 
   it('renders system-generated green race-start flags inline with crossings', async () => {
@@ -3687,11 +3703,18 @@ describe('RecentRecords integration', () => {
       }));
     });
 
-    const addRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Add record');
-    expect(addRecordMenuItem).toBeDefined();
+    const insertRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Insert record');
+    expect(insertRecordMenuItem).toBeDefined();
 
     await act(async () => {
-      addRecordMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      insertRecordMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const passingMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Passing');
+    expect(passingMenuItem).toBeDefined();
+
+    await act(async () => {
+      passingMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     const timeInput = document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement | null;
@@ -3702,6 +3725,9 @@ describe('RecentRecords integration', () => {
     expect(txInput).toBeTruthy();
     expect(timingLineInput).toBeTruthy();
     expect(timingLoopInput).toBeTruthy();
+    expect(timeInput!.value).toBe('20:06:00.000');
+    expect(txInput!.value).toBe('');
+    expect((document.querySelector('input[aria-label="Plate"]') as HTMLInputElement).value).toBe('');
 
     await act(async () => {
       setInputValue(timeInput!, '10:07:30.250');
@@ -3790,22 +3816,28 @@ describe('RecentRecords integration', () => {
       }));
     });
 
-    const addRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Add record');
-    expect(addRecordMenuItem).toBeDefined();
+    const insertRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Insert record');
+    expect(insertRecordMenuItem).toBeDefined();
 
     await act(async () => {
-      addRecordMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      insertRecordMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const flagMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Flag');
+    expect(flagMenuItem).toBeDefined();
+
+    await act(async () => {
+      flagMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     const recordTypeSelect = document.querySelector('select[aria-label="Record type"]') as HTMLSelectElement | null;
     expect(recordTypeSelect).toBeTruthy();
 
-    await act(async () => {
-      setSelectValue(recordTypeSelect!, 'flag');
-    });
+    expect(recordTypeSelect!.value).toBe('flag');
 
     const flagTypeSelect = document.querySelector('select[aria-label="Flag type"]') as HTMLSelectElement | null;
     expect(flagTypeSelect).toBeTruthy();
+    expect(flagTypeSelect!.value).toBe('yellow');
 
     await act(async () => {
       setSelectValue(flagTypeSelect!, 'red');
@@ -3840,6 +3872,7 @@ describe('RecentRecords integration', () => {
       sessionId: 'session-1',
       source: expect.any(String),
     }));
+    await waitForNoDialog();
   });
 
   it('opens the edit-record dialog with existing values populated and saves through the edit callback', async () => {

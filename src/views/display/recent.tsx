@@ -105,6 +105,7 @@ type RecordDialogMode = 'add' | 'edit';
 interface AddRecordDialogState {
   anchorRecord: EventTimeRecord;
   existingRecord?: EventTimeRecord;
+  initialRecordType?: AddableRecordType;
   mode: RecordDialogMode;
 }
 
@@ -119,6 +120,43 @@ const manualFlagLabelByType: Record<AddableFlagType, string> = {
 
 const formatRecordIdTitle = (recordId: TimeRecordId): string => {
   return `Record ID: ${recordId}`;
+};
+
+const RecordInsertionMenuItem = ({
+  onClose,
+  onInsert,
+}: {
+  onClose: () => void;
+  onInsert: (recordType: AddableRecordType) => void;
+}): JSX.Element => {
+  const [submenuAnchor, setSubmenuAnchor] = React.useState<HTMLElement | null>(null);
+  const openSubmenu = (event: React.MouseEvent<HTMLElement>): void => {
+    setSubmenuAnchor(event.currentTarget);
+  };
+  const closeSubmenu = (): void => {
+    setSubmenuAnchor(null);
+  };
+  const insertRecord = (recordType: AddableRecordType): void => {
+    onInsert(recordType);
+    closeSubmenu();
+    onClose();
+  };
+
+  return <>
+    <MenuItem aria-haspopup="menu" aria-expanded={submenuAnchor !== null} onClick={openSubmenu}>
+      Insert record
+    </MenuItem>
+    <Menu
+      anchorEl={submenuAnchor}
+      anchorOrigin={{ horizontal: 'right', vertical: 'top' }}
+      onClose={closeSubmenu}
+      open={submenuAnchor !== null}
+      transformOrigin={{ horizontal: 'left', vertical: 'top' }}
+    >
+      <MenuItem onClick={() => insertRecord('passing')}>Passing</MenuItem>
+      <MenuItem onClick={() => insertRecord('flag')}>Flag</MenuItem>
+    </Menu>
+  </>;
 };
 
 const buildSelectionKey = <IdType extends string>(ids: Set<IdType>): string => {
@@ -621,7 +659,7 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   onAssignFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
   onExclude?: (crossingId: TimeRecordId, exclude: boolean) => void;
   onChangeCategory?: (participantId: EventParticipantId, categoryId: EventCategoryId) => void;
-  onOpenAddRecordDialog?: (record: EventTimeRecord) => void;
+  onOpenAddRecordDialog?: (record: EventTimeRecord, recordType: AddableRecordType) => void;
   onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
   onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void;
   onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
@@ -701,9 +739,8 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
     props.onAssignFlagCategory?.(record.id, categoryId);
     handleClose();
   };
-  const handleAddRecord = (): void => {
-    props.onOpenAddRecordDialog?.(record);
-    handleClose();
+  const handleInsertRecord = (recordType: AddableRecordType): void => {
+    props.onOpenAddRecordDialog?.(record, recordType);
   };
   const handleEditRecord = (): void => {
     props.onOpenEditRecordDialog?.(record);
@@ -740,9 +777,7 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
           : undefined
       }
     >
-      <MenuItem onClick={handleAddRecord}>
-        Add record
-      </MenuItem>
+      <RecordInsertionMenuItem onClose={handleClose} onInsert={handleInsertRecord} />
       <MenuItem onClick={handleEditRecord}>
         Edit record
       </MenuItem>
@@ -846,7 +881,7 @@ const UnknownChipRow = (
   { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae, cautionRecordIds, onOpenAddRecordDialog, onOpenEditRecordDialog, onSelectRecord, onSelectUnrecognisedPlateNumber, plateNumber, record, selectedPlateNumber, selectedRecordId, showSectorColumn, timeZone }: {
     antennae: string
     cautionRecordIds?: Set<string>,
-    onOpenAddRecordDialog?: (record: EventTimeRecord) => void,
+    onOpenAddRecordDialog?: (record: EventTimeRecord, recordType: AddableRecordType) => void,
     onOpenEditRecordDialog?: (record: EventTimeRecord) => void,
     onSelectRecord?: (recordId: TimeRecordId | undefined) => void,
     onSelectUnrecognisedPlateNumber?: (plateNumber: string | undefined) => void,
@@ -898,9 +933,8 @@ const UnknownChipRow = (
   const handleClose = (): void => {
     setContextMenu(null);
   };
-  const handleAddRecord = (): void => {
-    onOpenAddRecordDialog?.(record);
-    handleClose();
+  const handleInsertRecord = (recordType: AddableRecordType): void => {
+    onOpenAddRecordDialog?.(record, recordType);
   };
   const handleEditRecord = (): void => {
     onOpenEditRecordDialog?.(record);
@@ -935,9 +969,7 @@ const UnknownChipRow = (
             : undefined
         }
       >
-        <MenuItem onClick={handleAddRecord}>
-          Add record
-        </MenuItem>
+        <RecordInsertionMenuItem onClose={handleClose} onInsert={handleInsertRecord} />
         <MenuItem onClick={handleEditRecord}>
           Edit record
         </MenuItem>
@@ -959,7 +991,7 @@ interface PassingRecordRowProps {
   onSelect?: (passingRecord: ParticipantPassingRecord) => void;
   onExclude?: (crossingId: TimeRecordId, exclude: boolean) => void;
   onChangeCategory?: (participantId: EventParticipantId, categoryId: EventCategoryId) => void;
-  onOpenAddRecordDialog?: (record: EventTimeRecord) => void;
+  onOpenAddRecordDialog?: (record: EventTimeRecord, recordType: AddableRecordType) => void;
   onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
   onSelectRecord?: (recordId: TimeRecordId | undefined) => void;
   onSelectUnrecognisedPlateNumber?: (plateNumber: string | undefined) => void;
@@ -1028,9 +1060,8 @@ export const PassingRecordRow = (
     }
     handleClose();
   };
-  const handleAddRecord = (): void => {
-    props.onOpenAddRecordDialog?.(passing);
-    handleClose();
+  const handleInsertRecord = (recordType: AddableRecordType): void => {
+    props.onOpenAddRecordDialog?.(passing, recordType);
   };
   const handleEditRecord = (): void => {
     props.onOpenEditRecordDialog?.(passing);
@@ -1175,9 +1206,7 @@ export const PassingRecordRow = (
             : undefined
         }
       >
-        <MenuItem onClick={handleAddRecord}>
-          Add record
-        </MenuItem>
+        <RecordInsertionMenuItem onClose={handleClose} onInsert={handleInsertRecord} />
         <MenuItem onClick={handleEditRecord}>
           Edit record
         </MenuItem>
@@ -1845,7 +1874,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   const participants = React.useMemo(() => participantArrayFromLookup(props.raceStateLookup), [props.raceStateLookup]);
   const [timeOfDay, setTimeOfDay] = React.useState<string>('');
   const [recordType, setRecordType] = React.useState<AddableRecordType>('passing');
-  const [flagType, setFlagType] = React.useState<AddableFlagType>('green');
+  const [flagType, setFlagType] = React.useState<AddableFlagType>('yellow');
   const [selectedFlagCategoryIds, setSelectedFlagCategoryIds] = React.useState<EventCategoryId[]>([]);
   const [passingTxNo, setPassingTxNo] = React.useState<string>('');
   const [passingPlate, setPassingPlate] = React.useState<string>('');
@@ -1861,7 +1890,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
     if (dialogMode === 'edit' && editingRecord) {
       setTimeOfDay(timeOfDayInputStringInTimeZone(editingRecord.time, props.displayTimeZone));
       setRecordType(isFlagRecord(editingRecord) ? 'flag' : 'passing');
-      setFlagType(isFlagRecord(editingRecord) ? editingRecord.flagType as AddableFlagType : 'green');
+      setFlagType(isFlagRecord(editingRecord) ? editingRecord.flagType as AddableFlagType : 'yellow');
       setSelectedFlagCategoryIds(getEditableFlagCategoryIds(editingRecord));
       setPassingTxNo(getEditablePassingTxNo(editingRecord));
       setPassingPlate(getEditablePassingPlate(editingRecord, props.raceStateLookup));
@@ -1869,8 +1898,8 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       setPassingLoopNumber(formatOptionalNumber(getPassingLoopNumber(editingRecord as ParticipantPassingRecord)));
     } else {
       setTimeOfDay(timeOfDayInputStringInTimeZone(anchorRecord.time, props.displayTimeZone));
-      setRecordType('passing');
-      setFlagType('green');
+      setRecordType(props.openState?.initialRecordType || 'passing');
+      setFlagType('yellow');
       setSelectedFlagCategoryIds([]);
       setPassingTxNo('');
       setPassingPlate('');
@@ -1878,7 +1907,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       setPassingLoopNumber('');
     }
     setTimeError('');
-  }, [anchorRecord, dialogMode, editingRecord, props.displayTimeZone, props.raceStateLookup]);
+  }, [anchorRecord, dialogMode, editingRecord, props.displayTimeZone, props.openState?.initialRecordType, props.raceStateLookup]);
   React.useEffect(() => {
     setShowRawRecordJson(false);
   }, [props.openState]);
@@ -2460,8 +2489,8 @@ export const RecentRecords = (props: RecordsProps & {
       window.scrollTo({ behavior: 'smooth', top: 0 });
     }
   }, [isAtTop]);
-  const openAddRecordDialog = React.useCallback((record: EventTimeRecord): void => {
-    setAddRecordDialogState({ anchorRecord: record, mode: 'add' });
+  const openAddRecordDialog = React.useCallback((record: EventTimeRecord, recordType: AddableRecordType): void => {
+    setAddRecordDialogState({ anchorRecord: record, initialRecordType: recordType, mode: 'add' });
   }, []);
   const openEditRecordDialog = React.useCallback((record: EventTimeRecord): void => {
     setAddRecordDialogState({ anchorRecord: record, existingRecord: record, mode: 'edit' });
@@ -2502,9 +2531,11 @@ export const RecentRecords = (props: RecordsProps & {
       onSave={(record, mode) => {
         if (mode === 'edit') {
           props.onEditRecord?.(record);
+          setAddRecordDialogState(null);
           return;
         }
         props.onAddRecord?.(record);
+        setAddRecordDialogState(null);
       }}
       openState={addRecordDialogState}
       raceStateLookup={props.raceStateLookup}

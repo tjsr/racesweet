@@ -494,7 +494,6 @@ export const RaceSweetMainApp = () => {
 
       Promise.all([adminServicePromise, catalogServicePromise, systemServicePromise]).then(async ([raceService, catalogService, systemService]) => {
         completeProgressStage('services');
-        const session = raceService.raceState;
         const initialCatalog = catalogService.catalog;
         updateProgressStage('source-metadata', Math.max(1, systemService.state.dataSources.length), 0);
         const initialSystemConfig = await loadSystemConfigWithImportedApicalPaths(systemService, catalogService);
@@ -503,6 +502,15 @@ export const RaceSweetMainApp = () => {
         if (!validateUuid(initialEventId)) {
           throw new Error(`Invalid initial event ID in catalog: ${initialEventId}`);
         };
+        const initialSessionId = getSessionsForEvent(initialCatalog, initialEventId)
+          .find((session) => session.id === initialCatalog.activeSessionId)?.id ||
+          getSessionsForEvent(initialCatalog, initialEventId)[0]?.id;
+        const persistedInitialRaceState = initialSessionId
+          ? catalogService.getImportedRaceState(initialEventId, initialSessionId)
+          : undefined;
+        const session = persistedInitialRaceState
+          ? sessionFromPartialRaceState(persistedInitialRaceState)
+          : raceService.raceState;
         const catalogValidationTotal = Math.max(1, initialCatalog.events.length + session.participants.length + 4);
         let catalogValidationCompleted = 0;
         initialCatalog.events.forEach((event) => {
@@ -531,7 +539,7 @@ export const RaceSweetMainApp = () => {
         const missingEntrantIds = Array.from(participantEntrantIds).filter((entrantId) => !catalogEntrantIds.has(entrantId));
         catalogValidationCompleted += 1;
         updateProgressStage('catalog-validation', catalogValidationTotal, catalogValidationTotal);
-        const shouldSyncScaffold = !!initialEventId && (
+        const shouldSyncScaffold = !persistedInitialRaceState && !!initialEventId && (
           getCategoriesForEvent(initialCatalog, initialEventId).length !== expectedCategoryCount || 
           (initialCatalog.events.find((event) => event.id === initialEventId)?.entrantIds.length || 0) !== participantEntrantIds.size ||
           missingCategoryIds.length > 0 ||
@@ -543,13 +551,13 @@ export const RaceSweetMainApp = () => {
           const sessionList = getSessionsForEvent(catalog, initialEventId);
           const categoryList = getCategoriesForEvent(catalog, initialEventId);
           const entrantList = getEntrantsForEvent(catalog, initialEventId);
-          const initialSessionId = sessionList.find((session) => session.id === catalog.activeSessionId)?.id || sessionList[0]?.id;
+          const selectedInitialSessionId = sessionList.find((session) => session.id === catalog.activeSessionId)?.id || sessionList[0]?.id;
 
           const sessionPreparationTotal = Math.max(1, session.categories.length + session.participants.length + session.records.length);
           updateProgressStage('session-state', sessionPreparationTotal, 0);
-          if (initialSessionId) {
-            incrementLoadingMetric('Apply admin changes to startup session', initialSessionId);
-            await raceService.applyChangesToSessionById(session, initialSessionId);
+          if (selectedInitialSessionId) {
+            incrementLoadingMetric('Apply admin changes to startup session', selectedInitialSessionId);
+            await raceService.applyChangesToSessionById(session, selectedInitialSessionId);
           }
           updateProgressStage('session-state', sessionPreparationTotal, sessionPreparationTotal);
           updateProgressStage('publish', 1, 0);
@@ -565,13 +573,13 @@ export const RaceSweetMainApp = () => {
           setSelectedEntrantsEventId(initialEventId);
           setSelectedEntrantId(entrantList[0]?.id);
           setSelectedSessionsEventId(initialEventId);
-          setSelectedSessionId(initialSessionId);
+          setSelectedSessionId(selectedInitialSessionId);
           const restoredTimingSelection = resolveTimingContextSelection(catalog, initialSystemConfig.timingContextSelection);
           setTimingSessionSelection(restoredTimingSelection.selectionMode);
           setSelectedTimingEventId(restoredTimingSelection.eventId);
           setSelectedTimingSessionId(restoredTimingSelection.sessionId);
           setSelectedAnalyticsEventId(initialEventId);
-          setSelectedAnalyticsSessionId(initialSessionId);
+          setSelectedAnalyticsSessionId(selectedInitialSessionId);
           setAnalyticsRaceState(session);
           setTimingRaceState(restoredTimingSelection.selectionMode === 'active' ? session : createEmptySessionState());
           initialTimingSelectionHydrated.current = restoredTimingSelection.selectionMode === 'active';
@@ -1281,7 +1289,14 @@ export const RaceSweetMainApp = () => {
       }
     });
 
-    const categories = getCategoriesForEvent(eventCatalogState, timingEventId);
+    const timingSessionIdForCategories = timingSessionSelection === 'active'
+      ? eventCatalogState.activeSessionId
+      : selectedTimingSessionId || sortSessionsByScheduledStart(getSessionsForEvent(eventCatalogState, timingEventId))[0]?.id;
+    const timingCategoryIds = getSessionAssignedCategoryIds(eventCatalogState, timingEventId, timingSessionIdForCategories);
+    const eventCategories = getCategoriesForEvent(eventCatalogState, timingEventId);
+    const categories = timingCategoryIds && timingCategoryIds.size > 0
+      ? eventCategories.filter((category) => timingCategoryIds.has(category.id))
+      : eventCategories;
     const categoriesById = new Map<EventCategoryId, EventCategory>(
       [...displayedTimingRaceState.categories, ...categories].map((category) => [category.id, category])
     );

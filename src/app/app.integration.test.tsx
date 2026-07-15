@@ -848,6 +848,139 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.textContent).toContain('Handicap Data');
   });
 
+  it('hydrates startup timing categories from persisted imported race state without fixture scaffold categories', async () => {
+    const importedEventId = createEventId('ctc-startup-event');
+    const importedSessionId = createSessionId('ctc-startup-session');
+    const importedCategoryId = createCategoryId('ctc-startup-unknown-category');
+    const importedRaceState = {
+      categories: [
+        {
+          code: 'UNKNOWN',
+          description: 'Placeholder entrants created for CTC transmitters not assigned to a known participant.',
+          id: importedCategoryId,
+          name: 'Unknown participants',
+        },
+      ],
+      participants: [],
+      records: [],
+      teams: [],
+    };
+
+    const requestFileContent = async (filePath: string, _dataType: string): Promise<string> => {
+      if (filePath.includes('event-catalog.json')) {
+        return JSON.stringify({
+          mutations: [
+            ...createSeedEventCatalogLedger().mutations,
+            {
+              event: {
+                categoryIds: [importedCategoryId],
+                date: '2026-05-29',
+                entrantIds: [],
+                format: 'race-weekend',
+                id: importedEventId,
+                name: 'CTC Startup Import',
+                sessionIds: [importedSessionId],
+                timeZone: 'Australia/Sydney',
+              },
+              id: 'mutation-ctc-startup-event',
+              timestamp: '2026-05-29T00:00:00.000Z',
+              type: 'event-created',
+            },
+            {
+              category: {
+                code: 'UNKNOWN',
+                description: 'Placeholder entrants created for CTC transmitters not assigned to a known participant.',
+                eventId: importedEventId,
+                id: importedCategoryId,
+                name: 'Unknown participants',
+              },
+              id: 'mutation-ctc-startup-imported-category',
+              timestamp: '2026-05-29T00:00:01.000Z',
+              type: 'category-created',
+            },
+            {
+              id: 'mutation-ctc-startup-session',
+              session: {
+                categoryIds: [importedCategoryId],
+                eventId: importedEventId,
+                id: importedSessionId,
+                kind: 'race',
+                name: 'CTC Startup Import Race',
+                scheduledStart: '2026-05-29T10:00:00.000Z',
+                status: 'completed',
+              },
+              timestamp: '2026-05-29T00:00:03.000Z',
+              type: 'session-created',
+            },
+            {
+              eventId: importedEventId,
+              id: 'mutation-ctc-startup-race-state',
+              raceState: importedRaceState,
+              sessionId: importedSessionId,
+              timestamp: '2026-05-29T00:00:04.000Z',
+              type: 'race-state-imported',
+            },
+            {
+              eventId: importedEventId,
+              id: 'mutation-ctc-startup-event-active',
+              timestamp: '2026-05-29T00:00:05.000Z',
+              type: 'event-activated',
+            },
+            {
+              eventId: importedEventId,
+              id: 'mutation-ctc-startup-session-active',
+              sessionId: importedSessionId,
+              timestamp: '2026-05-29T00:00:06.000Z',
+              type: 'session-activated',
+            },
+          ],
+          schemaVersion: 1,
+        });
+      }
+
+      if (filePath.includes('system-config.json')) {
+        return JSON.stringify({
+          dataSources: [],
+          eventSourceAssignments: {},
+          schemaVersion: 1,
+          sessionSourceAssignments: {},
+        });
+      }
+
+      if (filePath.includes('admin-overrides.json')) {
+        return JSON.stringify({ entrantCategories: {}, excludedCrossings: {}, schemaVersion: 1 });
+      }
+
+      throw new Error(`Unknown generated file requested: ${filePath}`);
+    };
+
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer: readFixtureBuffer,
+      requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async () => undefined,
+    };
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    await clickSectionButton(container, 'Timing');
+    await waitForText(container, 'Recent Records (0)');
+
+    const timingCategoryPayload = container.querySelector('[data-timing-categories]')?.getAttribute('data-timing-categories');
+    const timingCategories = JSON.parse(timingCategoryPayload || '[]') as Array<{ id: CategoryId; name: string }>;
+
+    expect(timingCategories.map((category) => category.id)).toEqual([importedCategoryId]);
+    expect(timingCategories.map((category) => category.name)).toEqual(['Unknown participants']);
+  });
+
   it('shows staged startup progress while generated files are loading', async () => {
     let catalogFilePath = '';
     let resolveCatalogLoad: ((content: string) => void) | undefined;
