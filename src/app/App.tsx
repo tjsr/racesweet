@@ -243,6 +243,10 @@ const sessionFromPartialRaceState = (raceState: Partial<RaceState>): Session => 
   timeRecordSources: raceState.timeRecordSources || [],
 });
 
+const cloneSessionState = (raceState: Session & RaceStateLookup): Session & RaceStateLookup => {
+  return Object.assign(sessionFromPartialRaceState(raceState), raceState) as Session & RaceStateLookup;
+};
+
 const applyCatalogSessionScopeToRaceState = (
   raceState: (Session & RaceStateLookup) | undefined,
   catalog: EventCatalogState,
@@ -668,11 +672,23 @@ export const RaceSweetMainApp = () => {
     setSelectedCategoryId(nextCategoryId);
     setSelectedAnalyticsEventId(nextEventId);
     setSelectedAnalyticsSessionId(nextSessionId);
-    applyCatalogSessionScopeToRaceState(sessionState, catalog, catalog.activeEventId, catalog.activeSessionId);
-    applyCatalogSessionScopeToRaceState(timingRaceState, catalog, selectedTimingEventId, selectedTimingSessionId);
-    applyCatalogSessionScopeToRaceState(analyticsRaceState, catalog, selectedAnalyticsEventId, selectedAnalyticsSessionId);
+    if (sessionState) {
+      const nextSessionState = cloneSessionState(sessionState);
+      applyCatalogSessionScopeToRaceState(nextSessionState, catalog, catalog.activeEventId, catalog.activeSessionId);
+      setSessionState(nextSessionState);
+    }
+    if (timingRaceState) {
+      const nextTimingRaceState = cloneSessionState(timingRaceState);
+      applyCatalogSessionScopeToRaceState(nextTimingRaceState, catalog, selectedTimingEventId, selectedTimingSessionId);
+      setTimingRaceState(nextTimingRaceState);
+    }
+    if (analyticsRaceState) {
+      const nextAnalyticsRaceState = cloneSessionState(analyticsRaceState);
+      applyCatalogSessionScopeToRaceState(nextAnalyticsRaceState, catalog, selectedAnalyticsEventId, selectedAnalyticsSessionId);
+      setAnalyticsRaceState(nextAnalyticsRaceState);
+    }
     if (nextEventId === catalog.activeEventId && nextSessionId === catalog.activeSessionId) {
-      setAnalyticsRaceState(sessionState);
+      setAnalyticsRaceState(sessionState ? cloneSessionState(sessionState) : sessionState);
     }
   };
 
@@ -2021,6 +2037,7 @@ export const RaceSweetMainApp = () => {
             }
             return eventCatalogService.updateEvent(eventId, changes).then((catalog) => {
               updateEventCatalogState(catalog, eventId);
+              setRenderTick((tick) => tick + 1);
             }).catch((error: unknown) => {
               setErrorState(error as Error);
               throw error;

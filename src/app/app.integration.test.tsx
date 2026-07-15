@@ -42,9 +42,26 @@ interface MockRecentRecordsProps {
   onAssignFlagCategory?: (flagId: TimeRecordId, categoryId: CategoryId) => void;
   onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void;
   onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: CategoryId) => void;
-  raceStateLookup?: { categories?: Array<{ id: CategoryId }> };
+  raceStateLookup?: {
+    categories?: Array<{ id: CategoryId }>;
+    getParticipantLaps?: (participantId: string) => Array<{ id: string; isExcluded?: boolean; unrelatedReasonCode?: string }>;
+    participants?: Array<{ id: string }>;
+  };
   records: Array<{ categoryIds?: CategoryId[]; flagType?: string; id: TimeRecordId }>;
 }
+
+const getTimingLapSummary = (raceStateLookup: MockRecentRecordsProps['raceStateLookup']): string => {
+  const firstParticipant = raceStateLookup?.participants?.[0];
+  const firstParticipantLaps = firstParticipant && raceStateLookup?.getParticipantLaps
+    ? raceStateLookup.getParticipantLaps(firstParticipant.id)
+    : [];
+  const normalizedLaps = Array.isArray(firstParticipantLaps) ? firstParticipantLaps : [];
+  return JSON.stringify(normalizedLaps.map((lap) => ({
+    id: lap.id,
+    isExcluded: lap.isExcluded,
+    unrelatedReasonCode: lap.unrelatedReasonCode,
+  })));
+};
 
 vi.mock('../views/display/recent', async () => {
   const react = await import('react');
@@ -58,6 +75,7 @@ vi.mock('../views/display/recent', async () => {
       'div',
       {
         'data-timing-categories': JSON.stringify(props.raceStateLookup?.categories || []),
+        'data-timing-first-participant-laps': getTimingLapSummary(props.raceStateLookup),
         'data-timing-record-count': props.records.length,
       },
       `Recent Records (${props.records.length})`,
@@ -101,6 +119,7 @@ vi.mock('./views/timing/recentRecords', async () => {
       'div',
       {
         'data-timing-categories': JSON.stringify(props.raceStateLookup?.categories || []),
+        'data-timing-first-participant-laps': getTimingLapSummary(props.raceStateLookup),
         'data-timing-record-count': props.records.length,
       },
       `Recent Records (${props.records.length})`,
@@ -548,6 +567,23 @@ const waitForInputValue = async (container: HTMLDivElement, selector: string, va
   }
 
   throw new Error(`Timed out waiting for input value: ${selector}=${value}`);
+};
+
+const waitForTimingLapSummary = async (container: HTMLDivElement, expectedFragment: string): Promise<void> => {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const lapSummary = container.querySelector('[data-timing-first-participant-laps]')?.getAttribute('data-timing-first-participant-laps') || '';
+    if (lapSummary.includes(expectedFragment)) {
+      return;
+    }
+
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 10);
+      });
+    });
+  }
+
+  throw new Error(`Timed out waiting for timing lap summary to include ${expectedFragment}; current summary: ${container.querySelector('[data-timing-first-participant-laps]')?.getAttribute('data-timing-first-participant-laps') || ''}`);
 };
 
 const waitForTextNotPresent = async (container: HTMLDivElement, text: string): Promise<void> => {
@@ -2554,6 +2590,244 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Results');
     expect(container.querySelector('select[aria-label="Race View Category"]')).toBeTruthy();
     expect(container.querySelector('table[aria-label="Results Table"]')).toBeTruthy();
+  });
+
+  it('recalculates the displayed timing model when the event minimum lap time changes', async () => {
+    const eventId = createEventId('minimum-lap-event');
+    const sessionId = createSessionId('minimum-lap-session');
+    const categoryId = createCategoryId('minimum-lap-category');
+    const entrantId = createEventEntrantId('minimum-lap-entrant');
+    const participantId = createEventParticipantId('minimum-lap-participant');
+    const sourceId = createTimeRecordSourceId('minimum-lap-source');
+    const startFlagId = createTimeRecordId('minimum-lap-start');
+    const lapOneId = createTimeRecordId('minimum-lap-lap-1');
+    const lapTwoId = createTimeRecordId('minimum-lap-lap-2');
+    const participant = {
+      categoryId,
+      currentResult: undefined,
+      entrantId,
+      firstname: 'Minimum',
+      id: participantId,
+      identifiers: [
+        { fromTime: undefined, racePlate: '101', toTime: undefined },
+        { fromTime: undefined, toTime: undefined, txNo: 101001 },
+      ] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Lap',
+    } as EventParticipant;
+    const startFlag = createGreenFlagEvent({
+      categoryIds: [categoryId],
+      eventId,
+      id: startFlagId,
+      indicatesRaceStart: true,
+      sequence: 1,
+      sessionId,
+      source: sourceId,
+      time: new Date('2026-05-29T10:00:00.000Z'),
+    });
+    const importedRaceState = {
+      categories: [{
+        code: 'MIN',
+        description: '',
+        id: categoryId,
+        name: 'Minimum Lap Category',
+      }],
+      participants: [participant],
+      records: [
+        startFlag,
+        {
+          chipCode: 101001,
+          eventId,
+          id: lapOneId,
+          originRecordNumber: 1,
+          plateNumber: '101',
+          recordType: RECORD_TX_CROSSING,
+          sequence: 2,
+          sessionId,
+          source: sourceId,
+          time: new Date('2026-05-29T10:00:30.000Z'),
+        },
+        {
+          chipCode: 101001,
+          eventId,
+          id: lapTwoId,
+          originRecordNumber: 2,
+          plateNumber: '101',
+          recordType: RECORD_TX_CROSSING,
+          sequence: 3,
+          sessionId,
+          source: sourceId,
+          time: new Date('2026-05-29T10:01:30.000Z'),
+        },
+      ],
+      teams: [],
+    };
+    const requestFileContent = async (filePath: string, _dataType: string): Promise<string> => {
+      if (filePath.includes('event-catalog.json')) {
+        return JSON.stringify({
+          mutations: [
+            ...createSeedEventCatalogLedger().mutations,
+            {
+              category: {
+                code: 'MIN',
+                description: '',
+                eventId,
+                id: categoryId,
+                name: 'Minimum Lap Category',
+              },
+              id: 'mutation-minimum-lap-category',
+              timestamp: '2026-05-29T00:00:01.000Z',
+              type: 'category-created',
+            },
+            {
+              entrant: {
+                categoryId,
+                categoryIds: [categoryId],
+                entrantType: 'rider',
+                eventId,
+                firstName: 'Minimum',
+                id: entrantId,
+                identifiers: participant.identifiers,
+                lastName: 'Lap',
+                memberParticipantIds: [participantId],
+                name: 'Minimum Lap',
+                sessionIds: [sessionId],
+              },
+              id: 'mutation-minimum-lap-entrant',
+              timestamp: '2026-05-29T00:00:02.000Z',
+              type: 'entrant-created',
+            },
+            {
+              event: {
+                categoryIds: [categoryId],
+                date: '2026-05-29',
+                entrantIds: [entrantId],
+                format: 'race-weekend',
+                id: eventId,
+                minimumLapTimeMilliseconds: 25000,
+                name: 'Minimum Lap Event',
+                sessionIds: [sessionId],
+                timeZone: 'Australia/Sydney',
+              },
+              id: 'mutation-minimum-lap-event',
+              timestamp: '2026-05-29T00:00:00.000Z',
+              type: 'event-created',
+            },
+            {
+              id: 'mutation-minimum-lap-session',
+              session: {
+                categoryIds: [categoryId],
+                eventId,
+                id: sessionId,
+                kind: 'race',
+                name: 'Minimum Lap Session',
+                scheduledStart: '2026-05-29T10:00:00.000Z',
+                status: 'completed',
+              },
+              timestamp: '2026-05-29T00:00:03.000Z',
+              type: 'session-created',
+            },
+            {
+              eventId,
+              id: 'mutation-minimum-lap-race-state',
+              raceState: importedRaceState,
+              sessionId,
+              timestamp: '2026-05-29T00:00:04.000Z',
+              type: 'race-state-imported',
+            },
+            {
+              eventId,
+              id: 'mutation-minimum-lap-event-active',
+              timestamp: '2026-05-29T00:00:05.000Z',
+              type: 'event-activated',
+            },
+            {
+              eventId,
+              id: 'mutation-minimum-lap-session-active',
+              sessionId,
+              timestamp: '2026-05-29T00:00:06.000Z',
+              type: 'session-activated',
+            },
+          ],
+          schemaVersion: 1,
+        });
+      }
+
+      if (filePath.includes('system-config.json')) {
+        return JSON.stringify({
+          dataSources: [],
+          eventSourceAssignments: {},
+          schemaVersion: 1,
+          sessionSourceAssignments: {},
+        });
+      }
+
+      if (filePath.includes('admin-overrides.json')) {
+        return JSON.stringify({ entrantCategories: {}, excludedCrossings: {}, schemaVersion: 1 });
+      }
+
+      throw new Error(`Unknown generated file requested: ${filePath}`);
+    };
+
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string, dataType?: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer: ((filePath: string): Promise<Buffer> => {
+        const fileName = path.basename(filePath);
+        return readFile(path.join(process.cwd(), 'src', 'testdata', fileName));
+      }) as unknown as (filePath: string) => Promise<Buffer>,
+      requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async () => undefined,
+    };
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    await clickSectionButton(container, 'Timing');
+    const timingEventSelect = container.querySelector('select[aria-label="Timing Event"]') as HTMLSelectElement;
+    const timingSessionSelect = container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement;
+    expect(timingEventSelect).toBeTruthy();
+    expect(timingSessionSelect).toBeTruthy();
+
+    await act(async () => {
+      timingEventSelect.value = eventId;
+      timingEventSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await waitForInputValue(container, 'select[aria-label="Timing Event"]', eventId);
+
+    await act(async () => {
+      timingSessionSelect.value = sessionId;
+      timingSessionSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await waitForInputValue(container, 'select[aria-label="Timing Session"]', sessionId);
+    await waitForTimingLapSummary(container, lapOneId);
+    let lapSummary = container.querySelector('[data-timing-first-participant-laps]')?.getAttribute('data-timing-first-participant-laps') || '';
+    expect(lapSummary).not.toContain('lap-under-minimum');
+
+    await clickSectionButton(container, 'Events');
+    const eventNameInput = container.querySelector('input[aria-label="Event Name"]') as HTMLInputElement;
+    const eventMinimumLapTimeInput = container.querySelector('input[aria-label="Event Minimum Lap Time"]') as HTMLInputElement;
+    expect(eventNameInput.value).toBe('Minimum Lap Event');
+    expect(eventMinimumLapTimeInput.value).toBe('0:00:25.0000');
+
+    await act(async () => {
+      setInputValue(eventMinimumLapTimeInput, '0:00:45.0000');
+    });
+
+    await clickButtonByText(container, 'Save Event Details');
+    await waitForInputValue(container, 'input[aria-label="Event Minimum Lap Time"]', '0:00:45.0000');
+
+    await clickSectionButton(container, 'Timing');
+    await waitForTimingLapSummary(container, lapOneId);
+    lapSummary = container.querySelector('[data-timing-first-participant-laps]')?.getAttribute('data-timing-first-participant-laps') || '';
+    expect(lapSummary).toContain('"unrelatedReasonCode":"lap-under-minimum"');
   });
 
   it('shows an actionable warning banner when Windows file permissions block optional generated files', async () => {
