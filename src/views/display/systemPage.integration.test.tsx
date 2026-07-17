@@ -134,6 +134,7 @@ describe('SystemPage integration', () => {
     });
 
     expect(container.textContent).toContain('System');
+    expect(container.querySelector('img[alt="RaceSweet"]')).toBeTruthy();
     expect(container.textContent).toContain('Apical Source');
     const sourceTypeSelect = container.querySelector('select[aria-label="New Data Source Type"]') as HTMLSelectElement;
     expect(sourceTypeSelect).toBeDefined();

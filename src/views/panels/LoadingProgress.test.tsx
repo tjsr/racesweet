@@ -44,6 +44,7 @@ describe('LoadingProgress', () => {
     expect(container.textContent).toContain('Processing records');
     expect(container.textContent).toContain('Stage 2 of 2');
     expect(container.textContent).toContain('2 of 7');
+    expect(container.querySelector('img[alt="RaceSweet"]')).toBeTruthy();
   });
 
   it('renders loading metrics when provided', () => {

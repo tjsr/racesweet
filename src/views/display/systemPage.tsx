@@ -9,6 +9,7 @@ import { FastestTimeIndicatorsPanel } from '../panels/fastestTimeIndicators.js';
 import type { InlineLoadingProgress } from '../panels/InlineLoadingIndicator.js';
 import { LocalStorageLocationPanel } from '../panels/localStorageLocation.js';
 import { LogPanel } from '../panels/log.js';
+import { RaceSweetLogo } from '../panels/RaceSweetLogo.js';
 import { RuntimeInformationPanel } from '../panels/runtimeInformation.js';
 
 interface SystemPageProps {
@@ -43,7 +44,10 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
       <h1>System</h1>
       <p>Configure global data-source definitions and source connection settings.</p>
 
-      <RuntimeInformationPanel runtimeVersions={runtimeVersions} />
+      <div className="system-runtime-summary">
+        <RuntimeInformationPanel runtimeVersions={runtimeVersions} />
+        <RaceSweetLogo className="system-runtime-summary__logo" />
+      </div>
 
       <LocalStorageLocationPanel
         localStorageDirectoryPath={props.config.localStorageDirectoryPath}
