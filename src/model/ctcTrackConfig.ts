@@ -29,6 +29,17 @@ export interface CtcTrackConfigLoopLookupResult {
   network: CtcTrackConfigNetwork;
 }
 
+/**
+ * Whether this TRACK.CFG has an explicit, persisted per-loop lap-completion
+ * selection. Older saved configurations did not have this property, so they
+ * continue to use the line-name inference below.
+ */
+export const hasCtcLapCompletionSelection = (trackConfig: CtcTrackConfig | undefined): boolean => (
+  trackConfig?.networks.some((network) => network.lines.some((line) => (
+    line.loops.some((loop) => typeof loop.isLapCompletion === 'boolean')
+  ))) === true
+);
+
 const normalizeCtcLineName = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 const isPitLineName = (name: string): boolean => {
@@ -64,6 +75,13 @@ export const getCtcFinishLineNumbers = (trackConfig: CtcTrackConfig | undefined)
   }
 
   const lines = trackConfig.networks.flatMap((network) => network.lines);
+  if (hasCtcLapCompletionSelection(trackConfig)) {
+    const selectedLines = lines
+      .filter((line) => line.loops.some((loop) => loop.isLapCompletion === true))
+      .map((line) => line.line);
+    return Array.from(new Set(selectedLines)).sort((left, right) => left - right);
+  }
+
   const trackStartFinishLines = lines
     .filter((line) => normalizeCtcLineName(line.name).includes('start') && normalizeCtcLineName(line.name).includes('finish'))
     .map((line) => line.line);

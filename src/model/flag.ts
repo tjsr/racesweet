@@ -9,6 +9,7 @@ export interface FlagRecord extends EventTimeRecord {
   flagType: string;
   flagValue: string;
   categoryIds?: EventCategoryId[];
+  categoryStartOverrides?: EventCategoryId[];
   deleted?: boolean;
   description?: string;
   systemGenerated?: boolean;

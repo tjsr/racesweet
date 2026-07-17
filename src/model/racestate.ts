@@ -463,6 +463,9 @@ export class Session implements RaceState, RaceStateLookup {
     const categoryIds = new Set<EventCategoryId>(flag.categoryIds || []);
     categoryIds.add(categoryId);
     flag.categoryIds = Array.from(categoryIds);
+    const categoryStartOverrides = new Set<EventCategoryId>(flag.categoryStartOverrides || []);
+    categoryStartOverrides.add(categoryId);
+    flag.categoryStartOverrides = Array.from(categoryStartOverrides);
     this.__reprocessAfterFlagChange();
   }
 
@@ -476,6 +479,7 @@ export class Session implements RaceState, RaceStateLookup {
     this.validateCategory(categoryId);
     const flag = this.getFlagById(flagId);
     flag.categoryIds = (flag.categoryIds || []).filter((id) => id !== categoryId);
+    flag.categoryStartOverrides = (flag.categoryStartOverrides || []).filter((id) => id !== categoryId);
     this.__reprocessAfterFlagChange();
   }
 

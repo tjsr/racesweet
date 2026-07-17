@@ -125,8 +125,12 @@ export const getEventStartFlagForCategory = (
   eventFlags: FlagRecord[]
 ): GreenFlagRecord | null => {
   const catFlags = getCategoryFlags(eventFlags, categoryId);
+  const categoryStartOverrides = catFlags.filter((flag) => (
+    flag.categoryStartOverrides?.some((id) => id.toString() === categoryId.toString())
+  ));
+  const candidateFlags = categoryStartOverrides.length > 0 ? categoryStartOverrides : catFlags;
 
-  const green = catFlags.reduce<GreenFlagRecord | undefined>((selectedFlag, flag) => {
+  const green = candidateFlags.reduce<GreenFlagRecord | undefined>((selectedFlag, flag) => {
     if (!isGreenFlag(flag)) {
       return selectedFlag;
     }

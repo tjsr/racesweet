@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { EventId, SessionId } from '../model/raceevent';
-import { getCtcFinishLineNumbers, type CtcTrackConfig } from '../model/ctcTrackConfig';
+import { getCtcFinishLineNumbers, hasCtcLapCompletionSelection, type CtcTrackConfig } from '../model/ctcTrackConfig';
 import type { MrScatsDataFileSummary } from '../parsers/mrScats/fileInventory';
 
 export type DataSourceType =
@@ -235,7 +235,9 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListed
   if (source.type === 'file-dorian-ctc-srt') {
     const configuredFinishLines = normalizeFinishLineNumbers(source.finishLineNumbers) || [];
     const ctcFinishLines = getCtcFinishLineNumbers(source.fileConfig?.ctcTrackConfig) || [];
-    const finishLineNumbers = Array.from(new Set([...configuredFinishLines, ...ctcFinishLines])).sort((left, right) => left - right);
+    const finishLineNumbers = hasCtcLapCompletionSelection(source.fileConfig?.ctcTrackConfig)
+      ? ctcFinishLines
+      : Array.from(new Set([...configuredFinishLines, ...ctcFinishLines])).sort((left, right) => left - right);
     return {
       ...source,
       fileConfig: {
@@ -245,7 +247,7 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListed
         importMode: source.fileConfig?.importMode === 'update' ? 'update' : 'import',
         trackConfigFilePath: normalizeOptionalSystemFilePath(source.fileConfig?.trackConfigFilePath),
       },
-      finishLineNumbers: finishLineNumbers.length > 0 ? finishLineNumbers : [1],
+      finishLineNumbers,
     };
   }
 
@@ -381,7 +383,9 @@ export const getFinishLineNumbersForSession = (
   const ctcFinishLines = source.type === 'file-dorian-ctc-srt'
     ? getCtcFinishLineNumbers(source.fileConfig?.ctcTrackConfig) || []
     : [];
-  const finishLineNumbers = Array.from(new Set([...configuredFinishLines, ...ctcFinishLines]));
+  const finishLineNumbers = source.type === 'file-dorian-ctc-srt' && hasCtcLapCompletionSelection(source.fileConfig?.ctcTrackConfig)
+    ? ctcFinishLines
+    : Array.from(new Set([...configuredFinishLines, ...ctcFinishLines]));
   return finishLineNumbers.length > 0 ? finishLineNumbers : undefined;
 };
 
