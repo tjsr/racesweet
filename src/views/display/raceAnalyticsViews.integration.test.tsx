@@ -362,6 +362,114 @@ describe('race analytics views integration', () => {
     expect(container.textContent).not.toContain('0:00.500');
   });
 
+  it('uses the Timing source-loop lap-completion rules in Results and Reports', async () => {
+    const soloParticipantId = createEventParticipantId('p-rider-1');
+    const soloEntrantId = createEventEntrantId('rider-1');
+    const sourceId = createTimeRecordSourceId('configured-source');
+    const configuredLap = {
+      ...createLap('configured-lap', soloParticipantId, soloEntrantId, 1, 90000, 90000),
+      isLapCompletion: false,
+      lineNumber: 2,
+      loopNumber: 1,
+      source: sourceId,
+    };
+    const sourceLoop = {
+      card: 1,
+      comPort: 1,
+      isLapCompletion: true,
+      loopNumber: 1,
+      siteAddress: 2,
+    };
+    const raceStateWithConfiguredLapCompletion = {
+      ...raceState,
+      getFinishLineNumbers: () => [1],
+      getParticipantLaps: (participantId: EventParticipantId) => participantId === soloParticipantId
+        ? [configuredLap]
+        : [],
+      getTimeRecordSourceById: () => ({
+        ctcTrackConfig: {
+          eventDescriptions: {},
+          networks: [{
+            lines: [{ line: 2, loops: [sourceLoop], name: 'Alternate finish' }],
+            name: 'Timing network',
+          }],
+        },
+        id: sourceId,
+        name: 'Configured source',
+      }),
+      records: [configuredLap],
+    } as unknown as Session & RaceStateLookup;
+
+    await act(async () => {
+      root.render(
+        <ResultsPage
+          categories={categories}
+          catalogEntrants={catalogEntrants}
+          raceState={raceStateWithConfiguredLapCompletion}
+        />,
+      );
+    });
+
+    const resultsRows = Array.from(container.querySelectorAll('table[aria-label="Results Table"] tbody tr'));
+    const soloResult = resultsRows.find((row) => row.textContent?.includes('Solo Rider'));
+    expect(Array.from(soloResult!.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
+      '1',
+      'Solo Rider',
+      'Category B',
+      '1',
+      '1:30.000',
+      '1:30.000',
+    ]);
+
+    await act(async () => {
+      root.render(
+        <ReportsPage
+          categories={categories}
+          catalogEntrants={catalogEntrants}
+          raceState={raceStateWithConfiguredLapCompletion}
+        />,
+      );
+    });
+
+    const ignoreFirstLapCheckbox = container.querySelector('input[aria-label="Ignore first lap"]') as HTMLInputElement;
+    await act(async () => {
+      ignoreFirstLapCheckbox.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const fastestRow = Array.from(container.querySelectorAll('table[aria-label="Fastest Laps Report Table"] tbody tr'))
+      .find((row) => row.textContent?.includes('Solo Rider'));
+    expect(Array.from(fastestRow!.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
+      soloParticipantId,
+      'Solo Rider',
+      'Category B',
+      '1:30.000',
+      '1',
+      '1',
+    ]);
+
+    sourceLoop.isLapCompletion = false;
+    await act(async () => {
+      root.render(
+        <ReportsPage
+          categories={categories}
+          catalogEntrants={catalogEntrants}
+          raceState={raceStateWithConfiguredLapCompletion}
+        />,
+      );
+    });
+
+    const updatedFastestRow = Array.from(container.querySelectorAll('table[aria-label="Fastest Laps Report Table"] tbody tr'))
+      .find((row) => row.textContent?.includes('Solo Rider'));
+    expect(Array.from(updatedFastestRow!.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
+      '-',
+      'Solo Rider',
+      'Category B',
+      '--:--:--.---',
+      '-',
+      '0',
+    ]);
+  });
+
   it('reports fastest laps and participant lap times correctly for team and individual entrants', async () => {
     await act(async () => {
       root.render(

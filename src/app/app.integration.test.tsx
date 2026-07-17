@@ -1423,6 +1423,11 @@ describe('RaceSweetMainApp integration', () => {
     expect(lapTimesTable?.textContent || container.textContent).toContain('MR-SCATS Rider');
 
     expect(requestBuffer).not.toHaveBeenCalled();
+
+    await clickSectionButton(container, 'Timing');
+    expect((container.querySelector('select[aria-label="Timing Event"]') as HTMLSelectElement).value).toBe(importedEventId);
+    expect((container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement).value).toBe(importedSessionId);
+    expect(container.textContent).toContain('Recent Records (3)');
   });
 
   it('keeps panel rendering healthy after edits and panel switches', async () => {
@@ -1715,6 +1720,15 @@ describe('RaceSweetMainApp integration', () => {
     expect(pinnedTimingSessionSelect.value).toBe(SEED_QUALIFYING_SESSION_ID);
     expect(container.textContent).toContain('Feature Race (active)');
     expect(container.textContent).toContain('Recent Records (0)');
+
+    const expectedSharedSessionValue = `session:${timingEventSelect.value}:${SEED_QUALIFYING_SESSION_ID}`;
+    await clickSectionButton(container, 'Results');
+    expect((container.querySelector('select[aria-label="Race View Event Session"]') as HTMLSelectElement).value).toBe(expectedSharedSessionValue);
+    expect(container.querySelector('table[aria-label="Results Table"] tbody')?.textContent).toContain('Rider 101Premier0');
+
+    await clickSectionButton(container, 'Reports');
+    expect((container.querySelector('select[aria-label="Race View Event Session"]') as HTMLSelectElement).value).toBe(expectedSharedSessionValue);
+    expect(container.querySelector('table[aria-label="Fastest Laps Report Table"] tbody')?.textContent).toContain('Rider 101Premier');
   });
 
   it('persists the last viewed Timing event and session and restores them after reload', async () => {

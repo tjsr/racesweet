@@ -299,10 +299,12 @@ describe('RecentRecords integration', () => {
       'Finish',
       'Next Caution',
       'Next Green',
-      'Prev Tx crossing',
-      'Next Tx crossing',
+      'Previous crossing for this transmitter',
+      'Next crossing for this transmitter',
       'Prev Tx crossing on this line',
       'Next Tx crossing on this line',
+      'Leaders prev lap (B)',
+      'Leaders next lap (N)',
     ]);
 
     const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;

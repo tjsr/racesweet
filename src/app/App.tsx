@@ -370,9 +370,6 @@ export const RaceSweetMainApp = () => {
   const [selectedSessionId, setSelectedSessionId] = useState<string|undefined>(undefined);
   const [selectedTimingEventId, setSelectedTimingEventId] = useState<string|undefined>(undefined);
   const [selectedTimingSessionId, setSelectedTimingSessionId] = useState<string|undefined>(undefined);
-  const [selectedAnalyticsEventId, setSelectedAnalyticsEventId] = useState<string|undefined>(undefined);
-  const [selectedAnalyticsSessionId, setSelectedAnalyticsSessionId] = useState<string|undefined>(undefined);
-  const [analyticsRaceState, setAnalyticsRaceState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [timingRaceState, setTimingRaceState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [timingSessionSelection, setTimingSessionSelection] = useState<TimingSessionSelection>('active');
   const [timingSelectionLoading, setTimingSelectionLoading] = useState<boolean>(false);
@@ -583,9 +580,6 @@ export const RaceSweetMainApp = () => {
           setTimingSessionSelection(restoredTimingSelection.selectionMode);
           setSelectedTimingEventId(restoredTimingSelection.eventId);
           setSelectedTimingSessionId(restoredTimingSelection.sessionId);
-          setSelectedAnalyticsEventId(initialEventId);
-          setSelectedAnalyticsSessionId(selectedInitialSessionId);
-          setAnalyticsRaceState(session);
           setTimingRaceState(restoredTimingSelection.selectionMode === 'active' ? session : createEmptySessionState());
           initialTimingSelectionHydrated.current = restoredTimingSelection.selectionMode === 'active';
           setErrorState(undefined);
@@ -670,8 +664,6 @@ export const RaceSweetMainApp = () => {
     setSelectedSessionId(nextSessionId);
     setSelectedCategoriesEventId(nextEventId);
     setSelectedCategoryId(nextCategoryId);
-    setSelectedAnalyticsEventId(nextEventId);
-    setSelectedAnalyticsSessionId(nextSessionId);
     if (sessionState) {
       const nextSessionState = cloneSessionState(sessionState);
       applyCatalogSessionScopeToRaceState(nextSessionState, catalog, catalog.activeEventId, catalog.activeSessionId);
@@ -681,14 +673,6 @@ export const RaceSweetMainApp = () => {
       const nextTimingRaceState = cloneSessionState(timingRaceState);
       applyCatalogSessionScopeToRaceState(nextTimingRaceState, catalog, selectedTimingEventId, selectedTimingSessionId);
       setTimingRaceState(nextTimingRaceState);
-    }
-    if (analyticsRaceState) {
-      const nextAnalyticsRaceState = cloneSessionState(analyticsRaceState);
-      applyCatalogSessionScopeToRaceState(nextAnalyticsRaceState, catalog, selectedAnalyticsEventId, selectedAnalyticsSessionId);
-      setAnalyticsRaceState(nextAnalyticsRaceState);
-    }
-    if (nextEventId === catalog.activeEventId && nextSessionId === catalog.activeSessionId) {
-      setAnalyticsRaceState(sessionState ? cloneSessionState(sessionState) : sessionState);
     }
   };
 
@@ -931,9 +915,6 @@ export const RaceSweetMainApp = () => {
     if (selectedTimingEventId === eventId && selectedTimingSessionId === sessionId) {
       setTimingRaceState(targetSessionState);
     }
-    if (selectedAnalyticsEventId === eventId && selectedAnalyticsSessionId === sessionId) {
-      setAnalyticsRaceState(targetSessionState);
-    }
     setRecordSelectedParticipants(new Set<EventParticipantId>());
     setCategorySelected(new Set<EventCategoryId>());
     setRecordSelectedCategories(new Set<EventCategoryId>());
@@ -1028,6 +1009,33 @@ export const RaceSweetMainApp = () => {
     });
   };
 
+  const selectTimingEventSession = (eventId: EventId, sessionId: SessionId): void => {
+    if (!validateUuid(eventId)) {
+      throw new Error(`Invalid eventId provided: ${eventId}`);
+    }
+    if (!validateUuid(sessionId)) {
+      throw new Error(`Invalid sessionId provided: ${sessionId}`);
+    }
+
+    setTimingSessionSelection('session');
+    setSelectedTimingEventId(eventId);
+    setSelectedTimingSessionId(sessionId);
+    persistTimingContextSelection({
+      eventId,
+      selectionMode: 'session',
+      sessionId,
+    });
+    setTimingSelectionLoading(true);
+    setTimingRaceState(createEmptySessionState());
+    runAfterTimingLoadingPaint(() => {
+      loadTimingSession(eventId, sessionId).catch((error: unknown) => {
+        setTimingErrorState(error as Error);
+      }).finally(() => {
+        setTimingSelectionLoading(false);
+      });
+    });
+  };
+
   const selectTimingEvent = (eventId: EventId): void => {
     if (!validateUuid(eventId)) {
       throw new Error(`Invalid eventId provided: ${eventId}`);
@@ -1038,29 +1046,20 @@ export const RaceSweetMainApp = () => {
 
     const nextSessions = sortSessionsByScheduledStart(getSessionsForEvent(eventCatalogState, eventId));
     const nextSessionId = nextSessions.find((session) => session.id === selectedTimingSessionId)?.id || nextSessions[0]?.id;
-    setTimingSessionSelection('session');
-    setSelectedTimingEventId(eventId);
-    setSelectedTimingSessionId(nextSessionId);
-    persistTimingContextSelection({
-      eventId,
-      selectionMode: 'session',
-      sessionId: nextSessionId,
-    });
-    setTimingSelectionLoading(true);
-    setTimingRaceState(createEmptySessionState());
-
-    runAfterTimingLoadingPaint(() => {
-      if (!nextSessionId) {
-        setTimingSelectionLoading(false);
-        return;
-      }
-
-      loadTimingSession(eventId, nextSessionId).catch((error: unknown) => {
-        setTimingErrorState(error as Error);
-      }).finally(() => {
-        setTimingSelectionLoading(false);
+    if (!nextSessionId) {
+      setTimingSessionSelection('session');
+      setSelectedTimingEventId(eventId);
+      setSelectedTimingSessionId(undefined);
+      persistTimingContextSelection({
+        eventId,
+        selectionMode: 'session',
       });
-    });
+      setTimingRaceState(createEmptySessionState());
+      setTimingSelectionLoading(false);
+      return;
+    }
+
+    selectTimingEventSession(eventId, nextSessionId);
   };
 
   const selectTimingSession = (sessionId: SessionId): void => {
@@ -1086,21 +1085,7 @@ export const RaceSweetMainApp = () => {
       return;
     }
 
-    setTimingSessionSelection('session');
-    setSelectedTimingSessionId(sessionId);
-    persistTimingContextSelection({
-      eventId,
-      selectionMode: 'session',
-      sessionId,
-    });
-    setTimingRaceState(createEmptySessionState());
-    runAfterTimingLoadingPaint(() => {
-      loadTimingSession(eventId, sessionId).catch((error: unknown) => {
-        setTimingErrorState(error as Error);
-      }).finally(() => {
-        setTimingSelectionLoading(false);
-      });
-    });
+    selectTimingEventSession(eventId, sessionId);
   };
 
   const encodeEventSessionValue = (eventId: EventId, sessionId?: SessionId): string => {
@@ -1125,29 +1110,7 @@ export const RaceSweetMainApp = () => {
       return;
     }
 
-    setSelectedAnalyticsEventId(nextEventId);
-    setSelectedAnalyticsSessionId(nextSessionId);
-
-    if (nextEventId === eventCatalogState.activeEventId && nextSessionId === eventCatalogState.activeSessionId) {
-      setAnalyticsRaceState(sessionState);
-      return;
-    }
-
-    const targetSessionState = createEmptySessionState();
-    applySessionSources(nextEventId, nextSessionId, {
-      cachedSpreadsheetOnly: true,
-      clearSelections: true,
-      preferCachedSpreadsheet: true,
-      preferPersistedRaceState: true,
-      targetSessionState,
-    }).then((loadedState) => {
-      const hydratedState = loadedState || targetSessionState;
-      const analyticsSessionState = sessionFromPartialRaceState(raceStateSnapshot(hydratedState));
-      applyCatalogSessionScopeToRaceState(analyticsSessionState, eventCatalogService?.catalog || eventCatalogState, nextEventId, nextSessionId);
-      setAnalyticsRaceState(analyticsSessionState);
-    }).catch((error: unknown) => {
-      setErrorState(error as Error);
-    });
+    selectTimingEventSession(nextEventId, nextSessionId);
   };
 
   useEffect(() => {
@@ -1178,12 +1141,6 @@ export const RaceSweetMainApp = () => {
       setTimingSelectionLoading(false);
     });
   }, [loadTimingSession, selectedTimingEventId, selectedTimingSessionId, timingSessionSelection]);
-
-  useEffect(() => {
-    if (selectedAnalyticsEventId === eventCatalogState?.activeEventId && selectedAnalyticsSessionId === eventCatalogState?.activeSessionId) {
-      setAnalyticsRaceState(sessionState);
-    }
-  }, [eventCatalogState?.activeEventId, eventCatalogState?.activeSessionId, selectedAnalyticsEventId, selectedAnalyticsSessionId, sessionState]);
 
   useEffect(() => {
     if (!eventCatalogState || !sessionState || !selectedSessionsEventId || !selectedSessionId) {
@@ -1263,7 +1220,7 @@ export const RaceSweetMainApp = () => {
     categories: EventCategory[];
     participants: EventParticipant[];
     records: EventTimeRecord[];
-    teams: EventTeam[] | undefined;
+    teams: EventTeam[];
     timeRecordSources: Session['timeRecordSources'] | undefined;
   } = (() => {
     if (!displayedTimingRaceState || !eventCatalogState) {
@@ -1280,7 +1237,7 @@ export const RaceSweetMainApp = () => {
         getTransponderCrossings: () => [],
         participants: [],
         records: [],
-        teams: undefined,
+        teams: [],
         timeRecordSources: undefined,
         updateCategoryDetails: () => undefined,
         updateEntrantCategory: () => undefined,
@@ -1331,7 +1288,7 @@ export const RaceSweetMainApp = () => {
       getTransponderCrossings: (txNo, untilTime) => displayedTimingRaceState.getTransponderCrossings(txNo, untilTime),
       participants: Array.from(participantById.values()),
       records: displayedTimingRaceState.records as EventTimeRecord[],
-      teams: displayedTimingRaceState.teams,
+      teams: displayedTimingRaceState.teams || [],
       timeRecordSources: displayedTimingRaceState.timeRecordSources,
       updateCategoryDetails: (categoryId, changes) => displayedTimingRaceState.updateCategoryDetails(categoryId, changes),
       updateEntrantCategory: (entrantId, categoryId) => displayedTimingRaceState.updateEntrantCategory(entrantId, categoryId),
@@ -1584,9 +1541,9 @@ export const RaceSweetMainApp = () => {
     selectedEntrantsResolvedSessionId === eventCatalogState.activeSessionId
     ? sessionState
     : selectedEntrantsImportedRaceState;
-  const selectedResultsEventId = selectedAnalyticsEventId || eventCatalogState.activeEventId || eventCatalogState.events[0]?.id;
-  const selectedResultsSessionId = selectedAnalyticsSessionId || eventCatalogState.activeSessionId || getSessionsForEvent(eventCatalogState, selectedResultsEventId)[0]?.id;
-  const displayedAnalyticsRaceState = analyticsRaceState || sessionState;
+  const selectedResultsEventId = timingEvent?.id || eventCatalogState.activeEventId || eventCatalogState.events[0]?.id;
+  const selectedResultsSessionId = timingSessionId || eventCatalogState.activeSessionId || getSessionsForEvent(eventCatalogState, selectedResultsEventId)[0]?.id;
+  const displayedAnalyticsRaceState = timingRaceStateLookup;
   const selectedEventSessionValue = selectedResultsEventId
     ? encodeEventSessionValue(selectedResultsEventId, selectedResultsSessionId)
     : '';

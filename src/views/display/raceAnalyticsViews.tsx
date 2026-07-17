@@ -1,10 +1,10 @@
-import type { RaceStateLookup, Session } from '../../model/racestate.js';
+import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 
 import React from 'react';
 import type { EventCatalogEntrant } from '../../catalog/eventCatalog.js';
 import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
 import { shouldExcludeCategoryFromResults } from '../../controllers/category.js';
-import { isCountedLapPassing } from '../../controllers/laps.js';
+import { getSourceLapCompletion, isCountedLapPassing } from '../../controllers/laps.js';
 import { getParticipantNumber } from '../../controllers/participant.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
@@ -102,7 +102,7 @@ interface BaseRaceAnalyticsProps {
   catalogEntrants: EventCatalogEntrant[];
   eventSessionOptions?: EventSessionOption[];
   onSelectEventSession?: (value: string) => void;
-  raceState: Session & RaceStateLookup;
+  raceState: RaceState & RaceStateLookup;
   selectedEventSessionValue?: string;
 }
 
@@ -125,7 +125,7 @@ const getLapChartEntrantLineColor = (_entrantId: EventEntrantId, entrantIndex: n
 };
 
 const getCategoryByIdSafely = (
-  raceState: Session & RaceStateLookup,
+  raceState: RaceState & RaceStateLookup,
   categoryId?: EventCategoryId
 ): CategoryOption | undefined => {
   if (!categoryId) {
@@ -139,7 +139,7 @@ const getCategoryByIdSafely = (
   }
 };
 
-const categoryNameFromId = (raceState: Session & RaceStateLookup, categoryId?: EventCategoryId): string => {
+const categoryNameFromId = (raceState: RaceState & RaceStateLookup, categoryId?: EventCategoryId): string => {
   if (!categoryId) {
     return 'Unknown';
   }
@@ -149,7 +149,7 @@ const categoryNameFromId = (raceState: Session & RaceStateLookup, categoryId?: E
 
 const categoryKeyFromName = (name: string): string => normalizeText(name);
 
-const _categoryKeyFromId = (raceState: Session & RaceStateLookup, categoryId?: EventCategoryId): string => {
+const _categoryKeyFromId = (raceState: RaceState & RaceStateLookup, categoryId?: EventCategoryId): string => {
   return categoryKeyFromName(categoryNameFromId(raceState, categoryId));
 };
 
@@ -165,7 +165,7 @@ const dedupeCategoryOptions = (categories: CategoryOption[]): CategoryOption[] =
 };
 
 const getExcludedCategoryKeys = (
-  raceState: Session & RaceStateLookup,
+  raceState: RaceState & RaceStateLookup,
   categories: CategoryOption[]
 ): Set<string> => {
   const excludedKeys = new Set<string>();
@@ -188,7 +188,7 @@ const getExcludedCategoryKeys = (
 };
 
 const isParticipantExcludedFromResults = (
-  raceState: Session & RaceStateLookup,
+  raceState: RaceState & RaceStateLookup,
   participant: EventParticipant,
   excludedCategoryKeys: Set<string>
 ): boolean => {
@@ -205,9 +205,11 @@ const formatDuration = (duration?: number): string => {
 
 const isValidLap = (
   lap: ParticipantPassingRecord,
-  finishLineNumbers: number[] | undefined
+  raceState: RaceStateLookup
 ): boolean => {
-  return isCountedLapPassing(lap, finishLineNumbers);
+  return isCountedLapPassing(lap, raceState.getFinishLineNumbers?.(), (passing) => (
+    getSourceLapCompletion(passing, raceState.getTimeRecordSourceById?.(passing.source))
+  ));
 };
 
 const findEntrantName = (entrantId: EventEntrantId, members: EventParticipant[], catalogEntrantsById: Map<EventEntrantId, EventCatalogEntrant>): string => {
@@ -249,13 +251,12 @@ const findFastestLapPlate = (row: EntrantSummaryRow, fastestLapRecord: Participa
 };
 
 const buildEntrantRows = (
-  raceState: Session & RaceStateLookup,
+  raceState: RaceState & RaceStateLookup,
   catalogEntrants: EventCatalogEntrant[],
   excludedCategoryKeys: Set<string>,
 ): EntrantSummaryRow[] => {
   const catalogEntrantsById = new Map(catalogEntrants.map((entrant) => [entrant.id, entrant]));
   const participantGroups = new Map<EventEntrantId, EventParticipant[]>();
-  const finishLineNumbers = raceState.getFinishLineNumbers?.();
 
   raceState.participants.forEach((participant) => {
     const entrantId = participant.entrantId?.toString() || participant.id.toString();
@@ -274,7 +275,7 @@ const buildEntrantRows = (
 
     const laps = includedMembers
       .flatMap((member) => raceState.getParticipantLaps(member.id) || [])
-      .filter((lap) => isValidLap(lap, finishLineNumbers))
+      .filter((lap) => isValidLap(lap, raceState))
       .sort((a, b) => {
         const at = a.time?.getTime() || Number.MAX_SAFE_INTEGER;
         const bt = b.time?.getTime() || Number.MAX_SAFE_INTEGER;
@@ -391,18 +392,51 @@ const buildLapChart = (rows: EntrantSummaryRow[]): LapChartColumn[] => {
     });
 };
 
-const getRaceStateContentSignature = (raceState: Session & RaceStateLookup): string => {
+const getRaceStateContentSignature = (raceState: RaceState & RaceStateLookup): string => {
   const participantSignature = raceState.participants
-    .map((participant) => `${participant.id}:${participant.categoryId}:${participant.identifiers?.length || 0}`)
+    .map((participant) => [
+      participant.id,
+      participant.entrantId,
+      participant.categoryId,
+      participant.firstname,
+      participant.surname,
+      JSON.stringify(participant.identifiers || []),
+    ].join(':'))
+    .join('|');
+  const categorySignature = raceState.categories
+    .map((category) => `${category.id}:${category.name}:${category.excludeFromResults === true}`)
     .join('|');
   const recordSignature = raceState.records
     .map((record) => {
       const passing = record as ParticipantPassingRecord;
-      return `${record.id}:${passing.participantId || ''}:${passing.lapNo || ''}:${passing.lapTime || ''}:${record.time?.getTime() || ''}`;
+      const sourceLapCompletion = getSourceLapCompletion(
+        passing,
+        raceState.getTimeRecordSourceById?.(passing.source),
+      );
+      return [
+        record.id,
+        passing.participantId,
+        passing.entrantId,
+        passing.source,
+        passing.sourceLineNumber,
+        passing.lineNumber,
+        passing.loopNumber,
+        passing.isLapCompletion,
+        sourceLapCompletion,
+        passing.isValid,
+        passing.isExcluded,
+        passing.isManuallyExcluded,
+        passing.unrelatedReasonCode,
+        passing.lapNo,
+        passing.lapTime,
+        passing.elapsedTime,
+        record.time?.getTime(),
+        record.timeTenthOfMillisecond,
+      ].join(':');
     })
     .join('|');
 
-  return `${participantSignature}::${recordSignature}`;
+  return `${participantSignature}::${categorySignature}::${recordSignature}`;
 };
 
 const buildFastestLapTimeline = (rows: EntrantSummaryRow[], ignoreFirstLap: boolean): FastestLapTimelineRow[] => {

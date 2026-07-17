@@ -53,7 +53,9 @@ type RecentRecordsGoToOption =
   | 'previousTransmitterCrossing'
   | 'nextTransmitterCrossing'
   | 'previousTransmitterCrossingOnLine'
-  | 'nextTransmitterCrossingOnLine';
+  | 'nextTransmitterCrossingOnLine'
+  | 'leadersNextLap'
+  | 'leadersPreviousLap';
 
 interface LapTimeIndicators {
   entrantFaster: boolean;
@@ -1867,6 +1869,24 @@ const buildLapTimeIndicatorMap = (
   return indicatorsByRecordId;
 };
 
+const getLeaderLapAtVisibleRange = (
+  sortedRecords: EventTimeRecord[],
+  visibleRowRange: RowIndexRange
+): number | undefined => {
+  const start = Math.max(0, visibleRowRange.start);
+  const end = Math.min(sortedRecords.length - 1, visibleRowRange.end);
+  if (end < start) {
+    return undefined;
+  }
+
+  return sortedRecords.slice(start, end + 1).reduce<number | undefined>((leaderLap, record) => {
+    if (!isCrossingRecord(record) || typeof record.lapNo !== 'number') {
+      return leaderLap;
+    }
+    return leaderLap === undefined ? record.lapNo : Math.max(leaderLap, record.lapNo);
+  }, undefined);
+};
+
 const buildSectorTimesByRecordId = (
   records: EventTimeRecord[],
   raceStateLookup: RaceStateLookup
@@ -2545,6 +2565,9 @@ export const RecentRecords = (props: RecordsProps & {
   const lapTimeIndicators = React.useMemo(() => {
     return buildLapTimeIndicatorMap(filteredRecords, props.raceStateLookup, props.sessionKind);
   }, [filteredRecords, props.raceStateLookup, props.sessionKind]);
+  const leaderLapAtVisibleRange = React.useMemo(() => {
+    return getLeaderLapAtVisibleRange(sortedRecords, visibleRowRange);
+  }, [sortedRecords, visibleRowRange]);
   const showSectorColumn = React.useMemo(() => {
     return shouldShowSectorColumnForLookup(filteredRecords, props.raceStateLookup);
   }, [filteredRecords, props.raceStateLookup]);
@@ -2796,6 +2819,17 @@ export const RecentRecords = (props: RecordsProps & {
         : recordsByTime.slice(selectedTimeIndex + 1);
       return candidates.find((record) => isMatchingTransmitterCrossing(record, onSelectedLine));
     };
+    const findLeaderLapTransition = (next: boolean): EventTimeRecord | undefined => {
+      if (leaderLapAtVisibleRange === undefined) {
+        return undefined;
+      }
+      const targetLap = next ? leaderLapAtVisibleRange + 1 : leaderLapAtVisibleRange - 1;
+      const candidates = recordsByTime.filter((record) => {
+        const indicators = lapTimeIndicators.get(record.id);
+        return isCrossingRecord(record) && indicators?.lapLeader === true && record.lapNo === targetLap;
+      });
+      return next ? candidates[0] : candidates.at(-1);
+    };
     const target = option === 'first'
       ? recordsByTime[0]
       : option === 'last'
@@ -2814,10 +2848,14 @@ export const RecentRecords = (props: RecordsProps & {
                     ? findTransmitterCrossing(false, false)
                     : option === 'previousTransmitterCrossingOnLine'
                       ? findTransmitterCrossing(true, true)
-                      : findTransmitterCrossing(false, true);
+                      : option === 'nextTransmitterCrossingOnLine'
+                        ? findTransmitterCrossing(false, true)
+                        : option === 'leadersNextLap'
+                          ? findLeaderLapTransition(true)
+                          : findLeaderLapTransition(false);
     setGoToMenuAnchor(null);
     goToRecord(target);
-  }, [goToRecord, props.raceStateLookup, recordsByTime, selectedRecordId]);
+  }, [goToRecord, lapTimeIndicators, leaderLapAtVisibleRange, props.raceStateLookup, recordsByTime, selectedRecordId]);
   const selectedTimeIndex = selectedRecordId === undefined
     ? -1
     : recordsByTime.findIndex((record) => record.id === selectedRecordId);
@@ -2842,6 +2880,37 @@ export const RecentRecords = (props: RecordsProps & {
       return !onSelectedLine || getTimingLineKey(record as ParticipantPassingRecord, props.raceStateLookup.getFinishLineNumbers?.()) === selectedLineKey;
     });
   };
+  const hasLeaderLapTransition = (next: boolean): boolean => {
+    if (leaderLapAtVisibleRange === undefined) {
+      return false;
+    }
+    const targetLap = next ? leaderLapAtVisibleRange + 1 : leaderLapAtVisibleRange - 1;
+    return recordsByTime.some((record) => {
+      return isCrossingRecord(record) && record.lapNo === targetLap && lapTimeIndicators.get(record.id)?.lapLeader === true;
+    });
+  };
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest('input, select, textarea, button, [contenteditable="true"]')) {
+        return;
+      }
+      if (event.altKey || event.ctrlKey || event.metaKey) {
+        return;
+      }
+      if (event.key.toLowerCase() === 'n' && hasLeaderLapTransition(true)) {
+        event.preventDefault();
+        handleGoTo('leadersNextLap');
+      }
+      if (event.key.toLowerCase() === 'b' && hasLeaderLapTransition(false)) {
+        event.preventDefault();
+        handleGoTo('leadersPreviousLap');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleGoTo, hasLeaderLapTransition]);
   const openAddRecordDialog = React.useCallback((record: EventTimeRecord, recordType: AddableRecordType): void => {
     setAddRecordDialogState({ anchorRecord: record, initialRecordType: recordType, mode: 'add' });
   }, []);
@@ -3047,10 +3116,12 @@ export const RecentRecords = (props: RecordsProps & {
           <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && isFinishFlag(record))} onClick={() => handleGoTo('finish')}>Finish</MenuItem>
           <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && isCautionStartFlag(record))} onClick={() => handleGoTo('nextCaution')}>Next Caution</MenuItem>
           <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green')} onClick={() => handleGoTo('nextGreen')}>Next Green</MenuItem>
-          <MenuItem disabled={!hasTransmitterCrossing(true, false)} onClick={() => handleGoTo('previousTransmitterCrossing')}>Prev Tx crossing</MenuItem>
-          <MenuItem disabled={!hasTransmitterCrossing(false, false)} onClick={() => handleGoTo('nextTransmitterCrossing')}>Next Tx crossing</MenuItem>
+          <MenuItem disabled={!hasTransmitterCrossing(true, false)} onClick={() => handleGoTo('previousTransmitterCrossing')}>Previous crossing for this transmitter</MenuItem>
+          <MenuItem disabled={!hasTransmitterCrossing(false, false)} onClick={() => handleGoTo('nextTransmitterCrossing')}>Next crossing for this transmitter</MenuItem>
           <MenuItem disabled={!hasTransmitterCrossing(true, true)} onClick={() => handleGoTo('previousTransmitterCrossingOnLine')}>Prev Tx crossing on this line</MenuItem>
           <MenuItem disabled={!hasTransmitterCrossing(false, true)} onClick={() => handleGoTo('nextTransmitterCrossingOnLine')}>Next Tx crossing on this line</MenuItem>
+          <MenuItem disabled={!hasLeaderLapTransition(false)} onClick={() => handleGoTo('leadersPreviousLap')}>Leaders prev lap (B)</MenuItem>
+          <MenuItem disabled={!hasLeaderLapTransition(true)} onClick={() => handleGoTo('leadersNextLap')}>Leaders next lap (N)</MenuItem>
         </Menu>
       </div>
     </div>
