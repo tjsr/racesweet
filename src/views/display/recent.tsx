@@ -1,10 +1,11 @@
-import { Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip } from '@mui/material';
 import { TZDate } from '@date-fns/tz';
+import { Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip } from '@mui/material';
 import React, { type JSX } from 'react';
 import { DEFAULT_FASTEST_TIME_INDICATOR_COLORS, type FastestTimeIndicatorColors } from '../../app/systemConfig.ts';
 import type { MillisecondsDuration, TimeDisplayZoneMode } from '../../app/utils/timeutils.ts';
 import {
   dateStringInTimeZone,
+  elapsedTimeMilliseconds,
   millisecondsToTime,
   parseTimeOfDayInputInTimeZone,
   resolveDisplayTimeZone,
@@ -42,7 +43,17 @@ import "./recent.css";
 
 type RecentRecordsFilterMode = 'all' | 'category' | 'flags' | 'participant' | 'team';
 type RecentRecordsIgnoreMode = 'outsideEventWindow' | 'sectorLoops' | 'unrecognised';
-type RecentRecordsGoToOption = 'first' | 'last' | 'firstGreen' | 'finish' | 'nextCaution' | 'nextGreen';
+type RecentRecordsGoToOption =
+  | 'first'
+  | 'last'
+  | 'firstGreen'
+  | 'finish'
+  | 'nextCaution'
+  | 'nextGreen'
+  | 'previousTransmitterCrossing'
+  | 'nextTransmitterCrossing'
+  | 'previousTransmitterCrossingOnLine'
+  | 'nextTransmitterCrossingOnLine';
 
 interface LapTimeIndicators {
   entrantFaster: boolean;
@@ -113,6 +124,37 @@ const RECENT_RECORD_VIRTUALIZATION_MIN_ROWS = 100;
 
 const getRecordIndex = (records: EventTimeRecord[], recordId: TimeRecordId): number => {
   return records.findIndex((record) => record.id === recordId);
+};
+
+const getDisplayedLapTime = (
+  passing: ParticipantPassingRecord,
+  recordsByTime: EventTimeRecord[],
+  finishLineNumbers: number[] | undefined
+): number | undefined => {
+  if (typeof passing.lapTime === 'number') {
+    return passing.lapTime;
+  }
+  if (!passing.time) {
+    return undefined;
+  }
+
+  const passingIndex = getRecordIndex(recordsByTime, passing.id);
+  if (passingIndex < 0) {
+    return undefined;
+  }
+  const timingLineKey = getTimingLineKey(passing, finishLineNumbers);
+  const transmitter = getAutomaticIdentifier(passing);
+  const previousPassing = recordsByTime.slice(0, passingIndex).reverse().find((record) => {
+    if (!isCrossingRecord(record) || !record.time || getTimingLineKey(record, finishLineNumbers) !== timingLineKey) {
+      return false;
+    }
+    if (passing.participantId) {
+      return record.participantId === passing.participantId;
+    }
+    return transmitter !== undefined && getAutomaticIdentifier(record) === transmitter;
+  });
+
+  return previousPassing?.time ? elapsedTimeMilliseconds(previousPassing.time, passing.time) : undefined;
 };
 
 const getSelectionVisibleRowRange = (recordIndex: number, currentRange: RowIndexRange, totalRows: number): RowIndexRange => {
@@ -721,6 +763,7 @@ interface RecordsProps {
 
 interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRecord> {
   record: RecordType;
+  displayedLapTime?: (passing: ParticipantPassingRecord) => number | undefined;
   index: number;
   raceStateLookup: RaceStateLookup;
   lapTimeIndicators?: LapTimeIndicators;
@@ -1054,6 +1097,7 @@ const UnknownChipRow = (
 };
 
 interface PassingRecordRowProps {
+  displayedLapTime?: number;
   lapTimeIndicators?: LapTimeIndicators;
   passing: ParticipantPassingRecord;
   raceStateLookup: RaceStateLookup;
@@ -1181,7 +1225,11 @@ export const PassingRecordRow = (
       // const lap = entrantLaps.find((l) => l.timeRecordId === evt.id);
       lapNo = passingIsValid ? passing?.lapNo?.toString() || '' : '';
       elapsedTime = passing?.elapsedTime ? millisecondsToTime(passing.elapsedTime) : '--:--:--.---';
-      lapTime = getLapTimeCell(passing);
+      lapTime = props.displayedLapTime === undefined ? getLapTimeCell(passing) : millisecondsToTime(props.displayedLapTime);
+    }
+
+    if (!entrantLaps && props.displayedLapTime !== undefined) {
+      lapTime = millisecondsToTime(props.displayedLapTime);
     }
 
     if (entrant?.categoryId) {
@@ -1208,6 +1256,10 @@ export const PassingRecordRow = (
         categoryStr = categoryStr ? `${categoryStr} (unrelated)` : 'Unrelated';
       }
     }
+  }
+
+  if (!entrant && props.displayedLapTime !== undefined) {
+    lapTime = millisecondsToTime(props.displayedLapTime);
   }
 
   if (passingIsExcluded || isUnrelatedToSession) {
@@ -1386,6 +1438,7 @@ const RecordRowComponent = (props: RecentRecordRowProps) => {
 
     return <PassingRecordRow
       cautionRecordIds={props.cautionRecordIds}
+      displayedLapTime={props.displayedLapTime?.(passing)}
       lapTimeIndicators={props.lapTimeIndicators}
       raceStateLookup={props.raceStateLookup}
       passing={passing}
@@ -2483,6 +2536,9 @@ export const RecentRecords = (props: RecordsProps & {
       .sort(compareRecordsByTimeAndInputOrder)
       .map(({ record }) => record);
   }, [sortedRecords]);
+  const displayedLapTime = React.useCallback((passing: ParticipantPassingRecord): number | undefined => {
+    return getDisplayedLapTime(passing, recordsByTime, props.raceStateLookup.getFinishLineNumbers?.());
+  }, [props.raceStateLookup, recordsByTime]);
   const cautionRecordIds = React.useMemo(() => {
     return buildCautionRecordIds(filteredRecords);
   }, [filteredRecords]);
@@ -2718,6 +2774,28 @@ export const RecentRecords = (props: RecordsProps & {
     const findNextFlag = (predicate: (record: EventTimeRecord) => boolean): EventTimeRecord | undefined => (
       recordsByTime.slice(selectedTimeIndex + 1).find(predicate)
     );
+    const selectedRecord = selectedTimeIndex >= 0 ? recordsByTime[selectedTimeIndex] : undefined;
+    const selectedTransmitter = selectedRecord && isCrossingRecord(selectedRecord)
+      ? getAutomaticIdentifier(selectedRecord)
+      : undefined;
+    const selectedLineKey = selectedRecord && isCrossingRecord(selectedRecord)
+      ? getTimingLineKey(selectedRecord as ParticipantPassingRecord, props.raceStateLookup.getFinishLineNumbers?.())
+      : undefined;
+    const isMatchingTransmitterCrossing = (record: EventTimeRecord, onSelectedLine: boolean): boolean => {
+      if (selectedTransmitter === undefined || !isCrossingRecord(record) || getAutomaticIdentifier(record) !== selectedTransmitter) {
+        return false;
+      }
+      return !onSelectedLine || getTimingLineKey(record as ParticipantPassingRecord, props.raceStateLookup.getFinishLineNumbers?.()) === selectedLineKey;
+    };
+    const findTransmitterCrossing = (previous: boolean, onSelectedLine: boolean): EventTimeRecord | undefined => {
+      if (selectedTimeIndex < 0 || selectedTransmitter === undefined) {
+        return undefined;
+      }
+      const candidates = previous
+        ? recordsByTime.slice(0, selectedTimeIndex).reverse()
+        : recordsByTime.slice(selectedTimeIndex + 1);
+      return candidates.find((record) => isMatchingTransmitterCrossing(record, onSelectedLine));
+    };
     const target = option === 'first'
       ? recordsByTime[0]
       : option === 'last'
@@ -2728,10 +2806,42 @@ export const RecentRecords = (props: RecordsProps & {
             ? recordsByTime.find((record) => isFlagRecord(record) && isFinishFlag(record))
             : option === 'nextCaution'
               ? findNextFlag((record) => isFlagRecord(record) && isCautionStartFlag(record))
-              : findNextFlag(isGreenFlag);
+              : option === 'nextGreen'
+                ? findNextFlag(isGreenFlag)
+                : option === 'previousTransmitterCrossing'
+                  ? findTransmitterCrossing(true, false)
+                  : option === 'nextTransmitterCrossing'
+                    ? findTransmitterCrossing(false, false)
+                    : option === 'previousTransmitterCrossingOnLine'
+                      ? findTransmitterCrossing(true, true)
+                      : findTransmitterCrossing(false, true);
     setGoToMenuAnchor(null);
     goToRecord(target);
-  }, [goToRecord, recordsByTime, selectedRecordId]);
+  }, [goToRecord, props.raceStateLookup, recordsByTime, selectedRecordId]);
+  const selectedTimeIndex = selectedRecordId === undefined
+    ? -1
+    : recordsByTime.findIndex((record) => record.id === selectedRecordId);
+  const selectedRecord = selectedTimeIndex >= 0 ? recordsByTime[selectedTimeIndex] : undefined;
+  const selectedTransmitter = selectedRecord && isCrossingRecord(selectedRecord)
+    ? getAutomaticIdentifier(selectedRecord)
+    : undefined;
+  const selectedLineKey = selectedRecord && isCrossingRecord(selectedRecord)
+    ? getTimingLineKey(selectedRecord as ParticipantPassingRecord, props.raceStateLookup.getFinishLineNumbers?.())
+    : undefined;
+  const hasTransmitterCrossing = (previous: boolean, onSelectedLine: boolean): boolean => {
+    if (selectedTimeIndex < 0 || selectedTransmitter === undefined) {
+      return false;
+    }
+    const candidates = previous
+      ? recordsByTime.slice(0, selectedTimeIndex)
+      : recordsByTime.slice(selectedTimeIndex + 1);
+    return candidates.some((record) => {
+      if (!isCrossingRecord(record) || getAutomaticIdentifier(record) !== selectedTransmitter) {
+        return false;
+      }
+      return !onSelectedLine || getTimingLineKey(record as ParticipantPassingRecord, props.raceStateLookup.getFinishLineNumbers?.()) === selectedLineKey;
+    });
+  };
   const openAddRecordDialog = React.useCallback((record: EventTimeRecord, recordType: AddableRecordType): void => {
     setAddRecordDialogState({ anchorRecord: record, initialRecordType: recordType, mode: 'add' });
   }, []);
@@ -2937,6 +3047,10 @@ export const RecentRecords = (props: RecordsProps & {
           <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && isFinishFlag(record))} onClick={() => handleGoTo('finish')}>Finish</MenuItem>
           <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && isCautionStartFlag(record))} onClick={() => handleGoTo('nextCaution')}>Next Caution</MenuItem>
           <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green')} onClick={() => handleGoTo('nextGreen')}>Next Green</MenuItem>
+          <MenuItem disabled={!hasTransmitterCrossing(true, false)} onClick={() => handleGoTo('previousTransmitterCrossing')}>Prev Tx crossing</MenuItem>
+          <MenuItem disabled={!hasTransmitterCrossing(false, false)} onClick={() => handleGoTo('nextTransmitterCrossing')}>Next Tx crossing</MenuItem>
+          <MenuItem disabled={!hasTransmitterCrossing(true, true)} onClick={() => handleGoTo('previousTransmitterCrossingOnLine')}>Prev Tx crossing on this line</MenuItem>
+          <MenuItem disabled={!hasTransmitterCrossing(false, true)} onClick={() => handleGoTo('nextTransmitterCrossingOnLine')}>Next Tx crossing on this line</MenuItem>
         </Menu>
       </div>
     </div>
@@ -2968,6 +3082,7 @@ export const RecentRecords = (props: RecordsProps & {
                       lapTimeIndicators={lapTimeIndicators.get(record.id)}
                       record={record}
                       index={index}
+                      displayedLapTime={displayedLapTime}
                       raceStateLookup={props.raceStateLookup}
                       selectedRecordId={rowSelectionState.selectedRecordId}
                       selectedCategories={rowSelectionState.selectedCategories}

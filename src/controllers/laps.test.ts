@@ -125,6 +125,36 @@ describe('lap calculation exclusion reasons', () => {
     expect(isPassingValid(passings[1]!)).toBe(true);
   });
 
+  it('uses the green flag instead of a pre-start crossing when validating the first lap', () => {
+    const { participant, source, startFlag } = createLapCalculationFixture();
+    const preStartPassing: ParticipantPassingRecord = {
+      id: createTimeRecordId('pre-start-passing'),
+      lineNumber: 1,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 1,
+      source,
+      time: new Date('2026-05-29T09:59:30.000Z'),
+    };
+    const firstPassingAfterGreen: ParticipantPassingRecord = {
+      id: createTimeRecordId('first-passing-after-green'),
+      lineNumber: 1,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 3,
+      source,
+      time: new Date('2026-05-29T10:00:30.000Z'),
+    };
+
+    calculateParticipantLapTimes(startFlag, [preStartPassing, firstPassingAfterGreen], participant, 60000, 'race', [1]);
+
+    expect(firstPassingAfterGreen).toEqual(expect.objectContaining({
+      lapTime: 60000,
+      startingLapRecordId: preStartPassing.id,
+      unrelatedReasonCode: CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
+    }));
+  });
+
   it('uses non-race crossings under the minimum lap time as the next lap start reference', () => {
     const { participant, source, startFlag } = createLapCalculationFixture();
     const passings: ParticipantPassingRecord[] = [

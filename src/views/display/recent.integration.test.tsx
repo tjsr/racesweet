@@ -299,6 +299,10 @@ describe('RecentRecords integration', () => {
       'Finish',
       'Next Caution',
       'Next Green',
+      'Prev Tx crossing',
+      'Next Tx crossing',
+      'Prev Tx crossing on this line',
+      'Next Tx crossing on this line',
     ]);
 
     const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
@@ -311,6 +315,89 @@ describe('RecentRecords integration', () => {
 
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'center', inline: 'nearest' });
     expect(container.querySelector('tr[data-record-id="toolbar-earliest-green"]')?.className).toContain('selected-row');
+    HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+  });
+
+  it('navigates matching transmitter crossings across all lines or only the selected line', async () => {
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: () => undefined,
+      getEntrantIdForParticipant: () => undefined,
+      getFinishLineNumbers: () => [1],
+      getParticipantById: () => undefined,
+      getParticipantLaps: () => [],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+    const createCrossing = (id: string, minute: number, lineNumber: number): ParticipantPassingRecord => ({
+      chipCode: 77,
+      id,
+      isValid: true,
+      lineNumber,
+      recordType: RECORD_TX_CROSSING,
+      sequence: minute,
+      source: 'test-source',
+      time: new Date(`2026-05-29T10:${minute.toString().padStart(2, '0')}:00.000Z`),
+    } as ParticipantPassingRecord);
+    const crossings = [
+      createCrossing('tx-other-line-before', 1, 2),
+      createCrossing('tx-selected-line', 2, 1),
+      createCrossing('tx-other-line-after', 3, 2),
+      createCrossing('tx-selected-line-after', 4, 1),
+    ];
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={crossings}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const goToButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Go to');
+    const selectRecord = async (id: string): Promise<void> => {
+      const row = container.querySelector(`tr[data-record-id="${id}"]`);
+      expect(row).not.toBeNull();
+      await act(async () => {
+        row!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+    };
+    const chooseGoTo = async (label: string): Promise<void> => {
+      await act(async () => {
+        goToButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      const item = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((menuItem) => menuItem.textContent?.trim() === label);
+      expect(item).not.toBeNull();
+      expect(item?.getAttribute('aria-disabled')).not.toBe('true');
+      await act(async () => {
+        item!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+    };
+
+    await selectRecord('tx-selected-line');
+    await chooseGoTo('Previous crossing for this transmitter');
+    expect(container.querySelector('tr[data-record-id="tx-other-line-before"]')?.className).toContain('selected-row');
+
+    await selectRecord('tx-selected-line');
+    await chooseGoTo('Next crossing for this transmitter');
+    expect(container.querySelector('tr[data-record-id="tx-other-line-after"]')?.className).toContain('selected-row');
+
+    await selectRecord('tx-selected-line');
+    await chooseGoTo('Next Tx crossing on this line');
+    expect(container.querySelector('tr[data-record-id="tx-selected-line-after"]')?.className).toContain('selected-row');
+
+    await selectRecord('tx-selected-line-after');
+    await chooseGoTo('Prev Tx crossing on this line');
+    expect(container.querySelector('tr[data-record-id="tx-selected-line"]')?.className).toContain('selected-row');
     HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
   });
 
