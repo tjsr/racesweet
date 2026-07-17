@@ -14,7 +14,7 @@ import {
 import type { EventSessionKind } from '../../catalog/eventCatalog.ts';
 import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../controllers/category.ts';
 import { createGreenFlagEvent, createRedFlagEvent, isFlagRecord } from '../../controllers/flag';
-import { getLapTimeCell, getPassingLineNumber, getPassingLoopNumber, getTimingLineKey, isFinishLinePassing, isLapCompletionPassing } from '../../controllers/laps.ts';
+import { getLapTimeCell, getPassingLineNumber, getPassingLoopNumber, getSourceLapCompletion, getTimingLineKey, isFinishLinePassing, isLapCompletionPassing } from '../../controllers/laps.ts';
 import { getParticipantNumber, getParticipantTransponders } from '../../controllers/participant.ts';
 import { findEntrantByChipCode, findEntrantByPlateNumber } from '../../controllers/participantSearch.ts';
 import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
@@ -42,6 +42,7 @@ import "./recent.css";
 
 type RecentRecordsFilterMode = 'all' | 'category' | 'flags' | 'participant' | 'team';
 type RecentRecordsIgnoreMode = 'outsideEventWindow' | 'sectorLoops' | 'unrecognised';
+type RecentRecordsGoToOption = 'first' | 'last' | 'firstGreen' | 'finish' | 'nextCaution' | 'nextGreen';
 
 interface LapTimeIndicators {
   entrantFaster: boolean;
@@ -59,6 +60,12 @@ interface RowIndexRange {
 interface FilterScrollAnchor {
   previousIndex: number;
   recordId: TimeRecordId;
+}
+
+interface NavigationTarget {
+  attempt: number;
+  recordId: TimeRecordId;
+  recordIndex: number;
 }
 
 interface RowSelectionState {
@@ -678,8 +685,15 @@ const isLapControlCrossing = (
     return false;
   }
 
-  return isLapCompletionPassing(record, raceStateLookup.getFinishLineNumbers?.());
+  return isLapCompletionForRaceState(record, raceStateLookup);
 };
+
+const isLapCompletionForRaceState = (
+  record: ParticipantPassingRecord,
+  raceStateLookup: RaceStateLookup
+): boolean => isLapCompletionPassing(record, raceStateLookup.getFinishLineNumbers?.(), (passing) => (
+  getSourceLapCompletion(passing, raceStateLookup.getTimeRecordSourceById?.(passing.source))
+));
 
 const getCrossingUnrelatedReason = (passing: ParticipantPassingRecord): string | undefined => {
   return passing.unrelatedReason;
@@ -1734,7 +1748,6 @@ const buildLapTimeIndicatorMap = (
   const bestLapTimeByEntrant = new Map<string, MillisecondsDuration>();
   const previousLapTimeByEntrant = new Map<string, MillisecondsDuration>();
   const leadingLapNumbers = new Set<number>();
-  const finishLineNumbers = raceStateLookup.getFinishLineNumbers?.();
   const isRaceSession = sessionKind === undefined || sessionKind === 'race';
   let overallBestLapTime: MillisecondsDuration | undefined = undefined;
   let leaderLapNumber: number | undefined = undefined;
@@ -1760,7 +1773,7 @@ const buildLapTimeIndicatorMap = (
 
       const indicators = createEmptyLapTimeIndicators();
       const entrantKey = getEntrantKey(participant, raceStateLookup);
-      const isLapCompletion = isLapCompletionPassing(record, finishLineNumbers);
+      const isLapCompletion = isLapCompletionForRaceState(record, raceStateLookup);
 
       if (isLapCompletion) {
         const lapTime = passingRecord.lapTime;
@@ -1927,7 +1940,7 @@ const isNonLapCrossing = (
   if (!isCrossingRecord(record)) {
     return false;
   }
-  if (!isLapCompletionPassing(record, raceStateLookup.getFinishLineNumbers?.())) {
+  if (!isLapCompletionForRaceState(record, raceStateLookup)) {
     return true;
   }
   const effectiveLoopNumber = getPassingLoopNumber(record) ?? getPassingLineNumber(record);
@@ -2277,6 +2290,7 @@ export const RecentRecords = (props: RecordsProps & {
   const [offsetsDialogOpen, setOffsetsDialogOpen] = React.useState<boolean>(false);
   const [recentFirst, setRecentFirst] = React.useState<boolean>(false);
   const [filterMode, setFilterMode] = React.useState<RecentRecordsFilterMode>('all');
+  const [goToMenuAnchor, setGoToMenuAnchor] = React.useState<HTMLElement | null>(null);
   const [ignoreModes, setIgnoreModes] = React.useState<RecentRecordsIgnoreMode[]>([]);
   const [selectedPlateNumber, setSelectedPlateNumber] = React.useState<string | undefined>(undefined);
   const [selectedRecordId, setSelectedRecordId] = React.useState<TimeRecordId | undefined>(undefined);
@@ -2293,7 +2307,6 @@ export const RecentRecords = (props: RecordsProps & {
     left: 0,
     width: 0,
   });
-  const [isAtTop, setIsAtTop] = React.useState<boolean>(true);
   const timeDisplayZoneMode = props.timeDisplayZoneMode || 'event';
   const displayTimeZone = resolveDisplayTimeZone(timeDisplayZoneMode, props.eventTimeZone);
   const editableSourceOffsets = React.useMemo(() => {
@@ -2308,6 +2321,7 @@ export const RecentRecords = (props: RecordsProps & {
   const [localSelectedParticipants, setLocalSelectedParticipants] = React.useState<Set<EventParticipantId>>(
     () => new Set<EventParticipantId>(propSelectedParticipants)
   );
+  const [navigationTarget, setNavigationTarget] = React.useState<NavigationTarget | null>(null);
   React.useEffect(() => {
     setLocalSelectedParticipants(new Set<EventParticipantId>(propSelectedParticipants));
   }, [propSelectedParticipantKey]);
@@ -2463,6 +2477,12 @@ export const RecentRecords = (props: RecordsProps & {
       return leftTime - rightTime;
     });
   }, [filteredRecords, recentFirst]);
+  const recordsByTime = React.useMemo(() => {
+    return sortedRecords
+      .map((record, index) => ({ index, record }))
+      .sort(compareRecordsByTimeAndInputOrder)
+      .map(({ record }) => record);
+  }, [sortedRecords]);
   const cautionRecordIds = React.useMemo(() => {
     return buildCautionRecordIds(filteredRecords);
   }, [filteredRecords]);
@@ -2492,6 +2512,9 @@ export const RecentRecords = (props: RecordsProps & {
     } as React.CSSProperties;
   }, [fastestTimeIndicatorColors, toolbarDock.height, toolbarDock.isDocked]);
   const updateVisibleRowRange = React.useCallback((): void => {
+    if (navigationTarget !== null || pendingFilterScrollIndexRef.current !== undefined) {
+      return;
+    }
     const container = tableContainerRef.current;
     if (!container) {
       return;
@@ -2526,11 +2549,57 @@ export const RecentRecords = (props: RecordsProps & {
         ? current
         : { end, start };
     });
-  }, [sortedRecords.length]);
+  }, [navigationTarget, sortedRecords.length]);
   React.useLayoutEffect(() => {
     updateVisibleRowRange();
   }, [sortedRecords.length, updateVisibleRowRange]);
   React.useLayoutEffect(() => {
+    if (navigationTarget !== null) {
+      const container = tableContainerRef.current;
+      const targetRecord = sortedRecords[navigationTarget.recordIndex];
+      if (!container || !targetRecord || targetRecord.id !== navigationTarget.recordId) {
+        setNavigationTarget(null);
+        return;
+      }
+      const targetRow = Array.from(container.querySelectorAll('tr[data-record-id]'))
+        .find((row) => row.getAttribute('data-record-id') === targetRecord.id.toString()) as HTMLElement | undefined;
+      if (!targetRow) {
+        return;
+      }
+
+      targetRow.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+      window.requestAnimationFrame(() => {
+        const scrollContainer = findVerticalScrollContainer(container);
+        const rowRect = targetRow.getBoundingClientRect();
+        const viewportRect = scrollContainer?.getBoundingClientRect();
+        const viewportTop = scrollContainer ? viewportRect?.top || 0 : 0;
+        const viewportBottom = scrollContainer
+          ? viewportRect?.bottom || scrollContainer.clientHeight
+          : window.innerHeight || document.documentElement.clientHeight;
+        const isVisible = rowRect.top >= viewportTop && rowRect.bottom <= viewportBottom;
+        if (isVisible || navigationTarget.attempt >= 2) {
+          setNavigationTarget(null);
+          updateVisibleRowRange();
+          return;
+        }
+        const targetTop = scrollContainer === container
+          ? targetRow.offsetTop
+          : targetRow.getBoundingClientRect().top + window.scrollY;
+        if (scrollContainer === container) {
+          scrollContainer.scrollTo({ behavior: 'auto', top: targetTop });
+        } else if (scrollContainer) {
+          scrollContainer.scrollTo({
+            behavior: 'auto',
+            top: targetRow.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top + scrollContainer.scrollTop,
+          });
+        } else {
+          window.scrollTo({ behavior: 'auto', top: Math.max(0, targetTop) });
+        }
+        setNavigationTarget({ ...navigationTarget, attempt: navigationTarget.attempt + 1 });
+      });
+      return;
+    }
+
     const pendingScrollIndex = pendingFilterScrollIndexRef.current;
     if (pendingScrollIndex !== undefined) {
       const container = tableContainerRef.current;
@@ -2546,6 +2615,12 @@ export const RecentRecords = (props: RecordsProps & {
         return;
       }
       pendingFilterScrollIndexRef.current = undefined;
+
+      if (typeof (targetRow as HTMLElement).scrollIntoView === 'function') {
+        (targetRow as HTMLElement).scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+        window.requestAnimationFrame(updateVisibleRowRange);
+        return;
+      }
 
       const scrollContainer = findVerticalScrollContainer(container);
       const rowRect = targetRow.getBoundingClientRect();
@@ -2599,7 +2674,7 @@ export const RecentRecords = (props: RecordsProps & {
     const nextVisibleRowRange = getSelectionVisibleRowRange(recordIndex, visibleRowRange, sortedRecords.length);
     setVisibleRowRange(nextVisibleRowRange);
     pendingFilterScrollIndexRef.current = recordIndex;
-  }, [recentRecordRowHeight, sortedRecords, visibleRowRange]);
+  }, [navigationTarget, recentRecordRowHeight, sortedRecords, updateVisibleRowRange, visibleRowRange]);
   React.useEffect(() => {
     const container = tableContainerRef.current;
     if (!container) {
@@ -2623,37 +2698,40 @@ export const RecentRecords = (props: RecordsProps & {
       window.removeEventListener('resize', handleVisibleRowRangeChange);
     };
   }, [updateVisibleRowRange]);
-  React.useEffect(() => {
-    const updateScrollPosition = (): void => {
-      const container = tableContainerRef.current;
-      const scrollContainer = container ? findVerticalScrollContainer(container) : undefined;
-      const scrollTop = scrollContainer
-        ? scrollContainer.scrollTop
-        : window.scrollY;
-      setIsAtTop(scrollTop <= 1);
-    };
-
-    updateScrollPosition();
-    window.addEventListener('scroll', updateScrollPosition, true);
-    return () => window.removeEventListener('scroll', updateScrollPosition, true);
-  }, []);
-  const handleJumpToBoundary = React.useCallback((): void => {
-    const container = tableContainerRef.current;
-    const target = container ? findVerticalScrollContainer(container) : undefined;
-    if (isAtTop) {
-      if (target) {
-        target.scrollTo({ behavior: 'smooth', top: target.scrollHeight });
-      } else {
-        window.scrollTo({ behavior: 'smooth', top: document.documentElement.scrollHeight });
-      }
+  const goToRecord = React.useCallback((record: EventTimeRecord | undefined): void => {
+    if (!record) {
       return;
     }
-    if (target) {
-      target.scrollTo({ behavior: 'smooth', top: 0 });
-    } else {
-      window.scrollTo({ behavior: 'smooth', top: 0 });
+    const recordIndex = getRecordIndex(sortedRecords, record.id);
+    if (recordIndex < 0) {
+      return;
     }
-  }, [isAtTop]);
+    setSelectedRecordId(record.id);
+    setNavigationTarget({ attempt: 0, recordId: record.id, recordIndex });
+    setVisibleRowRange(getSelectionVisibleRowRange(recordIndex, visibleRowRange, sortedRecords.length));
+  }, [sortedRecords, visibleRowRange]);
+  const handleGoTo = React.useCallback((option: RecentRecordsGoToOption): void => {
+    const selectedTimeIndex = selectedRecordId === undefined
+      ? -1
+      : recordsByTime.findIndex((record) => record.id === selectedRecordId);
+    const isGreenFlag = (record: EventTimeRecord): boolean => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green';
+    const findNextFlag = (predicate: (record: EventTimeRecord) => boolean): EventTimeRecord | undefined => (
+      recordsByTime.slice(selectedTimeIndex + 1).find(predicate)
+    );
+    const target = option === 'first'
+      ? recordsByTime[0]
+      : option === 'last'
+        ? recordsByTime.at(-1)
+        : option === 'firstGreen'
+          ? recordsByTime.find(isGreenFlag)
+          : option === 'finish'
+            ? recordsByTime.find((record) => isFlagRecord(record) && isFinishFlag(record))
+            : option === 'nextCaution'
+              ? findNextFlag((record) => isFlagRecord(record) && isCautionStartFlag(record))
+              : findNextFlag(isGreenFlag);
+    setGoToMenuAnchor(null);
+    goToRecord(target);
+  }, [goToRecord, recordsByTime, selectedRecordId]);
   const openAddRecordDialog = React.useCallback((record: EventTimeRecord, recordType: AddableRecordType): void => {
     setAddRecordDialogState({ anchorRecord: record, initialRecordType: recordType, mode: 'add' });
   }, []);
@@ -2838,7 +2916,28 @@ export const RecentRecords = (props: RecordsProps & {
           </Select>
         </FormControl>
         <Button onClick={() => setOffsetsDialogOpen(true)} variant="outlined">Edit offsets</Button>
-        <Button onClick={handleJumpToBoundary} variant="outlined">{isAtTop ? 'To last' : 'Back to top'}</Button>
+        <Button
+          aria-controls={goToMenuAnchor ? 'recent-records-go-to-menu' : undefined}
+          aria-expanded={goToMenuAnchor ? 'true' : undefined}
+          aria-haspopup="menu"
+          onClick={(event) => setGoToMenuAnchor(event.currentTarget)}
+          variant="outlined"
+        >
+          Go to
+        </Button>
+        <Menu
+          anchorEl={goToMenuAnchor}
+          id="recent-records-go-to-menu"
+          onClose={() => setGoToMenuAnchor(null)}
+          open={goToMenuAnchor !== null}
+        >
+          <MenuItem disabled={recordsByTime.length === 0} onClick={() => handleGoTo('first')}>First</MenuItem>
+          <MenuItem disabled={recordsByTime.length === 0} onClick={() => handleGoTo('last')}>Last</MenuItem>
+          <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green')} onClick={() => handleGoTo('firstGreen')}>First Green</MenuItem>
+          <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && isFinishFlag(record))} onClick={() => handleGoTo('finish')}>Finish</MenuItem>
+          <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && isCautionStartFlag(record))} onClick={() => handleGoTo('nextCaution')}>Next Caution</MenuItem>
+          <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green')} onClick={() => handleGoTo('nextGreen')}>Next Green</MenuItem>
+        </Menu>
       </div>
     </div>
     { warnings?.length > 0 && <Warnings warnings={warnings} />}

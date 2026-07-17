@@ -69,6 +69,34 @@ describe('processAllParticipantLaps entrant sequencing', () => {
     expect(riderTwoPassings[0].lapTime).toBe(360000);
   });
 
+  it('calculates crossings after a high-sequence green flag by time of day', () => {
+    const participants = new Map<string, EventParticipant>([
+      ['p1', participant('p1', '101', 'team-a')],
+    ]);
+
+    const records = [
+      createGreenFlagEvent({
+        categoryIds: [category.id],
+        flagValue: 'course',
+        id: 'flag-100',
+        recordType: 4,
+        sequence: 100,
+        source: 'test',
+        time: new Date('2026-05-30T10:00:00.000Z'),
+      }),
+      passing('c1', 'p1', 'team-a', 1, '2026-05-30T10:06:00.000Z'),
+      passing('c2', 'p1', 'team-a', 2, '2026-05-30T10:12:00.000Z'),
+    ];
+
+    const processed = processAllParticipantLaps(records, participants, 300000, true);
+    const riderPassings = processed.get('p1') || [];
+
+    expect(riderPassings).toMatchObject([
+      { elapsedTime: 360000, lapNo: 1, lapTime: 360000 },
+      { elapsedTime: 720000, lapNo: 2, lapTime: 360000 },
+    ]);
+  });
+
   it('uses the previous team crossing rather than the previous rider crossing for lap time', () => {
     const participants = new Map<string, EventParticipant>([
       ['p1', participant('p1', '101', 'team-a')],
@@ -274,7 +302,7 @@ describe('processAllParticipantLaps entrant sequencing', () => {
     warnSpy.mockRestore();
   });
 
-  it('uses the latest applicable category green flag when multiple start flags reference the category', () => {
+  it('uses the earliest applicable category green flag by time when multiple start flags reference the category', () => {
     const participants = new Map<string, EventParticipant>([
       ['p1', participant('p1', '101', 'team-a')],
     ]);
@@ -305,11 +333,12 @@ describe('processAllParticipantLaps entrant sequencing', () => {
     const processed = processAllParticipantLaps(records, participants, 300000, true);
     const riderPassings = processed.get('p1') || [];
 
-    expect(isPassingValid(riderPassings[0]!)).toBe(false);
-    expect(riderPassings[0].elapsedTime).toBeUndefined();
+    expect(isPassingValid(riderPassings[0]!)).toBe(true);
+    expect(riderPassings[0].elapsedTime).toBe(360000);
+    expect(riderPassings[0].participantStartRecordId).toBe('flag-early');
     expect(isPassingValid(riderPassings[1]!)).toBe(true);
-    expect(riderPassings[1].elapsedTime).toBe(360000);
-    expect(riderPassings[1].participantStartRecordId).toBe('flag-late');
+    expect(riderPassings[1].elapsedTime).toBe(960000);
+    expect(riderPassings[1].participantStartRecordId).toBe('flag-early');
   });
 
   it('counts only the first crossing after a chequered flag for applicable categories', () => {

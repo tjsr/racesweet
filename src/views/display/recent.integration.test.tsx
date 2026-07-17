@@ -255,7 +255,22 @@ describe('RecentRecords integration', () => {
       root.render(
         <RecentRecords
           raceStateLookup={raceStateLookup}
-          records={[]}
+          records={[
+            createGreenFlagEvent({
+              id: 'toolbar-first-green',
+              recordType: 4,
+              sequence: 2,
+              source: 'test-source',
+              time: new Date('2026-05-29T10:02:00.000Z'),
+            }),
+            createGreenFlagEvent({
+              id: 'toolbar-earliest-green',
+              recordType: 4,
+              sequence: 1,
+              source: 'test-source',
+              time: new Date('2026-05-29T10:01:00.000Z'),
+            }),
+          ]}
           selectedCategories={new Set()}
           selectedParticipants={new Set()}
         />
@@ -270,6 +285,33 @@ describe('RecentRecords integration', () => {
     expect(toolbar?.querySelector('#recent-records-time-zone-dropdown')).toBeDefined();
     expect(toolbar?.querySelector('#recent-records-ignore-dropdown')).toBeDefined();
     expect(toolbar?.querySelector('#recent-records-order-dropdown')).toBeDefined();
+    const goToButton = Array.from(toolbar?.querySelectorAll('button') || []).find((button) => button.textContent?.trim() === 'Go to');
+    expect(goToButton).toBeDefined();
+
+    await act(async () => {
+      goToButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(Array.from(document.querySelectorAll('li[role="menuitem"]')).map((item) => item.textContent?.trim())).toEqual([
+      'First',
+      'Last',
+      'First Green',
+      'Finish',
+      'Next Caution',
+      'Next Green',
+    ]);
+
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollIntoView = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    const firstMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'First');
+    await act(async () => {
+      firstMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'center', inline: 'nearest' });
+    expect(container.querySelector('tr[data-record-id="toolbar-earliest-green"]')?.className).toContain('selected-row');
+    HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
   });
 
   it('marks lap time cells with fastest indicators and lap-leading rows', async () => {
@@ -1211,7 +1253,7 @@ describe('RecentRecords integration', () => {
       categoryId: categoryBId,
       flagId: laterFlagId,
     });
-    expect(getCrossingRow()?.textContent).toContain('1:00.000');
+    expect(getCrossingRow()?.textContent).toContain('6:00.000');
 
     await openFlagMenu(laterFlagId);
     await clickMenuItem('Category B');

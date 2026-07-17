@@ -2,7 +2,7 @@ import { elapsedTimeMilliseconds, millisecondsToTime } from "../app/utils/timeut
 import type { EventSessionKind } from "../catalog/eventCatalog.js";
 import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
 import type { FlagRecord, GreenFlagRecord } from "../model/flag.js";
-import { type CrossingUnrelatedReasonCode, type ParticipantPassingRecord, type TimeRecord, isPassingExcluded, isPassingValid } from "../model/timerecord.js";
+import { type CrossingUnrelatedReasonCode, type ParticipantPassingRecord, type TimeRecord, type TimeRecordSource, isPassingExcluded, isPassingValid } from "../model/timerecord.js";
 import { EventFlagsError, NoStartFlagError, ParticipantStartFlagError, StartFlagHasNoTimeError } from "../validators/errors.js";
 import { getCategoryFlags, getFlagEvents, getOrCacheGreenFlagForCategory } from "./flag.js";
 import { calculateParticipantElapsedTimes, getParticipantNumber, getParticipantTransponders, getPassingsForParticipant } from "./participant.js";
@@ -25,10 +25,22 @@ import { warn } from "../utils.js";
 import { setCategoryStartForPassings } from "./category.js";
 import { entrantHasAnyTx } from "./participantMatch.js";
 import { compareByTime } from './timerecord.js';
+import { findCtcTrackLoopBySiteAddress } from '../model/ctcTrackConfig.js';
 
 const MINIMUM_LAP_TIME_SECONDS = 300;
 const DEFAULT_FINISH_LINE_NUMBERS = [1];
 const SESSION_CATEGORY_UNRELATED_REASON = 'Participant category is not assigned to this session.';
+
+export type LapCompletionResolver = (passing: ParticipantPassingRecord) => boolean | undefined;
+
+export const getSourceLapCompletion = (
+  passing: ParticipantPassingRecord,
+  source: TimeRecordSource | undefined
+): boolean | undefined => findCtcTrackLoopBySiteAddress(
+  source?.ctcTrackConfig,
+  passing.sourceLineNumber ?? passing.lineNumber,
+  passing.loopNumber
+)?.loop.isLapCompletion;
 
 const isRaceSessionKind = (sessionKind: EventSessionKind | undefined): boolean => {
   return sessionKind === undefined || sessionKind === 'race';
@@ -129,8 +141,13 @@ const excludeParticipantPassingsForSessionCategory = (
 
 export const isLapCompletionPassing = (
   passing: ParticipantPassingRecord,
-  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS
+  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS,
+  resolveLapCompletion?: LapCompletionResolver
 ): boolean => {
+  const sourceLapCompletion = resolveLapCompletion?.(passing);
+  if (sourceLapCompletion !== undefined) {
+    return sourceLapCompletion;
+  }
   if (typeof passing.isLapCompletion === 'boolean') {
     return passing.isLapCompletion;
   }
@@ -184,11 +201,12 @@ export const isFinishLinePassing = (
 
 export const isCountedLapPassing = (
   passing: ParticipantPassingRecord,
-  finishLineNumbers: number[] | undefined
+  finishLineNumbers: number[] | undefined,
+  resolveLapCompletion?: LapCompletionResolver
 ): boolean => {
   return isPassingValid(passing) &&
     !isPassingExcluded(passing) &&
-    isLapCompletionPassing(passing, finishLineNumbers) &&
+    isLapCompletionPassing(passing, finishLineNumbers, resolveLapCompletion) &&
     (passing.lapNo || 0) > 0 &&
     typeof passing.elapsedTime === 'number' &&
     passing.elapsedTime >= 0 &&
@@ -255,7 +273,8 @@ export const processParticipantLaps = (
   participantCategoryStartFlag: GreenFlagRecord,
   minimumLapTimeMilliseconds: number = MINIMUM_LAP_TIME_SECONDS * 1000, // Default to 60 seconds if not provided
   sessionKind: EventSessionKind | undefined = 'race',
-  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS
+  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS,
+  resolveLapCompletion?: LapCompletionResolver
 ): void => {
   validateParticipantStartFlag(participantCategoryStartFlag, participant);
 
@@ -267,7 +286,8 @@ export const processParticipantLaps = (
     participant,
     minimumLapTimeMilliseconds,
     sessionKind,
-    finishLineNumbers
+    finishLineNumbers,
+    resolveLapCompletion
   );
 };
 
@@ -278,7 +298,8 @@ export const processAllParticipantLaps = (
   silenceWarnings: boolean = false,
   sessionKind: EventSessionKind | undefined = 'race',
   finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS,
-  sessionValidCategoryIds: Set<EventCategoryId> | undefined = undefined
+  sessionValidCategoryIds: Set<EventCategoryId> | undefined = undefined,
+  resolveLapCompletion?: LapCompletionResolver
 ): Map<EventParticipantId, ParticipantPassingRecord[]> => {
   const participantTimesMap = new Map<EventParticipantId, ParticipantPassingRecord[]>();
   const entrantParticipantMap = new Map<EventEntrantId, EventParticipant[]>();
@@ -375,7 +396,8 @@ export const processAllParticipantLaps = (
           minimumLapTimeMilliseconds,
           sessionKind,
           finishFlag,
-          finishLineNumbers
+          finishLineNumbers,
+          resolveLapCompletion
         );
       } catch (error: unknown) {
         if (error instanceof ParticipantStartFlagError || error instanceof StartFlagHasNoTimeError) {
@@ -406,7 +428,8 @@ const processEntrantLaps = (
   minimumLapTimeMilliseconds: number,
   sessionKind: EventSessionKind | undefined,
   finishFlag?: FlagRecord,
-  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS
+  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS,
+  resolveLapCompletion?: LapCompletionResolver
 ): void => {
   setCategoryStartForPassings(entrantCategoryStartFlag.id, entrantPassings);
 
@@ -461,7 +484,7 @@ const processEntrantLaps = (
     passing.lapTime = lapTime;
     passing.startingLapRecordId = (finishLine ? previousPassingOnLine?.id : previousFinishPassing?.id) || entrantCategoryStartFlag.id;
 
-    if (!isLapCompletionPassing(passing, finishLineNumbers)) {
+    if (!isLapCompletionPassing(passing, finishLineNumbers, resolveLapCompletion)) {
       previousPassingByLine.set(timingLineKey, passing);
       clearCalculatedUnrelatedReason(passing);
       passing.lapNo = lapNo;
@@ -515,7 +538,8 @@ export const calculateParticipantLapTimes = (
   participant: EventParticipant,
   minimumLapTimeMilliseconds: number = MINIMUM_LAP_TIME_SECONDS * 1000, // 1 minute in milliseconds
   sessionKind: EventSessionKind | undefined = 'race',
-  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS
+  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS,
+  resolveLapCompletion?: LapCompletionResolver
 ): void => {
   const identifier = '#' + getParticipantNumber(participant);
   if (!(passings?.length > 0)) {
@@ -554,7 +578,7 @@ export const calculateParticipantLapTimes = (
       ? (previousPassingOnLine ? validTimeAfterLastLap(passing, previousPassingOnLine) : passing.elapsedTime)
       : elapsedTimeMilliseconds(lapStartReference.time!, passing.time);
     passing.startingLapRecordId = (finishLine ? previousPassingOnLine?.id : prevFinishPassing?.id) || participantCategoryStartFlag?.id || null;
-    if (!isLapCompletionPassing(passing, finishLineNumbers)) {
+    if (!isLapCompletionPassing(passing, finishLineNumbers, resolveLapCompletion)) {
       previousPassingByLine.set(timingLineKey, passing);
       clearCalculatedUnrelatedReason(passing);
       passing.lapNo = onLapNumber;

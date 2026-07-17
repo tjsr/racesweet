@@ -93,7 +93,6 @@ const createCrossingRecord = (
     eventId,
     hitCount: record.hitCount,
     id: createTimeRecordId(`dorian-ctc-srt:${filePath}:record:${record.recordNumber}:${record.raw}`),
-    ...(trackLoop?.loop.isLapCompletion === undefined ? {} : { isLapCompletion: trackLoop.loop.isLapCompletion }),
     lineNumber: trackLoop?.line.line ?? record.lineNumber,
     loopNumber: trackLoop?.loop.loopNumber ?? record.laneNumber,
     originRecordNumber: record.recordNumber,
@@ -103,6 +102,7 @@ const createCrossingRecord = (
     sequence,
     sessionId,
     source: sourceId,
+    sourceLineNumber: record.lineNumber,
     time: createTimeOfDay(eventDate, record, timeZone),
     timeTenthOfMillisecond: record.rawTimeTicks % 10,
   };
@@ -118,12 +118,17 @@ const getTrackConfigEventDescription = (
     return undefined;
   }
 
-  const eventCode = (record.transmitter === undefined ? record.status ?? record.drtCode : undefined)?.toUpperCase();
+  const eventCode = (record.transmitter === undefined || record.transmitter <= 0
+    ? record.status ?? record.drtCode
+    : undefined)?.toUpperCase();
   if (!eventCode) {
     return undefined;
   }
 
-  const description = trackConfig.eventDescriptions[eventCode];
+  const normalizedEventCode = eventCode.length === 3 && eventCode.startsWith('0')
+    ? eventCode.slice(1)
+    : eventCode;
+  const description = trackConfig.eventDescriptions[eventCode] ?? trackConfig.eventDescriptions[normalizedEventCode];
   return description ? { code: eventCode, description } : undefined;
 };
 
@@ -263,7 +268,6 @@ export const loadDorianCtcSrtCatalogForSession = async (
 
   const records: EventTimeRecord[] = [];
   let lastProgressAt = Date.now();
-  let hasImportedRaceStartFlag = false;
   for (const [index, record] of rawRecords.entries()) {
     const crossing = createCrossingRecord(
       options.eventId,
@@ -292,15 +296,6 @@ export const loadDorianCtcSrtCatalogForSession = async (
       options.trackConfig
     );
     if (flag) {
-      const ctcGreenFlag = flag as FlagRecord & { indicatesRaceStart?: boolean };
-      if (flag.flagType === 'green' && ctcGreenFlag.indicatesRaceStart === true) {
-        if (hasImportedRaceStartFlag) {
-          ctcGreenFlag.indicatesRaceStart = false;
-          flag.recordType &= ~EVENT_SESSION_START;
-        } else {
-          hasImportedRaceStartFlag = true;
-        }
-      }
       records.push(flag);
     }
 

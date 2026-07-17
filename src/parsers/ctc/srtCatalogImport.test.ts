@@ -194,21 +194,48 @@ describe('Dorian CTC SRT catalog import', () => {
         eventId,
         flagType: 'green',
         flagValue: 'course',
-        indicatesRaceStart: false,
-        recordType: EVENT_FLAG_DISPLAYED,
+        indicatesRaceStart: true,
+        recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_START,
         sessionId,
       }),
     ]);
     expect(raceState.timeRecordSources).toEqual([expect.objectContaining({ ctcTrackConfig: trackConfig })]);
   });
 
-  it('uses imported Green Flag Light records as the race start for lap calculation', async () => {
+  it('imports zero-transmitter switch records with a padded green-light status as flags', async () => {
+    const eventId = createEventId('ctc-switch-event');
+    const sessionId = createSessionId('ctc-switch-session');
+    const trackConfig = parseCtcTrackConfig('40 Green Flag Light');
+    const switchRecord = (timeTicks: number): string => `04${timeTicks.toString().padStart(14, '0')}${'0'.repeat(11)}040`;
+
+    const raceState = await loadDorianCtcSrtCatalogForSession(
+      'C:/timing/switch.erf',
+      Buffer.from([
+        switchRecord(200_000),
+        switchRecord(100_000),
+      ].join('\r')),
+      {
+        eventDate: '2026-07-14',
+        eventId,
+        sessionId,
+        trackConfig,
+      }
+    );
+    const greenFlags = raceState.records?.filter((record) => 'flagType' in record && record.flagType === 'green') || [];
+
+    expect(greenFlags).toHaveLength(2);
+    expect(greenFlags).toEqual(expect.arrayContaining([
+      expect.objectContaining({ indicatesRaceStart: true, recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_START }),
+    ]));
+  });
+
+  it.each(['Green Flag Light', 'Green Flag'])('uses imported %s records as the race start for lap calculation', async (greenFlagDescription: string) => {
     const eventId = createEventId('ctc-green-start-event');
     const sessionId = createSessionId('ctc-green-start-session');
     const trackConfig = parseCtcTrackConfig([
       '#***************** Start/Finish : Track ******* North Network *****#',
       'A     31     1       2               1,1     1,2     1,3     1,4',
-      '40 Green Flag Light',
+      `40 ${greenFlagDescription}`,
     ].join('\n'));
 
     const raceState = await loadDorianCtcSrtCatalogForSession(

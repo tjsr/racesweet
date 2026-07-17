@@ -143,10 +143,7 @@ export const getEventStartFlagForCategory = (
     if (!greenFlag.time) {
       return selectedFlag;
     }
-    if (greenFlag.time.getTime() > selectedFlag.time.getTime()) {
-      return greenFlag;
-    }
-    if (greenFlag.time.getTime() === selectedFlag.time.getTime() && greenFlag.sequence > selectedFlag.sequence) {
+    if (greenFlag.time.getTime() < selectedFlag.time.getTime()) {
       return greenFlag;
     }
     return selectedFlag;

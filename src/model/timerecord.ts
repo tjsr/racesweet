@@ -65,6 +65,7 @@ export interface ParticipantPassingRecord extends EventTimeRecord {
   hitCount?: number | undefined;
   lineNumber?: number | undefined;
   loopNumber?: number | undefined;
+  sourceLineNumber?: number | undefined;
   participantId?: EventParticipantId | null | undefined;
   entrantId?: EventEntrantId | null | undefined;
   participantStartRecordId?: TimeRecordId | null | undefined;

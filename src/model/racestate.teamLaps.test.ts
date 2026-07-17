@@ -1,8 +1,9 @@
 import type { ChipCrossingData } from './chipcrossing.js';
+import type { CtcTrackConfig } from './ctcTrackConfig.js';
 import type { EventCategory } from './eventcategory.js';
 import type { EventParticipant } from './eventparticipant.js';
 import { Session } from './racestate.js';
-import { CROSSING_UNRELATED_LAP_UNDER_MINIMUM, isPassingExcluded, isPassingValid, type ParticipantPassingRecord } from './timerecord.js';
+import { CROSSING_UNRELATED_LAP_UNDER_MINIMUM, isPassingExcluded, isPassingValid, type ParticipantPassingRecord, type TimeRecordSource } from './timerecord.js';
 import { createGreenFlagEvent } from '../controllers/flag.js';
 
 const category: EventCategory = { id: '1', name: 'Team Category' };
@@ -130,6 +131,39 @@ describe('Session team lap processing', () => {
     expect(isPassingValid(riderTwoLaps[0]!)).toBe(true);
     expect(riderTwoLaps[0].lapNo).toBe(1);
     expect(riderTwoLaps[0].lapTime).toBe(360000);
+  });
+
+  it('recalculates all lap results when a crossing time is edited', async () => {
+    const session = new Session({
+      categories: [category],
+      participants: [participant('101', '11', 1001)],
+      records: [
+        createGreenFlagEvent({
+          categoryIds: [category.id],
+          flagValue: 'course',
+          id: 'flag-100',
+          recordType: 4,
+          sequence: 100,
+          source: 'test',
+          time: new Date('2026-05-30T10:00:00.000Z'),
+        }),
+        chipCrossing('1001', 1001, 1, '2026-05-30T10:06:00.000Z'),
+        chipCrossing('1002', 1001, 2, '2026-05-30T10:12:00.000Z'),
+      ],
+      teams: [],
+    });
+
+    expect(session.getParticipantLaps('101')).toMatchObject([
+      { id: '1001', lapNo: 1, lapTime: 360000 },
+      { id: '1002', lapNo: 2, lapTime: 360000 },
+    ]);
+
+    session.updateRecord(chipCrossing('1002', 1001, 2, '2026-05-30T10:04:00.000Z'));
+
+    expect(session.getParticipantLaps('101')).toMatchObject([
+      { id: '1002', elapsedTime: 240000, lapNo: 1, lapTime: 240000 },
+      { id: '1001', elapsedTime: 360000, lapNo: 2, lapTime: 120000 },
+    ]);
   });
 
   it('toggles manually excluded crossings out of and back into lap calculations', async () => {
@@ -314,6 +348,54 @@ describe('Session team lap processing', () => {
     });
     expect(isPassingExcluded(laps[1]!)).toBe(false);
     expect(isPassingValid(laps[1]!)).toBe(true);
+  });
+
+  it('derives lap completion from the current source configuration and recalculates when it changes', async () => {
+    const createTrackConfig = (isLapCompletion: boolean): CtcTrackConfig => ({
+      eventDescriptions: {},
+      networks: [{
+        lines: [{
+          line: 1,
+          loops: [{ card: 1, comPort: 1, isLapCompletion, loopNumber: 9, siteAddress: 31 }],
+          name: 'Start/Finish',
+        }],
+        name: 'Track',
+      }],
+    });
+    const createSource = (isLapCompletion: boolean): TimeRecordSource => ({
+      ctcTrackConfig: createTrackConfig(isLapCompletion),
+      id: 'test',
+      name: 'CTC',
+    });
+    const session = new Session({
+      categories: [category],
+      participants: [participant('101', '11', 1001)],
+      records: [
+        createGreenFlagEvent({
+          categoryIds: [category.id],
+          flagValue: 'course',
+          id: '1',
+          recordType: 4,
+          sequence: 1,
+          source: 'test',
+          time: new Date('2026-05-30T10:00:00.000Z'),
+        }),
+        {
+          ...chipCrossing('1001', 1001, 2, '2026-05-30T10:06:00.000Z'),
+          lineNumber: 1,
+          loopNumber: 9,
+          sourceLineNumber: 31,
+        } as ParticipantPassingRecord,
+      ],
+      teams: [],
+      timeRecordSources: [createSource(false)],
+    });
+
+    expect(session.getParticipantLaps('101')?.[0]).toMatchObject({ lapNo: 0, lapTime: 360000 });
+
+    session.addTimeRecordSources([createSource(true)]);
+
+    expect(session.getParticipantLaps('101')?.[0]).toMatchObject({ lapNo: 1, lapTime: 360000 });
   });
 
   it('only warns for short sector crossings when the same line is repeated too quickly', async () => {
