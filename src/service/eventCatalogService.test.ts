@@ -4739,6 +4739,7 @@ describe("EventCatalogService", () => {
     );
 
     await service.updateCategory(SEED_CLUBMAN_CATEGORY_ID, {
+      isPlaceholder: true,
       name: "Unknown participants",
     });
     await service.updateEntrant(SEED_ENTRANT_ID, {
@@ -4788,6 +4789,7 @@ describe("EventCatalogService", () => {
         {
           firstName: "Seed",
           lastName: "Entrant",
+          raceNumber: "191",
           transponderNumber: "91",
         },
         {
@@ -4814,12 +4816,19 @@ describe("EventCatalogService", () => {
       expect.objectContaining({
         categoryId: SEED_PREMIER_CATEGORY_ID,
         categoryIds: [SEED_PREMIER_CATEGORY_ID],
+        identifiers: expect.arrayContaining([
+          expect.objectContaining({ racePlate: "191" }),
+        ]),
+        isPlaceholder: false,
       }),
     );
-    expect(importedParticipant?.categoryId).toBe(SEED_PREMIER_CATEGORY_ID);
-    expect(importedUnscaffoldedParticipant?.categoryId).toBe(
-      SEED_PREMIER_CATEGORY_ID,
-    );
+    expect(importedParticipant?.categoryId).toBeUndefined();
+    expect(importedParticipant).toEqual(expect.objectContaining({
+      firstname: "Seed",
+      isPlaceholder: false,
+      surname: "Entrant",
+    }));
+    expect(importedUnscaffoldedParticipant?.categoryId).toBeUndefined();
     expect(
       service.getImportedRaceState(SEED_EVENT_ID, SEED_RACE_SESSION_ID)
         ?.participants,
@@ -4871,7 +4880,7 @@ describe("EventCatalogService", () => {
     );
     expect(participant).toEqual(
       expect.objectContaining({
-        categoryId: SEED_PREMIER_CATEGORY_ID,
+        categoryId: undefined,
         identifiers: expect.arrayContaining([
           expect.objectContaining({ racePlate: "15" }),
           expect.objectContaining({ txNo: "200015" }),

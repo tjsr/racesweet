@@ -338,13 +338,14 @@ export const loadDorianCtcSrtCatalogForSession = async (
       firstname: '',
       id: participantId,
       identifiers: [transponder],
+      isPlaceholder: true,
       lastRecordTime: null,
       resultDuration: null,
       surname: '',
     };
   });
   const categories: EventCategory[] = participants.length > 0
-    ? [{ code: 'UNKNOWN', description: 'Placeholder entrants created for CTC transmitters not assigned to a known participant.', id: placeholderCategoryId, name: UNKNOWN_PARTICIPANTS_CATEGORY_NAME }]
+    ? [{ code: 'UNKNOWN', description: 'Placeholder entrants created for CTC transmitters not assigned to a known participant.', id: placeholderCategoryId, isPlaceholder: true, name: UNKNOWN_PARTICIPANTS_CATEGORY_NAME }]
     : [];
   const recordsWithPlaceholders = records.map((record) => {
     if (!('chipCode' in record) || typeof record.chipCode !== 'number') {

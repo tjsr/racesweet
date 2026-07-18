@@ -1018,7 +1018,10 @@ const inferSessionCategoryIds = (
 ): MrScatsImportedSession[] => {
   const participantsByPlate = buildParticipantsByPlate(participants);
   const participantCountByCategoryId = participants.reduce<Map<string, number>>((counts, participant) => {
-    const categoryId = participant.categoryId.toString();
+    const categoryId = participant.categoryId?.toString();
+    if (!categoryId) {
+      return counts;
+    }
     counts.set(categoryId, (counts.get(categoryId) || 0) + 1);
     return counts;
   }, new Map<string, number>());
@@ -1349,7 +1352,7 @@ const getSessionTransponderNumbers = (
 ): Set<number> => {
   const sessionCategoryIds = new Set(session.categoryIds.map((categoryId) => categoryId.toString()));
   return participants.reduce<Set<number>>((transponders, participant) => {
-    if (!sessionCategoryIds.has(participant.categoryId.toString())) {
+    if (!participant.categoryId || !sessionCategoryIds.has(participant.categoryId.toString())) {
       return transponders;
     }
 

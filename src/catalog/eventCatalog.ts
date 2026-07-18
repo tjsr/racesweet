@@ -80,6 +80,8 @@ export interface EventCatalogEntrant {
   gender?: string;
   id: EventEntrantId;
   identifiers?: EventParticipant['identifiers'];
+  /** True while this entrant was created only to represent unidentified timing data. */
+  isPlaceholder?: boolean;
   lastName?: string;
   memberParticipantIds: EventParticipantId[];
   name: string;

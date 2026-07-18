@@ -93,6 +93,7 @@ const filterRaceStateForCategories = (
       categoryIdSet.has(category.id.toString()),
     ),
     participants: (raceState.participants || []).filter((participant) =>
+      participant.categoryId !== undefined &&
       categoryIdSet.has(participant.categoryId.toString()),
     ),
     records: (raceState.records || []).filter((record) => {
@@ -470,11 +471,22 @@ const findUniqueSourceParticipantImportMatch = (
     );
     const placeholderMatches = matches.filter(
       (participant) =>
+        participant.isPlaceholder === true ||
         isPlaceholderEntrantName(getParticipantDisplayName(participant)) ||
-        hasPlaceholderCategory(participant.categoryId, categoriesById),
+        (hasPlaceholderCategory(participant.categoryId, categoriesById) &&
+          !participant.firstname.trim() &&
+          !participant.surname.trim()),
     );
-    if (placeholderMatches.length === 1) {
-      return placeholderMatches[0];
+    const identifiedMatches = matches.filter(
+      (participant) => !placeholderMatches.includes(participant),
+    );
+    if (identifiedMatches.length === 1) {
+      return identifiedMatches[0];
+    }
+    if (placeholderMatches.length > 0) {
+      return placeholderMatches.sort((left, right) =>
+        left.id.toString().localeCompare(right.id.toString()),
+      )[0];
     }
     if (matches.length > 1) {
       throw new Error(
@@ -618,11 +630,22 @@ const findUniqueEntrantImportMatch = (
 
     const placeholderMatches = matches.filter(
       (entrant) =>
+        entrant.isPlaceholder === true ||
         isPlaceholderEntrantName(entrant.name) ||
-        hasPlaceholderCategory(entrant.categoryId, categoriesById),
+        (hasPlaceholderCategory(entrant.categoryId, categoriesById) &&
+          !entrant.firstName?.trim() &&
+          !entrant.lastName?.trim()),
     );
-    if (placeholderMatches.length === 1) {
-      return placeholderMatches[0];
+    const identifiedMatches = matches.filter(
+      (entrant) => !placeholderMatches.includes(entrant),
+    );
+    if (identifiedMatches.length === 1) {
+      return identifiedMatches[0];
+    }
+    if (placeholderMatches.length > 0) {
+      return placeholderMatches.sort((left, right) =>
+        left.id.toString().localeCompare(right.id.toString()),
+      )[0];
     }
 
     return undefined;
@@ -636,11 +659,22 @@ const findUniqueEntrantImportMatch = (
     );
     const placeholderMatches = matches.filter(
       (entrant) =>
+        entrant.isPlaceholder === true ||
         isPlaceholderEntrantName(entrant.name) ||
-        hasPlaceholderCategory(entrant.categoryId, categoriesById),
+        (hasPlaceholderCategory(entrant.categoryId, categoriesById) &&
+          !entrant.firstName?.trim() &&
+          !entrant.lastName?.trim()),
     );
-    if (placeholderMatches.length === 1) {
-      return placeholderMatches[0];
+    const identifiedMatches = matches.filter(
+      (entrant) => !placeholderMatches.includes(entrant),
+    );
+    if (identifiedMatches.length === 1) {
+      return identifiedMatches[0];
+    }
+    if (placeholderMatches.length > 0) {
+      return placeholderMatches.sort((left, right) =>
+        left.id.toString().localeCompare(right.id.toString()),
+      )[0];
     }
     if (matches.length > 1) {
       throw new Error(
@@ -688,6 +722,7 @@ const mergeImportedParticipant = (
     currentResult: primary.currentResult ?? duplicate.currentResult,
     entrantId: primary.entrantId || duplicate.entrantId,
     firstname: primary.firstname || duplicate.firstname,
+    isPlaceholder: primary.isPlaceholder && duplicate.isPlaceholder,
     identifiers: mergeParticipantIdentifiers(
       primary.identifiers,
       duplicate.identifiers,
@@ -1016,7 +1051,7 @@ const deriveMaxTeamSizesByCategory = (
       team.categoryId?.toString() || "",
       ...team.members.map(
         (memberId) =>
-          participantById.get(memberId.toString())?.categoryId.toString() || "",
+          participantById.get(memberId.toString())?.categoryId?.toString() || "",
       ),
     ]);
 
@@ -1078,7 +1113,9 @@ const deriveCategoriesFromEventData = (
   });
 
   unique(
-    participants.map((participant) => participant.categoryId.toString()),
+    participants
+      .map((participant) => participant.categoryId?.toString())
+      .filter((categoryId): categoryId is string => categoryId !== undefined),
   ).forEach((categoryId) => {
     if (!byId.has(categoryId)) {
       byId.set(categoryId, {
@@ -1102,6 +1139,7 @@ const deriveCategoriesFromEventData = (
 const deriveEntrantsFromParticipants = async (
   eventId: EventId,
   participants: EventParticipant[],
+  categories: EventCatalogCategory[] = [],
   masterProfiles: MasterEntrantProfile[] = [],
   teams: EventTeam[] = [],
 ): Promise<EventCatalogEntrant[]> => {
@@ -1125,7 +1163,7 @@ const deriveEntrantsFromParticipants = async (
 
       return {
         categoryId:
-          nonEmpty(member.categoryId.toString()) || fallbackCategoryId,
+          nonEmpty(member.categoryId?.toString()) || fallbackCategoryId,
         dateOfBirth: nonEmpty(profile?.dateOfBirth),
         firstName:
           nonEmpty(member.firstname) || nonEmpty(profile?.firstName) || "",
@@ -1159,7 +1197,10 @@ const deriveEntrantsFromParticipants = async (
         nonEmpty(member.surname) || nonEmpty(profile?.lastName);
       const riderCategoryId =
         nonEmpty(member.categoryId?.toString()) ||
-        nonEmpty(profile?.categoryId);
+        nonEmpty(profile?.categoryId) ||
+        (member.isPlaceholder
+          ? categories.find((category) => category.isPlaceholder === true)?.id
+          : undefined);
       const riderName = [riderFirstName, riderLastName]
         .filter((part) => !!part)
         .join(" ")
@@ -1176,6 +1217,7 @@ const deriveEntrantsFromParticipants = async (
         gender: nonEmpty(profile?.gender),
         id: entrantType === "team" ? participantId : entrantId,
         identifiers: [...member.identifiers],
+        isPlaceholder: member.isPlaceholder === true,
         lastName: riderLastName,
         memberParticipantIds: [participantId],
         name: riderName || getParticipantDisplayName(member),
@@ -2186,6 +2228,7 @@ export class EventCatalogService {
       await deriveEntrantsFromParticipants(
         eventId,
         participants,
+        scaffoldCategories,
         masterProfiles,
         teams,
       ),
@@ -2583,6 +2626,7 @@ export class EventCatalogService {
     const derivedEntrants = await deriveEntrantsFromParticipants(
       normalizedImportData.eventId,
       normalizedImportData.raceState.participants || [],
+      derivedCategories,
       masterProfiles,
       normalizedImportData.raceState.teams || [],
     );
@@ -3509,6 +3553,7 @@ export class EventCatalogService {
         categoryIds: riderCategoryId ? [riderCategoryId] : rider.categoryIds,
         firstName: hasUsableName ? record.firstName : rider.firstName,
         identifiers: mergeEntrantImportIdentifiers(rider.identifiers, record),
+        isPlaceholder: false,
         lastName: hasUsableName ? record.lastName : rider.lastName,
         memberParticipantIds: unique([
           ...rider.memberParticipantIds,
@@ -3625,6 +3670,65 @@ export class EventCatalogService {
     const importedRiders = workingEntrants.filter((entrant) =>
       importedRiderIds.has(entrant.id),
     );
+    const importedTransponderNumbers = new Set(
+      records
+        .map((record) => normalizeEntrantImportValue(record.transponderNumber))
+        .filter(Boolean),
+    );
+    const importedRiderIdsByTransponder = new Map<string, string>();
+    importedRiders.forEach((rider) => {
+      getEntrantImportIdentifierValues(rider, sourceParticipants, "txNo")
+        .filter((transponder) => importedTransponderNumbers.has(transponder))
+        .forEach((transponder) => {
+          importedRiderIdsByTransponder.set(
+            transponder,
+            rider.memberParticipantIds[0]?.toString() || "",
+          );
+        });
+    });
+    const selectedRiderIds = new Set(
+      importedRiders.map((rider) => rider.id.toString()),
+    );
+    const placeholderEntrantIdsToRemove = new Set(
+      workingEntrants
+        .filter((entrant) =>
+          !selectedRiderIds.has(entrant.id.toString()) &&
+          (entrant.isPlaceholder === true ||
+            isPlaceholderEntrantName(entrant.name) ||
+            (hasPlaceholderCategory(entrant.categoryId, categoriesById) &&
+              !entrant.firstName?.trim() &&
+              !entrant.lastName?.trim())) &&
+          getEntrantImportIdentifierValues(entrant, sourceParticipants, "txNo")
+            .some((transponder) => importedTransponderNumbers.has(transponder)),
+        )
+        .map((entrant) => entrant.id.toString()),
+    );
+    workingEntrants = workingEntrants.filter(
+      (entrant) => !placeholderEntrantIdsToRemove.has(entrant.id.toString()),
+    );
+    const placeholderParticipantRedirects = new Map<string, string>();
+    sourceParticipants.forEach((participant) => {
+      const matchingTransponder = getIdentifierValues(participant.identifiers, "txNo")
+        .map(normalizeEntrantImportValue)
+        .find((transponder) => importedRiderIdsByTransponder.has(transponder));
+      const replacementParticipantId = matchingTransponder
+        ? importedRiderIdsByTransponder.get(matchingTransponder)
+        : undefined;
+      if (
+        replacementParticipantId &&
+        replacementParticipantId !== participant.id.toString() &&
+        (participant.isPlaceholder === true ||
+          isPlaceholderEntrantName(getParticipantDisplayName(participant)) ||
+          (hasPlaceholderCategory(participant.categoryId, categoriesById) &&
+            !participant.firstname.trim() &&
+            !participant.surname.trim()))
+      ) {
+        placeholderParticipantRedirects.set(
+          participant.id.toString(),
+          replacementParticipantId,
+        );
+      }
+    });
     const teamsById = new Map(
       workingEntrants
         .filter((entrant) => entrant.entrantType === "team")
@@ -3648,12 +3752,19 @@ export class EventCatalogService {
     });
     const raceStateMutations: EventCatalogLedger["mutations"] =
       importedRaceStates.map(({ metadata, sessionId }) => {
-        const participants = (metadata.raceState.participants || []).map(
+        const participants = (metadata.raceState.participants || [])
+          .filter(
+            (participant) =>
+              !placeholderParticipantRedirects.has(participant.id.toString()),
+          )
+          .map(
           (participant): EventParticipant => {
             const categoryId = participantCategoryUpdates.get(
               participant.id.toString(),
             );
-            return categoryId ? { ...participant, categoryId } : participant;
+            return categoryId && !participant.entrantId
+              ? { ...participant, categoryId }
+              : participant;
           },
         );
         importedRiders.forEach((rider) => {
@@ -3667,15 +3778,8 @@ export class EventCatalogService {
             participantIndex = participants.length;
           }
           const existingParticipant = participants[participantIndex];
-          const entrant = rider.teamEntrantId
-            ? teamsById.get(rider.teamEntrantId)
-            : rider;
           participants[participantIndex] = {
-            categoryId:
-              entrant?.categoryId ||
-              entrant?.categoryIds[0] ||
-              existingParticipant?.categoryId ||
-              "",
+            categoryId: undefined,
             currentResult: existingParticipant?.currentResult,
             entrantId: rider.teamEntrantId || rider.id,
             firstname: rider.firstName || existingParticipant?.firstname || "",
@@ -3684,11 +3788,25 @@ export class EventCatalogService {
               existingParticipant?.identifiers,
               rider.identifiers,
             ),
+            isPlaceholder: false,
             lastRecordTime: existingParticipant?.lastRecordTime || null,
             resultDuration: existingParticipant?.resultDuration || null,
             surname: rider.lastName || existingParticipant?.surname || "",
           };
         });
+        const remappedRecords = (metadata.raceState.records || []).map(
+          (record): TimeRecord => {
+            if (!("participantId" in record) || !record.participantId) {
+              return record;
+            }
+            const participantId = placeholderParticipantRedirects.get(
+              record.participantId.toString(),
+            );
+            return participantId
+              ? ({ ...record, participantId } as TimeRecord)
+              : record;
+          },
+        );
         const teamsByRaceStateId = new Map(
           (metadata.raceState.teams || []).map((team) => [team.id, team]),
         );
@@ -3721,6 +3839,7 @@ export class EventCatalogService {
           raceState: {
             ...metadata.raceState,
             participants,
+            records: remappedRecords,
             teams: Array.from(teamsByRaceStateId.values()),
           },
           sessionId,
@@ -3744,8 +3863,18 @@ export class EventCatalogService {
           },
         ];
 
+    const placeholderEntrantRemovalMutations: EventCatalogLedger["mutations"] =
+      originalEntrants
+        .filter((entrant) => placeholderEntrantIdsToRemove.has(entrant.id.toString()))
+        .map((entrant) => ({
+          entrantId: entrant.id,
+          id: createMutationId(),
+          timestamp: createTimestamp(),
+          type: "entrant-deleted" as const,
+        }));
+
     return this.appendMutations(
-      [...raceStateMutations, ...entrantMutations, ...eventMutation],
+      [...raceStateMutations, ...entrantMutations, ...placeholderEntrantRemovalMutations, ...eventMutation],
       onCompleteStep,
     );
   }
@@ -3996,6 +4125,7 @@ export class EventCatalogService {
     const importedEntrants = await deriveEntrantsFromParticipants(
       eventId,
       importedRaceState?.participants || [],
+      importedCategories,
       masterProfiles,
       importedRaceState?.teams || [],
     );

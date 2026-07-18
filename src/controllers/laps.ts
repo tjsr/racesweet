@@ -372,6 +372,10 @@ export const processAllParticipantLaps = (
     if (!participant) {
       return;
     }
+    if (!participant.categoryId) {
+      entrantPassings.forEach(setPassingNoStart);
+      return;
+    }
 
     let participantCategoryStartFlag: GreenFlagRecord | null | undefined;
     try {

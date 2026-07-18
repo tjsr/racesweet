@@ -273,7 +273,7 @@ export class Session implements RaceState, RaceStateLookup {
     this.validateCategory(categoryId);
     const participants: EventParticipant[] = [];
     this._participants.forEach((participant: EventParticipant) => {
-      if (participant.categoryId.toString() === categoryId.toString()) {
+      if (participant.categoryId?.toString() === categoryId.toString()) {
         participants.push(participant);
       }
     });
@@ -724,6 +724,9 @@ export class Session implements RaceState, RaceStateLookup {
 
       let participantCategoryStartFlag: GreenFlagRecord | null | undefined;
       try {
+        if (!participant.categoryId) {
+          return;
+        }
         participantCategoryStartFlag = this.__getCategoryGreenFlag(participant.categoryId);
       } catch (error: unknown) {
         if (error instanceof EventFlagsError || error instanceof NoStartFlagError) {

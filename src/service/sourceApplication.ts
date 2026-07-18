@@ -210,7 +210,9 @@ const validateRaceStateIds = (
 
   (raceState.participants || []).forEach((participant) => {
     assertUuid(errors, 'participant.id', participant.id);
-    assertUuid(errors, `participant ${participant.id} categoryId`, participant.categoryId);
+    if (!participant.entrantId) {
+      assertUuid(errors, `participant ${participant.id} categoryId`, participant.categoryId);
+    }
     assertUuid(errors, `participant ${participant.id} entrantId`, participant.entrantId);
     participantIds.add(participant.id);
     if (participant.categoryId && !categoryIds.has(participant.categoryId)) {

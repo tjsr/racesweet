@@ -19,8 +19,14 @@ export interface EventParticipant extends WithId<EventParticipantId> {
   lastRecordTimingPoint?: TimingPointId | undefined;
   resultDuration: ISO8601Duration | null;
   currentResult: string | undefined;
-  categoryId: EventCategoryId;
+  /**
+   * Direct event participants own a category. Participants linked to an entrant
+   * inherit that category from the entrant and must not duplicate it here.
+   */
+  categoryId?: EventCategoryId;
   identifiers: ParticipantIdentifier[];
+  /** True while this participant was created only to represent unidentified timing data. */
+  isPlaceholder?: boolean;
 }
 
 export interface ParticipateRacePlate extends ParticipantIdentifier {

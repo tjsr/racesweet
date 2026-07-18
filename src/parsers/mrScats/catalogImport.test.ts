@@ -417,7 +417,7 @@ describe('MR-SCATS catalog import parser', () => {
 
     const imported = await loadMrScatsCatalogFromLocation(tempDir);
     const participantSummaries = (imported.raceState.participants || []).map((participant) => ({
-      categoryId: participant.categoryId.toString(),
+      categoryId: participant.categoryId!.toString(),
       name: `${participant.firstname} ${participant.surname}`.trim(),
       racePlate: participant.identifiers.find((identifier) => 'racePlate' in identifier)?.racePlate?.toString(),
       txNos: participant.identifiers

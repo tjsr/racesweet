@@ -1425,6 +1425,7 @@ describe('RaceSweetMainApp integration', () => {
     expect(requestBuffer).not.toHaveBeenCalled();
 
     await clickSectionButton(container, 'Timing');
+    await waitForText(container, 'Recent Records (3)');
     expect((container.querySelector('select[aria-label="Timing Event"]') as HTMLSelectElement).value).toBe(importedEventId);
     expect((container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement).value).toBe(importedSessionId);
     expect(container.textContent).toContain('Recent Records (3)');

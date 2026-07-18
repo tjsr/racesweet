@@ -112,10 +112,11 @@ describe('Dorian CTC SRT catalog import', () => {
       }
     );
 
-    expect(raceState.categories).toEqual([expect.objectContaining({ name: 'Unknown participants' })]);
+    expect(raceState.categories).toEqual([expect.objectContaining({ isPlaceholder: true, name: 'Unknown participants' })]);
     expect(raceState.participants).toEqual([expect.objectContaining({
       firstname: '',
       identifiers: [expect.objectContaining({ txNo: 1234 })],
+      isPlaceholder: true,
       surname: '',
     })]);
     expect(raceState.records?.every((record) => 'participantId' in record && record.participantId === raceState.participants?.[0]?.id)).toBe(true);

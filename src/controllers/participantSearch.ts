@@ -39,7 +39,9 @@ const selectMatchedEntrant = (
     return matchedEntrants[0];
   }
 
-  const preferredEntrants = matchedEntrants.filter((entrant) => preferredCategoryIdSet.has(entrant.categoryId.toString()));
+  const preferredEntrants = matchedEntrants.filter((entrant) =>
+    entrant.categoryId !== undefined && preferredCategoryIdSet.has(entrant.categoryId.toString()),
+  );
   return preferredEntrants[0] || matchedEntrants[0];
 };
 

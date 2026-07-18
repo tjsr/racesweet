@@ -270,7 +270,9 @@ const filterMrScatsRaceStateForSession = (
   return {
     ...raceState,
     categories: (raceState.categories || []).filter((category) => categoryIdSet.has(category.id.toString())),
-    participants: (raceState.participants || []).filter((participant) => categoryIdSet.has(participant.categoryId.toString())),
+    participants: (raceState.participants || []).filter((participant) =>
+      participant.categoryId !== undefined && categoryIdSet.has(participant.categoryId.toString()),
+    ),
     records: (raceState.records || []).filter((record) => {
       const recordSessionId = (record as EventTimeRecord).sessionId?.toString();
       return !recordSessionId || recordSessionId === sessionId.toString();
@@ -523,7 +525,9 @@ export const RaceSweetMainApp = () => {
           catalogValidationCompleted += 1;
           updateProgressStage('catalog-validation', catalogValidationTotal, catalogValidationCompleted);
         });
-        const participantCategoryIds = new Set(session.participants.map((participant) => participant.categoryId.toString()));
+        const participantCategoryIds = new Set(session.participants.flatMap((participant) =>
+          participant.categoryId ? [participant.categoryId.toString()] : [],
+        ));
         session.participants.forEach((participant) => incrementLoadingMetric('Read startup participant category', participant.id.toString()));
         catalogValidationCompleted += session.participants.length;
         updateProgressStage('catalog-validation', catalogValidationTotal, catalogValidationCompleted);
@@ -1577,6 +1581,9 @@ export const RaceSweetMainApp = () => {
 
     const categoriesById = new Map(fromCatalog.map((category) => [category.id.toString(), category.name]));
     displayedAnalyticsRaceState.participants.forEach((participant) => {
+      if (!participant.categoryId) {
+        return;
+      }
       const categoryId = participant.categoryId.toString();
       if (!categoriesById.has(categoryId)) {
         const category = displayedAnalyticsRaceState.categories.find((item) => item.id === participant.categoryId);
@@ -1761,11 +1768,23 @@ export const RaceSweetMainApp = () => {
               ? raceStateSnapshot(sessionState)
               : eventCatalogService.getImportedRaceState(eventId, sessionId) || {};
             const targetSessionState = sessionFromPartialRaceState(importMode === 'import' ? {} : existingRaceState);
-            const knownTransmitterNumbers = importMode === 'update'
-              ? (existingRaceState.participants || []).flatMap((participant) => participant.identifiers
-                .filter((identifier) => 'txNo' in identifier)
-                .map((identifier) => (identifier as ParticipantTransponder).txNo))
-              : [];
+            const knownTransmitterNumbers = [
+              ...getEntrantsForEvent(eventCatalogState, eventId).flatMap((entrant) =>
+                entrant.isPlaceholder === true || entrant.name.trim().toLowerCase().startsWith('unknown participant')
+                  ? []
+                  : (entrant.identifiers || [])
+                    .filter((identifier) => 'txNo' in identifier)
+                    .map((identifier) => (identifier as ParticipantTransponder).txNo),
+              ),
+              ...(existingRaceState.participants || []).flatMap((participant) =>
+                participant.isPlaceholder === true ||
+                (!participant.firstname.trim() && !participant.surname.trim())
+                  ? []
+                  : participant.identifiers
+                    .filter((identifier) => 'txNo' in identifier)
+                    .map((identifier) => (identifier as ParticipantTransponder).txNo),
+              ),
+            ];
 
             const trackConfigFilePath = source.fileConfig?.trackConfigFilePath;
             const trackConfigPromise = trackConfigFilePath
