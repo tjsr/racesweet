@@ -311,7 +311,26 @@ const normalizeRaceStateForSession = (
     ...rewrittenRaceState,
     categories: (rewrittenRaceState.categories || []).map((category) => normalizeCategoryResultExclusion(category)),
   };
-  const linkedCategorySafeRaceState = addMissingLinkedCategoryPlaceholders(normalizedRaceState);
+  const catalogEntrants = options.catalog?.entrants.filter(
+    (entrant) => entrant.eventId === options.eventId,
+  ) || [];
+  const linkedCategorySafeRaceState = addMissingLinkedCategoryPlaceholders({
+    ...normalizedRaceState,
+    participants: (normalizedRaceState.participants || []).map(
+      (participant): EventParticipant => {
+        if (participant.categoryId) {
+          return participant;
+        }
+        const entrant = catalogEntrants.find(
+          (candidate) =>
+            candidate.id === participant.entrantId ||
+            candidate.memberParticipantIds.includes(participant.id),
+        );
+        const categoryId = entrant?.categoryId || entrant?.categoryIds[0];
+        return categoryId ? { ...participant, categoryId } : participant;
+      },
+    ),
+  });
   validateRaceStateIds(linkedCategorySafeRaceState, existingCategories, options);
   return linkedCategorySafeRaceState;
 };

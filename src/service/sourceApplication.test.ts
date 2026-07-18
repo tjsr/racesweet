@@ -548,7 +548,7 @@ describe('sourceApplication', () => {
         categories: [],
         participants: [
           {
-            categoryId: EXISTING_CATEGORY_ID,
+            categoryId: undefined,
             currentResult: undefined,
             entrantId: teamId,
             firstname: 'Pat',
@@ -797,7 +797,7 @@ describe('sourceApplication', () => {
     )).rejects.toThrow(`Catalog search: found 1 possible match: Recovered Event (${previousEventId}): team entrant "Recovered Team" (${entrantId}).`);
   });
 
-  it('accepts missing entrant references when the catalog has linked that entrant to the target event', async () => {
+  it('resolves a linked participant category from the target-event entrant', async () => {
     const addCategories = vi.fn(async (_categories: EventCategory[]) => null);
     const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
     const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
@@ -857,7 +857,7 @@ describe('sourceApplication', () => {
         categories: [],
         participants: [
           {
-            categoryId: EXISTING_CATEGORY_ID,
+            categoryId: undefined,
             currentResult: undefined,
             entrantId,
             firstname: 'Pat',
@@ -872,7 +872,13 @@ describe('sourceApplication', () => {
       },
       { catalog, eventId, sessionId }
     )).resolves.toBeUndefined();
-    expect(addParticipants).toHaveBeenCalledWith([expect.objectContaining({ entrantId, id: participantId })]);
+    expect(addParticipants).toHaveBeenCalledWith([
+      expect.objectContaining({
+        categoryId: EXISTING_CATEGORY_ID,
+        entrantId,
+        id: participantId,
+      }),
+    ]);
   });
 
   it('reports when a missing entrant cannot be found in any active event catalog', async () => {

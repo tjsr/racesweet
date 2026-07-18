@@ -19,4 +19,24 @@ describe('parseEntrantImportRows', () => {
       vehicle: undefined,
     }]);
   });
+
+  it.each([
+    'Car Num.',
+    'Race Number',
+    'Race Plate',
+    'Number',
+    'No',
+    'Race No',
+  ])('maps %s to the race number', (raceNumberHeader) => {
+    const records = parseEntrantImportRows([
+      ['Driver Name', raceNumberHeader],
+      ['Alex Driver', '42'],
+    ]);
+
+    expect(records).toEqual([
+      expect.objectContaining({
+        raceNumber: '42',
+      }),
+    ]);
+  });
 });
