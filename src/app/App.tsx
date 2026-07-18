@@ -2163,7 +2163,11 @@ export const RaceSweetMainApp = () => {
 
             return eventCatalogService.updateCategory(categoryId, changes).then((catalog) => {
               const activeEventId = eventCatalogState.activeEventId;
-              if (selectedCategoryEventId && selectedCategoryEventId === activeEventId) {
+              if (
+                selectedCategoryEventId &&
+                selectedCategoryEventId === activeEventId &&
+                sessionState.categories.some((category) => category.id === categoryId)
+              ) {
                 sessionState.updateCategoryDetails(categoryId, {
                   code: changes.code,
                   description: changes.description,
@@ -2226,7 +2230,9 @@ export const RaceSweetMainApp = () => {
             eventCatalogService.createEntrant(eventId, entrantType).then((catalog) => {
               const event = catalog.events.find((item) => item.id === eventId);
               const entrantLabels = getEventDisciplineLabels(event?.discipline);
-              const entrantName = entrantType === 'team' ? 'New Team' : `New ${entrantLabels.singular}`;
+              const entrantName = entrantType === 'team'
+                ? event?.discipline === 'motorsport' ? 'New Entrant' : 'New Team'
+                : `New ${entrantLabels.singular}`;
               const entrant = getEntrantsForEvent(catalog, eventId).find((item) => item.name === entrantName);
               updateEventCatalogState(catalog, eventId, selectedSessionId, selectedCategoryId);
               setSelectedEntrantId(entrant?.id);
@@ -2241,6 +2247,26 @@ export const RaceSweetMainApp = () => {
               updateEventCatalogState(catalog, eventId, selectedSessionId, selectedCategoryId);
               setSelectedEntrantId(nextEntrantId);
             }).catch((error: unknown) => setErrorState(error as Error));
+          }}
+          onImportEntrants={(eventId, records, _fileName, defaultCategoryId) => {
+            if (!eventCatalogService) {
+              return;
+            }
+            return eventCatalogService.importEntrants(eventId, records, defaultCategoryId).then((catalog) => {
+              const sessionId = selectedEntrantsResolvedEventId === eventId
+                ? selectedEntrantsResolvedSessionId
+                : getSessionsForEvent(catalog, eventId)[0]?.id;
+              const importedRaceState = sessionId ? eventCatalogService.getImportedRaceState(eventId, sessionId) : undefined;
+              if (eventId === eventCatalogState.activeEventId && sessionId === eventCatalogState.activeSessionId && importedRaceState) {
+                setSessionState(sessionFromPartialRaceState(importedRaceState));
+              }
+              updateEventCatalogState(catalog, eventId, sessionId, selectedCategoryId);
+              setSelectedEntrantId(getEntrantsForEvent(catalog, eventId).find((entrant) => entrant.entrantType === 'rider')?.id);
+              setRenderTick((tick) => tick + 1);
+            }).catch((error: unknown) => {
+              setErrorState(error as Error);
+              throw error;
+            });
           }}
           onSelectEntrant={setSelectedEntrantId}
           onSelectEvent={selectEntrantsEvent}
@@ -2301,6 +2327,7 @@ export const RaceSweetMainApp = () => {
             });
           }}
           raceState={displayedEntrantsRaceState}
+          selectedCategoryId={selectedCategoryEventId === selectedEntrantsResolvedEventId ? resolvedSelectedCategoryId : undefined}
           selectedEntrantId={selectedEntrantId}
           selectedEventId={selectedEntrantsResolvedEventId}
         />
@@ -2327,6 +2354,7 @@ export const RaceSweetMainApp = () => {
           categories={sessionScopedCategories}
           eventSessionOptions={eventSessionOptions}
           catalogEntrants={getEntrantsForEvent(eventCatalogState, selectedResultsEventId)}
+          event={timingEvent}
           onSelectEventSession={selectAnalyticsEventSession}
           raceState={displayedAnalyticsRaceState}
           selectedCategoryId={selectedCategoryId}

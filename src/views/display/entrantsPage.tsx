@@ -9,7 +9,9 @@ import {
   getEventDisciplineLabels,
   getSessionsForEvent,
 } from '../../catalog/eventCatalog.js';
+import { type EntrantImportRecord, parseEntrantImportBuffer } from '../../controllers/entrantImport.js';
 import { EventEntrantId } from '../../model/entrant.js';
+import { type EventCategoryId } from '../../model/eventcategory.js';
 import { type EventParticipant, type EventParticipantId, type ParticipantIdentifierUpdate } from '../../model/eventparticipant.js';
 import { EventId } from '../../model/raceevent.js';
 import { type RaceState } from '../../model/racestate.js';
@@ -24,12 +26,14 @@ interface EntrantsPageProps {
   enableMultiplePlates?: boolean;
   onCreateEntrant: (eventId: EventId, entrantType?: EntrantType) => void | Promise<void>;
   onDeleteEntrant: (eventId: EventId, entrantId: EventEntrantId) => void | Promise<void>;
+  onImportEntrants?: (eventId: EventId, records: EntrantImportRecord[], fileName: string, defaultCategoryId?: EventCategoryId) => void | Promise<void>;
   onSelectEntrant: (entrantId: EventEntrantId) => void;
   onSelectEvent: (eventId: EventId) => void;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
   onUpdateParticipantIdentifiers?: (participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: ParticipantIdentifierUpdate[]) => void | Promise<void>;
-  onUpdateEntrant: (entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>) => void | Promise<void>;
+  onUpdateEntrant: (entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'startOrder' | 'teamEntrantId' | 'teamMembers' | 'vehicle'>>) => void | Promise<void>;
   raceState?: Partial<RaceState>;
+  selectedCategoryId?: EventCategoryId;
   selectedEntrantId?: EventEntrantId;
   selectedEventId?: EventId;
 }
@@ -46,7 +50,9 @@ const getEntrantDraft = (entrant: EventCatalogEntrant | undefined): EntrantDraft
   lastName: entrant?.lastName || '',
   name: entrant?.name || '',
   notes: entrant?.notes || '',
+  startOrder: entrant?.startOrder?.toString() || '',
   teamEntrantId: entrant?.teamEntrantId || '',
+  vehicle: entrant?.vehicle || '',
 });
 
 const eventSupportsTeams = (catalog: EventCatalogState, eventId: EventId | undefined): boolean => {
@@ -87,10 +93,12 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
   const raceStateParticipants = props.raceState?.participants || [];
   const [selectedCategoryFilter, setSelectedCategoryFilter] = React.useState<string>(CATEGORY_FILTER_ALL);
+  const [importStatus, setImportStatus] = React.useState<string>('');
   const teamEntrants = eventEntrants.filter((entrant) => entrant.entrantType === 'team');
   const eventCategoryIds = new Set(eventCategories.map((category) => category.id.toString()));
   const eventCategoryKey = eventCategories.map((category) => category.id.toString()).join('|');
   const disciplineLabels = getEventDisciplineLabels(selectedEvent?.discipline);
+  const isMotorsport = selectedEvent?.discipline === 'motorsport';
 
   React.useEffect(() => {
     const validCategoryIds = new Set(eventCategoryKey.split('|').filter((categoryId) => categoryId.length > 0));
@@ -170,20 +178,26 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
         categoryId: entrantDraft.categoryId || undefined,
         name: entrantDraft.name,
         notes: entrantDraft.notes || undefined,
+        startOrder: isMotorsport && entrantDraft.startOrder ? Number(entrantDraft.startOrder) : undefined,
+        vehicle: isMotorsport ? entrantDraft.vehicle || undefined : undefined,
       });
       setSavedEntrantDraft(entrantDraft);
       return true;
     }
 
     await props.onUpdateEntrant(selectedEntrant.id, {
-      categoryId: entrantDraft.categoryId || undefined,
+      categoryId: isMotorsport ? undefined : entrantDraft.categoryId || undefined,
       dateOfBirth: entrantDraft.dateOfBirth || undefined,
       firstName: entrantDraft.firstName || undefined,
       gender: entrantDraft.gender === UNSPECIFIED_GENDER ? undefined : entrantDraft.gender,
       lastName: entrantDraft.lastName || undefined,
-      name: entrantDraft.name,
+      name: isMotorsport
+        ? `${entrantDraft.firstName} ${entrantDraft.lastName}`.trim() || selectedEntrant.name
+        : entrantDraft.name,
       notes: entrantDraft.notes || undefined,
+      startOrder: isMotorsport ? undefined : entrantDraft.startOrder ? Number(entrantDraft.startOrder) : undefined,
       teamEntrantId: entrantDraft.teamEntrantId || undefined,
+      vehicle: isMotorsport ? undefined : entrantDraft.vehicle || undefined,
     });
     setSavedEntrantDraft(entrantDraft);
     return true;
@@ -224,6 +238,47 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
         </select>
       </label>
       <label className="page-filter-label">
+        Entrant file
+        <input
+          accept=".csv,.txt,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain"
+          aria-label="Entrants Import File"
+          disabled={!selectedEvent || !props.onImportEntrants}
+          type="file"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (!file || !selectedEvent || !props.onImportEntrants) {
+              return;
+            }
+            setImportStatus(`Reading ${file.name}...`);
+            void file.arrayBuffer()
+              .then(async (buffer) => {
+                const records = parseEntrantImportBuffer(buffer);
+                setImportStatus(`Updating ${records.length} entrant record${records.length === 1 ? '' : 's'} from ${file.name}...`);
+                await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+                const selectedContextCategoryId = eventCategories.some((category) => (
+                  category.id.toString() === props.selectedCategoryId?.toString()
+                )) ? props.selectedCategoryId : undefined;
+                const defaultCategoryId = selectedContextCategoryId || (
+                  selectedCategoryFilter !== CATEGORY_FILTER_ALL &&
+                  selectedCategoryFilter !== CATEGORY_FILTER_UNASSIGNED
+                    ? selectedCategoryFilter
+                    : undefined
+                );
+                if (defaultCategoryId) {
+                  await props.onImportEntrants?.(selectedEvent.id, records, file.name, defaultCategoryId);
+                } else {
+                  await props.onImportEntrants?.(selectedEvent.id, records, file.name);
+                }
+                setImportStatus(`Imported ${records.length} entrant record${records.length === 1 ? '' : 's'} from ${file.name}.`);
+              })
+              .catch((error: unknown) => {
+                setImportStatus(error instanceof Error ? error.message : `Unable to import ${file.name}.`);
+              });
+          }}
+        />
+      </label>
+      {importStatus ? <p aria-live="polite" className="page-filter-status">{importStatus}</p> : null}
+      <label className="page-filter-label">
         Category
         <select
           aria-label="Entrants Category"
@@ -249,6 +304,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           riderEntrants={riderEntrants}
           selectedEntrant={selectedEntrant}
           selectedEventId={selectedEvent?.id}
+          isMotorsport={isMotorsport}
           singularLabel={disciplineLabels.singular}
           pluralLabel={disciplineLabels.plural}
           setCreateKind={setCreateKind}
@@ -266,6 +322,8 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           onSetEntrantDraft={setEntrantDraft}
           selectedEntrant={selectedEntrant}
           selectedTeamName={selectedTeamName}
+          isMotorsport={isMotorsport}
+          showVehicle={isMotorsport}
           teamMemberLabel={disciplineLabels.plural}
           teamEntrants={teamEntrants}
           teamMembers={selectedTeamMembers}

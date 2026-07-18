@@ -109,7 +109,9 @@ export class Session implements RaceState, RaceStateLookup {
       .forEach((record) => {
         const crossing = record as ParticipantPassingRecord;
         crossing.entrantId = undefined;
-        crossing.participantId = undefined;
+        if (!crossing.isGenerated) {
+          crossing.participantId = undefined;
+        }
         crossing.participantStartRecordId = undefined;
         crossing.startingLapRecordId = undefined;
       });
@@ -401,7 +403,9 @@ export class Session implements RaceState, RaceStateLookup {
       crossing.elapsedTime = undefined;
       crossing.lapNo = undefined;
       crossing.lapTime = undefined;
-      crossing.participantId = undefined;
+      if (!crossing.isGenerated) {
+        crossing.participantId = undefined;
+      }
       crossing.participantStartRecordId = undefined;
       crossing.startingLapRecordId = undefined;
     }
@@ -658,7 +662,9 @@ export class Session implements RaceState, RaceStateLookup {
         crossing.elapsedTime = undefined;
         crossing.lapNo = undefined;
         crossing.lapTime = undefined;
-        crossing.participantId = undefined;
+        if (!crossing.isGenerated) {
+          crossing.participantId = undefined;
+        }
         crossing.participantStartRecordId = undefined;
         crossing.startingLapRecordId = undefined;
       });

@@ -80,6 +80,30 @@ describe('lap calculation exclusion reasons', () => {
     expect(isPassingValid(passings[0]!)).toBe(false);
   });
 
+  it('keeps calculated minimum-lap exclusions authoritative over imported false flags', () => {
+    const { participant, source, startFlag } = createLapCalculationFixture();
+    const passing: ParticipantPassingRecord = {
+      elapsedTime: 59_999,
+      id: createTimeRecordId('persisted-passing-under-minimum'),
+      infoFlags: CROSSING_FLAG_LAP_UNDER_MINIMUM,
+      isExcluded: false,
+      isValid: true,
+      lapNo: 1,
+      lapTime: 59_999,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source,
+      startingLapRecordId: startFlag.id,
+      time: new Date('2026-05-29T10:00:59.999Z'),
+      unrelatedReasonCode: CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
+    };
+
+    expect(isPassingExcluded(passing)).toBe(true);
+    expect(isPassingValid(passing)).toBe(false);
+    expect(isCountedLapPassing(passing, [1])).toBe(false);
+  });
+
   it('ignores race crossings under the minimum lap time when calculating the next lap', () => {
     const { participant, source, startFlag } = createLapCalculationFixture();
     const passings: ParticipantPassingRecord[] = [

@@ -1,4 +1,4 @@
-import type { ParticipantPassingRecord, TimeRecord, Validated } from "../model/timerecord.js";
+import { isGeneratedMissingCrossing, type ParticipantPassingRecord, type TimeRecord, type Validated } from "../model/timerecord.js";
 import { assertValidTimeRecord, moveForwardIfUndefined } from "./crossingList.js";
 import { getChipIdentifier, isChipCrossing } from './chipCrossing.ts';
 import { getTransmitterIdentifier, isTransmitterCrossing } from './transmitter.ts';
@@ -118,14 +118,14 @@ export const isNotRecordType = (event: TimeRecord, recordType: number): boolean 
 export const isDeviceCrossing = (crossing: TimeRecord): crossing is (ChipCrossingData|TransponderCrossingData|TransmitterCrossingData) =>
   isTransmitterCrossing(crossing) || isTransponderCrossing(crossing) || isChipCrossing(crossing);
 
-export const isCrossingRecord = (crossing: TimeRecord): crossing is (AutomaticTimingIdentifiactionCrossing|PlateCrossingData) => {
+export const isCrossingRecord = (crossing: TimeRecord): crossing is (AutomaticTimingIdentifiactionCrossing|ParticipantPassingRecord|PlateCrossingData) => {
   if (isFlagRecord(crossing)) {
     return false;
   }
   if (isStartRecord(crossing)) {
     return false;
   }
-  return isDeviceCrossing(crossing) || isPlateCrossing(crossing);
+  return isDeviceCrossing(crossing) || isGeneratedMissingCrossing(crossing) || isPlateCrossing(crossing);
 };
 
 export const isIdentifiedCrossing = (crossing: TimeRecord): crossing is ParticipantPassingRecord => {

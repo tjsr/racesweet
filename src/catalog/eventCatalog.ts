@@ -13,6 +13,23 @@ export type EventSessionKind = 'practice' | 'qualifying' | 'race' | 'warmup' | '
 export type EventSessionStatus = 'draft' | 'scheduled' | 'live' | 'completed';
 export type EntrantType = 'rider' | 'team';
 
+export interface EventTrackTimingLine {
+  label?: string;
+  lineNumber: number;
+  progress: number;
+}
+
+export interface EventTrackMap {
+  gpxContent?: string;
+  gpxFileName?: string;
+  racingLineCsvContent?: string;
+  racingLineCsvFileName?: string;
+  sourceType?: 'gpx' | 'racetrack-csv';
+  timingLines: EventTrackTimingLine[];
+  trackCsvContent?: string;
+  trackCsvFileName?: string;
+}
+
 export interface CategoryDistanceTime {
   kind: 'time';
   value: string;
@@ -68,6 +85,7 @@ export interface EventCatalogEntrant {
   name: string;
   notes?: string;
   sessionIds?: SessionId[];
+  startOrder?: number;
   teamEntrantId?: EventEntrantId;
   teamMembers?: Array<{
     categoryId?: EventCategoryId;
@@ -77,6 +95,7 @@ export interface EventCatalogEntrant {
     lastName: string;
     participantId: EventParticipantId;
   }>;
+  vehicle?: string;
 }
 
 export interface EventCatalogEvent {
@@ -90,6 +109,7 @@ export interface EventCatalogEvent {
   name: string;
   sessionIds: SessionId[];
   timeZone?: string;
+  trackMap?: EventTrackMap;
 }
 
 export interface EventCatalogSession {

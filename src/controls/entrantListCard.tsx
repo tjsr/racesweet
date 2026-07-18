@@ -6,8 +6,10 @@ interface EntrantListCartProps {
   entrant: EventCatalogEntrant;
   entrantLabel?: string;
   isSelected: boolean;
+  relationshipLabel?: string;
   onSelect: () => void;
   raceNumber?: string | number;
+  showCategory?: boolean;
   timingDevices?: Array<string | number>;
   teamName?: string;
 }
@@ -43,7 +45,7 @@ export const EntrantListCard = (props: EntrantListCartProps): React.ReactElement
           </div>
         ) : null}
       </div>
-      {props.entrant.entrantType === 'rider' ? (
+      {props.showCategory !== false && props.categoryName ? (
         <span className="entrant-category-chip">
           {props.categoryName || 'No category'}
         </span>
@@ -51,7 +53,7 @@ export const EntrantListCard = (props: EntrantListCartProps): React.ReactElement
       <div className="entrant-list-team-row">
         {props.entrant.entrantType === 'rider' && props.teamName ? (
           <span className="entrant-team-chip">
-            Team: {props.teamName}
+            {props.relationshipLabel || 'Team'}: {props.teamName}
           </span>
         ) : null}
         <span className="entrant-list-type">{props.entrant.entrantType === 'rider' ? (props.entrantLabel || 'Driver').toLowerCase() : props.entrant.entrantType}</span>

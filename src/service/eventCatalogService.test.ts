@@ -17,6 +17,7 @@ import { createSeedEventCatalogLedger } from '../ledger/createSeedEventCatalogLe
 import {
   type EventCatalogLedger,
   applyEventCatalogLedger,
+  applyEventCatalogMutation,
   createDefaultEventCatalogLedger,
 } from '../ledger/eventCatalogLedger.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
@@ -523,6 +524,215 @@ describe('EventCatalogService', () => {
       memberParticipantIds: [participantId],
       name: 'Direct Entrant',
     }));
+  });
+
+  it('imports motorsport entrants by transmitter, enriches placeholders, and keeps multiple team vehicles distinct', async () => {
+    const onPersistedLedger = vi.fn(async () => undefined);
+    const service = await EventCatalogService.create(createPersistence(createSeedEventCatalogLedger()), { onPersistedLedger });
+    const placeholderEntrantId = createEventEntrantId('entrant-import-placeholder');
+    const placeholderParticipantId = createEventParticipantId('entrant-import-placeholder');
+    const placeholderParticipant: EventParticipant = {
+      categoryId: SEED_PREMIER_CATEGORY_ID,
+      currentResult: undefined,
+      entrantId: placeholderEntrantId,
+      firstname: '',
+      id: placeholderParticipantId,
+      identifiers: [{ fromTime: undefined, toTime: undefined, txNo: '98' }] as ParticipantTransponder[],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: '',
+    };
+    await service.updateEvent(SEED_EVENT_ID, { discipline: 'motorsport' });
+    await service.updateImportedRaceState(SEED_EVENT_ID, SEED_RACE_SESSION_ID, {
+      categories: getCategoriesForEvent(service.catalog, SEED_EVENT_ID),
+      participants: [placeholderParticipant],
+      records: [],
+      teams: [],
+      timeRecordSources: [],
+    });
+    onPersistedLedger.mockClear();
+
+    const catalog = await service.importEntrants(SEED_EVENT_ID, [
+      {
+        entrantName: 'Penske Racing',
+        firstName: 'Rick',
+        fullName: 'Rick Mears',
+        lastName: 'Mears',
+        raceNumber: '3',
+        startOrder: 1,
+        transponderNumber: '98',
+        vehicle: 'Penske/Chevrolet Indy A',
+      },
+      {
+        entrantName: 'Penske Racing',
+        firstName: 'Second',
+        fullName: 'Second Driver',
+        lastName: 'Driver',
+        raceNumber: '10',
+        startOrder: 5,
+        transponderNumber: '32',
+        vehicle: 'Lola/Chevrolet Indy A',
+      },
+    ]);
+
+    const importedRiders = getEntrantsForEvent(catalog, SEED_EVENT_ID).filter((entrant) => (
+      entrant.name === 'Rick Mears' || entrant.name === 'Second Driver'
+    ));
+    const matchedPlaceholder = importedRiders.find((entrant) => entrant.name === 'Rick Mears');
+    const matchedPlaceholderEntrant = getEntrantsForEvent(catalog, SEED_EVENT_ID)
+      .find((entrant) => entrant.id === matchedPlaceholder?.teamEntrantId);
+    const secondDriver = importedRiders.find((entrant) => entrant.name === 'Second Driver');
+    const secondDriverEntrant = getEntrantsForEvent(catalog, SEED_EVENT_ID)
+      .find((entrant) => entrant.id === secondDriver?.teamEntrantId);
+    expect(importedRiders).toHaveLength(2);
+    expect(matchedPlaceholder?.id).toBe(placeholderEntrantId);
+    expect(matchedPlaceholder).toEqual(expect.objectContaining({
+      firstName: 'Rick',
+      lastName: 'Mears',
+      categoryId: undefined,
+      categoryIds: [],
+      teamEntrantId: matchedPlaceholderEntrant?.id,
+      vehicle: undefined,
+    }));
+    expect(getParticipantRacePlate({
+      ...placeholderParticipant,
+      identifiers: matchedPlaceholder?.identifiers || [],
+    })).toBe('3');
+    expect(matchedPlaceholderEntrant).toEqual(expect.objectContaining({
+      name: 'Penske Racing',
+      startOrder: 1,
+      vehicle: 'Penske/Chevrolet Indy A',
+    }));
+    expect(secondDriverEntrant).toEqual(expect.objectContaining({
+      name: 'Penske Racing',
+      startOrder: 5,
+      vehicle: 'Lola/Chevrolet Indy A',
+    }));
+    expect(new Set(importedRiders.map((entrant) => entrant.id)).size).toBe(2);
+
+    const importedRaceState = service.getImportedRaceState(SEED_EVENT_ID, SEED_RACE_SESSION_ID);
+    const enrichedParticipant = importedRaceState?.participants?.find((participant) => participant.id === placeholderParticipantId);
+    expect(enrichedParticipant).toEqual(expect.objectContaining({
+      entrantId: matchedPlaceholderEntrant?.id,
+      firstname: 'Rick',
+      surname: 'Mears',
+    }));
+    expect(getParticipantRacePlate(enrichedParticipant!)).toBe('3');
+    expect(importedRaceState?.participants).toHaveLength(2);
+    expect(importedRaceState?.teams).toHaveLength(2);
+    expect(onPersistedLedger).toHaveBeenCalledTimes(1);
+  });
+
+  it('matches entrant imports by driver name and then reuses the allocated race number', async () => {
+    const service = await EventCatalogService.create(createPersistence(createSeedEventCatalogLedger()));
+    await service.createEntrant(SEED_EVENT_ID, 'rider');
+    const createdEntrant = getEntrantsForEvent(service.catalog, SEED_EVENT_ID).find((entrant) => entrant.name === 'New Driver');
+    expect(createdEntrant).toBeDefined();
+    await service.updateEntrant(createdEntrant!.id, {
+      firstName: 'Casey',
+      lastName: 'Jones',
+      name: 'Casey Jones',
+    });
+
+    await service.importEntrants(SEED_EVENT_ID, [{
+      firstName: 'Casey',
+      fullName: 'Casey Jones',
+      lastName: 'Jones',
+      raceNumber: '44',
+    }]);
+    await service.importEntrants(SEED_EVENT_ID, [{
+      firstName: 'Casey',
+      fullName: 'Casey Jones-Smith',
+      lastName: 'Jones-Smith',
+      raceNumber: '44',
+      transponderNumber: '744',
+    }]);
+
+    const updatedEntrant = getEntrantsForEvent(service.catalog, SEED_EVENT_ID).find((entrant) => entrant.id === createdEntrant!.id);
+    expect(updatedEntrant).toEqual(expect.objectContaining({
+      firstName: 'Casey',
+      lastName: 'Jones-Smith',
+      name: 'Casey Jones-Smith',
+    }));
+    expect(updatedEntrant?.identifiers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ racePlate: '44' }),
+      expect.objectContaining({ txNo: '744' }),
+    ]));
+    expect(getEntrantsForEvent(service.catalog, SEED_EVENT_ID).filter((entrant) => entrant.name.includes('Casey'))).toHaveLength(1);
+  });
+
+  it('updates a full grid of existing transmitter placeholders without replacing participant IDs', async () => {
+    const service = await EventCatalogService.create(createPersistence(createSeedEventCatalogLedger()));
+    const placeholderParticipants = Array.from({ length: 34 }, (_, index): EventParticipant => {
+      const transmitterNumber = index + 1;
+      return {
+        categoryId: SEED_PREMIER_CATEGORY_ID,
+        currentResult: undefined,
+        entrantId: createEventEntrantId(`full-grid-placeholder-${transmitterNumber}`),
+        firstname: '',
+        id: createEventParticipantId(`full-grid-placeholder-${transmitterNumber}`),
+        identifiers: [{ fromTime: undefined, toTime: undefined, txNo: transmitterNumber }] as ParticipantTransponder[],
+        lastRecordTime: null,
+        resultDuration: null,
+        surname: '',
+      };
+    });
+    await service.updateEvent(SEED_EVENT_ID, { discipline: 'motorsport' });
+    await service.updateImportedRaceState(SEED_EVENT_ID, SEED_RACE_SESSION_ID, {
+      categories: getCategoriesForEvent(service.catalog, SEED_EVENT_ID),
+      participants: placeholderParticipants,
+      records: [],
+      teams: [],
+      timeRecordSources: [],
+    });
+    const importRecords = placeholderParticipants.slice(0, 33).map((participant, index) => ({
+      entrantName: `Team ${Math.floor(index / 3) + 1}`,
+      firstName: `Driver${index + 1}`,
+      fullName: `Driver${index + 1} Surname${index + 1}`,
+      lastName: `Surname${index + 1}`,
+      raceNumber: `${index + 101}`,
+      startOrder: index + 1,
+      transponderNumber: `${index + 1}`,
+      vehicle: `Vehicle ${index + 1}`,
+    }));
+
+    await service.importEntrants(SEED_EVENT_ID, importRecords);
+
+    const importedRaceState = service.getImportedRaceState(SEED_EVENT_ID, SEED_RACE_SESSION_ID);
+    expect(importedRaceState?.participants).toHaveLength(34);
+    placeholderParticipants.slice(0, 33).forEach((placeholder, index) => {
+      const participant = importedRaceState?.participants?.find((candidate) => candidate.id === placeholder.id);
+      const entrant = getEntrantsForEvent(service.catalog, SEED_EVENT_ID).find((candidate) => (
+        candidate.id === placeholder.entrantId
+      ));
+      expect(participant).toEqual(expect.objectContaining({
+        firstname: `Driver${index + 1}`,
+        id: placeholder.id,
+        surname: `Surname${index + 1}`,
+      }));
+      expect(getParticipantRacePlate(participant!)).toBe(`${index + 101}`);
+      const parentEntrant = getEntrantsForEvent(service.catalog, SEED_EVENT_ID).find((candidate) => (
+        candidate.id === entrant?.teamEntrantId
+      ));
+      expect(entrant).toEqual(expect.objectContaining({
+        id: placeholder.entrantId,
+        name: `Driver${index + 1} Surname${index + 1}`,
+        categoryId: undefined,
+        categoryIds: [],
+        startOrder: undefined,
+        vehicle: undefined,
+      }));
+      expect(parentEntrant).toEqual(expect.objectContaining({
+        categoryId: SEED_PREMIER_CATEGORY_ID,
+        startOrder: index + 1,
+        vehicle: `Vehicle ${index + 1}`,
+      }));
+    });
+    const unmatchedParticipant = importedRaceState?.participants?.find((candidate) => (
+      candidate.id === placeholderParticipants[33]?.id
+    ));
+    expect(unmatchedParticipant?.firstname).toBe('');
+    expect(unmatchedParticipant?.surname).toBe('');
   });
 
   it('creates a parent entrant for an imported unknown-transmitter participant', async () => {
@@ -1130,13 +1340,22 @@ describe('EventCatalogService', () => {
 
   it('updates event, session, and category rule details through immutable ledger changes', async () => {
     const seededPersistence = createPersistence(createSeedEventCatalogLedger());
-    const service = await EventCatalogService.create(seededPersistence);
+    const onPersistedLedger = vi.fn(async (_ledger: EventCatalogLedger) => undefined);
+    const service = await EventCatalogService.create(seededPersistence, { onPersistedLedger });
 
     await service.updateEvent(SEED_EVENT_ID, {
       format: 'track-day',
       minimumLapTimeMilliseconds: 75000,
       name: 'RaceSweet Open Track Day',
       timeZone: 'Australia/Brisbane',
+      trackMap: {
+        racingLineCsvContent: '# x_m,y_m\n1,1\n9,1',
+        racingLineCsvFileName: 'IMS-raceline.csv',
+        sourceType: 'racetrack-csv',
+        timingLines: [{ label: 'Finish', lineNumber: 1, progress: 0.75 }],
+        trackCsvContent: '# x_m,y_m,w_tr_right_m,w_tr_left_m\n0,0,5,5\n10,0,5,5',
+        trackCsvFileName: 'IMS-track.csv',
+      },
     });
     await service.updateSession(SEED_PRACTICE_SESSION_ID, {
       minimumLapTimeMilliseconds: 45000,
@@ -1165,6 +1384,14 @@ describe('EventCatalogService', () => {
     expect(event?.format).toBe('track-day');
     expect(event?.minimumLapTimeMilliseconds).toBe(75000);
     expect(event?.timeZone).toBe('Australia/Brisbane');
+    expect(event?.trackMap).toEqual({
+      racingLineCsvContent: '# x_m,y_m\n1,1\n9,1',
+      racingLineCsvFileName: 'IMS-raceline.csv',
+      sourceType: 'racetrack-csv',
+      timingLines: [{ label: 'Finish', lineNumber: 1, progress: 0.75 }],
+      trackCsvContent: '# x_m,y_m,w_tr_right_m,w_tr_left_m\n0,0,5,5\n10,0,5,5',
+      trackCsvFileName: 'IMS-track.csv',
+    });
     expect(session?.name).toBe('Friday Free Practice');
     expect(session?.minimumLapTimeMilliseconds).toBe(45000);
     expect(session?.status).toBe('live');
@@ -1172,6 +1399,14 @@ describe('EventCatalogService', () => {
     expect(category?.distanceRule).toEqual({ kind: 'time', value: '1:45' });
     expect(category?.teamRules?.maxTeamSize).toBe(3);
     expect(seededPersistence.save).toHaveBeenCalledTimes(4);
+    expect(onPersistedLedger).toHaveBeenCalledTimes(4);
+    expect(onPersistedLedger).toHaveBeenCalledWith(expect.objectContaining({
+      mutations: expect.arrayContaining([expect.objectContaining({
+        changes: expect.objectContaining({ trackMap: expect.any(Object) }),
+        eventId: SEED_EVENT_ID,
+        type: 'event-updated',
+      })]),
+    }));
   });
 
   it('replaces a session import without retaining its stale categories or entrants', async () => {
@@ -1280,6 +1515,38 @@ describe('EventCatalogService', () => {
     expect(matchingUpdates).toHaveLength(1);
     expect(seededPersistence.save).toHaveBeenCalledTimes(1);
   });
+
+  it('applies a batch import incrementally when the ledger has a long mutation history', async () => {
+    const seed = createSeedEventCatalogLedger();
+    const historicalMutations: EventCatalogLedger['mutations'] = Array.from({ length: 10_000 }, (_, index) => ({
+      changes: { name: index % 2 === 0 ? 'Historical Event A' : 'Historical Event B' },
+      eventId: SEED_EVENT_ID,
+      id: createId(`long-ledger-event-update-${index}`),
+      timestamp: `2026-07-17T00:${(index % 60).toString().padStart(2, '0')}:00.000Z`,
+      type: 'event-updated' as const,
+    }));
+    const persistence = createPersistence({
+      ...seed,
+      mutations: [...seed.mutations, ...historicalMutations],
+    });
+    const service = await EventCatalogService.create(persistence);
+    const importRecords = Array.from({ length: 33 }, (_, index) => ({
+      firstName: `Imported${index + 1}`,
+      fullName: `Imported${index + 1} Driver`,
+      lastName: 'Driver',
+      raceNumber: `${index + 1}`,
+      transponderNumber: `${index + 1}`,
+    }));
+    const startedAt = performance.now();
+
+    await service.importEntrants(SEED_EVENT_ID, importRecords);
+
+    const elapsedMilliseconds = performance.now() - startedAt;
+    expect(getEntrantsForEvent(service.catalog, SEED_EVENT_ID).filter((entrant) => (
+      entrant.name.startsWith('Imported')
+    ))).toHaveLength(33);
+    expect(elapsedMilliseconds).toBeLessThan(2_000);
+  }, 15_000);
 
   it('persists bulk session updates as one service notification', async () => {
     const seededPersistence = createPersistence(createSeedEventCatalogLedger());
@@ -2997,6 +3264,128 @@ describe('EventCatalogService', () => {
     expect(entrant?.categoryIds).toEqual([]);
   });
 
+  it('migrates entrants from named placeholder categories when a later import identifies the category', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+    const placeholderCategoryId = createCategoryId('multi-stage-placeholder-premier');
+    const identifiedCategoryId = createCategoryId('multi-stage-identified-premier');
+    const teamEntrantId = createEventEntrantId('multi-stage-premier-team');
+    const firstParticipantId = createEventParticipantId('multi-stage-premier-first');
+    const secondParticipantId = createEventParticipantId('multi-stage-premier-second');
+
+    await service.syncEventScaffold(SEED_EVENT_ID, [{
+      code: 'MISSING',
+      id: placeholderCategoryId,
+      isPlaceholder: true,
+      name: 'Missing category Premier',
+    }], [{
+      categoryId: placeholderCategoryId,
+      currentResult: undefined,
+      entrantId: teamEntrantId,
+      firstname: 'Avery',
+      id: firstParticipantId,
+      identifiers: [],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Driver',
+    }, {
+      categoryId: placeholderCategoryId,
+      currentResult: undefined,
+      entrantId: teamEntrantId,
+      firstname: 'Blake',
+      id: secondParticipantId,
+      identifiers: [],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Driver',
+    }]);
+
+    expect(service.catalog.categories.find((category) => category.id === placeholderCategoryId)?.isPlaceholder).toBe(true);
+    expect(service.catalog.entrants.find((entrant) => entrant.id === teamEntrantId)).toEqual(expect.objectContaining({
+      categoryId: placeholderCategoryId,
+      categoryIds: [placeholderCategoryId],
+    }));
+
+    await service.syncEventScaffold(SEED_EVENT_ID, [{
+      code: 'PREM',
+      id: identifiedCategoryId,
+      name: 'Premier',
+    }], []);
+
+    const migratedTeam = service.catalog.entrants.find((entrant) => entrant.id === teamEntrantId);
+    expect(migratedTeam).toEqual(expect.objectContaining({
+      categoryId: identifiedCategoryId,
+      categoryIds: [identifiedCategoryId],
+    }));
+    expect(migratedTeam?.teamMembers?.map((member) => member.categoryId)).toEqual([
+      identifiedCategoryId,
+      identifiedCategoryId,
+    ]);
+  });
+
+  it('uses the selected import category to replace matched placeholder entrant and participant categories', async () => {
+    const seededPersistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(seededPersistence);
+    const seedEntrant = service.catalog.entrants.find((entrant) => entrant.id === SEED_ENTRANT_ID)!;
+    const participantId = seedEntrant.memberParticipantIds[0]!;
+    const unmatchedParticipantId = createEventParticipantId('placeholder-participant-without-catalog-entrant');
+
+    await service.updateCategory(SEED_CLUBMAN_CATEGORY_ID, { name: 'Unknown participants' });
+    await service.updateEntrant(SEED_ENTRANT_ID, {
+      categoryId: SEED_CLUBMAN_CATEGORY_ID,
+      identifiers: [{ fromTime: undefined, toTime: undefined, txNo: '91' }] as ParticipantTransponder[],
+    });
+    await service.updateImportedRaceState(SEED_EVENT_ID, SEED_RACE_SESSION_ID, {
+      categories: getCategoriesForEvent(service.catalog, SEED_EVENT_ID),
+      participants: [{
+        categoryId: SEED_CLUBMAN_CATEGORY_ID,
+        currentResult: undefined,
+        entrantId: SEED_ENTRANT_ID,
+        firstname: 'Seed',
+        id: participantId,
+        identifiers: [{ fromTime: undefined, toTime: undefined, txNo: '91' }] as ParticipantTransponder[],
+        lastRecordTime: null,
+        resultDuration: null,
+        surname: 'Entrant',
+      }, {
+        categoryId: SEED_CLUBMAN_CATEGORY_ID,
+        currentResult: undefined,
+        entrantId: createEventEntrantId('placeholder-participant-without-catalog-entrant'),
+        firstname: 'Unscaffolded',
+        id: unmatchedParticipantId,
+        identifiers: [{ fromTime: undefined, toTime: undefined, txNo: '92' }] as ParticipantTransponder[],
+        lastRecordTime: null,
+        resultDuration: null,
+        surname: 'Driver',
+      }],
+      records: [],
+      teams: [],
+      timeRecordSources: [],
+    });
+
+    await service.importEntrants(SEED_EVENT_ID, [{
+      firstName: 'Seed',
+      lastName: 'Entrant',
+      transponderNumber: '91',
+    }, {
+      firstName: 'Unscaffolded',
+      lastName: 'Driver',
+      transponderNumber: '92',
+    }], SEED_PREMIER_CATEGORY_ID);
+
+    const importedEntrant = service.catalog.entrants.find((entrant) => entrant.id === SEED_ENTRANT_ID);
+    const importedParticipant = service.getImportedRaceState(SEED_EVENT_ID, SEED_RACE_SESSION_ID)
+      ?.participants?.find((participant) => participant.id === participantId);
+    const importedUnscaffoldedParticipant = service.getImportedRaceState(SEED_EVENT_ID, SEED_RACE_SESSION_ID)
+      ?.participants?.find((participant) => participant.id === unmatchedParticipantId);
+    expect(importedEntrant).toEqual(expect.objectContaining({
+      categoryId: SEED_PREMIER_CATEGORY_ID,
+      categoryIds: [SEED_PREMIER_CATEGORY_ID],
+    }));
+    expect(importedParticipant?.categoryId).toBe(SEED_PREMIER_CATEGORY_ID);
+    expect(importedUnscaffoldedParticipant?.categoryId).toBe(SEED_PREMIER_CATEGORY_ID);
+  });
+
   it('uses master entrant profiles to backfill missing participant names and profile fields', async () => {
     const seededPersistence = createPersistence(createSeedEventCatalogLedger());
     const service = await EventCatalogService.create(seededPersistence);
@@ -3100,6 +3489,20 @@ describe('EventCatalogService', () => {
 });
 
 describe('applyEventCatalogLedger', () => {
+  it('applies one mutation to an already rebuilt state', () => {
+    const state = applyEventCatalogLedger(createSeedEventCatalogLedger());
+    const updatedState = applyEventCatalogMutation(state, {
+      changes: { name: 'Incrementally Updated Event' },
+      eventId: SEED_EVENT_ID,
+      id: createId('incremental-event-update'),
+      timestamp: '2026-07-18T00:00:00.000Z',
+      type: 'event-updated',
+    });
+
+    expect(updatedState.events.find((event) => event.id === SEED_EVENT_ID)?.name).toBe('Incrementally Updated Event');
+    expect(state.events.find((event) => event.id === SEED_EVENT_ID)?.name).not.toBe('Incrementally Updated Event');
+  });
+
   it('rebuilds state from immutable mutations', () => {
     const state = applyEventCatalogLedger(createSeedEventCatalogLedger());
 

@@ -2,17 +2,23 @@
 
 import { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
-import type { EventCatalogEntrant } from '../../catalog/eventCatalog.js';
 import { tableTimeString } from '../../app/utils/timeutils.js';
+import type { EventCatalogEntrant, EventCatalogEvent } from '../../catalog/eventCatalog.js';
 import { CategoryId } from '../../controllers/category.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordSourceId } from '../../model/ids.js';
 import type { RaceStateLookup, Session } from '../../model/racestate.js';
-import { CROSSING_UNRELATED_AFTER_FINISH, type ParticipantPassingRecord } from '../../model/timerecord.js';
+import {
+  CROSSING_FLAG_LAP_UNDER_MINIMUM,
+  CROSSING_UNRELATED_AFTER_FINISH,
+  CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
+  type ParticipantPassingRecord,
+} from '../../model/timerecord.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 import { ReportsPage, ResultsPage } from './raceAnalyticsViews.js';
+import { RecentRecords } from './recent.js';
 
 const setSelectValue = (select: HTMLSelectElement, value: string): void => {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
@@ -360,6 +366,102 @@ describe('race analytics views integration', () => {
     expect(lapRows.map((row) => row.querySelectorAll('td')[1]?.textContent)).toEqual(['1:10.000', '0:55.000']);
     expect(container.textContent).toContain('0:55.000');
     expect(container.textContent).not.toContain('0:00.500');
+  });
+
+  it('uses the same finish-line and minimum-lap rules in Timing, Results, and Reports', async () => {
+    const soloParticipantId = createEventParticipantId('p-rider-1');
+    const soloEntrantId = createEventEntrantId('rider-1');
+    const firstLap = {
+      ...createLap('parity-lap-1', soloParticipantId, soloEntrantId, 1, 90_000, 90_000),
+      chipCode: 12_345,
+      lineNumber: 1,
+    };
+    const fastestCountedLap = {
+      ...createLap('parity-lap-2', soloParticipantId, soloEntrantId, 2, 160_000, 70_000),
+      chipCode: 12_345,
+      lineNumber: 1,
+    };
+    const sectorCrossing = {
+      ...createLap('parity-sector', soloParticipantId, soloEntrantId, 2, 161_000, 1_000),
+      chipCode: 12_345,
+      lineNumber: 2,
+    };
+    const underMinimumLap = {
+      ...createLap('parity-under-minimum', soloParticipantId, soloEntrantId, 2, 170_000, 10_000),
+      chipCode: 12_345,
+      infoFlags: CROSSING_FLAG_LAP_UNDER_MINIMUM,
+      lineNumber: 1,
+      unrelatedReasonCode: CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
+    };
+    const parityLaps = [firstLap, fastestCountedLap, sectorCrossing, underMinimumLap];
+    const parityRaceState = {
+      ...raceState,
+      getFinishLineNumbers: () => [1],
+      getParticipantLaps: (participantId: EventParticipantId) => participantId === soloParticipantId
+        ? parityLaps
+        : [],
+      records: parityLaps,
+    } as unknown as Session & RaceStateLookup;
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={parityRaceState}
+          records={parityLaps}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />,
+      );
+    });
+
+    const timingFastestRow = container.querySelector('tr[data-record-id="parity-lap-2"]');
+    const timingUnderMinimumRow = container.querySelector('tr[data-record-id="parity-under-minimum"]');
+    expect(timingFastestRow).toBeTruthy();
+    expect(timingUnderMinimumRow).toBeTruthy();
+    expect(timingFastestRow!.querySelector('.overallFastest')).toBeTruthy();
+    expect(timingUnderMinimumRow!.querySelector('.overallFastest')).toBeFalsy();
+
+    await act(async () => {
+      root.render(
+        <ResultsPage
+          categories={categories}
+          catalogEntrants={catalogEntrants}
+          raceState={parityRaceState}
+        />,
+      );
+    });
+
+    const resultsRow = Array.from(container.querySelectorAll('table[aria-label="Results Table"] tbody tr'))
+      .find((row) => row.textContent?.includes('Solo Rider'));
+    expect(Array.from(resultsRow!.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
+      '1',
+      'Solo Rider',
+      'Category B',
+      '2',
+      '2:40.000',
+      '1:10.000',
+    ]);
+
+    await act(async () => {
+      root.render(
+        <ReportsPage
+          categories={categories}
+          catalogEntrants={catalogEntrants}
+          raceState={parityRaceState}
+        />,
+      );
+    });
+
+    const reportsRow = Array.from(container.querySelectorAll('table[aria-label="Fastest Laps Report Table"] tbody tr'))
+      .find((row) => row.textContent?.includes('Solo Rider'));
+    expect(Array.from(reportsRow!.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
+      soloParticipantId,
+      'Solo Rider',
+      'Category B',
+      '1:10.000',
+      '2',
+      '2',
+    ]);
   });
 
   it('uses the Timing source-loop lap-completion rules in Results and Reports', async () => {
@@ -771,6 +873,91 @@ describe('race analytics views integration', () => {
     });
 
     expect(container.querySelector('svg.lap-chart-line-overlay')).toBeFalsy();
+  });
+
+  it('renders the GPX track-map report with playback controls and clickable entrant state', async () => {
+    const trackRecords = Array.from(lapsByParticipant.values()).flat().map((record) => ({
+      ...record,
+      lineNumber: 1,
+      time: record.participantId === createEventParticipantId('p-rider-1')
+        ? new Date(`2026-06-12T10:04:${String(record.lapNo).padStart(2, '0')}.000Z`)
+        : record.time,
+      txNumber: 7,
+    }));
+    const trackRaceState = {
+      ...raceState,
+      getFinishLineNumbers: () => [1],
+      records: trackRecords,
+    } as unknown as Session & RaceStateLookup;
+    const event: EventCatalogEvent = {
+      categoryIds: [createCategoryId('cat-a'), createCategoryId('cat-b')],
+      date: '2026-06-12',
+      entrantIds: catalogEntrants.map((entrant) => entrant.id),
+      format: 'race-weekend',
+      id: createEventId('event-1'),
+      name: 'Winter Round',
+      sessionIds: [createSessionId('session-1')],
+      timeZone: 'Australia/Sydney',
+      trackMap: {
+        racingLineCsvContent: '# x_m,y_m\n1,1\n9,1\n9,9\n1,9',
+        racingLineCsvFileName: 'IMS.csv',
+        sourceType: 'racetrack-csv',
+        timingLines: [{ label: 'Finish', lineNumber: 1, progress: 0.25 }],
+        trackCsvContent: '# x_m,y_m,w_tr_right_m,w_tr_left_m\n0,0,1,1\n10,0,1,1\n10,10,1,1\n0,10,1,1',
+        trackCsvFileName: 'IMS.csv',
+      },
+    };
+
+    await act(async () => {
+      root.render(
+        <ReportsPage
+          categories={categories}
+          catalogEntrants={catalogEntrants}
+          event={event}
+          raceState={trackRaceState}
+        />,
+      );
+    });
+
+    const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
+    await act(async () => {
+      setSelectValue(reportSelect, 'track-map');
+    });
+
+    expect(container.querySelector('svg[aria-label="Track Map"]')).toBeTruthy();
+    expect(container.querySelector('polyline[aria-label="Racing Line"]')).toBeTruthy();
+    expect(container.querySelector('input[aria-label="Track Map Session Progress"]')).toBeTruthy();
+    expect(container.querySelector('circle[aria-label="Timing line 1"]')).toBeTruthy();
+    const speedSelect = container.querySelector('select[aria-label="Track Map Playback Speed"]') as HTMLSelectElement;
+    expect(Array.from(speedSelect.options).map((option) => option.textContent)).toContain('0.1x');
+    expect(Array.from(speedSelect.options).map((option) => option.textContent)).toContain('100x');
+    expect(container.textContent).toContain('Event elapsed time:');
+    expect(container.textContent).toContain('Time of day:');
+
+    const entrantMarker = container.querySelector('g[aria-label^="Track entrant"]') as SVGGElement;
+    expect(entrantMarker).toBeTruthy();
+    const selectedMarkerLabel = entrantMarker.getAttribute('aria-label');
+    await act(async () => {
+      entrantMarker.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.querySelector('[aria-label="Selected Track Entrant"]')).toBeTruthy();
+    expect(container.textContent).toContain('Race position:');
+    expect(container.textContent).toContain('Fastest lap:');
+    expect(container.textContent).toContain('Last lap:');
+    expect(container.textContent).toContain('Laps:');
+    expect(container.textContent).toContain('Race elapsed:');
+
+    const progressSlider = container.querySelector('input[aria-label="Track Map Session Progress"]') as HTMLInputElement;
+    await act(async () => {
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+      descriptor?.set?.call(progressSlider, progressSlider.max);
+      progressSlider.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(container.querySelector('[aria-label="DNF Entrants"]')).toBeTruthy();
+    expect(container.querySelector(`g[aria-label="${selectedMarkerLabel}"]`)).toBeFalsy();
+    expect(container.querySelector('[aria-label="Selected Track Entrant"]')?.textContent).toContain('Race position: DNF');
   });
 });
 

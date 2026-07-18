@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { type Root, createRoot } from 'react-dom/client';
+import * as XLSX from 'xlsx';
 import { EntrantsPage } from './entrantsPage.js';
 import { type EventCatalogState } from '../../catalog/eventCatalog.js';
 import { type EventCatalogLedger, applyEventCatalogLedger, createDefaultEventCatalogLedger } from '../../ledger/eventCatalogLedger.js';
@@ -407,11 +408,15 @@ describe('EntrantsPage integration', () => {
     const onSelectEntrant = vi.fn();
     const onSelectEvent = vi.fn();
     const onUpdateEntrant = vi.fn();
+    const motorsportCatalog: EventCatalogState = {
+      ...catalog,
+      events: catalog.events.map((event) => event.id === 'event-1' ? { ...event, discipline: 'motorsport' } : event),
+    };
 
     await act(async () => {
       root.render(
         <EntrantsPage
-          catalog={catalog}
+          catalog={motorsportCatalog}
           onCreateEntrant={onCreateEntrant}
           onDeleteEntrant={onDeleteEntrant}
           onSelectEntrant={onSelectEntrant}
@@ -427,24 +432,27 @@ describe('EntrantsPage integration', () => {
     const surnameInput = container.querySelector('input[aria-label="Entrant Surname"]') as HTMLInputElement;
     const genderInput = container.querySelector('select[aria-label="Entrant Gender"]') as HTMLSelectElement;
     const dobInput = container.querySelector('input[aria-label="Entrant Date Of Birth"]') as HTMLInputElement;
-    const categoryInput = container.querySelector('select[aria-label="Entrant Category"]') as HTMLSelectElement;
     const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Entrant');
+
+    expect(container.querySelector('input[aria-label="Entrant Name"]')).toBeNull();
+    expect(container.querySelector('input[aria-label="Entrant Start Order"]')).toBeNull();
+    expect(container.querySelector('input[aria-label="Entrant Vehicle"]')).toBeNull();
+    expect(container.querySelector('select[aria-label="Entrant Category"]')).toBeNull();
 
     await act(async () => {
       setInputValue(firstNameInput, 'Jordan');
       setInputValue(surnameInput, 'Taylor');
       setSelectValue(genderInput, 'female');
       setInputValue(dobInput, '1998-12-24');
-      setSelectValue(categoryInput, 'cat-1');
       saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(onUpdateEntrant).toHaveBeenCalledWith('ent-1', expect.objectContaining({
-      categoryId: 'cat-1',
       dateOfBirth: '1998-12-24',
       firstName: 'Jordan',
       gender: 'female',
       lastName: 'Taylor',
+      name: 'Jordan Taylor',
     }));
 
     await act(async () => {
@@ -475,6 +483,69 @@ describe('EntrantsPage integration', () => {
     expect(onUpdateEntrant).toHaveBeenLastCalledWith('ent-2', expect.objectContaining({
       categoryId: 'cat-pro',
     }));
+  });
+
+  it('loads an entrant spreadsheet beside the event selector and forwards detected records', async () => {
+    let completeImport: (() => void) | undefined;
+    const onImportEntrants = vi.fn(() => new Promise<void>((resolve) => {
+      completeImport = resolve;
+    }));
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ['Tx', 'Grid', 'Car Num.', 'Driver', 'Entrant', 'Vehicle', 'Ignored'],
+      ['98', '1', '3', 'Rick Mears', 'Penske Racing', 'Penske IndyCar', 'not imported'],
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Entrants');
+    const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+    const file = new File([buffer], 'entrants.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    Object.defineProperty(file, 'arrayBuffer', { value: vi.fn(async () => buffer) });
+    const motorsportCatalog: EventCatalogState = {
+      ...catalog,
+      events: catalog.events.map((event) => event.id === 'event-1' ? { ...event, discipline: 'motorsport' } : event),
+    };
+
+    await act(async () => {
+      root.render(
+        <EntrantsPage
+          catalog={motorsportCatalog}
+          onCreateEntrant={() => undefined}
+          onDeleteEntrant={() => undefined}
+          onImportEntrants={onImportEntrants}
+          onSelectEntrant={() => undefined}
+          onSelectEvent={() => undefined}
+          onUpdateEntrant={() => undefined}
+          selectedCategoryId="cat-1"
+          selectedEventId="event-1"
+        />
+      );
+    });
+
+    const input = container.querySelector('input[aria-label="Entrants Import File"]') as HTMLInputElement;
+    expect(input.accept).toContain('.xlsx');
+    expect(container.querySelector('input[aria-label="Entrant Vehicle"]')).toBeNull();
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    await act(async () => {
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      await Promise.resolve();
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      await Promise.resolve();
+    });
+
+    expect(onImportEntrants).toHaveBeenCalledWith('event-1', [expect.objectContaining({
+      entrantName: 'Penske Racing',
+      firstName: 'Rick',
+      lastName: 'Mears',
+      raceNumber: '3',
+      startOrder: 1,
+      transponderNumber: '98',
+      vehicle: 'Penske IndyCar',
+    })], 'entrants.xlsx', 'cat-1');
+    expect(container.textContent).toContain('Updating 1 entrant record from entrants.xlsx...');
+    await act(async () => {
+      completeImport?.();
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain('Imported 1 entrant record from entrants.xlsx.');
   });
 
   it('shows and edits selected participant identification values', async () => {

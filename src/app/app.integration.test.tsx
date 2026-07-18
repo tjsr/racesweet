@@ -1579,6 +1579,75 @@ describe('RaceSweetMainApp integration', () => {
     ]));
   });
 
+  it('saves newly created categories from the navigation warning and form footer', async () => {
+    const writtenFiles: Array<{ content: string; filePath: string }> = [];
+
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer: readFixtureBuffer,
+      requestFileContent: readGeneratedFixture as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async (filePath: string, content: string) => {
+        writtenFiles.push({ content, filePath });
+      },
+    };
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    await clickSectionButton(container, 'Categories');
+    await clickButtonByText(container, 'Create Category');
+    await waitForInputValue(container, 'input[aria-label="Category Name"]', 'New Category');
+
+    await act(async () => {
+      setInputValue(container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement, 'Navigation Save Category');
+    });
+
+    await clickSectionButton(container, 'Timing');
+    expect(container.querySelector('[aria-label="Unsaved category changes"]')).toBeTruthy();
+    await clickButtonByText(container, 'Save');
+    await waitForText(container, 'Recent Records');
+
+    const categoryLedger = await waitForPersistedCatalogLedger(writtenFiles, (ledger) => {
+      return ledger.mutations.some((mutation) => (
+        mutation.type === 'category-updated' &&
+        (mutation.changes as { name?: string } | undefined)?.name === 'Navigation Save Category'
+      ));
+    });
+    expect(categoryLedger.mutations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        changes: expect.objectContaining({ name: 'Navigation Save Category' }),
+        type: 'category-updated',
+      }),
+    ]));
+    expect(container.querySelector('[aria-label="Unsaved category changes"]')).toBeNull();
+    expect(container.textContent).not.toContain('Error loading content');
+
+    await clickSectionButton(container, 'Categories');
+    await clickButtonByText(container, 'Create Category');
+    await waitForInputValue(container, 'input[aria-label="Category Name"]', 'New Category');
+    await act(async () => {
+      setInputValue(container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement, 'Footer Save Category');
+    });
+    await clickButtonByText(container, 'Save Category');
+    await waitForPersistedCatalogLedger(writtenFiles, (ledger) => {
+      return ledger.mutations.some((mutation) => (
+        mutation.type === 'category-updated' &&
+        (mutation.changes as { name?: string } | undefined)?.name === 'Footer Save Category'
+      ));
+    });
+
+    await clickSectionButton(container, 'Timing');
+    await waitForText(container, 'Recent Records');
+    expect(container.querySelector('[aria-label="Unsaved category changes"]')).toBeNull();
+  });
+
   it('supports create and delete operations and still renders correctly after panel switches', async () => {
     await ensureAppStylesLoaded();
 

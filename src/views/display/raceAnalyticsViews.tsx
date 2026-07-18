@@ -1,7 +1,7 @@
 import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 
 import React from 'react';
-import type { EventCatalogEntrant } from '../../catalog/eventCatalog.js';
+import type { EventCatalogEntrant, EventCatalogEvent } from '../../catalog/eventCatalog.js';
 import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
 import { shouldExcludeCategoryFromResults } from '../../controllers/category.js';
 import { getSourceLapCompletion, isCountedLapPassing } from '../../controllers/laps.js';
@@ -12,6 +12,7 @@ import { EventCategoryId } from '../../model/index.js';
 import { EventId, SessionId } from '../../model/raceevent.js';
 import type { ParticipantPassingRecord } from '../../model/timerecord.js';
 import { LapTimesReport } from '../reports/LapTimesReport.js';
+import { TrackMapReport } from '../reports/TrackMapReport.js';
 import { HandicapView } from './handicap.js';
 
 interface CategoryOption {
@@ -101,6 +102,7 @@ interface BaseRaceAnalyticsProps {
   categories: CategoryOption[];
   catalogEntrants: EventCatalogEntrant[];
   eventSessionOptions?: EventSessionOption[];
+  event?: EventCatalogEvent;
   onSelectEventSession?: (value: string) => void;
   raceState: RaceState & RaceStateLookup;
   selectedEventSessionValue?: string;
@@ -738,7 +740,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
   const [drawLineChart, setDrawLineChart] = React.useState<boolean>(false);
   const [lapChartLineSegments, setLapChartLineSegments] = React.useState<LapChartLineSegment[]>([]);
-  const [reportType, setReportType] = React.useState<'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'handicap-data'>('fastest-laps');
+  const [reportType, setReportType] = React.useState<'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'handicap-data' | 'track-map'>('fastest-laps');
   const [ignoreFirstLapForFastestLaps, setIgnoreFirstLapForFastestLaps] = React.useState<boolean>(true);
   const [ignoreFirstLapForTimeline, setIgnoreFirstLapForTimeline] = React.useState<boolean>(true);
   const [handicapShowFilter, setHandicapShowFilter] = React.useState<'all' | 'event-participants-only'>('all');
@@ -902,12 +904,13 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <select
               aria-label="Reports View Type"
               value={reportType}
-              onChange={(event) => setReportType(event.target.value as 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'handicap-data')}
+              onChange={(event) => setReportType(event.target.value as 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'handicap-data' | 'track-map')}
             >
               <option value="fastest-laps">Fastest Laps</option>
               <option value="fastest-lap-timeline">Fastest Lap Timeline</option>
               <option value="lap-times">Lap Times</option>
               <option value="lap-chart">Lap Chart</option>
+              <option value="track-map">Track Map</option>
               <option value="handicap-data">Handicap Data</option>
             </select>
           </label>
@@ -1107,6 +1110,12 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
           <HandicapView
             participantNames={handicapShowFilter === 'event-participants-only' ? eventParticipantNames : undefined}
           />
+        </section>
+      ) : null}
+      {reportType === 'track-map' ? (
+        <section className="events-panel">
+          <h2>Track Map</h2>
+          <TrackMapReport catalogEntrants={props.catalogEntrants} event={props.event} raceState={props.raceState} />
         </section>
       ) : null}
     </section>

@@ -90,6 +90,7 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
       description: categoryDraft.description || undefined,
       distanceRule,
       excludeFromResults: categoryDraft.excludeFromResults,
+      isPlaceholder: categoryDraft.isPlaceholder,
       name: categoryDraft.name,
       teamRules: {
         maxRiderAge: parseInteger(categoryDraft.maxRiderAge),

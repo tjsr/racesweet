@@ -27,7 +27,7 @@ export interface EventCreatedMutation extends EventCatalogMutationBase {
 }
 
 export interface EventUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogEvent, 'categoryIds' | 'date' | 'discipline' | 'entrantIds' | 'format' | 'minimumLapTimeMilliseconds' | 'name' | 'sessionIds' | 'timeZone'>>;
+  changes: Partial<Pick<EventCatalogEvent, 'categoryIds' | 'date' | 'discipline' | 'entrantIds' | 'format' | 'minimumLapTimeMilliseconds' | 'name' | 'sessionIds' | 'timeZone' | 'trackMap'>>;
   eventId: EventId;
   type: 'event-updated';
 }
@@ -79,7 +79,7 @@ export interface CategoryCreatedMutation extends EventCatalogMutationBase {
 
 export interface CategoryUpdatedMutation extends EventCatalogMutationBase {
   categoryId: EventCategoryId;
-  changes: Partial<Pick<EventCatalogCategory, 'code' | 'deleted' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'excludeFromResults' | 'name' | 'startTime' | 'teamRules'>>;
+  changes: Partial<Pick<EventCatalogCategory, 'code' | 'deleted' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'excludeFromResults' | 'isPlaceholder' | 'name' | 'startTime' | 'teamRules'>>;
   type: 'category-updated';
 }
 
@@ -94,7 +94,7 @@ export interface EntrantCreatedMutation extends EventCatalogMutationBase {
 }
 
 export interface EntrantUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>;
+  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'startOrder' | 'teamEntrantId' | 'teamMembers' | 'vehicle'>>;
   entrantId: EventEntrantId;
   type: 'entrant-updated';
 }
@@ -173,10 +173,11 @@ const migrateLegacyCategoryAssignments = (state: EventCatalogState): EventCatalo
   };
 };
 
-export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalogState => {
-  const state = ledger.mutations.reduce<EventCatalogState>((currentState, mutation) => {
-    incrementLoadingMetric('Apply event catalog ledger mutation', mutation.type);
-    switch (mutation.type) {
+export const applyEventCatalogMutation = (
+  currentState: EventCatalogState,
+  mutation: EventCatalogMutation
+): EventCatalogState => {
+  switch (mutation.type) {
     case 'event-created': {
       if (currentState.deletedEventIds.includes(mutation.event.id)) {
         return currentState;
@@ -371,7 +372,13 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
     default: {
       return currentState;
     }
-    }
+  }
+};
+
+export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalogState => {
+  const state = ledger.mutations.reduce<EventCatalogState>((currentState, mutation) => {
+    incrementLoadingMetric('Apply event catalog ledger mutation', mutation.type);
+    return applyEventCatalogMutation(currentState, mutation);
   }, createDefaultEventCatalogState());
 
   return migrateLegacyCategoryAssignments(state);

@@ -204,12 +204,20 @@ export const isCountedLapPassing = (
   finishLineNumbers: number[] | undefined,
   resolveLapCompletion?: LapCompletionResolver
 ): boolean => {
+  return isFastestLapCandidate(passing, finishLineNumbers, resolveLapCompletion) &&
+    typeof passing.elapsedTime === 'number' &&
+    passing.elapsedTime >= 0;
+};
+
+export const isFastestLapCandidate = (
+  passing: ParticipantPassingRecord,
+  finishLineNumbers: number[] | undefined,
+  resolveLapCompletion?: LapCompletionResolver
+): boolean => {
   return isPassingValid(passing) &&
     !isPassingExcluded(passing) &&
     isLapCompletionPassing(passing, finishLineNumbers, resolveLapCompletion) &&
     (passing.lapNo || 0) > 0 &&
-    typeof passing.elapsedTime === 'number' &&
-    passing.elapsedTime >= 0 &&
     typeof passing.lapTime === 'number' &&
     passing.lapTime > 0;
 };

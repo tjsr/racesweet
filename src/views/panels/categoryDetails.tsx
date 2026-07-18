@@ -55,6 +55,15 @@ export const CategoryDetailsPanel = (props: CategoryDetailsPanelProps): React.Re
           Exclude from results
         </label>
         <label>
+          <input
+            aria-label="Category Is Placeholder"
+            type="checkbox"
+            checked={props.categoryDraft.isPlaceholder}
+            onChange={(event) => props.onSetCategoryDraft((current) => ({ ...current, isPlaceholder: event.target.checked }))}
+          />
+          Placeholder category
+        </label>
+        <label>
           Distance Type
           <select
             aria-label="Category Distance Rule Type"

@@ -18,6 +18,7 @@ interface EntrantListPanelProps {
   riderEntrants: EventCatalogEntrant[];
   selectedEntrant?: EventCatalogEntrant;
   selectedEventId?: EventId;
+  isMotorsport?: boolean;
   singularLabel?: string;
   pluralLabel?: string;
   setCreateKind: React.Dispatch<React.SetStateAction<EntrantType>>;
@@ -167,6 +168,8 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
   const [sortOrder, setSortOrder] = React.useState<EntrantListSortOrder>('surname');
   const singularLabel = props.singularLabel || 'Driver';
   const pluralLabel = props.pluralLabel || 'Drivers';
+  const groupLabel = props.isMotorsport ? 'Entrants' : 'Teams';
+  const relationshipLabel = props.isMotorsport ? 'Entrant' : 'Team';
   const sortedRiderEntrants = React.useMemo(() => sortEntrants(
     props.riderEntrants,
     sortOrder,
@@ -195,7 +198,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
               onChange={(event) => props.setCreateKind(event.target.value as EntrantType)}
             >
               <option value="rider">Create {singularLabel.toLowerCase()}</option>
-              <option value="team">Create team</option>
+              <option value="team">Create {groupLabel.toLowerCase().slice(0, -1)}</option>
             </select>
           </label>
         ) : null}
@@ -214,7 +217,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
           }}
           disabled={!props.selectedEventId}
         >
-          {props.teamsEnabled && props.createKind === 'team' ? 'Create Team' : `Create ${singularLabel}`}
+          {props.teamsEnabled && props.createKind === 'team' ? `Create ${groupLabel.slice(0, -1)}` : `Create ${singularLabel}`}
         </button>
         <label className="compact-action-label">
           Sort
@@ -251,6 +254,8 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
                   onSelect={() => props.requestFormExit(() => props.onSelectEntrant(entrant.id))}
                   timingDevices={participant ? getParticipantTransponders(participant) : undefined}
                   teamName={teamName}
+                  relationshipLabel={relationshipLabel}
+                  showCategory={!props.isMotorsport}
                 />
               );
             })}
@@ -258,7 +263,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
         ) : null}
         {props.teamsEnabled && sortedTeamEntrants.length > 0 ? (
           <>
-            <h3 className="events-list-subheading">Teams</h3>
+            <h3 className="events-list-subheading">{groupLabel}</h3>
             {sortedTeamEntrants.map((entrant) => {
               const participant = getEntrantParticipant(entrant, props.raceStateParticipants, props.teamEntrants);
 
@@ -267,10 +272,12 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
                   key={entrant.id}
                   entrant={entrant}
                   entrantLabel={singularLabel}
+                  categoryName={getCategoryName(props.catalog, getEntrantCategoryId(entrant))}
                   isSelected={entrant.id === props.selectedEntrant?.id}
                   onSelect={() => props.requestFormExit(() => props.onSelectEntrant(entrant.id))}
                   raceNumber={participant ? getParticipantNumber(participant) : undefined}
                   timingDevices={participant ? getParticipantTransponders(participant) : undefined}
+                  showCategory={props.isMotorsport}
                 />
               );
             })}

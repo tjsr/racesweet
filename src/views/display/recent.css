@@ -134,6 +134,28 @@
   border-right-color: var(--session-fastest-time-color, #8a2be2);
 }
 
+.generated-crossing > .MuiTableCell-root {
+  background-color: #dff4ff;
+}
+
+.generated-crossing.selected-row > .MuiTableCell-root {
+  background-color: #0b5f85;
+}
+
+.missing-crossing-indicator {
+  display: inline-block;
+  font-weight: 700;
+  margin-left: 0.35rem;
+}
+
+.missing-crossing-question {
+  color: #0369a1;
+}
+
+.missing-crossing-warning {
+  color: #b45309;
+}
+
 .unrelated-reason-marker {
   align-items: center;
   background: #f59e0b;

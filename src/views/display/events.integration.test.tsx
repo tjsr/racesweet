@@ -190,7 +190,8 @@ describe('EventsScreen integration', () => {
     expect(summarySections[1]?.textContent).toContain('Premier');
     const detailColumn = container.querySelector('.event-detail-column');
     expect(detailColumn).toBeTruthy();
-    expect(detailColumn?.children).toHaveLength(2);
+    expect(detailColumn?.children).toHaveLength(3);
+    expect(container.textContent).toContain('Track Map');
 
     const createSessionButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Create Session') as HTMLButtonElement | undefined;
     expect(createSessionButton).toBeDefined();
@@ -226,6 +227,88 @@ describe('EventsScreen integration', () => {
       minimumLapTimeMilliseconds: 75000,
       name: 'Winter Championship Round',
     }));
+
+    const gpxContent = '<gpx><trk><trkseg><trkpt lat="-33.0" lon="151.0"/><trkpt lat="-33.1" lon="151.1"/></trkseg></trk></gpx>';
+    const gpxFile = new File([gpxContent], 'spring-test.gpx', { type: 'application/gpx+xml' });
+    Object.defineProperty(gpxFile, 'text', { value: async () => gpxContent });
+    const gpxInput = container.querySelector('input[aria-label="Event GPX File"]') as HTMLInputElement;
+    Object.defineProperty(gpxInput, 'files', { configurable: true, value: [gpxFile] });
+    await act(async () => {
+      gpxInput.dispatchEvent(new Event('change', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain('spring-test.gpx loaded');
+
+    const editTimingLinesButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Edit timing-line positions');
+    expect(editTimingLinesButton).toBeDefined();
+    await act(async () => {
+      editTimingLinesButton!.click();
+    });
+    const timingLineSelect = container.querySelector('select[aria-label="Track Map Timing Line"]') as HTMLSelectElement;
+    await act(async () => {
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+      descriptor?.set?.call(timingLineSelect, '1');
+      timingLineSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const trackEditor = container.querySelector('svg[aria-label="Event Track Map Editor"]') as SVGSVGElement;
+    Object.defineProperty(trackEditor, 'getBoundingClientRect', {
+      value: () => ({ bottom: 100, height: 100, left: 0, right: 100, top: 0, width: 100, x: 0, y: 0 }),
+    });
+    await act(async () => {
+      trackEditor.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 50, clientY: 10 }));
+    });
+    const saveTrackMapButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Track Map');
+    await act(async () => {
+      saveTrackMapButton!.click();
+      await Promise.resolve();
+    });
+    expect(onUpdateEvent).toHaveBeenCalledWith('event-2', {
+      trackMap: expect.objectContaining({
+        gpxContent,
+        gpxFileName: 'spring-test.gpx',
+        timingLines: [expect.objectContaining({ lineNumber: 1 })],
+      }),
+    });
+
+    const backToEventButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Back to event');
+    await act(async () => {
+      backToEventButton!.click();
+    });
+    const trackFormatSelect = container.querySelector('select[aria-label="Event Track Data Format"]') as HTMLSelectElement;
+    await act(async () => {
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+      descriptor?.set?.call(trackFormatSelect, 'racetrack-csv');
+      trackFormatSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const trackCsvContent = '# x_m,y_m,w_tr_right_m,w_tr_left_m\n0,0,5,5\n10,0,5,5\n10,10,5,5';
+    const racingLineCsvContent = '# x_m,y_m\n1,1\n9,1\n9,9';
+    const trackCsvFile = new File([trackCsvContent], 'IMS-track.csv', { type: 'text/csv' });
+    const racingLineCsvFile = new File([racingLineCsvContent], 'IMS-raceline.csv', { type: 'text/csv' });
+    Object.defineProperty(trackCsvFile, 'text', { value: async () => trackCsvContent });
+    Object.defineProperty(racingLineCsvFile, 'text', { value: async () => racingLineCsvContent });
+    const trackCsvInput = container.querySelector('input[aria-label="Event Track CSV File"]') as HTMLInputElement;
+    const racingLineCsvInput = container.querySelector('input[aria-label="Event Racing Line CSV File"]') as HTMLInputElement;
+    Object.defineProperty(trackCsvInput, 'files', { configurable: true, value: [trackCsvFile] });
+    Object.defineProperty(racingLineCsvInput, 'files', { configurable: true, value: [racingLineCsvFile] });
+    await act(async () => {
+      trackCsvInput.dispatchEvent(new Event('change', { bubbles: true }));
+      racingLineCsvInput.dispatchEvent(new Event('change', { bubbles: true }));
+      await Promise.resolve();
+    });
+    const csvSaveTrackMapButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Track Map');
+    await act(async () => {
+      csvSaveTrackMapButton!.click();
+      await Promise.resolve();
+    });
+    expect(onUpdateEvent).toHaveBeenCalledWith('event-2', {
+      trackMap: expect.objectContaining({
+        racingLineCsvContent,
+        racingLineCsvFileName: 'IMS-raceline.csv',
+        sourceType: 'racetrack-csv',
+        trackCsvContent,
+        trackCsvFileName: 'IMS-track.csv',
+      }),
+    });
 
     const testSessionButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Test Session'));
     expect(testSessionButton).toBeDefined();

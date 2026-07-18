@@ -19,6 +19,7 @@ import { CategoryListPanel } from '../panels/categoryList.js';
 import { EventDataSourcesPanel } from '../panels/eventDataSources.js';
 import { EventDetailsPanel } from '../panels/eventDetails.js';
 import { EventListPanel } from '../panels/eventList.js';
+import { EventTrackMapPanel } from '../panels/eventTrackMap.js';
 import { SessionListPanel } from '../panels/sessionList.js';
 
 interface EventsScreenProps {
@@ -33,7 +34,7 @@ interface EventsScreenProps {
   onSelectSession: (sessionId: SessionId) => void;
   onMakeSessionActive: (eventId: EventId, sessionId: SessionId) => void | Promise<void>;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
-  onUpdateEvent: (eventId: EventId, changes: { date?: string; discipline?: EventDiscipline; format?: EventCatalogEvent['format']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string }) => void | Promise<void>;
+  onUpdateEvent: (eventId: EventId, changes: { date?: string; discipline?: EventDiscipline; format?: EventCatalogEvent['format']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string; trackMap?: EventCatalogEvent['trackMap'] }) => void | Promise<void>;
   selectedEventId?: EventId;
   selectedSessionId?: SessionId;
 }
@@ -62,6 +63,23 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
   const selectedEventCategories = getCategoriesForEvent(props.catalog, selectedEvent?.id);
   const selectedSession = selectedEventSessions.find((session) => session.id === props.selectedSessionId) ?? selectedEventSessions[0];
   const assignedSourceIds = selectedEvent ? getEventAssignedSourceIds(props.config, selectedEvent.id) : [];
+  const availableTimingLines = React.useMemo(() => {
+    const byLineNumber = new Map<number, string>();
+    props.config.dataSources
+      .filter((source) => assignedSourceIds.includes(source.id))
+      .forEach((source) => {
+        source.finishLineNumbers?.forEach((lineNumber) => {
+          byLineNumber.set(lineNumber, byLineNumber.get(lineNumber) || `Line ${lineNumber}`);
+        });
+        source.fileConfig?.ctcTrackConfig?.networks.forEach((network) => {
+          network.lines.forEach((line) => byLineNumber.set(line.line, line.name || `Line ${line.line}`));
+        });
+      });
+    if (byLineNumber.size === 0) {
+      byLineNumber.set(1, 'Start / finish');
+    }
+    return Array.from(byLineNumber.entries()).map(([lineNumber, label]) => ({ label, lineNumber }));
+  }, [assignedSourceIds, props.config.dataSources]);
   const timeZoneOptions = React.useMemo(() => getSupportedTimeZones(), []);
   const systemTimeZone = React.useMemo(() => getSystemTimeZone(), []);
   const selectedEventDraft = React.useMemo(() => getEventDraft(selectedEvent, systemTimeZone), [selectedEvent, systemTimeZone]);
@@ -156,6 +174,11 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
             assignedSourceIds={assignedSourceIds}
             dataSources={props.config.dataSources}
             onSaveEventAssignment={props.onSaveEventAssignment}
+            selectedEvent={selectedEvent}
+          />
+          <EventTrackMapPanel
+            availableTimingLines={availableTimingLines}
+            onSave={(trackMap) => selectedEvent ? props.onUpdateEvent(selectedEvent.id, { trackMap }) : undefined}
             selectedEvent={selectedEvent}
           />
         </div>

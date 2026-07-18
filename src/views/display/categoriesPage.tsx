@@ -11,7 +11,7 @@ import { EventCategoryId } from '../../model/eventcategory.js';
 import { EventId } from '../../model/raceevent.js';
 import { type UnsavedChangesGuard } from './unsavedChangesWarning.js';
 
-export type CategoryChanges = Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distanceRule' | 'excludeFromResults' | 'name' | 'teamRules'>>;
+export type CategoryChanges = Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distanceRule' | 'excludeFromResults' | 'isPlaceholder' | 'name' | 'teamRules'>>;
 
 export interface CategoriesPageProps {
   catalog: EventCatalogState;
@@ -34,6 +34,7 @@ export interface CategoryDraft {
   distanceRuleKind: CategoryDistanceRule['kind'];
   distanceRuleValue: string;
   excludeFromResults: boolean;
+  isPlaceholder: boolean;
   maxRiderAge: string;
   maxTeamSize: string;
   minRiderAge: string;
@@ -65,6 +66,7 @@ export const getCategoryDraft = (category: EventCatalogCategory | undefined, ses
   distanceRuleKind: category?.distanceRule?.kind || 'unspecified',
   distanceRuleValue: category?.distanceRule?.kind === 'unspecified' ? '' : category?.distanceRule?.value?.toString() || '',
   excludeFromResults: category?.excludeFromResults || false,
+  isPlaceholder: category?.isPlaceholder === true,
   maxRiderAge: category?.teamRules?.maxRiderAge?.toString() || '',
   maxTeamSize: category?.teamRules?.maxTeamSize?.toString() || '',
   minRiderAge: category?.teamRules?.minRiderAge?.toString() || '',

@@ -83,7 +83,14 @@ export interface ParticipantPassingRecord extends EventTimeRecord {
   infoFlags?: number;
   unrelatedReasonCode?: CrossingUnrelatedReasonCode;
   unrelatedReason?: string;
+  generatedReason?: 'missing-crossing';
+  isGenerated?: boolean;
 }
+
+export const isGeneratedMissingCrossing = (passing: TimeRecord): passing is ParticipantPassingRecord => {
+  const candidate = passing as Partial<ParticipantPassingRecord>;
+  return candidate.isGenerated === true && candidate.generatedReason === 'missing-crossing';
+};
 
 export interface EntrantPassingRecord extends ParticipantPassingRecord {
   entrantId?: EventEntrantId | null | undefined;
@@ -97,16 +104,16 @@ const hasCalculatedLapState = (passing: ParticipantPassingRecord): boolean => {
 };
 
 export const isPassingExcluded = (passing: ParticipantPassingRecord): boolean => {
-  if (typeof passing.isExcluded === 'boolean') {
-    return passing.isExcluded;
-  }
-
   if (passing.isManuallyExcluded) {
     return true;
   }
 
   if (passing.unrelatedReasonCode === CROSSING_UNRELATED_LAP_UNDER_MINIMUM) {
     return passing.isLapCompletion !== false;
+  }
+
+  if (typeof passing.isExcluded === 'boolean') {
+    return passing.isExcluded;
   }
 
   return passing.unrelatedReasonCode === CROSSING_UNRELATED_AFTER_FINISH ||

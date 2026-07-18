@@ -10,6 +10,8 @@ export interface EventCategory extends WithId<EventCategoryId> {
   description?: string;
   deleted?: boolean;
   excludeFromResults?: boolean;
+  /** True while this category only represents data that has not been identified yet. */
+  isPlaceholder?: boolean;
   startTime?: ISO8601DateTime;
   distance?: number;
   duration?: ISO8601Duration;

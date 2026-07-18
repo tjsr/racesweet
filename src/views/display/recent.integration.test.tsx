@@ -114,6 +114,7 @@ const getRecentRecordsFilterSelect = (): Element | undefined => {
   return Array.from(document.querySelectorAll('[role="combobox"]')).find((element) => {
     return element.textContent?.includes('All records') ||
       element.textContent?.includes('Only flags') ||
+      element.textContent?.includes('Only potential missing crossings') ||
       element.textContent?.includes('Only selected category') ||
       element.textContent?.includes('Only selected team') ||
       element.textContent?.includes('Only selected rider');
@@ -4657,5 +4658,147 @@ describe('RecentRecords integration', () => {
     expect(row?.querySelector('.unrelated-reason-marker')).toBeNull();
     expect(cells[8]).toBe('0:30.000');
     expect(cells[cells.length - 1]).toBe('0:30.000');
+  });
+
+  it('warns about a likely missing crossing and inserts an editable generated record', async () => {
+    const category: EventCategory = { id: 'category-1', name: 'Category A' };
+    const participant: EventParticipant = {
+      categoryId: category.id,
+      currentResult: undefined,
+      entrantId: 'entrant-101',
+      firstname: 'Pat',
+      id: 'participant-101',
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    };
+    const createPassing = (id: string, seconds: number, lapTime: number): ParticipantPassingRecord => ({
+      chipCode: 100101,
+      id,
+      isLapCompletion: true,
+      isValid: true,
+      lapNo: seconds / 100,
+      lapTime,
+      lineNumber: 1,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: seconds,
+      source: 'test-source',
+      time: new Date(seconds * 1_000),
+    } as ParticipantPassingRecord);
+    const records = [
+      createPassing('lap-1', 100, 100_000),
+      createPassing('lap-2', 200, 100_000),
+      createPassing('lap-3', 300, 100_000),
+      createPassing('lap-long', 500, 200_000),
+    ];
+    const possibleRecords = [
+      ...records.slice(0, 3),
+      createPassing('lap-question', 495, 195_000),
+    ];
+    const onAddRecord = vi.fn();
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [category],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: () => category,
+      getEntrantIdForParticipant: () => participant.entrantId,
+      getFinishLineNumbers: () => [1],
+      getParticipantById: (id) => id === participant.id ? participant : undefined,
+      getParticipantLaps: () => records,
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          currentEventId="event-1"
+          currentSessionId="session-1"
+          onAddRecord={onAddRecord}
+          raceStateLookup={raceStateLookup}
+          records={possibleRecords}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    const possibleRow = container.querySelector('tr[data-record-id="lap-question"]');
+    expect(possibleRow?.querySelector('[aria-label="Possible missing crossing"]')?.textContent).toBe('?');
+    expect(possibleRow?.querySelector('[aria-label="Likely missing crossing"]')).toBeNull();
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          currentEventId="event-1"
+          currentSessionId="session-1"
+          onAddRecord={onAddRecord}
+          raceStateLookup={raceStateLookup}
+          records={records}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+
+    let row = container.querySelector('tr[data-record-id="lap-long"]');
+    expect(row?.querySelector('[aria-label="Likely missing crossing"]')?.textContent).toBe('!');
+
+    await selectRecentRecordsFilter('Only potential missing crossings');
+    expect(getDisplayedRecordIds(container)).toEqual(['lap-long']);
+    await selectRecentRecordsFilter('All records');
+    expect(getDisplayedRecordIds(container)).toEqual(['lap-1', 'lap-2', 'lap-3', 'lap-long']);
+    row = container.querySelector('tr[data-record-id="lap-long"]');
+
+    await act(async () => {
+      row?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 100, clientY: 100 }));
+    });
+    const insertOption = Array.from(document.querySelectorAll('li')).find((item) => item.textContent === 'Insert missing crossing');
+    expect(insertOption).toBeDefined();
+    await act(async () => {
+      insertOption?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(document.querySelector('div[role="dialog"]')?.textContent).toContain('Insert missing crossing');
+    expect((document.querySelector('input[aria-label="TxNo"]') as HTMLInputElement).value).toBe('');
+    expect((document.querySelector('input[aria-label="TxNo"]') as HTMLInputElement).disabled).toBe(true);
+    expect((document.querySelector('input[aria-label="Plate"]') as HTMLInputElement).value).toBe('101');
+    expect((document.querySelector('input[aria-label="Timing line"]') as HTMLInputElement).value).toBe('1');
+
+    const addButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'Add record');
+    await act(async () => {
+      addButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onAddRecord).toHaveBeenCalledWith(expect.objectContaining({
+      entrantId: participant.entrantId,
+      generatedReason: 'missing-crossing',
+      isGenerated: true,
+      lineNumber: 1,
+      participantId: participant.id,
+      plateNumber: '101',
+    }));
+    const addedRecord = onAddRecord.mock.calls[0]?.[0] as ParticipantPassingRecord & { chipCode?: number };
+    expect(addedRecord.chipCode).toBeUndefined();
+    expect(addedRecord.isExcluded).not.toBe(true);
+    expect(addedRecord.time?.toISOString()).toBe('1970-01-01T00:06:40.000Z');
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={raceStateLookup}
+          records={[...records, addedRecord]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />
+      );
+    });
+    const generatedRow = container.querySelector(`tr[data-record-id="${addedRecord.id}"]`);
+    expect(generatedRow?.className).toContain('generated-crossing');
+    expect(generatedRow?.getAttribute('title')).toContain('Generated missing crossing');
   });
 });

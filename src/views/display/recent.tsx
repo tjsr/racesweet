@@ -15,9 +15,14 @@ import {
 import type { EventSessionKind } from '../../catalog/eventCatalog.ts';
 import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../controllers/category.ts';
 import { createGreenFlagEvent, createRedFlagEvent, isFlagRecord } from '../../controllers/flag';
-import { getLapTimeCell, getPassingLineNumber, getPassingLoopNumber, getSourceLapCompletion, getTimingLineKey, isFinishLinePassing, isLapCompletionPassing } from '../../controllers/laps.ts';
+import { getLapTimeCell, getPassingLineNumber, getPassingLoopNumber, getSourceLapCompletion, getTimingLineKey, isFastestLapCandidate, isFinishLinePassing, isLapCompletionPassing } from '../../controllers/laps.ts';
 import { getParticipantNumber, getParticipantTransponders } from '../../controllers/participant.ts';
 import { findEntrantByChipCode, findEntrantByPlateNumber } from '../../controllers/participantSearch.ts';
+import {
+  type MissingCrossingIndicator,
+  estimateMissingCrossingTime,
+  getPotentialMissingCrossingIndicators,
+} from '../../controllers/missingCrossing.ts';
 import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../controllers/timerecord.ts';
 import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../model';
 import { findCtcTrackLineName } from '../../model/ctcTrackConfig.ts';
@@ -41,7 +46,7 @@ import {
 import { InvalidCategoryIdError, NoCrossingError, NoParticipantError, ParticipantNotFoundError } from '../../validators/errors.ts';
 import "./recent.css";
 
-type RecentRecordsFilterMode = 'all' | 'category' | 'flags' | 'participant' | 'team';
+type RecentRecordsFilterMode = 'all' | 'category' | 'flags' | 'participant' | 'potentialMissingCrossings' | 'team';
 type RecentRecordsIgnoreMode = 'outsideEventWindow' | 'sectorLoops' | 'unrecognised';
 type RecentRecordsGoToOption =
   | 'first'
@@ -63,6 +68,7 @@ interface LapTimeIndicators {
   lapLeader: boolean;
   overallFastest: boolean;
   sameLapAsLeader: boolean;
+  missingCrossingIndicator?: MissingCrossingIndicator;
 }
 
 interface RowIndexRange {
@@ -176,12 +182,14 @@ type RecordDialogMode = 'add' | 'edit';
 
 interface AddRecordDialogState {
   anchorRecord: EventTimeRecord;
+  draftRecord?: EventTimeRecord;
   existingRecord?: EventTimeRecord;
   initialRecordType?: AddableRecordType;
   mode: RecordDialogMode;
 }
 
 const MANUAL_RECORD_SOURCE_ID = createTimeRecordSourceId('manual-entry');
+const GENERATED_MISSING_CROSSING_SOURCE_ID = createTimeRecordSourceId('generated-missing-crossing');
 const manualFlagLabelByType: Record<AddableFlagType, string> = {
   chequered: 'Checquered',
   green: 'Green',
@@ -499,6 +507,13 @@ const buildManualPassingRecord = (
     time,
   };
 
+  if (existingRecord && isCrossingRecord(existingRecord) && existingRecord.isGenerated) {
+    record.entrantId = existingRecord.entrantId;
+    record.generatedReason = existingRecord.generatedReason;
+    record.isGenerated = true;
+    record.participantId = existingRecord.participantId;
+  }
+
   if (trimmedTxNo.length > 0 && !Number.isNaN(Number(trimmedTxNo))) {
     record.chipCode = Number(trimmedTxNo);
   }
@@ -781,6 +796,7 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   onChangeCategory?: (participantId: EventParticipantId, categoryId: EventCategoryId) => void;
   onOpenAddRecordDialog?: (record: EventTimeRecord, recordType: AddableRecordType) => void;
   onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
+  onOpenMissingCrossingDialog?: (record: ParticipantPassingRecord) => void;
   onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void;
   onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
   onSelectRecord?: (recordId: TimeRecordId | undefined) => void;
@@ -1114,6 +1130,7 @@ interface PassingRecordRowProps {
   onChangeCategory?: (participantId: EventParticipantId, categoryId: EventCategoryId) => void;
   onOpenAddRecordDialog?: (record: EventTimeRecord, recordType: AddableRecordType) => void;
   onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
+  onOpenMissingCrossingDialog?: (record: ParticipantPassingRecord) => void;
   onSelectRecord?: (recordId: TimeRecordId | undefined) => void;
   onSelectUnrecognisedPlateNumber?: (plateNumber: string | undefined) => void;
   sectorTime?: number;
@@ -1186,6 +1203,10 @@ export const PassingRecordRow = (
   };
   const handleEditRecord = (): void => {
     props.onOpenEditRecordDialog?.(passing);
+    handleClose();
+  };
+  const handleInsertMissingCrossing = (): void => {
+    props.onOpenMissingCrossingDialog?.(passing);
     handleClose();
   };
 
@@ -1277,6 +1298,9 @@ export const PassingRecordRow = (
   if (props.lapTimeIndicators?.lapLeader) {
     className += ' lapLeader';
   }
+  if (passing.isGenerated) {
+    className += ' generated-crossing';
+  }
 
   const allCategories = (rs as unknown as { categories: EventCategory[] }).categories || [];
   const lapTimeCellClasses = [
@@ -1304,7 +1328,7 @@ export const PassingRecordRow = (
         className={className}
         onContextMenu={handleContextMenu}
         style={{ cursor: 'context-menu' }}
-        title={formatRecordIdTitle(passing.id)}
+        title={passing.isGenerated ? `Generated missing crossing · ${formatRecordIdTitle(passing.id)}` : formatRecordIdTitle(passing.id)}
         onClick={handleSelect}>
         <TableCell className={cautionCellClasses}>{passing.sequence}</TableCell>
         <TableCell className={cautionCellClasses} title={sourceTooltip}>
@@ -1323,6 +1347,16 @@ export const PassingRecordRow = (
         {props.showSectorColumn ? <TableCell className={cellClasses}>{sectorTime}</TableCell> : null}
         <TableCell className={lapTimeCellClasses}>
           <span>{lapTime}</span>
+          {props.lapTimeIndicators?.missingCrossingIndicator === 'possible' ? (
+            <Tooltip title="Lap time is more than 190% but less than 198% of this entrant's fastest lap; it may be too fast to represent two laps">
+              <span aria-label="Possible missing crossing" className="missing-crossing-indicator missing-crossing-question" role="img">?</span>
+            </Tooltip>
+          ) : null}
+          {props.lapTimeIndicators?.missingCrossingIndicator === 'likely' ? (
+            <Tooltip title="Lap time is at least 198% of this entrant's fastest lap; a crossing is likely to be missing">
+              <span aria-label="Likely missing crossing" className="missing-crossing-indicator missing-crossing-warning" role="img">!</span>
+            </Tooltip>
+          ) : null}
           {unrelatedReason ? (
             <Tooltip title={unrelatedReason}>
               <span
@@ -1350,6 +1384,9 @@ export const PassingRecordRow = (
         <MenuItem onClick={handleEditRecord}>
           Edit record
         </MenuItem>
+        {props.lapTimeIndicators?.missingCrossingIndicator ? (
+          <MenuItem onClick={handleInsertMissingCrossing}>Insert missing crossing</MenuItem>
+        ) : null}
         <MenuItem onClick={handleExclude}>
           {passing.isExcluded === true ? 'Include crossing' : 'Exclude crossing'}
         </MenuItem>
@@ -1457,6 +1494,7 @@ const RecordRowComponent = (props: RecentRecordRowProps) => {
       onChangeCategory={props.onChangeCategory}
       onOpenAddRecordDialog={props.onOpenAddRecordDialog}
       onOpenEditRecordDialog={props.onOpenEditRecordDialog}
+      onOpenMissingCrossingDialog={props.onOpenMissingCrossingDialog}
       onSelectRecord={props.onSelectRecord}
       onSelectUnrecognisedPlateNumber={props.onSelectUnrecognisedPlateNumber}
       timeZone={props.timeZone}
@@ -1532,6 +1570,7 @@ const recordRowPropsAreEqual = (previousProps: RecentRecordRowProps, nextProps: 
     previousProps.onAssignFlagCategory === nextProps.onAssignFlagCategory &&
     previousProps.onOpenAddRecordDialog === nextProps.onOpenAddRecordDialog &&
     previousProps.onOpenEditRecordDialog === nextProps.onOpenEditRecordDialog &&
+    previousProps.onOpenMissingCrossingDialog === nextProps.onOpenMissingCrossingDialog &&
     previousProps.onExclude === nextProps.onExclude &&
     previousProps.onChangeCategory === nextProps.onChangeCategory &&
     previousProps.onMarkFlagDeleted === nextProps.onMarkFlagDeleted &&
@@ -1797,7 +1836,10 @@ const createEmptyLapTimeIndicators = (): LapTimeIndicators => ({
 const buildLapTimeIndicatorMap = (
   records: EventTimeRecord[],
   raceStateLookup: RaceStateLookup,
-  sessionKind: EventSessionKind | undefined = 'race'
+  sessionKind: EventSessionKind | undefined = 'race',
+  missingCrossingIndicators: Map<TimeRecordId, MissingCrossingIndicator> = (
+    getPotentialMissingCrossingIndicators(records, raceStateLookup)
+  )
 ): Map<TimeRecordId, LapTimeIndicators> => {
   const indicatorsByRecordId = new Map<TimeRecordId, LapTimeIndicators>();
   const bestLapTimeByEntrant = new Map<string, MillisecondsDuration>();
@@ -1806,7 +1848,6 @@ const buildLapTimeIndicatorMap = (
   const isRaceSession = sessionKind === undefined || sessionKind === 'race';
   let overallBestLapTime: MillisecondsDuration | undefined = undefined;
   let leaderLapNumber: number | undefined = undefined;
-
   records
     .map((record, index) => ({ index, record }))
     .sort(compareRecordsByTimeAndInputOrder)
@@ -1828,9 +1869,13 @@ const buildLapTimeIndicatorMap = (
 
       const indicators = createEmptyLapTimeIndicators();
       const entrantKey = getEntrantKey(participant, raceStateLookup);
-      const isLapCompletion = isLapCompletionForRaceState(record, raceStateLookup);
+      const isCountedLap = isFastestLapCandidate(
+        passingRecord,
+        raceStateLookup.getFinishLineNumbers?.(),
+        (passing) => getSourceLapCompletion(passing, raceStateLookup.getTimeRecordSourceById?.(passing.source))
+      );
 
-      if (isLapCompletion) {
+      if (isCountedLap) {
         const lapTime = passingRecord.lapTime;
         if (lapTime === undefined || lapTime === null || lapTime <= 0) {
           return;
@@ -1838,6 +1883,7 @@ const buildLapTimeIndicatorMap = (
 
         const previousLapTime = previousLapTimeByEntrant.get(entrantKey);
         const entrantBestLapTime = bestLapTimeByEntrant.get(entrantKey);
+        indicators.missingCrossingIndicator = missingCrossingIndicators.get(record.id);
 
         if (isRaceSession && !leadingLapNumbers.has(lapNo)) {
           indicators.lapLeader = true;
@@ -2039,6 +2085,9 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   const anchorRecord = props.openState?.anchorRecord;
   const dialogMode = props.openState?.mode || 'add';
   const editingRecord = props.openState?.existingRecord;
+  const draftRecord = props.openState?.draftRecord;
+  const sourceRecord = editingRecord || draftRecord;
+  const isGeneratedPassing = !!sourceRecord && isCrossingRecord(sourceRecord) && sourceRecord.isGenerated === true;
   const editingRecordId = editingRecord?.id?.toString() || '';
   const categories = (props.raceStateLookup as unknown as { categories?: EventCategory[] }).categories || [];
   const participantMap = React.useMemo(() => participantMapFromLookup(props.raceStateLookup), [props.raceStateLookup]);
@@ -2058,15 +2107,15 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
     if (!anchorRecord) {
       return;
     }
-    if (dialogMode === 'edit' && editingRecord) {
-      setTimeOfDay(timeOfDayInputStringInTimeZone(editingRecord.time, props.displayTimeZone));
-      setRecordType(isFlagRecord(editingRecord) ? 'flag' : 'passing');
-      setFlagType(isFlagRecord(editingRecord) ? editingRecord.flagType as AddableFlagType : 'yellow');
-      setSelectedFlagCategoryIds(getEditableFlagCategoryIds(editingRecord));
-      setPassingTxNo(getEditablePassingTxNo(editingRecord));
-      setPassingPlate(getEditablePassingPlate(editingRecord, props.raceStateLookup));
-      setPassingLineNumber(formatOptionalNumber(getPassingLineNumber(editingRecord as ParticipantPassingRecord)));
-      setPassingLoopNumber(formatOptionalNumber(getPassingLoopNumber(editingRecord as ParticipantPassingRecord)));
+    if (sourceRecord) {
+      setTimeOfDay(timeOfDayInputStringInTimeZone(sourceRecord.time, props.displayTimeZone));
+      setRecordType(isFlagRecord(sourceRecord) ? 'flag' : 'passing');
+      setFlagType(isFlagRecord(sourceRecord) ? sourceRecord.flagType as AddableFlagType : 'yellow');
+      setSelectedFlagCategoryIds(getEditableFlagCategoryIds(sourceRecord));
+      setPassingTxNo(getEditablePassingTxNo(sourceRecord));
+      setPassingPlate(getEditablePassingPlate(sourceRecord, props.raceStateLookup));
+      setPassingLineNumber(formatOptionalNumber(getPassingLineNumber(sourceRecord as ParticipantPassingRecord)));
+      setPassingLoopNumber(formatOptionalNumber(getPassingLoopNumber(sourceRecord as ParticipantPassingRecord)));
     } else {
       setTimeOfDay(timeOfDayInputStringInTimeZone(anchorRecord.time, props.displayTimeZone));
       setRecordType(props.openState?.initialRecordType || 'passing');
@@ -2078,7 +2127,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       setPassingLoopNumber('');
     }
     setTimeError('');
-  }, [anchorRecord, dialogMode, editingRecord, props.displayTimeZone, props.openState?.initialRecordType, props.raceStateLookup]);
+  }, [anchorRecord, props.displayTimeZone, props.openState?.initialRecordType, props.raceStateLookup, sourceRecord]);
   React.useEffect(() => {
     setShowRawRecordJson(false);
   }, [props.openState]);
@@ -2101,8 +2150,11 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   }, [participants]);
 
   const resolvedParticipant = React.useMemo(() => {
-    return resolveParticipantForManualEntry(participantMap, passingTxNo, passingPlate);
-  }, [participantMap, passingPlate, passingTxNo]);
+    return resolveParticipantForManualEntry(participantMap, passingTxNo, passingPlate) ||
+      (sourceRecord && isCrossingRecord(sourceRecord) && sourceRecord.participantId
+        ? props.raceStateLookup.getParticipantById(sourceRecord.participantId)
+        : undefined);
+  }, [participantMap, passingPlate, passingTxNo, props.raceStateLookup, sourceRecord]);
 
   const resolvedCategory = resolvedParticipant?.categoryId ? props.raceStateLookup.getCategoryById(resolvedParticipant.categoryId) : undefined;
   const resolvedEntrantName = resolvedParticipant ? getParticipantDisplayName(resolvedParticipant) : '';
@@ -2136,7 +2188,8 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       return;
     }
     setTimeError('');
-    if (recordType === 'passing' && passingTxNo.trim().length === 0 && passingPlate.trim().length === 0) {
+    if (recordType === 'passing' && passingTxNo.trim().length === 0 && passingPlate.trim().length === 0 &&
+      !(sourceRecord && isCrossingRecord(sourceRecord) && sourceRecord.participantId)) {
       setTimeError('Enter a TxNo or Plate for a passing record');
       return;
     }
@@ -2161,7 +2214,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
         passingPlate,
         passingLineNumber,
         passingLoopNumber,
-        editingRecord
+        sourceRecord
       );
     props.onSave(record, dialogMode);
     props.onClose();
@@ -2169,7 +2222,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
 
   return (
     <Dialog fullWidth maxWidth="md" onClose={props.onClose} open={props.openState !== null}>
-      <DialogTitle>{dialogMode === 'edit' ? 'Edit record' : 'Add record'}</DialogTitle>
+      <DialogTitle>{dialogMode === 'edit' ? 'Edit record' : draftRecord ? 'Insert missing crossing' : 'Add record'}</DialogTitle>
       <DialogContent>
         <div className="event-details-form-grid">
           <TextField
@@ -2273,6 +2326,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
             <>
               <div className="event-details-form-row">
                 <TextField
+                  disabled={isGeneratedPassing}
                   label="TxNo"
                   margin="dense"
                   onChange={(event) => handleTxNoChange(event.target.value)}
@@ -2440,6 +2494,9 @@ export const RecentRecords = (props: RecordsProps & {
   const outsideEventWindowIgnoredRecordIds = React.useMemo(() => {
     return getOutsideEventWindowIgnoredRecordIds(props.records || [], props.raceStateLookup);
   }, [props.records, props.raceStateLookup]);
+  const potentialMissingCrossingIndicators = React.useMemo(() => {
+    return getPotentialMissingCrossingIndicators(props.records || [], props.raceStateLookup);
+  }, [props.raceStateLookup, props.records]);
   React.useEffect(() => {
     const selectedFilterHasNoTarget =
       (filterMode === 'category' && selectedCategories.size === 0) ||
@@ -2515,6 +2572,9 @@ export const RecentRecords = (props: RecordsProps & {
       if (filterMode === 'flags') {
         return isFlagRecord(record);
       }
+      if (filterMode === 'potentialMissingCrossings') {
+        return potentialMissingCrossingIndicators.has(record.id);
+      }
       if (filterMode === 'category') {
         return recordMatchesSelectedCategory(record, props.raceStateLookup, selectedCategories);
       }
@@ -2529,6 +2589,7 @@ export const RecentRecords = (props: RecordsProps & {
     outsideEventWindowIgnoredRecordIds,
     props.raceStateLookup,
     props.records,
+    potentialMissingCrossingIndicators,
     selectedCategories,
     selectedParticipants,
     teamMemberIds,
@@ -2563,8 +2624,13 @@ export const RecentRecords = (props: RecordsProps & {
     return buildCautionRecordIds(filteredRecords);
   }, [filteredRecords]);
   const lapTimeIndicators = React.useMemo(() => {
-    return buildLapTimeIndicatorMap(filteredRecords, props.raceStateLookup, props.sessionKind);
-  }, [filteredRecords, props.raceStateLookup, props.sessionKind]);
+    return buildLapTimeIndicatorMap(
+      filteredRecords,
+      props.raceStateLookup,
+      props.sessionKind,
+      potentialMissingCrossingIndicators
+    );
+  }, [filteredRecords, potentialMissingCrossingIndicators, props.raceStateLookup, props.sessionKind]);
   const leaderLapAtVisibleRange = React.useMemo(() => {
     return getLeaderLapAtVisibleRange(sortedRecords, visibleRowRange);
   }, [sortedRecords, visibleRowRange]);
@@ -2917,6 +2983,33 @@ export const RecentRecords = (props: RecordsProps & {
   const openEditRecordDialog = React.useCallback((record: EventTimeRecord): void => {
     setAddRecordDialogState({ anchorRecord: record, existingRecord: record, mode: 'edit' });
   }, []);
+  const openMissingCrossingDialog = React.useCallback((record: ParticipantPassingRecord): void => {
+    const estimatedTime = estimateMissingCrossingTime(record, props.records, props.raceStateLookup);
+    if (!estimatedTime || !record.participantId) {
+      return;
+    }
+    const participant = props.raceStateLookup.getParticipantById(record.participantId);
+    const plateNumber = participant ? getParticipantNumber(participant) : undefined;
+    const draftRecord: ParticipantPassingRecord & { plateNumber?: string } = {
+      entrantId: record.entrantId || props.raceStateLookup.getEntrantIdForParticipant(record.participantId),
+      eventId: props.currentEventId || record.eventId,
+      generatedReason: 'missing-crossing',
+      id: createTimeRecordId(),
+      isGenerated: true,
+      lineNumber: getPassingLineNumber(record),
+      loopNumber: getPassingLoopNumber(record),
+      participantId: record.participantId,
+      recordType: RECORD_TX_CROSSING,
+      sequence: Math.max(...props.records.map((candidate: EventTimeRecord): number => candidate.sequence), 0) + 1,
+      sessionId: props.currentSessionId || record.sessionId,
+      source: GENERATED_MISSING_CROSSING_SOURCE_ID,
+      time: estimatedTime,
+    };
+    if (plateNumber !== undefined) {
+      draftRecord.plateNumber = plateNumber.toString();
+    }
+    setAddRecordDialogState({ anchorRecord: record, draftRecord, initialRecordType: 'passing', mode: 'add' });
+  }, [props.currentEventId, props.currentSessionId, props.raceStateLookup, props.records]);
   const handleCategorySelected = React.useCallback((categoryIds: Set<EventCategoryId>): void => {
     const nextCategoryIds = new Set<EventCategoryId>(categoryIds);
     React.startTransition(() => {
@@ -3024,6 +3117,7 @@ export const RecentRecords = (props: RecordsProps & {
             label="Record types">
             <MenuItem value="all">All records</MenuItem>
             <MenuItem value="flags">Only flags</MenuItem>
+            <MenuItem value="potentialMissingCrossings">Only potential missing crossings</MenuItem>
             <MenuItem value="category">Only selected category</MenuItem>
             <MenuItem value="team">Only selected team</MenuItem>
             <MenuItem value="participant">Only selected rider</MenuItem>
@@ -3167,6 +3261,7 @@ export const RecentRecords = (props: RecordsProps & {
                       onAssignFlagCategory={props.onAssignFlagCategory}
                       onOpenAddRecordDialog={openAddRecordDialog}
                       onOpenEditRecordDialog={openEditRecordDialog}
+                      onOpenMissingCrossingDialog={openMissingCrossingDialog}
                       onExclude={props.onExclude}
                       onChangeCategory={props.onChangeCategory}
                       onMarkFlagDeleted={props.onMarkFlagDeleted}

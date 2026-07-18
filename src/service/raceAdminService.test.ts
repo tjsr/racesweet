@@ -182,6 +182,28 @@ describe('RaceAdminService', () => {
     expect(persistence.snapshot.addedRecords).toEqual([{ record, sessionId: 'session-a' }]);
   });
 
+  it('persists generated missing crossings as included session records', async () => {
+    const sessionDouble = createSessionDouble();
+    const persistence = new MemoryPersistence();
+    const service = await RaceAdminService.create(async () => sessionDouble.session as never, persistence, 'session-a');
+    const record = {
+      generatedReason: 'missing-crossing',
+      id: 'record-generated',
+      isGenerated: true,
+      participantId: 'participant-1',
+      recordType: 16,
+      sequence: 2,
+      sessionId: 'session-a',
+      source: 'generated-missing-crossing',
+    } as EventTimeRecord;
+
+    await service.addRecordForSession(sessionDouble.session as never, 'session-a', record);
+
+    expect(sessionDouble.addedRecords).toEqual([record]);
+    expect(persistence.snapshot.addedRecords).toEqual([{ record, sessionId: 'session-a' }]);
+    expect(record).not.toHaveProperty('isExcluded');
+  });
+
   it('persists manual record edits for a specific session', async () => {
     const sessionDouble = createSessionDouble();
     const persistence = new MemoryPersistence();

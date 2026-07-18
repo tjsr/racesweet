@@ -261,6 +261,7 @@ const createMissingCategoryPlaceholder = (categoryId: string): EventCategory => 
   description: `Category ${categoryId} was not found in the reloaded source data, but participants, entrants, or time records still reference it.`,
   excludeFromResults: true,
   id: categoryId,
+  isPlaceholder: true,
   name: `Missing category ${categoryId}`,
 });
 
@@ -325,7 +326,8 @@ const createMissingCategoryPlaceholderForVersion = (categoryId: string, category
 };
 
 export const isMissingLinkedCategoryPlaceholder = (category: EventCategory): boolean => {
-  return category.code === 'MISSING' &&
+  return category.isPlaceholder === true &&
+    category.code === 'MISSING' &&
     category.excludeFromResults === true &&
     category.name.startsWith('Missing category ');
 };

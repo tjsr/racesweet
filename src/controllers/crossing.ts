@@ -5,7 +5,7 @@ import { findEntrantByChipCode, findEntrantByPlateNumber } from "./participantSe
 import type { ChipCrossingData } from "../model/chipcrossing.js";
 import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
 import type { PlateCrossingData } from "../model/platecrossing.js";
-import type { TimeRecord } from "../model/timerecord.js";
+import { isGeneratedMissingCrossing, type TimeRecord } from "../model/timerecord.js";
 import assert from "node:assert/strict";
 import { validateCategoriesToCreate } from '../validators/categories.ts';
 
@@ -41,6 +41,10 @@ export const assignEntrantToTime = (
   categoryList: EventCategory[] | undefined = undefined,
   preferredCategoryIds: Set<EventCategoryId> | EventCategoryId[] | undefined = undefined
 ): void => {
+  if (isGeneratedMissingCrossing(record) && record.participantId && entrants.has(record.participantId)) {
+    record.entrantId = entrants.get(record.participantId)?.entrantId || record.participantId;
+    return;
+  }
   if (Object.prototype.hasOwnProperty.call(record, 'chipCode')) {
     const crossing = record as ChipCrossingData;
     assignEntrantToChipCrossing(entrants, crossing, createUnknownEntrants, categoryList, preferredCategoryIds);

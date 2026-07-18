@@ -5,6 +5,7 @@ import type { EventParticipant } from './eventparticipant.js';
 import { Session } from './racestate.js';
 import { CROSSING_UNRELATED_LAP_UNDER_MINIMUM, isPassingExcluded, isPassingValid, type ParticipantPassingRecord, type TimeRecordSource } from './timerecord.js';
 import { createGreenFlagEvent } from '../controllers/flag.js';
+import { createTimeRecordId } from './ids.js';
 
 const category: EventCategory = { id: '1', name: 'Team Category' };
 
@@ -163,6 +164,56 @@ describe('Session team lap processing', () => {
     expect(session.getParticipantLaps('101')).toMatchObject([
       { id: '1002', elapsedTime: 240000, lapNo: 1, lapTime: 240000 },
       { id: '1001', elapsedTime: 360000, lapNo: 2, lapTime: 120000 },
+    ]);
+  });
+
+  it('includes generated crossings in lap results and recalculates them after editing', async () => {
+    const session = new Session({
+      categories: [category],
+      participants: [participant('101', '11', 1001)],
+      records: [
+        createGreenFlagEvent({
+          categoryIds: [category.id],
+          flagValue: 'course',
+          id: 'flag-generated',
+          recordType: 4,
+          sequence: 1,
+          source: 'test',
+          time: new Date('2026-05-30T10:00:00.000Z'),
+        }),
+        chipCrossing('generated-before', 1001, 2, '2026-05-30T10:06:00.000Z'),
+        chipCrossing('generated-after', 1001, 4, '2026-05-30T10:12:00.000Z'),
+      ],
+      teams: [],
+    });
+    const generatedCrossing: ParticipantPassingRecord = {
+      generatedReason: 'missing-crossing',
+      id: createTimeRecordId(),
+      isGenerated: true,
+      participantId: '101',
+      recordType: 16,
+      sequence: 3,
+      source: 'generated-missing-crossing',
+      time: new Date('2026-05-30T10:09:00.000Z'),
+    };
+
+    await session.addRecords([generatedCrossing]);
+
+    expect(session.getParticipantLaps('101')).toMatchObject([
+      { id: 'generated-before', lapNo: 1, lapTime: 360000 },
+      { id: generatedCrossing.id, lapNo: 2, lapTime: 180000 },
+      { id: 'generated-after', lapNo: 3, lapTime: 180000 },
+    ]);
+
+    session.updateRecord({ ...generatedCrossing, time: new Date('2026-05-30T10:10:00.000Z') });
+
+    const updatedGeneratedCrossing = session.records.find((record) => record.id === generatedCrossing.id);
+    expect(updatedGeneratedCrossing).toMatchObject({ participantId: '101' });
+    expect(updatedGeneratedCrossing).not.toHaveProperty('isExcluded');
+    expect(session.getParticipantLaps('101')).toMatchObject([
+      { id: 'generated-before', lapTime: 360000 },
+      { id: generatedCrossing.id, lapTime: 240000 },
+      { id: 'generated-after', lapTime: 120000 },
     ]);
   });
 

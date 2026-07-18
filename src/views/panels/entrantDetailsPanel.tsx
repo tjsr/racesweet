@@ -12,7 +12,9 @@ export interface EntrantDraft {
   lastName: string;
   name: string;
   notes: string;
+  startOrder: string;
   teamEntrantId: EventEntrantId;
+  vehicle: string;
 }
 
 interface EntrantDetailsPanelProps {
@@ -24,6 +26,8 @@ interface EntrantDetailsPanelProps {
   onSetEntrantDraft: React.Dispatch<React.SetStateAction<EntrantDraft>>;
   selectedEntrant?: EventCatalogEntrant;
   selectedTeamName?: string;
+  isMotorsport?: boolean;
+  showVehicle?: boolean;
   teamMemberLabel?: string;
   teamEntrants: EventCatalogEntrant[];
   teamMembers: string[];
@@ -50,22 +54,24 @@ const ReadOnlyList = (props: { emptyText: string; items: string[] }): React.Reac
 export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.ReactElement => {
   const entrantLabel = props.entrantLabel || 'Driver';
   const teamMemberLabel = props.teamMemberLabel || 'Drivers';
+  const parentLabel = props.isMotorsport ? 'Entrant' : 'Team';
+  const isDriver = props.selectedEntrant?.entrantType === 'rider';
 
   return (
     <section className="events-panel">
-      <h2>{props.selectedEntrant?.entrantType === 'team' ? 'Team Details' : `${entrantLabel} Details`}</h2>
+      <h2>{isDriver ? `${entrantLabel} Details` : `${parentLabel} Details`}</h2>
       {props.selectedEntrant ? (
         <>
-          <label>
-            {props.selectedEntrant.entrantType === 'team' ? 'Team Name' : `${entrantLabel} Name`}
+          {!props.isMotorsport || !isDriver ? <label>
+            {isDriver ? `${entrantLabel} Name` : `${parentLabel} Name`}
             <input
               aria-label="Entrant Name"
               type="text"
               value={props.entrantDraft.name}
               onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, name: event.target.value }))}
             />
-          </label>
-          {props.selectedEntrant.entrantType === 'rider' ? (
+          </label> : null}
+          {isDriver ? (
             <>
               <label>
                 First Name
@@ -106,14 +112,24 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
                   onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, dateOfBirth: event.target.value }))}
                 />
               </label>
+              {!props.isMotorsport ? <label>
+                Start Order
+                <input
+                  aria-label="Entrant Start Order"
+                  min="1"
+                  type="number"
+                  value={props.entrantDraft.startOrder}
+                  onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, startOrder: event.target.value }))}
+                />
+              </label> : null}
               <label>
-                Team
+                {parentLabel}
                 <select
-                  aria-label="Entrant Team"
+                  aria-label="Driver Entrant"
                   value={props.entrantDraft.teamEntrantId}
                   onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, teamEntrantId: event.target.value }))}
                 >
-                  <option value="">Individual entry</option>
+                  <option value="">{props.isMotorsport ? 'No entrant' : 'Individual entry'}</option>
                   {props.teamEntrants.map((team) => (
                     <option key={team.id} value={team.id}>{team.name}</option>
                   ))}
@@ -122,14 +138,14 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
             </>
           ) : (
             <>
-              <h3>Team Members</h3>
+              <h3>{props.isMotorsport ? 'Drivers' : 'Team Members'}</h3>
               <ReadOnlyList
-                emptyText={`No ${teamMemberLabel.toLowerCase()} are assigned to this team.`}
+                emptyText={`No ${teamMemberLabel.toLowerCase()} are assigned to this ${parentLabel.toLowerCase()}.`}
                 items={props.teamMembers}
               />
             </>
           )}
-          <label>
+          {!props.isMotorsport || !isDriver ? <label>
             Category
             <select
               aria-label="Entrant Category"
@@ -141,9 +157,32 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
                 <option key={category.id.toString()} value={category.id.toString()}>{category.name}</option>
               ))}
             </select>
-          </label>
-          {props.selectedEntrant.entrantType === 'rider' && props.selectedTeamName ? (
-            <p className="readonly-summary">Team: {props.selectedTeamName}</p>
+          </label> : null}
+          {isDriver && props.selectedTeamName ? (
+            <p className="readonly-summary">{parentLabel}: {props.selectedTeamName}</p>
+          ) : null}
+          {props.showVehicle && !isDriver ? (
+            <label>
+              Vehicle
+              <input
+                aria-label="Entrant Vehicle"
+                type="text"
+                value={props.entrantDraft.vehicle}
+                onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, vehicle: event.target.value }))}
+              />
+            </label>
+          ) : null}
+          {props.isMotorsport && !isDriver ? (
+            <label>
+              Start Order
+              <input
+                aria-label="Entrant Start Order"
+                min="1"
+                type="number"
+                value={props.entrantDraft.startOrder}
+                onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, startOrder: event.target.value }))}
+              />
+            </label>
           ) : null}
           <label>
             Notes

@@ -4,6 +4,35 @@ import type { EventParticipant } from '../model/eventparticipant.js';
 import type { ParticipantPassingRecord } from '../model/timerecord.js';
 
 describe('assignEntrantToTime', () => {
+  it('preserves the explicit participant link on a generated crossing without a transmitter or plate', () => {
+    const participant = {
+      categoryId: 'category-1',
+      currentResult: undefined,
+      entrantId: 'entrant-1',
+      firstname: 'Pat',
+      id: 'participant-1',
+      identifiers: [],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Rider',
+    } as EventParticipant;
+    const crossing = {
+      generatedReason: 'missing-crossing',
+      id: 'generated-crossing-1',
+      isGenerated: true,
+      participantId: participant.id,
+      recordType: 16,
+      sequence: 1,
+      source: 'generated-source',
+      time: new Date('2026-05-29T10:07:30.250Z'),
+    } as ParticipantPassingRecord;
+
+    assignEntrantToTime(new Map([[participant.id, participant]]), crossing);
+
+    expect(crossing.participantId).toBe(participant.id);
+    expect(crossing.entrantId).toBe(participant.entrantId);
+  });
+
   it('falls back to plate lookup when a manual crossing has an unknown TxNo but a known plate', () => {
     const participant: EventParticipant = {
       categoryId: 'category-1',

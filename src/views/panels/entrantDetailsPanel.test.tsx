@@ -68,7 +68,9 @@ describe('EntrantDetailsPanel', () => {
       lastName: 'One',
       name: 'Rider One',
       notes: 'Notes',
+      startOrder: '',
       teamEntrantId: 'team-1' as EventEntrantId,
+      vehicle: '',
     };
 
     flushSync(() => {
@@ -118,7 +120,9 @@ describe('EntrantDetailsPanel', () => {
             lastName: '',
             name: 'Fast Friends',
             notes: '',
+            startOrder: '',
             teamEntrantId: '' as EventEntrantId,
+            vehicle: '',
           }}
           eventCategories={categories}
           onDeleteEntrant={() => undefined}
@@ -152,7 +156,9 @@ describe('EntrantDetailsPanel', () => {
             lastName: 'One',
             name: 'Rider One',
             notes: '',
+            startOrder: '',
             teamEntrantId: '' as EventEntrantId,
+            vehicle: '',
           }}
           eventCategories={categoriesWithDeleted}
           onDeleteEntrant={() => undefined}
@@ -167,5 +173,89 @@ describe('EntrantDetailsPanel', () => {
 
     const categorySelect = container.querySelector('select[aria-label="Entrant Category"]') as HTMLSelectElement;
     expect(Array.from(categorySelect.options).map((option) => option.textContent)).toEqual(['No category', 'Premier']);
+  });
+
+  it('keeps motorsport vehicle and category details on the entrant, not the driver', () => {
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <EntrantDetailsPanel
+          entrantDraft={{
+            categoryId: 'category-1',
+            dateOfBirth: '2000-01-01',
+            firstName: 'Rider',
+            gender: 'male',
+            lastName: 'One',
+            name: 'Rider One',
+            notes: '',
+            startOrder: '3',
+            teamEntrantId: 'team-1' as EventEntrantId,
+            vehicle: 'Falcon GT',
+          }}
+          eventCategories={categories}
+          isMotorsport
+          onDeleteEntrant={() => undefined}
+          onSaveEntrant={() => undefined}
+          onSetEntrantDraft={() => undefined}
+          selectedEntrant={riderEntrant}
+          selectedTeamName="Fast Friends"
+          showVehicle
+          teamEntrants={[teamEntrant]}
+          teamMembers={[]}
+        />
+      );
+    });
+
+    expect(container.textContent).toContain('Driver Details');
+    expect(container.textContent).toContain('Entrant: Fast Friends');
+    expect(container.querySelector('input[aria-label="Entrant Name"]')).toBeNull();
+    expect(container.querySelector('select[aria-label="Entrant Category"]')).toBeNull();
+    expect(container.querySelector('input[aria-label="Entrant Vehicle"]')).toBeNull();
+    expect(container.textContent).not.toContain('Team: Fast Friends');
+  });
+
+  it('labels the motorsport parent as an entrant and owns vehicle, category, and grid details', () => {
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <EntrantDetailsPanel
+          entrantDraft={{
+            categoryId: 'category-1',
+            dateOfBirth: '',
+            firstName: '',
+            gender: 'unspecified',
+            lastName: '',
+            name: 'Fast Friends',
+            notes: '',
+            startOrder: '3',
+            teamEntrantId: '' as EventEntrantId,
+            vehicle: 'Falcon GT',
+          }}
+          eventCategories={categories}
+          isMotorsport
+          onDeleteEntrant={() => undefined}
+          onSaveEntrant={() => undefined}
+          onSetEntrantDraft={() => undefined}
+          selectedEntrant={teamEntrant}
+          showVehicle
+          teamEntrants={[teamEntrant]}
+          teamMembers={['Rider One']}
+        />
+      );
+    });
+
+    expect(container.textContent).toContain('Entrant Details');
+    expect(container.textContent).toContain('Entrant Name');
+    expect(container.textContent).toContain('Drivers');
+    expect(container.textContent).not.toContain('Team Details');
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="Entrant Vehicle"]')?.value).toBe('Falcon GT');
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="Entrant Start Order"]')?.value).toBe('3');
+    expect(container.querySelector<HTMLSelectElement>('select[aria-label="Entrant Category"]')?.value).toBe('category-1');
   });
 });

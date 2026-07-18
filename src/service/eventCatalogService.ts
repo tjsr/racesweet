@@ -16,18 +16,20 @@ import {
   getParticipantEntrantMemberships,
 } from '../catalog/eventCatalog.js';
 import { CategoryId, normalizeCategoryResultExclusion } from '../controllers/category.js';
+import { type EntrantImportRecord, isPlaceholderEntrantName } from '../controllers/entrantImport.js';
 import { createSeedEventCatalogLedger } from '../ledger/createSeedEventCatalogLedger.js';
 import {
   type EventCatalogLedger,
   type EventCatalogMutation,
   applyEventCatalogLedger,
+  applyEventCatalogMutation,
 } from '../ledger/eventCatalogLedger.js';
 import { incrementLoadingMetric } from '../loadingMetrics.js';
 import { EventEntrantId } from '../model/entrant.js';
-import type { EventCategory } from '../model/eventcategory.js';
+import type { EventCategory, EventCategoryId } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { EventTeam } from '../model/eventteam.js';
-import { createCategoryId, createEventEntrantId, createEventId, createId, createSessionId, rewriteImportedObjectIds } from '../model/ids.js';
+import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createId, createSessionId, rewriteImportedObjectIds } from '../model/ids.js';
 import { getParticipantDisplayName } from '../model/participantDisplay.js';
 import { EventId, SessionId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
@@ -273,6 +275,154 @@ const mergeParticipantIdentifiers = (
   });
 
   return Array.from(mergedByKey.values());
+};
+
+const normalizeEntrantImportValue = (value: string | number | undefined): string => {
+  return value?.toString().trim().toLowerCase() || '';
+};
+
+const resolveEntrantImportCategoryId = (
+  record: EntrantImportRecord,
+  categories: EventCatalogCategory[],
+  defaultCategoryId: EventCategoryId | undefined
+): EventCategoryId | undefined => {
+  const importedCategory = normalizeEntrantImportValue(record.category);
+  const matchedCategory = importedCategory
+    ? categories.find((category) => (
+      category.id.toString() === importedCategory ||
+      normalizeEntrantImportValue(category.code) === importedCategory ||
+      normalizeEntrantImportValue(category.name) === importedCategory
+    ))
+    : undefined;
+
+  return matchedCategory?.id || defaultCategoryId;
+};
+
+const hasPlaceholderCategory = (
+  categoryId: EventCategoryId | undefined,
+  categoriesById: Map<string, EventCatalogCategory>
+): boolean => {
+  const category = categoryId === undefined ? undefined : categoriesById.get(categoryId.toString());
+  const categoryName = normalizeEntrantImportValue(category?.name);
+
+  return category?.isPlaceholder === true ||
+    normalizeEntrantImportValue(category?.code) === 'missing' ||
+    categoryName === 'unassigned' ||
+    categoryName === 'unknown participants' ||
+    categoryName === 'unknown participant' ||
+    categoryName.startsWith('missing category ');
+};
+
+const participantMatchesEntrantImportRecord = (
+  participant: EventParticipant,
+  record: EntrantImportRecord
+): boolean => {
+  const transponderNumber = normalizeEntrantImportValue(record.transponderNumber);
+  const raceNumber = normalizeEntrantImportValue(record.raceNumber);
+  const participantName = normalizeEntrantImportValue(`${participant.firstname || ''} ${participant.surname || ''}`);
+  const importedName = normalizeEntrantImportValue(`${record.firstName || ''} ${record.lastName || ''}`);
+
+  return (transponderNumber.length > 0 && getIdentifierValues(participant.identifiers, 'txNo')
+    .map(normalizeEntrantImportValue)
+    .includes(transponderNumber)) ||
+    (raceNumber.length > 0 && getIdentifierValues(participant.identifiers, 'racePlate')
+      .map(normalizeEntrantImportValue)
+      .includes(raceNumber)) ||
+    (importedName.length > 0 && !isPlaceholderEntrantName(importedName) && participantName === importedName);
+};
+
+const createImportedIdentifier = (
+  identifierType: 'racePlate' | 'txNo',
+  value: string
+): EventParticipant['identifiers'][number] => ({
+  fromTime: undefined,
+  [identifierType]: value,
+  toTime: undefined,
+} as EventParticipant['identifiers'][number]);
+
+const mergeEntrantImportIdentifiers = (
+  identifiers: EventParticipant['identifiers'] = [],
+  record: EntrantImportRecord
+): EventParticipant['identifiers'] => {
+  let merged = [...identifiers];
+  if (record.transponderNumber && !getIdentifierValues(merged, 'txNo').some((value) => (
+    normalizeEntrantImportValue(value) === normalizeEntrantImportValue(record.transponderNumber)
+  ))) {
+    merged = mergeParticipantIdentifiers(merged, [createImportedIdentifier('txNo', record.transponderNumber)]);
+  }
+  if (record.raceNumber && getIdentifierValues(merged, 'racePlate').length === 0) {
+    merged = mergeParticipantIdentifiers(merged, [createImportedIdentifier('racePlate', record.raceNumber)]);
+  }
+  return merged;
+};
+
+const getParticipantsForCatalogEntrant = (
+  entrant: EventCatalogEntrant,
+  participants: EventParticipant[]
+): EventParticipant[] => {
+  const memberIds = new Set(entrant.memberParticipantIds.map((id) => id.toString()));
+  return participants.filter((participant) => memberIds.has(participant.id.toString()) || (
+    memberIds.size === 0 && participant.entrantId?.toString() === entrant.id.toString()
+  ));
+};
+
+const getEntrantImportIdentifierValues = (
+  entrant: EventCatalogEntrant,
+  participants: EventParticipant[],
+  identifierType: 'racePlate' | 'txNo'
+): string[] => {
+  return [
+    ...getIdentifierValues(entrant.identifiers, identifierType),
+    ...getParticipantsForCatalogEntrant(entrant, participants).flatMap((participant) => (
+      getIdentifierValues(participant.identifiers, identifierType)
+    )),
+  ].map(normalizeEntrantImportValue).filter(Boolean);
+};
+
+const getEntrantImportNames = (
+  entrant: EventCatalogEntrant,
+  participants: EventParticipant[]
+): string[] => {
+  return [
+    entrant.name,
+    `${entrant.firstName || ''} ${entrant.lastName || ''}`,
+    ...getParticipantsForCatalogEntrant(entrant, participants).map((participant) => (
+      `${participant.firstname || ''} ${participant.surname || ''}`
+    )),
+  ].map(normalizeEntrantImportValue).filter((name) => name.length > 0 && !isPlaceholderEntrantName(name));
+};
+
+const findUniqueEntrantImportMatch = (
+  entrants: EventCatalogEntrant[],
+  participants: EventParticipant[],
+  record: EntrantImportRecord
+): EventCatalogEntrant | undefined => {
+  const riderEntrants = entrants.filter((entrant) => entrant.entrantType === 'rider');
+  const findUnique = (matches: EventCatalogEntrant[]): EventCatalogEntrant | undefined => (
+    matches.length === 1 ? matches[0] : undefined
+  );
+  const transponder = normalizeEntrantImportValue(record.transponderNumber);
+  if (transponder) {
+    const match = findUnique(riderEntrants.filter((entrant) => (
+      getEntrantImportIdentifierValues(entrant, participants, 'txNo').includes(transponder)
+    )));
+    if (match) {
+      return match;
+    }
+  }
+  const raceNumber = normalizeEntrantImportValue(record.raceNumber);
+  if (raceNumber) {
+    const match = findUnique(riderEntrants.filter((entrant) => (
+      getEntrantImportIdentifierValues(entrant, participants, 'racePlate').includes(raceNumber)
+    )));
+    if (match) {
+      return match;
+    }
+  }
+  const importedName = normalizeEntrantImportValue(`${record.firstName || ''} ${record.lastName || ''}`);
+  return importedName && !isPlaceholderEntrantName(importedName)
+    ? findUnique(riderEntrants.filter((entrant) => getEntrantImportNames(entrant, participants).includes(importedName)))
+    : undefined;
 };
 
 const mergeImportedParticipant = (primary: EventParticipant, duplicate: EventParticipant): EventParticipant => {
@@ -524,6 +674,7 @@ const deriveCategoriesFromEventData = (
         },
         eventId,
         id: categoryId,
+        isPlaceholder: true,
         name: `Category ${categoryId}`,
         teamRules: createCategoryTeamRules(categoryId, maxTeamSizeByCategory),
       });
@@ -617,8 +768,8 @@ const deriveEntrantsFromParticipants = async (
 };
 
 const normalizeEntrantChanges = (
-  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>
-): Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>> => {
+  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'startOrder' | 'teamEntrantId' | 'teamMembers' | 'vehicle'>>
+): Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'startOrder' | 'teamEntrantId' | 'teamMembers' | 'vehicle'>> => {
   if (!hasOwn(changes, 'categoryId')) {
     return changes;
   }
@@ -687,19 +838,6 @@ const raceStateImportMutationChangesLedger = (
     !hasSameSerializedValue(existingImport.raceState, mutation.raceState);
 };
 
-const mutationChangesLedgerState = (
-  acceptedMutations: EventCatalogLedger['mutations'],
-  mutation: EventCatalogMutation
-): boolean => {
-  if (mutation.type === 'race-state-imported') {
-    return raceStateImportMutationChangesLedger(acceptedMutations, mutation);
-  }
-
-  const currentState = applyEventCatalogLedger(createLedgerWithMutations(acceptedMutations));
-  const nextState = applyEventCatalogLedger(createLedgerWithMutations([...acceptedMutations, mutation]));
-  return !hasSameSerializedValue(currentState, nextState);
-};
-
 const removeDuplicateMutationIds = (mutations: EventCatalogLedger['mutations']): EventCatalogLedger['mutations'] => {
   const acceptedMutations: EventCatalogLedger['mutations'] = [];
   const acceptedMutationIds = new Set<string>();
@@ -729,14 +867,23 @@ const removeDuplicateAndNoopMutations = async (
 ): Promise<EventCatalogLedger['mutations']> => {
   const acceptedMutations = compactSupersededRaceStateImportMutations(removeDuplicateMutationIds(existingMutations));
   const acceptedMutationIds = new Set(acceptedMutations.map((mutation) => mutation.id));
+  let acceptedState = applyEventCatalogLedger(createLedgerWithMutations(acceptedMutations));
 
   for (const [index, mutation] of proposedMutations.entries()) {
     if (acceptedMutationIds.has(mutation.id)) {
       continue;
     }
 
-    if (!mutationChangesLedgerState(acceptedMutations, mutation)) {
-      continue;
+    if (mutation.type === 'race-state-imported') {
+      if (!raceStateImportMutationChangesLedger(acceptedMutations, mutation)) {
+        continue;
+      }
+    } else {
+      const nextState = applyEventCatalogMutation(acceptedState, mutation);
+      if (hasSameSerializedValue(acceptedState, nextState)) {
+        continue;
+      }
+      acceptedState = nextState;
     }
 
     acceptedMutations.push(mutation);
@@ -754,6 +901,7 @@ const hasSameCategoryScaffold = (existing: EventCatalogCategory, next: EventCata
     hasSameSerializedValue(existing.distanceRule, next.distanceRule) &&
     existing.duration === next.duration &&
     existing.excludeFromResults === next.excludeFromResults &&
+    existing.isPlaceholder === next.isPlaceholder &&
     existing.name === next.name &&
     existing.startTime === next.startTime &&
     hasSameSerializedValue(existing.teamRules, next.teamRules);
@@ -782,10 +930,68 @@ const getCategoryScaffoldChanges = (category: EventCatalogCategory): NonNullable
   distanceRule: category.distanceRule,
   duration: category.duration,
   excludeFromResults: category.excludeFromResults,
+  isPlaceholder: category.isPlaceholder,
   name: category.name,
   startTime: category.startTime,
   teamRules: category.teamRules,
 });
+
+const normalizePlaceholderCategoryName = (name: string): string => name
+  .replace(/^missing category\s+/i, '')
+  .trim()
+  .replace(/\s+/g, ' ')
+  .toLocaleLowerCase();
+
+const getPlaceholderCategoryReplacements = (
+  existingCategories: EventCatalogCategory[],
+  identifiedCategories: EventCatalogCategory[]
+): Map<string, EventCategoryId> => {
+  const identifiedCategoryIdsByName = new Map<string, EventCategoryId>();
+  identifiedCategories
+    .filter((category) => category.isPlaceholder !== true)
+    .forEach((category) => {
+      identifiedCategoryIdsByName.set(normalizePlaceholderCategoryName(category.name), category.id);
+    });
+
+  return existingCategories.reduce<Map<string, EventCategoryId>>((replacements, category) => {
+    if (category.isPlaceholder !== true) {
+      return replacements;
+    }
+
+    const replacementCategoryId = identifiedCategoryIdsByName.get(normalizePlaceholderCategoryName(category.name));
+    if (replacementCategoryId && replacementCategoryId !== category.id) {
+      replacements.set(category.id.toString(), replacementCategoryId);
+    }
+    return replacements;
+  }, new Map<string, EventCategoryId>());
+};
+
+const migrateEntrantPlaceholderCategories = (
+  entrant: EventCatalogEntrant,
+  replacements: Map<string, EventCategoryId>
+): EventCatalogEntrant => {
+  const replaceCategoryId = (categoryId: EventCategoryId | undefined): EventCategoryId | undefined => {
+    return categoryId ? replacements.get(categoryId.toString()) || categoryId : undefined;
+  };
+  const categoryId = replaceCategoryId(entrant.categoryId);
+  const categoryIds = unique(entrant.categoryIds.map((existingCategoryId) => replaceCategoryId(existingCategoryId) || existingCategoryId));
+  const teamMembers = entrant.teamMembers?.map((teamMember) => ({
+    ...teamMember,
+    categoryId: replaceCategoryId(teamMember.categoryId),
+  }));
+  if (categoryId === entrant.categoryId &&
+    hasSameMembers(categoryIds, entrant.categoryIds) &&
+    hasSameSerializedValue(teamMembers, entrant.teamMembers)) {
+    return entrant;
+  }
+
+  return {
+    ...entrant,
+    categoryId,
+    categoryIds,
+    teamMembers,
+  };
+};
 
 const getEntrantScaffoldChanges = (entrant: EventCatalogEntrant): NonNullable<Extract<EventCatalogMutation, { type: 'entrant-updated' }>['changes']> => ({
   categoryId: entrant.categoryId,
@@ -1168,7 +1374,7 @@ export class EventCatalogService {
     ], onCompleteStep);
   }
 
-  public async updateEvent(eventId: EventId, changes: { date?: string; discipline?: EventCatalogState['events'][number]['discipline']; format?: EventCatalogState['events'][number]['format']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string; }, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
+  public async updateEvent(eventId: EventId, changes: { date?: string; discipline?: EventCatalogState['events'][number]['discipline']; format?: EventCatalogState['events'][number]['format']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string; trackMap?: EventCatalogState['events'][number]['trackMap']; }, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes,
@@ -1220,7 +1426,7 @@ export class EventCatalogService {
       .filter((entrant) => !existingEventEntrantsById.has(entrant.id.toString()))
       .map((entrant) => [entrant.id.toString(), entrant] as const));
     const linkedEntrantIds = new Set<string>();
-    const entrants = deduplicateCatalogEntrants(derivedEntrants.map((entrant) => {
+    let entrants = deduplicateCatalogEntrants(derivedEntrants.map((entrant) => {
       const linkedEntrant = linkedGlobalEntrantsById.get(entrant.id.toString());
       if (!linkedEntrant) {
         return entrant;
@@ -1233,6 +1439,11 @@ export class EventCatalogService {
     const existingCategoriesById = new Map(this.state.categories
       .filter((category) => category.eventId === eventId)
       .map((category) => [category.id.toString(), category] as const));
+    const placeholderCategoryReplacements = getPlaceholderCategoryReplacements(
+      Array.from(existingCategoriesById.values()),
+      scaffoldCategories
+    );
+    entrants = entrants.map((entrant) => migrateEntrantPlaceholderCategories(entrant, placeholderCategoryReplacements));
     const existingEntrantsById = new Map(existingEventEntrantsById);
     const categoryMutations = scaffoldCategories.map((category) => {
       incrementLoadingMetric('Prepare scaffold category mutation', category.name || category.id.toString());
@@ -1329,6 +1540,26 @@ export class EventCatalogService {
       }];
     });
 
+    const migratedExistingEntrantMutations: EventCatalogLedger['mutations'] = getEntrantsForEvent(this.state, eventId)
+      .filter((entrant) => !entrants.some((incomingEntrant) => incomingEntrant.id === entrant.id))
+      .flatMap((entrant): EventCatalogLedger['mutations'] => {
+        const migratedEntrant = migrateEntrantPlaceholderCategories(entrant, placeholderCategoryReplacements);
+        if (migratedEntrant === entrant) {
+          return [];
+        }
+        return [{
+          changes: {
+            categoryId: migratedEntrant.categoryId,
+            categoryIds: migratedEntrant.categoryIds,
+            teamMembers: migratedEntrant.teamMembers,
+          },
+          entrantId: entrant.id,
+          id: createMutationId(),
+          timestamp: createTimestamp(),
+          type: 'entrant-updated' as const,
+        }];
+      });
+
     const staleDuplicateEntrants = getEntrantsForEvent(this.state, eventId).filter((existingEntrant) => {
       const matchingEntrant = entrants.find((entrant) => buildCatalogEntrantIdentity(entrant) === buildCatalogEntrantIdentity(existingEntrant));
       return !!matchingEntrant && matchingEntrant.id !== existingEntrant.id;
@@ -1379,7 +1610,7 @@ export class EventCatalogService {
         type: 'category-deleted' as const,
       }));
 
-    if (categoryMutations.length === 0 && entrantMutations.length === 0 && staleDuplicateEntrantMutations.length === 0 && removedEntrantMutations.length === 0 && removedCategoryMutations.length === 0 && !eventChanges) {
+    if (categoryMutations.length === 0 && entrantMutations.length === 0 && migratedExistingEntrantMutations.length === 0 && staleDuplicateEntrantMutations.length === 0 && removedEntrantMutations.length === 0 && removedCategoryMutations.length === 0 && !eventChanges) {
       if (!sessionCategoryMutation) {
         return this.state;
       }
@@ -1389,6 +1620,7 @@ export class EventCatalogService {
       ...categoryMutations,
       ...removedCategoryMutations,
       ...entrantMutations,
+      ...migratedExistingEntrantMutations,
       ...staleDuplicateEntrantMutations,
       ...removedEntrantMutations,
       ...(sessionCategoryMutation ? [sessionCategoryMutation] : []),
@@ -1966,7 +2198,7 @@ export class EventCatalogService {
     ], onCompleteStep);
   }
 
-  public async updateCategory(categoryId: CategoryId, changes: Partial<Pick<EventCatalogCategory, 'code' | 'deleted' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'excludeFromResults' | 'name' | 'startTime' | 'teamRules'>>, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
+  public async updateCategory(categoryId: CategoryId, changes: Partial<Pick<EventCatalogCategory, 'code' | 'deleted' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'excludeFromResults' | 'isPlaceholder' | 'name' | 'startTime' | 'teamRules'>>, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         categoryId,
@@ -2000,6 +2232,252 @@ export class EventCatalogService {
     ], onCompleteStep);
   }
 
+  public async importEntrants(
+    eventId: EventId,
+    records: EntrantImportRecord[],
+    defaultCategoryId: EventCategoryId | undefined = undefined,
+    onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP
+  ): Promise<EventCatalogState> {
+    const event = this.state.events.find((candidate) => candidate.id === eventId);
+    if (!event) {
+      throw new Error(`Cannot import entrants for unknown event ${eventId}.`);
+    }
+    const importedRaceStates = this.state.sessions
+      .filter((session) => session.eventId === eventId)
+      .flatMap((session) => {
+        const metadata = this.getImportedRaceStateMetadata(eventId, session.id);
+        return metadata ? [{ metadata, sessionId: session.id }] : [];
+      });
+    const sourceParticipants = importedRaceStates.flatMap(({ metadata }) => metadata.raceState.participants || []);
+    const originalEntrants = getEntrantsForEvent(this.state, eventId);
+    const categories = getCategoriesForEvent(this.state, eventId);
+    const categoriesById = new Map(categories.map((category) => [category.id.toString(), category] as const));
+    const selectedDefaultCategoryId = defaultCategoryId && categoriesById.has(defaultCategoryId.toString())
+      ? defaultCategoryId
+      : undefined;
+    let workingEntrants: EventCatalogEntrant[] = originalEntrants.map((entrant) => ({
+      ...entrant,
+      categoryIds: [...entrant.categoryIds],
+      identifiers: [...(entrant.identifiers || [])],
+      memberParticipantIds: [...entrant.memberParticipantIds],
+      teamMembers: entrant.teamMembers ? [...entrant.teamMembers] : undefined,
+    }));
+    const importedRiderIds = new Set<EventEntrantId>();
+
+    records.forEach((record) => {
+      const importedCategoryId = resolveEntrantImportCategoryId(record, categories, selectedDefaultCategoryId);
+      const importedName = `${record.firstName || ''} ${record.lastName || ''}`.trim();
+      const hasUsableName = importedName.length > 0 && !isPlaceholderEntrantName(record.fullName || importedName);
+      let rider = findUniqueEntrantImportMatch(workingEntrants, sourceParticipants, record);
+      if (!rider) {
+        const entrantId = createEventEntrantId();
+        const participantId = createEventParticipantId();
+        rider = {
+          categoryId: importedCategoryId || event.categoryIds[0],
+          categoryIds: importedCategoryId || event.categoryIds[0] ? [importedCategoryId || event.categoryIds[0]] : [],
+          entrantType: 'rider',
+          eventId,
+          firstName: hasUsableName ? record.firstName : undefined,
+          id: entrantId,
+          identifiers: [],
+          lastName: hasUsableName ? record.lastName : undefined,
+          memberParticipantIds: [participantId],
+          name: hasUsableName ? importedName : 'Unknown participant',
+        };
+        workingEntrants.push(rider);
+      }
+
+      const riderIndex = workingEntrants.findIndex((entrant) => entrant.id === rider!.id);
+      const participantId = rider.memberParticipantIds[0] ||
+        getParticipantsForCatalogEntrant(rider, sourceParticipants)[0]?.id ||
+        createEventParticipantId();
+      const shouldReplaceRiderCategory = !!importedCategoryId && (
+        !rider.categoryId || hasPlaceholderCategory(rider.categoryId, categoriesById)
+      );
+      const riderCategoryId = shouldReplaceRiderCategory ? importedCategoryId : rider.categoryId;
+      rider = {
+        ...rider,
+        categoryId: riderCategoryId,
+        categoryIds: riderCategoryId ? [riderCategoryId] : rider.categoryIds,
+        firstName: hasUsableName ? record.firstName : rider.firstName,
+        identifiers: mergeEntrantImportIdentifiers(rider.identifiers, record),
+        lastName: hasUsableName ? record.lastName : rider.lastName,
+        memberParticipantIds: rider.memberParticipantIds.length > 0 ? rider.memberParticipantIds : [participantId],
+        name: hasUsableName ? importedName : rider.name,
+        startOrder: event.discipline === 'motorsport' ? undefined : record.startOrder ?? rider.startOrder,
+        vehicle: event.discipline === 'motorsport' ? undefined : rider.vehicle,
+      };
+
+      if (event.discipline === 'motorsport' && record.entrantName) {
+        const normalizedTeamName = normalizeEntrantImportValue(record.entrantName);
+        const normalizedVehicle = normalizeEntrantImportValue(record.vehicle);
+        let team = workingEntrants.find((entrant) => (
+          entrant.entrantType === 'team' &&
+          normalizeEntrantImportValue(entrant.name) === normalizedTeamName &&
+          (!normalizedVehicle || normalizeEntrantImportValue(entrant.vehicle) === normalizedVehicle)
+        ));
+        if (!team) {
+          team = {
+            categoryId: rider.categoryId,
+            categoryIds: rider.categoryIds,
+            entrantType: 'team',
+            eventId,
+            id: createEventEntrantId(),
+            memberParticipantIds: [],
+            name: record.entrantName,
+            startOrder: record.startOrder,
+            teamMembers: [],
+            vehicle: record.vehicle,
+          };
+          workingEntrants.push(team);
+        }
+        const resolvedTeam = team;
+        const shouldReplaceTeamCategory = !!riderCategoryId && (
+          !resolvedTeam.categoryId || hasPlaceholderCategory(resolvedTeam.categoryId, categoriesById)
+        );
+        const teamCategoryId = shouldReplaceTeamCategory ? riderCategoryId : resolvedTeam.categoryId;
+        const teamMemberIds = new Set(resolvedTeam.memberParticipantIds.map((id) => id.toString()));
+        teamMemberIds.add(participantId.toString());
+        const teamMembers = (resolvedTeam.teamMembers || []).filter((member) => member.participantId !== participantId);
+        teamMembers.push({
+          categoryId: rider.categoryId,
+          firstName: rider.firstName || '',
+          lastName: rider.lastName || '',
+          participantId,
+        });
+        const teamIndex = workingEntrants.findIndex((entrant) => entrant.id === resolvedTeam.id);
+        workingEntrants[teamIndex] = {
+          ...resolvedTeam,
+          categoryId: teamCategoryId,
+          categoryIds: teamCategoryId ? [teamCategoryId] : resolvedTeam.categoryIds,
+          memberParticipantIds: Array.from(teamMemberIds),
+          startOrder: record.startOrder ?? resolvedTeam.startOrder,
+          teamMembers,
+          vehicle: record.vehicle || resolvedTeam.vehicle,
+        };
+        rider.teamEntrantId = resolvedTeam.id;
+        rider.categoryId = undefined;
+        rider.categoryIds = [];
+      }
+
+      workingEntrants[riderIndex] = rider;
+      importedRiderIds.add(rider.id);
+    });
+
+    const originalEntrantsById = new Map(originalEntrants.map((entrant) => [entrant.id, entrant]));
+    const entrantMutations: EventCatalogLedger['mutations'] = workingEntrants.flatMap((entrant): EventCatalogLedger['mutations'] => {
+      const original = originalEntrantsById.get(entrant.id);
+      if (!original) {
+        return [{
+          entrant,
+          id: createMutationId(),
+          timestamp: createTimestamp(),
+          type: 'entrant-created' as const,
+        }];
+      }
+      if (hasSameSerializedValue(original, entrant)) {
+        return [];
+      }
+      const { eventId: _eventId, id: _id, sessionIds: _sessionIds, ...changes } = entrant;
+      return [{
+        changes,
+        entrantId: entrant.id,
+        id: createMutationId(),
+        timestamp: createTimestamp(),
+        type: 'entrant-updated' as const,
+      }];
+    });
+    const importedRiders = workingEntrants.filter((entrant) => importedRiderIds.has(entrant.id));
+    const teamsById = new Map(workingEntrants
+      .filter((entrant) => entrant.entrantType === 'team')
+      .map((entrant) => [entrant.id, entrant]));
+    const participantCategoryUpdates = new Map<string, EventCategoryId>();
+    records.forEach((record) => {
+      const categoryId = resolveEntrantImportCategoryId(record, categories, selectedDefaultCategoryId);
+      if (!categoryId) {
+        return;
+      }
+      sourceParticipants.forEach((participant) => {
+        if (hasPlaceholderCategory(participant.categoryId, categoriesById) && participantMatchesEntrantImportRecord(participant, record)) {
+          participantCategoryUpdates.set(participant.id.toString(), categoryId);
+        }
+      });
+    });
+    const raceStateMutations: EventCatalogLedger['mutations'] = importedRaceStates.map(({ metadata, sessionId }) => {
+      const participants = (metadata.raceState.participants || []).map((participant): EventParticipant => {
+        const categoryId = participantCategoryUpdates.get(participant.id.toString());
+        return categoryId ? { ...participant, categoryId } : participant;
+      });
+      importedRiders.forEach((rider) => {
+        const memberIds = new Set(rider.memberParticipantIds.map((id) => id.toString()));
+        let participantIndex = participants.findIndex((participant) => memberIds.has(participant.id.toString()));
+        if (participantIndex < 0) {
+          participantIndex = participants.length;
+        }
+        const existingParticipant = participants[participantIndex];
+        const entrant = rider.teamEntrantId ? teamsById.get(rider.teamEntrantId) : rider;
+        participants[participantIndex] = {
+          categoryId: entrant?.categoryId || entrant?.categoryIds[0] || existingParticipant?.categoryId || '',
+          currentResult: existingParticipant?.currentResult,
+          entrantId: rider.teamEntrantId || rider.id,
+          firstname: rider.firstName || existingParticipant?.firstname || '',
+          id: existingParticipant?.id || rider.memberParticipantIds[0],
+          identifiers: mergeParticipantIdentifiers(existingParticipant?.identifiers, rider.identifiers),
+          lastRecordTime: existingParticipant?.lastRecordTime || null,
+          resultDuration: existingParticipant?.resultDuration || null,
+          surname: rider.lastName || existingParticipant?.surname || '',
+        };
+      });
+      const teamsByRaceStateId = new Map((metadata.raceState.teams || []).map((team) => [team.id, team]));
+      importedRiders.forEach((rider) => {
+        if (!rider.teamEntrantId) {
+          return;
+        }
+        const catalogTeam = teamsById.get(rider.teamEntrantId);
+        if (!catalogTeam) {
+          return;
+        }
+        const existingTeam = teamsByRaceStateId.get(catalogTeam.id);
+        teamsByRaceStateId.set(catalogTeam.id, {
+          categoryId: catalogTeam.categoryId || rider.categoryId || '',
+          description: existingTeam?.description || 'Imported entrant team',
+          id: catalogTeam.id,
+          members: Array.from(new Set([...(existingTeam?.members || []), ...catalogTeam.memberParticipantIds])),
+          name: catalogTeam.name,
+        });
+      });
+      return {
+        apicalDataFilePath: metadata.apicalDataFilePath,
+        eventId,
+        id: createMutationId(),
+        raceState: {
+          ...metadata.raceState,
+          participants,
+          teams: Array.from(teamsByRaceStateId.values()),
+        },
+        sessionId,
+        timestamp: createTimestamp(),
+        type: 'race-state-imported' as const,
+      };
+    });
+    const entrantIds = workingEntrants.map((entrant) => entrant.id);
+    const eventMutation: EventCatalogLedger['mutations'] = hasSameMembers(event.entrantIds, entrantIds)
+      ? []
+      : [{
+        changes: { entrantIds },
+        eventId,
+        id: createMutationId(),
+        timestamp: createTimestamp(),
+        type: 'event-updated' as const,
+      }];
+
+    return this.appendMutations([
+      ...raceStateMutations,
+      ...entrantMutations,
+      ...eventMutation,
+    ], onCompleteStep);
+  }
+
   public async createEntrant(eventId: EventId, entrantType: EntrantType = 'rider', onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     const entrantId = createEventEntrantId();
     const event = this.state.events.find((item) => item.id === eventId);
@@ -2012,7 +2490,9 @@ export class EventCatalogService {
       eventId,
       id: entrantId,
       memberParticipantIds: [],
-      name: entrantType === 'team' ? 'New Team' : `New ${entrantLabels.singular}`,
+      name: entrantType === 'team'
+        ? event?.discipline === 'motorsport' ? 'New Entrant' : 'New Team'
+        : `New ${entrantLabels.singular}`,
       notes: '',
       teamMembers: entrantType === 'team' ? [] : undefined,
     };
@@ -2036,7 +2516,7 @@ export class EventCatalogService {
     ], onCompleteStep);
   }
 
-  public async updateEntrant(entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'teamEntrantId' | 'teamMembers'>>, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
+  public async updateEntrant(entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'startOrder' | 'teamEntrantId' | 'teamMembers' | 'vehicle'>>, onCompleteStep: (currentTask: string, index: number) => Promise<void> = NO_OP_COMPLETE_STEP): Promise<EventCatalogState> {
     return this.appendMutations([
       {
         changes: normalizeEntrantChanges(changes),
