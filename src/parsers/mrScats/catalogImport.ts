@@ -2,6 +2,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { TZDate } from '@date-fns/tz';
 import { generateResult, type EntrantResult } from '../../controllers/result.js';
+import { getParticipantEntryId, type EventEntryId } from '../../model/entry.js';
 import type { EventEntrantId } from '../../model/entrant.js';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
@@ -2808,12 +2809,13 @@ const buildCalculatedEntrants = (
   sessionState.setSessionValidCategoryIds(new Set(session.categoryIds));
 
   const participantsByEntrantId = (raceState.participants || []).reduce<Map<string, EventParticipant[]>>((map, participant) => {
-    const entrants = map.get(participant.entrantId.toString()) || [];
+    const entryId = getParticipantEntryId(participant).toString();
+    const entrants = map.get(entryId) || [];
     entrants.push(participant);
-    map.set(participant.entrantId.toString(), entrants);
+    map.set(entryId, entrants);
     return map;
   }, new Map<string, EventParticipant[]>());
-  const passingsByEntrantId = new Map<EventEntrantId, EntrantPassingRecord[]>();
+  const passingsByEntrantId = new Map<EventEntryId, EntrantPassingRecord[]>();
 
   (raceState.participants || []).forEach((participant) => {
     const participantLaps = sessionState.getParticipantLaps(participant.id) || [];
@@ -2821,9 +2823,10 @@ const buildCalculatedEntrants = (
       return;
     }
 
-    const entrantPassings = passingsByEntrantId.get(participant.entrantId) || [];
+    const entryId = getParticipantEntryId(participant);
+    const entrantPassings = passingsByEntrantId.get(entryId) || [];
     entrantPassings.push(...participantLaps);
-    passingsByEntrantId.set(participant.entrantId, entrantPassings);
+    passingsByEntrantId.set(entryId, entrantPassings);
   });
 
   return generateResult(passingsByEntrantId)

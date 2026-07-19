@@ -7,7 +7,7 @@ import type { EventTeam } from '../model/eventteam.js';
 import { Session } from '../model/racestate.js';
 import { isPassingExcluded, isPassingValid } from '../model/timerecord.js';
 import { RECORD_TX_CROSSING, type ParticipantPassingRecord, type TimeRecord, type TimeRecordSource } from '../model/timerecord.js';
-import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
+import { createCategoryId, createEventEntrantId, createEventEntryId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
 import type { EventCatalogState } from '../catalog/eventCatalog.js';
 
 const EXISTING_CATEGORY_ID = createCategoryId('cat-existing');
@@ -232,6 +232,63 @@ describe('sourceApplication', () => {
     expect(setSessionValidCategoryIds).toHaveBeenCalledWith(new Set([categoryId]));
     expect(setSessionKind).toHaveBeenCalledWith('race');
     expect(endBulkProcess).toHaveBeenCalledTimes(1);
+  });
+
+  it('hydrates an assigned catalog category even when the timing source has the same category under another ID', async () => {
+    const eventId = createEventId('catalog-source-category-event');
+    const sessionId = createSessionId('catalog-source-category-session');
+    const catalogCategoryId = createCategoryId('catalog-category-id');
+    const sourceCategoryId = createCategoryId('source-category-id');
+    const flagId = createTimeRecordId('catalog-source-category-flag');
+    const sourceId = createTimeRecordSourceId('catalog-source-category-source');
+    const catalog: EventCatalogState = {
+      activeEventId: eventId,
+      activeSessionId: sessionId,
+      categories: [{ code: 'INDY', eventId, id: catalogCategoryId, name: 'INDY' }],
+      deletedEventIds: [],
+      entrants: [],
+      events: [{
+        categoryIds: [catalogCategoryId],
+        date: '2026-07-19',
+        entrantIds: [],
+        format: 'race-weekend',
+        id: eventId,
+        name: 'INDY Event',
+        sessionIds: [sessionId],
+      }],
+      sessions: [{
+        categoryIds: [catalogCategoryId],
+        eventId,
+        id: sessionId,
+        kind: 'race',
+        name: 'INDY Session',
+        scheduledStart: '2026-07-19T10:00:00.000Z',
+        status: 'scheduled',
+      }],
+    };
+    const session = new Session({ categories: [], participants: [], records: [], teams: [] });
+
+    await applyPulledRaceStateToSession(session, {
+      categories: [{ code: 'INDY', id: sourceCategoryId, name: 'INDY' }],
+      participants: [],
+      records: [createGreenFlagEvent({
+        categoryIds: [sourceCategoryId],
+        eventId,
+        flagValue: 'course',
+        id: flagId,
+        sequence: 1,
+        sessionId,
+        source: sourceId,
+        time: new Date('2026-07-19T10:00:00.000Z'),
+      })],
+    }, { catalog, eventId, sessionId });
+
+    expect(session.categories.map((category) => category.id)).toEqual(expect.arrayContaining([
+      sourceCategoryId,
+      catalogCategoryId,
+    ]));
+    expect(session.canAssignFlagCategory(flagId, catalogCategoryId)).toBe(true);
+    expect(() => session.assignFlagCategory(flagId, catalogCategoryId)).not.toThrow();
   });
 
   it('uses short post-green crossings as lap start references for imported qualifying sessions', async () => {
@@ -797,8 +854,9 @@ describe('sourceApplication', () => {
     )).rejects.toThrow(`Catalog search: found 1 possible match: Recovered Event (${previousEventId}): team entrant "Recovered Team" (${entrantId}).`);
   });
 
-  it('resolves a linked participant category from the target-event entrant', async () => {
+  it('resolves a linked participant category onto its Entry without mutating the participant', async () => {
     const addCategories = vi.fn(async (_categories: EventCategory[]) => null);
+    const addEntries = vi.fn();
     const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);
     const addRecords = vi.fn(async (_records: TimeRecord[]) => undefined);
     const eventId = createEventId('linked-entrant-event');
@@ -848,6 +906,7 @@ describe('sourceApplication', () => {
     await expect(applyPulledRaceStateToSession(
       {
         addCategories,
+        addEntries,
         addParticipants,
         addRecords,
         categories: existingCategories,
@@ -874,10 +933,157 @@ describe('sourceApplication', () => {
     )).resolves.toBeUndefined();
     expect(addParticipants).toHaveBeenCalledWith([
       expect.objectContaining({
-        categoryId: EXISTING_CATEGORY_ID,
+        categoryId: undefined,
         entrantId,
         id: participantId,
       }),
+    ]);
+    expect(addEntries).toHaveBeenCalledWith([
+      expect.objectContaining({
+        categoryId: EXISTING_CATEGORY_ID,
+        entrantId,
+        id: entrantId,
+        participantIds: [participantId],
+      }),
+    ]);
+  });
+
+  it('calculates imported crossings through Participant to Entry category in the production source application flow', async () => {
+    const eventId = createEventId('entry-category-flow-event');
+    const sessionId = createSessionId('entry-category-flow-session');
+    const categoryId = createCategoryId('entry-category-flow-category');
+    const entrantId = createEventEntrantId('entry-category-flow-entrant');
+    const driverEntrantId = createEventEntrantId('entry-category-flow-driver');
+    const entryId = createEventEntryId('entry-category-flow-entry');
+    const participantId = createEventParticipantId('entry-category-flow-participant');
+    const sourceId = createTimeRecordSourceId('entry-category-flow-source');
+    const participant: EventParticipant = {
+      categoryId: undefined,
+      currentResult: undefined,
+      entrantId,
+      entryId,
+      firstname: 'Entry',
+      id: participantId,
+      identifiers: [{ fromTime: undefined, toTime: undefined, txNo: 123000 }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Driver',
+    };
+    const catalog: EventCatalogState = {
+      activeEventId: eventId,
+      activeSessionId: sessionId,
+      categories: [{ code: 'PRO', eventId, id: categoryId, name: 'Pro' }],
+      deletedEventIds: [],
+      entries: [{
+        categoryId,
+        entrantId,
+        eventId,
+        id: entryId,
+        identifiers: participant.identifiers,
+        name: 'Entry Driver',
+        participantIds: [participantId],
+        raceNumber: '123',
+        startOrder: 7,
+        vehicle: 'Updated race car',
+      }],
+      entrants: [{
+        categoryIds: [categoryId],
+        entrantType: 'team',
+        entryIds: [entryId],
+        eventId,
+        id: entrantId,
+        isEntryOwner: true,
+        memberParticipantIds: [participantId],
+        name: 'Entry Owner',
+      }, {
+        categoryId,
+        categoryIds: [categoryId],
+        entrantType: 'rider',
+        eventId,
+        firstName: 'Updated',
+        id: driverEntrantId,
+        lastName: 'Driver',
+        memberParticipantIds: [participantId],
+        name: 'Updated Driver',
+      }],
+      events: [{
+        categoryIds: [categoryId],
+        date: '2026-07-19',
+        discipline: 'motorsport',
+        entrantIds: [entrantId, driverEntrantId],
+        entryIds: [entryId],
+        format: 'race-weekend',
+        id: eventId,
+        minimumLapTimeMilliseconds: 60000,
+        name: 'Entry Category Race',
+        sessionIds: [sessionId],
+      }],
+      sessions: [{
+        categoryIds: [categoryId],
+        eventId,
+        id: sessionId,
+        kind: 'race',
+        name: 'Race',
+        scheduledStart: '2026-07-19T10:00:00.000Z',
+        status: 'completed',
+      }],
+    };
+    const session = new Session({ categories: [], entries: [], participants: [], records: [], teams: [] });
+
+    await applyPulledRaceStateToSession(session, {
+      categories: [{ code: 'PRO', id: categoryId, name: 'Pro' }],
+      participants: [participant],
+      records: [
+        createGreenFlagEvent({
+          categoryIds: [categoryId],
+          eventId,
+          id: createTimeRecordId('entry-category-flow-green'),
+          indicatesRaceStart: true,
+          sequence: 1,
+          sessionId,
+          source: sourceId,
+          time: new Date('2026-07-19T10:00:00.000Z'),
+        }),
+        {
+          chipCode: 123000,
+          eventId,
+          id: createTimeRecordId('entry-category-flow-lap-1'),
+          recordType: RECORD_TX_CROSSING,
+          sequence: 2,
+          sessionId,
+          source: sourceId,
+          time: new Date('2026-07-19T10:01:30.000Z'),
+        } as ParticipantPassingRecord,
+        {
+          chipCode: 123000,
+          eventId,
+          id: createTimeRecordId('entry-category-flow-lap-2'),
+          recordType: RECORD_TX_CROSSING,
+          sequence: 3,
+          sessionId,
+          source: sourceId,
+          time: new Date('2026-07-19T10:03:00.000Z'),
+        } as ParticipantPassingRecord,
+      ],
+    }, { catalog, eventId, sessionId });
+
+    expect(session.getParticipantById(participantId)?.categoryId).toBeUndefined();
+    expect(session.getParticipantById(participantId)).toEqual(expect.objectContaining({
+      firstname: 'Updated',
+      surname: 'Driver',
+    }));
+    expect(session.entries.find((entry) => entry.id === entryId)).toEqual(expect.objectContaining({
+      startOrder: 7,
+      vehicle: 'Updated race car',
+    }));
+    expect(session.getCategoryIdForParticipant(participantId)).toBe(categoryId);
+    expect(session.getParticipantLaps(participantId)?.map((lap) => ({
+      lapNo: lap.lapNo,
+      participantId: lap.participantId,
+      unrelatedReasonCode: lap.unrelatedReasonCode,
+    }))).toEqual([
+      { lapNo: 1, participantId, unrelatedReasonCode: undefined },
+      { lapNo: 2, participantId, unrelatedReasonCode: undefined },
     ]);
   });
 

@@ -12,7 +12,10 @@ export interface LapTimesReportEntry {
   categoryIds: string[];
   id: string;
   name: string;
+  participantIds?: string[];
+  participantNames?: string[];
   raceNumber: string;
+  teamName?: string;
 }
 
 export interface LapTimesReportProps {
@@ -32,6 +35,36 @@ const FIXED_COLS_WIDTH_PX = 160;
 
 const formatMs = (ms: number | null | undefined): string =>
   ms != null ? millisecondsToTime(ms) : '--:--:--.---';
+
+const formatParticipantOption = (participant: LapTimesReportEntry): string => {
+  const names = participant.participantNames?.filter(Boolean) || [participant.name];
+  const name = names.join('/');
+  const numbers = participant.raceNumber
+    .split(' / ')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return `${numbers.length > 0 ? `[#${numbers.join('/')}] ` : ''}${name}`;
+};
+
+const formatTableParticipant = (
+  participant: LapTimesReportEntry,
+  laps: ParticipantPassingRecord[],
+): string => {
+  const names = participant.participantNames?.filter(Boolean) || [participant.name];
+  if (names.length <= 1) {
+    return names[0] || participant.name;
+  }
+  const recordedParticipantIds = new Set(
+    laps
+      .map((lap) => lap.participantId?.toString())
+      .filter((id): id is string => !!id),
+  );
+  const recordedNames = names.filter((_name, index) => {
+    const participantId = participant.participantIds?.[index];
+    return participantId ? recordedParticipantIds.has(participantId) : true;
+  });
+  return `${participant.teamName || participant.name} (${(recordedNames.length > 0 ? recordedNames : names).join('/')})`;
+};
 
 // ─── Individual view ──────────────────────────────────────────────────────────
 
@@ -144,7 +177,7 @@ const TableView = ({ participants, passings, lapsPerBlock }: TableViewProps) => 
                         {p.raceNumber}
                       </td>
                       <td className="participant-name">
-                        {p.name}
+                        {formatTableParticipant(p, laps)}
                       </td>
                       {rowLaps.map((lap, idx) => (
                         <td
@@ -266,7 +299,7 @@ export const LapTimesReport = ({
               <option value="">— select —</option>
               {filteredParticipants.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name}
+                  {formatParticipantOption(p)}
                 </option>
               ))}
             </select>

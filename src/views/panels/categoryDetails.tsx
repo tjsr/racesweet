@@ -88,6 +88,17 @@ export const CategoryDetailsPanel = (props: CategoryDetailsPanelProps): React.Re
           </label>
         ) : null}
         <label>
+          Entrant Identity
+          <select
+            aria-label="Category Entrant Identity"
+            value={props.categoryDraft.identityMode}
+            onChange={(event) => props.onSetCategoryDraft((current) => ({ ...current, identityMode: event.target.value as 'single' | 'multiple' }))}
+          >
+            <option value="single">Single identity</option>
+            <option value="multiple">Multiple identity</option>
+          </select>
+        </label>
+        <label>
           Max Team Size
           <input
             aria-label="Category Max Team Size"

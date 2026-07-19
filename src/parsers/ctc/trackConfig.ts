@@ -176,30 +176,6 @@ const inferLapCompletionFromLineName = (lineName: string): boolean => {
   return normalized.includes('start') && normalized.includes('finish');
 };
 
-const applyInferredLapCompletionDefaults = (networks: CtcTrackConfigNetwork[]): void => {
-  const lines = networks.flatMap((network) => network.lines);
-  const normalizeLineName = (lineName: string): string => lineName.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  const isPitLine = (line: CtcTrackConfigLine): boolean => normalizeLineName(line.name).includes('pit');
-  const isPitStartFinish = (line: CtcTrackConfigLine): boolean => {
-    const normalized = normalizeLineName(line.name);
-    return isPitLine(line) && normalized.includes('start') && normalized.includes('finish');
-  };
-  const isPitEntry = (line: CtcTrackConfigLine): boolean => isPitLine(line) && normalizeLineName(line.name).includes('entry');
-  const isPitExit = (line: CtcTrackConfigLine): boolean => isPitLine(line) && normalizeLineName(line.name).includes('exit');
-  const explicitPitLines = lines.filter(isPitStartFinish);
-  const pitFallbackLines = explicitPitLines.length > 0
-    ? explicitPitLines
-    : lines.filter(isPitEntry).length > 0
-      ? lines.filter(isPitEntry)
-      : lines.filter(isPitExit);
-
-  pitFallbackLines.forEach((line) => {
-    line.loops.forEach((loop) => {
-      loop.isLapCompletion = true;
-    });
-  });
-};
-
 const parseHeadingLabels = (line: string): string[] | undefined => {
   if (/^E\b/iu.test(line)) {
     return undefined;
@@ -307,8 +283,6 @@ export const parseCtcTrackConfig = (
       }
     });
   });
-
-  applyInferredLapCompletionDefaults(networks);
 
   networks.forEach((network) => {
     network.lines.sort((left, right) => left.line - right.line);

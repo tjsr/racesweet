@@ -93,6 +93,7 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
       isPlaceholder: categoryDraft.isPlaceholder,
       name: categoryDraft.name,
       teamRules: {
+        identityMode: categoryDraft.identityMode,
         maxRiderAge: parseInteger(categoryDraft.maxRiderAge),
         maxTeamSize: parseInteger(categoryDraft.maxTeamSize),
         minRiderAge: parseInteger(categoryDraft.minRiderAge),

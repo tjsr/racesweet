@@ -3,7 +3,7 @@
 import { type Root, createRoot } from 'react-dom/client';
 import * as XLSX from 'xlsx';
 import { EntrantsPage } from './entrantsPage.js';
-import { type EventCatalogState } from '../../catalog/eventCatalog.js';
+import { type EventCatalogEntry, type EventCatalogState } from '../../catalog/eventCatalog.js';
 import { type EventCatalogLedger, applyEventCatalogLedger, createDefaultEventCatalogLedger } from '../../ledger/eventCatalogLedger.js';
 import { type EventParticipant } from '../../model/eventparticipant.js';
 import { type RaceState } from '../../model/racestate.js';
@@ -482,6 +482,254 @@ describe('EntrantsPage integration', () => {
 
     expect(onUpdateEntrant).toHaveBeenLastCalledWith('ent-2', expect.objectContaining({
       categoryId: 'cat-pro',
+    }));
+  });
+
+  it('shows imported Entry owners and their linked Drivers in the Entry category', async () => {
+    const importedCatalog: EventCatalogState = {
+      ...catalog,
+      entrants: [
+        ...catalog.entrants,
+        {
+          categoryIds: ['cat-1'],
+          entrantType: 'team',
+          entryIds: ['entry-mears'],
+          eventId: 'event-1',
+          id: 'entrant-penske',
+          isEntryOwner: true,
+          memberParticipantIds: ['participant-mears'],
+          name: 'Penske Racing',
+        },
+        {
+          categoryIds: [],
+          entrantType: 'rider',
+          eventId: 'event-1',
+          firstName: 'Rick',
+          id: 'driver-mears',
+          lastName: 'Mears',
+          memberParticipantIds: ['participant-mears'],
+          name: 'Rick Mears',
+        },
+      ],
+      entries: [
+        {
+          categoryId: 'cat-1',
+          entrantId: 'entrant-penske',
+          eventId: 'event-1',
+          id: 'entry-mears',
+          identifiers: [{ fromTime: undefined, toTime: undefined, txNo: '98' }] as unknown as EventCatalogEntry['identifiers'],
+          name: 'Rick Mears',
+          participantIds: ['participant-mears'],
+          raceNumber: '3',
+        },
+      ],
+      events: catalog.events.map((event) => event.id === 'event-1'
+        ? {
+          ...event,
+          discipline: 'motorsport' as const,
+          entrantIds: [...event.entrantIds, 'entrant-penske', 'driver-mears'],
+          entryIds: ['entry-mears'],
+        }
+        : event),
+    };
+    const importedRaceState: Partial<RaceState> = {
+      categories: [],
+      entries: importedCatalog.entries,
+      participants: [
+        {
+          categoryId: undefined,
+          currentResult: undefined,
+          entrantId: 'entrant-penske',
+          entryId: 'entry-mears',
+          firstname: 'Rick',
+          id: 'participant-mears',
+          identifiers: [],
+          lastRecordTime: null,
+          resultDuration: null,
+          surname: 'Mears',
+        },
+      ],
+      records: [],
+      teams: [],
+    };
+
+    await act(async () => {
+      root.render(
+        <EntrantsPage
+          catalog={importedCatalog}
+          onCreateEntrant={() => undefined}
+          onDeleteEntrant={() => undefined}
+          onSelectEntrant={() => undefined}
+          onSelectEvent={() => undefined}
+          onUpdateEntrant={() => undefined}
+          raceState={importedRaceState}
+          selectedEntrantId="driver-mears"
+          selectedEventId="event-1"
+        />,
+      );
+    });
+
+    const categoryFilter = container.querySelector('select[aria-label="Entrants Category"]') as HTMLSelectElement;
+    await act(async () => {
+      setSelectValue(categoryFilter, 'cat-1');
+    });
+
+    const entrantList = container.querySelector('[aria-label="Entrants for selected event"]');
+    expect(entrantList?.textContent).toContain('Penske Racing');
+    expect(entrantList?.textContent).toContain('Rick MEARS');
+    expect(entrantList?.querySelector('.entrant-entry-chip')?.textContent).toBe('#3 Rick MEARS (Tx98)');
+    expect(Array.from(entrantList?.querySelectorAll('strong') || []).map((item) => item.textContent)).not.toContain('Rick Mears');
+    const entrantSelect = container.querySelector('select[aria-label="Driver Entrant"]') as HTMLSelectElement;
+    expect(entrantSelect.value).toBe('entrant-penske');
+    expect(entrantSelect.disabled).toBe(true);
+    expect(entrantSelect.selectedOptions[0]?.textContent).toBe('Penske Racing (entran)');
+    expect(container.textContent).toContain('Entrant: Penske Racing');
+  });
+
+  it('renders and edits each motorsport Entry and its Driver independently', async () => {
+    const onUpdateEntrant = vi.fn();
+    const onUpdateEntry = vi.fn();
+    const entryCatalog: EventCatalogState = {
+      ...catalog,
+      entrants: [
+        ...catalog.entrants,
+        {
+          categoryIds: ['cat-1'],
+          entrantType: 'team',
+          entryIds: ['entry-3', 'entry-5'],
+          eventId: 'event-1',
+          id: 'entrant-penske-two-cars',
+          isEntryOwner: true,
+          memberParticipantIds: ['participant-3', 'participant-5'],
+          name: 'Penske Racing',
+        },
+        {
+          categoryIds: [],
+          entrantType: 'rider',
+          eventId: 'event-1',
+          firstName: 'Rick',
+          id: 'driver-3',
+          lastName: 'Mears',
+          memberParticipantIds: ['participant-3'],
+          name: 'Rick Mears',
+        },
+        {
+          categoryIds: [],
+          entrantType: 'rider',
+          eventId: 'event-1',
+          firstName: 'Emerson',
+          id: 'driver-5',
+          lastName: 'Fittipaldi',
+          memberParticipantIds: ['participant-5'],
+          name: 'Emerson Fittipaldi',
+        },
+      ],
+      entries: [
+        {
+          categoryId: 'cat-1',
+          entrantId: 'entrant-penske-two-cars',
+          eventId: 'event-1',
+          id: 'entry-3',
+          identifiers: [],
+          name: 'Rick Mears',
+          participantIds: ['participant-3'],
+          raceNumber: '3',
+          startOrder: 1,
+          vehicle: 'Penske PC-18',
+        },
+        {
+          categoryId: 'cat-1',
+          entrantId: 'entrant-penske-two-cars',
+          eventId: 'event-1',
+          id: 'entry-5',
+          identifiers: [],
+          name: 'Emerson Fittipaldi',
+          participantIds: ['participant-5'],
+          raceNumber: '5',
+          startOrder: 3,
+          vehicle: 'Penske PC-18B',
+        },
+      ],
+      events: catalog.events.map((event) => event.id === 'event-1' ? {
+        ...event,
+        discipline: 'motorsport' as const,
+        entrantIds: [...event.entrantIds, 'entrant-penske-two-cars', 'driver-3', 'driver-5'],
+        entryIds: ['entry-3', 'entry-5'],
+      } : event),
+    };
+    const participants: EventParticipant[] = [
+      {
+        categoryId: undefined,
+        currentResult: undefined,
+        entrantId: 'entrant-penske-two-cars',
+        entryId: 'entry-3',
+        firstname: 'Rick',
+        id: 'participant-3',
+        identifiers: [],
+        lastRecordTime: null,
+        resultDuration: null,
+        surname: 'Mears',
+      },
+      {
+        categoryId: undefined,
+        currentResult: undefined,
+        entrantId: 'entrant-penske-two-cars',
+        entryId: 'entry-5',
+        firstname: 'Emerson',
+        id: 'participant-5',
+        identifiers: [],
+        lastRecordTime: null,
+        resultDuration: null,
+        surname: 'Fittipaldi',
+      },
+    ];
+
+    await act(async () => {
+      root.render(
+        <EntrantsPage
+          catalog={entryCatalog}
+          onCreateEntrant={() => undefined}
+          onDeleteEntrant={() => undefined}
+          onSelectEntrant={() => undefined}
+          onSelectEvent={() => undefined}
+          onUpdateEntrant={onUpdateEntrant}
+          onUpdateEntry={onUpdateEntry}
+          raceState={{ categories: [], participants, records: [], teams: [] }}
+          selectedEntrantId="entrant-penske-two-cars"
+          selectedEventId="event-1"
+        />,
+      );
+    });
+
+    expect(container.querySelectorAll('.entrant-entry-form')).toHaveLength(2);
+    expect((container.querySelector('input[aria-label="Entry Vehicle entry-3"]') as HTMLInputElement).value).toBe('Penske PC-18');
+    const secondVehicle = container.querySelector('input[aria-label="Entry Vehicle entry-5"]') as HTMLInputElement;
+    const secondStartOrder = container.querySelector('input[aria-label="Entry Start Order entry-5"]') as HTMLInputElement;
+    expect(secondVehicle.value).toBe('Penske PC-18B');
+    expect(secondStartOrder.value).toBe('3');
+    expect(container.querySelector('input[aria-label="Entry Driver First Name driver-3"]')).toBeTruthy();
+    const secondDriverSurname = container.querySelector('input[aria-label="Entry Driver Surname driver-5"]') as HTMLInputElement;
+
+    await act(async () => {
+      setInputValue(secondVehicle, 'Penske PC-19');
+      setInputValue(secondStartOrder, '7');
+      Array.from(secondVehicle.closest('fieldset')!.querySelectorAll('button')).find((button) => button.textContent === 'Save Entry')!
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      setInputValue(secondDriverSurname, 'Fittipaldi Jr');
+      Array.from(secondDriverSurname.closest('fieldset')!.querySelectorAll('button')).find((button) => button.textContent === 'Save Driver')!
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onUpdateEntry).toHaveBeenCalledWith('entry-5', expect.objectContaining({
+      categoryId: 'cat-1',
+      raceNumber: '5',
+      startOrder: 7,
+      vehicle: 'Penske PC-19',
+    }));
+    expect(onUpdateEntrant).toHaveBeenCalledWith('driver-5', expect.objectContaining({
+      firstName: 'Emerson',
+      lastName: 'Fittipaldi Jr',
+      name: 'Emerson Fittipaldi Jr',
     }));
   });
 

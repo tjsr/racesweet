@@ -168,14 +168,15 @@ describe('CTC TRACK.CFG parsing', () => {
     expect(northNetwork?.lines.find((line) => line.line === 4)?.loops.every((loop) => loop.isLapCompletion === false)).toBe(true);
   });
 
-  it('falls back from pit entry to pit exit when no pit start/finish line exists', () => {
+  it('does not treat pit entry or pit exit lines as lap completions', () => {
     const trackConfig = parseCtcTrackConfig([
       '# Start/Finish : Track ******** North Network *****#',
       'A 31 1 2 1,1 1,2',
       '# Pit Entry : Track ******** North Network *****#',
       'A 36 1 2 6,1 6,2',
     ].join('\n'));
-    expect(getCtcFinishLineNumbers(trackConfig)).toEqual([1, 6]);
+    expect(getCtcFinishLineNumbers(trackConfig)).toEqual([1]);
+    expect(trackConfig.networks[0]?.lines.find((line) => line.line === 6)?.loops.every((loop) => loop.isLapCompletion === false)).toBe(true);
 
     const exitOnlyConfig = parseCtcTrackConfig([
       '# Start/Finish : Track ******** North Network *****#',
@@ -183,7 +184,7 @@ describe('CTC TRACK.CFG parsing', () => {
       '# Pit Exit : Track ******** North Network *****#',
       'A 35 1 2 5,1 5,2',
     ].join('\n'));
-    expect(getCtcFinishLineNumbers(exitOnlyConfig)).toEqual([1, 5]);
+    expect(getCtcFinishLineNumbers(exitOnlyConfig)).toEqual([1]);
   });
 
   it('maps explicit and grouped event status codes to descriptions', () => {

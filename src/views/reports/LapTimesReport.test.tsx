@@ -90,4 +90,44 @@ describe('LapTimesReport', () => {
     ]);
     expect(table.textContent).not.toContain(createEventEntrantId('entrant-42'));
   });
+
+  it('labels the participant selector with driver names and the table with recorded team drivers', async () => {
+    const teamId = createEventEntrantId('team-rocket');
+    const firstParticipantId = createEventParticipantId('team-driver-1');
+    const participantId = createEventParticipantId('team-driver-2');
+    const participants: LapTimesReportEntry[] = [{
+      categoryIds: ['category-1'],
+      id: teamId,
+      name: 'Team Rocket',
+      participantIds: [firstParticipantId, participantId],
+      participantNames: ['Alex SMITH', 'Casey JONES'],
+      raceNumber: '42',
+      teamName: 'Team Rocket',
+    }];
+    const passings = new Map<string, ParticipantPassingRecord[]>([
+      [teamId, [{ ...createLap('team-lap'), participantId }]],
+    ]);
+
+    await act(async () => {
+      root.render(
+        <LapTimesReport
+          categories={[{ id: 'category-1', name: 'Category 1' }]}
+          participants={participants}
+          passings={passings}
+        />,
+      );
+    });
+
+    const participantOption = container.querySelector('option[value="' + teamId + '"]');
+    expect(participantOption?.textContent).toBe('[#42] Alex SMITH/Casey JONES');
+
+    const showAsSelect = container.querySelector('.lap-times-report__toolbar select') as HTMLSelectElement;
+    await act(async () => {
+      setSelectValue(showAsSelect, 'table');
+    });
+
+    const rowCells = container.querySelectorAll('table.lap-times-block-table tbody tr:first-child td');
+    expect(rowCells[0]?.textContent).toBe('42');
+    expect(rowCells[1]?.textContent).toBe('Team Rocket (Casey JONES)');
+  });
 });

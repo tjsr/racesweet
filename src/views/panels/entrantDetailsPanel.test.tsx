@@ -92,6 +92,7 @@ describe('EntrantDetailsPanel', () => {
     expect(container.textContent).toContain('Driver Details');
     expect(container.textContent).toContain('First Name');
     expect(container.textContent).toContain('Team: Fast Friends');
+    expect(Array.from(container.querySelector<HTMLSelectElement>('select[aria-label="Driver Entrant"]')?.options || []).map((option) => option.textContent)).toContain('Fast Friends (team-1)');
 
     const nameInput = container.querySelector<HTMLInputElement>('input[aria-label="Entrant Name"]');
     expect(nameInput?.value).toBe('Rider One');

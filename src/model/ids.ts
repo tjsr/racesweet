@@ -1,5 +1,6 @@
 import { v5 as uuidv5, v7 as uuidv7, validate as validateUuid } from 'uuid';
 import type { EventEntrantId } from './entrant.ts';
+import type { EventEntryId } from './entry.ts';
 import { EventCategoryId } from "./eventcategory.ts";
 import type { EventParticipantId } from './eventparticipant.ts';
 import { EventId, SessionId } from './raceevent.ts';
@@ -28,6 +29,7 @@ export const createEventId = (seedData?: string): EventId => createId<EventId>('
 export const createSessionId = (seedData?: string): SessionId => createId<SessionId>('sessionId', seedData);
 export const createCategoryId = (seedData?: string): EventCategoryId => createId<EventCategoryId>('categoryId', seedData);
 export const createEventEntrantId = (seedData?: string): EventEntrantId => createId<EventEntrantId>('entrantId', seedData);
+export const createEventEntryId = (seedData?: string): EventEntryId => createId<EventEntryId>('entryId', seedData);
 export const createEventParticipantId = (seedData?: string): EventParticipantId => createId<EventParticipantId>('participantId', seedData);
 export const createTimingPointId = (seedData?: string): TimingPointId => createId<TimingPointId>('timingPointId', seedData);
 export const createTimeRecordId = (seedData?: string): TimeRecordId => createId<TimeRecordId>('timeRecordId', seedData);
@@ -38,6 +40,7 @@ const collectionIdTypes: Record<string, IdType> = {
   categories: 'categoryId',
   dataSources: 'sourceId',
   entrants: 'entrantId',
+  entries: 'entryId',
   events: 'eventId',
   flags: 'timeRecordId',
   mutations: 'mutationId',
@@ -55,6 +58,7 @@ const objectIdTypes: Record<string, IdType> = {
   crossing: 'timeRecordId',
   dataSource: 'sourceId',
   entrant: 'entrantId',
+  entry: 'entryId',
   event: 'eventId',
   flag: 'timeRecordId',
   mutation: 'mutationId',
@@ -67,12 +71,13 @@ const objectIdTypes: Record<string, IdType> = {
   timingPoint: 'timingPointId',
 };
 
-type EventComponentIdType = 'categoryId' | 'entrantId' | 'sessionId';
-type EventComponentListKey = 'categoryIds' | 'entrantIds' | 'sessionIds';
+type EventComponentIdType = 'categoryId' | 'entrantId' | 'entryId' | 'sessionId';
+type EventComponentListKey = 'categoryIds' | 'entrantIds' | 'entryIds' | 'sessionIds';
 
 const eventComponentListKeys: Record<EventComponentIdType, EventComponentListKey> = {
   categoryId: 'categoryIds',
   entrantId: 'entrantIds',
+  entryId: 'entryIds',
   sessionId: 'sessionIds',
 };
 
@@ -198,7 +203,7 @@ const replaceIdReferences = (value: unknown, idMap: IdReplacementMap, options: I
 };
 
 const isEventComponentIdType = (idType: IdType | undefined): idType is EventComponentIdType => {
-  return idType === 'categoryId' || idType === 'entrantId' || idType === 'sessionId';
+  return idType === 'categoryId' || idType === 'entrantId' || idType === 'entryId' || idType === 'sessionId';
 };
 
 const collectEventComponentRelationships = (

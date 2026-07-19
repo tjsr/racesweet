@@ -111,4 +111,18 @@ describe('missing crossing detection', () => {
     expect(estimateMissingCrossingTime(records[2] as ParticipantPassingRecord, records, lookup)?.toISOString())
       .toBe('1970-01-01T00:05:00.000Z');
   });
+
+  it('marks the next finish as likely when two sector lines prove a skipped finish crossing', () => {
+    const entrant = participantId('entrant-a');
+    const lookup = createLookup();
+    const finishBefore = passing('finish-before', entrant, 60, 60_000, 1);
+    const sectorTwoFirst = { ...passing('sector-two-first', entrant, 100, 40_000, 2), isLapCompletion: false };
+    const sectorThreeFirst = { ...passing('sector-three-first', entrant, 110, 50_000, 3), isLapCompletion: false };
+    const sectorTwoSecond = { ...passing('sector-two-second', entrant, 160, 100_000, 2), isLapCompletion: false };
+    const sectorThreeSecond = { ...passing('sector-three-second', entrant, 170, 110_000, 3), isLapCompletion: false };
+    const finishAfter = passing('finish-after', entrant, 220, 160_000, 1);
+    const records = [finishBefore, sectorTwoFirst, sectorThreeFirst, sectorTwoSecond, sectorThreeSecond, finishAfter];
+
+    expect(getPotentialMissingCrossingIndicators(records, lookup).get(finishAfter.id)).toBe('likely');
+  });
 });

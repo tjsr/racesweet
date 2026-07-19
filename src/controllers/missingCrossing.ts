@@ -1,4 +1,5 @@
-import { getTimingLineKey, isLapCompletionPassing } from './laps.js';
+import { getMissingLapCompletionEvidence, getSourceLapCompletion, getTimingLineKey, isLapCompletionPassing } from './laps.js';
+import { getParticipantEntryId } from '../model/entry.js';
 import { isCrossingRecord } from './timerecord.js';
 import type { EventParticipantId } from '../model/eventparticipant.js';
 import type { RaceStateLookup } from '../model/racestate.js';
@@ -22,7 +23,8 @@ const average = (values: number[]): number | undefined => {
 };
 
 const getEntrantKey = (participantId: EventParticipantId, raceStateLookup: RaceStateLookup): string => {
-  return raceStateLookup.getEntrantIdForParticipant(participantId)?.toString() || participantId.toString();
+  const participant = raceStateLookup.getParticipantById(participantId);
+  return raceStateLookup.getEntryIdForParticipant?.(participantId)?.toString() || (participant ? getParticipantEntryId(participant).toString() : participantId.toString());
 };
 
 const isUsableLapCompletion = (
@@ -37,7 +39,11 @@ const isUsableLapCompletion = (
     record.lapTime > 0 &&
     isPassingValid(record) &&
     !isPassingExcluded(record) &&
-    isLapCompletionPassing(record, raceStateLookup.getFinishLineNumbers?.());
+    isLapCompletionPassing(
+      record,
+      raceStateLookup.getFinishLineNumbers?.(),
+      (passing) => getSourceLapCompletion(passing, raceStateLookup.getTimeRecordSourceById?.(passing.source)),
+    );
 };
 
 const getEntrantLapCompletions = (
@@ -80,7 +86,26 @@ export const getPotentialMissingCrossingIndicators = (
     }
   });
 
-  return new Map(usableRecords.flatMap((record: ParticipantPassingRecord): [TimeRecordId, MissingCrossingIndicator][] => {
+  const passingsByEntrant = new Map<string, ParticipantPassingRecord[]>();
+  records
+    .filter((record): record is ParticipantPassingRecord => isCrossingRecord(record) && !!record.participantId && !!record.time)
+    .forEach((record) => {
+      const entrantKey = getEntrantKey(record.participantId!, raceStateLookup);
+      passingsByEntrant.set(entrantKey, [...(passingsByEntrant.get(entrantKey) || []), record]);
+    });
+  const evidenceIndicators = new Map<TimeRecordId, MissingCrossingIndicator>();
+  passingsByEntrant.forEach((passings) => {
+    getMissingLapCompletionEvidence(
+      passings,
+      0,
+      raceStateLookup.getFinishLineNumbers?.(),
+      (passing) => getSourceLapCompletion(passing, raceStateLookup.getTimeRecordSourceById?.(passing.source)),
+    ).forEach((evidence) => {
+      evidenceIndicators.set(evidence.nextFinishRecord.id, 'likely');
+    });
+  });
+
+  const durationIndicators = new Map(usableRecords.flatMap((record: ParticipantPassingRecord): [TimeRecordId, MissingCrossingIndicator][] => {
     const fastestLapTime = fastestLapTimeByEntrant.get(getEntrantKey(record.participantId!, raceStateLookup));
     if (fastestLapTime === undefined || record.lapTime! <= fastestLapTime * MISSING_CROSSING_LAP_TIME_RATIO) {
       return [];
@@ -92,6 +117,7 @@ export const getPotentialMissingCrossingIndicators = (
     );
     return [[record.id, indicator]];
   }));
+  return new Map([...durationIndicators, ...evidenceIndicators]);
 };
 
 export const getPotentialMissingCrossingIds = (

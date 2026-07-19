@@ -3,7 +3,7 @@
 import { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import { tableTimeString } from '../../app/utils/timeutils.js';
-import type { EventCatalogEntrant, EventCatalogEvent } from '../../catalog/eventCatalog.js';
+import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent } from '../../catalog/eventCatalog.js';
 import { CategoryId } from '../../controllers/category.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import type { EventCategory } from '../../model/eventcategory.js';
@@ -240,7 +240,7 @@ describe('race analytics views integration', () => {
 
     const categoryOptions = Array.from(categorySelect.querySelectorAll('option')).map((option) => option.textContent);
     expect(categoryOptions.filter((text) => text === 'Category A')).toHaveLength(1);
-    expect(categoryOptions).not.toContain('Timing Error List');
+    expect(categoryOptions).toContain('Timing Error List');
 
     await act(async () => {
       setSelectValue(categorySelect, createCategoryId('cat-a'));
@@ -272,6 +272,133 @@ describe('race analytics views integration', () => {
 
     expect(container.querySelector('[aria-label="Lap Entry Details"]')).toBeTruthy();
     expect(container.textContent).toContain(`Entrant: Team Rocket (${createEventEntrantId('team-1')})`);
+  });
+
+  it('renders calculated INDY Entry laps without merging Penske drivers', async () => {
+    const indyEventId = createEventId('indy-entry-results');
+    const indyCategoryId = createCategoryId('indy-entry-category');
+    const penskeEntrantId = createEventEntrantId('indy-penske-entrant');
+    const driverData = [
+      { entrySeed: 'indy-mears-entry', firstName: 'Rick', laps: 200, number: '3', surname: 'Mears', totalTime: 10_000_000 },
+      { entrySeed: 'indy-andretti-entry', firstName: 'Michael', laps: 200, number: '10', surname: 'Andretti', totalTime: 10_001_000 },
+      { entrySeed: 'indy-fittipaldi-entry', firstName: 'Emerson', laps: 171, number: '5', surname: 'Fittipaldi', totalTime: 9_000_000 },
+    ];
+    const indyParticipants: EventParticipant[] = driverData.map((driver) => {
+      const entryId = createEventEntrantId(driver.entrySeed);
+      return {
+        categoryId: undefined,
+        currentResult: undefined,
+        entrantId: penskeEntrantId,
+        entryId,
+        firstname: driver.firstName,
+        id: createEventParticipantId(`${driver.entrySeed}-participant`),
+        identifiers: [],
+        lastRecordTime: null,
+        resultDuration: null,
+        surname: driver.surname,
+      };
+    });
+    const indyEntries: EventCatalogEntry[] = driverData.map((driver, index) => ({
+      categoryId: indyCategoryId,
+      entrantId: penskeEntrantId,
+      eventId: indyEventId,
+      id: createEventEntrantId(driver.entrySeed),
+      identifiers: [],
+      name: `${driver.firstName} ${driver.surname}`,
+      participantIds: [indyParticipants[index].id],
+      raceNumber: driver.number,
+    }));
+    const indyCategory: EventCategory = { id: indyCategoryId, name: 'INDY 500' };
+    const indyRaceState = {
+      ...raceState,
+      categories: [indyCategory],
+      getCategoryById: (categoryId: CategoryId) => categoryId === indyCategoryId ? indyCategory : undefined,
+      getFinishLineNumbers: () => [1],
+      getParticipantById: (participantId: EventParticipantId) => indyParticipants.find((participant) => participant.id === participantId),
+      getParticipantLaps: (participantId: EventParticipantId) => {
+        const driverIndex = indyParticipants.findIndex((participant) => participant.id === participantId);
+        const driver = driverData[driverIndex];
+        return driver
+          ? Array.from({ length: driver.laps }, (_, lapIndex) => createLap(
+            `${driver.entrySeed}-lap-${lapIndex + 1}`,
+            participantId,
+            createEventEntrantId(driver.entrySeed),
+            lapIndex + 1,
+            Math.round((driver.totalTime * (lapIndex + 1)) / driver.laps),
+            Math.round(driver.totalTime / driver.laps),
+          ))
+          : [];
+      },
+      participants: indyParticipants,
+    } as unknown as Session & RaceStateLookup;
+
+    await act(async () => {
+      root.render(
+        <ResultsPage
+          categories={[indyCategory]}
+          catalogEntries={indyEntries}
+          catalogEntrants={[{
+            categoryIds: [],
+            entrantType: 'team',
+            entryIds: indyEntries.map((entry) => entry.id),
+            eventId: indyEventId,
+            id: penskeEntrantId,
+            isEntryOwner: true,
+            memberParticipantIds: [],
+            name: 'Penske Racing',
+          }]}
+          event={{
+            categoryIds: [indyCategoryId],
+            date: '1991-05-26',
+            discipline: 'motorsport',
+            entrantIds: [penskeEntrantId],
+            entryIds: indyEntries.map((entry) => entry.id),
+            format: 'race-weekend',
+            id: indyEventId,
+            name: 'INDY500',
+            sessionIds: [],
+            timeZone: 'America/Indiana/Indianapolis',
+          }}
+          raceState={indyRaceState}
+        />,
+      );
+    });
+
+    const rows = Array.from(container.querySelectorAll<HTMLTableRowElement>('table[aria-label="Results Table"] tbody tr'));
+    expect(rows.map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent))).toEqual([
+      ['1', '3', 'Rick MEARS', 'INDY 500', '200', '02:46:40.000', '0:50.000'],
+      ['2', '10', 'Michael ANDRETTI', 'INDY 500', '200', '02:46:41.000', '0:50.005'],
+      ['3', '5', 'Emerson FITTIPALDI', 'INDY 500', '171', '02:30:00.000', '0:52.632'],
+    ]);
+
+    await act(async () => {
+      root.render(
+        <ReportsPage
+          categories={[indyCategory]}
+          catalogEntries={indyEntries}
+          catalogEntrants={[{
+            categoryIds: [],
+            entrantType: 'team',
+            entryIds: indyEntries.map((entry) => entry.id),
+            eventId: indyEventId,
+            id: penskeEntrantId,
+            isEntryOwner: true,
+            memberParticipantIds: [],
+            name: 'Penske Racing',
+          }]}
+          raceState={indyRaceState}
+        />,
+      );
+    });
+
+    const reportRows = Array.from(container.querySelectorAll<HTMLTableRowElement>('table[aria-label="Fastest Laps Report Table"] tbody tr'));
+    expect(reportRows).toHaveLength(3);
+    expect(reportRows.every((row) => row.textContent?.includes('INDY 500'))).toBe(true);
+    expect(reportRows.map((row) => row.querySelectorAll('td')[1]?.textContent)).toEqual([
+      'Rick Mears',
+      'Michael Andretti',
+      'Emerson Fittipaldi',
+    ]);
   });
 
   it('uses counted finish-line crossings only for results and reports', async () => {
@@ -326,6 +453,7 @@ describe('race analytics views integration', () => {
     const soloResult = resultsRows.find((row) => row.textContent?.includes('Solo Rider'));
     expect(Array.from(soloResult!.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
       '2',
+      '-',
       'Solo Rider',
       'Category B',
       '2',
@@ -435,6 +563,7 @@ describe('race analytics views integration', () => {
       .find((row) => row.textContent?.includes('Solo Rider'));
     expect(Array.from(resultsRow!.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
       '1',
+      '-',
       'Solo Rider',
       'Category B',
       '2',
@@ -516,6 +645,7 @@ describe('race analytics views integration', () => {
     const soloResult = resultsRows.find((row) => row.textContent?.includes('Solo Rider'));
     expect(Array.from(soloResult!.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
       '1',
+      '-',
       'Solo Rider',
       'Category B',
       '1',

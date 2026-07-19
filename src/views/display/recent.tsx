@@ -32,7 +32,7 @@ import { FlagRecord } from '../../model/flag';
 import { createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.ts';
 import { getParticipantDisplayName } from '../../model/participantDisplay.js';
 import { EventId, SessionId } from '../../model/raceevent.ts';
-import { RaceStateLookup } from '../../model/racestate.ts';
+import { RaceStateLookup, getEffectiveParticipantCategoryId } from '../../model/racestate.ts';
 import {
   EVENT_FLAG_DISPLAYED,
   EVENT_SESSION_END,
@@ -427,8 +427,9 @@ const getParticipantSessionCategoryIds = (participant: EventParticipant, raceSta
   const teams = (raceStateLookup as unknown as { teams?: EventTeam[] }).teams || [];
   const categoryIds = new Set<EventCategoryId>();
 
-  if (participant.categoryId) {
-    categoryIds.add(participant.categoryId);
+  const effectiveCategoryId = getEffectiveParticipantCategoryId(raceStateLookup, participant);
+  if (effectiveCategoryId) {
+    categoryIds.add(effectiveCategoryId);
   }
 
   teams.forEach((team) => {
@@ -846,7 +847,19 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
   const allCategories = (props.raceStateLookup as unknown as { categories?: EventCategory[] }).categories || [];
   const assignedCategoryIds = new Set<EventCategoryId>(record.categoryIds || []);
   const assignedCategories = allCategories.filter((category) => assignedCategoryIds.has(category.id));
-  const unassignedCategories = allCategories.filter((category) => !assignedCategoryIds.has(category.id));
+  const categoryCanBeAssigned = (categoryId: EventCategoryId): boolean => {
+    if (props.raceStateLookup.canAssignFlagCategory) {
+      return props.raceStateLookup.canAssignFlagCategory(record.id, categoryId);
+    }
+    try {
+      return props.raceStateLookup.getCategoryById(categoryId) !== undefined;
+    } catch (_error: unknown) {
+      return false;
+    }
+  };
+  const unassignedCategories = allCategories.filter((category) => (
+    !assignedCategoryIds.has(category.id) && categoryCanBeAssigned(category.id)
+  ));
   const handleContextMenu = (event: React.MouseEvent): void => {
     event.preventDefault();
     props.onSelectRecord?.(record.id);
@@ -1233,7 +1246,11 @@ export const PassingRecordRow = (
 
   if (resolvedParticipant) {
     const categoryLookup = props.raceStateLookup.getCategoryById.bind(props.raceStateLookup);
-    categoryStr = categoryStringFromParticipant(resolvedParticipant, categoryLookup);
+    const effectiveCategoryId = getEffectiveParticipantCategoryId(props.raceStateLookup, resolvedParticipant);
+    categoryStr = categoryStringFromParticipant(
+      effectiveCategoryId ? { ...resolvedParticipant, categoryId: effectiveCategoryId } : resolvedParticipant,
+      categoryLookup,
+    );
   }
 
   if (entrant) {
@@ -1255,15 +1272,16 @@ export const PassingRecordRow = (
       lapTime = millisecondsToTime(props.displayedLapTime);
     }
 
-    if (entrant?.categoryId) {
-      const cat = rs.getCategoryById(entrant?.categoryId);
+    const effectiveCategoryId = getEffectiveParticipantCategoryId(rs, entrant);
+    if (effectiveCategoryId) {
+      const cat = rs.getCategoryById(effectiveCategoryId);
       if (cat) {
         if (cat.name) {
           categoryStr = cat?.name;
         }
       }
 
-      if (props.selectedCategories?.has(entrant?.categoryId)) {
+      if (props.selectedCategories?.has(effectiveCategoryId)) {
         if (!shouldExcludeCategoryFromResults(cat)) {
           className += ' selected-category';
         }
@@ -1399,7 +1417,7 @@ export const PassingRecordRow = (
             <MenuItem 
               key={cat.id} 
               onClick={() => handleChangeCategory(cat.id)}
-              selected={resolvedParticipant.categoryId === cat.id}
+              selected={getEffectiveParticipantCategoryId(props.raceStateLookup, resolvedParticipant) === cat.id}
               sx={{ pl: 4 }}
             >
               {cat.name}
@@ -1645,8 +1663,9 @@ const recordMatchesSelectedCategory = (
   }
 
   const participant = resolveCrossingParticipant(record, raceStateLookup);
-  const category = participant?.categoryId ? raceStateLookup.getCategoryById(participant.categoryId) : undefined;
-  return !!participant?.categoryId && selectedCategories.has(participant.categoryId) && !shouldExcludeCategoryFromResults(category);
+  const categoryId = getEffectiveParticipantCategoryId(raceStateLookup, participant);
+  const category = categoryId ? raceStateLookup.getCategoryById(categoryId) : undefined;
+  return !!categoryId && selectedCategories.has(categoryId) && !shouldExcludeCategoryFromResults(category);
 };
 
 const selectedTeamMemberIds = (
@@ -1791,10 +1810,11 @@ const isUnrecognisedCrossing = (
   if (!participant) {
     return true;
   }
-  if (!participant?.categoryId) {
+  const categoryId = getEffectiveParticipantCategoryId(raceStateLookup, participant);
+  if (!categoryId) {
     return true;
   }
-  const category = raceStateLookup.getCategoryById(participant.categoryId);
+  const category = raceStateLookup.getCategoryById(categoryId);
   return !category || shouldExcludeCategoryFromResults(category);
 };
 
@@ -2012,7 +2032,7 @@ const getOutsideEventWindowIgnoredRecordIds = (
       }
 
       const participant = raceStateLookup.getParticipantById(record.participantId);
-      const categoryId = participant?.categoryId;
+      const categoryId = getEffectiveParticipantCategoryId(raceStateLookup, participant);
       if (!participant || !categoryId || !raceStateLookup.getCategoryById(categoryId)) {
         return;
       }
@@ -2156,7 +2176,8 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
         : undefined);
   }, [participantMap, passingPlate, passingTxNo, props.raceStateLookup, sourceRecord]);
 
-  const resolvedCategory = resolvedParticipant?.categoryId ? props.raceStateLookup.getCategoryById(resolvedParticipant.categoryId) : undefined;
+  const resolvedCategoryId = getEffectiveParticipantCategoryId(props.raceStateLookup, resolvedParticipant);
+  const resolvedCategory = resolvedCategoryId ? props.raceStateLookup.getCategoryById(resolvedCategoryId) : undefined;
   const resolvedEntrantName = resolvedParticipant ? getParticipantDisplayName(resolvedParticipant) : '';
   const resolvedTeamName = getParticipantTeamName(resolvedParticipant, props.raceStateLookup);
   const resolvedCategoryName = resolvedCategory?.name || '';

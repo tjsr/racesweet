@@ -2,21 +2,25 @@ import React from 'react';
 import {
   type EntrantType,
   type EventCatalogEntrant,
+  type EventCatalogEntry,
   type EventCatalogState,
   getCategoriesForEvent,
   getEntrantAssignedSessionIds,
   getEntrantsForEvent,
+  getEntriesForEvent,
   getEventDisciplineLabels,
   getSessionsForEvent,
 } from '../../catalog/eventCatalog.js';
 import { type EntrantImportRecord, parseEntrantImportBuffer } from '../../controllers/entrantImport.js';
 import { EventEntrantId } from '../../model/entrant.js';
+import type { EventEntryId } from '../../model/entry.js';
 import { type EventCategoryId } from '../../model/eventcategory.js';
 import { type EventParticipant, type EventParticipantId, type ParticipantIdentifierUpdate } from '../../model/eventparticipant.js';
 import { EventId } from '../../model/raceevent.js';
 import { type RaceState } from '../../model/racestate.js';
 import { EntrantListPanel, getParticipantsForEntrant } from '../panels/entrantList.js';
 import { EntrantDetailsPanel, type EntrantDraft } from '../panels/entrantDetailsPanel.js';
+import { EntrantEntriesPanel } from '../panels/entrantEntriesPanel.js';
 import { IdentificationPanel } from '../panels/identificationPanel.js';
 import { SessionListPanel } from '../panels/sessionList.js';
 import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
@@ -32,6 +36,7 @@ interface EntrantsPageProps {
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
   onUpdateParticipantIdentifiers?: (participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: ParticipantIdentifierUpdate[]) => void | Promise<void>;
   onUpdateEntrant: (entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'startOrder' | 'teamEntrantId' | 'teamMembers' | 'vehicle'>>) => void | Promise<void>;
+  onUpdateEntry?: (entryId: EventEntryId, changes: Partial<Pick<EventCatalogEntry, 'categoryId' | 'identifiers' | 'name' | 'raceNumber' | 'startOrder' | 'vehicle'>>) => void | Promise<void>;
   raceState?: Partial<RaceState>;
   selectedCategoryId?: EventCategoryId;
   selectedEntrantId?: EventEntrantId;
@@ -42,7 +47,10 @@ const UNSPECIFIED_GENDER = 'unspecified';
 const CATEGORY_FILTER_ALL = 'all';
 const CATEGORY_FILTER_UNASSIGNED = 'unassigned';
 
-const getEntrantDraft = (entrant: EventCatalogEntrant | undefined): EntrantDraft => ({
+const getEntrantDraft = (
+  entrant: EventCatalogEntrant | undefined,
+  owningEntrantId?: EventEntrantId,
+): EntrantDraft => ({
   categoryId: entrant?.categoryId || entrant?.categoryIds[0] || '',
   dateOfBirth: entrant?.dateOfBirth || '',
   firstName: entrant?.firstName || '',
@@ -51,7 +59,7 @@ const getEntrantDraft = (entrant: EventCatalogEntrant | undefined): EntrantDraft
   name: entrant?.name || '',
   notes: entrant?.notes || '',
   startOrder: entrant?.startOrder?.toString() || '',
-  teamEntrantId: entrant?.teamEntrantId || '',
+  teamEntrantId: owningEntrantId || entrant?.teamEntrantId || '',
   vehicle: entrant?.vehicle || '',
 });
 
@@ -89,6 +97,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
     props.catalog.events.find((event) => event.id === props.catalog.activeEventId) ??
     props.catalog.events[0];
   const eventEntrants = getEntrantsForEvent(props.catalog, selectedEvent?.id);
+  const eventEntries = getEntriesForEvent(props.catalog, selectedEvent?.id);
   const eventCategories = getCategoriesForEvent(props.catalog, selectedEvent?.id);
   const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
   const raceStateParticipants = props.raceState?.participants || [];
@@ -113,9 +122,18 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   }, [eventCategoryKey, selectedCategoryFilter]);
 
   const getEntrantCategoryIds = (entrant: EventCatalogEntrant): string[] => {
+    const participantIds = new Set(entrant.memberParticipantIds.map((participantId) => participantId.toString()));
+    const entryCategoryIds = eventEntries
+      .filter((entry) => (
+        entry.id.toString() === entrant.id.toString() ||
+        entry.entrantId?.toString() === entrant.id.toString() ||
+        entry.participantIds.some((participantId) => participantIds.has(participantId.toString()))
+      ))
+      .map((entry) => entry.categoryId?.toString() || '');
     return Array.from(new Set([
       entrant.categoryId?.toString() || '',
       ...entrant.categoryIds.map((categoryId) => categoryId.toString()),
+      ...entryCategoryIds,
     ].filter((categoryId) => eventCategoryIds.has(categoryId))));
   };
 
@@ -137,6 +155,16 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   const filteredTeamEntrants = filteredEventEntrants.filter((entrant) => entrant.entrantType === 'team');
   const teamsEnabled = eventSupportsTeams(props.catalog, selectedEvent?.id);
   const selectedEntrant = filteredEventEntrants.find((entrant) => entrant.id === props.selectedEntrantId) ?? filteredEventEntrants[0];
+  const selectedEntrantParticipantIds = new Set(
+    (selectedEntrant?.memberParticipantIds || []).map((participantId) => participantId.toString()),
+  );
+  const selectedEntry = selectedEntrant?.entrantType === 'rider'
+    ? eventEntries.find((entry) => (
+      entry.id.toString() === selectedEntrant.id.toString() ||
+      entry.participantIds.some((participantId) => selectedEntrantParticipantIds.has(participantId.toString()))
+    ))
+    : undefined;
+  const selectedOwningEntrantId = selectedEntry?.entrantId;
   const selectedParticipants = getParticipantsForEntrant(selectedEntrant, raceStateParticipants, eventEntrants);
   const selectedIdentificationParticipant = selectedParticipants[0] || getFallbackParticipantForEntrant(selectedEntrant);
   const identificationParticipants = selectedParticipants.length > 0
@@ -144,7 +172,10 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
     : selectedIdentificationParticipant
       ? [selectedIdentificationParticipant]
       : [];
-  const selectedEntrantDraft = React.useMemo(() => getEntrantDraft(selectedEntrant), [selectedEntrant]);
+  const selectedEntrantDraft = React.useMemo(
+    () => getEntrantDraft(selectedEntrant, selectedOwningEntrantId),
+    [selectedEntrant, selectedOwningEntrantId],
+  );
   const [createKind, setCreateKind] = React.useState<EntrantType>('rider');
   const [entrantDraft, setEntrantDraft] = React.useState<EntrantDraft>(selectedEntrantDraft);
   const [savedEntrantDraft, setSavedEntrantDraft] = React.useState<EntrantDraft>(selectedEntrantDraft);
@@ -159,14 +190,34 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
 
   const selectedEntrantSessionIds = getEntrantAssignedSessionIds(selectedEntrant, eventCategories, eventSessions, eventEntrants);
   const selectedEntrantSessions = eventSessions.filter((session) => selectedEntrantSessionIds.has(session.id));
-  const selectedTeamName = selectedEntrant?.teamEntrantId
-    ? teamEntrants.find((team) => team.id === selectedEntrant.teamEntrantId)?.name
+  const selectedParentEntrantId = selectedOwningEntrantId || selectedEntrant?.teamEntrantId;
+  const selectedTeamName = selectedParentEntrantId
+    ? teamEntrants.find((team) => team.id === selectedParentEntrantId)?.name
     : undefined;
   const selectedTeamMembers = selectedEntrant?.entrantType === 'team'
     ? riderEntrants
-      .filter((entrant) => entrant.teamEntrantId === selectedEntrant.id)
+      .filter((entrant) => {
+        if (entrant.teamEntrantId === selectedEntrant.id) {
+          return true;
+        }
+        return eventEntries.some((entry) => (
+          entry.entrantId === selectedEntrant.id &&
+          entry.participantIds.some((participantId) => entrant.memberParticipantIds.includes(participantId))
+        ));
+      })
       .map((entrant) => entrant.name)
     : [];
+  const entryOwnerEntrants = teamEntrants.filter((entrant) => entrant.isEntryOwner === true);
+  const selectableParentEntrants = isMotorsport && entryOwnerEntrants.length > 0
+    ? entryOwnerEntrants
+    : teamEntrants;
+  const selectedEntrantEntries = !isMotorsport || !selectedEntrant
+    ? []
+    : selectedEntrant.isEntryOwner
+      ? eventEntries.filter((entry) => entry.entrantId === selectedEntrant.id)
+      : selectedEntry
+        ? [selectedEntry]
+        : [];
 
   const saveEntrant = async (): Promise<boolean> => {
     if (!selectedEntrant) {
@@ -196,7 +247,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
         : entrantDraft.name,
       notes: entrantDraft.notes || undefined,
       startOrder: isMotorsport ? undefined : entrantDraft.startOrder ? Number(entrantDraft.startOrder) : undefined,
-      teamEntrantId: entrantDraft.teamEntrantId || undefined,
+      teamEntrantId: isMotorsport ? selectedEntrant.teamEntrantId : entrantDraft.teamEntrantId || undefined,
       vehicle: isMotorsport ? undefined : entrantDraft.vehicle || undefined,
     });
     setSavedEntrantDraft(entrantDraft);
@@ -311,24 +362,38 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           teamEntrants={teamEntrants}
           teamsEnabled={teamsEnabled}
         />
-        <EntrantDetailsPanel
-          entrantLabel={disciplineLabels.singular}
-          entrantDraft={entrantDraft}
-          eventCategories={eventCategories}
-          onDeleteEntrant={deleteEntrant}
-          onSaveEntrant={() => {
-            void saveEntrant();
-          }}
-          onSetEntrantDraft={setEntrantDraft}
-          selectedEntrant={selectedEntrant}
-          selectedTeamName={selectedTeamName}
-          isMotorsport={isMotorsport}
-          showVehicle={isMotorsport}
-          teamMemberLabel={disciplineLabels.plural}
-          teamEntrants={teamEntrants}
-          teamMembers={selectedTeamMembers}
-          warningModal={warningModal}
-        />
+        <div className="event-summary-column">
+          <EntrantDetailsPanel
+            entrantAssignmentIsDerived={isMotorsport && !!selectedEntry}
+            entrantLabel={disciplineLabels.singular}
+            entrantDraft={entrantDraft}
+            eventCategories={eventCategories}
+            onDeleteEntrant={deleteEntrant}
+            onSaveEntrant={() => {
+              void saveEntrant();
+            }}
+            onSetEntrantDraft={setEntrantDraft}
+            selectedEntrant={selectedEntrant}
+            selectedTeamName={selectedTeamName}
+            isMotorsport={isMotorsport}
+            showVehicle={isMotorsport}
+            showTeamMembers={!isMotorsport}
+            teamMemberLabel={disciplineLabels.plural}
+            teamEntrants={selectableParentEntrants}
+            teamMembers={selectedTeamMembers}
+            warningModal={warningModal}
+          />
+          {isMotorsport && selectedEntrant?.isEntryOwner && props.onUpdateEntry ? (
+            <EntrantEntriesPanel
+              categories={eventCategories}
+              entries={selectedEntrantEntries}
+              onUpdateDriver={props.onUpdateEntrant}
+              onUpdateEntry={props.onUpdateEntry}
+              participants={raceStateParticipants}
+              riderEntrants={eventEntrants.filter((entrant) => entrant.entrantType === 'rider')}
+            />
+          ) : null}
+        </div>
         <div className="event-summary-column">
           <SessionListPanel
             emptyText="No sessions are currently assigned to this entrant."

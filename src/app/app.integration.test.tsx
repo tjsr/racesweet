@@ -884,6 +884,41 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.textContent).toContain('Handicap Data');
   });
 
+  it('uses the same valid event category options in Entrants, Timing, Results, and Reports', async () => {
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+    await waitForLoadedApp(container);
+
+    await clickSectionButton(container, 'Entrants');
+    const entrantCategorySelect = container.querySelector('select[aria-label="Entrants Category"]') as HTMLSelectElement;
+    const entrantCategories = Array.from(entrantCategorySelect.options)
+      .filter((option) => option.value !== 'all' && option.value !== 'unassigned')
+      .map((option) => ({ id: option.value, name: option.textContent || '' }));
+
+    await clickSectionButton(container, 'Timing');
+    const timingCategoryPayload = container.querySelector('[data-timing-categories]')?.getAttribute('data-timing-categories');
+    const timingCategories = (JSON.parse(timingCategoryPayload || '[]') as Array<{ id: string; name: string }>)
+      .map((category) => ({ id: category.id, name: category.name }));
+
+    await clickSectionButton(container, 'Results');
+    const resultCategorySelect = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
+    const resultCategories = Array.from(resultCategorySelect.options)
+      .filter((option) => option.value !== 'overall')
+      .map((option) => ({ id: option.value, name: option.textContent || '' }));
+
+    await clickSectionButton(container, 'Reports');
+    const reportCategorySelect = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
+    const reportCategories = Array.from(reportCategorySelect.options)
+      .filter((option) => option.value !== 'overall')
+      .map((option) => ({ id: option.value, name: option.textContent || '' }));
+
+    expect(timingCategories).toEqual(entrantCategories);
+    expect(resultCategories).toEqual(entrantCategories);
+    expect(reportCategories).toEqual(entrantCategories);
+    expect(entrantCategories.every((category) => !UUID_TEXT_PATTERN.test(category.name))).toBe(true);
+  });
+
   it('hydrates startup timing categories from persisted imported race state without fixture scaffold categories', async () => {
     const importedEventId = createEventId('ctc-startup-event');
     const importedSessionId = createSessionId('ctc-startup-session');
@@ -1413,14 +1448,14 @@ describe('RaceSweetMainApp integration', () => {
 
     await waitForText(container, 'Lap Times Report');
     const participantSelect = container.querySelector('select[aria-label="Reports Participant"]') as HTMLSelectElement | null;
-    expect(Array.from(participantSelect?.options || []).map((option) => option.textContent)).toContain('MR-SCATS Rider');
-    const mrScatsParticipantOption = Array.from(participantSelect?.options || []).find((option) => option.textContent === 'MR-SCATS Rider');
+    expect(Array.from(participantSelect?.options || []).map((option) => option.textContent)).toContain('[#42] MR-SCATS RIDER');
+    const mrScatsParticipantOption = Array.from(participantSelect?.options || []).find((option) => option.textContent === '[#42] MR-SCATS RIDER');
     expect(mrScatsParticipantOption).toBeDefined();
     await act(async () => {
       setSelectValue(participantSelect!, mrScatsParticipantOption!.value);
     });
     const lapTimesTable = container.querySelector('table[aria-label="Lap Times Report Table"]') as HTMLTableElement | null;
-    expect(lapTimesTable?.textContent || container.textContent).toContain('MR-SCATS Rider');
+    expect(lapTimesTable?.textContent || container.textContent).toContain('MR-SCATS RIDER');
 
     expect(requestBuffer).not.toHaveBeenCalled();
 
@@ -1794,7 +1829,10 @@ describe('RaceSweetMainApp integration', () => {
     const expectedSharedSessionValue = `session:${timingEventSelect.value}:${SEED_QUALIFYING_SESSION_ID}`;
     await clickSectionButton(container, 'Results');
     expect((container.querySelector('select[aria-label="Race View Event Session"]') as HTMLSelectElement).value).toBe(expectedSharedSessionValue);
-    expect(container.querySelector('table[aria-label="Results Table"] tbody')?.textContent).toContain('Rider 101Premier0');
+    const resultsTable = container.querySelector('table[aria-label="Results Table"]') as HTMLTableElement;
+    expect(Array.from(resultsTable.querySelectorAll('thead th')).map((cell) => cell.textContent)).toContain('No.');
+    const resultsRow = resultsTable.querySelector('tbody tr') as HTMLTableRowElement;
+    expect(Array.from(resultsRow.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual(expect.arrayContaining(['-', 'Rider 101']));
 
     await clickSectionButton(container, 'Reports');
     expect((container.querySelector('select[aria-label="Race View Event Session"]') as HTMLSelectElement).value).toBe(expectedSharedSessionValue);

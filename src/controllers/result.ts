@@ -1,16 +1,21 @@
 import { EntrantPassingRecord, ParticipantPassingRecord, isPassingExcluded } from "../model/timerecord.js";
 
-import { EventEntrantId } from "../model/entrant.js";
+import type { EventEntryId } from '../model/entry.js';
 import { isCountedLapPassing } from "./laps.js";
 import { elapsedTimeSort } from "./timerecord.js";
 
-export interface EntrantResult {
-  entrantId: EventEntrantId;
+export interface EntryResult {
+  entryId: EventEntryId;
+  /** @deprecated Use entryId. */
+  entrantId: EventEntryId;
   lapCount: number;
   totalTime: number; // Total time in milliseconds
   fastestLap: ParticipantPassingRecord; // Fastest lap time in milliseconds
   laps: ParticipantPassingRecord[]; // All laps data for the entrant
 }
+
+/** @deprecated Results are now calculated per Entry. */
+export type EntrantResult = EntryResult;
 
 export const filterPassingsByTime = (passings: EntrantPassingRecord[], upToTime: Date): EntrantPassingRecord[] => 
   passings.filter((record) => {
@@ -68,12 +73,12 @@ const getFastestLap = (
   }, undefined);
 
 export const generateResult = (
-  passings: Map<EventEntrantId, EntrantPassingRecord[]>,
+  passings: Map<EventEntryId, EntrantPassingRecord[]>,
   upToEventTime?: Date,
   finishLineNumbers: number[] | undefined = undefined
-): EntrantResult[] => {
-  const filteredPassings = new Map<EventEntrantId, EntrantPassingRecord[]>();
-  const results: EntrantResult[] = [];
+): EntryResult[] => {
+  const filteredPassings = new Map<EventEntryId, EntrantPassingRecord[]>();
+  const results: EntryResult[] = [];
 
   passings.keys().forEach((entrantId) => {
     let entrantPassings = passings.get(entrantId) || [];
@@ -84,14 +89,15 @@ export const generateResult = (
     }
     entrantPassings.sort(elapsedTimeSort);
     filteredPassings.set(entrantId, entrantPassings);
-    const result: Partial<EntrantResult> = {
-      entrantId: entrantId,
+    const result: Partial<EntryResult> = {
+      entryId: entrantId,
+      entrantId,
       fastestLap: getFastestLap(entrantPassings, finishLineNumbers),
       lapCount: entrantPassings.length,
       laps: entrantPassings,
       totalTime: entrantPassings.length > 0 ? (entrantPassings[entrantPassings.length - 1].elapsedTime || 0) : 0,
     };
-    results.push(result as EntrantResult);
+    results.push(result as EntryResult);
   });
 
   return results;

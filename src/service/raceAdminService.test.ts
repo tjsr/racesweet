@@ -249,6 +249,21 @@ describe('RaceAdminService', () => {
     ]);
   });
 
+  it('rejects an unavailable flag category before mutating or persisting it', async () => {
+    const sessionDouble = createSessionDouble();
+    const persistence = new MemoryPersistence();
+    const session = Object.assign(sessionDouble.session, {
+      canAssignFlagCategory: () => false,
+    });
+    const service = await RaceAdminService.create(async () => session as never, persistence);
+
+    await expect(
+      service.assignFlagCategoryForSession(session as never, 'flag-3', 'missing-category'),
+    ).rejects.toThrow('Category missing-category is not available');
+    expect(sessionDouble.flagCategoryAssignments).toEqual([]);
+    expect(persistence.snapshot.flagCategoryChanges).toEqual([]);
+  });
+
   it('applies and persists changes against a displayed session state', async () => {
     const activeSessionDouble = createSessionDouble();
     const displayedSessionDouble = createSessionDouble();

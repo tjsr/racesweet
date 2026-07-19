@@ -1,11 +1,12 @@
 import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 
 import React from 'react';
-import type { EventCatalogEntrant, EventCatalogEvent } from '../../catalog/eventCatalog.js';
+import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent } from '../../catalog/eventCatalog.js';
 import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
 import { shouldExcludeCategoryFromResults } from '../../controllers/category.js';
 import { getSourceLapCompletion, isCountedLapPassing } from '../../controllers/laps.js';
 import { getParticipantNumber } from '../../controllers/participant.js';
+import { getParticipantEntryId } from '../../model/entry.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
 import { EventCategoryId } from '../../model/index.js';
@@ -42,12 +43,27 @@ interface EntrantSummaryRow {
   laps: ParticipantPassingRecord[];
   memberDetails: Array<{
     categoryName: string;
+    participantDisplayName: string;
     participantId: EventParticipantId;
     participantName: string;
     raceNumber: string;
+    racePlate?: string;
   }>;
   totalTime?: number;
 }
+
+const getRowDriverName = (row: EntrantSummaryRow): string => Array.from(new Set(
+  row.memberDetails.map((member) => member.participantDisplayName).filter((name) => name.length > 0),
+)).join(' / ');
+
+const getRowRaceNumber = (row: EntrantSummaryRow): string => Array.from(new Set(
+  row.memberDetails.map((member) => member.racePlate).filter((number): number is string => !!number),
+)).join(' / ');
+
+const getEntrantRaceNumber = (entrant: EventCatalogEntrant | undefined): string | undefined => {
+  const identifier = entrant?.identifiers?.find((candidate) => 'racePlate' in candidate) as { racePlate?: unknown } | undefined;
+  return typeof identifier?.racePlate === 'string' && identifier.racePlate.length > 0 ? identifier.racePlate : undefined;
+};
 
 interface LapChartEntry {
   categoryName: string;
@@ -100,6 +116,7 @@ interface LapChartLineSegment {
 
 interface BaseRaceAnalyticsProps {
   categories: CategoryOption[];
+  catalogEntries?: EventCatalogEntry[];
   catalogEntrants: EventCatalogEntrant[];
   eventSessionOptions?: EventSessionOption[];
   event?: EventCatalogEvent;
@@ -255,13 +272,15 @@ const findFastestLapPlate = (row: EntrantSummaryRow, fastestLapRecord: Participa
 const buildEntrantRows = (
   raceState: RaceState & RaceStateLookup,
   catalogEntrants: EventCatalogEntrant[],
+  catalogEntries: EventCatalogEntry[],
   excludedCategoryKeys: Set<string>,
 ): EntrantSummaryRow[] => {
   const catalogEntrantsById = new Map(catalogEntrants.map((entrant) => [entrant.id, entrant]));
+  const catalogEntriesById = new Map(catalogEntries.map((entry) => [entry.id, entry]));
   const participantGroups = new Map<EventEntrantId, EventParticipant[]>();
 
   raceState.participants.forEach((participant) => {
-    const entrantId = participant.entrantId?.toString() || participant.id.toString();
+    const entrantId = getParticipantEntryId(participant).toString();
     const group = participantGroups.get(entrantId) || [];
     group.push(participant);
     participantGroups.set(entrantId, group);
@@ -270,7 +289,14 @@ const buildEntrantRows = (
   const rows: EntrantSummaryRow[] = [];
 
   participantGroups.forEach((members, entrantId: EventEntrantId) => {
-    const includedMembers = members.filter((member) => !isParticipantExcludedFromResults(raceState, member, excludedCategoryKeys));
+    const catalogEntry = catalogEntriesById.get(entrantId);
+    const entryCategoryId = catalogEntry?.categoryId;
+    const entryCategory = getCategoryByIdSafely(raceState, entryCategoryId);
+    const isEntryExcluded = shouldExcludeCategoryFromResults(entryCategory) ||
+      excludedCategoryKeys.has(_categoryKeyFromId(raceState, entryCategoryId));
+    const includedMembers = members.filter((member) => entryCategoryId
+      ? !isEntryExcluded
+      : !isParticipantExcludedFromResults(raceState, member, excludedCategoryKeys));
     if (includedMembers.length === 0) {
       return;
     }
@@ -291,13 +317,15 @@ const buildEntrantRows = (
 
     const totalTime = laps.length > 0 ? laps[laps.length - 1].elapsedTime || undefined : undefined;
     const memberDetails = includedMembers.map((member) => {
-      const raceNumber = getParticipantNumber(member);
+      const raceNumber = catalogEntry?.raceNumber || getParticipantNumber(member) || getEntrantRaceNumber(catalogEntrantsById.get(entrantId));
       return {
-        categoryId: member.categoryId?.toString(),
-        categoryName: categoryNameFromId(raceState, member.categoryId?.toString()),
+        categoryId: (entryCategoryId || member.categoryId)?.toString(),
+        categoryName: categoryNameFromId(raceState, entryCategoryId || member.categoryId),
+        participantDisplayName: `${member.firstname || ''} ${member.surname ? member.surname.toUpperCase() : ''}`.trim() || member.id.toString(),
         participantId: member.id.toString(),
         participantName: `${member.firstname || ''} ${member.surname || ''}`.trim() || member.id.toString(),
         raceNumber: raceNumber ? raceNumber.toString() : member.id.toString(),
+        racePlate: raceNumber ? raceNumber.toString() : undefined,
       };
     });
     const categoryIds = Array.from(new Set(memberDetails.map((member) => member.categoryId).filter((categoryId): categoryId is string => !!categoryId)));
@@ -309,7 +337,7 @@ const buildEntrantRows = (
       categoryKeys,
       categoryName,
       entrantId,
-      entrantName: findEntrantName(entrantId, members, catalogEntrantsById),
+      entrantName: catalogEntry?.name?.trim() || findEntrantName(entrantId, members, catalogEntrantsById),
       fastestLap: fastestLapRecord?.lapTime || undefined,
       fastestLapNo: fastestLapRecord?.lapNo || undefined,
       fastestLapPlate: undefined,
@@ -395,6 +423,16 @@ const buildLapChart = (rows: EntrantSummaryRow[]): LapChartColumn[] => {
 };
 
 const getRaceStateContentSignature = (raceState: RaceState & RaceStateLookup): string => {
+  const entrySignature = (raceState.entries || [])
+    .map((entry) => [
+      entry.id,
+      entry.entrantId,
+      entry.categoryId,
+      entry.raceNumber,
+      JSON.stringify(entry.identifiers),
+      entry.participantIds.join(','),
+    ].join(':'))
+    .join('|');
   const participantSignature = raceState.participants
     .map((participant) => [
       participant.id,
@@ -438,7 +476,7 @@ const getRaceStateContentSignature = (raceState: RaceState & RaceStateLookup): s
     })
     .join('|');
 
-  return `${participantSignature}::${categorySignature}::${recordSignature}`;
+  return `${entrySignature}::${participantSignature}::${categorySignature}::${recordSignature}`;
 };
 
 const buildFastestLapTimeline = (rows: EntrantSummaryRow[], ignoreFirstLap: boolean): FastestLapTimelineRow[] => {
@@ -579,10 +617,15 @@ const EventSessionSelector = (props: {
 };
 
 export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
+  const isMotorsport = props.event?.discipline === 'motorsport';
+  const isCycling = props.event?.discipline === 'cycling';
+  const useParticipantIdentity = isMotorsport || isCycling;
+  const participantLabel = isMotorsport ? 'Driver' : isCycling ? 'Participant' : 'Entrant';
+  const numberLabel = 'No.';
   const excludedCategoryKeys = React.useMemo(() => getExcludedCategoryKeys(props.raceState, props.categories), [props.categories, props.raceState]);
   const categories = React.useMemo(() => {
-    return dedupeCategoryOptions(props.categories).filter((category) => !excludedCategoryKeys.has(categoryKeyFromName(category.name)));
-  }, [excludedCategoryKeys, props.categories]);
+    return dedupeCategoryOptions(props.categories);
+  }, [props.categories]);
   const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(props.selectedCategoryId || 'overall');
   const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
   const [viewType, setViewType] = React.useState<'results' | 'lap-chart'>('results');
@@ -604,8 +647,8 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
 
   const raceStateContentSignature = getRaceStateContentSignature(props.raceState);
   const allRows = React.useMemo(() => {
-    return buildEntrantRows(props.raceState, props.catalogEntrants, excludedCategoryKeys);
-  }, [excludedCategoryKeys, props.catalogEntrants, props.raceState, raceStateContentSignature]);
+    return buildEntrantRows(props.raceState, props.catalogEntrants, props.catalogEntries || [], excludedCategoryKeys);
+  }, [excludedCategoryKeys, props.catalogEntries, props.catalogEntrants, props.raceState, raceStateContentSignature]);
 
   const rows = React.useMemo(() => {
     if (selectedCategory === 'overall') {
@@ -657,7 +700,8 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
             <thead>
               <tr>
                 <th>Position</th>
-                <th>Entrant</th>
+                <th>{numberLabel}</th>
+                <th>{participantLabel}</th>
                 <th>Category</th>
                 <th>Laps</th>
                 <th>Total Time</th>
@@ -668,7 +712,8 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
               {rows.map((row, index) => (
                 <tr key={row.entrantId}>
                   <td>{index + 1}</td>
-                  <td>{row.entrantName}</td>
+                  <td>{getRowRaceNumber(row) || '-'}</td>
+                  <td>{useParticipantIdentity ? getRowDriverName(row) || '-' : row.entrantName}</td>
                   <td>{row.categoryName}</td>
                   <td>{row.lapCount}</td>
                   <td>{formatDuration(row.totalTime)}</td>
@@ -732,10 +777,16 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
 };
 
 export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
+  const isMotorsport = props.event?.discipline === 'motorsport';
+  const isCycling = props.event?.discipline === 'cycling';
+  const useParticipantIdentity = isMotorsport || isCycling;
+  const participantLabel = isMotorsport ? 'Driver' : isCycling ? 'Participant' : 'Entrant';
+  const timelineParticipantLabel = isMotorsport ? 'Driver' : 'Participant';
+  const numberLabel = isMotorsport ? 'No.' : 'Plate';
   const excludedCategoryKeys = React.useMemo(() => getExcludedCategoryKeys(props.raceState, props.categories), [props.categories, props.raceState]);
   const categories = React.useMemo(() => {
-    return dedupeCategoryOptions(props.categories).filter((category) => !excludedCategoryKeys.has(categoryKeyFromName(category.name)));
-  }, [excludedCategoryKeys, props.categories]);
+    return dedupeCategoryOptions(props.categories);
+  }, [props.categories]);
   const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(props.selectedCategoryId || 'overall');
   const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
   const [drawLineChart, setDrawLineChart] = React.useState<boolean>(false);
@@ -754,8 +805,8 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
 
   const raceStateContentSignature = getRaceStateContentSignature(props.raceState);
   const allRows = React.useMemo(() => {
-    return buildEntrantRows(props.raceState, props.catalogEntrants, excludedCategoryKeys);
-  }, [excludedCategoryKeys, props.catalogEntrants, props.raceState, raceStateContentSignature]);
+    return buildEntrantRows(props.raceState, props.catalogEntrants, props.catalogEntries || [], excludedCategoryKeys);
+  }, [excludedCategoryKeys, props.catalogEntries, props.catalogEntrants, props.raceState, raceStateContentSignature]);
 
   const rows = React.useMemo(() => {
     if (selectedCategory === 'overall') {
@@ -778,7 +829,10 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     categoryIds: row.categoryIds,
     id: row.entrantId,
     name: row.entrantName,
-    raceNumber: Array.from(new Set(row.memberDetails.map((member) => member.raceNumber))).join(' / '),
+    participantIds: row.memberDetails.map((member) => member.participantId),
+    participantNames: row.memberDetails.map((member) => member.participantDisplayName),
+    raceNumber: Array.from(new Set(row.memberDetails.map((member) => member.racePlate).filter((value): value is string => !!value))).join(' / '),
+    teamName: row.entrantName,
   })), [rows]);
 
   const lapChart = React.useMemo(() => {
@@ -948,8 +1002,8 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
           <table aria-label="Fastest Laps Report Table">
             <thead>
               <tr>
-                <th>Plate</th>
-                <th>Entrant</th>
+                <th>{numberLabel}</th>
+                <th>{participantLabel}</th>
                 <th>Category</th>
                 <th>Fastest Lap</th>
                 <th>On</th>
@@ -959,8 +1013,8 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <tbody>
               {fastestLapRows.map((row) => (
                 <tr key={row.entrantId}>
-                  <td>{row.fastestLapPlate || '-'}</td>
-                  <td>{row.entrantName}</td>
+                  <td>{getRowRaceNumber(row) || row.fastestLapPlate || '-'}</td>
+                  <td>{useParticipantIdentity ? getRowDriverName(row) || '-' : row.entrantName}</td>
                   <td>{row.categoryName}</td>
                   <td>{formatDuration(row.fastestLap)}</td>
                   <td>{row.fastestLapNo || '-'}</td>
@@ -987,8 +1041,8 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
           <table aria-label="Fastest Lap Timeline Report Table">
             <thead>
               <tr>
-                <th>Plate</th>
-                <th>Participant</th>
+                <th>{numberLabel}</th>
+                <th>{timelineParticipantLabel}</th>
                 <th>Team</th>
                 <th>Time of day</th>
                 <th>Elapsed</th>

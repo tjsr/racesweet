@@ -2,21 +2,26 @@ import * as XLSX from 'xlsx';
 
 export interface EntrantImportRecord {
   category?: string;
+  classifiedLaps?: number;
   entrantName?: string;
+  finishPosition?: number;
   firstName?: string;
   fullName?: string;
   lastName?: string;
   raceNumber?: string;
   startOrder?: number;
+  teamName?: string;
   transponderNumber?: string;
   vehicle?: string;
 }
 
-type EntrantImportField = keyof Omit<EntrantImportRecord, 'startOrder'> | 'startOrder';
+type EntrantImportField = keyof EntrantImportRecord;
 
 const FIELD_ALIASES: Record<EntrantImportField, string[]> = {
   category: ['category', 'class', 'class name', 'grade', 'division'],
-  entrantName: ['entrant', 'entrant name', 'team', 'team name'],
+  classifiedLaps: ['laps', 'classified laps', 'completed laps'],
+  entrantName: ['entrant', 'entrant name'],
+  finishPosition: ['finish', 'finish position', 'position', 'place'],
   firstName: ['first name', 'firstname', 'given name', 'givenname'],
   fullName: ['driver name', 'driver', 'rider name', 'rider', 'competitor name', 'competitor', 'full name', 'name'],
   lastName: ['surname', 'last name', 'lastname', 'family name', 'familyname'],
@@ -40,6 +45,7 @@ const FIELD_ALIASES: Record<EntrantImportField, string[]> = {
     'no',
   ],
   startOrder: ['start order', 'grid position', 'grid', 'start', 'seed'],
+  teamName: ['team', 'team name'],
   transponderNumber: ['transponder number', 'transponder no', 'transponder', 'transmitter number', 'transmitter no', 'transmitter', 'chip number', 'chip no', 'chip', 'tx number', 'tx no', 'txno', 'tx'],
   vehicle: ['vehicle', 'make/model', 'make model', 'vehicle make/model', 'car make/model', 'car'],
 };
@@ -142,14 +148,19 @@ export const parseEntrantImportRows = (rows: unknown[][]): EntrantImportRecord[]
       return [];
     }
     const startOrderValue = Number(readField('startOrder'));
+    const classifiedLapsValue = Number(readField('classifiedLaps'));
+    const finishPositionValue = Number(readField('finishPosition'));
     return [{
       entrantName: readField('entrantName'),
       category: readField('category'),
+      classifiedLaps: Number.isFinite(classifiedLapsValue) && classifiedLapsValue >= 0 ? classifiedLapsValue : undefined,
+      finishPosition: Number.isFinite(finishPositionValue) && finishPositionValue > 0 ? finishPositionValue : undefined,
       firstName,
       fullName,
       lastName,
       raceNumber,
       startOrder: Number.isFinite(startOrderValue) && startOrderValue > 0 ? startOrderValue : undefined,
+      teamName: readField('teamName'),
       transponderNumber,
       vehicle: readField('vehicle'),
     }];

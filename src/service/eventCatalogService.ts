@@ -8,10 +8,12 @@ import {
   type EntrantType,
   type EventCatalogCategory,
   type EventCatalogEntrant,
+  type EventCatalogEntry,
   type EventCatalogSession,
   type EventCatalogState,
   type ParticipantEntrantMembership,
   getCategoriesForEvent,
+  getEntriesForEvent,
   getEntrantsForEvent,
   getEventDisciplineLabels,
   getParticipantEntrantMemberships,
@@ -33,6 +35,7 @@ import {
 } from "../ledger/eventCatalogLedger.js";
 import { incrementLoadingMetric } from "../loadingMetrics.js";
 import { EventEntrantId } from "../model/entrant.js";
+import type { EventEntryId } from '../model/entry.js';
 import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
 import type { EventParticipant } from "../model/eventparticipant.js";
 import type { EventTeam } from "../model/eventteam.js";
@@ -324,14 +327,8 @@ const buildRiderEntrantIdentity = (entrant: EventCatalogEntrant): string => {
   );
 };
 
-const buildTeamIdentity = (team: {
-  categoryId?: string;
-  id: string;
-  name: string;
-}): string => {
-  const categoryId = team.categoryId?.toString() || "";
-  const name = normalizeIdentityPart(team.name);
-  return `${categoryId}|${name || team.id.toString()}`;
+const buildTeamIdentity = (team: { id: string }): string => {
+  return team.id.toString();
 };
 
 const mergeParticipantIdentifiers = (
@@ -617,6 +614,7 @@ const findUniqueEntrantImportMatch = (
   participants: EventParticipant[],
   record: EntrantImportRecord,
   categoriesById: Map<string, EventCatalogCategory>,
+  allowNameMatch = true,
 ): EventCatalogEntrant | undefined => {
   const riderEntrants = entrants.filter(
     (entrant) => entrant.entrantType === "rider",
@@ -703,7 +701,7 @@ const findUniqueEntrantImportMatch = (
   const importedName = normalizeEntrantImportValue(
     `${record.firstName || ""} ${record.lastName || ""}`,
   );
-  return importedName && !isPlaceholderEntrantName(importedName)
+  return allowNameMatch && importedName && !isPlaceholderEntrantName(importedName)
     ? findUnique(
         riderEntrants.filter((entrant) =>
           getEntrantImportNames(entrant, participants).includes(importedName),
@@ -778,15 +776,22 @@ const ensureImportedParticipantEntrantIds = (
       const participantId = participant.id.toString();
       const entrantId =
         nonEmpty(participant.entrantId?.toString()) ||
-        teamEntrantIdsByParticipantId.get(participantId) ||
         participantId;
+      const entryId =
+        nonEmpty(participant.entryId?.toString()) ||
+        teamEntrantIdsByParticipantId.get(participantId) ||
+        entrantId;
 
-      if (participant.entrantId?.toString() === entrantId) {
+      if (
+        participant.entrantId?.toString() === entrantId &&
+        participant.entryId?.toString() === entryId
+      ) {
         return participant;
       }
 
       return {
         ...participant,
+        entryId,
         entrantId,
       };
     },
@@ -905,9 +910,7 @@ const normalizeImportedRaceStateForEvent = (
 
   existingTeamEntrants.forEach((entrant) => {
     const identity = buildTeamIdentity({
-      categoryId: entrant.categoryId,
       id: entrant.id,
-      name: entrant.name,
     });
     if (!teamCanonicalIdByIdentity.has(identity)) {
       teamCanonicalIdByIdentity.set(identity, entrant.id.toString());
@@ -959,6 +962,7 @@ const normalizeImportedRaceStateForEvent = (
       oldEntrantId;
     const remappedParticipant: EventParticipant = {
       ...participant,
+      entryId: canonicalEntrantId,
       entrantId: canonicalEntrantId,
       id: canonicalParticipantId,
     };
@@ -1070,10 +1074,12 @@ const deriveMaxTeamSizesByCategory = (
 const createCategoryTeamRules = (
   categoryId: string,
   maxTeamSizeByCategory: Map<string, number>,
+  identityMode: 'single' | 'multiple' = 'single',
 ): CategoryTeamRules => {
   const maxTeamSize = maxTeamSizeByCategory.get(categoryId);
 
   return {
+    identityMode,
     ...(maxTeamSize && maxTeamSize > 1 ? { maxTeamSize } : {}),
     teamCompositionRules: [],
   };
@@ -1108,7 +1114,11 @@ const deriveCategoriesFromEventData = (
       ...category,
       distanceRule: deriveDistanceRule(category),
       eventId,
-      teamRules: createCategoryTeamRules(id.toString(), maxTeamSizeByCategory),
+        teamRules: createCategoryTeamRules(
+          id.toString(),
+          maxTeamSizeByCategory,
+          (category as EventCatalogCategory).teamRules?.identityMode,
+        ),
     });
   });
 
@@ -1641,9 +1651,7 @@ const mergeDerivedEntrants = (
 const buildCatalogEntrantIdentity = (entrant: EventCatalogEntrant): string => {
   if (entrant.entrantType === "team") {
     return buildTeamIdentity({
-      categoryId: entrant.categoryId,
       id: entrant.id,
-      name: entrant.name,
     });
   }
 
@@ -1923,9 +1931,9 @@ const assertSessionCategoryIdsBelongToEvent = (
   state: EventCatalogState,
   sessionId: SessionId,
   categoryIds: string[] | undefined,
-): void => {
+): string[] | undefined => {
   if (!categoryIds) {
-    return;
+    return undefined;
   }
 
   const session = state.sessions.find(
@@ -1945,11 +1953,18 @@ const assertSessionCategoryIdsBelongToEvent = (
   const invalidCategoryIds = categoryIds.filter(
     (categoryId) => categoriesById.get(categoryId)?.eventId !== session.eventId,
   );
-  if (invalidCategoryIds.length > 0) {
+  const existingCategoryIds = new Set(session.categoryIds);
+  const newlyInvalidCategoryIds = invalidCategoryIds.filter(
+    (categoryId) => !existingCategoryIds.has(categoryId),
+  );
+  if (newlyInvalidCategoryIds.length > 0) {
     throw new Error(
-      `Cannot assign categories from another event to session ${sessionId}: ${invalidCategoryIds.join(", ")}.`,
+      `Cannot assign categories from another event to session ${sessionId}: ${newlyInvalidCategoryIds.join(", ")}.`,
     );
   }
+  return categoryIds.filter(
+    (categoryId) => categoriesById.get(categoryId)?.eventId === session.eventId,
+  );
 };
 
 const repairAndValidateLoadedLedger = async (
@@ -3150,15 +3165,18 @@ export class EventCatalogService {
       index: number,
     ) => Promise<void> = NO_OP_COMPLETE_STEP,
   ): Promise<EventCatalogState> {
-    assertSessionCategoryIdsBelongToEvent(
+    const categoryIds = assertSessionCategoryIdsBelongToEvent(
       this.state,
       sessionId,
       changes.categoryIds,
     );
+    const normalizedChanges = changes.categoryIds
+      ? { ...changes, categoryIds }
+      : changes;
     return this.appendMutations(
       [
         {
-          changes,
+          changes: normalizedChanges,
           id: createMutationId(),
           sessionId,
           timestamp: createTimestamp(),
@@ -3190,15 +3208,21 @@ export class EventCatalogService {
       index: number,
     ) => Promise<void> = NO_OP_COMPLETE_STEP,
   ): Promise<EventCatalogState> {
-    updates.forEach((update) =>
-      assertSessionCategoryIdsBelongToEvent(
-        this.state,
-        update.sessionId,
-        update.changes.categoryIds,
-      ),
-    );
+    const normalizedUpdates = updates.map((update) => ({
+      ...update,
+      changes: update.changes.categoryIds
+        ? {
+            ...update.changes,
+            categoryIds: assertSessionCategoryIdsBelongToEvent(
+              this.state,
+              update.sessionId,
+              update.changes.categoryIds,
+            ),
+          }
+        : update.changes,
+    }));
     return this.appendMutations(
-      updates.map((update) => ({
+      normalizedUpdates.map((update) => ({
         changes: update.changes,
         id: createMutationId(),
         sessionId: update.sessionId,
@@ -3207,6 +3231,58 @@ export class EventCatalogService {
       })),
       onCompleteStep,
     );
+  }
+
+  public async updateCategorySessionAssignments(
+    categoryId: EventCategoryId,
+    sessionIds: SessionId[],
+    onCompleteStep: (
+      currentTask: string,
+      index: number,
+    ) => Promise<void> = NO_OP_COMPLETE_STEP,
+  ): Promise<EventCatalogState> {
+    const category = this.state.categories.find(
+      (candidate) => candidate.id === categoryId && candidate.deleted !== true,
+    );
+    if (!category) {
+      throw new Error(`Cannot assign sessions because category ${categoryId} does not exist.`);
+    }
+
+    const selectedSessionIds = new Set(unique(sessionIds));
+    const invalidSessionIds = sessionIds.filter((sessionId) => {
+      const session = this.state.sessions.find((candidate) => candidate.id === sessionId);
+      return !session || session.eventId !== category.eventId;
+    });
+    if (invalidSessionIds.length > 0) {
+      throw new Error(
+        `Cannot assign category ${categoryId} to sessions from another event: ${unique(invalidSessionIds).join(", ")}.`,
+      );
+    }
+
+    const eventCategoryIds = new Set(
+      this.state.categories
+        .filter((candidate) => candidate.eventId === category.eventId && candidate.deleted !== true)
+        .map((candidate) => candidate.id),
+    );
+    const updates = this.state.sessions
+      .filter((session) => session.eventId === category.eventId)
+      .flatMap((session) => {
+        const validExistingCategoryIds = session.categoryIds.filter((id) => eventCategoryIds.has(id));
+        const isAssigned = validExistingCategoryIds.includes(categoryId);
+        const shouldBeAssigned = selectedSessionIds.has(session.id);
+        const categoryIds = shouldBeAssigned
+          ? unique([...validExistingCategoryIds, categoryId])
+          : validExistingCategoryIds.filter((id) => id !== categoryId);
+        if (isAssigned === shouldBeAssigned && hasSameMembers(session.categoryIds, categoryIds)) {
+          return [];
+        }
+        return [{
+          changes: { categoryIds },
+          sessionId: session.id,
+        }];
+      });
+
+    return this.updateSessions(updates, onCompleteStep);
   }
 
   public async moveSessionToEvent(
@@ -3226,9 +3302,15 @@ export class EventCatalogService {
     const previousEvent = this.state.events.find(
       (item) => item.id === session.eventId,
     );
+    const targetEventCategoryIds = new Set(
+      this.state.categories
+        .filter((category) => category.eventId === nextEventId && category.deleted !== true)
+        .map((category) => category.id),
+    );
     const mutations: EventCatalogLedger["mutations"] = [
       {
         changes: {
+          categoryIds: session.categoryIds.filter((categoryId) => targetEventCategoryIds.has(categoryId)),
           eventId: nextEventId,
         },
         id: createMutationId(),
@@ -3469,6 +3551,7 @@ export class EventCatalogService {
       ({ metadata }) => metadata.raceState.participants || [],
     );
     const originalEntrants = getEntrantsForEvent(this.state, eventId);
+    const originalEntries = getEntriesForEvent(this.state, eventId);
     const categories = getCategoriesForEvent(this.state, eventId);
     const categoriesById = new Map(
       categories.map((category) => [category.id.toString(), category] as const),
@@ -3490,6 +3573,13 @@ export class EventCatalogService {
         memberParticipantIds: [...entrant.memberParticipantIds],
         teamMembers: entrant.teamMembers ? [...entrant.teamMembers] : undefined,
       }),
+    );
+    const workingEntriesById = new Map<EventEntryId, EventCatalogEntry>(
+      originalEntries.map((entry) => [entry.id, {
+        ...entry,
+        identifiers: [...entry.identifiers],
+        participantIds: [...entry.participantIds],
+      }]),
     );
     const importedRiderIds = new Set<EventEntrantId>();
 
@@ -3514,6 +3604,7 @@ export class EventCatalogService {
         sourceParticipants,
         record,
         categoriesById,
+        false,
       );
       if (!rider) {
         const entrantId =
@@ -3564,21 +3655,19 @@ export class EventCatalogService {
           event.discipline === "motorsport"
             ? undefined
             : (record.startOrder ?? rider.startOrder),
+        teamEntrantId: record.teamName ? rider.teamEntrantId : undefined,
         vehicle: event.discipline === "motorsport" ? undefined : rider.vehicle,
       };
 
-      if (event.discipline === "motorsport" && record.entrantName) {
+      if (record.teamName) {
         const normalizedTeamName = normalizeEntrantImportValue(
-          record.entrantName,
+          record.teamName,
         );
-        const normalizedVehicle = normalizeEntrantImportValue(record.vehicle);
         let team = workingEntrants.find(
           (entrant) =>
             entrant.entrantType === "team" &&
-            normalizeEntrantImportValue(entrant.name) === normalizedTeamName &&
-            (!normalizedVehicle ||
-              normalizeEntrantImportValue(entrant.vehicle) ===
-                normalizedVehicle),
+            entrant.isEntryOwner !== true &&
+            normalizeEntrantImportValue(entrant.name) === normalizedTeamName,
         );
         if (!team) {
           team = {
@@ -3588,7 +3677,7 @@ export class EventCatalogService {
             eventId,
             id: createEventEntrantId(),
             memberParticipantIds: [],
-            name: record.entrantName,
+            name: record.teamName,
             startOrder: record.startOrder,
             teamMembers: [],
             vehicle: record.vehicle,
@@ -3627,6 +3716,56 @@ export class EventCatalogService {
         };
         rider.teamEntrantId = resolvedTeam.id;
       }
+
+      const entryId = (record.teamName && rider.teamEntrantId
+        ? rider.teamEntrantId
+        : rider.id) as EventEntryId;
+      let ownerEntrantId: EventEntrantId | undefined;
+      const ownerName = record.entrantName || (
+        event.discipline === "motorsport" ? rider.name : undefined
+      );
+      const normalizedOwnerName = normalizeEntrantImportValue(ownerName);
+      if (normalizedOwnerName) {
+        let owner = workingEntrants.find((entrant) => (
+          entrant.isEntryOwner === true &&
+          normalizeEntrantImportValue(entrant.name) === normalizedOwnerName
+        ));
+        if (!owner) {
+          owner = {
+            categoryIds: [],
+            entrantType: "team",
+            entryIds: [],
+            eventId,
+            id: createEventEntrantId(),
+            isEntryOwner: true,
+            memberParticipantIds: [],
+            name: ownerName!,
+          };
+          workingEntrants.push(owner);
+        }
+        ownerEntrantId = owner.id;
+        owner.entryIds = unique([...(owner.entryIds || []), entryId]);
+        owner.memberParticipantIds = unique([...(owner.memberParticipantIds || []), participantId]);
+        if (rider.categoryId) {
+          owner.categoryIds = unique([...(owner.categoryIds || []), rider.categoryId]);
+        }
+      }
+
+      const entryParent = workingEntrants.find((entrant) => entrant.id === entryId);
+      const existingEntry = workingEntriesById.get(entryId);
+      workingEntriesById.set(entryId, {
+        categoryId: rider.categoryId || entryParent?.categoryId,
+        entrantId: ownerEntrantId || existingEntry?.entrantId || rider.id,
+        eventId,
+        id: entryId,
+        identifiers: mergeParticipantIdentifiers(existingEntry?.identifiers, rider.identifiers),
+        name: record.teamName || rider.name,
+        participantIds: unique([...(existingEntry?.participantIds || []), participantId]),
+        raceNumber: record.raceNumber || existingEntry?.raceNumber,
+        sessionIds: existingEntry?.sessionIds,
+        startOrder: record.startOrder ?? existingEntry?.startOrder,
+        vehicle: record.vehicle || existingEntry?.vehicle,
+      });
 
       workingEntrants[riderIndex] = rider;
       importedRiderIds.add(rider.id);
@@ -3667,8 +3806,37 @@ export class EventCatalogService {
           },
         ];
       });
+    const originalEntriesById = new Map(originalEntries.map((entry) => [entry.id, entry]));
+    const workingEntries = Array.from(workingEntriesById.values());
+    const entryMutations: EventCatalogLedger["mutations"] = workingEntries.flatMap((entry): EventCatalogLedger["mutations"] => {
+      const original = originalEntriesById.get(entry.id);
+      if (!original) {
+        return [{
+          entry,
+          id: createMutationId(),
+          timestamp: createTimestamp(),
+          type: "entry-created" as const,
+        }];
+      }
+      if (hasSameSerializedValue(original, entry)) {
+        return [];
+      }
+      const { eventId: _eventId, id: _id, ...changes } = entry;
+      return [{
+        changes,
+        entryId: entry.id,
+        id: createMutationId(),
+        timestamp: createTimestamp(),
+        type: "entry-updated" as const,
+      }];
+    });
     const importedRiders = workingEntrants.filter((entrant) =>
       importedRiderIds.has(entrant.id),
+    );
+    const importedCategoryIds = new Set<EventCategoryId>(
+      workingEntries
+        .map((entry) => entry.categoryId)
+        .filter((categoryId): categoryId is EventCategoryId => categoryId !== undefined),
     );
     const importedTransponderNumbers = new Set(
       records
@@ -3778,12 +3946,18 @@ export class EventCatalogService {
             participantIndex = participants.length;
           }
           const existingParticipant = participants[participantIndex];
+          const participantId = existingParticipant?.id || rider.memberParticipantIds[0];
+          const entry = workingEntries.find((candidate) => (
+            candidate.participantIds.includes(participantId)
+          ));
+          const entryId = entry?.id || rider.teamEntrantId || rider.id;
           participants[participantIndex] = {
             categoryId: undefined,
             currentResult: existingParticipant?.currentResult,
-            entrantId: rider.teamEntrantId || rider.id,
+            entrantId: entry?.entrantId || rider.id,
+            entryId,
             firstname: rider.firstName || existingParticipant?.firstname || "",
-            id: existingParticipant?.id || rider.memberParticipantIds[0],
+            id: participantId,
             identifiers: mergeParticipantIdentifiers(
               existingParticipant?.identifiers,
               rider.identifiers,
@@ -3838,6 +4012,14 @@ export class EventCatalogService {
           id: createMutationId(),
           raceState: {
             ...metadata.raceState,
+            categories: [
+              ...(metadata.raceState.categories || []),
+              ...categories.filter((category) => (
+                importedCategoryIds.has(category.id) &&
+                !(metadata.raceState.categories || []).some((existingCategory) => existingCategory.id === category.id)
+              )),
+            ],
+            entries: workingEntries,
             participants,
             records: remappedRecords,
             teams: Array.from(teamsByRaceStateId.values()),
@@ -3847,15 +4029,30 @@ export class EventCatalogService {
           type: "race-state-imported" as const,
         };
       });
+    const sessionMutations: EventCatalogLedger["mutations"] = importedRaceStates.flatMap(({ sessionId }) => {
+      const session = this.state.sessions.find((candidate) => candidate.id === sessionId && candidate.eventId === eventId);
+      if (!session) {
+        return [];
+      }
+      const categoryIds = unique([...session.categoryIds, ...importedCategoryIds]);
+      if (hasSameMembers(session.categoryIds, categoryIds)) {
+        return [];
+      }
+      return [{
+        changes: { categoryIds },
+        id: createMutationId(),
+        sessionId,
+        timestamp: createTimestamp(),
+        type: "session-updated" as const,
+      }];
+    });
     const entrantIds = workingEntrants.map((entrant) => entrant.id);
-    const eventMutation: EventCatalogLedger["mutations"] = hasSameMembers(
-      event.entrantIds,
-      entrantIds,
-    )
+    const entryIds = workingEntries.map((entry) => entry.id);
+    const eventMutation: EventCatalogLedger["mutations"] = hasSameMembers(event.entrantIds, entrantIds) && hasSameMembers(event.entryIds || [], entryIds)
       ? []
       : [
           {
-            changes: { entrantIds },
+            changes: { entrantIds, entryIds },
             eventId,
             id: createMutationId(),
             timestamp: createTimestamp(),
@@ -3874,7 +4071,7 @@ export class EventCatalogService {
         }));
 
     return this.appendMutations(
-      [...raceStateMutations, ...entrantMutations, ...placeholderEntrantRemovalMutations, ...eventMutation],
+      [...entrantMutations, ...entryMutations, ...eventMutation, ...sessionMutations, ...raceStateMutations, ...placeholderEntrantRemovalMutations],
       onCompleteStep,
     );
   }
@@ -3958,15 +4155,57 @@ export class EventCatalogService {
     ) => Promise<void> = NO_OP_COMPLETE_STEP,
   ): Promise<EventCatalogState> {
     return this.appendMutations(
-      [
-        {
-          changes: normalizeEntrantChanges(changes),
-          entrantId,
-          id: createMutationId(),
-          timestamp: createTimestamp(),
-          type: "entrant-updated",
-        },
-      ],
+      [{
+        changes: normalizeEntrantChanges(changes),
+        entrantId,
+        id: createMutationId(),
+        timestamp: createTimestamp(),
+        type: "entrant-updated",
+      }],
+      onCompleteStep,
+    );
+  }
+
+  public async updateEntry(
+    entryId: EventEntryId,
+    changes: Partial<
+      Pick<
+        EventCatalogEntry,
+        | "categoryId"
+        | "entrantId"
+        | "identifiers"
+        | "name"
+        | "participantIds"
+        | "raceNumber"
+        | "sessionIds"
+        | "startOrder"
+        | "vehicle"
+      >
+    >,
+    onCompleteStep: (
+      currentTask: string,
+      index: number,
+    ) => Promise<void> = NO_OP_COMPLETE_STEP,
+  ): Promise<EventCatalogState> {
+    const entry = (this.state.entries || []).find((candidate) => candidate.id === entryId);
+    if (!entry) {
+      throw new Error(`Cannot update missing Entry ${entryId}.`);
+    }
+    if (changes.categoryId) {
+      const category = this.state.categories.find((candidate) => candidate.id === changes.categoryId);
+      if (!category || category.eventId !== entry.eventId) {
+        throw new Error(`Cannot assign Entry ${entryId} to a category from another event.`);
+      }
+    }
+
+    return this.appendMutations(
+      [{
+        changes,
+        entryId,
+        id: createMutationId(),
+        timestamp: createTimestamp(),
+        type: "entry-updated",
+      }],
       onCompleteStep,
     );
   }

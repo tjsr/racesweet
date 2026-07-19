@@ -59,6 +59,37 @@ const chipCrossing = (
 });
 
 describe('Session team lap processing', () => {
+  it('keeps participants from the same Entrant separate when their Entry IDs differ', async () => {
+    const mears = { ...participant('103', '3', 98), categoryId: undefined, entrantId: '900', entryId: '3' };
+    const fittipaldi = { ...participant('105', '5', 19), categoryId: undefined, entrantId: '900', entryId: '5' };
+    const start = createGreenFlagEvent({
+      categoryIds: [category.id],
+      flagValue: 'course',
+      id: 'entry-start',
+      recordType: 4,
+      sequence: 1,
+      source: 'test',
+      time: new Date('2026-05-30T10:00:00.000Z'),
+    });
+    const session = new Session({
+      categories: [category],
+      entries: [
+        { categoryId: category.id, entrantId: '900', eventId: '800', id: '3', identifiers: [], participantIds: [mears.id], raceNumber: '3' },
+        { categoryId: category.id, entrantId: '900', eventId: '800', id: '5', identifiers: [], participantIds: [fittipaldi.id], raceNumber: '5' },
+      ],
+      participants: [mears, fittipaldi],
+      records: [
+        start,
+        chipCrossing('mears-lap-1', 98, 2, '2026-05-30T10:06:00.000Z'),
+        chipCrossing('fittipaldi-lap-1', 19, 3, '2026-05-30T10:06:10.000Z'),
+      ],
+      teams: [],
+    });
+
+    expect(session.getParticipantLaps(mears.id)?.[0]).toMatchObject({ lapNo: 1, startingLapRecordId: start.id });
+    expect(session.getParticipantLaps(fittipaldi.id)?.[0]).toMatchObject({ lapNo: 1, startingLapRecordId: start.id });
+  });
+
   it('reprocesses incremental team crossings against the last crossing by any team member', async () => {
     const session = new Session({
       categories: [category],

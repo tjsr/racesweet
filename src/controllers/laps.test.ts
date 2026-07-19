@@ -1,7 +1,7 @@
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { GreenFlagRecord } from '../model/flag.js';
 import { createCategoryId, createEventEntrantId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
-import { calculateParticipantLapTimes, isCountedLapPassing, processAllParticipantLaps } from './laps.js';
+import { calculateParticipantLapTimes, getMissingLapCompletionEvidence, isCountedLapPassing, processAllParticipantLaps } from './laps.js';
 import {
   CROSSING_FLAG_LAP_UNDER_MINIMUM,
   CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
@@ -353,5 +353,80 @@ describe('lap calculation exclusion reasons', () => {
     expect(isPassingExcluded(laps.get(participant.id)?.[0]!)).toBe(true);
     expect(isPassingValid(laps.get(participant.id)?.[0]!)).toBe(false);
     expect(categoryId).not.toBe(otherCategoryId);
+  });
+
+  it('infers a missed finish crossing only when two sector lines prove an extra circuit', () => {
+    const { participant, source, startFlag } = createLapCalculationFixture();
+    const crossing = (id: string, seconds: number, lineNumber: number, isLapCompletion: boolean): ParticipantPassingRecord => ({
+      id: createTimeRecordId(id),
+      isLapCompletion,
+      lineNumber,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: seconds,
+      source,
+      time: new Date(`2026-05-29T10:${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}.000Z`),
+    });
+    const passings = [
+      crossing('finish-before-gap', 60, 1, true),
+      crossing('sector-two-first', 100, 2, false),
+      crossing('sector-three-first', 110, 3, false),
+      crossing('sector-two-second', 160, 2, false),
+      crossing('sector-three-second', 170, 3, false),
+      crossing('finish-after-gap', 220, 1, true),
+    ];
+
+    const evidence = getMissingLapCompletionEvidence(passings, 60_000, [1]);
+
+    expect(evidence).toHaveLength(1);
+    expect(evidence[0]).toEqual(expect.objectContaining({
+      evidenceLineKeys: ['line:2', 'line:3'],
+      missingCount: 1,
+      nextFinishRecord: passings[5],
+      previousFinishRecord: passings[0],
+    }));
+    expect(evidence[0]?.inferredCrossings).toEqual([
+      expect.objectContaining({
+        generatedReason: 'missing-crossing',
+        isGenerated: true,
+        isLapCompletion: true,
+        participantId: participant.id,
+        time: new Date('2026-05-29T10:02:20.000Z'),
+      }),
+    ]);
+
+    const calculatedPassings = processAllParticipantLaps(
+      [startFlag, ...passings],
+      new Map([[participant.id, participant]]),
+      60_000,
+      true,
+      'race',
+      [1],
+    ).get(participant.id) || [];
+    const countedFinishes = calculatedPassings
+      .filter((passing) => isCountedLapPassing(passing, [1]))
+      .sort((left, right) => left.time!.getTime() - right.time!.getTime());
+    expect(countedFinishes).toHaveLength(3);
+    expect(countedFinishes.map((passing) => passing.lapNo)).toEqual([1, 2, 3]);
+    expect(countedFinishes[1]).toEqual(expect.objectContaining({
+      generatedReason: 'missing-crossing',
+      isGenerated: true,
+    }));
+  });
+
+  it('does not infer a missed finish from a repeated reading on only one sector line', () => {
+    const { participant, source } = createLapCalculationFixture();
+    const passings: ParticipantPassingRecord[] = [60, 100, 160, 220].map((seconds, index) => ({
+      id: createTimeRecordId(`single-sector-${index}`),
+      isLapCompletion: index === 0 || index === 3,
+      lineNumber: index === 0 || index === 3 ? 1 : 2,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: seconds,
+      source,
+      time: new Date(`2026-05-29T10:${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}.000Z`),
+    }));
+
+    expect(getMissingLapCompletionEvidence(passings, 60_000, [1])).toEqual([]);
   });
 });

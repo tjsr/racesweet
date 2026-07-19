@@ -1,11 +1,21 @@
-import { processAllParticipantLaps } from '../../controllers/laps.js';
+import { existsSync, readFileSync } from 'node:fs';
+
+import { parseEntrantImportBuffer } from '../../controllers/entrantImport.js';
+import { isCountedLapPassing, processAllParticipantLaps } from '../../controllers/laps.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
-import { createEventId, createSessionId } from '../../model/ids.js';
+import type { GreenFlagRecord } from '../../model/flag.js';
+import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId } from '../../model/ids.js';
+import { Session } from '../../model/racestate.js';
 import { EVENT_FLAG_DISPLAYED, EVENT_SESSION_START, isPassingValid } from '../../model/timerecord.js';
 import { loadDorianCtcSrtCatalog, loadDorianCtcSrtCatalogForSession } from './srtCatalogImport.js';
 import { parseCtcTrackConfig } from './trackConfig.js';
 
 describe('Dorian CTC SRT catalog import', () => {
+  const indyDirectory = 'C:/Users/tim/OneDrive/RaceTime/timing/DORIAN/INDY';
+  const maybeIndyIt = existsSync(`${indyDirectory}/910526.ERF`) &&
+    existsSync(`${indyDirectory}/entrants.xlsx`) &&
+    existsSync(`${indyDirectory}/TRACK.CFG`) ? it : it.skip;
+
   it('creates one competitor-free session while preserving raw crossing metadata', () => {
     const catalog = loadDorianCtcSrtCatalog(
       'C:/timing/round-1.srt',
@@ -195,8 +205,8 @@ describe('Dorian CTC SRT catalog import', () => {
         eventId,
         flagType: 'green',
         flagValue: 'course',
-        indicatesRaceStart: true,
-        recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_START,
+        indicatesRaceStart: false,
+        recordType: EVENT_FLAG_DISPLAYED,
         sessionId,
       }),
     ]);
@@ -229,6 +239,106 @@ describe('Dorian CTC SRT catalog import', () => {
       expect.objectContaining({ indicatesRaceStart: true, recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_START }),
     ]));
   });
+
+  it('uses the last repeated green before sustained finish crossings', async () => {
+    const eventId = createEventId('ctc-duplicate-green-event');
+    const sessionId = createSessionId('ctc-duplicate-green-session');
+    const trackConfig = parseCtcTrackConfig([
+      '#***************** Start/Finish : Track ******* North Network *****#',
+      'A     31     1       2               1,1     1,2     1,3     1,4',
+      '40 Green Flag Light',
+      '41 Yellow Flag Light',
+    ].join('\n'));
+    const raceState = await loadDorianCtcSrtCatalogForSession(
+      'C:/timing/duplicate-green.erf',
+      Buffer.from([
+        '4000000000100000',
+        '4100000000200000',
+        '4000000000300000',
+        '040000000040000012343101064000',
+        '4000000000500000',
+        '040000000060000012343101064000',
+      ].join('\r')),
+      {
+        eventDate: '2026-07-14',
+        eventId,
+        sessionId,
+        trackConfig,
+      },
+    );
+    const greenFlags = raceState.records
+      ?.filter((record): record is GreenFlagRecord => 'flagType' in record && record.flagType === 'green') || [];
+
+    expect(greenFlags.map((flag) => ({
+      indicatesRaceStart: flag.indicatesRaceStart,
+      isSessionStart: (flag.recordType & EVENT_SESSION_START) > 0,
+    }))).toEqual([
+      { indicatesRaceStart: false, isSessionStart: false },
+      { indicatesRaceStart: false, isSessionStart: false },
+      { indicatesRaceStart: true, isSessionStart: true },
+    ]);
+  });
+
+  maybeIndyIt('identifies the two finish crossings missing for Mears and Andretti in the INDY source', async () => {
+    const eventId = createEventId('indy-crossing-verification-event');
+    const sessionId = createSessionId('indy-crossing-verification-session');
+    const categoryId = createCategoryId('indy-crossing-verification-category');
+    const erfPath = `${indyDirectory}/910526.ERF`;
+    const trackConfig = parseCtcTrackConfig(readFileSync(`${indyDirectory}/TRACK.CFG`));
+    const entrantRecords = parseEntrantImportBuffer(readFileSync(`${indyDirectory}/entrants.xlsx`));
+    const driverData = ['Rick Mears', 'Michael Andretti'].map((fullName) => {
+      const entrantRecord = entrantRecords.find((record) => record.fullName === fullName)!;
+      return {
+        firstName: entrantRecord.firstName!,
+        officialLaps: entrantRecord.classifiedLaps!,
+        surname: entrantRecord.lastName!,
+        transmitter: Number(entrantRecord.transponderNumber),
+      };
+    });
+    const participants: EventParticipant[] = driverData.map((driver) => ({
+      categoryId,
+      currentResult: undefined,
+      entrantId: createEventEntrantId(`indy-crossing-verification-${driver.transmitter}`),
+      firstname: driver.firstName,
+      id: createEventParticipantId(`indy-crossing-verification-${driver.transmitter}`),
+      identifiers: [{ fromTime: undefined, toTime: undefined, txNo: driver.transmitter }],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: driver.surname,
+    }));
+    const raceState = await loadDorianCtcSrtCatalogForSession(
+      erfPath,
+      readFileSync(erfPath),
+      {
+        eventDate: '1991-05-26',
+        eventId,
+        knownTransmitterNumbers: driverData.map((driver) => driver.transmitter),
+        sessionId,
+        timeZone: 'America/Indiana/Indianapolis',
+        trackConfig,
+      },
+    );
+    const session = new Session({
+      categories: [{ id: categoryId, name: 'INDY 500' }],
+      participants,
+      records: raceState.records || [],
+      teams: [],
+      timeRecordSources: raceState.timeRecordSources,
+    });
+    session.setFinishLineNumbers([1, 2]);
+    session.setMinimumLapTimeMilliseconds(5_000);
+    const calculatedLapCounts = participants.map((participant) => {
+      const countedLaps = (session.getParticipantLaps(participant.id) || [])
+        .filter((passing) => isCountedLapPassing(passing, [1, 2]));
+      return countedLaps.at(-1)?.lapNo;
+    });
+    const officialVerificationLapCounts = driverData.map((driver) => driver.officialLaps);
+
+    expect(calculatedLapCounts).toEqual([198, 198]);
+    expect(officialVerificationLapCounts.map((officialLaps, index) => (
+      officialLaps - (calculatedLapCounts[index] || 0)
+    ))).toEqual([2, 2]);
+  }, 20_000);
 
   it.each(['Green Flag Light', 'Green Flag'])('uses imported %s records as the race start for lap calculation', async (greenFlagDescription: string) => {
     const eventId = createEventId('ctc-green-start-event');

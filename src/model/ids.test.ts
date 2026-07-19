@@ -1,5 +1,5 @@
 import { validate as validateUuid } from 'uuid';
-import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createId, createSessionId, rewriteImportedObjectIds } from './ids.js';
+import { createCategoryId, createEventEntrantId, createEventEntryId, createEventId, createEventParticipantId, createId, createSessionId, rewriteImportedObjectIds } from './ids.js';
 
 describe('rewriteImportedObjectIds', () => {
   it('rewrites typed id fields and unresolved id fields through a shared deterministic map', () => {
@@ -111,6 +111,7 @@ describe('rewriteImportedObjectIds', () => {
           event: {
             categoryIds: [],
             entrantIds: [],
+            entryIds: [],
             id: 'event-a',
             sessionIds: [],
           },
@@ -136,6 +137,16 @@ describe('rewriteImportedObjectIds', () => {
           type: 'entrant-created',
         },
         {
+          entry: {
+            eventId: 'event-a',
+            id: 'entry-a',
+            identifiers: [],
+            participantIds: [],
+          },
+          id: 'mutation-entry',
+          type: 'entry-created',
+        },
+        {
           id: 'mutation-session',
           session: {
             eventId: 'event-a',
@@ -150,17 +161,21 @@ describe('rewriteImportedObjectIds', () => {
     const event = value.mutations[0]!.event!;
     const category = value.mutations[1]!.category!;
     const entrant = value.mutations[2]!.entrant!;
-    const session = value.mutations[3]!.session!;
+    const entry = value.mutations[3]!.entry!;
+    const session = value.mutations[4]!.session!;
 
     expect(event.id).toBe(createEventId('event-a'));
     expect(category.id).toBe(createCategoryId('cat-a'));
     expect(category.eventId).toBe(event.id);
     expect(entrant.id).toBe(createEventEntrantId('entrant-a'));
     expect(entrant.eventId).toBe(event.id);
+    expect(entry.id).toBe(createEventEntryId('entry-a'));
+    expect(entry.eventId).toBe(event.id);
     expect(session.id).toBe(createSessionId('session-a'));
     expect(session.eventId).toBe(event.id);
     expect(event.categoryIds).toEqual([category.id]);
     expect(event.entrantIds).toEqual([entrant.id]);
+    expect(event.entryIds).toEqual([entry.id]);
     expect(event.sessionIds).toEqual([session.id]);
   });
 

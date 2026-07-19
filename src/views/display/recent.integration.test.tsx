@@ -1216,6 +1216,98 @@ describe('RecentRecords integration', () => {
     expect(onAssignFlagCategory).toHaveBeenCalledWith(flag.id, categoryB.id);
   });
 
+  it('only offers flag categories accepted by the target Session and succeeds for every offered category', async () => {
+    const categoryA: EventCategory = {
+      id: createCategoryId('flag-option-category-a'),
+      name: 'Available Category A',
+    };
+    const categoryB: EventCategory = {
+      id: createCategoryId('flag-option-category-b'),
+      name: 'Catalog Category B',
+    };
+    const flag = createGreenFlagEvent({
+      categoryIds: [categoryA.id],
+      flagValue: 'course',
+      id: createTimeRecordId('flag-option-start'),
+      sequence: 1,
+      source: createTimeRecordSourceId('flag-option-source'),
+      time: new Date('2026-05-29T10:00:00.000Z'),
+    });
+    const session = new Session({
+      categories: [categoryA],
+      participants: [],
+      records: [flag],
+      teams: [],
+    });
+    const persistence = new MemoryRaceAdminPersistence();
+    const service = await RaceAdminService.create(async () => session, persistence);
+    let latestMutation: Promise<void> = Promise.resolve();
+    const createMergedLookup = (): RaceStateLookup & { categories: EventCategory[] } => ({
+      canAssignFlagCategory: (flagId, categoryId) => session.canAssignFlagCategory(flagId, categoryId),
+      categories: [categoryA, categoryB],
+      countTransponderCrossings: (txNo, untilTime) => session.countTransponderCrossings(txNo, untilTime),
+      excludeCrossing: (crossingId, exclude) => session.excludeCrossing(crossingId, exclude),
+      getCategoryById: (categoryId) => [categoryA, categoryB].find((category) => category.id === categoryId),
+      getEntrantIdForParticipant: (participantId) => session.getEntrantIdForParticipant(participantId),
+      getParticipantById: (participantId) => session.getParticipantById(participantId),
+      getParticipantLaps: (participantId) => session.getParticipantLaps(participantId),
+      getTransponderCrossings: (txNo, untilTime) => session.getTransponderCrossings(txNo, untilTime),
+      updateCategoryDetails: (categoryId, changes) => session.updateCategoryDetails(categoryId, changes),
+      updateEntrantCategory: (entrantId, categoryId) => session.updateEntrantCategory(entrantId, categoryId),
+      updateParticipantCategory: (participantId, categoryId) => session.updateParticipantCategory(participantId, categoryId),
+    });
+    const openMenu = async (): Promise<void> => {
+      await act(async () => {
+        container.querySelector(`tr[data-record-id="${flag.id}"]`)!.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 60,
+          clientY: 80,
+        }));
+      });
+    };
+    const getMenuItem = (label: string): Element | undefined => Array.from(
+      document.querySelectorAll('li[role="menuitem"]'),
+    ).find((item) => item.textContent?.trim() === label);
+    const renderRecords = async (): Promise<void> => {
+      await act(async () => {
+        root.render(
+          <RecentRecords
+            onAssignFlagCategory={(flagId, categoryId) => {
+              latestMutation = service.assignFlagCategoryForSession(session, flagId, categoryId);
+            }}
+            raceStateLookup={createMergedLookup()}
+            records={session.records as EventTimeRecord[]}
+            selectedCategories={new Set()}
+            selectedParticipants={new Set()}
+          />
+        );
+      });
+    };
+
+    await renderRecords();
+    await openMenu();
+    expect(getMenuItem(categoryB.name)).toBeUndefined();
+    expect(document.body.textContent).toContain('No available categories');
+
+    session.ensureCategories([categoryB]);
+    await renderRecords();
+    await openMenu();
+    expect(getMenuItem(categoryB.name)).toBeDefined();
+
+    await act(async () => {
+      getMenuItem(categoryB.name)!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await latestMutation;
+    });
+
+    expect(flag.categoryIds).toContain(categoryB.id);
+    expect(persistence.snapshot.flagCategoryChanges).toContainEqual({
+      action: 'assign',
+      categoryId: categoryB.id,
+      flagId: flag.id,
+    });
+  });
+
   it('re-renders recalculated crossing times after persisted flag menu actions', async () => {
     const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
     const categoryAId = createCategoryId('recent-flow-category-a');

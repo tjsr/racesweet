@@ -18,6 +18,7 @@ export interface EntrantDraft {
 }
 
 interface EntrantDetailsPanelProps {
+  entrantAssignmentIsDerived?: boolean;
   entrantLabel?: string;
   entrantDraft: EntrantDraft;
   eventCategories: EventCategory[];
@@ -28,6 +29,7 @@ interface EntrantDetailsPanelProps {
   selectedTeamName?: string;
   isMotorsport?: boolean;
   showVehicle?: boolean;
+  showTeamMembers?: boolean;
   teamMemberLabel?: string;
   teamEntrants: EventCatalogEntrant[];
   teamMembers: string[];
@@ -126,17 +128,18 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
                 {parentLabel}
                 <select
                   aria-label="Driver Entrant"
+                  disabled={props.entrantAssignmentIsDerived}
                   value={props.entrantDraft.teamEntrantId}
                   onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, teamEntrantId: event.target.value }))}
                 >
                   <option value="">{props.isMotorsport ? 'No entrant' : 'Individual entry'}</option>
                   {props.teamEntrants.map((team) => (
-                    <option key={team.id} value={team.id}>{team.name}</option>
+                    <option key={team.id} value={team.id}>{`${team.name} (${team.id.toString().slice(0, 6)})`}</option>
                   ))}
                 </select>
               </label>
             </>
-          ) : (
+          ) : props.showTeamMembers !== false ? (
             <>
               <h3>{props.isMotorsport ? 'Drivers' : 'Team Members'}</h3>
               <ReadOnlyList
@@ -144,7 +147,7 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
                 items={props.teamMembers}
               />
             </>
-          )}
+          ) : null}
           {!props.isMotorsport || !isDriver ? <label>
             Category
             <select

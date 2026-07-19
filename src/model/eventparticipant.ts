@@ -1,6 +1,7 @@
 import type { ISO8601DateTime, ISO8601Duration, IdType, WithId } from "./types.js";
 
 import type { EventCategoryId } from "./eventcategory.js";
+import type { EventEntryId } from './entry.js';
 import type { EventEntrantId } from "./entrant.js";
 import type { TimingPointId } from "./timingpoint.js";
 
@@ -14,6 +15,9 @@ export interface ParticipantIdentifier {
 export interface EventParticipant extends WithId<EventParticipantId> {
   firstname: string;
   surname: string;
+  /** The competition unit whose laps and result include this participant. */
+  entryId?: EventEntryId;
+  /** The person or organisation responsible for the Entry. */
   entrantId: EventEntrantId;
   lastRecordTime: ISO8601DateTime | null;
   lastRecordTimingPoint?: TimingPointId | undefined;

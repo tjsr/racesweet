@@ -1,4 +1,5 @@
 import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
+import { getParticipantEntryId } from '../model/entry.js';
 import { assignParticipantNumber, createEntrant, createEntrantForUnmatchedChipCode } from "./participant.js";
 import { findEntrantByChipCode, findEntrantByPlateNumber } from "./participantSearch.js";
 
@@ -31,6 +32,7 @@ export const assignEntrantToPlateCrossing = (
   }
 
   crossing.participantId = entrant?.id;
+  crossing.entryId = entrant ? getParticipantEntryId(entrant) : undefined;
   crossing.entrantId = entrant?.entrantId || entrant?.id;
 };
 
@@ -84,6 +86,7 @@ export const assignEntrantToChipCrossing = (
   }
 
   crossing.participantId = entrant?.id;
+  crossing.entryId = entrant ? getParticipantEntryId(entrant) : undefined;
   crossing.entrantId = entrant?.entrantId || entrant?.id;
 };
 

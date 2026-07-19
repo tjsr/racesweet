@@ -3,12 +3,12 @@ import { TZDate } from '@date-fns/tz';
 import { normalizeTimeZone } from '../../app/utils/timeutils.js';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant, ParticipantTransponder } from '../../model/eventparticipant.js';
-import type { FlagRecord } from '../../model/flag.js';
+import type { FlagRecord, GreenFlagRecord } from '../../model/flag.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
 import type { EventId, SessionId } from '../../model/raceevent.js';
 import type { RaceState } from '../../model/racestate.js';
 import { EVENT_FLAG_DISPLAYED, EVENT_SESSION_START, RECORD_TX_CROSSING, type EventTimeRecord, type ParticipantPassingRecord } from '../../model/timerecord.js';
-import { findCtcTrackLoopBySiteAddress, type CtcTrackConfig } from '../../model/ctcTrackConfig.js';
+import { findCtcTrackLoopBySiteAddress, getCtcFinishLineNumbers, type CtcTrackConfig } from '../../model/ctcTrackConfig.js';
 import { MR_SCATS_DEFAULT_MINIMUM_LAP_TIME, type MrScatsCatalogImport } from '../mrScats/catalogImport.js';
 import { parseCtcRawCrossingFile, splitCtcRawCrossingLines, type CtcRawCrossingFormat, type CtcRawCrossingRecord } from './rawCrossing.js';
 
@@ -205,6 +205,68 @@ const createFlagRecord = (
   return flagRecord;
 };
 
+const normalizeImportedRaceStartFlags = (
+  records: EventTimeRecord[],
+  trackConfig: CtcTrackConfig | undefined,
+): void => {
+  const stateFlags = records
+    .filter((record): record is FlagRecord => 'flagType' in record && (
+      record.flagType === 'green' || record.flagType === 'yellow'
+    ))
+    .filter((record) => record.time !== undefined)
+    .sort((left, right) => left.time!.getTime() - right.time!.getTime());
+  const greenFlags = stateFlags.filter((flag): flag is GreenFlagRecord => flag.flagType === 'green');
+  if (greenFlags.length <= 1) {
+    return;
+  }
+
+  const finishLineNumbers = new Set(getCtcFinishLineNumbers(trackConfig) || []);
+  const lapCompletionCrossings = records
+    .filter((record): record is ParticipantPassingRecord & { chipCode: number | string } => (
+      'chipCode' in record && (typeof record.chipCode === 'number' || typeof record.chipCode === 'string') && record.time !== undefined
+    ))
+    .filter((record) => {
+      const configuredLapCompletion = findCtcTrackLoopBySiteAddress(
+        trackConfig,
+        record.sourceLineNumber ?? record.lineNumber,
+        record.loopNumber,
+      )?.loop.isLapCompletion;
+      return configuredLapCompletion ?? finishLineNumbers.has(record.lineNumber || 0);
+    })
+    .map((record) => ({ chipCode: record.chipCode?.toString(), time: record.time!.getTime() }));
+  const greenFlagEvidence = greenFlags.map((greenFlag) => {
+    const flagIndex = stateFlags.indexOf(greenFlag);
+    const nextStateFlag = stateFlags[flagIndex + 1];
+    const nextStateTime = nextStateFlag?.time?.getTime() ?? Number.POSITIVE_INFINITY;
+    const greenTime = greenFlag.time!.getTime();
+    return {
+      distinctTransmitters: new Set(lapCompletionCrossings
+        .filter((crossing) => crossing.time > greenTime && crossing.time < nextStateTime)
+        .map((crossing) => crossing.chipCode)),
+      durationMilliseconds: nextStateTime - greenTime,
+      greenFlag,
+      isLastGreenInState: nextStateFlag?.flagType !== 'green',
+    };
+  });
+  const maximumDistinctTransmitters = Math.max(...greenFlagEvidence.map((evidence) => evidence.distinctTransmitters.size));
+  const minimumFieldEvidence = maximumDistinctTransmitters > 1 ? Math.min(3, maximumDistinctTransmitters) : 1;
+  const selectedStart = greenFlagEvidence.find((evidence) => (
+    evidence.isLastGreenInState &&
+    evidence.durationMilliseconds >= 30_000 &&
+    evidence.distinctTransmitters.size >= minimumFieldEvidence
+  ))?.greenFlag || greenFlagEvidence.find((evidence) => (
+    evidence.isLastGreenInState && evidence.distinctTransmitters.size >= minimumFieldEvidence
+  ))?.greenFlag || greenFlags[0];
+
+  greenFlags.forEach((greenFlag) => {
+    const indicatesRaceStart = greenFlag.id === selectedStart.id;
+    greenFlag.indicatesRaceStart = indicatesRaceStart;
+    greenFlag.recordType = indicatesRaceStart
+      ? greenFlag.recordType | EVENT_SESSION_START
+      : greenFlag.recordType & ~EVENT_SESSION_START;
+  });
+};
+
 export const loadDorianCtcSrtCatalog = (filePath: string, buffer: Buffer, eventDate = DEFAULT_EVENT_DATE, timeZone = 'UTC'): MrScatsCatalogImport => {
   const normalizedFilePath = path.resolve(filePath);
   const baseName = path.basename(normalizedFilePath, path.extname(normalizedFilePath));
@@ -309,6 +371,8 @@ export const loadDorianCtcSrtCatalogForSession = async (
     }
   }
 
+  normalizeImportedRaceStartFlags(records, options.trackConfig);
+
   await options.onProgress?.({
     ...progressBase,
     completed: total,
@@ -334,6 +398,7 @@ export const loadDorianCtcSrtCatalogForSession = async (
     return {
       categoryId: placeholderCategoryId,
       currentResult: undefined,
+      entryId: entrantId,
       entrantId,
       firstname: '',
       id: participantId,

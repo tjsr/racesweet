@@ -5,6 +5,7 @@ interface EntrantListCartProps {
   categoryName?: string;
   entrant: EventCatalogEntrant;
   entrantLabel?: string;
+  entrySummaries?: string[];
   isSelected: boolean;
   relationshipLabel?: string;
   onSelect: () => void;
@@ -50,13 +51,26 @@ export const EntrantListCard = (props: EntrantListCartProps): React.ReactElement
           {props.categoryName || 'No category'}
         </span>
       ) : null}
+      {props.entrySummaries && props.entrySummaries.length > 0 ? (
+        <div className="entrant-list-entries">
+          {props.entrySummaries.map((summary) => (
+            <span className="entrant-entry-chip" key={summary}>{summary}</span>
+          ))}
+        </div>
+      ) : null}
       <div className="entrant-list-team-row">
         {props.entrant.entrantType === 'rider' && props.teamName ? (
           <span className="entrant-team-chip">
             {props.relationshipLabel || 'Team'}: {props.teamName}
           </span>
         ) : null}
-        <span className="entrant-list-type">{props.entrant.entrantType === 'rider' ? (props.entrantLabel || 'Driver').toLowerCase() : props.entrant.entrantType}</span>
+        <span className="entrant-list-type">{
+          props.entrant.isEntryOwner
+            ? 'entrant'
+            : props.entrant.entrantType === 'rider'
+              ? (props.entrantLabel || 'Driver').toLowerCase()
+              : props.entrant.entrantType
+        }</span>
       </div>
     </button>
   );

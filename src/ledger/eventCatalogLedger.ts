@@ -1,5 +1,6 @@
 import { normalizeCategoryResultExclusion } from '../controllers/category.js';
 import type { EventEntrantId } from '../model/entrant.js';
+import type { EventEntryId } from '../model/entry.js';
 import type { EventCategoryId } from '../model/eventcategory.js';
 import type { EventId, SessionId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
@@ -11,6 +12,7 @@ import {
   createDefaultEventCatalogState,
   type EventCatalogCategory,
   type EventCatalogEntrant,
+  type EventCatalogEntry,
   type EventCatalogEvent,
   type EventCatalogSession,
   type EventCatalogState,
@@ -27,7 +29,7 @@ export interface EventCreatedMutation extends EventCatalogMutationBase {
 }
 
 export interface EventUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogEvent, 'categoryIds' | 'date' | 'discipline' | 'entrantIds' | 'format' | 'minimumLapTimeMilliseconds' | 'name' | 'sessionIds' | 'timeZone' | 'trackMap'>>;
+  changes: Partial<Pick<EventCatalogEvent, 'categoryIds' | 'date' | 'discipline' | 'entryIds' | 'entrantIds' | 'format' | 'minimumLapTimeMilliseconds' | 'name' | 'sessionIds' | 'timeZone' | 'trackMap'>>;
   eventId: EventId;
   type: 'event-updated';
 }
@@ -94,7 +96,7 @@ export interface EntrantCreatedMutation extends EventCatalogMutationBase {
 }
 
 export interface EntrantUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'startOrder' | 'teamEntrantId' | 'teamMembers' | 'vehicle'>>;
+  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'entryIds' | 'firstName' | 'gender' | 'identifiers' | 'isEntryOwner' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'startOrder' | 'teamEntrantId' | 'teamMembers' | 'vehicle'>>;
   entrantId: EventEntrantId;
   type: 'entrant-updated';
 }
@@ -104,6 +106,22 @@ export interface EntrantDeletedMutation extends EventCatalogMutationBase {
   type: 'entrant-deleted';
 }
 
+export interface EntryCreatedMutation extends EventCatalogMutationBase {
+  entry: EventCatalogEntry;
+  type: 'entry-created';
+}
+
+export interface EntryUpdatedMutation extends EventCatalogMutationBase {
+  changes: Partial<Pick<EventCatalogEntry, 'categoryId' | 'entrantId' | 'identifiers' | 'isPlaceholder' | 'name' | 'participantIds' | 'raceNumber' | 'sessionIds' | 'startOrder' | 'vehicle'>>;
+  entryId: EventEntryId;
+  type: 'entry-updated';
+}
+
+export interface EntryDeletedMutation extends EventCatalogMutationBase {
+  entryId: EventEntryId;
+  type: 'entry-deleted';
+}
+
 export type EventCatalogMutation =
   | CategoryCreatedMutation
   | CategoryDeletedMutation
@@ -111,6 +129,9 @@ export type EventCatalogMutation =
   | EntrantCreatedMutation
   | EntrantDeletedMutation
   | EntrantUpdatedMutation
+  | EntryCreatedMutation
+  | EntryDeletedMutation
+  | EntryUpdatedMutation
   | EventActivatedMutation
   | EventCreatedMutation
   | EventDeletedMutation
@@ -281,6 +302,10 @@ export const applyEventCatalogMutation = (
           categoryId: entrant.categoryId === mutation.categoryId.toString() ? undefined : entrant.categoryId,
           categoryIds: removeEntry(entrant.categoryIds, mutation.categoryId.toString()),
         })),
+        entries: (currentState.entries || []).map((entry) => ({
+          ...entry,
+          categoryId: entry.categoryId === mutation.categoryId.toString() ? undefined : entry.categoryId,
+        })),
         events: currentState.events.map((event) => ({
           ...event,
           categoryIds: removeEntry(event.categoryIds, mutation.categoryId.toString()),
@@ -319,6 +344,30 @@ export const applyEventCatalogMutation = (
         events: currentState.events.map((event) => ({
           ...event,
           entrantIds: removeEntry(event.entrantIds, mutation.entrantId),
+        })),
+      };
+    }
+    case 'entry-created': {
+      return {
+        ...currentState,
+        entries: [...(currentState.entries || []), mutation.entry],
+      };
+    }
+    case 'entry-updated': {
+      return {
+        ...currentState,
+        entries: (currentState.entries || []).map((entry) => entry.id === mutation.entryId
+          ? { ...entry, ...mutation.changes }
+          : entry),
+      };
+    }
+    case 'entry-deleted': {
+      return {
+        ...currentState,
+        entries: (currentState.entries || []).filter((entry) => entry.id !== mutation.entryId),
+        events: currentState.events.map((event) => ({
+          ...event,
+          entryIds: removeEntry(event.entryIds || [], mutation.entryId),
         })),
       };
     }

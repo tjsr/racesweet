@@ -1,5 +1,11 @@
 import React from 'react';
-import { type EntrantType, type EventCatalogEntrant, type EventCatalogState } from '../../catalog/eventCatalog.js';
+import {
+  type EntrantType,
+  type EventCatalogEntrant,
+  type EventCatalogEntry,
+  type EventCatalogState,
+  getEntriesForEvent,
+} from '../../catalog/eventCatalog.js';
 import { type CategoryId } from '../../controllers/category.js';
 import { getParticipantNumber, getParticipantTransponders } from '../../controllers/participant.js';
 import { EntrantListCard } from '../../controls/entrantListCard.js';
@@ -83,6 +89,70 @@ const getEntrantParticipant = (
   teamEntrants: EventCatalogEntrant[]
 ): EventParticipant | undefined => getParticipantsForEntrant(entrant, participants, teamEntrants)[0] ||
   createParticipantFromEntrantIdentifiers(entrant);
+
+const getEntryParticipant = (
+  entry: EventCatalogEntry,
+  participants: EventParticipant[],
+): EventParticipant | undefined => participants.find((participant) => (
+  entry.participantIds.includes(participant.id)
+));
+
+const formatDriverName = (firstName: string | undefined, lastName: string | undefined, fallbackName: string): string => {
+  const formattedName = `${firstName || ''} ${(lastName || '').toUpperCase()}`.trim();
+  if (formattedName) {
+    return formattedName;
+  }
+
+  const nameParts = fallbackName.trim().split(/\s+/);
+  const surname = nameParts.pop();
+  return [...nameParts, surname?.toUpperCase()].filter(Boolean).join(' ') || 'Unknown driver';
+};
+
+const getEntryDriverName = (
+  entry: EventCatalogEntry,
+  participants: EventParticipant[],
+  riderEntrants: EventCatalogEntrant[],
+): string => {
+  const participant = getEntryParticipant(entry, participants);
+  if (participant) {
+    return formatDriverName(participant.firstname, participant.surname, entry.name || '');
+  }
+
+  const riderEntrant = riderEntrants.find((entrant) => entry.participantIds.some((participantId) => (
+    entrant.memberParticipantIds.includes(participantId)
+  )));
+  return formatDriverName(riderEntrant?.firstName, riderEntrant?.lastName, riderEntrant?.name || entry.name || '');
+};
+
+const getEntrySummary = (
+  entry: EventCatalogEntry,
+  participants: EventParticipant[],
+  riderEntrants: EventCatalogEntrant[],
+): string => {
+  const participant = getEntryParticipant(entry, participants);
+  const raceNumber = entry.raceNumber || (participant ? getParticipantNumber(participant) : undefined);
+  const entryTransponders = entry.identifiers.flatMap((identifier) => (
+    'txNo' in identifier && identifier.txNo !== undefined ? [identifier.txNo] : []
+  ));
+  const transponders = entryTransponders.length > 0
+    ? entryTransponders
+    : participant
+      ? getParticipantTransponders(participant)
+      : [];
+  const raceNumberText = raceNumber === undefined || raceNumber === '' ? '' : `#${raceNumber} `;
+  const normalizedTransponders = transponders.flatMap((transponder): string[] => {
+    if (transponder === null || transponder === undefined || transponder === '') {
+      return [];
+    }
+    const value = transponder.toString();
+    return [value.toLowerCase().startsWith('tx') ? value : `Tx${value}`];
+  });
+  const transponderText = normalizedTransponders.length > 0
+    ? ` (${normalizedTransponders.join(', ')})`
+    : '';
+
+  return `${raceNumberText}${getEntryDriverName(entry, participants, riderEntrants)}${transponderText}`;
+};
 
 const sortEntrants = (
   entrants: EventCatalogEntrant[],
@@ -170,6 +240,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
   const pluralLabel = props.pluralLabel || 'Drivers';
   const groupLabel = props.isMotorsport ? 'Entrants' : 'Teams';
   const relationshipLabel = props.isMotorsport ? 'Entrant' : 'Team';
+  const eventEntries = getEntriesForEvent(props.catalog, props.selectedEventId);
   const sortedRiderEntrants = React.useMemo(() => sortEntrants(
     props.riderEntrants,
     sortOrder,
@@ -184,6 +255,23 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
     props.raceStateParticipants,
     props.teamEntrants
   ), [props.catalog, props.filteredTeamEntrants, props.raceStateParticipants, props.teamEntrants, sortOrder]);
+  const motorsportEntrants = sortedTeamEntrants.filter((entrant) => entrant.isEntryOwner === true);
+  const entriesByEntrantId = new Map(motorsportEntrants.map((entrant) => [
+    entrant.id,
+    eventEntries.filter((entry) => entry.entrantId === entrant.id),
+  ]));
+  const ownedEntryIds = new Set(Array.from(entriesByEntrantId.values()).flat().map((entry) => entry.id));
+  const ownedParticipantIds = new Set(
+    Array.from(entriesByEntrantId.values()).flatMap((entries) => (
+      entries.flatMap((entry) => entry.participantIds)
+    )),
+  );
+  const unownedRiderEntrants = sortedRiderEntrants.filter((entrant) => (
+    !ownedEntryIds.has(entrant.id) &&
+    !entrant.memberParticipantIds.some((participantId) => ownedParticipantIds.has(participantId))
+  ));
+  const displayedRiderEntrants = props.isMotorsport ? unownedRiderEntrants : sortedRiderEntrants;
+  const displayedTeamEntrants = props.isMotorsport ? motorsportEntrants : sortedTeamEntrants;
 
   return (
     <section className="events-panel">
@@ -233,10 +321,10 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
         </label>
       </div>
       <div className="events-list" role="listbox" aria-label="Entrants for selected event">
-        {sortedRiderEntrants.length > 0 ? (
+        {displayedRiderEntrants.length > 0 ? (
           <>
             {props.teamsEnabled ? <h3 className="events-list-subheading">Individual {pluralLabel}</h3> : null}
-            {sortedRiderEntrants.map((entrant) => {
+            {displayedRiderEntrants.map((entrant) => {
               const participant = getEntrantParticipant(entrant, props.raceStateParticipants, props.teamEntrants);
               const teamName = entrant.teamEntrantId
                 ? props.teamEntrants.find((team) => team.id === entrant.teamEntrantId)?.name
@@ -261,10 +349,10 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
             })}
           </>
         ) : null}
-        {props.teamsEnabled && sortedTeamEntrants.length > 0 ? (
+        {(props.isMotorsport || props.teamsEnabled) && displayedTeamEntrants.length > 0 ? (
           <>
             <h3 className="events-list-subheading">{groupLabel}</h3>
-            {sortedTeamEntrants.map((entrant) => {
+            {displayedTeamEntrants.map((entrant) => {
               const participant = getEntrantParticipant(entrant, props.raceStateParticipants, props.teamEntrants);
 
               return (
@@ -272,11 +360,18 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
                   key={entrant.id}
                   entrant={entrant}
                   entrantLabel={singularLabel}
+                  entrySummaries={props.isMotorsport
+                    ? (entriesByEntrantId.get(entrant.id) || []).map((entry) => getEntrySummary(
+                      entry,
+                      props.raceStateParticipants,
+                      props.riderEntrants,
+                    ))
+                    : undefined}
                   categoryName={getCategoryName(props.catalog, getEntrantCategoryId(entrant))}
                   isSelected={entrant.id === props.selectedEntrant?.id}
                   onSelect={() => props.requestFormExit(() => props.onSelectEntrant(entrant.id))}
-                  raceNumber={participant ? getParticipantNumber(participant) : undefined}
-                  timingDevices={participant ? getParticipantTransponders(participant) : undefined}
+                  raceNumber={!props.isMotorsport && participant ? getParticipantNumber(participant) : undefined}
+                  timingDevices={!props.isMotorsport && participant ? getParticipantTransponders(participant) : undefined}
                   showCategory={props.isMotorsport}
                 />
               );

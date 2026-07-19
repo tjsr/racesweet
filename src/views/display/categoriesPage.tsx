@@ -35,6 +35,7 @@ export interface CategoryDraft {
   distanceRuleValue: string;
   excludeFromResults: boolean;
   isPlaceholder: boolean;
+  identityMode: 'single' | 'multiple';
   maxRiderAge: string;
   maxTeamSize: string;
   minRiderAge: string;
@@ -66,6 +67,7 @@ export const getCategoryDraft = (category: EventCatalogCategory | undefined, ses
   distanceRuleKind: category?.distanceRule?.kind || 'unspecified',
   distanceRuleValue: category?.distanceRule?.kind === 'unspecified' ? '' : category?.distanceRule?.value?.toString() || '',
   excludeFromResults: category?.excludeFromResults || false,
+  identityMode: category?.teamRules?.identityMode || 'single',
   isPlaceholder: category?.isPlaceholder === true,
   maxRiderAge: category?.teamRules?.maxRiderAge?.toString() || '',
   maxTeamSize: category?.teamRules?.maxTeamSize?.toString() || '',

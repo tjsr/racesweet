@@ -102,6 +102,7 @@ const getMutationEventId = (
   mutation: EventCatalogMutation,
   idsByReference: {
     categoryIds: Map<string, string>;
+    entryIds: Map<string, string>;
     entrantIds: Map<string, string>;
     sessionIds: Map<string, string>;
   }
@@ -130,6 +131,11 @@ const getMutationEventId = (
   case 'entrant-updated':
   case 'entrant-deleted':
     return idsByReference.entrantIds.get(mutation.entrantId.toString());
+  case 'entry-created':
+    return mutation.entry.eventId.toString();
+  case 'entry-updated':
+  case 'entry-deleted':
+    return idsByReference.entryIds.get(mutation.entryId.toString());
   default:
     return undefined;
   }
@@ -140,6 +146,7 @@ const updateMutationReferenceMaps = (
   eventId: string | undefined,
   idsByReference: {
     categoryIds: Map<string, string>;
+    entryIds: Map<string, string>;
     entrantIds: Map<string, string>;
     sessionIds: Map<string, string>;
   }
@@ -154,6 +161,9 @@ const updateMutationReferenceMaps = (
     break;
   case 'entrant-created':
     idsByReference.entrantIds.set(mutation.entrant.id.toString(), eventId);
+    break;
+  case 'entry-created':
+    idsByReference.entryIds.set(mutation.entry.id.toString(), eventId);
     break;
   case 'session-created':
     idsByReference.sessionIds.set(mutation.session.id.toString(), eventId);
@@ -171,6 +181,7 @@ const splitLedgerByEvent = (ledger: EventCatalogLedger): {
 } => {
   const idsByReference = {
     categoryIds: new Map<string, string>(),
+    entryIds: new Map<string, string>(),
     entrantIds: new Map<string, string>(),
     sessionIds: new Map<string, string>(),
   };

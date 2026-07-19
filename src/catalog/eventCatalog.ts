@@ -1,5 +1,6 @@
 import { CategoryId } from '../controllers/category.js';
 import { EventEntrantId } from '../model/entrant.js';
+import type { EventEntry, EventEntryId } from '../model/entry.js';
 import type { EventCategory, EventCategoryId } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import { EventParticipantId } from '../model/eventparticipant.js';
@@ -53,6 +54,7 @@ export interface CategoryTeamCompositionRule {
 }
 
 export interface CategoryTeamRules {
+  identityMode?: 'single' | 'multiple';
   maxTeamSize?: number;
   maxRiderAge?: number;
   minRiderAge?: number;
@@ -75,6 +77,7 @@ export interface EventCatalogEntrant {
   categoryIds: EventCategoryId[];
   dateOfBirth?: string;
   entrantType: EntrantType;
+  entryIds?: EventEntryId[];
   eventId: EventId;
   firstName?: string;
   gender?: string;
@@ -82,6 +85,8 @@ export interface EventCatalogEntrant {
   identifiers?: EventParticipant['identifiers'];
   /** True while this entrant was created only to represent unidentified timing data. */
   isPlaceholder?: boolean;
+  /** True when this is the person or organisation responsible for Entries. */
+  isEntryOwner?: boolean;
   lastName?: string;
   memberParticipantIds: EventParticipantId[];
   name: string;
@@ -100,10 +105,18 @@ export interface EventCatalogEntrant {
   vehicle?: string;
 }
 
+export type EventCatalogEntry = EventEntry & {
+  isPlaceholder?: boolean;
+  sessionIds?: SessionId[];
+  startOrder?: number;
+  vehicle?: string;
+};
+
 export interface EventCatalogEvent {
   categoryIds: EventCategoryId[];
   date: string;
   discipline?: EventDiscipline;
+  entryIds?: EventEntryId[];
   entrantIds: EventEntrantId[];
   format: EventFormat;
   id: EventId;
@@ -131,6 +144,7 @@ export interface EventCatalogState {
   activeSessionId?: SessionId;
   categories: EventCatalogCategory[];
   deletedEventIds: EventId[];
+  entries?: EventCatalogEntry[];
   entrants: EventCatalogEntrant[];
   events: EventCatalogEvent[];
   sessions: EventCatalogSession[];
@@ -153,6 +167,7 @@ export const createDefaultEventCatalogState = (): EventCatalogState => ({
   activeSessionId: undefined,
   categories: [],
   deletedEventIds: [],
+  entries: [],
   entrants: [],
   events: [],
   sessions: [],
@@ -321,6 +336,17 @@ export const getEntrantsForEvent = (
   }
 
   return state.entrants.filter((entrant) => entrant.eventId === eventId);
+};
+
+export const getEntriesForEvent = (
+  state: EventCatalogState,
+  eventId: EventId | undefined,
+): EventCatalogEntry[] => {
+  if (!eventId || !state.events.some((event) => event.id === eventId)) {
+    return [];
+  }
+
+  return (state.entries || []).filter((entry) => entry.eventId === eventId);
 };
 
 export const getEntrantsForCategory = (

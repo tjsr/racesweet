@@ -125,6 +125,10 @@ const pruneReloadRaceState = (
     return getParticipantPlateNumbers(participant).length > 0 && hasParticipantReloadRecord(participant, records);
   });
   const keptParticipantIds = new Set(keptParticipants.map((participant) => participant.id.toString()));
+  const keptEntries = (nextRaceState.entries || []).flatMap((entry) => {
+    const participantIds = entry.participantIds.filter((participantId) => keptParticipantIds.has(participantId.toString()));
+    return participantIds.length > 0 ? [{ ...entry, participantIds }] : [];
+  });
   const keptTeams = (nextRaceState.teams || []).flatMap((team): EventTeam[] => {
     const wasAddedDuringReload = !existingTeamIds.has(team.id.toString());
     const members = team.members.filter((memberId) => keptParticipantIds.has(memberId.toString()));
@@ -138,6 +142,11 @@ const pruneReloadRaceState = (
   keptParticipants.forEach((participant) => {
     if (participant.categoryId) {
       categoryIdsWithEntrants.add(participant.categoryId.toString());
+    }
+  });
+  keptEntries.forEach((entry) => {
+    if (entry.categoryId) {
+      categoryIdsWithEntrants.add(entry.categoryId.toString());
     }
   });
   keptTeams.forEach((team) => {
@@ -154,6 +163,7 @@ const pruneReloadRaceState = (
   return {
     ...nextRaceState,
     categories,
+    entries: keptEntries,
     participants: keptParticipants,
     teams: keptTeams,
   };
@@ -281,6 +291,11 @@ const getReferencedCategoryIds = (raceState: Partial<RaceState>): Set<string> =>
       referencedCategoryIds.add(participant.categoryId.toString());
     }
   });
+  (raceState.entries || []).forEach((entry) => {
+    if (entry.categoryId) {
+      referencedCategoryIds.add(entry.categoryId.toString());
+    }
+  });
   (raceState.teams || []).forEach((team) => {
     if (team.categoryId) {
       referencedCategoryIds.add(team.categoryId.toString());
@@ -365,6 +380,7 @@ export const addMissingLinkedCategoryPlaceholders = (raceState: Partial<RaceStat
 export const mergePulledRaceStates = (raceStates: Partial<RaceState>[]): Partial<RaceState> => {
   const mergedRaceState = raceStates.reduce<Partial<RaceState>>((merged, raceState) => ({
     categories: [...(merged.categories || []), ...(raceState.categories || [])],
+    entries: [...(merged.entries || []), ...(raceState.entries || [])],
     eventStartTime: raceState.eventStartTime || merged.eventStartTime,
     participants: [...(merged.participants || []), ...(raceState.participants || [])],
     records: [...(merged.records || []), ...(raceState.records || [])],
@@ -372,6 +388,7 @@ export const mergePulledRaceStates = (raceStates: Partial<RaceState>[]): Partial
     timeRecordSources: [...(merged.timeRecordSources || []), ...(raceState.timeRecordSources || [])],
   }), {
     categories: [],
+    entries: [],
     participants: [],
     records: [],
     teams: [],
@@ -392,6 +409,7 @@ export const mergeRaceStateForReload = (
   if (mode === 'all') {
     return pruneReloadRaceState(existingRaceState, addMissingLinkedCategoryPlaceholders({
       categories: reloadedRaceState.categories || [],
+      entries: reloadedRaceState.entries || [],
       eventStartTime: reloadedRaceState.eventStartTime,
       participants: reloadedRaceState.participants || [],
       records: reloadedRaceState.records || [],
@@ -401,6 +419,7 @@ export const mergeRaceStateForReload = (
   }
 
   const nextCategories = mode === 'categories' ? reloadedRaceState.categories || [] : existing.categories || [];
+  const nextEntries = mode === 'entrants' ? reloadedRaceState.entries || [] : existing.entries || [];
   const nextParticipants = mode === 'entrants' ? reloadedRaceState.participants || [] : existing.participants || [];
   const nextRecords = mode === 'time-records' ? reloadedRaceState.records || [] : existing.records || [];
   const nextTeams = mode === 'entrants' ? reloadedRaceState.teams || [] : existing.teams || [];
@@ -412,6 +431,7 @@ export const mergeRaceStateForReload = (
     categorySnapshotCandidates,
     nextCategories,
     {
+      entries: nextEntries,
       participants: nextParticipants,
       records: nextRecords,
       teams: nextTeams,
@@ -420,6 +440,7 @@ export const mergeRaceStateForReload = (
 
   return pruneReloadRaceState(existingRaceState, addMissingLinkedCategoryPlaceholders({
     categories: [...nextCategories, ...deletedAffectedCategorySnapshots],
+    entries: nextEntries,
     eventStartTime: mode === 'time-records' ? reloadedRaceState.eventStartTime || existing.eventStartTime : existing.eventStartTime,
     participants: nextParticipants,
     records: nextRecords,

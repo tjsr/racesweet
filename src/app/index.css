@@ -511,6 +511,44 @@
   font-size: 0.78rem;
 }
 
+.entrant-list-entries {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+}
+
+.entrant-entry-chip {
+  background-color: rgba(127, 127, 127, 0.14);
+  border: 1px solid rgba(127, 127, 127, 0.55);
+  border-radius: 0.35rem;
+  box-sizing: border-box;
+  font-size: 0.82rem;
+  padding: 0.22rem 0.45rem;
+  text-align: left;
+  width: 100%;
+}
+
+.entrant-entry-form,
+.entry-driver-form {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.65rem 0;
+  min-width: 0;
+}
+
+.entrant-entry-form > label,
+.entry-driver-form > label {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.entry-driver-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
 .entrant-list-team-row {
   align-items: center;
   display: flex;

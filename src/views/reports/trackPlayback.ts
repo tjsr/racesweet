@@ -2,6 +2,7 @@ import type { EventTrackTimingLine } from '../../catalog/eventCatalog.js';
 import { getPassingLineNumber, getSourceLapCompletion, isCountedLapPassing } from '../../controllers/laps.js';
 import { isCrossingRecord } from '../../controllers/timerecord.js';
 import type { EventEntrantId } from '../../model/entrant.js';
+import { getParticipantEntryId } from '../../model/entry.js';
 import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 import type { ParticipantPassingRecord } from '../../model/timerecord.js';
 
@@ -105,7 +106,7 @@ export const createTrackPlaybackIndex = (
       if (!participant) {
         return;
       }
-      const entrantId = raceState.getEntrantIdForParticipant(participant.id) || participant.entrantId || participant.id;
+      const entrantId = raceState.getEntryIdForParticipant?.(participant.id) || getParticipantEntryId(participant);
       const entrantPassings = passingsByEntrant.get(entrantId) || [];
       const lineNumber = getPassingLineNumber(passing);
       entrantPassings.push({

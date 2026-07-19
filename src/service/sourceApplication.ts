@@ -1,6 +1,7 @@
 import { validate as validateUuid } from 'uuid';
 import { normalizeCategoryResultExclusion } from '../controllers/category.js';
 import type { EventCategory } from '../model/eventcategory.js';
+import { getParticipantEntryId, type EventEntry } from '../model/entry.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { EventTeam } from '../model/eventteam.js';
 import { rewriteImportedObjectIds } from '../model/ids.js';
@@ -13,6 +14,7 @@ import { addMissingLinkedCategoryPlaceholders } from '../service/sessionSourceRe
 
 interface SessionSourceSink {
   addCategories(categories: EventCategory[]): Promise<unknown>;
+  addEntries?(entries: EventEntry[]): void;
   addParticipants(participants: EventParticipant[]): void;
   addRecords(records: TimeRecord[], validate?: boolean): Promise<void>;
   addTeams?(teams: EventTeam[]): void;
@@ -194,6 +196,7 @@ const validateRaceStateIds = (
 ): void => {
   const errors: string[] = [];
   const categoryIds = new Set<string>();
+  const entryIds = new Set<string>();
   const participantIds = new Set<string>();
   const teamIds = new Set<string>();
   const recordIds = new Set<string>();
@@ -217,6 +220,30 @@ const validateRaceStateIds = (
     participantIds.add(participant.id);
     if (participant.categoryId && !categoryIds.has(participant.categoryId)) {
       errors.push(`participant ${participant.id} references missing category ${participant.categoryId}.`);
+    }
+  });
+
+  (raceState.entries || []).forEach((entry) => {
+    assertUuid(errors, 'entry.id', entry.id);
+    assertUuid(errors, `entry ${entry.id} eventId`, entry.eventId);
+    entryIds.add(entry.id);
+    if (entry.categoryId) {
+      assertUuid(errors, `entry ${entry.id} categoryId`, entry.categoryId);
+      if (!categoryIds.has(entry.categoryId)) {
+        errors.push(`entry ${entry.id} references missing category ${entry.categoryId}.`);
+      }
+    }
+    entry.participantIds.forEach((participantId) => {
+      assertUuid(errors, `entry ${entry.id} participantId`, participantId);
+      if (!participantIds.has(participantId)) {
+        errors.push(`entry ${entry.id} references missing participant ${participantId}.`);
+      }
+    });
+  });
+
+  (raceState.participants || []).forEach((participant) => {
+    if (entryIds.size > 0 && participant.entryId && !entryIds.has(participant.entryId)) {
+      errors.push(`participant ${participant.id} references missing entry ${participant.entryId}.`);
     }
   });
 
@@ -314,22 +341,69 @@ const normalizeRaceStateForSession = (
   const catalogEntrants = options.catalog?.entrants.filter(
     (entrant) => entrant.eventId === options.eventId,
   ) || [];
+  const normalizedParticipants = (normalizedRaceState.participants || []).map((participant) => {
+    const driver = catalogEntrants.find((entrant) => (
+      entrant.entrantType === 'rider' && entrant.memberParticipantIds.includes(participant.id)
+    ));
+    return driver
+      ? {
+          ...participant,
+          firstname: driver.firstName || participant.firstname,
+          surname: driver.lastName || participant.surname,
+        }
+      : participant;
+  });
+  const catalogEntriesById = new Map((options.catalog?.entries || [])
+    .filter((entry) => entry.eventId === options.eventId)
+    .map((entry) => [entry.id.toString(), entry] as const));
+  const entriesById = new Map<string, EventEntry>((normalizedRaceState.entries || []).map((entry): [string, EventEntry] => {
+    const catalogEntry = catalogEntriesById.get(entry.id.toString());
+    return [entry.id.toString(), {
+      ...entry,
+      categoryId: catalogEntry?.categoryId || entry.categoryId,
+      entrantId: catalogEntry?.entrantId || entry.entrantId,
+      identifiers: catalogEntry?.identifiers.length ? [...catalogEntry.identifiers] : entry.identifiers,
+      raceNumber: catalogEntry?.raceNumber || entry.raceNumber,
+    }];
+  }));
+  normalizedParticipants.forEach((participant) => {
+    const entryId = getParticipantEntryId(participant);
+    const existingEntry = entriesById.get(entryId.toString());
+    if (existingEntry) {
+      existingEntry.participantIds = Array.from(new Set([...existingEntry.participantIds, participant.id]));
+      return;
+    }
+    const catalogEntry = catalogEntriesById.get(entryId.toString());
+    if (catalogEntry) {
+      entriesById.set(entryId.toString(), {
+        ...catalogEntry,
+        identifiers: [...catalogEntry.identifiers],
+        participantIds: Array.from(new Set([...catalogEntry.participantIds, participant.id])),
+      });
+      return;
+    }
+    const entrant = catalogEntrants.find(
+      (candidate) => candidate.id === participant.entrantId || candidate.memberParticipantIds.includes(participant.id),
+    );
+    const eventId = options.eventId || entrant?.eventId;
+    if (!eventId) {
+      return;
+    }
+    entriesById.set(entryId.toString(), {
+      categoryId: entrant?.categoryId || entrant?.categoryIds[0] || participant.categoryId,
+      entrantId: entrant?.id || participant.entrantId,
+      eventId,
+      id: entryId,
+      identifiers: [...(entrant?.identifiers || participant.identifiers)],
+      name: entrant?.name || getParticipantDisplayName(participant),
+      participantIds: [participant.id],
+      raceNumber: undefined,
+    });
+  });
   const linkedCategorySafeRaceState = addMissingLinkedCategoryPlaceholders({
     ...normalizedRaceState,
-    participants: (normalizedRaceState.participants || []).map(
-      (participant): EventParticipant => {
-        if (participant.categoryId) {
-          return participant;
-        }
-        const entrant = catalogEntrants.find(
-          (candidate) =>
-            candidate.id === participant.entrantId ||
-            candidate.memberParticipantIds.includes(participant.id),
-        );
-        const categoryId = entrant?.categoryId || entrant?.categoryIds[0];
-        return categoryId ? { ...participant, categoryId } : participant;
-      },
-    ),
+    entries: Array.from(entriesById.values()),
+    participants: normalizedParticipants,
   });
   validateRaceStateIds(linkedCategorySafeRaceState, existingCategories, options);
   return linkedCategorySafeRaceState;
@@ -412,7 +486,22 @@ export const applyPulledRaceStateToSession = async (
         }
       }
     }
+    const assignedCategoryIds = getSessionAssignedCategoryIds(
+      options.catalog,
+      options.eventId,
+      options.sessionId,
+    );
+    const requiredCatalogCategories = (options.catalog?.categories || []).filter((category) => (
+      category.deleted !== true &&
+      category.eventId === options.eventId &&
+      assignedCategoryIds?.has(category.id.toString()) &&
+      !sessionState.categories.some((existing) => existing.id === category.id)
+    ));
+    if (requiredCatalogCategories.length > 0) {
+      await sessionState.addCategories(requiredCatalogCategories);
+    }
 
+    sessionState.addEntries?.(normalizedRaceState.entries || []);
     sessionState.addParticipants(normalizedRaceState.participants || []);
     sessionState.addTeams?.(normalizedRaceState.teams || []);
     sessionState.addTimeRecordSources?.(normalizedRaceState.timeRecordSources || []);

@@ -343,6 +343,7 @@ describe('CategoriesPage integration', () => {
       excludeFromResults: true,
       name: 'Development Cup',
       teamRules: {
+        identityMode: 'single',
         maxRiderAge: 55,
         maxTeamSize: 3,
         minRiderAge: 15,
@@ -448,6 +449,40 @@ describe('CategoriesPage integration', () => {
     expect(container.textContent).toContain('Category ID: cat-1');
     expect(parentEventError).toBeNull();
     expect(onDisplayError).not.toHaveBeenCalled();
+  });
+
+  it('uses the selected event category and sessions when the previous event selection is stale', async () => {
+    const onUpdateCategorySessionAssignments = vi.fn().mockResolvedValue(undefined);
+
+    await act(async () => {
+      root.render(
+        <CategoriesPage
+          catalog={catalog}
+          entrants={entrantsByCategory['cat-3']}
+          onCreateCategory={vi.fn()}
+          onDeleteCategory={vi.fn()}
+          onSelectCategory={vi.fn()}
+          onSelectEvent={vi.fn()}
+          onUpdateCategory={vi.fn().mockResolvedValue(undefined)}
+          onUpdateCategorySessionAssignments={onUpdateCategorySessionAssignments}
+          selectedCategoryId="cat-1"
+          selectedEventId="event-2"
+        />
+      );
+    });
+
+    expect(container.textContent).toContain('Category ID: cat-3');
+    const sessionAssignments = container.querySelector('select[aria-label="Category Session Assignments"]') as HTMLSelectElement;
+    expect(Array.from(sessionAssignments.options).map((option) => option.value)).toEqual(['session-3']);
+
+    const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Category');
+    await act(async () => {
+      saveButton!.click();
+      await Promise.resolve();
+    });
+
+    expect(onUpdateCategorySessionAssignments).toHaveBeenCalledWith('cat-3', ['session-3']);
+    expect(onUpdateCategorySessionAssignments).not.toHaveBeenCalledWith('cat-1', expect.anything());
   });
 
   it('prompts before replacing a dirty category form and handles save discard and cancel', async () => {

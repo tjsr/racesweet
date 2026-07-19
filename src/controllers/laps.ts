@@ -8,8 +8,9 @@ import { getCategoryFlags, getFlagEvents, getOrCacheGreenFlagForCategory } from 
 import { calculateParticipantElapsedTimes, getParticipantNumber, getParticipantTransponders, getPassingsForParticipant } from "./participant.js";
 import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.js";
 
-import type { EventEntrantId } from "../model/entrant.js";
+import { getParticipantEntryId, type EventEntryId } from '../model/entry.js';
 import type { EventCategoryId } from "../model/eventcategory.js";
+import { createTimeRecordId } from '../model/ids.js';
 import {
   CROSSING_FLAG_LAP_UNDER_MINIMUM,
   CROSSING_FLAG_NON_LAP_COMPLETION,
@@ -231,6 +232,96 @@ export const getTimingLineKey = (
     : `line:${getPassingLineNumber(passing)?.toString() || 'unknown'}`;
 };
 
+const CROSSING_DEDUPLICATION_MILLISECONDS = 5_000;
+
+export interface MissingLapCompletionEvidence {
+  evidenceLineKeys: string[];
+  inferredCrossings: ParticipantPassingRecord[];
+  missingCount: number;
+  nextFinishRecord: ParticipantPassingRecord;
+  previousFinishRecord: ParticipantPassingRecord;
+}
+
+const getDistinctLineCrossings = (crossings: ParticipantPassingRecord[]): ParticipantPassingRecord[] => {
+  return [...crossings]
+    .sort(compareByTime)
+    .filter((crossing, index, orderedCrossings) => {
+      const previousCrossing = orderedCrossings[index - 1];
+      return !previousCrossing || !previousCrossing.time || !crossing.time ||
+        crossing.time.getTime() - previousCrossing.time.getTime() > CROSSING_DEDUPLICATION_MILLISECONDS;
+    });
+};
+
+const getEvidenceLineKey = (passing: ParticipantPassingRecord): string => {
+  const lineNumber = passing.sourceLineNumber ?? getPassingLineNumber(passing);
+  const loopNumber = getPassingLoopNumber(passing);
+  return passing.sourceLineNumber !== undefined || loopNumber !== undefined
+    ? `source:${passing.source}:line:${lineNumber?.toString() || 'unknown'}:loop:${loopNumber?.toString() || 'unknown'}`
+    : `line:${lineNumber?.toString() || 'unknown'}`;
+};
+
+export const getMissingLapCompletionEvidence = (
+  entrantPassings: ParticipantPassingRecord[],
+  minimumLapTimeMilliseconds: number,
+  finishLineNumbers: number[] | undefined = DEFAULT_FINISH_LINE_NUMBERS,
+  resolveLapCompletion?: LapCompletionResolver,
+  startTime?: Date,
+): MissingLapCompletionEvidence[] => {
+  const orderedPassings = entrantPassings
+    .filter((passing) => passing.time && (!startTime || passing.time.getTime() >= startTime.getTime()))
+    .sort(compareByTime);
+  const finishCrossings = getDistinctLineCrossings(orderedPassings.filter((passing) => (
+    isLapCompletionPassing(passing, finishLineNumbers, resolveLapCompletion)
+  )));
+
+  return finishCrossings.slice(1).flatMap((nextFinishRecord, index): MissingLapCompletionEvidence[] => {
+    const previousFinishRecord = finishCrossings[index];
+    const previousTime = previousFinishRecord.time!.getTime();
+    const nextTime = nextFinishRecord.time!.getTime();
+    const sectorCrossings = orderedPassings.filter((passing) => (
+      passing.time!.getTime() > previousTime &&
+      passing.time!.getTime() < nextTime &&
+      !isLapCompletionPassing(passing, finishLineNumbers, resolveLapCompletion)
+    ));
+    const sectorCrossingsByLine = new Map<string, ParticipantPassingRecord[]>();
+    sectorCrossings.forEach((crossing) => {
+      const lineKey = getEvidenceLineKey(crossing);
+      sectorCrossingsByLine.set(lineKey, [...(sectorCrossingsByLine.get(lineKey) || []), crossing]);
+    });
+    const repeatedLineCounts = Array.from(sectorCrossingsByLine.entries())
+      .map(([lineKey, crossings]) => ({ count: getDistinctLineCrossings(crossings).length, lineKey }))
+      .filter(({ count }) => count > 1)
+      .sort((left, right) => right.count - left.count);
+    const missingCount = Math.max(0, (repeatedLineCounts[1]?.count || 1) - 1);
+    if (missingCount === 0 || (nextTime - previousTime) / (missingCount + 1) < minimumLapTimeMilliseconds) {
+      return [];
+    }
+    const inferredCrossings = Array.from({ length: missingCount }, (_, inferredIndex): ParticipantPassingRecord => ({
+      entryId: nextFinishRecord.entryId,
+      entrantId: nextFinishRecord.entrantId,
+      generatedReason: 'missing-crossing',
+      id: createTimeRecordId(`inferred-missing-finish:${previousFinishRecord.id}:${nextFinishRecord.id}:${inferredIndex + 1}`),
+      isGenerated: true,
+      isLapCompletion: true,
+      lineNumber: nextFinishRecord.lineNumber,
+      loopNumber: nextFinishRecord.loopNumber,
+      participantId: nextFinishRecord.participantId,
+      recordType: nextFinishRecord.recordType,
+      sequence: previousFinishRecord.sequence + ((nextFinishRecord.sequence - previousFinishRecord.sequence) * (inferredIndex + 1)) / (missingCount + 1),
+      source: nextFinishRecord.source,
+      sourceLineNumber: nextFinishRecord.sourceLineNumber,
+      time: new Date(previousTime + ((nextTime - previousTime) * (inferredIndex + 1)) / (missingCount + 1)),
+    }));
+    return [{
+      evidenceLineKeys: repeatedLineCounts.filter(({ count }) => count >= missingCount + 1).map(({ lineKey }) => lineKey),
+      inferredCrossings,
+      missingCount,
+      nextFinishRecord,
+      previousFinishRecord,
+    }];
+  });
+};
+
 const resetPassingLapState = (passing: ParticipantPassingRecord): void => {
   passing.elapsedTime = undefined;
   passing.lapNo = undefined;
@@ -310,8 +401,8 @@ export const processAllParticipantLaps = (
   resolveLapCompletion?: LapCompletionResolver
 ): Map<EventParticipantId, ParticipantPassingRecord[]> => {
   const participantTimesMap = new Map<EventParticipantId, ParticipantPassingRecord[]>();
-  const entrantParticipantMap = new Map<EventEntrantId, EventParticipant[]>();
-  const entrantPassingsMap = new Map<EventEntrantId, ParticipantPassingRecord[]>();
+  const entryParticipantMap = new Map<EventEntryId, EventParticipant[]>();
+  const entryPassingsMap = new Map<EventEntryId, ParticipantPassingRecord[]>();
   const eventFlags: FlagRecord[] = getFlagEvents(allTimeRecords);
 
   if (!silenceWarnings && (!eventFlags || eventFlags.length === 0)) {
@@ -333,10 +424,10 @@ export const processAllParticipantLaps = (
   };
 
   eventParticipants.forEach((participant) => {
-    const entrantId = participant.entrantId || participant.id;
-    const entrantParticipants = entrantParticipantMap.get(entrantId) || [];
-    entrantParticipants.push(participant);
-    entrantParticipantMap.set(entrantId, entrantParticipants);
+    const entryId = getParticipantEntryId(participant);
+    const entryParticipants = entryParticipantMap.get(entryId) || [];
+    entryParticipants.push(participant);
+    entryParticipantMap.set(entryId, entryParticipants);
   });
 
   eventParticipants.forEach((participant, participantId) => {
@@ -360,14 +451,14 @@ export const processAllParticipantLaps = (
       return; // Skip processing this participant if they have no passings
     }
 
-    const entrantId = participant.entrantId || participant.id;
-    const entrantPassings = entrantPassingsMap.get(entrantId) || [];
-    entrantPassings.push(...participantPassings);
-    entrantPassingsMap.set(entrantId, entrantPassings);
+    const entryId = getParticipantEntryId(participant);
+    const entryPassings = entryPassingsMap.get(entryId) || [];
+    entryPassings.push(...participantPassings);
+    entryPassingsMap.set(entryId, entryPassings);
   });
 
-  entrantPassingsMap.forEach((entrantPassings, entrantId) => {
-    const members = entrantParticipantMap.get(entrantId) || [];
+  entryPassingsMap.forEach((entrantPassings, entryId) => {
+    const members = entryParticipantMap.get(entryId) || [];
     const participant = members[0];
     if (!participant) {
       return;
@@ -402,6 +493,14 @@ export const processAllParticipantLaps = (
       try {
         validateParticipantStartFlag(participantCategoryStartFlag, participant);
         const finishFlag = getFinishFlagForCategory(participant.categoryId);
+        const inferredCrossings = getMissingLapCompletionEvidence(
+          entrantPassings,
+          minimumLapTimeMilliseconds,
+          finishLineNumbers,
+          resolveLapCompletion,
+          participantCategoryStartFlag.time,
+        ).flatMap((evidence) => evidence.inferredCrossings);
+        entrantPassings.push(...inferredCrossings);
         processEntrantLaps(
           entrantPassings,
           participantCategoryStartFlag!,

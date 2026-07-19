@@ -2,6 +2,7 @@ import type { IdType, TimeRecordSourceId, WithId } from "./types.js";
 
 import { v5 as uuidv5 } from "uuid";
 import type { CtcTrackConfig } from "./ctcTrackConfig.js";
+import type { EventEntryId } from './entry.js';
 import { EventEntrantId } from "./entrant.js";
 import type { EventParticipantId } from "./eventparticipant.js";
 import { EventId, SessionId } from "./raceevent.js";
@@ -67,6 +68,7 @@ export interface ParticipantPassingRecord extends EventTimeRecord {
   loopNumber?: number | undefined;
   sourceLineNumber?: number | undefined;
   participantId?: EventParticipantId | null | undefined;
+  entryId?: EventEntryId | null | undefined;
   entrantId?: EventEntrantId | null | undefined;
   participantStartRecordId?: TimeRecordId | null | undefined;
   startingLapRecordId?: TimeRecordId | null | undefined;

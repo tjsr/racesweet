@@ -72,6 +72,9 @@ export class RaceAdminService {
   }
 
   public async assignFlagCategoryForSession(session: Session & RaceStateLookup, flagId: TimeRecordId, categoryId: EventCategoryId): Promise<void> {
+    if (session.canAssignFlagCategory?.(flagId, categoryId) === false) {
+      throw new Error(`Category ${categoryId} is not available for flag ${flagId} in this session.`);
+    }
     this.assignFlagCategoryInSession(session, flagId, categoryId);
     this.changes = {
       ...this.changes,
