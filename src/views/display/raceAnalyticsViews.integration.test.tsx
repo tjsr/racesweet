@@ -1204,6 +1204,15 @@ describe('race analytics views integration', () => {
       root.render(
         <ReportsPage
           categories={categories}
+          catalogEntries={[{
+            categoryId: createCategoryId('cat-a'),
+            entrantId: createEventEntrantId('team-1'),
+            eventId: createEventId('event-1'),
+            id: createEventEntrantId('team-1'),
+            identifiers: [],
+            participantIds: [createEventParticipantId('p-team-1'), createEventParticipantId('p-team-2')],
+            raceNumber: '42',
+          }]}
           catalogEntrants={catalogEntrants}
           event={event}
           raceState={trackRaceState}
@@ -1217,6 +1226,7 @@ describe('race analytics views integration', () => {
     });
 
     expect(container.querySelector('svg[aria-label="Track Map"]')).toBeTruthy();
+    expect(container.querySelector('g[aria-label="Track entrant 42"]')).toBeTruthy();
     expect(container.querySelector('polyline[aria-label="Racing Line"]')).toBeTruthy();
     expect(container.querySelector('input[aria-label="Track Map Session Progress"]')).toBeTruthy();
     expect(container.querySelector('circle[aria-label="Timing line 1"]')).toBeTruthy();
@@ -1248,6 +1258,9 @@ describe('race analytics views integration', () => {
     });
 
     expect(container.querySelector('[aria-label="DNF Entrants"]')).toBeTruthy();
+    const dnfPanel = container.querySelector('[aria-label="DNF Entrants"]') as HTMLElement;
+    expect(dnfPanel.style.maxHeight).toBe('min(64vh, 720px)');
+    expect(dnfPanel.style.overflowY).toBe('auto');
     expect(container.querySelector(`g[aria-label="${selectedMarkerLabel}"]`)).toBeFalsy();
     expect(container.querySelector('[aria-label="Selected Track Entrant"]')?.textContent).toContain('Race position: DNF');
   });

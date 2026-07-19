@@ -1,13 +1,15 @@
 import React from 'react';
-import type { EventCatalogEntrant, EventCatalogEvent } from '../../catalog/eventCatalog.js';
+import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent } from '../../catalog/eventCatalog.js';
 import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
 import { getParticipantNumber } from '../../controllers/participant.js';
 import type { EventEntrantId } from '../../model/entrant.js';
 import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 import { type TrackPlaybackEntrantState, createTrackPlaybackIndex } from './trackPlayback.js';
 import { createTrackMapGeometry, getTrackPointAtProgress, toSvgPolylinePoints } from './trackMapGeometry.js';
+import { createTrackStatusSegments } from './trackStatus.js';
 
 interface TrackMapReportProps {
+  catalogEntries?: EventCatalogEntry[];
   catalogEntrants: EventCatalogEntrant[];
   event?: EventCatalogEvent;
   raceState: RaceState & RaceStateLookup;
@@ -24,7 +26,11 @@ const getPlaybackSignature = (raceState: RaceState): string => raceState.records
   return `${record.id}:${record.time?.getTime() || ''}:${passing.participantId || ''}:${passing.lapNo || ''}:${passing.lapTime || ''}:${passing.elapsedTime || ''}`;
 }).join('|');
 
-const getMarkerLabel = (entrantId: EventEntrantId, raceState: RaceState & RaceStateLookup): string => {
+const getMarkerLabel = (entrantId: EventEntrantId, raceState: RaceState & RaceStateLookup, catalogEntries: EventCatalogEntry[] = []): string => {
+  const entry = catalogEntries.find((candidate) => candidate.id === entrantId);
+  if (entry?.raceNumber) {
+    return entry.raceNumber.toString();
+  }
   const participant = raceState.participants.find((candidate) => (
     raceState.getEntrantIdForParticipant(candidate.id) === entrantId || candidate.entrantId === entrantId || candidate.id === entrantId
   ));
@@ -40,6 +46,7 @@ export const TrackMapReport = (props: TrackMapReportProps): React.ReactElement =
     props.event?.trackMap?.timingLines || [],
   ), [playbackSignature, props.event?.trackMap?.timingLines, props.raceState]);
   const geometry = React.useMemo(() => createTrackMapGeometry(props.event?.trackMap), [props.event?.trackMap]);
+  const statusSegments = React.useMemo(() => createTrackStatusSegments(props.raceState, playbackIndex), [playbackIndex, props.raceState]);
   const duration = Math.max(0, playbackIndex.endTime - playbackIndex.startTime);
   const [elapsed, setElapsed] = React.useState<number>(0);
   const [isPlaying, setIsPlaying] = React.useState<boolean>(false);
@@ -89,7 +96,7 @@ export const TrackMapReport = (props: TrackMapReportProps): React.ReactElement =
 
   const renderMarker = (entrant: TrackPlaybackEntrantState): React.ReactElement => {
     const point = getTrackPointAtProgress(geometry.entrantPathPoints, entrant.progress);
-    const label = getMarkerLabel(entrant.entrantId, props.raceState);
+    const label = getMarkerLabel(entrant.entrantId, props.raceState, props.catalogEntries);
     const selected = entrant.entrantId === selectedEntrantId;
     return (
       <g
@@ -142,11 +149,11 @@ export const TrackMapReport = (props: TrackMapReportProps): React.ReactElement =
           </aside>
         ) : null}
         {dnfEntrants.length > 0 ? (
-          <aside aria-label="DNF Entrants" className="events-panel" style={{ alignSelf: 'end', gridColumn: 2, gridRow: selectedEntrant ? 2 : 1 }}>
+          <aside aria-label="DNF Entrants" className="events-panel" style={{ alignSelf: 'end', boxSizing: 'border-box', gridColumn: 2, gridRow: selectedEntrant ? 2 : 1, maxHeight: 'min(64vh, 720px)', overflowY: 'auto' }}>
             <h3>DNF</h3>
             <div style={{ display: 'grid', gap: '0.5rem' }}>
               {dnfEntrants.map((entrant) => {
-                const label = getMarkerLabel(entrant.entrantId, props.raceState);
+                const label = getMarkerLabel(entrant.entrantId, props.raceState, props.catalogEntries);
                 return (
                   <button key={entrant.entrantId} onClick={() => setSelectedEntrantId(entrant.entrantId)} type="button">
                     {label} · {entrantNames.get(entrant.entrantId) || `Entrant ${label}`}
@@ -168,6 +175,18 @@ export const TrackMapReport = (props: TrackMapReportProps): React.ReactElement =
           type="range"
           value={Math.min(elapsed, duration)}
         />
+        <div
+          aria-label="Track Status Timeline"
+          style={{ display: 'flex', height: '0.75rem', marginTop: '0.25rem', overflow: 'hidden', width: '100%' }}
+        >
+          {statusSegments.map((segment) => (
+            <div
+              aria-label={`Track status ${segment.status}`}
+              key={`${segment.startTime}-${segment.endTime}-${segment.status}`}
+              style={{ backgroundColor: segment.status === 'green' ? '#4caf50' : segment.status === 'yellow' ? '#fdd835' : segment.status === 'white' ? '#fff' : '#000', border: segment.status === 'white' ? '1px solid #777' : undefined, flexGrow: segment.endTime - segment.startTime }}
+            />
+          ))}
+        </div>
         <div className="events-actions">
           <button aria-label={isPlaying ? 'Pause Track Map Playback' : 'Play Track Map Playback'} onClick={() => {
             if (!isPlaying && elapsedRef.current >= duration) {

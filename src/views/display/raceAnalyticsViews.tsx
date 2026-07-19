@@ -1210,7 +1210,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
       {reportType === 'track-map' ? (
         <section className="events-panel">
           <h2>Track Map</h2>
-          <TrackMapReport catalogEntrants={props.catalogEntrants} event={props.event} raceState={props.raceState} />
+          <TrackMapReport catalogEntries={props.catalogEntries} catalogEntrants={props.catalogEntrants} event={props.event} raceState={props.raceState} />
         </section>
       ) : null}
     </section>
