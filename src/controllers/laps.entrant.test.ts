@@ -341,6 +341,51 @@ describe('processAllParticipantLaps entrant sequencing', () => {
     expect(riderPassings[1].participantStartRecordId).toBe('flag-early');
   });
 
+  it('applies unscoped start and finish flags to every participant category', () => {
+    const participants = new Map<string, EventParticipant>([
+      ['p1', participant('p1', '101', 'team-a')],
+    ]);
+    const chequered: FlagRecord = {
+      categoryIds: [],
+      flagType: 'chequered',
+      flagValue: 'course',
+      id: 'flag-unscoped-finish',
+      recordType: 4,
+      sequence: 3,
+      source: 'test',
+      time: new Date('2026-05-30T10:11:00.000Z'),
+    };
+    const records = [
+      createGreenFlagEvent({
+        categoryIds: [],
+        flagValue: 'course',
+        id: 'flag-unscoped-start',
+        recordType: 4,
+        sequence: 1,
+        source: 'test',
+        time: new Date('2026-05-30T10:00:00.000Z'),
+      }),
+      passing('c1', 'p1', 'team-a', 2, '2026-05-30T10:06:00.000Z'),
+      chequered as unknown as ParticipantPassingRecord,
+      passing('c2', 'p1', 'team-a', 4, '2026-05-30T10:12:00.000Z'),
+      passing('c3', 'p1', 'team-a', 5, '2026-05-30T10:18:00.000Z'),
+    ];
+
+    const processed = processAllParticipantLaps(records, participants, 300000, true);
+    const riderPassings = processed.get('p1') || [];
+
+    expect(riderPassings.map((record) => ({
+      id: record.id,
+      lapNo: record.lapNo,
+      participantStartRecordId: record.participantStartRecordId,
+      valid: isPassingValid(record),
+    }))).toEqual([
+      { id: 'c1', lapNo: 1, participantStartRecordId: 'flag-unscoped-start', valid: true },
+      { id: 'c2', lapNo: 2, participantStartRecordId: 'flag-unscoped-start', valid: true },
+      { id: 'c3', lapNo: 2, participantStartRecordId: 'flag-unscoped-start', valid: false },
+    ]);
+  });
+
   it('counts only the first crossing after a chequered flag for applicable categories', () => {
     const participants = new Map<string, EventParticipant>([
       ['p1', participant('p1', '101', 'team-a')],

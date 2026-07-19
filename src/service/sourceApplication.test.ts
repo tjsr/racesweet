@@ -1087,6 +1087,53 @@ describe('sourceApplication', () => {
     ]);
   });
 
+  it('rebuilds persisted Entries from current Participant relationships and removes stale participant links', async () => {
+    const eventId = createEventId('stale-entry-event');
+    const currentEntryId = createEventEntryId('stale-entry-current');
+    const staleEntryId = createEventEntryId('stale-entry-obsolete');
+    const participantId = createEventParticipantId('stale-entry-current-participant');
+    const missingParticipantId = createEventParticipantId('stale-entry-missing-participant');
+    const participant: EventParticipant = {
+      categoryId: EXISTING_CATEGORY_ID,
+      currentResult: undefined,
+      entrantId: participantId,
+      entryId: currentEntryId,
+      firstname: 'Current',
+      id: participantId,
+      identifiers: [],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Driver',
+    };
+    const session = new Session({ categories: existingCategories, entries: [], participants: [], records: [], teams: [] });
+
+    await applyPulledRaceStateToSession(session, {
+      categories: existingCategories,
+      entries: [{
+        categoryId: EXISTING_CATEGORY_ID,
+        eventId,
+        id: staleEntryId,
+        identifiers: [],
+        participantIds: [participantId, missingParticipantId],
+      }, {
+        categoryId: EXISTING_CATEGORY_ID,
+        eventId,
+        id: currentEntryId,
+        identifiers: [],
+        participantIds: [participantId, missingParticipantId],
+      }],
+      participants: [participant],
+      records: [],
+    }, { eventId });
+
+    expect(session.entries).toEqual([
+      expect.objectContaining({
+        id: currentEntryId,
+        participantIds: [participantId],
+      }),
+    ]);
+  });
+
   it('reports when a missing entrant cannot be found in any active event catalog', async () => {
     const addCategories = vi.fn(async (_categories: EventCategory[]) => null);
     const addParticipants = vi.fn((_participants: EventParticipant[]) => undefined);

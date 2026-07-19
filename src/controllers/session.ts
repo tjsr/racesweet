@@ -2,17 +2,7 @@ import { EVENT_SESSION_START, type TimeRecord } from "../model/timerecord.js";
 import type { FlagRecord, GreenFlagRecord } from "../model/flag.js";
 import type { EventCategoryId } from "../model/eventcategory.js";
 import { compareByTime } from "./timerecord.js";
-import { isFlagRecord, isGreenFlag } from "./flag.js";
-
-const flagAppliesToCategory = (flagEvent: FlagRecord, categoryId?: EventCategoryId): boolean => {
-  if (!categoryId) {
-    return true;
-  }
-  if (flagEvent.categoryIds === undefined || flagEvent.categoryIds.length === 0) {
-    return true;
-  }
-  return flagEvent.categoryIds.includes(categoryId);
-};
+import { flagAppliesToCategory, isFlagRecord, isGreenFlag } from "./flag.js";
 
 export const isStartRecord = (event: TimeRecord, categoryId?: EventCategoryId): boolean => {
   if (event.time === undefined) {

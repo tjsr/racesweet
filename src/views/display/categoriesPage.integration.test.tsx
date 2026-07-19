@@ -36,6 +36,15 @@ const catalog: EventCatalogState = {
   categories: [
     {
       code: 'PW',
+      deleted: true,
+      distanceRule: { kind: 'laps', value: 8 },
+      eventId: 'event-1',
+      id: 'cat-1-deleted-history',
+      name: 'Premier',
+      teamRules: { teamCompositionRules: [] },
+    },
+    {
+      code: 'PW',
       distanceRule: { kind: 'laps', value: 8 },
       eventId: 'event-1',
       id: 'cat-1',
@@ -264,6 +273,9 @@ describe('CategoriesPage integration', () => {
     const showAllCategories = categoryListPanel.querySelector('input[aria-label="Show all categories"]') as HTMLInputElement;
     expect(showAllCategories).toBeTruthy();
     expect(categoryListPanel.textContent).not.toContain('Deleted Category');
+    expect(categoryListPanel.textContent).toContain('Premier');
+    expect(container.textContent).toContain('Category ID: cat-1');
+    expect(container.textContent).not.toContain('Category ID: cat-1-deleted-history');
 
     await act(async () => {
       showAllCategories.click();

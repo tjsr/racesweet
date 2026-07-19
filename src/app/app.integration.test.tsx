@@ -10,7 +10,7 @@ import { CategoryId } from '../controllers/category.js';
 import { createGreenFlagEvent } from '../controllers/flag.js';
 import type { ApicalLapByCategory } from '../model/apical.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
-import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
+import { createCategoryId, createEventEntrantId, createEventEntryId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
 import { EventId, SessionId } from '../model/raceevent.js';
 import { RECORD_TX_CROSSING, TimeRecordId } from '../model/timerecord.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
@@ -919,10 +919,15 @@ describe('RaceSweetMainApp integration', () => {
     expect(entrantCategories.every((category) => !UUID_TEXT_PATTERN.test(category.name))).toBe(true);
   });
 
-  it('hydrates startup timing categories from persisted imported race state without fixture scaffold categories', async () => {
+  it('hydrates persisted CTC timing records and the current category after an application restart', async () => {
     const importedEventId = createEventId('ctc-startup-event');
     const importedSessionId = createSessionId('ctc-startup-session');
     const importedCategoryId = createCategoryId('ctc-startup-unknown-category');
+    const deletedHistoricalCategoryId = createCategoryId('ctc-startup-deleted-history');
+    const importedStaleEntryId = createEventEntryId('ctc-startup-stale-entry');
+    const missingParticipantId = createEventParticipantId('ctc-startup-missing-participant');
+    const importedRecordId = createTimeRecordId('ctc-startup-record');
+    const importedSourceId = createTimeRecordSourceId('ctc-startup-source');
     const importedRaceState = {
       categories: [
         {
@@ -932,8 +937,25 @@ describe('RaceSweetMainApp integration', () => {
           name: 'Unknown participants',
         },
       ],
+      entries: [{
+        categoryId: importedCategoryId,
+        eventId: importedEventId,
+        id: importedStaleEntryId,
+        identifiers: [],
+        participantIds: [missingParticipantId],
+      }],
       participants: [],
-      records: [],
+      records: [{
+        chipCode: 92,
+        eventId: importedEventId,
+        id: importedRecordId,
+        originRecordNumber: 1,
+        recordType: RECORD_TX_CROSSING,
+        sequence: 1,
+        sessionId: importedSessionId,
+        source: importedSourceId,
+        time: new Date('2026-05-29T10:00:00.000Z'),
+      }],
       teams: [],
     };
 
@@ -956,6 +978,24 @@ describe('RaceSweetMainApp integration', () => {
               id: 'mutation-ctc-startup-event',
               timestamp: '2026-05-29T00:00:00.000Z',
               type: 'event-created',
+            },
+            {
+              category: {
+                code: 'UNKNOWN',
+                description: 'Historical category replaced during import.',
+                eventId: importedEventId,
+                id: deletedHistoricalCategoryId,
+                name: 'Unknown participants',
+              },
+              id: 'mutation-ctc-startup-historical-category',
+              timestamp: '2026-05-29T00:00:00.500Z',
+              type: 'category-created',
+            },
+            {
+              categoryId: deletedHistoricalCategoryId,
+              id: 'mutation-ctc-startup-historical-category-deleted',
+              timestamp: '2026-05-29T00:00:00.750Z',
+              type: 'category-deleted',
             },
             {
               category: {
@@ -1015,6 +1055,11 @@ describe('RaceSweetMainApp integration', () => {
           eventSourceAssignments: {},
           schemaVersion: 1,
           sessionSourceAssignments: {},
+          timingContextSelection: {
+            eventId: importedEventId,
+            selectionMode: 'session',
+            sessionId: importedSessionId,
+          },
         });
       }
 
@@ -1043,13 +1088,150 @@ describe('RaceSweetMainApp integration', () => {
 
     await waitForLoadedApp(container);
     await clickSectionButton(container, 'Timing');
-    await waitForText(container, 'Recent Records (0)');
+    await waitForText(container, 'Recent Records (1)');
 
     const timingCategoryPayload = container.querySelector('[data-timing-categories]')?.getAttribute('data-timing-categories');
     const timingCategories = JSON.parse(timingCategoryPayload || '[]') as Array<{ id: CategoryId; name: string }>;
 
     expect(timingCategories.map((category) => category.id)).toEqual([importedCategoryId]);
     expect(timingCategories.map((category) => category.name)).toEqual(['Unknown participants']);
+    expect(container.textContent).not.toContain('references missing participant');
+
+    await clickSectionButton(container, 'Categories');
+    const categoryButtons = Array.from(container.querySelectorAll('[aria-label="Categories for selected event"] button'));
+    expect(categoryButtons).toHaveLength(1);
+    expect(categoryButtons[0]?.textContent).toContain('Unknown participants');
+    expect(container.textContent).toContain(`Category ID: ${importedCategoryId}`);
+    expect(container.textContent).not.toContain(`Category ID: ${deletedHistoricalCategoryId}`);
+  });
+
+  it('persists the imported CTC target and restores its timing records after a cold restart', async () => {
+    const sourceId = createTimeRecordSourceId('ctc-cold-restart-source');
+    const ctcFilePath = 'C:/timing/cold-restart.erf';
+    const writtenFiles: CatalogWrite[] = [];
+    const initialSystemConfig = {
+      dataSources: [{
+        enabled: true,
+        fileConfig: {
+          filePath: ctcFilePath,
+          importMode: 'import',
+        },
+        id: sourceId,
+        name: 'Cold Restart CTC Source',
+        type: 'file-dorian-ctc-srt',
+      }],
+      eventSourceAssignments: {},
+      schemaVersion: 1,
+      sessionSourceAssignments: {},
+      timingContextSelection: {
+        eventId: createEventId('stale-timing-event'),
+        selectionMode: 'session',
+        sessionId: createSessionId('stale-timing-session'),
+      },
+    };
+    const requestInitialFileContent = async (filePath: string): Promise<string> => {
+      if (filePath.includes('event-catalog.json')) {
+        return JSON.stringify(createSeedEventCatalogLedger());
+      }
+      if (filePath.includes('system-config.json')) {
+        return JSON.stringify(initialSystemConfig);
+      }
+      if (filePath.includes('admin-overrides.json')) {
+        return JSON.stringify({ entrantCategories: {}, excludedCrossings: {}, schemaVersion: 1 });
+      }
+      throw new Error(`Unknown generated file requested: ${filePath}`);
+    };
+    const requestBuffer = vi.fn(async (filePath: string): Promise<Buffer> => {
+      if (filePath.replace(/\\/g, '/').endsWith('/cold-restart.erf')) {
+        return Buffer.from([
+          '040000000010000012340302064000',
+          '040000000020000012340401063016',
+        ].join('\r'));
+      }
+      return readFixtureBuffer(filePath);
+    });
+    const writeFileContent = async (filePath: string, content: string, dataType?: string): Promise<void> => {
+      writtenFiles.push({ content, dataType, filePath });
+    };
+
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string, dataType?: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer,
+      requestFileContent: requestInitialFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent,
+    };
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+    await waitForLoadedApp(container);
+    await clickSectionButton(container, 'System');
+    await clickButtonByText(container, 'Import CTC File');
+    const importedLedger = await waitForPersistedCatalogLedger(writtenFiles, (ledger) => {
+      const raceStateMutation = ledger.mutations.find((mutation) => mutation.type === 'race-state-imported') as
+        | { raceState?: { records?: unknown[] } }
+        | undefined;
+      return raceStateMutation?.raceState?.records?.length === 2;
+    });
+    expect(importedLedger.mutations.some((mutation) => mutation.type === 'race-state-imported')).toBe(true);
+
+    let persistedSystemConfig: { timingContextSelection?: { eventId?: string; selectionMode?: string; sessionId?: string } } | undefined;
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const latestWrite = writtenFiles.filter((write) => getCatalogWriteFileName(write.filePath) === 'system-config.json').at(-1);
+      if (latestWrite) {
+        persistedSystemConfig = JSON.parse(latestWrite.content) as typeof persistedSystemConfig;
+        if (persistedSystemConfig?.timingContextSelection?.selectionMode === 'active') {
+          break;
+        }
+      }
+      await act(async () => {
+        await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      });
+    }
+    expect(persistedSystemConfig?.timingContextSelection).toEqual({
+      selectionMode: 'active',
+    });
+
+    await act(async () => {
+      root.unmount();
+    });
+    root = createRoot(container);
+    const requestRestartFileContent = async (filePath: string): Promise<string> => {
+      const latestWrite = writtenFiles.filter((write) => {
+        return getCatalogWriteFileName(write.filePath) === getCatalogWriteFileName(filePath);
+      }).at(-1);
+      if (latestWrite) {
+        return latestWrite.content;
+      }
+      return requestInitialFileContent(filePath);
+    };
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string, dataType?: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer,
+      requestFileContent: requestRestartFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent,
+    };
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+    await waitForLoadedApp(container);
+    await clickSectionButton(container, 'Timing');
+    await waitForText(container, 'Recent Records (2)');
+    expect((container.querySelector('select[aria-label="Timing Event"]') as HTMLSelectElement).value)
+      .toBe(createEventId('event-2026-racesweet-round-1'));
+    expect((container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement).value)
+      .toBe(createSessionId('session-1-practice'));
   });
 
   it('shows staged startup progress while generated files are loading', async () => {

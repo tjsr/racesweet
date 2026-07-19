@@ -54,7 +54,11 @@ export const dedupeCategoriesForDisplay = (categories: EventCatalogCategory[]): 
   const bySeriesKey = new Map<string, EventCatalogCategory>();
   categories.forEach((category) => {
     const key = getCategorySeriesKey(category);
-    if (!bySeriesKey.has(key)) {
+    const existingCategory: EventCatalogCategory | undefined = bySeriesKey.get(key);
+    if (
+      existingCategory === undefined ||
+      (existingCategory.deleted === true && category.deleted !== true)
+    ) {
       bySeriesKey.set(key, category);
     }
   });

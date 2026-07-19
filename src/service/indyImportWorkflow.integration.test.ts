@@ -16,11 +16,18 @@ const INDY_DIRECTORY = 'C:/Users/tim/OneDrive/RaceTime/timing/DORIAN/INDY';
 const INDY_ERF_PATH = `${INDY_DIRECTORY}/INDY500.ERF`;
 const INDY_ENTRANTS_PATH = `${INDY_DIRECTORY}/entrants.xlsx`;
 const INDY_TRACK_PATH = `${INDY_DIRECTORY}/TRACK.CFG`;
+const PERSISTED_INDY_EVENT_PATH = 'src/generated/94a8f950-0cf6-569d-9dfc-868d186a3bb8.json';
 const maybeIndyIt = [INDY_ERF_PATH, INDY_ENTRANTS_PATH, INDY_TRACK_PATH].every(existsSync) ? it : it.skip;
+const maybePersistedIndyIt = existsSync(PERSISTED_INDY_EVENT_PATH) ? it : it.skip;
 
-const createPersistence = (initial: EventCatalogLedger): EventCatalogPersistence => {
+interface InspectableEventCatalogPersistence extends EventCatalogPersistence {
+  getLedger: () => EventCatalogLedger;
+}
+
+const createPersistence = (initial: EventCatalogLedger): InspectableEventCatalogPersistence => {
   let ledger = initial;
   return {
+    getLedger: () => ledger,
     load: vi.fn(async () => ledger),
     save: vi.fn(async (nextLedger: EventCatalogLedger) => {
       ledger = nextLedger;
@@ -38,8 +45,50 @@ const snapshotSession = (session: Session): RaceState => ({
 });
 
 describe('INDY SRT and entrant import workflow', () => {
+  maybePersistedIndyIt('repairs historical Entry links while hydrating the persisted INDY timing state', async () => {
+    const persistedEventFile = JSON.parse(readFileSync(PERSISTED_INDY_EVENT_PATH, 'utf8')) as {
+      mutations: EventCatalogLedger['mutations'];
+    };
+    const service = await EventCatalogService.create(createPersistence({
+      mutations: persistedEventFile.mutations,
+      schemaVersion: 1,
+    }));
+    const event = service.catalog.events.find((candidate) => candidate.name === '1991 Indianapolis 500');
+    const session = service.catalog.sessions.find((candidate) => candidate.eventId === event?.id && candidate.name === 'INDY500');
+    const persistedRaceState = event && session
+      ? service.getImportedRaceState(event.id, session.id)
+      : undefined;
+    expect(event).toBeDefined();
+    expect(session).toBeDefined();
+    expect(persistedRaceState?.records?.length).toBeGreaterThan(0);
+
+    const hydratedSession = new Session({ categories: [], entries: [], participants: [], records: [], teams: [] });
+    await expect(applyPulledRaceStateToSession(hydratedSession, persistedRaceState || {}, {
+      catalog: service.catalog,
+      eventId: event!.id,
+      finishLineNumbers: [1, 2],
+      sessionId: session!.id,
+    })).resolves.toBeUndefined();
+
+    const participantIds = new Set(hydratedSession.participants.map((participant) => participant.id.toString()));
+    expect(hydratedSession.entries.every((entry) => (
+      entry.participantIds.length > 0 && entry.participantIds.every((participantId) => participantIds.has(participantId.toString()))
+    ))).toBe(true);
+    expect(hydratedSession.entries.some((entry) => entry.id === '019f753d-3077-75d5-bdef-43745c5ade3a')).toBe(false);
+    expect(hydratedSession.entries.some((entry) => entry.id === '019f753d-3078-707c-babb-38f6f8435ada')).toBe(false);
+    const calculatedLapsByName = new Map(hydratedSession.participants.map((participant) => [
+      `${participant.firstname} ${participant.surname}`.trim(),
+      (hydratedSession.getParticipantLaps(participant.id) || [])
+        .filter((passing) => isCountedLapPassing(passing, [1, 2]))
+        .at(-1)?.lapNo || 0,
+    ]));
+    expect(calculatedLapsByName.get('Rick Mears')).toBeGreaterThanOrEqual(190);
+    expect(calculatedLapsByName.get('Michael Andretti')).toBeGreaterThanOrEqual(190);
+  }, 30_000);
+
   maybeIndyIt('keeps event/category identity and produces category-valid Timing competitors', async () => {
-    const service = await EventCatalogService.create(createPersistence(createSeedEventCatalogLedger()));
+    const persistence = createPersistence(createSeedEventCatalogLedger());
+    const service = await EventCatalogService.create(persistence);
     const eventId = service.catalog.activeEventId!;
     const sessionId = service.catalog.activeSessionId!;
     await service.updateEvent(eventId, {
@@ -96,8 +145,9 @@ describe('INDY SRT and entrant import workflow', () => {
       indyCategoryId,
     );
 
-    const catalog = service.catalog;
-    const persistedRaceState = service.getImportedRaceState(eventId, sessionId)!;
+    const restartedService = await EventCatalogService.create(createPersistence(persistence.getLedger()));
+    const catalog = restartedService.catalog;
+    const persistedRaceState = restartedService.getImportedRaceState(eventId, sessionId)!;
     const finalSession = new Session({
       categories: persistedRaceState.categories || [],
       entries: persistedRaceState.entries || [],

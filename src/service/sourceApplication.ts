@@ -356,13 +356,24 @@ const normalizeRaceStateForSession = (
   const catalogEntriesById = new Map((options.catalog?.entries || [])
     .filter((entry) => entry.eventId === options.eventId)
     .map((entry) => [entry.id.toString(), entry] as const));
-  const entriesById = new Map<string, EventEntry>((normalizedRaceState.entries || []).map((entry): [string, EventEntry] => {
+  const participantIdsByEntryId = new Map<string, EventParticipant['id'][]>();
+  normalizedParticipants.forEach((participant) => {
+    const entryId = getParticipantEntryId(participant).toString();
+    participantIdsByEntryId.set(entryId, [
+      ...(participantIdsByEntryId.get(entryId) || []),
+      participant.id,
+    ]);
+  });
+  const entriesById = new Map<string, EventEntry>((normalizedRaceState.entries || [])
+    .filter((entry) => participantIdsByEntryId.has(entry.id.toString()))
+    .map((entry): [string, EventEntry] => {
     const catalogEntry = catalogEntriesById.get(entry.id.toString());
     return [entry.id.toString(), {
       ...entry,
       categoryId: catalogEntry?.categoryId || entry.categoryId,
       entrantId: catalogEntry?.entrantId || entry.entrantId,
       identifiers: catalogEntry?.identifiers.length ? [...catalogEntry.identifiers] : entry.identifiers,
+      participantIds: participantIdsByEntryId.get(entry.id.toString()) || [],
       raceNumber: catalogEntry?.raceNumber || entry.raceNumber,
     }];
   }));

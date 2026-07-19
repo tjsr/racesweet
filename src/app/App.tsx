@@ -1825,15 +1825,20 @@ export const RaceSweetMainApp = () => {
                   setSessionState(targetSessionState);
                   setRenderTick((tick) => tick + 1);
                 }
-                const timingShowsImportedSession =
-                  (timingSessionSelection === 'active' && isActiveSession) ||
-                  (selectedTimingEventId === eventId && selectedTimingSessionId === sessionId);
-                if (timingShowsImportedSession) {
-                  setTimingRaceState(targetSessionState);
-                }
-                const config = await systemConfigService.assignSourcesToEvent(eventId, [sourceId]);
-                const assignedConfig = await systemConfigService.assignSourcesToSession(sessionId, { mode: 'specific', sourceIds: [sourceId] });
-                updateSystemConfigState(assignedConfig || config);
+                setTimingSessionSelection(isActiveSession ? 'active' : 'session');
+                setSelectedTimingEventId(eventId);
+                setSelectedTimingSessionId(sessionId);
+                setTimingRaceState(targetSessionState);
+                await systemConfigService.assignSourcesToEvent(eventId, [sourceId]);
+                await systemConfigService.assignSourcesToSession(sessionId, { mode: 'specific', sourceIds: [sourceId] });
+                const selectedConfig = await systemConfigService.updateTimingContextSelection(isActiveSession
+                  ? { selectionMode: 'active' }
+                  : {
+                    eventId,
+                    selectionMode: 'session',
+                    sessionId,
+                  });
+                updateSystemConfigState(selectedConfig);
               })
               .catch((error: unknown) => {
                 setErrorState(error as Error);

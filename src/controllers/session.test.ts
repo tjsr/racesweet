@@ -28,6 +28,22 @@ describe('session start helpers', () => {
     expect(findSessionStart([startFlag], categoryB)).toBeUndefined();
   });
 
+  it.each([undefined, []] as const)('treats an unscoped green flag with categoryIds %s as applying to every category', (categoryIds) => {
+    const startFlag = createGreenFlagEvent({
+      categoryIds: categoryIds ? [...categoryIds] : undefined,
+      flagValue: 'course',
+      id: 'flag-session-wide-start',
+      sequence: 1,
+      source: 'test',
+      time: new Date('2026-05-30T10:00:00.000Z'),
+    });
+
+    expect(isStartRecord(startFlag, categoryA)).toBe(true);
+    expect(isStartRecord(startFlag, categoryB)).toBe(true);
+    expect(findSessionStart([startFlag], categoryA)?.id).toBe(startFlag.id);
+    expect(findSessionStart([startFlag], categoryB)?.id).toBe(startFlag.id);
+  });
+
   it('ignores deleted green flags when finding a session start', () => {
     const deletedStart = createGreenFlagEvent({
       categoryIds: [categoryA],

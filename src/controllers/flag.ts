@@ -76,13 +76,19 @@ export const getFlagEvents = (timeRecords: TimeRecord[]): FlagRecord[] => {
   return timeRecords.filter((record): record is FlagRecord => isFlagRecord(record) && !record.deleted);
 };
 
-const isFlagForCategory = (
-  flag: FlagRecord, categoryId: EventCategoryId
-): boolean => flag.categoryIds === undefined || flag.categoryIds?.map((id) => id?.toString()).includes(categoryId.toString());
+export const flagAppliesToCategory = (
+  flag: FlagRecord,
+  categoryId?: EventCategoryId,
+): boolean => {
+  if (!categoryId || !flag.categoryIds || flag.categoryIds.length === 0) {
+    return true;
+  }
+  return flag.categoryIds.some((id) => id?.toString() === categoryId.toString());
+};
 
 export const getCategoryFlags = (
   flagEvents: FlagRecord[], categoryId: EventCategoryId
-): FlagRecord[] => flagEvents.filter((flag) => isFlagForCategory(flag, categoryId));
+): FlagRecord[] => flagEvents.filter((flag) => flagAppliesToCategory(flag, categoryId));
 
 const isRetractedFlag = (flag: FlagRecord): boolean =>
   flag.deleted === true || (flag.recordType & EVENT_FLAG_RETRACTED) > 0;

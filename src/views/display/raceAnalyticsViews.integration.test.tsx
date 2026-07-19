@@ -5,16 +5,19 @@ import { type Root, createRoot } from 'react-dom/client';
 import { tableTimeString } from '../../app/utils/timeutils.js';
 import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent } from '../../catalog/eventCatalog.js';
 import { CategoryId } from '../../controllers/category.js';
+import { createGreenFlagEvent } from '../../controllers/flag.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
-import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordSourceId } from '../../model/ids.js';
-import type { RaceStateLookup, Session } from '../../model/racestate.js';
+import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
+import { type RaceStateLookup, Session } from '../../model/racestate.js';
 import {
   CROSSING_FLAG_LAP_UNDER_MINIMUM,
   CROSSING_UNRELATED_AFTER_FINISH,
   CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
+  type EventTimeRecord,
   type ParticipantPassingRecord,
+  RECORD_TX_CROSSING,
 } from '../../model/timerecord.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 import { ReportsPage, ResultsPage } from './raceAnalyticsViews.js';
@@ -587,6 +590,124 @@ describe('race analytics views integration', () => {
       soloParticipantId,
       'Solo Rider',
       'Category B',
+      '1:10.000',
+      '2',
+      '2',
+    ]);
+  });
+
+  it('uses a green flag with no categories for Timing, Results, and Reports calculations', async () => {
+    const categoryId = createCategoryId('unscoped-flag-category');
+    const entrantId = createEventEntrantId('unscoped-flag-entrant');
+    const participantId = createEventParticipantId('unscoped-flag-participant');
+    const sourceId = createTimeRecordSourceId('unscoped-flag-source');
+    const participant: EventParticipant = {
+      categoryId,
+      currentResult: undefined,
+      entrantId,
+      firstname: 'Unscoped',
+      id: participantId,
+      identifiers: [{ fromTime: undefined, toTime: undefined, txNo: 99 }] as unknown as EventParticipant['identifiers'],
+      lastRecordTime: null,
+      resultDuration: null,
+      surname: 'Flag',
+    };
+    const greenFlag = createGreenFlagEvent({
+      categoryIds: [],
+      id: createTimeRecordId('unscoped-flag-green'),
+      indicatesRaceStart: true,
+      sequence: 1,
+      source: sourceId,
+      time: new Date('2026-06-12T10:00:00.000Z'),
+    });
+    const crossings: ParticipantPassingRecord[] = [{
+      chipCode: 99,
+      entrantId,
+      id: createTimeRecordId('unscoped-flag-lap-1'),
+      lineNumber: 1,
+      participantId,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 2,
+      source: sourceId,
+      time: new Date('2026-06-12T10:01:30.000Z'),
+    } as unknown as ParticipantPassingRecord, {
+      chipCode: 99,
+      entrantId,
+      id: createTimeRecordId('unscoped-flag-lap-2'),
+      lineNumber: 1,
+      participantId,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 3,
+      source: sourceId,
+      time: new Date('2026-06-12T10:02:40.000Z'),
+    } as unknown as ParticipantPassingRecord];
+    const calculatedRaceState = new Session({
+      categories: [{ id: categoryId, name: 'Unscoped Flag Category' }],
+      participants: [participant],
+      records: [greenFlag, ...crossings],
+      teams: [],
+    });
+    calculatedRaceState.setFinishLineNumbers([1]);
+    calculatedRaceState.setMinimumLapTimeMilliseconds(60_000);
+    calculatedRaceState.setSessionValidCategoryIds(new Set([categoryId]));
+    const calculatedEntrants: EventCatalogEntrant[] = [{
+      categoryId,
+      categoryIds: [categoryId],
+      entrantType: 'rider',
+      eventId: createEventId('unscoped-flag-event'),
+      id: entrantId,
+      memberParticipantIds: [participantId],
+      name: 'Unscoped Flag',
+      sessionIds: [createSessionId('unscoped-flag-session')],
+    }];
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          raceStateLookup={calculatedRaceState}
+          records={calculatedRaceState.records as EventTimeRecord[]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />,
+      );
+    });
+    expect((calculatedRaceState.getParticipantLaps(participantId) || []).map((lap) => lap.lapNo)).toEqual([1, 2]);
+    expect(container.querySelector(`tr[data-record-id="${crossings[1]!.id}"] .overallFastest`)).toBeTruthy();
+
+    await act(async () => {
+      root.render(
+        <ResultsPage
+          categories={calculatedRaceState.categories}
+          catalogEntrants={calculatedEntrants}
+          raceState={calculatedRaceState}
+        />,
+      );
+    });
+    const resultRow = container.querySelector('table[aria-label="Results Table"] tbody tr');
+    expect(Array.from(resultRow!.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
+      '1',
+      '-',
+      'Unscoped Flag',
+      'Unscoped Flag Category',
+      '2',
+      '2:40.000',
+      '1:10.000',
+    ]);
+
+    await act(async () => {
+      root.render(
+        <ReportsPage
+          categories={calculatedRaceState.categories}
+          catalogEntrants={calculatedEntrants}
+          raceState={calculatedRaceState}
+        />,
+      );
+    });
+    const reportRow = container.querySelector('table[aria-label="Fastest Laps Report Table"] tbody tr');
+    expect(Array.from(reportRow!.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
+      participantId,
+      'Unscoped Flag',
+      'Unscoped Flag Category',
       '1:10.000',
       '2',
       '2',
