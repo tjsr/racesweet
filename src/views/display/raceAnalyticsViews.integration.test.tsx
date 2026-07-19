@@ -1126,6 +1126,47 @@ describe('race analytics views integration', () => {
     expect(container.querySelector('svg.lap-chart-line-overlay')).toBeFalsy();
   });
 
+  it('renders Yellow Flag periods with leader and revocation details', async () => {
+    const yellowTime = new Date('2026-06-12T10:00:10.000Z');
+    const greenTime = new Date('2026-06-12T10:00:25.000Z');
+    const yellow = {
+      flagType: 'yellow', flagValue: 'caution', id: createTimeRecordId('report-yellow'), recordType: 4, sequence: 10,
+      source: createTimeRecordSourceId('report-flags'), time: yellowTime,
+    };
+    const green = {
+      flagType: 'green', flagValue: 'course', id: createTimeRecordId('report-green'), indicatesRaceStart: false, recordType: 4, sequence: 11,
+      source: createTimeRecordSourceId('report-flags'), time: greenTime,
+    };
+    const reportRaceState = {
+      ...raceState,
+      getParticipantLaps: (participantId: EventParticipantId) => participantId === createEventParticipantId('p-rider-1')
+        ? [{ ...lapsByParticipant.get(participantId)![0], lapNo: 2, time: new Date('2026-06-12T10:00:08.000Z') }]
+        : [],
+      records: [yellow, green],
+    } as unknown as Session & RaceStateLookup;
+
+    await act(async () => {
+      root.render(<ReportsPage categories={[categories[2]!]} catalogEntrants={[catalogEntrants[1]!]} event={{
+        categoryIds: [categories[2]!.id],
+        date: '2026-06-12',
+        entrantIds: [catalogEntrants[1]!.id],
+        format: 'race-weekend',
+        id: createEventId('report-timezone-event'),
+        name: 'Timezone Event',
+        sessionIds: [],
+        timeZone: 'Australia/Sydney',
+      }} raceState={reportRaceState} />);
+    });
+    const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
+    await act(async () => {
+      setSelectValue(reportSelect, 'yellow-flag-periods');
+    });
+
+    const table = container.querySelector('table[aria-label="Yellow Flag Periods Report Table"]') as HTMLTableElement;
+    expect(Array.from(table.querySelectorAll('thead th')).map((cell) => cell.textContent)).toEqual(['From Lap', 'Time of Day', 'Duration', 'Leader at Flag', 'Until Lap', 'Until Time']);
+    expect(Array.from(table.querySelectorAll('tbody td')).map((cell) => cell.textContent)).toEqual(['2', tableTimeString(yellowTime, 'Australia/Sydney'), '0:15.000', 'Solo RIDER', '2', tableTimeString(greenTime, 'Australia/Sydney')]);
+  });
+
   it('renders the GPX track-map report with playback controls and clickable entrant state', async () => {
     const trackRecords = Array.from(lapsByParticipant.values()).flat().map((record) => ({
       ...record,

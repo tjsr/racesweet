@@ -6,6 +6,7 @@ import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.j
 import { shouldExcludeCategoryFromResults } from '../../controllers/category.js';
 import { getSourceLapCompletion, isCountedLapPassing } from '../../controllers/laps.js';
 import { getParticipantNumber } from '../../controllers/participant.js';
+import { calculateYellowFlagPeriods } from '../../controllers/yellowFlagPeriods.js';
 import { getParticipantEntryId } from '../../model/entry.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
@@ -791,7 +792,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
   const [drawLineChart, setDrawLineChart] = React.useState<boolean>(false);
   const [lapChartLineSegments, setLapChartLineSegments] = React.useState<LapChartLineSegment[]>([]);
-  const [reportType, setReportType] = React.useState<'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'handicap-data' | 'track-map'>('fastest-laps');
+  const [reportType, setReportType] = React.useState<'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'yellow-flag-periods' | 'handicap-data' | 'track-map'>('fastest-laps');
   const [ignoreFirstLapForFastestLaps, setIgnoreFirstLapForFastestLaps] = React.useState<boolean>(true);
   const [ignoreFirstLapForTimeline, setIgnoreFirstLapForTimeline] = React.useState<boolean>(true);
   const [handicapShowFilter, setHandicapShowFilter] = React.useState<'all' | 'event-participants-only'>('all');
@@ -938,6 +939,15 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     return buildFastestLapReportRows(rows, ignoreFirstLapForFastestLaps);
   }, [ignoreFirstLapForFastestLaps, rows]);
 
+  const yellowFlagPeriods = React.useMemo(() => calculateYellowFlagPeriods(
+    props.raceState.records,
+    rows.map((row) => ({
+      laps: row.laps,
+      name: getRowDriverName(row) || row.entrantName,
+    })),
+    selectedCategory === 'overall' ? undefined : selectedCategory as EventCategoryId,
+  ), [props.raceState.records, rows, selectedCategory]);
+
   const eventParticipantNames = React.useMemo(() => {
     return reportParticipants.map((participant) => participant.name).filter((name) => name.length > 0);
   }, [reportParticipants]);
@@ -958,12 +968,13 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <select
               aria-label="Reports View Type"
               value={reportType}
-              onChange={(event) => setReportType(event.target.value as 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'handicap-data' | 'track-map')}
+              onChange={(event) => setReportType(event.target.value as 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'yellow-flag-periods' | 'handicap-data' | 'track-map')}
             >
               <option value="fastest-laps">Fastest Laps</option>
               <option value="fastest-lap-timeline">Fastest Lap Timeline</option>
               <option value="lap-times">Lap Times</option>
               <option value="lap-chart">Lap Chart</option>
+              <option value="yellow-flag-periods">Yellow Flag periods</option>
               <option value="track-map">Track Map</option>
               <option value="handicap-data">Handicap Data</option>
             </select>
@@ -1164,6 +1175,36 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
           <HandicapView
             participantNames={handicapShowFilter === 'event-participants-only' ? eventParticipantNames : undefined}
           />
+        </section>
+      ) : null}
+
+      {reportType === 'yellow-flag-periods' ? (
+        <section className="events-panel">
+          <h2>Yellow Flag periods</h2>
+          <table aria-label="Yellow Flag Periods Report Table">
+            <thead>
+              <tr>
+                <th>From Lap</th>
+                <th>Time of Day</th>
+                <th>Duration</th>
+                <th>Leader at Flag</th>
+                <th>Until Lap</th>
+                <th>Until Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {yellowFlagPeriods.map((period, index) => (
+                <tr key={`yellow-flag-period-${index}`}>
+                  <td>{period.fromLap ?? '-'}</td>
+                  <td>{tableTimeString(period.fromTime, props.event?.timeZone)}</td>
+                  <td>{formatDuration(period.duration)}</td>
+                  <td>{period.leaderAtFlag || '-'}</td>
+                  <td>{period.untilLap ?? '-'}</td>
+                  <td>{tableTimeString(period.untilTime, props.event?.timeZone)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
       ) : null}
       {reportType === 'track-map' ? (
