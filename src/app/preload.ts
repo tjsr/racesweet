@@ -19,6 +19,7 @@ import {
 import { InvalidIpcChannelError, SendChannels } from '../model/electronIpcTypes.ts';
 import { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileReadDataType, FileWriteDataType, SelectLocalFileOptions } from './window.ts';
 
+import { FileWriteFailureError, isFileWriteFailurePayload, type FileWriteOptions } from './fileWriteDiagnostics.ts';
 import { assertRendererApi } from './rendererApi.ts';
 import { getRaceSweetServerPort } from './serverPort.ts';
 
@@ -70,9 +71,9 @@ ipcRenderer.on(WriteContentIpcReceiveChannel,
   });
 
 ipcRenderer.on(WriteContentErrorIpcReceiveChannel,
-  (event: IpcRendererEvent, eventId: IPCEventId, error?: string|Error): void => {
+  (event: IpcRendererEvent, eventId: IPCEventId, error?: unknown): void => {
     if (eventCalls[eventId] !== undefined) {
-      eventCalls[eventId][1](error);
+      eventCalls[eventId][1](isFileWriteFailurePayload(error) ? new FileWriteFailureError(error) : String(error));
       delete eventCalls[eventId];
     }
   });
@@ -138,11 +139,15 @@ const rendererApi: Window['api'] = {
       throw new InvalidIpcChannelError(channel);
     }
   },
-  writeFileContent: (filePath: string, contents: string, dataType: FileWriteDataType = 'utf8'): Promise<void> => {
+  writeFileContent: (filePath: string, contents: string, dataType: FileWriteDataType = 'utf8', options?: FileWriteOptions): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
       const outgoingEventId = crypto.randomUUID();
       eventCalls[outgoingEventId] = [resolve as never, reject];
-      ipcRenderer.send(RequestWriteIpcSendChannel, filePath, outgoingEventId, contents, dataType);
+      if (options) {
+        ipcRenderer.send(RequestWriteIpcSendChannel, filePath, outgoingEventId, contents, dataType, options);
+      } else {
+        ipcRenderer.send(RequestWriteIpcSendChannel, filePath, outgoingEventId, contents, dataType);
+      }
     });
   },
 };

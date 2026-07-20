@@ -1,6 +1,8 @@
 // import { ipcMain } from "electron";
 // const { ipcMain } = require("electron");
 
+import type { FileWriteOptions } from './fileWriteDiagnostics.js';
+
 export type AvailableSendChannels = 'askToRead' | 'askToWrite';
 export type AvailableReceiveChannels = 'sendReadContent' | 'sendReadError' | 'sendWriteSuccess' | 'sendWriteError';
 export type FileReadDataType = 'utf8' | 'buffer' | 'bytearray';
@@ -49,7 +51,7 @@ declare global {
       openLocalFile: (filePath: string) => Promise<void>;
       selectLocalDirectory: (title?: string) => Promise<string | undefined>;
       selectLocalFile: (options?: SelectLocalFileOptions) => Promise<string | undefined>;
-      writeFileContent: (filePath: string, contents: string, dataType?: FileWriteDataType) => Promise<void>;
+      writeFileContent: (filePath: string, contents: string, dataType?: FileWriteDataType, options?: FileWriteOptions) => Promise<void>;
       send: (channel: AvailableSendChannels, ...args: unknown[]) => void;
     },
     nodeAPI: {

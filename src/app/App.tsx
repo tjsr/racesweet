@@ -1998,6 +1998,15 @@ export const RaceSweetMainApp = () => {
             }
             systemConfigService.assignSourcesToEvent(eventId, sourceIds).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
           }}
+          onSaveTrackMap={(eventId, trackMap) => {
+            if (!eventCatalogService) {
+              return;
+            }
+            return eventCatalogService.updateEvent(eventId, { trackMap }).then((catalog) => {
+              updateEventCatalogState(catalog, eventId);
+              setRenderTick((tick) => tick + 1);
+            });
+          }}
           onUnsavedChangesGuardChange={(guard) => setUnsavedChangesGuard('Events', guard)}
           onUpdateEvent={(eventId, changes) => {
             if (!eventCatalogService) {

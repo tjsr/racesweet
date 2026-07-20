@@ -1,7 +1,7 @@
 import './runtimeSourceMaps.ts';
 
 import { BrowserWindow, app, dialog, ipcMain, session, shell } from 'electron';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
@@ -16,6 +16,8 @@ import {
 } from '../model/electronIpc';
 import { buildContentSecurityPolicy, injectContentSecurityPolicyHeader } from './contentSecurityPolicy';
 import { injectCorsHeaders, isAllowedCorsDownloadUrl } from './electron/corsHeaders';
+import { writeApplicationFile } from './fileWrite';
+import type { FileWriteOptions } from './fileWriteDiagnostics';
 import { waitForContentServer, waitForWindowContentLoad } from './startupContentServer';
 import type { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileWriteDataType, SelectLocalFileOptions } from './window';
 
@@ -217,25 +219,21 @@ ipcMain.handle(RequestOpenLocalFileIpcInvokeChannel, async (_event: Electron.Ipc
   }
 });
 
-ipcMain.on(RequestWriteIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: IPCEventId, contents: string, dataType: FileWriteDataType = 'utf8') => {
-  // Use __dirname if you're trying to restrict where things can be written to.
-  // You need to handle permissions and security based on what you want to allow to be written.
-  // I'd probably re-write this to take PathLike.
-  const fullPath = resolveAppFilePath(filename);
-  const fullDirPath = path.dirname(fullPath);
-
-  const fileContents = dataType === 'base64' ? Buffer.from(contents, 'base64') : contents;
-  mkdir(fullDirPath, { recursive: true }).then(() => writeFile(fullPath, fileContents)).then(() => {
-    event.returnValue = `File ${filename} written successfully.`;
+ipcMain.on(RequestWriteIpcSendChannel, (
+  event: Electron.IpcMainEvent,
+  filename: string,
+  eventId: IPCEventId,
+  contents: string,
+  dataType: FileWriteDataType = 'utf8',
+  options?: FileWriteOptions,
+): void => {
+  void writeApplicationFile({ contents, dataType, filename, options }, {
+    getUserDataPath: () => app.getPath('userData'),
+    resolvePath: resolveAppFilePath,
+  }).then(() => {
     event.reply(WriteContentIpcReceiveChannel, eventId);
-  }).catch((error: Error) => {
-    const nodeError = error as NodeJS.ErrnoException;
-    if (nodeError.code === 'EACCES' || nodeError.code === 'EPERM') {
-      console.warn(`Permission denied while writing ${fullPath}.`);
-    } else {
-      console.error(`Failed to write file ${fullPath}`, error);
-    }
-    event.reply(WriteContentErrorIpcReceiveChannel, eventId, error.message);
+  }).catch((error: unknown) => {
+    event.reply(WriteContentErrorIpcReceiveChannel, eventId, error);
   });
 });
 

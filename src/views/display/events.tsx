@@ -30,6 +30,7 @@ interface EventsScreenProps {
   onCreateSession: (eventId: EventId) => void | Promise<void>;
   onDeleteEvent: (eventId: EventId) => void | Promise<void>;
   onSaveEventAssignment: (eventId: EventId, sourceIds: string[]) => void | Promise<void>;
+  onSaveTrackMap?: (eventId: EventId, trackMap: EventCatalogEvent['trackMap']) => void | Promise<void>;
   onSelectEvent: (eventId: EventId) => void;
   onSelectSession: (sessionId: SessionId) => void;
   onMakeSessionActive: (eventId: EventId, sessionId: SessionId) => void | Promise<void>;
@@ -178,7 +179,9 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
           />
           <EventTrackMapPanel
             availableTimingLines={availableTimingLines}
-            onSave={(trackMap) => selectedEvent ? props.onUpdateEvent(selectedEvent.id, { trackMap }) : undefined}
+            onSave={(trackMap) => selectedEvent
+              ? props.onSaveTrackMap?.(selectedEvent.id, trackMap) ?? props.onUpdateEvent(selectedEvent.id, { trackMap })
+              : undefined}
             selectedEvent={selectedEvent}
           />
         </div>

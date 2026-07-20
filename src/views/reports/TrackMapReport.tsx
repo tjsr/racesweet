@@ -6,6 +6,7 @@ import type { EventEntrantId } from '../../model/entrant.js';
 import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 import { type TrackPlaybackEntrantState, createTrackPlaybackIndex } from './trackPlayback.js';
 import { createTrackMapGeometry, getTrackPointAtProgress, toSvgPolylinePoints } from './trackMapGeometry.js';
+import { checkTrackTimingLineOrder } from './trackLineOrder.js';
 import { createTrackStatusSegments } from './trackStatus.js';
 
 interface TrackMapReportProps {
@@ -52,6 +53,7 @@ export const TrackMapReport = (props: TrackMapReportProps): React.ReactElement =
   const [isPlaying, setIsPlaying] = React.useState<boolean>(false);
   const [playbackSpeed, setPlaybackSpeed] = React.useState<number>(1);
   const [selectedEntrantId, setSelectedEntrantId] = React.useState<EventEntrantId | undefined>(undefined);
+  const [lineOrderMessages, setLineOrderMessages] = React.useState<string[] | undefined>(undefined);
   const elapsedRef = React.useRef<number>(0);
 
   React.useEffect(() => {
@@ -188,6 +190,12 @@ export const TrackMapReport = (props: TrackMapReportProps): React.ReactElement =
           ))}
         </div>
         <div className="events-actions">
+          <button aria-label="Check Track Map Line Order" onClick={() => setLineOrderMessages(checkTrackTimingLineOrder(
+            props.raceState,
+            props.event?.trackMap?.timingLines || [],
+          ))} type="button">
+            Check line order
+          </button>
           <button aria-label={isPlaying ? 'Pause Track Map Playback' : 'Play Track Map Playback'} onClick={() => {
             if (!isPlaying && elapsedRef.current >= duration) {
               updateElapsed(0);
@@ -203,6 +211,13 @@ export const TrackMapReport = (props: TrackMapReportProps): React.ReactElement =
             </select>
           </label>
         </div>
+        {lineOrderMessages ? (
+          <div aria-label="Track Map Line Order Check" role="status">
+            {lineOrderMessages.length === 0
+              ? <p>Timing-line order matches the observed crossing sequence.</p>
+              : <ul>{lineOrderMessages.map((message) => <li key={message}>{message}</li>)}</ul>}
+          </div>
+        ) : null}
         <p>Event elapsed time: {millisecondsToTime(elapsed)}</p>
         <p>Time of day: {tableTimeString(new Date(currentTime), props.event?.timeZone)}</p>
       </div>

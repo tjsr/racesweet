@@ -1,4 +1,5 @@
 import { RendererApiUnavailableError, getRendererApi } from '../app/rendererApi.js';
+import { FileWriteFailureError, getFileWriteFailure } from '../app/fileWriteDiagnostics.js';
 import {
   type EventCatalogMutation,
   type EventCatalogLedger,
@@ -17,6 +18,11 @@ interface EventCatalogEventFileReference {
   fileName: string;
 }
 
+interface EventCatalogTrackMapFileReference {
+  eventId: string;
+  fileName: string;
+}
+
 interface SplitEventCatalogManifest {
   eventFiles: EventCatalogEventFileReference[];
   globalMutations: EventCatalogMutation[];
@@ -25,6 +31,7 @@ interface SplitEventCatalogManifest {
     mutationId: string;
   }>;
   schemaVersion: 2;
+  trackMapFiles?: EventCatalogTrackMapFileReference[];
 }
 
 interface SplitEventCatalogFile {
@@ -91,6 +98,14 @@ const joinPath = (directoryPath: string, fileName: string): string => {
 };
 
 const getEventFileName = (eventId: string): string => `${eventId}.json`;
+
+const getTrackMapFileName = (eventId: string): string => `${eventId}.track-map.json`;
+
+const isDedicatedTrackMapMutation = (mutation: EventCatalogMutation): mutation is Extract<EventCatalogMutation, { type: 'event-updated' }> => {
+  return mutation.type === 'event-updated' &&
+    Object.keys(mutation.changes).length === 1 &&
+    Object.hasOwn(mutation.changes, 'trackMap');
+};
 
 const isSplitEventCatalogManifest = (value: Partial<EventCatalogLedger> | Partial<SplitEventCatalogManifest>): value is SplitEventCatalogManifest => {
   return value.schemaVersion === 2 && Array.isArray((value as SplitEventCatalogManifest).eventFiles);
@@ -173,11 +188,18 @@ const updateMutationReferenceMaps = (
   }
 };
 
-const splitLedgerByEvent = (ledger: EventCatalogLedger): {
+const splitLedgerByEvent = (
+  ledger: EventCatalogLedger,
+  inlineTrackMapMutationIdsByEvent: ReadonlyMap<string, ReadonlySet<string>>,
+  persistedTrackMapMutationIdsByEvent: ReadonlyMap<string, ReadonlySet<string>>,
+): {
   eventFiles: EventCatalogEventFileReference[];
   eventLedgersById: Map<string, SplitEventCatalogFile>;
   globalMutations: EventCatalogMutation[];
   mutationOrder: SplitEventCatalogManifest['mutationOrder'];
+  trackMapFiles: EventCatalogTrackMapFileReference[];
+  trackMapLedgersById: Map<string, SplitEventCatalogFile>;
+  trackMapMutationIdsByEvent: Map<string, Set<string>>;
 } => {
   const idsByReference = {
     categoryIds: new Map<string, string>(),
@@ -188,6 +210,10 @@ const splitLedgerByEvent = (ledger: EventCatalogLedger): {
   const eventMutationsById = new Map<string, EventCatalogMutation[]>();
   const globalMutations: EventCatalogMutation[] = [];
   const mutationOrder: SplitEventCatalogManifest['mutationOrder'] = [];
+  const trackMapMutationIdsByEvent = new Map(Array.from(persistedTrackMapMutationIdsByEvent.entries()).map(([eventId, mutationIds]) => [
+    eventId,
+    new Set(mutationIds),
+  ]));
 
   ledger.mutations.forEach((mutation) => {
     const eventId = getMutationEventId(mutation, idsByReference);
@@ -207,6 +233,11 @@ const splitLedgerByEvent = (ledger: EventCatalogLedger): {
     }
 
     updateMutationReferenceMaps(mutation, eventId, idsByReference);
+    if (eventId && isDedicatedTrackMapMutation(mutation) && !inlineTrackMapMutationIdsByEvent.get(eventId)?.has(getMutationId(mutation))) {
+      const trackMapMutationIds = trackMapMutationIdsByEvent.get(eventId) || new Set<string>();
+      trackMapMutationIds.add(getMutationId(mutation));
+      trackMapMutationIdsByEvent.set(eventId, trackMapMutationIds);
+    }
   });
 
   const eventFiles = Array.from(eventMutationsById.keys()).map((eventId) => ({
@@ -217,16 +248,32 @@ const splitLedgerByEvent = (ledger: EventCatalogLedger): {
     eventId,
     {
       eventId,
-      mutations,
+      mutations: mutations.filter((mutation) => !trackMapMutationIdsByEvent.get(eventId)?.has(getMutationId(mutation))),
       schemaVersion: 1 as const,
     },
   ]));
+  const mutationsById = new Map(ledger.mutations.map((mutation) => [getMutationId(mutation), mutation]));
+  const trackMapLedgersById = new Map(Array.from(trackMapMutationIdsByEvent.entries()).map(([eventId, mutationIds]) => [
+    eventId,
+    {
+      eventId,
+      mutations: Array.from(mutationIds).map((mutationId) => mutationsById.get(mutationId)).filter((mutation): mutation is EventCatalogMutation => mutation !== undefined),
+      schemaVersion: 1 as const,
+    },
+  ]));
+  const trackMapFiles = Array.from(trackMapLedgersById.keys()).map((eventId) => ({
+    eventId,
+    fileName: getTrackMapFileName(eventId),
+  }));
 
   return {
     eventFiles,
     eventLedgersById,
     globalMutations,
     mutationOrder,
+    trackMapFiles,
+    trackMapLedgersById,
+    trackMapMutationIdsByEvent,
   };
 };
 
@@ -257,7 +304,10 @@ const mergeSplitLedger = (
 export class ElectronJsonEventCatalogPersistence implements EventCatalogPersistence {
   private readonly eventFileContentById = new Map<string, string>();
   private readonly filePath: string;
+  private readonly inlineTrackMapMutationIdsByEvent = new Map<string, Set<string>>();
   private readonly onError: ((error: unknown) => void) | undefined;
+  private readonly trackMapFileContentById = new Map<string, string>();
+  private readonly trackMapMutationIdsByEvent = new Map<string, Set<string>>();
 
   public constructor(filePath: string, onError?: (error: unknown) => void) {
     this.filePath = filePath;
@@ -309,41 +359,93 @@ export class ElectronJsonEventCatalogPersistence implements EventCatalogPersiste
       const content = await api.requestFileContent<string>(eventFilePath, 'utf8');
       const parsed = JSON.parse(content) as SplitEventCatalogFile;
       this.eventFileContentById.set(eventFile.eventId, JSON.stringify(parsed, null, 2));
+      this.inlineTrackMapMutationIdsByEvent.set(eventFile.eventId, new Set(parsed.mutations
+        .filter(isDedicatedTrackMapMutation)
+        .map(getMutationId)));
       return parsed;
     }));
 
-    return mergeSplitLedger(manifest, eventLedgers);
+    const trackMapLedgers = await Promise.all((manifest.trackMapFiles || []).map(async (trackMapFile) => {
+      const trackMapFilePath = joinPath(directoryPath, trackMapFile.fileName);
+      incrementLoadingMetric('Load event catalog track-map file', trackMapFilePath);
+      const content = await api.requestFileContent<string>(trackMapFilePath, 'utf8');
+      const parsed = JSON.parse(content) as SplitEventCatalogFile;
+      this.trackMapFileContentById.set(trackMapFile.eventId, JSON.stringify(parsed, null, 2));
+      this.trackMapMutationIdsByEvent.set(trackMapFile.eventId, new Set(parsed.mutations.map(getMutationId)));
+      return parsed;
+    }));
+
+    return mergeSplitLedger(manifest, [...eventLedgers, ...trackMapLedgers]);
   }
 
   public async save(ledger: EventCatalogLedger): Promise<void> {
     try {
       const api = getRendererApi(['writeFileContent']);
       const directoryPath = getDirectoryPath(this.filePath);
-      const splitLedger = splitLedgerByEvent(ledger);
+      const splitLedger = splitLedgerByEvent(ledger, this.inlineTrackMapMutationIdsByEvent, this.trackMapMutationIdsByEvent);
       const manifest: SplitEventCatalogManifest = {
         eventFiles: splitLedger.eventFiles,
         globalMutations: splitLedger.globalMutations,
         mutationOrder: splitLedger.mutationOrder,
         schemaVersion: 2,
+        ...(splitLedger.trackMapFiles.length > 0 ? { trackMapFiles: splitLedger.trackMapFiles } : {}),
       };
 
-      await api.writeFileContent(this.filePath, JSON.stringify(manifest, null, 2));
-      await Promise.all(splitLedger.eventFiles.map((eventFile) => {
+      for (const trackMapFile of splitLedger.trackMapFiles) {
+        const trackMapLedger = splitLedger.trackMapLedgersById.get(trackMapFile.eventId);
+        const trackMapFileContent = JSON.stringify(trackMapLedger, null, 2);
+        if (this.trackMapFileContentById.get(trackMapFile.eventId) === trackMapFileContent) {
+          continue;
+        }
+
+        const trackMapFilePath = joinPath(directoryPath, trackMapFile.fileName);
+        await api.writeFileContent(trackMapFilePath, trackMapFileContent, 'utf8', {
+          context: { eventId: trackMapFile.eventId, operation: 'event catalog track-map persistence' },
+        });
+        this.trackMapFileContentById.set(trackMapFile.eventId, trackMapFileContent);
+        this.trackMapMutationIdsByEvent.set(trackMapFile.eventId, new Set(trackMapLedger?.mutations.map(getMutationId)));
+      }
+      for (const eventFile of splitLedger.eventFiles) {
         const eventLedger = splitLedger.eventLedgersById.get(eventFile.eventId);
         const eventFileContent = JSON.stringify(eventLedger, null, 2);
         if (this.eventFileContentById.get(eventFile.eventId) === eventFileContent) {
-          return Promise.resolve();
+          continue;
         }
 
-        this.eventFileContentById.set(eventFile.eventId, eventFileContent);
         const eventFilePath = joinPath(directoryPath, eventFile.fileName);
-        return api.writeFileContent(eventFilePath, eventFileContent);
-      }));
+        try {
+          await api.writeFileContent(eventFilePath, eventFileContent, 'utf8', {
+            context: {
+              eventId: eventFile.eventId,
+              operation: 'event catalog event persistence',
+            },
+          });
+          this.eventFileContentById.set(eventFile.eventId, eventFileContent);
+        } catch (error: unknown) {
+          const fileWriteFailure = getFileWriteFailure(error);
+          if (fileWriteFailure) {
+            throw new FileWriteFailureError({
+              diagnostics: {
+                ...fileWriteFailure.diagnostics,
+                operation: {
+                  ...fileWriteFailure.diagnostics.operation,
+                  eventId: eventFile.eventId,
+                },
+              },
+              guidance: fileWriteFailure.guidance,
+            }, `Could not save event data for ${eventFile.eventId} to ${eventFilePath}. ${fileWriteFailure.message}`);
+          }
+          const reason = error instanceof Error ? error.message : String(error);
+          throw new Error(`Could not save event data for ${eventFile.eventId} to ${eventFilePath}. ${reason}`);
+        }
+      }
+      await api.writeFileContent(this.filePath, JSON.stringify(manifest, null, 2), 'utf8', {
+        context: { operation: 'event catalog manifest persistence' },
+      });
     } catch (error: unknown) {
       if (isPermissionDeniedError(error)) {
         const warning = createPermissionWarning(this.filePath, 'write');
         reportRecoverableWarning(this.onError, warning);
-        return;
       }
       throw error;
     }

@@ -159,7 +159,7 @@ describe('ElectronJsonEventCatalogPersistence', () => {
     expect(loaded.schemaVersion).toBe(1);
   });
 
-  it('reports save permission errors without throwing', async () => {
+  it('reports save permission errors and preserves the failed save for the caller', async () => {
     const writeFileContent = vi.fn(async () => {
       throw new Error('EPERM: operation not permitted');
     });
@@ -173,13 +173,13 @@ describe('ElectronJsonEventCatalogPersistence', () => {
     const onError = vi.fn();
     const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath, onError);
 
-    await expect(persistence.save(createDefaultEventCatalogLedger())).resolves.toBeUndefined();
+    await expect(persistence.save(createDefaultEventCatalogLedger())).rejects.toThrow('EPERM: operation not permitted');
     expect(onError).toHaveBeenCalledOnce();
     expect(onError.mock.calls[0][0]).toContain('Windows denied file access');
   });
 
   it('writes event catalog data to a manifest and per-event data files', async () => {
-    const writeFileContent = vi.fn(async () => undefined);
+    const writeFileContent = vi.fn(async (_filePath: string, _contents: string): Promise<void> => undefined);
 
     (window as unknown as {
       api: { writeFileContent: (filePath: string, contents: string) => Promise<void> };
@@ -245,7 +245,9 @@ describe('ElectronJsonEventCatalogPersistence', () => {
           },
         ],
         schemaVersion: 2,
-      }, null, 2)
+      }, null, 2),
+      'utf8',
+      { context: { operation: 'event catalog manifest persistence' } },
     );
     expect(writeFileContent).toHaveBeenCalledWith(
       `../../test/generated/${eventId}.json`,
@@ -253,8 +255,43 @@ describe('ElectronJsonEventCatalogPersistence', () => {
         eventId,
         mutations: ledger.mutations,
         schemaVersion: 1,
-      }, null, 2)
+      }, null, 2),
+      'utf8',
+      { context: { eventId, operation: 'event catalog event persistence' } },
     );
+  });
+
+  it('keeps an event file eligible for retry when its write fails', async () => {
+    const eventId = createEventId('retry-event');
+    const ledger = {
+      ...createDefaultEventCatalogLedger(),
+      mutations: [{
+        event: {
+          categoryIds: [],
+          date: '2026-07-20',
+          entrantIds: [],
+          format: 'race-weekend' as const,
+          id: eventId,
+          name: 'Retry event',
+          sessionIds: [],
+        },
+        id: 'retry-event-created',
+        timestamp: '2026-07-20T00:00:00.000Z',
+        type: 'event-created' as const,
+      }],
+    };
+    const eventFilePath = `../../test/generated/${eventId}.json`;
+    const writeFileContent = vi.fn(async (filePath: string) => {
+      if (filePath === eventFilePath && writeFileContent.mock.calls.filter(([path]) => path === eventFilePath).length === 1) {
+        throw new Error('UNKNOWN: unable to open file');
+      }
+    });
+    (window as unknown as { api: { writeFileContent: (filePath: string, contents: string) => Promise<void> } }).api = { writeFileContent };
+
+    const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath);
+    await expect(persistence.save(ledger)).rejects.toThrow(`Could not save event data for ${eventId} to ${eventFilePath}`);
+    await expect(persistence.save(ledger)).resolves.toBeUndefined();
+    expect(writeFileContent.mock.calls.filter(([filePath]) => filePath === eventFilePath)).toHaveLength(2);
   });
 
   it('loads split event catalog manifests and event data files as one ledger', async () => {
@@ -304,6 +341,131 @@ describe('ElectronJsonEventCatalogPersistence', () => {
       schemaVersion: 1,
     });
     expect(requestFileContent).toHaveBeenCalledWith(`../../test/generated/${eventId}.json`, 'utf8');
+  });
+
+  it('loads Track Map mutations from the referenced sidecar file in ledger order', async () => {
+    const eventId = createEventId('track-map-sidecar-event');
+    const eventMutation = {
+      event: {
+        categoryIds: [],
+        date: '2026-07-20',
+        entrantIds: [],
+        format: 'race-weekend' as const,
+        id: eventId,
+        name: 'Track Map Sidecar Event',
+        sessionIds: [],
+      },
+      id: 'track-map-sidecar-event-created',
+      timestamp: '2026-07-20T00:00:00.000Z',
+      type: 'event-created' as const,
+    };
+    const trackMapMutation = {
+      changes: { trackMap: { timingLines: [{ lineNumber: 1, progress: 0.5 }] } },
+      eventId,
+      id: 'track-map-sidecar-updated',
+      timestamp: '2026-07-20T00:01:00.000Z',
+      type: 'event-updated' as const,
+    };
+    const requestFileContent = vi.fn(async (filePath: string) => {
+      if (filePath === eventCatalogTestPath) {
+        return JSON.stringify({
+          eventFiles: [{ eventId, fileName: `${eventId}.json` }],
+          globalMutations: [],
+          mutationOrder: [
+            { eventId, mutationId: eventMutation.id },
+            { eventId, mutationId: trackMapMutation.id },
+          ],
+          schemaVersion: 2,
+          trackMapFiles: [{ eventId, fileName: `${eventId}.track-map.json` }],
+        });
+      }
+      if (filePath.endsWith('.track-map.json')) {
+        return JSON.stringify({ eventId, mutations: [trackMapMutation], schemaVersion: 1 });
+      }
+      return JSON.stringify({ eventId, mutations: [eventMutation], schemaVersion: 1 });
+    });
+    (window as unknown as {
+      api: { requestFileContent: <T>(filePath: string, dataType: string) => Promise<T> };
+    }).api = {
+      requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+    };
+
+    const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath);
+    await expect(persistence.load()).resolves.toEqual({ mutations: [eventMutation, trackMapMutation], schemaVersion: 1 });
+    expect(requestFileContent).toHaveBeenCalledWith(`../../test/generated/${eventId}.track-map.json`, 'utf8');
+  });
+
+  it('saves a Track Map-only update to a sidecar without rewriting the loaded event file', async () => {
+    const eventId = createEventId('sidecar-save-event');
+    const eventMutation = {
+      event: {
+        categoryIds: [],
+        date: '2026-07-20',
+        entrantIds: [],
+        format: 'race-weekend' as const,
+        id: eventId,
+        name: 'Sidecar Save Event',
+        sessionIds: [],
+      },
+      id: 'sidecar-save-event-created',
+      timestamp: '2026-07-20T00:00:00.000Z',
+      type: 'event-created' as const,
+    };
+    const legacyTrackMapMutation = {
+      changes: { trackMap: { timingLines: [] } },
+      eventId,
+      id: 'legacy-track-map-update',
+      timestamp: '2026-07-20T00:01:00.000Z',
+      type: 'event-updated' as const,
+    };
+    const newTrackMapMutation = {
+      changes: { trackMap: { timingLines: [{ lineNumber: 1, progress: 0.5 }] } },
+      eventId,
+      id: 'sidecar-track-map-update',
+      timestamp: '2026-07-20T00:02:00.000Z',
+      type: 'event-updated' as const,
+    };
+    const eventFilePath = `../../test/generated/${eventId}.json`;
+    const requestFileContent = vi.fn(async (filePath: string) => {
+      if (filePath === eventCatalogTestPath) {
+        return JSON.stringify({
+          eventFiles: [{ eventId, fileName: `${eventId}.json` }],
+          globalMutations: [],
+          mutationOrder: [
+            { eventId, mutationId: eventMutation.id },
+            { eventId, mutationId: legacyTrackMapMutation.id },
+          ],
+          schemaVersion: 2,
+        });
+      }
+      return JSON.stringify({ eventId, mutations: [eventMutation, legacyTrackMapMutation], schemaVersion: 1 });
+    });
+    const writeFileContent = vi.fn(async (_filePath: string, _contents: string): Promise<void> => undefined);
+    (window as unknown as {
+      api: {
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, contents: string, dataType?: string, options?: unknown) => Promise<void>;
+      };
+    }).api = {
+      requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent,
+    };
+
+    const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath);
+    await persistence.load();
+    await persistence.save({ mutations: [eventMutation, legacyTrackMapMutation, newTrackMapMutation], schemaVersion: 1 });
+
+    expect(writeFileContent).toHaveBeenCalledWith(
+      `../../test/generated/${eventId}.track-map.json`,
+      JSON.stringify({ eventId, mutations: [newTrackMapMutation], schemaVersion: 1 }, null, 2),
+      'utf8',
+      { context: { eventId, operation: 'event catalog track-map persistence' } },
+    );
+    expect(writeFileContent).not.toHaveBeenCalledWith(eventFilePath, expect.any(String), expect.anything(), expect.anything());
+    const manifestWrite = writeFileContent.mock.calls.find(([filePath]) => filePath === eventCatalogTestPath);
+    expect(JSON.parse(manifestWrite?.[1] as string)).toMatchObject({
+      trackMapFiles: [{ eventId, fileName: `${eventId}.track-map.json` }],
+    });
   });
 
   it('skips unchanged event data files on subsequent saves', async () => {
@@ -356,8 +518,8 @@ describe('ElectronJsonEventCatalogPersistence', () => {
     writeFileContent.mockClear();
     await persistence.save(secondLedger);
 
-    expect(writeFileContent).toHaveBeenCalledWith(eventCatalogTestPath, expect.any(String));
-    expect(writeFileContent).toHaveBeenCalledWith(`../../test/generated/${eventOneId}.json`, expect.any(String));
-    expect(writeFileContent).not.toHaveBeenCalledWith(`../../test/generated/${eventTwoId}.json`, expect.any(String));
+    expect(writeFileContent).toHaveBeenCalledWith(eventCatalogTestPath, expect.any(String), 'utf8', expect.any(Object));
+    expect(writeFileContent).toHaveBeenCalledWith(`../../test/generated/${eventOneId}.json`, expect.any(String), 'utf8', expect.any(Object));
+    expect(writeFileContent).not.toHaveBeenCalledWith(`../../test/generated/${eventTwoId}.json`, expect.any(String), 'utf8', expect.any(Object));
   });
 });

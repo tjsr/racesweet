@@ -1233,6 +1233,11 @@ describe('race analytics views integration', () => {
     const speedSelect = container.querySelector('select[aria-label="Track Map Playback Speed"]') as HTMLSelectElement;
     expect(Array.from(speedSelect.options).map((option) => option.textContent)).toContain('0.1x');
     expect(Array.from(speedSelect.options).map((option) => option.textContent)).toContain('100x');
+    const checkLineOrder = container.querySelector('button[aria-label="Check Track Map Line Order"]') as HTMLButtonElement;
+    await act(async () => {
+      checkLineOrder.click();
+    });
+    expect(container.querySelector('[aria-label="Track Map Line Order Check"]')?.textContent).toContain('Timing-line order matches the observed crossing sequence.');
     expect(container.textContent).toContain('Event elapsed time:');
     expect(container.textContent).toContain('Time of day:');
 

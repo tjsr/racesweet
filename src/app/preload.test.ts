@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
-import { RequestOpenLocalFileIpcInvokeChannel, RequestReadIpcSendChannel, RequestSelectLocalDirectoryIpcInvokeChannel, RequestSelectLocalFileIpcInvokeChannel, RequestWriteIpcSendChannel } from '../model/electronIpc.js';
+import { RequestOpenLocalFileIpcInvokeChannel, RequestReadIpcSendChannel, RequestSelectLocalDirectoryIpcInvokeChannel, RequestSelectLocalFileIpcInvokeChannel, RequestWriteIpcSendChannel, WriteContentErrorIpcReceiveChannel } from '../model/electronIpc.js';
 import { contextBridge, ipcRenderer } from 'electron';
+
 
 vi.mock('electron', () => ({
   contextBridge: {
@@ -92,6 +93,41 @@ describe('Electron preload renderer API', () => {
       '22222222-2222-4222-8222-222222222222',
       '{"schemaVersion":1}',
       'utf8');
+  });
+
+  it('converts structured main-process file-write failures into renderer errors', async () => {
+    setContextIsolation(false);
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('33333333-3333-4333-8333-333333333333');
+    await import('./preload.js');
+
+    const pendingWrite = window.api.writeFileContent('catalog.json', '{}');
+    const errorListener = vi.mocked(ipcRenderer.on).mock.calls.find(([channel]) => channel === WriteContentErrorIpcReceiveChannel)?.[1];
+    errorListener?.({} as never, '33333333-3333-4333-8333-333333333333', {
+      diagnostics: {
+        attemptId: 'save-attempt-1',
+        currentWorkingDirectory: 'C:\\dev\\racesweet',
+        durationMilliseconds: 1,
+        message: 'access denied',
+        osUserName: 'tim',
+        parentDirectoryPath: 'C:\\dev\\racesweet\\src\\generated',
+        payloadByteLength: 2,
+        payloadType: 'utf8',
+        processId: 1234,
+        queuedBehindApplicationWrite: false,
+        queueWaitMilliseconds: 0,
+        requestedPath: 'catalog.json',
+        resolvedPath: 'C:\\dev\\racesweet\\src\\generated\\catalog.json',
+        startedAt: '2026-07-20T00:00:00.000Z',
+        userDataPath: 'C:\\Users\\tim\\AppData\\Roaming\\RaceSweet',
+      },
+      guidance: 'Check file permissions.',
+    });
+
+    await expect(pendingWrite).rejects.toMatchObject({
+      diagnostics: expect.objectContaining({ attemptId: 'save-attempt-1' }),
+      guidance: 'Check file permissions.',
+      name: 'FileWriteFailureError',
+    });
   });
 
   it('opens local files through the invoke IPC bridge', async () => {

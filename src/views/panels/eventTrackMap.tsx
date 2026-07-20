@@ -1,4 +1,5 @@
 import React from 'react';
+import { type FileWriteDiagnostics, getFileWriteFailure } from '../../app/fileWriteDiagnostics.js';
 import type { EventCatalogEvent, EventTrackMap, EventTrackTimingLine } from '../../catalog/eventCatalog.js';
 import { createTrackMapGeometry, getClosestTrackProgress, getTrackPointAtProgress, toSvgPolylinePoints } from '../reports/trackMapGeometry.js';
 
@@ -24,9 +25,38 @@ const normalizeTrackMap = (trackMap: EventTrackMap | undefined): EventTrackMap =
   trackCsvFileName: trackMap?.trackCsvFileName,
 });
 
+const errorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
+
+const formatSaveDiagnostics = (eventId: string, diagnostics: FileWriteDiagnostics): string => [
+  'RaceSweet save diagnostics',
+  `eventId: ${eventId}`,
+  `attemptId: ${diagnostics.attemptId}`,
+  `requestedPath: ${diagnostics.requestedPath}`,
+  `resolvedPath: ${diagnostics.resolvedPath}`,
+  `parentDirectoryPath: ${diagnostics.parentDirectoryPath}`,
+  `code: ${diagnostics.code || 'unavailable'}`,
+  `errno: ${diagnostics.errno || 'unavailable'}`,
+  `syscall: ${diagnostics.syscall || 'unavailable'}`,
+  `message: ${diagnostics.message}`,
+  `currentWorkingDirectory: ${diagnostics.currentWorkingDirectory}`,
+  `userDataPath: ${diagnostics.userDataPath}`,
+  `osUserName: ${diagnostics.osUserName}`,
+  `operation: ${diagnostics.operation?.operation || 'unavailable'}`,
+  `processId: ${diagnostics.processId}`,
+  `queuedBehindApplicationWrite: ${diagnostics.queuedBehindApplicationWrite}`,
+  `queueWaitMilliseconds: ${diagnostics.queueWaitMilliseconds}`,
+  `sessionId: ${diagnostics.operation?.sessionId || 'unavailable'}`,
+  `trackMapId: ${diagnostics.operation?.trackMapId || 'unavailable'}`,
+  `startedAt: ${diagnostics.startedAt}`,
+  `durationMilliseconds: ${diagnostics.durationMilliseconds}`,
+  `stackSnippet: ${diagnostics.stackSnippet || 'unavailable'}`,
+].join('\n');
+
 export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactElement => {
   const [draft, setDraft] = React.useState<EventTrackMap>(() => normalizeTrackMap(props.selectedEvent?.trackMap));
   const [editing, setEditing] = React.useState<boolean>(false);
+  const [isSaving, setIsSaving] = React.useState<boolean>(false);
+  const [saveFailure, setSaveFailure] = React.useState<FileWriteDiagnostics | undefined>(undefined);
   const [selectedLineNumber, setSelectedLineNumber] = React.useState<number | undefined>(undefined);
   const [status, setStatus] = React.useState<string>('');
   const geometry = React.useMemo(() => createTrackMapGeometry(draft), [draft]);
@@ -48,6 +78,7 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
     setDraft(normalizeTrackMap(props.selectedEvent?.trackMap));
     setEditing(false);
     setSelectedLineNumber(undefined);
+    setSaveFailure(undefined);
     setStatus('');
   }, [props.selectedEvent]);
 
@@ -82,6 +113,22 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
       timingLines: [...current.timingLines.filter((line) => line.lineNumber !== selectedLineNumber), timingLine]
         .sort((left, right) => left.lineNumber - right.lineNumber),
     }));
+  };
+
+  const saveTrackMap = async (): Promise<void> => {
+    setIsSaving(true);
+    setSaveFailure(undefined);
+    setStatus('Saving track map…');
+    try {
+      await props.onSave(draft);
+      setStatus('Track map saved.');
+    } catch (error: unknown) {
+      const failure = getFileWriteFailure(error);
+      setSaveFailure(failure?.diagnostics);
+      setStatus(`Could not save the track map. ${failure?.guidance || errorMessage(error)} The timing-line positions remain unsaved; check that the event data file is writable and try again.`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!props.selectedEvent) {
@@ -169,13 +216,16 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
           Use circular track
         </button>
         <button
+          disabled={isSaving}
           type="button"
           onClick={() => {
-            Promise.resolve(props.onSave(draft)).then(() => setStatus('Track map saved.'));
+            void saveTrackMap();
           }}
         >
-          Save Track Map
+          {isSaving ? 'Saving Track Map…' : 'Save Track Map'}
         </button>
+        {status ? <span aria-label="Track Map Save Status" role="status">{status}</span> : null}
+        {saveFailure ? <button onClick={() => void navigator.clipboard.writeText(formatSaveDiagnostics(props.selectedEvent?.id.toString() || 'unavailable', saveFailure))} type="button">Copy save diagnostics</button> : null}
       </div>
       {editing ? (
         <div
@@ -189,13 +239,16 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
           <div className="events-actions">
             <button onClick={() => setEditing(false)} type="button">Back to event</button>
             <button
+              disabled={isSaving}
               onClick={() => {
-                Promise.resolve(props.onSave(draft)).then(() => setStatus('Track map saved.'));
+                void saveTrackMap();
               }}
               type="button"
             >
-              Save Track Map
+              {isSaving ? 'Saving Track Map…' : 'Save Track Map'}
             </button>
+            {status ? <span aria-label="Track Map Save Status" role="status">{status}</span> : null}
+            {saveFailure ? <button onClick={() => void navigator.clipboard.writeText(formatSaveDiagnostics(props.selectedEvent?.id.toString() || 'unavailable', saveFailure))} type="button">Copy save diagnostics</button> : null}
           </div>
           <label>
             Timing line
@@ -234,7 +287,6 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
           </svg>
         </div>
       ) : null}
-      {status ? <p role="status">{status}</p> : null}
     </section>
   );
 };
