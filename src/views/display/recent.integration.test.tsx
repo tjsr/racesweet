@@ -116,7 +116,9 @@ const getRecentRecordsFilterSelect = (): Element | undefined => {
       element.textContent?.includes('Only flags') ||
       element.textContent?.includes('Only potential missing crossings') ||
       element.textContent?.includes('Only selected category') ||
+      element.textContent?.includes('Only selected entrant') ||
       element.textContent?.includes('Only selected team') ||
+      element.textContent?.includes('Only selected driver') ||
       element.textContent?.includes('Only selected rider');
   });
 };
@@ -255,6 +257,7 @@ describe('RecentRecords integration', () => {
     await act(async () => {
       root.render(
         <RecentRecords
+          eventDiscipline="cycling"
           raceStateLookup={raceStateLookup}
           records={[
             createGreenFlagEvent({
@@ -286,6 +289,16 @@ describe('RecentRecords integration', () => {
     expect(toolbar?.querySelector('#recent-records-time-zone-dropdown')).toBeDefined();
     expect(toolbar?.querySelector('#recent-records-ignore-dropdown')).toBeDefined();
     expect(toolbar?.querySelector('#recent-records-order-dropdown')).toBeDefined();
+    const filterSelect = getRecentRecordsFilterSelect();
+    expect(filterSelect).toBeDefined();
+    await act(async () => {
+      filterSelect!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+    const filterLabels = Array.from(document.querySelectorAll('li[role="option"]')).map((option) => option.textContent?.trim());
+    expect(filterLabels).toContain('Only selected rider');
+    expect(filterLabels).toContain('Only selected entrant');
+    expect(filterLabels).not.toContain('Only selected driver');
+    expect(filterLabels).not.toContain('Only selected team');
     const goToButton = Array.from(toolbar?.querySelectorAll('button') || []).find((button) => button.textContent?.trim() === 'Go to');
     expect(goToButton).toBeDefined();
 
@@ -2106,7 +2119,7 @@ describe('RecentRecords integration', () => {
     await selectRecentRecordsFilter('All records');
     expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
 
-    await selectRecentRecordsFilter('Only selected rider');
+    await selectRecentRecordsFilter('Only selected driver');
     expect(getDisplayedRecordIds(container)).toEqual(['2001']);
 
     await selectRecentRecordsFilter('All records');
@@ -2195,7 +2208,8 @@ describe('RecentRecords integration', () => {
     const allRecordIds = ['2001', '2002', '2003'];
     const filterCases = [
       { expectedRecordIds: ['2001', '2002'], label: 'Only selected category' },
-      { expectedRecordIds: ['2001'], label: 'Only selected rider' },
+      { expectedRecordIds: ['2001'], label: 'Only selected driver' },
+      { expectedRecordIds: ['2001', '2002'], label: 'Only selected entrant' },
       { expectedRecordIds: ['2001', '2002'], label: 'Only selected team' },
     ];
 

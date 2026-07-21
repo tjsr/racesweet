@@ -12,7 +12,7 @@ import {
   tableDateTimeStringInTimeZone,
   timeOfDayInputStringInTimeZone,
 } from '../../app/utils/timeutils.ts';
-import type { EventSessionKind } from '../../catalog/eventCatalog.ts';
+import type { EventDiscipline, EventSessionKind } from '../../catalog/eventCatalog.ts';
 import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../controllers/category.ts';
 import { createGreenFlagEvent, createRedFlagEvent, isFlagRecord } from '../../controllers/flag';
 import { getLapTimeCell, getPassingLineNumber, getPassingLoopNumber, getSourceLapCompletion, getTimingLineKey, isFastestLapCandidate, isFinishLinePassing, isLapCompletionPassing } from '../../controllers/laps.ts';
@@ -27,6 +27,7 @@ import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } fro
 import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../model';
 import { findCtcTrackLineName } from '../../model/ctcTrackConfig.ts';
 import { EventCategory, EventCategoryId } from '../../model/eventcategory';
+import type { EventEntry } from '../../model/entry.ts';
 import { EventTeam } from '../../model/eventteam.ts';
 import { FlagRecord } from '../../model/flag';
 import { createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.ts';
@@ -46,7 +47,7 @@ import {
 import { InvalidCategoryIdError, NoCrossingError, NoParticipantError, ParticipantNotFoundError } from '../../validators/errors.ts';
 import "./recent.css";
 
-type RecentRecordsFilterMode = 'all' | 'category' | 'flags' | 'participant' | 'potentialMissingCrossings' | 'team';
+type RecentRecordsFilterMode = 'all' | 'category' | 'entrant' | 'flags' | 'participant' | 'potentialMissingCrossings' | 'team';
 type RecentRecordsIgnoreMode = 'outsideEventWindow' | 'sectorLoops' | 'unrecognised';
 type RecentRecordsGoToOption =
   | 'first'
@@ -762,6 +763,7 @@ const getCrossingUnrelatedReason = (passing: ParticipantPassingRecord): string |
 interface RecordsProps {
   currentEventId?: EventId;
   currentSessionId?: SessionId;
+  eventDiscipline?: EventDiscipline;
   eventTimeZone?: string;
   fastestTimeIndicatorColors?: FastestTimeIndicatorColors;
   onAddRecord?: (record: EventTimeRecord) => void;
@@ -1672,10 +1674,35 @@ const selectedTeamMemberIds = (
   raceStateLookup: RaceStateLookup,
   selectedParticipants: Set<EventParticipantId>
 ): Set<EventParticipantId> => {
-  const teams = (raceStateLookup as unknown as { teams?: EventTeam[] }).teams || [];
+  const raceState = raceStateLookup as RaceStateLookup & { entries?: EventEntry[]; teams?: EventTeam[] };
+  const teams = raceState.teams || [];
   const selectedTeam = teams.find((team) => team.members.some((memberId) => selectedParticipants.has(memberId)));
+  const selectedEntryId = Array.from(selectedParticipants)
+    .map((participantId) => raceStateLookup.getEntryIdForParticipant?.(participantId))
+    .find((entryId) => entryId !== undefined);
+  const selectedEntry = (raceState.entries || []).find((entry) => entry.id === selectedEntryId);
 
-  return new Set<EventParticipantId>(selectedTeam?.members || []);
+  return new Set<EventParticipantId>(selectedTeam?.members || selectedEntry?.participantIds || []);
+};
+
+const selectedEntrantIds = (
+  raceStateLookup: RaceStateLookup,
+  selectedParticipants: Set<EventParticipantId>
+): Set<string> => {
+  return new Set<string>(
+    Array.from(selectedParticipants)
+      .map((participantId) => raceStateLookup.getEntrantIdForParticipant(participantId)?.toString())
+      .filter((entrantId): entrantId is string => entrantId !== undefined)
+  );
+};
+
+const hasMultiParticipantEntry = (raceStateLookup: RaceStateLookup): boolean => {
+  const raceState = raceStateLookup as RaceStateLookup & {
+    entries?: Array<{ participantIds: EventParticipantId[] }>;
+    teams?: EventTeam[];
+  };
+  return (raceState.entries || []).some((entry) => entry.participantIds.length > 1) ||
+    (raceState.teams || []).some((team) => team.members.length > 1);
 };
 
 const recordMatchesSelectedParticipants = (
@@ -1684,6 +1711,19 @@ const recordMatchesSelectedParticipants = (
   selectedParticipants: Set<EventParticipantId>
 ): boolean => {
   return isCrossingRecord(record) && !!resolveCrossingParticipant(record, raceStateLookup)?.id && selectedParticipants.has(resolveCrossingParticipant(record, raceStateLookup)!.id);
+};
+
+const recordMatchesSelectedEntrants = (
+  record: EventTimeRecord,
+  raceStateLookup: RaceStateLookup,
+  entrantIds: Set<string>
+): boolean => {
+  if (!isCrossingRecord(record)) {
+    return false;
+  }
+  const participant = resolveCrossingParticipant(record, raceStateLookup);
+  const entrantId = participant ? raceStateLookup.getEntrantIdForParticipant(participant.id) : undefined;
+  return entrantId !== undefined && entrantIds.has(entrantId.toString());
 };
 
 const getFlagCategoryIds = (flag: FlagRecord): EventCategoryId[] => {
@@ -2478,6 +2518,13 @@ export const RecentRecords = (props: RecordsProps & {
   const teamMemberIds = React.useMemo(() => {
     return selectedTeamMemberIds(props.raceStateLookup, selectedParticipants);
   }, [props.raceStateLookup, selectedParticipantKey, selectedParticipants]);
+  const entrantIds = React.useMemo(() => {
+    return selectedEntrantIds(props.raceStateLookup, selectedParticipants);
+  }, [props.raceStateLookup, selectedParticipantKey, selectedParticipants]);
+  const canFilterByTeam = React.useMemo(() => {
+    return hasMultiParticipantEntry(props.raceStateLookup);
+  }, [props.raceStateLookup]);
+  const isCyclingEvent = props.eventDiscipline === 'cycling';
   const highlightedParticipantIds = React.useMemo(() => {
     return new Set<EventParticipantId>([
       ...selectedParticipants,
@@ -2521,13 +2568,14 @@ export const RecentRecords = (props: RecordsProps & {
   React.useEffect(() => {
     const selectedFilterHasNoTarget =
       (filterMode === 'category' && selectedCategories.size === 0) ||
+      (filterMode === 'entrant' && entrantIds.size === 0) ||
       (filterMode === 'participant' && selectedParticipants.size === 0) ||
-      (filterMode === 'team' && teamMemberIds.size === 0);
+      (filterMode === 'team' && (!canFilterByTeam || teamMemberIds.size === 0));
 
     if (selectedFilterHasNoTarget) {
       setFilterMode('all');
     }
-  }, [filterMode, selectedCategories, selectedParticipants, teamMemberIds]);
+  }, [canFilterByTeam, entrantIds, filterMode, selectedCategories, selectedParticipants, teamMemberIds]);
   React.useEffect(() => {
     if (selectionStateMatches(deferredSelectionState, immediateSelectionState)) {
       return;
@@ -2602,6 +2650,9 @@ export const RecentRecords = (props: RecordsProps & {
       if (filterMode === 'participant') {
         return recordMatchesSelectedParticipants(record, props.raceStateLookup, selectedParticipants);
       }
+      if (filterMode === 'entrant') {
+        return recordMatchesSelectedEntrants(record, props.raceStateLookup, entrantIds);
+      }
       return recordMatchesSelectedParticipants(record, props.raceStateLookup, teamMemberIds);
     });
   }, [
@@ -2613,6 +2664,7 @@ export const RecentRecords = (props: RecordsProps & {
     potentialMissingCrossingIndicators,
     selectedCategories,
     selectedParticipants,
+    entrantIds,
     teamMemberIds,
   ]);
   const sortedRecords = React.useMemo(() => {
@@ -3140,8 +3192,9 @@ export const RecentRecords = (props: RecordsProps & {
             <MenuItem value="flags">Only flags</MenuItem>
             <MenuItem value="potentialMissingCrossings">Only potential missing crossings</MenuItem>
             <MenuItem value="category">Only selected category</MenuItem>
-            <MenuItem value="team">Only selected team</MenuItem>
-            <MenuItem value="participant">Only selected rider</MenuItem>
+            {canFilterByTeam ? <MenuItem value="team">Only selected team</MenuItem> : null}
+            <MenuItem value="entrant">Only selected entrant</MenuItem>
+            <MenuItem value="participant">Only selected {isCyclingEvent ? 'rider' : 'driver'}</MenuItem>
           </Select>
         </FormControl>
         <FormControl

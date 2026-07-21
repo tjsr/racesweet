@@ -142,6 +142,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
       <RecentRecords
         currentEventId={props.timingEvent?.id}
         currentSessionId={props.timingSessionValue}
+        eventDiscipline={props.timingEvent?.discipline}
         eventTimeZone={props.eventTimeZone}
         fastestTimeIndicatorColors={props.fastestTimeIndicatorColors}
         onAddRecord={props.onAddRecord}
