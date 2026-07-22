@@ -14,7 +14,7 @@ import {
 } from '../../app/utils/timeutils.ts';
 import type { EventDiscipline, EventSessionKind } from '../../catalog/eventCatalog.ts';
 import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../processing/category.ts';
-import { createGreenFlagEvent, createRedFlagEvent, isFlagRecord } from '../../processing/flag';
+import { isFlagRecord } from '../../processing/flag';
 import { getLapTimeCell, getPassingLineNumber, getPassingLoopNumber, getSourceLapCompletion, getTimingLineKey, isFastestLapCandidate, isFinishLinePassing, isLapCompletionPassing } from '../../processing/laps.ts';
 import { getParticipantNumber, getParticipantTransponders } from '../../processing/participant.ts';
 import { findEntrantByChipCode, findEntrantByPlateNumber } from '../../processing/participantSearch.ts';
@@ -36,7 +36,6 @@ import { getParticipantDisplayName } from '../../model/participantDisplay.js';
 import { EventId, SessionId } from '../../model/raceevent.ts';
 import { RaceStateLookup, getEffectiveParticipantCategoryId } from '../../model/racestate.ts';
 import {
-  EVENT_FLAG_DISPLAYED,
   EVENT_SESSION_END,
   ParticipantPassingRecord,
   RECORD_TX_CROSSING,
@@ -190,7 +189,6 @@ interface AddRecordDialogState {
   mode: RecordDialogMode;
 }
 
-const MANUAL_RECORD_SOURCE_ID = createTimeRecordSourceId('manual-entry');
 const GENERATED_MISSING_CROSSING_SOURCE_ID = createTimeRecordSourceId('generated-missing-crossing');
 const manualFlagLabelByType: Record<AddableFlagType, string> = {
   chequered: 'Checquered',

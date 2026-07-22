@@ -22,6 +22,8 @@ import type { EventEntrantId } from "./entrant.js";
 import type { EventTeam } from "./eventteam.js";
 import type { MapOf, TimeRecordSourceId } from "./types.js";
 
+export type SessionItemLoadedCallback<TItem> = (item: TItem, index: number, total: number) => Promise<void>;
+
 export interface RaceStateLookup {
   getParticipantById(participantId: EventParticipantId): EventParticipant | undefined;
   getCategoryById(categoryId: EventCategoryId): EventCategory | undefined;
@@ -131,7 +133,9 @@ export class Session implements RaceState, RaceStateLookup {
         crossing.participantStartRecordId = undefined;
         crossing.startingLapRecordId = undefined;
       });
-    assignParticpantsToCrossings(this.getProcessingParticipants(), this.records, this._sessionValidCategoryIds);
+    if (!this._bulkProcess) {
+      assignParticpantsToCrossings(this.getProcessingParticipants(), this.records, this._sessionValidCategoryIds);
+    }
     this._cachedParticipantLaps = undefined;
     if (!this._bulkProcess) {
       this.__reprocessAllParticipantLaps();
@@ -421,7 +425,11 @@ export class Session implements RaceState, RaceStateLookup {
     }
   }
 
-  public async addRecords(records: TimeRecord[], validate: boolean = true): Promise<void> {
+  public async addRecords(
+    records: TimeRecord[],
+    validate: boolean = true,
+    onItemLoaded?: SessionItemLoadedCallback<TimeRecord>,
+  ): Promise<void> {
     try {
       this._validateRecords(records);
     } catch (error: unknown) {
@@ -430,7 +438,22 @@ export class Session implements RaceState, RaceStateLookup {
       }
     }
 
-    records.forEach((record: TimeRecord) => {
+    if (!onItemLoaded) {
+      records.forEach((record: TimeRecord) => {
+        incrementLoadingMetric('Add session record', record.id.toString());
+        if (!isValidId(record.id)) {
+          throw new InvalidIdError(`Record ID ${record.id} is not a valid Id type.`);
+        }
+        this._records.set(record.id.toString(), record);
+
+        if (!this._bulkProcess) {
+          this._processRecord(record);
+        }
+      });
+      return;
+    }
+
+    for (const [index, record] of records.entries()) {
       incrementLoadingMetric('Add session record', record.id.toString());
       if (!isValidId(record.id)) {
         throw new InvalidIdError(`Record ID ${record.id} is not a valid Id type.`);
@@ -440,7 +463,8 @@ export class Session implements RaceState, RaceStateLookup {
       if (!this._bulkProcess) {
         this._processRecord(record);
       }
-    });
+      await onItemLoaded(record, index, records.length);
+    }
   }
 
   public updateRecord(record: EventTimeRecord): void {
@@ -471,10 +495,12 @@ export class Session implements RaceState, RaceStateLookup {
     this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
     this._categoryGreenFlags = undefined;
 
-    if (isCrossingRecord(updatedRecord)) {
+    if (!this._bulkProcess && isCrossingRecord(updatedRecord)) {
       assignParticpantsToCrossings(this.getProcessingParticipants(), [updatedRecord], this._sessionValidCategoryIds);
     }
-    this.__reprocessAllParticipantLaps();
+    if (!this._bulkProcess) {
+      this.__reprocessAllParticipantLaps();
+    }
   }
 
   public getParticipantLaps(participantId: EventParticipantId): ParticipantPassingRecord[] | null | undefined {
@@ -510,10 +536,12 @@ export class Session implements RaceState, RaceStateLookup {
         delete crossing.isExcluded;
       }
       crossing.isManuallyExcluded = exclude;
-      if (record.participantId) {
-        this.__reprocessParticipantLaps(record.participantId);
-      } else {
-        this.__reprocessAllParticipantLaps();
+      if (!this._bulkProcess) {
+        if (record.participantId) {
+          this.__reprocessParticipantLaps(record.participantId);
+        } else {
+          this.__reprocessAllParticipantLaps();
+        }
       }
     }
   }
@@ -527,7 +555,9 @@ export class Session implements RaceState, RaceStateLookup {
     const categoryStartOverrides = new Set<EventCategoryId>(flag.categoryStartOverrides || []);
     categoryStartOverrides.add(categoryId);
     flag.categoryStartOverrides = Array.from(categoryStartOverrides);
-    this.__reprocessAfterFlagChange();
+    if (!this._bulkProcess) {
+      this.__reprocessAfterFlagChange();
+    }
   }
 
   public canAssignFlagCategory(flagId: TimeRecordId, categoryId: EventCategoryId): boolean {
@@ -543,7 +573,9 @@ export class Session implements RaceState, RaceStateLookup {
   public markFlagDeleted(flagId: TimeRecordId, deleted: boolean): void {
     const flag = this.getFlagById(flagId);
     flag.deleted = deleted;
-    this.__reprocessAfterFlagChange();
+    if (!this._bulkProcess) {
+      this.__reprocessAfterFlagChange();
+    }
   }
 
   public removeFlagCategory(flagId: TimeRecordId, categoryId: EventCategoryId): void {
@@ -551,7 +583,9 @@ export class Session implements RaceState, RaceStateLookup {
     const flag = this.getFlagById(flagId);
     flag.categoryIds = (flag.categoryIds || []).filter((id) => id !== categoryId);
     flag.categoryStartOverrides = (flag.categoryStartOverrides || []).filter((id) => id !== categoryId);
-    this.__reprocessAfterFlagChange();
+    if (!this._bulkProcess) {
+      this.__reprocessAfterFlagChange();
+    }
   }
 
   public updateParticipantCategory(participantId: EventParticipantId, categoryId: EventCategoryId): void {
@@ -565,7 +599,9 @@ export class Session implements RaceState, RaceStateLookup {
           (record as ParticipantPassingRecord).participantStartRecordId = undefined;
         });
 
-      this.__reprocessParticipantLaps(participantId);
+      if (!this._bulkProcess) {
+        this.__reprocessParticipantLaps(participantId);
+      }
     }
   }
 
@@ -573,7 +609,9 @@ export class Session implements RaceState, RaceStateLookup {
     const category = this.getCategoryById(categoryId);
 
     Object.assign(category, changes);
-    this.__reprocessParticipantLapsForCategory(categoryId);
+    if (!this._bulkProcess) {
+      this.__reprocessParticipantLapsForCategory(categoryId);
+    }
   }
 
   public updateEntrantCategory(entrantId: EventEntrantId, categoryId: EventCategoryId): void {
@@ -590,7 +628,9 @@ export class Session implements RaceState, RaceStateLookup {
         this.updateParticipantCategory(participant.id, categoryId);
       });
     } else {
-      this.__reprocessAllParticipantLaps();
+      if (!this._bulkProcess) {
+        this.__reprocessAllParticipantLaps();
+      }
     }
 
     const team = this._teams.get(entrantId.toString());
@@ -599,7 +639,10 @@ export class Session implements RaceState, RaceStateLookup {
     }
   }
 
-  public async addCategories(categories: EventCategory[]): Promise<Set<EventCategoryId>|null> {
+  public async addCategories(
+    categories: EventCategory[],
+    onItemLoaded?: SessionItemLoadedCallback<EventCategory>,
+  ): Promise<Set<EventCategoryId>|null> {
     let addedIds: Set<EventCategoryId>|null = null;
     // let placeholderCategoryParticipants: EventParticipant[]|null = null;
 
@@ -608,7 +651,7 @@ export class Session implements RaceState, RaceStateLookup {
       // placeholderCategoryParticipants = this.__findParticipantsWithPlaceholderCategories();
     }
 
-    categories.forEach((category: EventCategory) => {
+    const addCategory = (category: EventCategory): void => {
       incrementLoadingMetric('Add session category', category.name || category.id.toString());
       if (!isValidId(category.id) && category.id) {
         throw new InvalidCategoryIdError(`Category ID ${category.id} is invalid while adding category to session.`);
@@ -627,7 +670,17 @@ export class Session implements RaceState, RaceStateLookup {
           // This is okay at this time - categories can be added without flags existing.
         }
       }
-    });
+    };
+
+    if (!onItemLoaded) {
+      categories.forEach(addCategory);
+      return Promise.resolve(addedIds || null);
+    }
+
+    for (const [index, category] of categories.entries()) {
+      addCategory(category);
+      await onItemLoaded?.(category, index, categories.length);
+    }
     return Promise.resolve(addedIds || null);
   }
 
@@ -755,8 +808,10 @@ export class Session implements RaceState, RaceStateLookup {
       });
     this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
     this._categoryGreenFlags = undefined;
-    assignParticpantsToCrossings(this.getProcessingParticipants(), this.records, this._sessionValidCategoryIds);
-    this.__reprocessAllParticipantLaps();
+    if (!this._bulkProcess) {
+      assignParticpantsToCrossings(this.getProcessingParticipants(), this.records, this._sessionValidCategoryIds);
+      this.__reprocessAllParticipantLaps();
+    }
   }
 
   private getFlagById(flagId: TimeRecordId): FlagRecord {
@@ -863,6 +918,16 @@ export class Session implements RaceState, RaceStateLookup {
     // export const processedLaps: Map<EventParticipantId, ParticipantPassingRecord[]> = 
     if (!this._bulkProcess) {
       this.__reprocessAllParticipantLaps();
+    }
+  }
+
+  public async addParticipantsWithProgress(
+    participants: EventParticipant[],
+    onItemLoaded: SessionItemLoadedCallback<EventParticipant>,
+  ): Promise<void> {
+    for (const [index, participant] of participants.entries()) {
+      this.addParticipants([participant]);
+      await onItemLoaded(participant, index, participants.length);
     }
   }
 

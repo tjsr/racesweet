@@ -76,6 +76,7 @@ class MemoryPersistence implements RaceAdminPersistence {
 describe('RaceAdminService', () => {
   it('applies persisted changes during creation', async () => {
     const sessionDouble = createSessionDouble();
+    const progressEvents: Array<{ completed: number; currentTask: string; total: number }> = [];
     const persistence = new MemoryPersistence({
       entrantCategories: { team1: 'cat-b' },
       excludedCrossings: { crossing1: true },
@@ -95,7 +96,11 @@ describe('RaceAdminService', () => {
       }],
     });
 
-    await RaceAdminService.create(async () => sessionDouble.session as never, persistence, 'session-a');
+    await RaceAdminService.create(async () => sessionDouble.session as never, persistence, 'session-a', {
+      onProgress: async (progress) => {
+        progressEvents.push({ completed: progress.completed, currentTask: progress.currentTask, total: progress.total });
+      },
+    });
 
     expect(sessionDouble.addedRecords).toEqual([
       expect.objectContaining({ id: 'record-1' }),
@@ -109,6 +114,8 @@ describe('RaceAdminService', () => {
     expect(sessionDouble.flagCategoryAssignments).toEqual([{ categoryId: 'cat-b', flagId: 'flag-1' }]);
     expect(sessionDouble.flagCategoryRemovals).toEqual([{ categoryId: 'cat-a', flagId: 'flag-1' }]);
     expect(sessionDouble.bulkEvents).toEqual(['begin', 'end']);
+    expect(progressEvents.at(0)).toEqual({ completed: 0, currentTask: 'Preparing administrative changes', total: 7 });
+    expect(progressEvents.map((progress) => progress.completed)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
   });
 
   it('applies stored changes to a displayed session in one bulk replay', async () => {

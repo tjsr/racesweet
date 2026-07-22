@@ -120,6 +120,24 @@ const createSessionWithProcessedLaps = async (): Promise<{
 describe('Session category change regressions', () => {
   useStderrGuard();
 
+  it('defers recalculation for category and record changes inside a bulk process', async () => {
+    const fixture = await createSessionWithProcessedLaps();
+    const reprocessSpy = vi.spyOn(
+      fixture.session as unknown as { __reprocessAllParticipantLaps: () => void },
+      '__reprocessAllParticipantLaps',
+    );
+    const crossing = fixture.session.records.find((record) => record.id === fixture.crossingIds[0]) as ParticipantPassingRecord | undefined;
+
+    await fixture.session.beginBulkProcess();
+    fixture.session.updateParticipantCategory(fixture.participant1Id, fixture.categoryBId);
+    expect(crossing).toBeDefined();
+    fixture.session.updateRecord({ ...crossing!, time: new Date('2026-05-29T10:06:01.000Z') });
+
+    expect(reprocessSpy).not.toHaveBeenCalled();
+    await fixture.session.endBulkProcess();
+    expect(reprocessSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps elapsed and lap times available for all riders after one rider category changes', async () => {
     const fixture = await createSessionWithProcessedLaps();
 

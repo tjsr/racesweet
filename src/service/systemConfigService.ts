@@ -15,10 +15,12 @@ import {
     shouldRenameApicalSourceForFetchedEvent,
 } from '../app/systemConfig.js';
 import { incrementLoadingMetric } from '../loadingMetrics.js';
+import type { LoadingProgressCallback } from '../loadingProgress.js';
 import type { SystemConfigPersistence } from '../persistence/systemConfigPersistence.js';
 
-interface SystemConfigServiceOptions {
+export interface SystemConfigServiceOptions {
   onPersistedConfig?: (config: SystemConfiguration) => Promise<void>;
+  onProgress?: LoadingProgressCallback;
 }
 
 const createSourceId = (): string => `source-${Date.now()}-${Math.round(Math.random() * 100000)}`;
@@ -116,9 +118,26 @@ export class SystemConfigService {
   public static async create(persistence: SystemConfigPersistence, options: SystemConfigServiceOptions = {}): Promise<SystemConfigService> {
     incrementLoadingMetric('Load system config service');
     const config = await persistence.load();
-    config.dataSources.forEach((source) => incrementLoadingMetric('Normalize system data source', source.name || source.id));
-    Object.keys(config.eventSourceAssignments).forEach((eventId) => incrementLoadingMetric('Normalize event source assignment', eventId));
-    Object.keys(config.sessionSourceAssignments).forEach((sessionId) => incrementLoadingMetric('Normalize session source assignment', sessionId));
+    const eventAssignmentIds = Object.keys(config.eventSourceAssignments);
+    const sessionAssignmentIds = Object.keys(config.sessionSourceAssignments);
+    const total = Math.max(1, config.dataSources.length + eventAssignmentIds.length + sessionAssignmentIds.length);
+    let completed = 0;
+    await options.onProgress?.({ completed, currentTask: 'Preparing system configuration', total });
+    for (const source of config.dataSources) {
+      incrementLoadingMetric('Normalize system data source', source.name || source.id);
+      completed += 1;
+      await options.onProgress?.({ completed, currentTask: `Normalize source ${source.name || source.id}`, total });
+    }
+    for (const eventId of eventAssignmentIds) {
+      incrementLoadingMetric('Normalize event source assignment', eventId);
+      completed += 1;
+      await options.onProgress?.({ completed, currentTask: `Normalize event source assignment ${eventId}`, total });
+    }
+    for (const sessionId of sessionAssignmentIds) {
+      incrementLoadingMetric('Normalize session source assignment', sessionId);
+      completed += 1;
+      await options.onProgress?.({ completed, currentTask: `Normalize session source assignment ${sessionId}`, total });
+    }
     return new SystemConfigService(persistence, normalizeSystemConfiguration(config), options);
   }
 

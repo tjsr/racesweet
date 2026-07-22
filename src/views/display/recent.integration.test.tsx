@@ -1305,7 +1305,6 @@ describe('RecentRecords integration', () => {
 
     session.ensureCategories([categoryB]);
     await renderRecords();
-    await openMenu();
     expect(getMenuItem(categoryB.name)).toBeDefined();
 
     await act(async () => {

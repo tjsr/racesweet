@@ -21,6 +21,7 @@ import { createSeedEventCatalogLedger } from "../ledger/createSeedEventCatalogLe
 import {
   type EventCatalogLedger,
   applyEventCatalogLedger,
+  applyEventCatalogLedgerWithProgress,
   applyEventCatalogMutation,
   createDefaultEventCatalogLedger,
 } from "../ledger/eventCatalogLedger.js";
@@ -5290,6 +5291,21 @@ describe("EventCatalogService", () => {
 });
 
 describe("applyEventCatalogLedger", () => {
+  it("reports and awaits one progress callback per mutation", async () => {
+    const ledger = createSeedEventCatalogLedger();
+    const progressEvents: Array<{ completed: number; currentTask: string; total: number }> = [];
+
+    const state = await applyEventCatalogLedgerWithProgress(ledger, async (progress) => {
+      progressEvents.push({ completed: progress.completed, currentTask: progress.currentTask, total: progress.total });
+    });
+
+    expect(progressEvents[0]).toEqual({ completed: 0, currentTask: 'Preparing event catalog replay', total: ledger.mutations.length });
+    expect(progressEvents.slice(1).map((progress) => progress.completed)).toEqual(
+      Array.from({ length: ledger.mutations.length }, (_, index) => index + 1),
+    );
+    expect(state).toEqual(applyEventCatalogLedger(ledger));
+  });
+
   it("applies one mutation to an already rebuilt state", () => {
     const state = applyEventCatalogLedger(createSeedEventCatalogLedger());
     const updatedState = applyEventCatalogMutation(state, {

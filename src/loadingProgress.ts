@@ -19,6 +19,25 @@ export interface LoadingProgressSummary {
   total: number;
 }
 
+export interface LoadingProgressUpdate {
+  completed: number;
+  currentTask: string;
+  detail?: string;
+  total: number;
+}
+
+export type LoadingProgressCallback = (update: LoadingProgressUpdate) => Promise<void>;
+
+export const waitForLoadingProgressPaint = async (): Promise<void> => {
+  await new Promise<void>((resolve) => {
+    if (typeof window !== 'undefined') {
+      window.setTimeout(resolve, 0);
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
+};
+
 export const createLoadingProgressState = (
   title: string,
   stages: Array<Pick<LoadingProgressStage, 'id' | 'label'> & Partial<Pick<LoadingProgressStage, 'completed' | 'total'>>>

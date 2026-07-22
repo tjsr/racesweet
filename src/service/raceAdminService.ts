@@ -4,6 +4,7 @@ import type { SessionId } from '../model/raceevent.js';
 import type { RaceStateLookup, Session } from '../model/racestate.js';
 import type { EventTimeRecord, TimeRecordId } from '../model/timerecord.js';
 import { incrementLoadingMetric } from '../loadingMetrics.js';
+import type { LoadingProgressCallback } from '../loadingProgress.js';
 import {
   type AddedSessionRecord,
   type AdministrativeChanges,
@@ -18,6 +19,20 @@ export class RaceAdminService {
   private readonly sessionId: SessionId | undefined;
   private readonly session: Session & RaceStateLookup;
 
+  public static async create(
+    sessionLoader: () => Promise<Session & RaceStateLookup>,
+    persistence: RaceAdminPersistence,
+    sessionId?: SessionId,
+    options: { onProgress?: LoadingProgressCallback } = {},
+  ): Promise<RaceAdminService> {
+    incrementLoadingMetric('Load race admin service');
+    const session = await sessionLoader();
+    const changes = await persistence.load();
+    const service = new RaceAdminService(session, persistence, changes, sessionId);
+    await service.applyChanges(service.session, sessionId, options.onProgress);
+    return service;
+  }
+
   private constructor(
     session: Session & RaceStateLookup,
     persistence: RaceAdminPersistence,
@@ -28,19 +43,6 @@ export class RaceAdminService {
     this.persistence = persistence;
     this.sessionId = sessionId;
     this.session = session;
-  }
-
-  public static async create(
-    sessionLoader: () => Promise<Session & RaceStateLookup>,
-    persistence: RaceAdminPersistence,
-    sessionId?: SessionId
-  ): Promise<RaceAdminService> {
-    incrementLoadingMetric('Load race admin service');
-    const session = await sessionLoader();
-    const changes = await persistence.load();
-    const service = new RaceAdminService(session, persistence, changes, sessionId);
-    await service.applyChanges();
-    return service;
   }
 
   public get raceState(): Session & RaceStateLookup {
@@ -86,12 +88,16 @@ export class RaceAdminService {
     await this.persistence.save(this.changes);
   }
 
-  public async applyChangesToSession(session: Session & RaceStateLookup): Promise<void> {
-    await this.applyChanges(session);
+  public async applyChangesToSession(session: Session & RaceStateLookup, onProgress?: LoadingProgressCallback): Promise<void> {
+    await this.applyChanges(session, this.sessionId, onProgress);
   }
 
-  public async applyChangesToSessionById(session: Session & RaceStateLookup, sessionId: SessionId | undefined): Promise<void> {
-    await this.applyChanges(session, sessionId);
+  public async applyChangesToSessionById(
+    session: Session & RaceStateLookup,
+    sessionId: SessionId | undefined,
+    onProgress?: LoadingProgressCallback,
+  ): Promise<void> {
+    await this.applyChanges(session, sessionId, onProgress);
   }
 
   public async addRecordForSession(
@@ -174,7 +180,11 @@ export class RaceAdminService {
     await this.persistence.save(this.changes);
   }
 
-  private async applyChanges(session: Session & RaceStateLookup = this.session, sessionId: SessionId | undefined = this.sessionId): Promise<void> {
+  private async applyChanges(
+    session: Session & RaceStateLookup = this.session,
+    sessionId: SessionId | undefined = this.sessionId,
+    onProgress?: LoadingProgressCallback,
+  ): Promise<void> {
     incrementLoadingMetric('Apply race admin changes', sessionId);
     const changes = this.changes || createDefaultAdministrativeChanges();
     const addedRecords = changes.addedRecords.filter((candidate) => this.shouldApplyRecordToSession(candidate, sessionId));
@@ -182,6 +192,9 @@ export class RaceAdminService {
     const flagDeletedChanges = Object.entries(changes.flagDeleted);
     const entrantCategoryChanges = Object.entries(changes.entrantCategories);
     const excludedCrossingChanges = Object.entries(changes.excludedCrossings);
+    const total = Math.max(1, addedRecords.length + updatedRecords.length + flagDeletedChanges.length + changes.flagCategoryChanges.length + entrantCategoryChanges.length + excludedCrossingChanges.length);
+    let completed = 0;
+    await onProgress?.({ completed, currentTask: 'Preparing administrative changes', total });
     const hasApplicableChanges = addedRecords.length > 0 ||
       updatedRecords.length > 0 ||
       flagDeletedChanges.length > 0 ||
@@ -198,36 +211,48 @@ export class RaceAdminService {
       for (const entry of addedRecords) {
         incrementLoadingMetric('Apply admin added record', entry.record.id.toString());
         await this.applyStoredRecordChange(session, entry.record);
+        completed += 1;
+        await onProgress?.({ completed, currentTask: `Apply added record ${entry.record.id}`, total });
       }
 
-      updatedRecords.forEach((entry) => {
+      for (const entry of updatedRecords) {
         incrementLoadingMetric('Apply admin updated record', entry.record.id.toString());
         this.applyStoredUpdatedRecordChange(session, entry.record);
-      });
+        completed += 1;
+        await onProgress?.({ completed, currentTask: `Apply updated record ${entry.record.id}`, total });
+      }
 
-      flagDeletedChanges.forEach(([flagId, deleted]) => {
+      for (const [flagId, deleted] of flagDeletedChanges) {
         incrementLoadingMetric('Apply admin deleted flag', flagId);
         this.applyStoredFlagChange(() => this.markFlagDeletedInSession(session, flagId, deleted));
-      });
+        completed += 1;
+        await onProgress?.({ completed, currentTask: `Apply deleted flag ${flagId}`, total });
+      }
 
-      changes.flagCategoryChanges.forEach((change) => {
+      for (const change of changes.flagCategoryChanges) {
         incrementLoadingMetric('Apply admin flag category change', change.flagId.toString());
         if (change.action === 'assign') {
           this.applyStoredFlagChange(() => this.assignFlagCategoryInSession(session, change.flagId, change.categoryId));
         } else {
           this.applyStoredFlagChange(() => this.removeFlagCategoryInSession(session, change.flagId, change.categoryId));
         }
-      });
+        completed += 1;
+        await onProgress?.({ completed, currentTask: `Apply flag category change ${change.flagId}`, total });
+      }
 
-      entrantCategoryChanges.forEach(([entrantId, categoryId]) => {
+      for (const [entrantId, categoryId] of entrantCategoryChanges) {
         incrementLoadingMetric('Apply admin entrant category', entrantId);
         this.updateEntrantCategoryInSession(session, entrantId, categoryId);
-      });
+        completed += 1;
+        await onProgress?.({ completed, currentTask: `Apply entrant category ${entrantId}`, total });
+      }
 
-      excludedCrossingChanges.forEach(([crossingId, exclude]) => {
+      for (const [crossingId, exclude] of excludedCrossingChanges) {
         incrementLoadingMetric('Apply admin excluded crossing', crossingId);
         this.excludeCrossingInSession(session, crossingId, exclude);
-      });
+        completed += 1;
+        await onProgress?.({ completed, currentTask: `Apply excluded crossing ${crossingId}`, total });
+      }
     } finally {
       if (bulkStarted) {
         await session.endBulkProcess();

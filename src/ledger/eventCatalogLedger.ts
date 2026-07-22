@@ -6,6 +6,7 @@ import type { EventId, SessionId } from '../model/raceevent.js';
 import type { RaceState } from '../model/racestate.js';
 import type { IdType } from '../model/types.js';
 import { incrementLoadingMetric } from '../loadingMetrics.js';
+import type { LoadingProgressCallback } from '../loadingProgress.js';
 import { isValidId } from '../validators/isValidId.js';
 import {
   type CategorySessionAssignment,
@@ -429,6 +430,25 @@ export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalo
     incrementLoadingMetric('Apply event catalog ledger mutation', mutation.type);
     return applyEventCatalogMutation(currentState, mutation);
   }, createDefaultEventCatalogState());
+
+  return migrateLegacyCategoryAssignments(state);
+};
+
+export const applyEventCatalogLedgerWithProgress = async (
+  ledger: EventCatalogLedger,
+  onProgress?: LoadingProgressCallback,
+): Promise<EventCatalogState> => {
+  const total = Math.max(1, ledger.mutations.length);
+  let completed = 0;
+  await onProgress?.({ completed, currentTask: 'Preparing event catalog replay', total });
+
+  let state = createDefaultEventCatalogState();
+  for (const mutation of ledger.mutations) {
+    incrementLoadingMetric('Apply event catalog ledger mutation', mutation.type);
+    state = applyEventCatalogMutation(state, mutation);
+    completed += 1;
+    await onProgress?.({ completed, currentTask: `Apply catalog mutation ${mutation.type}`, detail: mutation.id, total });
+  }
 
   return migrateLegacyCategoryAssignments(state);
 };

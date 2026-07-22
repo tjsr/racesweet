@@ -8,7 +8,7 @@ import { MAX_ERRORS } from "../parsers/rfidtiming/settings.js";
 import type { RaceState } from "../model/racestate.js";
 import { ResourceProvider } from "../processing/resource/provider.js";
 import { RfidResourceProvider } from "../processing/resource/rfid.js";
-import type { TestSession } from "./testsession.js";
+import type { TestSession, TestSessionItemLoadedCallback } from "./testsession.js";
 // import type { TimeRecord } from "../model/timerecord.ts";
 import { TimeRecord } from "../model/timerecord.js";
 import { convertDataToRaceState } from "../parsers/apical.js";
@@ -94,31 +94,35 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
     });
   }
 
-  public async loadCategories(): Promise<void> {
-    return this.loadData().then((data: Partial<RaceState>) => {
+  protected override async getTestDataLoadTotal(): Promise<number> {
+    const data = await this.loadData();
+    return Math.max(1, (data.categories?.length || 0) + (data.participants?.length || 0) + (data.records?.length || 0) + 4);
+  }
+
+  public async loadCategories(onItemLoaded?: TestSessionItemLoadedCallback): Promise<void> {
+    return this.loadData().then(async (data: Partial<RaceState>) => {
       if (data.categories) {
-        this.addCategories(data.categories);
+        await this.addCategories(data.categories, async (category) => onItemLoaded?.(`Loading category ${category.name || category.id}`));
       }
-      return Promise.resolve();
     });
     // throw new Error("Method not implemented.");
   }
 
-  public async loadParticipants(): Promise<void> {
+  public async loadParticipants(onItemLoaded?: TestSessionItemLoadedCallback): Promise<void> {
     return this.loadData().then((_data: Partial<RaceState>) => {
       if (!this._data?.participants) {
         throw new Error('No participants in data.');
       }
       if (this._data?.participants) {
-        this.addParticipants(this._data.participants);
+        return this.addParticipantsWithProgress(this._data.participants, async (participant) => onItemLoaded?.(`Loading participant ${participant.id}`));
       }
       return Promise.resolve();;
     });
   }
 
-  public async loadFlags(): Promise<void> {
+  public async loadFlags(onItemLoaded?: TestSessionItemLoadedCallback): Promise<void> {
     return this.loadData().then((_data: Partial<RaceState>) => {
-      this.addRecords([
+      return this.addRecords([
         createGreenFlagEvent({
           categoryIds: this.categoryCodes(['A']),
           time: new Date('2025-06-06T19:02:06+10:00'),
@@ -135,18 +139,17 @@ export abstract class ApicalTestRace extends GenericTestSession implements TestS
           categoryIds: this.categoryCodes(['D']),
           time: new Date('2025-06-06T19:03:03.14+10:00'),
         }),
-      ]);
-      return Promise.resolve();
+      ], true, async (record) => onItemLoaded?.(`Loading flag ${record.id}`));
     });
     // throw new Error("Method not implemented.");
   }
 
-  public async loadCrossings(): Promise<void> {
+  public async loadCrossings(onItemLoaded?: TestSessionItemLoadedCallback): Promise<void> {
     return this.loadData().then((_data: Partial<RaceState>) => {
       if (!this._data?.records) {
         throw new Error("No records found in data.");
       }
-      return super.addRecords(this._data?.records);
+      return super.addRecords(this._data.records, true, async (record) => onItemLoaded?.(`Loading crossing ${record.id}`));
     });
     //   if (record.categoryId) {
     //     if (!this.categoryExists(record.categoryId)) {

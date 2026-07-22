@@ -31,9 +31,11 @@ import {
   type EventCatalogLedger,
   type EventCatalogMutation,
   applyEventCatalogLedger,
+  applyEventCatalogLedgerWithProgress,
   applyEventCatalogMutation,
 } from "../ledger/eventCatalogLedger.js";
 import { incrementLoadingMetric } from "../loadingMetrics.js";
+import type { LoadingProgressCallback } from "../loadingProgress.js";
 import { EventEntrantId } from "../model/entrant.js";
 import type { EventEntryId } from '../model/entry.js';
 import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
@@ -116,8 +118,9 @@ export interface ImportedRaceStateMetadata {
   raceState: Partial<RaceState>;
 }
 
-interface EventCatalogServiceOptions {
+export interface EventCatalogServiceOptions {
   onPersistedLedger?: (ledger: EventCatalogLedger) => Promise<void>;
+  onProgress?: LoadingProgressCallback;
 }
 
 const assertEventCatalogPersistence = (
@@ -2011,6 +2014,7 @@ export class EventCatalogService {
     persistence: EventCatalogPersistence,
     ledger: EventCatalogLedger,
     options: EventCatalogServiceOptions = {},
+    state?: EventCatalogState,
   ) {
     incrementLoadingMetric(
       "Rebuild event catalog state",
@@ -2019,7 +2023,7 @@ export class EventCatalogService {
     this.ledger = ledger;
     this.options = options;
     this.persistence = persistence;
-    this.state = applyEventCatalogLedger(ledger);
+    this.state = state || applyEventCatalogLedger(ledger);
   }
 
   public static async create(
@@ -2050,7 +2054,10 @@ export class EventCatalogService {
       }
     }
 
-    return new EventCatalogService(persistence, ledger, options);
+    const state = options.onProgress
+      ? await applyEventCatalogLedgerWithProgress(ledger, options.onProgress)
+      : undefined;
+    return new EventCatalogService(persistence, ledger, options, state);
   }
 
   public get catalog(): EventCatalogState {
@@ -2226,21 +2233,24 @@ export class EventCatalogService {
       ? this.state.sessions.find((session) => session.id === assignedSessionId)
       : undefined;
 
-    categories.forEach((category) =>
+    for (const [index, category] of categories.entries()) {
       incrementLoadingMetric(
         "Derive scaffold category",
         category.name || category.id.toString(),
-      ),
-    );
-    participants.forEach((participant) =>
+      );
+      await onCompleteStep(`Derive scaffold category ${category.name || category.id}`, index);
+    }
+    for (const [index, participant] of participants.entries()) {
       incrementLoadingMetric(
         "Derive scaffold entrant participant",
         participant.id.toString(),
-      ),
-    );
-    teams.forEach((team) =>
-      incrementLoadingMetric("Derive scaffold team", team.id.toString()),
-    );
+      );
+      await onCompleteStep(`Derive scaffold participant ${participant.id}`, categories.length + index);
+    }
+    for (const [index, team] of teams.entries()) {
+      incrementLoadingMetric("Derive scaffold team", team.id.toString());
+      await onCompleteStep(`Derive scaffold team ${team.id}`, categories.length + participants.length + index);
+    }
 
     const scaffoldCategories = deriveCategoriesFromEventData(
       eventId,
@@ -2260,6 +2270,9 @@ export class EventCatalogService {
         teams,
       ),
     );
+    for (const [index, entrant] of derivedEntrants.entries()) {
+      await onCompleteStep(`Prepare scaffold entrant ${entrant.name || entrant.id}`, index);
+    }
     const existingEventEntrantsById = new Map(
       getEntrantsForEvent(this.state, eventId).map(
         (entrant) => [entrant.id.toString(), entrant] as const,

@@ -21,6 +21,8 @@ import { RaceSweetMainApp } from './App.js';
 import { createSeedEventCatalogLedger } from '../ledger/createSeedEventCatalogLedger.js';
 import { APICAL_DEFAULT_SOURCE_NAME } from './systemConfig.js';
 
+vi.setConfig({ testTimeout: 10000 });
+
 vi.mock('../views/display/categories', () => ({
   CategoryList: (props: { categories?: unknown[] }) => React.createElement(
     'div',
@@ -484,7 +486,7 @@ const clickSectionButton = async (container: HTMLDivElement, sectionName: string
 };
 
 const waitForLoadedApp = async (container: HTMLDivElement): Promise<void> => {
-  for (let attempt = 0; attempt < 120; attempt += 1) {
+  for (let attempt = 0; attempt < 600; attempt += 1) {
     if (!container.querySelector('.loading-progress')) {
       return;
     }
@@ -1272,6 +1274,15 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.textContent).toContain('tracked calls');
     expect(container.textContent).toContain('Load event catalog persistence');
     expect(container.textContent).not.toContain('Loading...');
+
+    const progressValues = new Set<number>();
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      progressValues.add(progressBar?.value || 0);
+      await act(async () => {
+        await new Promise<void>((resolve) => setTimeout(resolve, 20));
+      });
+    }
+    expect(progressValues.size).toBeGreaterThan(1);
 
     await act(async () => {
       resolveCatalogLoad?.(await readGeneratedFixture(catalogFilePath));
