@@ -1,6 +1,6 @@
 import type { ApicalLapByCategory } from '../model/apical.js';
 import { createTimeRecordId } from '../model/ids.js';
-import { processAllParticipantLaps } from '../controllers/laps.js';
+import { processAllParticipantLaps } from '../processing/laps.js';
 import { apicalTimeOfDayToDate, apicalTimeToMilliseconds, convertDataToRaceState, createChipCrossingRecord } from './apical.js';
 import { excelTimeToMilliseconds } from './genericTimeParser.js';
 

@@ -6,8 +6,8 @@ import {
   type EventCatalogState,
   getEntriesForEvent,
 } from '../../catalog/eventCatalog.js';
-import { type CategoryId } from '../../controllers/category.js';
-import { getParticipantNumber, getParticipantTransponders } from '../../controllers/participant.js';
+import { type CategoryId } from '../../processing/category.js';
+import { getParticipantNumber, getParticipantTransponders } from '../../processing/participant.js';
 import { EntrantListCard } from '../../controls/entrantListCard.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import { type EventParticipant } from '../../model/eventparticipant.js';

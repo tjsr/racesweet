@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 
 import { getCategoriesForEvent, getEntriesForEvent, getSessionsForEvent } from '../catalog/eventCatalog.js';
-import { parseEntrantImportBuffer } from '../controllers/entrantImport.js';
-import { isCountedLapPassing } from '../controllers/laps.js';
+import { parseEntrantImportBuffer } from '../processing/entrantImport.js';
+import { isCountedLapPassing } from '../processing/laps.js';
 import { createSeedEventCatalogLedger } from '../ledger/createSeedEventCatalogLedger.js';
 import type { EventCatalogLedger } from '../ledger/eventCatalogLedger.js';
 import { getEffectiveParticipantCategoryId, Session, type RaceState } from '../model/racestate.js';

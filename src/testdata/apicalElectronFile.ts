@@ -1,7 +1,7 @@
 import { v1 as randomUUID, v5 as uuidv5 } from "uuid";
 
 import { ApicalTestRace } from "./apical.js";
-import { ElectronBufferResourceProvider } from "../controllers/resource/electron";
+import { ElectronBufferResourceProvider } from "../processing/resource/electron";
 
 export class ApicalElectronFile extends ApicalTestRace {
   constructor() {

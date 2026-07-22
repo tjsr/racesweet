@@ -1,4 +1,4 @@
-import { generateExcelData } from '../../controllers/apical/generateExcel.js';
+import { generateExcelData } from '../../processing/apical/generateExcel.js';
 import { ApicalDataException } from '../../errors/apicalDataException.js';
 import { fetchExternalHttp } from '../externalHttp.js';
 import { ApicalSpreadsheetLapsRow, retrieveExcelData } from './apicalEventSpreadsheet.js';

@@ -1,6 +1,6 @@
 import type { EventTrackTimingLine } from '../../catalog/eventCatalog.js';
-import { getPassingLineNumber } from '../../controllers/laps.js';
-import { isCrossingRecord } from '../../controllers/timerecord.js';
+import { getPassingLineNumber } from '../../processing/laps.js';
+import { isCrossingRecord } from '../../processing/timerecord.js';
 import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 import type { ParticipantPassingRecord } from '../../model/timerecord.js';
 

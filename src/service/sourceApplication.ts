@@ -1,5 +1,5 @@
 import { validate as validateUuid } from 'uuid';
-import { normalizeCategoryResultExclusion } from '../controllers/category.js';
+import { normalizeCategoryResultExclusion } from '../processing/category.js';
 import type { EventCategory } from '../model/eventcategory.js';
 import { getParticipantEntryId, type EventEntry } from '../model/entry.js';
 import type { EventParticipant } from '../model/eventparticipant.js';

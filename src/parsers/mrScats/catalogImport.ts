@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { TZDate } from '@date-fns/tz';
-import { generateResult, type EntrantResult } from '../../controllers/result.js';
+import { generateResult, type EntrantResult } from '../../processing/result.js';
 import { getParticipantEntryId, type EventEntryId } from '../../model/entry.js';
 import type { EventEntrantId } from '../../model/entrant.js';
 import type { EventCategory } from '../../model/eventcategory.js';

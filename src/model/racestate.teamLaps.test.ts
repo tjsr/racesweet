@@ -4,7 +4,7 @@ import type { EventCategory } from './eventcategory.js';
 import type { EventParticipant } from './eventparticipant.js';
 import { Session } from './racestate.js';
 import { CROSSING_UNRELATED_LAP_UNDER_MINIMUM, isPassingExcluded, isPassingValid, type ParticipantPassingRecord, type TimeRecordSource } from './timerecord.js';
-import { createGreenFlagEvent } from '../controllers/flag.js';
+import { createGreenFlagEvent } from '../processing/flag.js';
 import { createTimeRecordId } from './ids.js';
 
 const category: EventCategory = { id: '1', name: 'Team Category' };

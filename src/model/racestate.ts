@@ -1,7 +1,7 @@
-import { getOrCacheGreenFlagForCategory, hasCategoryIds, isFlagRecord } from "../controllers/flag.js";
-import { getSourceLapCompletion, processAllParticipantLaps } from "../controllers/laps.js";
-import { ParticipantNotFoundError, assignParticpantsToCrossings } from "../controllers/participant.js";
-import { addError, compareByTime, isCrossingRecord } from "../controllers/timerecord.js";
+import { getOrCacheGreenFlagForCategory, hasCategoryIds, isFlagRecord } from "../processing/flag.js";
+import { getSourceLapCompletion, processAllParticipantLaps } from "../processing/laps.js";
+import { ParticipantNotFoundError, assignParticpantsToCrossings } from "../processing/participant.js";
+import { addError, compareByTime, isCrossingRecord } from "../processing/timerecord.js";
 import type { EventSessionKind } from "../catalog/eventCatalog.js";
 import { DuplicateCategoryError, EventFlagsError, InvalidCategoryIdError, InvalidIdError, NoStartFlagError, SessionStateError } from "../validators/errors.js";
 import { FlagReferencesUnknownCategoryError, InvalidFlagRecordError } from "./errors.js";
@@ -10,9 +10,9 @@ import type { EventParticipant, EventParticipantId, ParticipantIdentifier, Parti
 import type { FlagRecord, GreenFlagRecord } from "./flag.js";
 import type { EventTimeRecord, ParticipantPassingRecord, TimeRecord, TimeRecordId, TimeRecordSource, Validated } from "./timerecord.js";
 
-import { isPlaceholderCatgegory } from "../controllers/category.js";
-import { isParsedChipCrossing } from "../controllers/chipCrossing.js";
-import { crossingMatchesParticipantIdentifiers } from "../controllers/participantMatch.js";
+import { isPlaceholderCatgegory } from "../processing/category.js";
+import { isParsedChipCrossing } from "../processing/chipCrossing.js";
+import { crossingMatchesParticipantIdentifiers } from "../processing/participantMatch.js";
 import { incrementLoadingMetric } from "../loadingMetrics.js";
 import { listToMap } from "../utils.js";
 import { isValidId } from "../validators/isValidId.js";

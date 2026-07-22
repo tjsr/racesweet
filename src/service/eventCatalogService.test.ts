@@ -15,8 +15,8 @@ import {
   getSessionsForEvent,
   getTeamsForParticipant,
 } from "../catalog/eventCatalog.js";
-import { readApicalExcelBuffer } from "../controllers/apical/apicalSpreadsheetProcessor.js";
-import { parseEntrantImportBuffer } from "../controllers/entrantImport.js";
+import { readApicalExcelBuffer } from "../processing/apical/apicalSpreadsheetProcessor.js";
+import { parseEntrantImportBuffer } from "../processing/entrantImport.js";
 import { createSeedEventCatalogLedger } from "../ledger/createSeedEventCatalogLedger.js";
 import {
   type EventCatalogLedger,

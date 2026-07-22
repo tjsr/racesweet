@@ -21,11 +21,11 @@ import {
 import {
   CategoryId,
   normalizeCategoryResultExclusion,
-} from "../controllers/category.js";
+} from "../processing/category.js";
 import {
   type EntrantImportRecord,
   isPlaceholderEntrantName,
-} from "../controllers/entrantImport.js";
+} from "../processing/entrantImport.js";
 import { createSeedEventCatalogLedger } from "../ledger/createSeedEventCatalogLedger.js";
 import {
   type EventCatalogLedger,
@@ -2002,6 +2002,7 @@ export class EventCatalogService {
   private batchDepth = 0;
   private ledger: EventCatalogLedger;
   private pendingBatchPersist = false;
+  private applyingRemoteMutations = false;
   private state: EventCatalogState;
   private readonly options: EventCatalogServiceOptions;
   private readonly persistence: EventCatalogPersistence;
@@ -2054,6 +2055,17 @@ export class EventCatalogService {
 
   public get catalog(): EventCatalogState {
     return this.state;
+  }
+
+  public async applyRemoteMutations(
+    mutations: EventCatalogMutation[],
+  ): Promise<EventCatalogState> {
+    this.applyingRemoteMutations = true;
+    try {
+      return await this.appendMutations(mutations);
+    } finally {
+      this.applyingRemoteMutations = false;
+    }
   }
 
   public getImportedRaceStateMetadata(
@@ -4449,7 +4461,7 @@ export class EventCatalogService {
 
   private async persistCurrentLedger(): Promise<void> {
     await this.persistence.save(this.ledger);
-    if (this.options.onPersistedLedger) {
+    if (this.options.onPersistedLedger && !this.applyingRemoteMutations) {
       await this.options.onPersistedLedger(this.ledger);
     }
   }

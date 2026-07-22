@@ -1,6 +1,6 @@
-import { isFlagRecord } from '../../controllers/flag.js';
-import { getPassingLineNumber } from '../../controllers/laps.js';
-import { isCrossingRecord } from '../../controllers/timerecord.js';
+import { isFlagRecord } from '../../processing/flag.js';
+import { getPassingLineNumber } from '../../processing/laps.js';
+import { isCrossingRecord } from '../../processing/timerecord.js';
 import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 import { EVENT_FLAG_RETRACTED, EVENT_SESSION_END } from '../../model/timerecord.js';
 import type { TrackPlaybackIndex } from './trackPlayback.js';

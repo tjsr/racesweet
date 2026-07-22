@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { v1 as randomUUID, v5 as uuidv5 } from 'uuid';
 import XLSX from 'xlsx';
-import { fetchApicalEvents } from '../controllers/apical/getResultListJson.js';
+import { fetchApicalEvents } from '../processing/apical/getResultListJson.js';
 import { ApicalDataException } from '../errors/apicalDataException.js';
 import { createEventId } from '../model/ids.js';
 import type { EventId } from '../model/raceevent.js';

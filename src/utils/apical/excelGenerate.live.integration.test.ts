@@ -2,7 +2,7 @@ import { getApicalEventExcelFilePath } from './excelGenerate.ts';
 import { promises as fs } from 'fs';
 import { retrieveExcelData } from './apicalEventSpreadsheet.ts';
 import XLSX from 'xlsx';
-import { generateExcelData } from '../../controllers/apical/generateExcel.ts';
+import { generateExcelData } from '../../processing/apical/generateExcel.ts';
 
 const APICAL_EVENT_ID = 69;
 const APICAL_FILE_NAME = 'Results  GMBC Autumn No Frills Round 4 2026-6-12.xlsx';

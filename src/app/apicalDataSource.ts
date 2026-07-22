@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { v5 as uuidv5, validate as validateUuid } from 'uuid';
 import type * as XlsxNamespace from 'xlsx';
-import { readApicalExcelBuffer } from '../controllers/apical/apicalSpreadsheetProcessor.js';
-import { generateExcelData } from '../controllers/apical/generateExcel.js';
+import { readApicalExcelBuffer } from '../processing/apical/apicalSpreadsheetProcessor.js';
+import { generateExcelData } from '../processing/apical/generateExcel.js';
 import { ApicalDataException } from '../errors/apicalDataException.js';
 import { ApicalRequestFailedError } from '../errors/ApicalRequestFailedError.js';
 import type { ApicalLapByCategory } from '../model/apical.js';

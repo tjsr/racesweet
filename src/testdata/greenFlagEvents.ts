@@ -1,5 +1,5 @@
 import type { GreenFlagRecord } from '../model/flag.ts';
-import { createGreenFlagEvent } from '../controllers/flag.ts';
+import { createGreenFlagEvent } from '../processing/flag.ts';
 
 export const createGreenFlagTestRecords = (): GreenFlagRecord[] => {
   console.log(createGreenFlagTestRecords.name, 'Creating test green flag records');

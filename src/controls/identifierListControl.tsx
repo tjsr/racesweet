@@ -1,5 +1,5 @@
 import React from 'react';
-import { getParticipantIdentifiers } from '../controllers/participant.js';
+import { getParticipantIdentifiers } from '../processing/participant.js';
 import { type EventParticipant, type ParticipantTransponder } from '../model/eventparticipant.js';
 import { getParticipantDisplayName } from '../model/participantDisplay.js';
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { type EventCatalogEntrant } from '../../catalog/eventCatalog.js';
-import { type CategoryId } from '../../controllers/category.js';
+import { type CategoryId } from '../../processing/category.js';
 import { type EventEntrantId } from '../../model/entrant.js';
 import { type EventCategory } from '../../model/eventcategory.js';
 

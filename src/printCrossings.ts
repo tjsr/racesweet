@@ -1,12 +1,12 @@
 import { ApicalLocalFile } from './testdata/apicalLocalFile.ts';
-import LocalFileResourceProvider from './controllers/resource/local.ts';
+import LocalFileResourceProvider from './processing/resource/local.ts';
 import { OutreachTeamsRaceTestSession } from './testdata/outreach.ts';
 import type { ParticipantPassingRecord } from './model/timerecord.ts';
-import { ResourceProvider } from './controllers/resource/provider.ts';
+import { ResourceProvider } from './processing/resource/provider.ts';
 import { RfidIndividualTestRace } from './testdata/rfid.ts';
 import type { TestSession } from './testdata/testsession.ts';
 import colors from 'colors';
-import { getCliTable } from "./controllers/clitable.js";
+import { getCliTable } from "./processing/clitable.js";
 import { warn } from './utils.ts';
 
 colors.enable();

@@ -2,7 +2,7 @@ import { getApicalEventExcelFilePath } from './excelGenerate.ts';
 import { readTempApicalExcelFile, retrieveExcelData } from './apicalEventSpreadsheet.ts';
 
 import { promises as fs } from 'fs';
-import { generateExcelData } from '../../controllers/apical/generateExcel.js';
+import { generateExcelData } from '../../processing/apical/generateExcel.js';
 
 const LIVE_TEST_ENABLED = process.env.APICAL_LIVE_TESTS === '1';
 const LIVE_APICAL_EVENT_ID = Number(process.env.APICAL_LIVE_EVENT_ID || '69');

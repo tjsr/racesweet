@@ -1,8 +1,8 @@
 import { Component, type ReactElement, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { validate as validateUuid } from 'uuid';
 import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getEntriesForEvent, getEventDisciplineLabels, getSessionsForEvent } from '../catalog/eventCatalog.ts';
-import { fetchApicalEvents } from '../controllers/apical/getResultListJson.ts';
-import { CategoryId } from '../controllers/category.ts';
+import { fetchApicalEvents } from '../processing/apical/getResultListJson.ts';
+import { CategoryId } from '../processing/category.ts';
 import { type LoadingMetricsState, getLoadingMetricsSnapshot, incrementLoadingMetric, resetLoadingMetrics, subscribeLoadingMetrics } from '../loadingMetrics.ts';
 import { type LoadingProgressState, completeLoadingProgressStage, createLoadingProgressState, updateLoadingProgressStage } from '../loadingProgress.ts';
 import { type EventCategory, EventCategoryId } from '../model/eventcategory.ts';

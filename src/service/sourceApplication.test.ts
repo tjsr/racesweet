@@ -1,6 +1,6 @@
 import { applyPulledRaceStateToSession, getCategoriesToAdd, getMinimumLapTimeMillisecondsForSession, getSessionKindForSession } from '../service/sourceApplication.js';
 
-import { createGreenFlagEvent } from '../controllers/flag.js';
+import { createGreenFlagEvent } from '../processing/flag.js';
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { EventTeam } from '../model/eventteam.js';

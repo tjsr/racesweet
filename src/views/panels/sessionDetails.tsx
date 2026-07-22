@@ -1,7 +1,7 @@
 import React from 'react';
 import { formatMinimumLapTimeInput } from '../../app/utils/timeutils.js';
 import { type EventCatalogSession, type EventCatalogState } from '../../catalog/eventCatalog.js';
-import { SESSION_SOURCE_RELOAD_OPTIONS, type SessionSourceReloadMode } from '../../service/sessionSourceReload.js';
+import { SESSION_SOURCE_RELOAD_OPTIONS, type SessionSourceReloadMode } from '../../model/sessionSourceReload.js';
 import { type SystemConfiguration } from '../../app/systemConfig.js';
 import { type EventId } from '../../model/raceevent.js';
 

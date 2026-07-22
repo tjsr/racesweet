@@ -1,4 +1,4 @@
-import { CategoryId } from '../controllers/category.js';
+import { CategoryId } from '../processing/category.js';
 import { EventEntrantId } from '../model/entrant.js';
 import type { EventEntry, EventEntryId } from '../model/entry.js';
 import type { EventCategory, EventCategoryId } from '../model/eventcategory.js';

@@ -1,6 +1,6 @@
 import type { ChipCrossingData } from "../model/chipcrossing.js";
 import type { TimeRecord } from "../model/timerecord.js";
-import { asUnparsedChipCrossing } from "../controllers/chipCrossing.js";
+import { asUnparsedChipCrossing } from "../processing/chipCrossing.js";
 import { formatRFC3339 } from "date-fns";
 import { timeOrTimeToday } from "./date/dateutils.js";
 import { TimeParseError } from "./date/errors.js";

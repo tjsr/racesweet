@@ -7,7 +7,7 @@ import React, { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import { updateCategorySelectionsForChangedParticipant } from '../../app/categoryChangeState.js';
 import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
-import { createGreenFlagEvent } from '../../controllers/flag.js';
+import { createGreenFlagEvent } from '../../processing/flag.js';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
 import type { EventTeam } from '../../model/eventteam.js';

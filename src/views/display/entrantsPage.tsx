@@ -11,7 +11,7 @@ import {
   getEventDisciplineLabels,
   getSessionsForEvent,
 } from '../../catalog/eventCatalog.js';
-import { type EntrantImportRecord, parseEntrantImportBuffer } from '../../controllers/entrantImport.js';
+import { type EntrantImportRecord, parseEntrantImportBuffer } from '../../processing/entrantImport.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import type { EventEntryId } from '../../model/entry.js';
 import { type EventCategoryId } from '../../model/eventcategory.js';

@@ -6,18 +6,18 @@ import type {
 import { GenericTestSession } from "./genericTestSession.js";
 import { MAX_ERRORS } from "../parsers/rfidtiming/settings.js";
 import type { RaceState } from "../model/racestate.js";
-import { ResourceProvider } from "../controllers/resource/provider.js";
-import { RfidResourceProvider } from "../controllers/resource/rfid.js";
+import { ResourceProvider } from "../processing/resource/provider.js";
+import { RfidResourceProvider } from "../processing/resource/rfid.js";
 import type { TestSession } from "./testsession.js";
 // import type { TimeRecord } from "../model/timerecord.ts";
 import { TimeRecord } from "../model/timerecord.js";
 import { convertDataToRaceState } from "../parsers/apical.js";
-import { createEventCategoryIdFromCategoryCode } from "../controllers/category.js";
-import { createGreenFlagEvent } from "../controllers/flag.js";
+import { createEventCategoryIdFromCategoryCode } from "../processing/category.js";
+import { createGreenFlagEvent } from "../processing/flag.js";
 import { getRfidSourceUuid } from "../parsers/rfidtiming/rfidtiming";
 import { EventId } from "../model/raceevent.ts";
 // import { parseFile } from "../parsers/rfidtiming/file.ts";
-// import LocalFileResourceProvider from "../controllers/resource/local.ts";
+// import LocalFileResourceProvider from "../processing/resource/local.ts";
 
 const TEST_EVENT_DATE = new Date('2025-06-06T10:00:00+10:00');
 const TEST_CROSSINGS_DATA_FILE = 'rfid-2025-06-06.txt';

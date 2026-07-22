@@ -1,4 +1,4 @@
-import { readApicalExcelBuffer } from '../../controllers/apical/apicalSpreadsheetProcessor.js';
+import { readApicalExcelBuffer } from '../../processing/apical/apicalSpreadsheetProcessor.js';
 import { ApicalDataException } from "../../errors/apicalDataException.js";
 import { ExcelDownloadException } from "../../errors/excelDownloadException.js";
 import type { ApicalLapByCategory } from "../../model/apical.js";

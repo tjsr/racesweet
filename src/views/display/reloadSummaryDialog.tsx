@@ -1,5 +1,5 @@
 import React from 'react';
-import type { SessionSourceReloadSummary, SessionSourceReloadSummaryCounts } from '../../service/sessionSourceReload.js';
+import type { SessionSourceReloadSummary, SessionSourceReloadSummaryCounts } from '../../model/sessionSourceReload.js';
 
 interface ReloadSummaryDialogProps {
   onClose: () => void;

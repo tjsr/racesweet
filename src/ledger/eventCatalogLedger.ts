@@ -1,4 +1,4 @@
-import { normalizeCategoryResultExclusion } from '../controllers/category.js';
+import { normalizeCategoryResultExclusion } from '../processing/category.js';
 import type { EventEntrantId } from '../model/entrant.js';
 import type { EventEntryId } from '../model/entry.js';
 import type { EventCategoryId } from '../model/eventcategory.js';

@@ -1,35 +1,22 @@
-import { isFlagRecord } from '../controllers/flag.js';
-import { isCrossingRecord } from '../controllers/timerecord.js';
+import { isFlagRecord } from '../processing/flag.js';
+import { isCrossingRecord } from '../processing/timerecord.js';
 import type { EventCategory } from '../model/eventcategory.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { EventTeam } from '../model/eventteam.js';
 import type { RaceState } from '../model/racestate.js';
 import type { TimeRecord } from '../model/timerecord.js';
+import {
+  type SessionSourceReloadMode,
+  type SessionSourceReloadSummary,
+  type SessionSourceReloadSummaryCounts,
+} from '../model/sessionSourceReload.js';
 
-export type SessionSourceReloadMode = 'all' | 'categories' | 'entrants' | 'time-records';
-
-export const SESSION_SOURCE_RELOAD_OPTIONS: Array<{ label: string; value: SessionSourceReloadMode }> = [
-  { label: 'All data', value: 'all' },
-  { label: 'Categories', value: 'categories' },
-  { label: 'Entrants', value: 'entrants' },
-  { label: 'Time records', value: 'time-records' },
-];
-
-export interface SessionSourceReloadSummaryCounts {
-  created: number;
-  deleted: number;
-  updated: number;
-}
-
-export interface SessionSourceReloadSummary {
-  categories: SessionSourceReloadSummaryCounts;
-  crossings: SessionSourceReloadSummaryCounts;
-  events: SessionSourceReloadSummaryCounts;
-  flags: SessionSourceReloadSummaryCounts;
-  participants: SessionSourceReloadSummaryCounts;
-  sessions: SessionSourceReloadSummaryCounts;
-  teams: SessionSourceReloadSummaryCounts;
-}
+export {
+  SESSION_SOURCE_RELOAD_OPTIONS,
+  type SessionSourceReloadMode,
+  type SessionSourceReloadSummary,
+  type SessionSourceReloadSummaryCounts,
+} from '../model/sessionSourceReload.js';
 
 export interface SessionSourceReloadMergeOptions {
   categoryIdsAssignedToSessions?: Set<string>;

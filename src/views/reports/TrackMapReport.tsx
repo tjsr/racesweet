@@ -1,7 +1,7 @@
 import React from 'react';
 import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent } from '../../catalog/eventCatalog.js';
 import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
-import { getParticipantNumber } from '../../controllers/participant.js';
+import { getParticipantNumber } from '../../processing/participant.js';
 import type { EventEntrantId } from '../../model/entrant.js';
 import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 import { type TrackPlaybackEntrantState, createTrackPlaybackIndex } from './trackPlayback.js';

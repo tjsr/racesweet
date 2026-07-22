@@ -7,7 +7,7 @@ import {
   getSessionsForEvent,
 } from '../../catalog/eventCatalog.js';
 import { formatMinimumLapTimeInput, parseMinimumLapTimeInputToMilliseconds } from '../../app/utils/timeutils.js';
-import { type SessionSourceReloadMode } from '../../service/sessionSourceReload.js';
+import { type SessionSourceReloadMode } from '../../model/sessionSourceReload.js';
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
 import { type EventCategoryId } from '../../model/eventcategory.js';
 import { EventId, SessionId } from '../../model/raceevent.js';

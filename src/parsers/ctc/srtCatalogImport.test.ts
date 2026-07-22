@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 
-import { parseEntrantImportBuffer } from '../../controllers/entrantImport.js';
-import { isCountedLapPassing, processAllParticipantLaps } from '../../controllers/laps.js';
+import { parseEntrantImportBuffer } from '../../processing/entrantImport.js';
+import { isCountedLapPassing, processAllParticipantLaps } from '../../processing/laps.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
 import type { GreenFlagRecord } from '../../model/flag.js';
 import { createCategoryId, createEventEntrantId, createEventId, createEventParticipantId, createSessionId } from '../../model/ids.js';

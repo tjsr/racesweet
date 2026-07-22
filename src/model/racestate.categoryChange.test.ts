@@ -5,7 +5,7 @@ import { isPassingExcluded, isPassingValid, type ParticipantPassingRecord } from
 import { createCategoryId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from './ids.js';
 import { RECORD_TX_CROSSING } from './timerecord.js';
 import { Session } from './racestate.js';
-import { createGreenFlagEvent } from '../controllers/flag.js';
+import { createGreenFlagEvent } from '../processing/flag.js';
 import { useStderrGuard } from '../testing/stderrGuard.js';
 
 const createCategory = (id: string, name: string): EventCategory => {

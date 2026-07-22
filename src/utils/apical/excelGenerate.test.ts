@@ -6,7 +6,7 @@ import { generateOrGetCachedEventPath, getApicalEventExcelFilePath } from './exc
 import { promises as fs } from 'fs';
 import { readTempApicalExcelFile, retrieveExcelData } from './apicalEventSpreadsheet.ts';
 import XLSX from 'xlsx';
-import { generateExcelData } from '../../controllers/apical/generateExcel.ts';
+import { generateExcelData } from '../../processing/apical/generateExcel.ts';
 
 const APICAL_EVENT_ID = 69;
 const APICAL_FILE_GUID = '1cf63381-1269-4257-b892-ef8b33424103';

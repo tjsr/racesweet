@@ -1,8 +1,7 @@
 import React from 'react';
-import { parseTeamCompositionRules } from '../../app/categoryRules.js';
-import { type CategoryDistanceRule, type EventCatalogCategory, getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent } from '../../catalog/eventCatalog.js';
-import { parseInteger } from '../../parsers/parseInteger.js';
-import { CategoriesPageProps, CategoryChanges, CategoryDraft, dedupeCategoriesForDisplay, getCategoryDraft } from '../display/categoriesPage.js';
+import { type EventCatalogCategory, getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent } from '../../catalog/eventCatalog.js';
+import { buildCategoryChanges } from '../../processing/categoryDraft.js';
+import { CategoriesPageProps, CategoryDraft, dedupeCategoriesForDisplay, getCategoryDraft } from '../display/categoriesPage.js';
 import { useUnsavedChangesWarning } from '../display/unsavedChangesWarning.js';
 import { CategoryDetailsPanel } from '../panels/categoryDetails.js';
 import { CategoryListPanel } from '../panels/categoryList.js';
@@ -62,53 +61,13 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
     setFormError(undefined);
   }, [selectedCategoryDraft]);
 
-  const buildCategoryChanges = (): CategoryChanges => {
-    let distanceRule: CategoryDistanceRule;
-    if (categoryDraft.distanceRuleKind === 'unspecified') {
-      distanceRule = { kind: 'unspecified' };
-    } else if (categoryDraft.distanceRuleKind === 'time') {
-      if (categoryDraft.distanceRuleValue.trim().length === 0) {
-        throw new Error('Time distance requires a value in minutes or h:mm format.');
-      }
-      distanceRule = {
-        kind: 'time',
-        value: categoryDraft.distanceRuleValue.trim(),
-      };
-    } else {
-      const laps = Number(categoryDraft.distanceRuleValue);
-      if (!Number.isInteger(laps) || laps <= 0) {
-        throw new Error('Lap distance requires a whole-number lap count.');
-      }
-      distanceRule = {
-        kind: 'laps',
-        value: laps,
-      };
-    }
-    const teamCompositionRules = parseTeamCompositionRules(categoryDraft.teamCompositionRules);
-    return {
-      code: categoryDraft.code || undefined,
-      description: categoryDraft.description || undefined,
-      distanceRule,
-      excludeFromResults: categoryDraft.excludeFromResults,
-      isPlaceholder: categoryDraft.isPlaceholder,
-      name: categoryDraft.name,
-      teamRules: {
-        identityMode: categoryDraft.identityMode,
-        maxRiderAge: parseInteger(categoryDraft.maxRiderAge),
-        maxTeamSize: parseInteger(categoryDraft.maxTeamSize),
-        minRiderAge: parseInteger(categoryDraft.minRiderAge),
-        teamCompositionRules,
-      },
-    };
-  };
-
   const saveCategory = async (): Promise<boolean> => {
     if (!selectedCategory) {
       return true;
     }
 
     try {
-      await props.onUpdateCategory(selectedCategory.id, buildCategoryChanges());
+      await props.onUpdateCategory(selectedCategory.id, buildCategoryChanges(categoryDraft));
       await props.onUpdateCategorySessionAssignments(selectedCategory.id, categoryDraft.sessionIds);
       setSavedCategoryDraft(categoryDraft);
       setFormError(undefined);
