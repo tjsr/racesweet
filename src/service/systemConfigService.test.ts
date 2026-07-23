@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { createEventEntrantId, createEventId } from '../model/ids.js';
 import * as systemConfig from '../app/systemConfig.js';
 
@@ -463,15 +465,17 @@ describe('SystemConfigService', () => {
 
     await service.updateSource(source.id, {
       fileConfig: {
-        filePath: 'C:/RaceTime/timing/INDY500.ERF',
+        filePath: path.join('RaceTime', 'timing', 'INDY500.ERF'),
         importMode: 'update',
       },
     });
 
     expect(service.state.dataSources[0]?.fileConfig).toEqual({
-      filePath: 'C:\\RaceTime\\timing\\INDY500.ERF',
+      ctcTrackConfig: undefined,
+      filePath: path.resolve('RaceTime', 'timing', 'INDY500.ERF'),
       importMode: 'update',
       importPlaceholderEntrantsForUnknownTransmitters: false,
+      trackConfigFilePath: undefined,
     });
   });
 

@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import {
   buildElectronForgeArgs,
   createElectronForgeEnv,
@@ -10,8 +12,10 @@ import { RACESWEET_SERVER_PORT_ENV } from './serverPort.js';
 
 describe('electronForgeStartup', () => {
   it('resolves the local Electron Forge CLI path', () => {
-    expect(getElectronForgeCliPath('C:\\RaceSweet')).toBe(
-      'C:\\RaceSweet\\node_modules\\@electron-forge\\cli\\dist\\electron-forge.js'
+    const installRoot = path.join('install-root');
+
+    expect(getElectronForgeCliPath(installRoot)).toBe(
+      path.join(installRoot, 'node_modules', '@electron-forge', 'cli', 'dist', 'electron-forge.js')
     );
   });
 

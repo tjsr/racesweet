@@ -1,11 +1,9 @@
 import { spawnSync } from 'node:child_process';
 
 const defaultTimezones = [
-  'UTC',
-  'America/New_York',
-  'Europe/London',
-  'Pacific/Kiritimati',
   'Australia/Sydney',
+  'America/Indianapolis',
+  'UTC',
 ];
 
 const timezones = process.argv.slice(2);

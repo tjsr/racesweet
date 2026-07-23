@@ -141,6 +141,24 @@ const selectRecentRecordsFilter = async (filterLabel: string): Promise<void> => 
   });
 };
 
+const recentRecordTimeZoneCases = [
+  {
+    eventTimeZone: 'Australia/Sydney',
+    expectedInitialTime: '20:06:00.000',
+    expectedSavedTime: '2026-05-29T00:07:30.250Z',
+  },
+  {
+    eventTimeZone: 'America/Indianapolis',
+    expectedInitialTime: '06:06:00.000',
+    expectedSavedTime: '2026-05-29T14:07:30.250Z',
+  },
+  {
+    eventTimeZone: 'UTC',
+    expectedInitialTime: '10:06:00.000',
+    expectedSavedTime: '2026-05-29T10:07:30.250Z',
+  },
+] as const;
+
 const toggleIgnoreRecordsFilter = async (filterLabel: string): Promise<void> => {
   const ignoreSelect = document.querySelector('#recent-records-ignore-dropdown [role="combobox"]');
   expect(ignoreSelect).toBeDefined();
@@ -3877,7 +3895,11 @@ describe('RecentRecords integration', () => {
     expect(container.querySelector('tr[data-record-id="677318b9-31a4-5606-a7b9-d1a9e2e79499"]')?.textContent).toContain('Green flag');
   });
 
-  it('opens the add-record dialog from a passing row and builds a passing record with looked-up entrant details', async () => {
+  it.each(recentRecordTimeZoneCases)('opens the add-record dialog for $eventTimeZone and builds a passing record with looked-up entrant details', async ({
+    eventTimeZone,
+    expectedInitialTime,
+    expectedSavedTime,
+  }) => {
     const categoryA: EventCategory = { id: '1', name: 'Category A' };
     const participant: EventParticipant = {
       categoryId: categoryA.id,
@@ -3932,6 +3954,7 @@ describe('RecentRecords integration', () => {
         <RecentRecords
           currentEventId="event-1"
           currentSessionId="session-1"
+          eventTimeZone={eventTimeZone}
           onAddRecord={onAddRecord}
           raceStateLookup={raceStateLookup}
           records={[crossing]}
@@ -3976,7 +3999,7 @@ describe('RecentRecords integration', () => {
     expect(txInput).toBeTruthy();
     expect(timingLineInput).toBeTruthy();
     expect(timingLoopInput).toBeTruthy();
-    expect(timeInput!.value).toBe('20:06:00.000');
+    expect(timeInput!.value).toBe(expectedInitialTime);
     expect(txInput!.value).toBe('');
     expect((document.querySelector('input[aria-label="Plate"]') as HTMLInputElement).value).toBe('');
 
@@ -4010,7 +4033,7 @@ describe('RecentRecords integration', () => {
       sessionId: 'session-1',
       source: expect.any(String),
     }));
-    expect((onAddRecord.mock.calls[0]?.[0] as ParticipantPassingRecord & { time?: Date }).time?.toISOString()).toBe('2026-05-29T00:07:30.250Z');
+    expect((onAddRecord.mock.calls[0]?.[0] as ParticipantPassingRecord & { time?: Date }).time?.toISOString()).toBe(expectedSavedTime);
   });
 
   it('opens the add-record dialog from a flag row and builds a category-scoped flag record', async () => {
