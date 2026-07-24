@@ -66,3 +66,13 @@ All Markdown files must pass the repository's Markdown lint checks. When adding 
 Remember that all data and modifications should occur in a ledger format, where modifications are an action and all previous data is immutable.  State becomes modified by instructions in sequence over time, and once modified never changes.  If we change an entrants category or name for example, the original information will not change but we log a change in the event data to indicate that it has to be updated.  That update is then reflected in the model.
 
 These changes are sent either by the server as an update to all clients, or stored in the event log when the data is persisted locally.  Every update event is sent to the controller, which will write that log entry to disk, and may also push that event to the server responsible for handling the event.
+
+## Additional TypeScript and UI code rules
+
+When writing TypeScript, all variables must have explicit, strong types at every definition, and every method or function parameter must be explicitly typed. Do not use implicit `any` or `unknown` unless it is absolutely necessary and cannot reasonably be resolved; document the reason when either is unavoidable.
+
+Prefer promise composition with `.then()` and parallel execution with promise arrays such as `Promise.all()` where practical. Avoid `await` when the code can safely preserve asynchronous parallelism without it.
+
+Sort imports correctly according to the repository's formatting rules, and use `.js` file extensions in import paths whenever possible.
+
+Break JSX and React elements into components at a reasonable level. JSX should not contain elements that span dozens or hundreds of lines. Event handlers longer than four lines must be defined externally rather than inline.
