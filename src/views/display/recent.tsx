@@ -2397,7 +2397,7 @@ export const RecentRecords = (props: RecordsProps & {
   const toolbarAnchorRef = React.useRef<HTMLDivElement>(null);
   const toolbarRef = React.useRef<HTMLDivElement>(null);
   const [visibleRowRange, setVisibleRowRange] = React.useState<RowIndexRange>(EMPTY_ROW_RANGE);
-  const [recentRecordRowHeight, setRecentRecordRowHeight] = React.useState<number>(ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX);
+  const recentRecordRowHeight = ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX;
   const [toolbarDock, setToolbarDock] = React.useState({
     height: 0,
     isDocked: false,
@@ -2646,10 +2646,7 @@ export const RecentRecords = (props: RecordsProps & {
     if (!container) {
       return;
     }
-    const rowElement = container.querySelector('tbody tr[data-record-id]') as HTMLTableRowElement | null;
-    const measuredRowHeight = rowElement?.getBoundingClientRect().height || ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX;
-    const safeRowHeight = measuredRowHeight > 0 ? measuredRowHeight : ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX;
-    setRecentRecordRowHeight((current) => Math.abs(current - safeRowHeight) < 0.5 ? current : safeRowHeight);
+    const safeRowHeight = ESTIMATED_RECENT_RECORD_ROW_HEIGHT_PX;
     const scrollContainer = findVerticalScrollContainer(container);
     const containerOwnsVerticalScroll = scrollContainer === container;
     const containerRect = container.getBoundingClientRect();

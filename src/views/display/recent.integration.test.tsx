@@ -1051,6 +1051,17 @@ describe('RecentRecords integration', () => {
     expect(firstVisibleRow.className).toContain('selected-category');
     expect(initialRenderedRows.length).toBeLessThan(records.length);
     expect(container.querySelector(`tr[data-record-id="${records[150]!.id}"]`)).toBeNull();
+    firstVisibleRow.getBoundingClientRect = (): DOMRect => ({
+      bottom: 72,
+      height: 72,
+      left: 0,
+      right: 1200,
+      toJSON: () => undefined,
+      top: 0,
+      width: 1200,
+      x: 0,
+      y: 0,
+    });
 
     await act(async () => {
       tableTop = -(150 * 36);
