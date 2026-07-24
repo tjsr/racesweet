@@ -10,7 +10,7 @@ import { type FileMakerTable, convertDurtFileMakerTablesToRaceState } from '../p
 
 const execFile = promisify(executeFile);
 
-const extractFileMakerJson = (databasePath: string, executablePath: string): Promise<string> => mkdtemp(path.join(tmpdir(), 'racesweet-durt-'))
+export const extractDurtFileMakerJson = (databasePath: string, executablePath: string): Promise<string> => mkdtemp(path.join(tmpdir(), 'racesweet-durt-'))
   .then((temporaryDirectory: string): Promise<string> => {
     const outputPath: string = path.join(temporaryDirectory, 'database.json');
     return execFile(executablePath, [databasePath, outputPath], {
@@ -21,16 +21,30 @@ const extractFileMakerJson = (databasePath: string, executablePath: string): Pro
       .finally((): Promise<void> => rm(temporaryDirectory, { force: true, recursive: true }));
   });
 
-const getDurtCompanionDatabasePaths = (sourceFilePath: string): Promise<string[]> => {
-  if (path.extname(sourceFilePath).toLowerCase() !== '.fmp12') {
+export const getDurtCompanionDatabasePaths = (sourceFilePath: string): Promise<string[]> => {
+  if (!['.fmp12', '.fp7'].includes(path.extname(sourceFilePath).toLowerCase())) {
     return Promise.resolve([]);
   }
   const sourceFileName = path.basename(sourceFilePath).toLowerCase();
   return readdir(path.dirname(sourceFilePath), { withFileTypes: true })
     .then((entries) => {
-      const registrationEntries = entries.filter((entry) => entry.isFile() && /^rider registration.*\.fmp12$/i.test(entry.name) && entry.name.toLowerCase() !== sourceFileName);
-      const canonicalEntry = registrationEntries.find((entry) => entry.name.toLowerCase() === 'rider registration.fmp12');
-      return (canonicalEntry ? [canonicalEntry] : registrationEntries).map((entry) => path.join(path.dirname(sourceFilePath), entry.name));
+      const companionPatterns: RegExp[] = [
+        /^rider registration.*\.(?:fmp12|fp7)$/i,
+        /^enduro riders.*\.(?:fmp12|fp7)$/i,
+        /^rider category nos ranges.*\.(?:fmp12|fp7)$/i,
+        /^enduro v .*\.(?:fmp12|fp7)$/i,
+        /^race event.*\.(?:fmp12|fp7)$/i,
+        /^mt beauty .*\.(?:fmp12|fp7)$/i,
+      ];
+      return entries
+        .filter((entry) => entry.isFile() && entry.name.toLowerCase() !== sourceFileName)
+        .filter((entry) => companionPatterns.some((pattern) => pattern.test(entry.name)))
+        .sort((left, right) => {
+          const leftPriority = companionPatterns.findIndex((pattern) => pattern.test(left.name));
+          const rightPriority = companionPatterns.findIndex((pattern) => pattern.test(right.name));
+          return leftPriority - rightPriority || left.name.localeCompare(right.name);
+        })
+        .map((entry) => path.join(path.dirname(sourceFilePath), entry.name));
     })
     .catch((): string[] => []);
 };
@@ -81,7 +95,7 @@ export interface DurtEventCatalogImportService<TCatalog> {
 }
 
 const defaultExtractor: DurtFileMakerExtractor = {
-  extract: extractFileMakerJson,
+  extract: extractDurtFileMakerJson,
 };
 
 const isFileMakerTable = (value: unknown): value is FileMakerTable => {

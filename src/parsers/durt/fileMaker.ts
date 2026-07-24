@@ -3,6 +3,7 @@ import { TZDate } from '@date-fns/tz';
 import { normalizeTimeZone } from '../../app/utils/timeutils.js';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant, ParticipantTransponder } from '../../model/eventparticipant.js';
+import type { EventTeam } from '../../model/eventteam.js';
 import { createCategoryId, createEventEntrantId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
 import type { EventId, SessionId } from '../../model/raceevent.js';
 import type { RaceState } from '../../model/racestate.js';
@@ -30,16 +31,20 @@ export interface DurtFileMakerImportOptions {
 const TRANSPONDER_COLUMNS: string[] = ['transponder', 'transponderno', 'transpondernumber', 'tx', 'txno', 'txnum', 'txnumber'];
 const FIRST_NAME_COLUMNS: string[] = ['firstname', 'givenname', 'riderfirstname'];
 const LAST_NAME_COLUMNS: string[] = ['lastname', 'riderlastname', 'surname', 'familyname'];
-const CATEGORY_COLUMNS: string[] = ['category', 'categoryentered', 'class', 'grade', 'ridercategory'];
-const PLATE_COLUMNS: string[] = ['number', 'racenumber', 'ridernumber', 'riderracenumber', 'plate', 'platenumber'];
-const DATE_COLUMNS: string[] = ['crossingdate', 'date', 'readdate', 'riderlapfinishdate'];
-const TIME_COLUMNS: string[] = ['crossingtime', 'time', 'timeofday', 'readtime', 'riderlapfinishtime'];
+const CATEGORY_COLUMNS: string[] = ['category', 'categoryentered', 'class', 'grade', 'ridercategory', 'entrantteamcategory'];
+const PLATE_COLUMNS: string[] = ['number', 'racenumber', 'ridernumber', 'riderracenumber', 'entrantracenumber', 'plate', 'platenumber'];
+const DATE_COLUMNS: string[] = ['crossingdate', 'date', 'readdate', 'riderlapfinishdate', 'entrantfinishdate', 'globallapdate'];
+const TIME_COLUMNS: string[] = ['crossingtime', 'time', 'timeofday', 'readtime', 'riderlapfinishtime', 'entrantfinishtime', 'globallaptime'];
 const TIMESTAMP_COLUMNS: string[] = ['crossingtimestamp', 'datetime', 'timestamp', 'readtimestamp'];
 const LINE_COLUMNS: string[] = ['line', 'lineno', 'linenumber'];
 const LOOP_COLUMNS: string[] = ['loop', 'loopno', 'loopnumber'];
 const CATEGORY_START_DATE_COLUMNS: string[] = ['categorystartdate'];
 const CATEGORY_START_TIME_COLUMNS: string[] = ['categorystarttime'];
 const LAP_TIME_COLUMNS: string[] = ['riderstimeforthislap'];
+const TEAM_NAME_COLUMNS: string[] = ['teamname', 'entryteamname'];
+const TEAM_MEMBER_COLUMNS: string[] = ['memberofteamcalc'];
+const CATEGORY_RANGE_LOWER_COLUMNS: string[] = ['lowercategoryridernumber'];
+const CATEGORY_RANGE_UPPER_COLUMNS: string[] = ['uppercategoryridernumber'];
 
 const normalizeColumnName = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -58,6 +63,13 @@ const getNumber = (row: Record<string, string>, columns: string[]): number | und
   return Number.isFinite(parsedValue) ? parsedValue : undefined;
 };
 
+const normalizePlateNumber = (value: string | undefined): string | undefined => {
+  if (!value) {
+    return undefined;
+  }
+  return /^\d+$/.test(value) ? String(Number(value)) : value;
+};
+
 const tableHasColumns = (table: FileMakerTable, columns: string[]): boolean => {
   const names = new Set<string>(table.columns.map((column: FileMakerColumn) => normalizeColumnName(column.name)));
   return columns.some((column: string) => names.has(column));
@@ -70,9 +82,15 @@ const isCrossingTable = (table: FileMakerTable): boolean => (
 );
 
 const isEntrantTable = (table: FileMakerTable): boolean => (
-  tableHasColumns(table, TRANSPONDER_COLUMNS) && (
+  (tableHasColumns(table, TRANSPONDER_COLUMNS) || tableHasColumns(table, PLATE_COLUMNS)) && (
     tableHasColumns(table, FIRST_NAME_COLUMNS) || tableHasColumns(table, LAST_NAME_COLUMNS) || tableHasColumns(table, CATEGORY_COLUMNS)
   ) && !isCrossingTable(table)
+);
+
+const isCategoryRangeTable = (table: FileMakerTable): boolean => (
+  tableHasColumns(table, CATEGORY_COLUMNS) &&
+  tableHasColumns(table, CATEGORY_RANGE_LOWER_COLUMNS) &&
+  tableHasColumns(table, CATEGORY_RANGE_UPPER_COLUMNS)
 );
 
 const parseDateTime = (dateText: string | undefined, timeText: string | undefined, timeZone: string): Date | undefined => {
@@ -120,12 +138,26 @@ export const convertDurtFileMakerTablesToRaceState = (
   const crossingTables = tables.filter(isCrossingTable);
   const categoryByName = new Map<string, EventCategory>();
   const categoryStartTimes = new Map<string, Date>();
+  const categoryRanges: Array<{ categoryName: string; lower: number; upper: number }> = [];
   const participantByPlate = new Map<string, EventParticipant>();
   const participantByTransponder = new Map<string, EventParticipant>();
+  const teamByName = new Map<string, EventTeam>();
+
+  tables.filter(isCategoryRangeTable).forEach((table: FileMakerTable) => table.values.forEach((row: Record<string, string>) => {
+    const categoryName = getValue(row, CATEGORY_COLUMNS);
+    const lower = getNumber(row, CATEGORY_RANGE_LOWER_COLUMNS);
+    const upper = getNumber(row, CATEGORY_RANGE_UPPER_COLUMNS);
+    if (!categoryName || lower === undefined || upper === undefined) {
+      return;
+    }
+    categoryRanges.push({ categoryName, lower, upper });
+  }));
 
   entrantTables.forEach((table: FileMakerTable) => table.values.forEach((row: Record<string, string>, rowIndex: number) => {
     const transponder = getValue(row, TRANSPONDER_COLUMNS);
-    if (!transponder || participantByTransponder.has(transponder)) {
+    const plate = normalizePlateNumber(getValue(row, PLATE_COLUMNS));
+    const participantKey = transponder || plate;
+    if (!participantKey || (transponder && participantByTransponder.has(transponder)) || (plate && participantByPlate.has(plate))) {
       return;
     }
     const firstName = getValue(row, FIRST_NAME_COLUMNS) || '';
@@ -136,30 +168,55 @@ export const convertDurtFileMakerTablesToRaceState = (
       category = createDurtCategory(options.eventId, categoryName);
       categoryByName.set(categoryName, category);
     }
-    const plate = getValue(row, PLATE_COLUMNS);
-    const identifier: ParticipantTransponder = { fromTime: undefined, toTime: undefined, txNo: /^\d+$/.test(transponder) ? Number(transponder) : transponder };
-    const identifiers = plate ? [{ fromTime: undefined, racePlate: plate, toTime: undefined }, identifier] : [identifier];
-    const participantId = createEventParticipantId(`durt:${options.sourceFilePath}:entrant:${table.name}:${rowIndex}:${transponder}`);
-    participantByTransponder.set(transponder, {
+    const transponderIdentifier: ParticipantTransponder | undefined = transponder
+      ? { fromTime: undefined, toTime: undefined, txNo: /^\d+$/.test(transponder) ? Number(transponder) : transponder }
+      : undefined;
+    const identifiers = [
+      ...(plate ? [{ fromTime: undefined, racePlate: plate, toTime: undefined }] : []),
+      ...(transponderIdentifier ? [transponderIdentifier] : []),
+    ];
+    const participantId = createEventParticipantId(`durt:${options.sourceFilePath}:entrant:${table.name}:${rowIndex}:${participantKey}`);
+    const teamName = getValue(row, TEAM_NAME_COLUMNS);
+    const isTeamMember = getValue(row, TEAM_MEMBER_COLUMNS)?.toLowerCase() === 'yes';
+    const team = teamName && isTeamMember
+      ? teamByName.get(teamName) || {
+        categoryId: category.id,
+        description: '',
+        id: createEventEntrantId(`durt:${options.sourceFilePath}:team:${teamName}`),
+        members: [],
+        name: teamName,
+      }
+      : undefined;
+    if (teamName && team) {
+      teamByName.set(teamName, team);
+    }
+    const participant: EventParticipant = {
       categoryId: category.id,
       currentResult: undefined,
-      entrantId: createEventEntrantId(`durt:${options.sourceFilePath}:entrant:${table.name}:${rowIndex}:${transponder}`),
+      entrantId: team?.id || createEventEntrantId(`durt:${options.sourceFilePath}:entrant:${table.name}:${rowIndex}:${participantKey}`),
       firstname: firstName,
       id: participantId,
       identifiers,
       lastRecordTime: null,
       resultDuration: null,
       surname: lastName,
-    });
+    };
+    if (team && !team.members.includes(participant.id)) {
+      team.members.push(participant.id);
+    }
+    if (transponder) {
+      participantByTransponder.set(transponder, participant);
+    }
     if (plate) {
-      participantByPlate.set(plate, participantByTransponder.get(transponder)!);
+      participantByPlate.set(plate, participant);
     }
   }));
 
   const records: TimeRecord[] = [];
+  const crossingIdentities = new Set<string>();
   crossingTables.forEach((table: FileMakerTable) => table.values.forEach((row: Record<string, string>, rowIndex: number) => {
     const transponder = getValue(row, TRANSPONDER_COLUMNS);
-    const plate = getValue(row, PLATE_COLUMNS);
+    const plate = normalizePlateNumber(getValue(row, PLATE_COLUMNS));
     if (!transponder && !plate) {
       return;
     }
@@ -171,7 +228,17 @@ export const convertDurtFileMakerTablesToRaceState = (
     if (!crossingTime) {
       return;
     }
-    const categoryName = getValue(row, CATEGORY_COLUMNS);
+    const crossingIdentity = `${transponder || plate}|${crossingTime.getTime()}`;
+    if (crossingIdentities.has(crossingIdentity)) {
+      return;
+    }
+    crossingIdentities.add(crossingIdentity);
+    const directCategoryName = getValue(row, CATEGORY_COLUMNS);
+    const plateNumber = plate ? Number(plate) : undefined;
+    const rangeCategoryNames = Number.isFinite(plateNumber)
+      ? categoryRanges.filter((range) => plateNumber! >= range.lower && plateNumber! <= range.upper).map((range) => range.categoryName)
+      : [];
+    const categoryName = directCategoryName || (rangeCategoryNames.length === 1 ? rangeCategoryNames[0] : undefined);
     if (categoryName) {
       let category = categoryByName.get(categoryName);
       if (!category) {
@@ -194,6 +261,7 @@ export const convertDurtFileMakerTablesToRaceState = (
       lineNumber: getNumber(row, LINE_COLUMNS),
       loopNumber: getNumber(row, LOOP_COLUMNS),
       participantId: participant?.id,
+      plateNumber: plate,
       recordType: RECORD_TX_CROSSING,
       sequence: records.length + 1,
       sessionId: options.sessionId,
@@ -223,9 +291,9 @@ export const convertDurtFileMakerTablesToRaceState = (
   }];
   return {
     categories: Array.from(categoryByName.values()),
-    participants: Array.from(participantByTransponder.values()),
+    participants: Array.from(new Set([...participantByTransponder.values(), ...participantByPlate.values()])),
     records,
-    teams: [],
+    teams: Array.from(teamByName.values()),
     timeRecordSources,
   };
 };

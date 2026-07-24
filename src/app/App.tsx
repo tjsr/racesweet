@@ -1833,7 +1833,6 @@ export const RaceSweetMainApp = () => {
               ? raceStateSnapshot(sessionState)
               : eventCatalogService.getImportedRaceState(eventId, sessionId) || {};
             const targetSessionState = sessionFromPartialRaceState(importMode === 'import' ? {} : existingRaceState);
-            const targetSessionState = sessionFromPartialRaceState(importMode === 'import' ? {} : existingRaceState);
             const knownTransmitterNumbers = [
               ...getEntrantsForEvent(eventCatalogState, eventId).flatMap((entrant) =>
                 entrant.isPlaceholder === true || entrant.name.trim().toLowerCase().startsWith('unknown participant')
@@ -1979,6 +1978,7 @@ export const RaceSweetMainApp = () => {
             const existingRaceState = isActiveSession
               ? raceStateSnapshot(sessionState)
               : eventCatalogService.getImportedRaceState(eventId, sessionId) || {};
+            const targetSessionState = sessionFromPartialRaceState(importMode === 'import' ? {} : existingRaceState);
             let latestProgress: DurtFileMakerLoadProgress = { completed: 0, total: 1 };
             const completeImportStep = (currentTask: string): Promise<void> => {
               latestProgress = {
