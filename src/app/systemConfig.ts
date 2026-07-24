@@ -9,6 +9,7 @@ export type DataSourceType =
   | 'timing-dorian-data1-supernode'
   | 'file-rfid-timing-csv'
   | 'file-dorian-ctc-srt'
+  | 'file-durt-filemaker'
   | 'file-mr-scats-data'
   | 'file-apical-data-file'
   | 'file-racesweet-ledger'
@@ -49,6 +50,12 @@ export interface MrScatsSourceConfig {
   sourceKind?: 'archive' | 'directory';
 }
 
+export interface DurtFileMakerSourceConfig {
+  databaseFilePath?: string;
+  extractorPath?: string;
+  importMode?: DataImportMode;
+}
+
 export interface ApicalListedEvent {
   companyName?: string;
   eventDate?: string;
@@ -79,6 +86,7 @@ export interface DataSourceConfig {
   apiConfig?: ApicalApiSourceConfig;
   apicalDataFilePath?: string;
   dataLastRetrieved?: string;
+  durtFileMakerConfig?: DurtFileMakerSourceConfig;
   enabled: boolean;
   fileConfig?: LocalFileSourceConfig;
   finishLineNumbers?: number[];
@@ -251,6 +259,17 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListed
     };
   }
 
+  if (source.type === 'file-durt-filemaker') {
+    return {
+      ...source,
+      durtFileMakerConfig: {
+        databaseFilePath: normalizeOptionalSystemFilePath(source.durtFileMakerConfig?.databaseFilePath),
+        extractorPath: normalizeOptionalSystemFilePath(source.durtFileMakerConfig?.extractorPath),
+        importMode: source.durtFileMakerConfig?.importMode === 'update' ? 'update' : 'import',
+      },
+    };
+  }
+
   if (source.type === 'timing-dorian-data1-supernode') {
     return {
       ...source,
@@ -335,6 +354,8 @@ export const getDataSourceTypeLabel = (type: DataSourceType): string => {
     return 'RFID Timing CSV';
   case 'file-dorian-ctc-srt':
     return 'Dorian CTC SRT / ERF File';
+  case 'file-durt-filemaker':
+    return 'DURT FileMaker Database';
   case 'file-mr-scats-data':
     return 'MR-SCATS Data';
   case 'file-apical-data-file':

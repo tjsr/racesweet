@@ -494,8 +494,10 @@ const fetchApicalDataFilePayload = async (source: DataSourceConfig, apicalEventI
     }
 
     const buffer = await response.arrayBuffer();
-    await cacheApicalExcelPayload(apicalEventId, buffer, cacheDirectoryPath);
-    const payload = await readApicalExcelPayloadBuffer(buffer);
+    const [payload] = await Promise.all([
+      readApicalExcelPayloadBuffer(buffer),
+      cacheApicalExcelPayload(apicalEventId, buffer, cacheDirectoryPath),
+    ]);
     return payload;
   } catch (err: unknown) {
     if (err instanceof ApicalDataException) {

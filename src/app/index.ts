@@ -7,6 +7,7 @@ import {
   ReadContentIpcReceiveChannel,
   RequestExternalHttpIpcInvokeChannel,
   RequestOpenLocalFileIpcInvokeChannel,
+  RequestOpenExternalUrlIpcInvokeChannel,
   RequestReadIpcSendChannel,
   RequestSelectLocalDirectoryIpcInvokeChannel,
   RequestSelectLocalFileIpcInvokeChannel,
@@ -235,6 +236,14 @@ ipcMain.on(RequestWriteIpcSendChannel, (
   }).catch((error: unknown) => {
     event.reply(WriteContentErrorIpcReceiveChannel, eventId, error);
   });
+});
+
+ipcMain.handle(RequestOpenExternalUrlIpcInvokeChannel, async (_event: Electron.IpcMainInvokeEvent, urlText: string): Promise<void> => {
+  const url = new URL(urlText);
+  if (url.protocol !== 'https:') {
+    throw new Error('Only HTTPS URLs may be opened externally.');
+  }
+  await shell.openExternal(url.toString());
 });
 
 ipcMain.handle('get-cookies', async (event, targetUrl) => {

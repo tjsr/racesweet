@@ -115,10 +115,13 @@ const fetchWithElectronSession = async (request: ExternalHttpProxyRequest): Prom
       method: request.method || 'GET',
       signal: abortController.signal,
     });
-    const bodyBuffer = Buffer.from(await response.arrayBuffer());
+    const bodyBufferPromise: Promise<Buffer> = response.arrayBuffer().then((body: ArrayBuffer): Buffer => Buffer.from(body));
     const headers = toExternalHttpHeaderRecord(response.headers);
+    const cookieHeaderPromise: Promise<string | undefined> = !headers['set-cookie'] && !headers.cookie
+      ? readElectronCookieHeader(response.url || request.url)
+      : Promise.resolve(undefined);
+    const [bodyBuffer, cookieHeader] = await Promise.all([bodyBufferPromise, cookieHeaderPromise]);
     if (!headers['set-cookie'] && !headers.cookie) {
-      const cookieHeader = await readElectronCookieHeader(response.url || request.url);
       if (cookieHeader) {
         headers.cookie = cookieHeader;
       } else {

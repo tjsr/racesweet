@@ -7,6 +7,7 @@ type RendererApi = {
   requestExternalHttp: (request: ExternalHttpProxyRequest) => Promise<ExternalHttpProxyResponse>;
   requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType) => Promise<DataType>;
   openLocalFile: (filePath: string) => Promise<void>;
+  openExternalUrl: (url: string) => Promise<void>;
   selectLocalDirectory: (title?: string) => Promise<string | undefined>;
   selectLocalFile: (options?: SelectLocalFileOptions) => Promise<string | undefined>;
   send: (channel: AvailableSendChannels, ...args: unknown[]) => void;
@@ -19,6 +20,7 @@ const requiredRendererApiMethods = [
   'requestExternalHttp',
   'requestFileContent',
   'openLocalFile',
+  'openExternalUrl',
   'selectLocalDirectory',
   'selectLocalFile',
   'send',

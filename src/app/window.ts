@@ -49,6 +49,7 @@ declare global {
       requestExternalHttp: (request: ExternalHttpProxyRequest) => Promise<ExternalHttpProxyResponse>;
       requestBuffer: (filePath: string) => Promise<Buffer>;
       openLocalFile: (filePath: string) => Promise<void>;
+      openExternalUrl: (url: string) => Promise<void>;
       selectLocalDirectory: (title?: string) => Promise<string | undefined>;
       selectLocalFile: (options?: SelectLocalFileOptions) => Promise<string | undefined>;
       writeFileContent: (filePath: string, contents: string, dataType?: FileWriteDataType, options?: FileWriteOptions) => Promise<void>;

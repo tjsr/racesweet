@@ -3,6 +3,7 @@
 import { assertRendererApi, getRendererApi } from './rendererApi.js';
 
 const createRendererApi = () => ({
+  openExternalUrl: vi.fn(),
   openLocalFile: vi.fn(),
   receive: vi.fn(),
   requestBuffer: vi.fn(),
@@ -36,7 +37,7 @@ describe('renderer API assertions', () => {
       requestFileContent: vi.fn(),
     };
 
-    expect(() => assertRendererApi(api)).toThrow(/Missing methods: receive, requestBuffer, requestExternalHttp, openLocalFile, selectLocalDirectory, selectLocalFile, send, writeFileContent/);
+    expect(() => assertRendererApi(api)).toThrow(/Missing methods: receive, requestBuffer, requestExternalHttp, openLocalFile, openExternalUrl, selectLocalDirectory, selectLocalFile, send, writeFileContent/);
   });
 
   it('allows callers to assert only the IPC methods required for a specific operation', () => {

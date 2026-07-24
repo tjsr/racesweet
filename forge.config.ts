@@ -1,4 +1,5 @@
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import path from 'node:path';
 
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import type { ForgeConfig } from '@electron-forge/shared-types';
@@ -17,6 +18,7 @@ const devServerPort = getRaceSweetServerPort();
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    extraResource: [path.resolve('packages', 'fmptools-win32-x64', 'bin', 'fmp2json.exe')],
   },
   rebuildConfig: {},
   makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],

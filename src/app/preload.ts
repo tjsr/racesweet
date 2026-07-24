@@ -7,6 +7,7 @@ import {
   ReadContentIpcReceiveChannel,
   RequestExternalHttpIpcInvokeChannel,
   RequestOpenLocalFileIpcInvokeChannel,
+  RequestOpenExternalUrlIpcInvokeChannel,
   RequestReadIpcSendChannel,
   RequestSelectLocalDirectoryIpcInvokeChannel,
   RequestSelectLocalFileIpcInvokeChannel,
@@ -113,6 +114,9 @@ const rendererApi: Window['api'] = {
   },
   openLocalFile: (filePath: string): Promise<void> => {
     return ipcRenderer.invoke(RequestOpenLocalFileIpcInvokeChannel, filePath) as Promise<void>;
+  },
+  openExternalUrl: (url: string): Promise<void> => {
+    return ipcRenderer.invoke(RequestOpenExternalUrlIpcInvokeChannel, url) as Promise<void>;
   },
   selectLocalDirectory: async (title?: string): Promise<string | undefined> => {
     try {

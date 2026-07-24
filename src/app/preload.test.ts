@@ -50,6 +50,7 @@ describe('Electron preload renderer API', () => {
     expect(window.api).toEqual(expect.objectContaining({
       receive: expect.any(Function),
       openLocalFile: expect.any(Function),
+      openExternalUrl: expect.any(Function),
       requestBuffer: expect.any(Function),
       requestExternalHttp: expect.any(Function),
       requestFileContent: expect.any(Function),
@@ -68,6 +69,7 @@ describe('Electron preload renderer API', () => {
     expect(contextBridge.exposeInMainWorld).toHaveBeenCalledWith('api', window.api);
     expect(window.api.writeFileContent).toEqual(expect.any(Function));
     expect(window.api.openLocalFile).toEqual(expect.any(Function));
+    expect(window.api.openExternalUrl).toEqual(expect.any(Function));
     expect(window.api.requestFileContent).toEqual(expect.any(Function));
   });
 
