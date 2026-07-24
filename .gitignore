@@ -14,3 +14,4 @@ out/
 .env.tjsr-yoga
 cachedEvents*.json
 
+packages/fmptools-win32-x64/bin/fmp2json.exe
