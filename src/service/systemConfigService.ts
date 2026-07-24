@@ -78,6 +78,14 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
     };
   }
 
+  if (type === 'file-durt-filemaker') {
+    return {
+      ...base,
+      durtFileMakerConfig: { importMode: 'import' },
+      name: 'DURT FileMaker Database',
+    };
+  }
+
   if (type === 'file-mr-scats-data') {
     return {
       ...base,

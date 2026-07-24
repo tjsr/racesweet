@@ -1,0 +1,15 @@
+{
+  "name": "@racesweet/fmptools-win32-x64",
+  "version": "0.2.2-racesweet.1",
+  "description": "RaceSweet-packaged Windows x64 fmp2json binary for local FileMaker imports.",
+  "files": [
+    "bin/fmp2json.exe"
+  ],
+  "license": "MIT",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ]
+}

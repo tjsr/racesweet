@@ -13,6 +13,16 @@ RaceSweet is an offline-capable event timing and results application. Its archit
 5. Remote mutations use the same validation, deduplication, ledger, and state rebuild path as local mutations. They are not applied directly to a store.
 6. Processing services operate on models and records, never React components. UI code renders projections and sends typed commands only.
 
+## DURT FileMaker data source
+
+RaceSweet uses the bundled `fmp2json.exe` utility to extract tables from DURT FileMaker `.fp7` files. Build the Windows x64 utility with Docker:
+
+```powershell
+npm run build:fmptools:win32
+```
+
+The executable is written to `packages\fmptools-win32-x64\bin\fmp2json.exe` beneath the repository root. In the DURT data source panel, this is the path to select when supplying an advanced extractor override. The default configuration uses this bundled executable automatically; packaged Electron builds copy it to the application resources directory.
+
 ## Source layout and ownership
 
 | Location | Owns | Must not own |

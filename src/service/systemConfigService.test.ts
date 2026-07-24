@@ -479,6 +479,29 @@ describe('SystemConfigService', () => {
     });
   });
 
+  it('creates and persists DURT FileMaker source settings', async () => {
+    const persistence = createPersistence();
+    const service = await SystemConfigService.create(persistence);
+
+    await service.createSource('file-durt-filemaker');
+    const source = service.state.dataSources[0];
+    expect(source?.durtFileMakerConfig).toEqual({ importMode: 'import' });
+
+    await service.updateSource(source!.id, {
+      durtFileMakerConfig: {
+        databaseFilePath: 'C:/DURT/Enduro Event.fp7',
+        extractorPath: 'C:/tools/fmp2json.exe',
+        importMode: 'update',
+      },
+    });
+
+    expect(service.state.dataSources[0]?.durtFileMakerConfig).toEqual({
+      databaseFilePath: path.resolve('C:/DURT/Enduro Event.fp7'),
+      extractorPath: path.resolve('C:/tools/fmp2json.exe'),
+      importMode: 'update',
+    });
+  });
+
   it('creates and persists MR-SCATS data source inventory config', async () => {
     const persistence = createPersistence();
     const service = await SystemConfigService.create(persistence);

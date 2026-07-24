@@ -40,6 +40,7 @@ import { type UnsavedChangesGuard } from '../views/display/unsavedChangesWarning
 import { LoadingProgress } from '../views/panels/LoadingProgress.tsx';
 import { PulledApicalRaceState, createApicalCatalogEventId, createApicalCatalogSessionId, fetchApicalRaceStateNow, getConfiguredApicalEventId, pullApicalRaceState } from './apicalDataSource.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
+import { type DurtFileMakerLoadProgress, getBundledDurtFileMakerExtractorPath, loadDurtFileMakerRaceState } from './durtFileMakerDataSource.ts';
 import './index.css';
 import { formatErrorForDisplay } from './stackTrace.ts';
 import { type DataSourceConfig, type EventTimeDisplayZoneMode, type SystemConfiguration, type TimingContextSelectionConfig, createDefaultSystemConfiguration, getFinishLineNumbersForSession, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
@@ -1832,6 +1833,7 @@ export const RaceSweetMainApp = () => {
               ? raceStateSnapshot(sessionState)
               : eventCatalogService.getImportedRaceState(eventId, sessionId) || {};
             const targetSessionState = sessionFromPartialRaceState(importMode === 'import' ? {} : existingRaceState);
+            const targetSessionState = sessionFromPartialRaceState(importMode === 'import' ? {} : existingRaceState);
             const knownTransmitterNumbers = [
               ...getEntrantsForEvent(eventCatalogState, eventId).flatMap((entrant) =>
                 entrant.isPlaceholder === true || entrant.name.trim().toLowerCase().startsWith('unknown participant')
@@ -1923,6 +1925,7 @@ export const RaceSweetMainApp = () => {
               });
           }}
           onOpenLocalFile={(filePath) => window.api.openLocalFile(filePath)}
+          onOpenExternalUrl={(url) => window.api.openExternalUrl(url)}
           onSaveLocalStorageDirectoryPath={(directoryPath) => {
             if (!systemConfigService) {
               return;
@@ -1958,6 +1961,89 @@ export const RaceSweetMainApp = () => {
             };
 
             saveSource().catch((error: unknown) => setErrorState(error as Error));
+          }}
+          onLoadDurtFileMakerDatabase={(sourceId, onProgress) => {
+            if (!eventCatalogService || !systemConfigService) {
+              return;
+            }
+            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+            const databaseFilePath = source?.durtFileMakerConfig?.databaseFilePath;
+            const extractorPath = source?.durtFileMakerConfig?.extractorPath || getBundledDurtFileMakerExtractorPath();
+            const eventId = selectedEventId;
+            const sessionId = selectedSessionId;
+            if (!source || source.type !== 'file-durt-filemaker' || !databaseFilePath || !eventId || !sessionId) {
+              throw new Error('Select an event and session, then select a DURT FileMaker database.');
+            }
+            const importMode = source.durtFileMakerConfig?.importMode || 'import';
+            const isActiveSession = eventId === eventCatalogState.activeEventId && sessionId === eventCatalogState.activeSessionId;
+            const existingRaceState = isActiveSession
+              ? raceStateSnapshot(sessionState)
+              : eventCatalogService.getImportedRaceState(eventId, sessionId) || {};
+            let latestProgress: DurtFileMakerLoadProgress = { completed: 0, total: 1 };
+            const completeImportStep = (currentTask: string): Promise<void> => {
+              latestProgress = {
+                ...latestProgress,
+                completed: Math.min(latestProgress.completed + 1, latestProgress.total),
+                currentFile: undefined,
+                currentTask,
+              };
+              return onProgress ? Promise.resolve(onProgress(latestProgress)) : Promise.resolve();
+            };
+
+            return loadDurtFileMakerRaceState({
+              additionalProgressSteps: 5,
+              eventId,
+              executablePath: extractorPath,
+              onProgress: (progress) => {
+                latestProgress = progress;
+                return onProgress?.(progress);
+              },
+              sessionId,
+              sourceFilePath: databaseFilePath,
+              timeZone: getEventTimeZone(eventId),
+            }).then(async (raceState) => {
+              await completeImportStep('Synchronising DURT entrants and categories');
+              const scaffoldCatalog = await eventCatalogService.syncEventScaffold(eventId, raceState.categories || [], raceState.participants || [], raceState.entries || [], raceState.teams || [], sessionId);
+              await completeImportStep('Applying DURT crossings to the timing session');
+              await applyPulledRaceStateToSession(targetSessionState, raceState, {
+                catalog: scaffoldCatalog,
+                eventId,
+                finishLineNumbers: getFinishLineNumbersForSession(systemConfigState, eventId, sessionId),
+                sessionId,
+              });
+              const importedSessionRaceState = raceStateSnapshot(targetSessionState);
+              const importSummary = summarizeSessionSourceReload(existingRaceState, importedSessionRaceState, 'all');
+              await completeImportStep('Writing DURT timing records');
+              const catalog = importMode === 'update'
+                ? await eventCatalogService.updateImportedRaceState(eventId, sessionId, importedSessionRaceState)
+                : await eventCatalogService.replaceImportedRaceState(eventId, sessionId, importedSessionRaceState);
+              updateEventCatalogState(catalog, eventId, sessionId);
+              if (isActiveSession) {
+                setSessionState(targetSessionState);
+                setRenderTick((tick) => tick + 1);
+              }
+              setTimingSessionSelection(isActiveSession ? 'active' : 'session');
+              setSelectedTimingEventId(eventId);
+              setSelectedTimingSessionId(sessionId);
+              setTimingRaceState(targetSessionState);
+              await completeImportStep('Refreshing imported DURT data');
+              await systemConfigService.assignSourcesToEvent(eventId, [sourceId]);
+              await systemConfigService.assignSourcesToSession(sessionId, { mode: 'specific', sourceIds: [sourceId] });
+              const config = await systemConfigService.updateTimingContextSelection(isActiveSession
+                ? { selectionMode: 'active' }
+                : {
+                  eventId,
+                  selectionMode: 'session',
+                  sessionId,
+                });
+              updateSystemConfigState(config);
+              await completeImportStep('Assigning DURT source to session');
+              await completeImportStep('Showing DURT import summary');
+              setReloadSummary(importSummary);
+            }).catch((error: unknown) => {
+              setErrorState(error as Error);
+              throw error;
+            });
           }}
           onPreviewMrScatsDataFile={(sourceId, file) => {
             const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
@@ -1996,6 +2082,14 @@ export const RaceSweetMainApp = () => {
               title: 'Select CTC TRACK.CFG file',
             });
           }}
+          onSelectDurtFileMakerDatabase={() => window.api.selectLocalFile({
+            filters: [{ extensions: ['fp7', 'fmp12'], name: 'FileMaker database files' }],
+            title: 'Select DURT FileMaker database',
+          })}
+          onSelectDurtFileMakerExtractor={() => window.api.selectLocalFile({
+            filters: [{ extensions: ['exe'], name: 'fmp2json executable' }],
+            title: 'Select fmp2json extractor',
+          })}
           onSelectMrScatsDataArchive={() => {
             return window.api.selectLocalFile({
               filters: [{ extensions: ['zip', 'arj'], name: 'MR-SCATS archive files' }],

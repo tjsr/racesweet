@@ -14,6 +14,7 @@
   "old.main": "index.mjs",
   "vite.main": ".vite/build/main.js",
   "scripts": {
+    "build:fmptools:win32": "node ./scripts/buildFmptoolsWindows.mjs",
     "build": "npm run types && npm run compile && npm run test && npm run lint",
     "compile": "tsc && npm run compile:electron && babel index.mjs -d build",
     "compile:electron": "electron-forge package",
@@ -120,6 +121,7 @@
     "npm": ">=11.4.1"
   },
   "optionalDependencies": {
+    "@racesweet/fmptools-win32-x64": "file:packages/fmptools-win32-x64",
     "node-adodb": "^5.0.3"
   },
   "allowScripts": {

@@ -20,9 +20,11 @@ interface SystemPageProps {
   onDisplayError?: (source: string, error: unknown) => void;
   onFetchApicalDataNow: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
+  onOpenExternalUrl?: (url: string) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onLoadMrScatsEvent?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
   onLoadDorianCtcSrtFile?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
+  onLoadDurtFileMakerDatabase?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
   onReprocessApicalData: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onPreviewMrScatsDataFile?: (sourceId: TimeRecordSourceId, file: MrScatsDataFileSummary) => Promise<MrScatsDataFilePreview>;
   onPreviewDorianCtcSrtFile?: (sourceId: TimeRecordSourceId) => Promise<MrScatsDataFilePreview>;
@@ -34,6 +36,8 @@ interface SystemPageProps {
   onSelectLocalFile?: () => Promise<string | undefined>;
   onSelectDorianCtcSrtFile?: () => Promise<string | undefined>;
   onSelectDorianCtcTrackConfigFile?: () => Promise<string | undefined>;
+  onSelectDurtFileMakerDatabase?: () => Promise<string | undefined>;
+  onSelectDurtFileMakerExtractor?: () => Promise<string | undefined>;
 }
 
 export const SystemPage = (props: SystemPageProps): React.ReactElement => {
@@ -67,7 +71,9 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         onLoadApicalEvents={props.onLoadApicalEvents}
         onLoadMrScatsEvent={props.onLoadMrScatsEvent}
         onLoadDorianCtcSrtFile={props.onLoadDorianCtcSrtFile}
+        onLoadDurtFileMakerDatabase={props.onLoadDurtFileMakerDatabase}
         onOpenLocalFile={props.onOpenLocalFile}
+        onOpenExternalUrl={props.onOpenExternalUrl}
         onPreviewMrScatsDataFile={props.onPreviewMrScatsDataFile}
         onPreviewDorianCtcSrtFile={props.onPreviewDorianCtcSrtFile}
         onReprocessApicalData={props.onReprocessApicalData}
@@ -77,6 +83,8 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         onSelectLocalFile={props.onSelectLocalFile}
         onSelectDorianCtcSrtFile={props.onSelectDorianCtcSrtFile}
         onSelectDorianCtcTrackConfigFile={props.onSelectDorianCtcTrackConfigFile}
+        onSelectDurtFileMakerDatabase={props.onSelectDurtFileMakerDatabase}
+        onSelectDurtFileMakerExtractor={props.onSelectDurtFileMakerExtractor}
       />
 
       <LogPanel displayedErrorLog={props.displayedErrorLog} />

@@ -13,6 +13,7 @@ const sourceTypeOptions: DataSourceType[] = [
   'timing-dorian-data1-supernode',
   'file-rfid-timing-csv',
   'file-dorian-ctc-srt',
+  'file-durt-filemaker',
   'file-mr-scats-data',
   'file-apical-data-file',
   'file-racesweet-ledger',

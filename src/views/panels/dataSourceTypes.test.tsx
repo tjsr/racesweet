@@ -37,8 +37,10 @@ describe('DataSourceTypesPanel', () => {
     expect(container.textContent).toContain('Add Data Source');
     expect(container.textContent).toContain('MR-SCATS Data');
     expect(container.textContent).toContain('Dorian CTC SRT / ERF File');
+    expect(container.textContent).toContain('DURT FileMaker Database');
 
     expect(Array.from(container.querySelectorAll('option')).map((option) => option.value)).toContain('file-dorian-ctc-srt');
+    expect(Array.from(container.querySelectorAll('option')).map((option) => option.value)).toContain('file-durt-filemaker');
 
     const select = container.querySelector('select[aria-label="New Data Source Type"]') as HTMLSelectElement;
     expect(select.value).toBe('api-apical-excel-file');

@@ -18,7 +18,9 @@ interface DataSourcesPanelProps {
   onLoadApicalEvents: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onLoadMrScatsEvent?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
   onLoadDorianCtcSrtFile?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
+  onLoadDurtFileMakerDatabase?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
+  onOpenExternalUrl?: (url: string) => void | Promise<void>;
   onPreviewMrScatsDataFile?: (sourceId: TimeRecordSourceId, file: MrScatsDataFileSummary) => Promise<MrScatsDataFilePreview>;
   onPreviewDorianCtcSrtFile?: (sourceId: TimeRecordSourceId) => Promise<MrScatsDataFilePreview>;
   onReprocessApicalData: (sourceId: TimeRecordSourceId) => void | Promise<void>;
@@ -28,6 +30,8 @@ interface DataSourcesPanelProps {
   onSelectLocalFile?: () => Promise<string | undefined>;
   onSelectDorianCtcSrtFile?: () => Promise<string | undefined>;
   onSelectDorianCtcTrackConfigFile?: () => Promise<string | undefined>;
+  onSelectDurtFileMakerDatabase?: () => Promise<string | undefined>;
+  onSelectDurtFileMakerExtractor?: () => Promise<string | undefined>;
 }
 
 interface SourceFetchError {
@@ -152,6 +156,8 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
   const [masterProfileDraftErrors, setMasterProfileDraftErrors] = React.useState<Record<string, string>>({});
   const [dorianCtcLoadProgress, setDorianCtcLoadProgress] = React.useState<InlineLoadingProgress>({ completed: 0, total: 1 });
   const [isLoadingDorianCtc, setIsLoadingDorianCtc] = React.useState<boolean>(false);
+  const [durtFileMakerLoadProgress, setDurtFileMakerLoadProgress] = React.useState<InlineLoadingProgress>({ completed: 0, total: 1 });
+  const [isLoadingDurtFileMaker, setIsLoadingDurtFileMaker] = React.useState<boolean>(false);
   const [dorianCtcPreview, setDorianCtcPreview] = React.useState<MrScatsDataFilePreview | undefined>();
   const [dorianCtcPreviewError, setDorianCtcPreviewError] = React.useState<string | undefined>();
   const [dorianCtcPreviewLoadingFile, setDorianCtcPreviewLoadingFile] = React.useState<string | undefined>();
@@ -300,6 +306,22 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
     });
   };
 
+  const handleSelectDurtFileMakerDatabase = async (source: DataSourceConfig): Promise<void> => {
+    const databaseFilePath = await props.onSelectDurtFileMakerDatabase?.();
+    if (!databaseFilePath) {
+      return;
+    }
+    await props.onSaveSource(source.id, { durtFileMakerConfig: { ...source.durtFileMakerConfig, databaseFilePath } });
+  };
+
+  const handleSelectDurtFileMakerExtractor = async (source: DataSourceConfig): Promise<void> => {
+    const extractorPath = await props.onSelectDurtFileMakerExtractor?.();
+    if (!extractorPath) {
+      return;
+    }
+    await props.onSaveSource(source.id, { durtFileMakerConfig: { ...source.durtFileMakerConfig, extractorPath } });
+  };
+
   const handleLoadDorianCtcSrtFile = async (sourceId: TimeRecordSourceId): Promise<void> => {
     if (!props.onLoadDorianCtcSrtFile) {
       return;
@@ -324,6 +346,33 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
       });
     } finally {
       setIsLoadingDorianCtc(false);
+    }
+  };
+
+  const handleLoadDurtFileMakerDatabase = async (sourceId: TimeRecordSourceId): Promise<void> => {
+    if (!props.onLoadDurtFileMakerDatabase) {
+      return;
+    }
+
+    setIsLoadingDurtFileMaker(true);
+    setDurtFileMakerLoadProgress({
+      callerName: 'Importing DURT FileMaker database',
+      completed: 0,
+      currentTask: 'Preparing DURT FileMaker database import',
+      total: 0,
+    });
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    let lastProgressPaintAt: number = Date.now();
+    try {
+      await props.onLoadDurtFileMakerDatabase(sourceId, async (progress: InlineLoadingProgress) => {
+        setDurtFileMakerLoadProgress(progress);
+        if (Date.now() - lastProgressPaintAt > 50 || progress.completed >= progress.total) {
+          lastProgressPaintAt = Date.now();
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        }
+      });
+    } finally {
+      setIsLoadingDurtFileMaker(false);
     }
   };
 
@@ -416,6 +465,7 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
               const isMrScatsData = source.type === 'file-mr-scats-data';
               const isRfidTimingCsv = source.type === 'file-rfid-timing-csv';
               const isDorianCtcSrt = source.type === 'file-dorian-ctc-srt';
+              const isDurtFileMaker = source.type === 'file-durt-filemaker';
               const masterProfilesJson = JSON.stringify(source.masterEntrantConfig?.profiles || [], null, 2);
               const sourceFetchError = sourceFetchErrors[source.id];
 
@@ -565,6 +615,42 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                         </button>
                         {isLoadingDorianCtc ? (
                           <InlineLoadingIndicator ariaLabel="Loading CTC file" progress={dorianCtcLoadProgress} />
+                        ) : null}
+                      </div>
+                    </>
+                  ) : isDurtFileMaker ? (
+                    <>
+                      <h4>DURT FileMaker Database</h4>
+                      <p>Imports entrant and crossing tables from a FileMaker .fp7 or .fmp12 file using the bundled fmp2json extractor.</p>
+                      <label>
+                        Database file
+                        <input aria-label={`DURT FileMaker Database Path ${source.id}`} readOnly type="text" value={source.durtFileMakerConfig?.databaseFilePath || ''} />
+                      </label>
+                      <label>
+                        fmp2json executable (bundled)
+                        <details className="inline-info">
+                          <summary aria-label="About fmp2json" title="About the required fmp2json extractor">ⓘ</summary>
+                          <p>FileMaker databases are proprietary binary files. RaceSweet uses fmp2json to read their tables safely, then converts DURT entrants and crossings into the RaceSweet ledger.</p>
+                          <p>RaceSweet packages fmp2json with the Windows app, so normal users do not need a compiler or separate installation. Developers can create that package with npm run build:fmptools:win32; the build runs entirely in Docker.</p>
+                          <p>The bundled binary is built from <a href="https://github.com/evanmiller/fmptools/releases" onClick={(event) => {
+                            event.preventDefault(); void props.onOpenExternalUrl?.('https://github.com/evanmiller/fmptools/releases');
+                          }}>fmptools releases</a>. A custom executable can be selected below only when troubleshooting or testing a different build.</p>
+                        </details>
+                        <input aria-label={`DURT FileMaker Extractor Path ${source.id}`} readOnly type="text" value={source.durtFileMakerConfig?.extractorPath || ''} />
+                      </label>
+                      <fieldset>
+                        <legend>Data import mode</legend>
+                        <label><input checked={(source.durtFileMakerConfig?.importMode || 'import') === 'import'} name={`durt-import-mode-${source.id}`} onChange={() => props.onSaveSource(source.id, { durtFileMakerConfig: { ...source.durtFileMakerConfig, importMode: 'import' } })} type="radio" />Import — replace imported state for the selected session.</label>
+                        <label><input checked={source.durtFileMakerConfig?.importMode === 'update'} name={`durt-import-mode-${source.id}`} onChange={() => props.onSaveSource(source.id, { durtFileMakerConfig: { ...source.durtFileMakerConfig, importMode: 'update' } })} type="radio" />Update — merge imported records into the selected session.</label>
+                      </fieldset>
+                      <div className="events-actions">
+                        <button type="button" onClick={() => handleSelectDurtFileMakerDatabase(source)}>Select Database</button>
+                        <button type="button" onClick={() => handleSelectDurtFileMakerExtractor(source)}>Select Extractor</button>
+                        <button disabled={!source.durtFileMakerConfig?.databaseFilePath || isLoadingDurtFileMaker} type="button" onClick={() => {
+                          void handleLoadDurtFileMakerDatabase(source.id);
+                        }}>Import DURT Database</button>
+                        {isLoadingDurtFileMaker ? (
+                          <InlineLoadingIndicator ariaLabel="Importing DURT database" progress={durtFileMakerLoadProgress} />
                         ) : null}
                       </div>
                     </>

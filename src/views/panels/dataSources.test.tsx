@@ -159,6 +159,62 @@ describe('DataSourcesPanel', () => {
     });
   });
 
+  it('selects DURT database and extractor paths before enabling import', async () => {
+    let completeImport: () => void = (): void => undefined;
+    let reportImportProgress: ((progress: { completed: number; currentTask?: string; total: number }) => void | Promise<void>) | undefined;
+    const onLoadDurtFileMakerDatabase = vi.fn((_sourceId: string, onProgress?: (progress: { completed: number; currentTask?: string; total: number }) => void | Promise<void>): Promise<void> => new Promise<void>((resolve) => {
+      completeImport = resolve;
+      reportImportProgress = onProgress;
+    }));
+    const onOpenExternalUrl = vi.fn();
+    const onSaveSource = vi.fn();
+    const durtSource: DataSourceConfig = {
+      durtFileMakerConfig: { importMode: 'import' },
+      enabled: true,
+      id: 'source-durt',
+      name: 'DURT Source',
+      type: 'file-durt-filemaker',
+    };
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+    flushSync(() => {
+      root?.render(<DataSourcesPanel dataSources={[durtSource]} onCreateSource={vi.fn()} onDeleteSource={vi.fn()} onFetchApicalDataNow={vi.fn()} onLoadApicalEvents={vi.fn()} onLoadDurtFileMakerDatabase={onLoadDurtFileMakerDatabase} onOpenExternalUrl={onOpenExternalUrl} onReprocessApicalData={vi.fn()} onSaveSource={onSaveSource} onSelectDurtFileMakerDatabase={async () => 'C:/DURT/event.fp7'} onSelectDurtFileMakerExtractor={async () => 'C:/tools/fmp2json.exe'} />);
+    });
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const databaseButton = buttons.find((button) => button.textContent === 'Select Database');
+    const extractorButton = buttons.find((button) => button.textContent === 'Select Extractor');
+    const importButton = buttons.find((button) => button.textContent === 'Import DURT Database');
+    const extractorInfo = container.querySelector('summary[aria-label="About fmp2json"]');
+    expect(importButton?.disabled).toBe(true);
+    expect(extractorInfo?.textContent).toBe('ⓘ');
+    const releaseLink = container.querySelector('a[href="https://github.com/evanmiller/fmptools/releases"]');
+    expect(releaseLink?.textContent).toBe('fmptools releases');
+    releaseLink?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(onOpenExternalUrl).toHaveBeenCalledWith('https://github.com/evanmiller/fmptools/releases');
+    databaseButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    extractorButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+    expect(onSaveSource).toHaveBeenCalledWith('source-durt', { durtFileMakerConfig: { databaseFilePath: 'C:/DURT/event.fp7', importMode: 'import' } });
+    expect(onSaveSource).toHaveBeenCalledWith('source-durt', { durtFileMakerConfig: { extractorPath: 'C:/tools/fmp2json.exe', importMode: 'import' } });
+
+    const configuredDurtSource: DataSourceConfig = {
+      ...durtSource,
+      durtFileMakerConfig: { databaseFilePath: 'C:/DURT/event.fp7', importMode: 'import' },
+    };
+    flushSync(() => {
+      root?.render(<DataSourcesPanel dataSources={[configuredDurtSource]} onCreateSource={vi.fn()} onDeleteSource={vi.fn()} onFetchApicalDataNow={vi.fn()} onLoadApicalEvents={vi.fn()} onLoadDurtFileMakerDatabase={onLoadDurtFileMakerDatabase} onReprocessApicalData={vi.fn()} onSaveSource={onSaveSource} />);
+    });
+    const configuredImportButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Import DURT Database');
+    configuredImportButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(onLoadDurtFileMakerDatabase).toHaveBeenCalledWith('source-durt', expect.any(Function));
+    await reportImportProgress?.({ completed: 1, currentTask: 'Converted DURT entrants and crossings', total: 1 });
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(container.textContent).toContain('Converted DURT entrants and crossings');
+    completeImport();
+  });
+
   it('displays parsed Dorian CTC TRACK.CFG networks, lines, and loop mappings', () => {
     const onSaveSource = vi.fn();
     const ctcSource: DataSourceConfig = {

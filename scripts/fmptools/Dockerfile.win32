@@ -1,0 +1,60 @@
+FROM debian:bookworm-slim AS builder
+
+ARG FMPTOOLS_VERSION=v0.2.2
+ARG YAJL_VERSION=2.1.0
+
+RUN apt-get update && apt-get install --yes --no-install-recommends \
+    autoconf \
+    automake \
+    build-essential \
+    ca-certificates \
+    cmake \
+    gettext \
+    git \
+    libtool \
+    make \
+    mingw-w64 \
+    pkg-config \
+    wget \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+RUN git clone --depth 1 --branch ${YAJL_VERSION} https://github.com/lloyd/yajl.git \
+  && sed --in-place '/\/W4/d; /\/wd4996/d; /\/O2/d' yajl/CMakeLists.txt yajl/src/CMakeLists.txt \
+  && cmake -S yajl -B yajl-build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc \
+    -DCMAKE_INSTALL_PREFIX=/opt/win64 \
+    -DCMAKE_SYSTEM_NAME=Windows \
+    -DBUILD_SHARED_LIBS=OFF \
+  && cmake --build yajl-build --target yajl_s --parallel \
+  && mkdir --parents /opt/win64/include /opt/win64/lib \
+  && cp --recursive yajl-build/yajl-2.1.0/include/yajl /opt/win64/include/ \
+  && cp yajl-build/yajl-2.1.0/lib/libyajl_s.a /opt/win64/lib/libyajl.a
+
+RUN wget --quiet https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.18.tar.gz \
+  && tar --extract --gzip --file libiconv-1.18.tar.gz \
+  && cd libiconv-1.18 \
+  && CC=x86_64-w64-mingw32-gcc \
+    ./configure --host=x86_64-w64-mingw32 --prefix=/opt/win64 --disable-shared --enable-static \
+  && make \
+  && make install
+
+RUN git clone --depth 1 --branch ${FMPTOOLS_VERSION} https://github.com/evanmiller/fmptools.git \
+  && cd fmptools \
+  && sed --in-place 's@fopen(path, "r")@fopen(path, "rb")@' src/fmp.c \
+  && sed --in-place 's@<sys/errno.h>@<errno.h>@' src/scsu.c \
+  && autoreconf --install --force \
+  && PKG_CONFIG_LIBDIR=/opt/win64/lib/pkgconfig \
+    PKG_CONFIG_PATH=/opt/win64/lib/pkgconfig \
+    CC=x86_64-w64-mingw32-gcc \
+    CPPFLAGS=-I/opt/win64/include \
+    LIBS='-liconv -lcharset' \
+    LDFLAGS='-L/opt/win64/lib -static -static-libgcc' \
+    ./configure --host=x86_64-w64-mingw32 --prefix=/opt/win64 \
+  && make
+
+FROM scratch AS artifact
+
+COPY --from=builder /build/fmptools/fmp2json.exe /fmp2json.exe
