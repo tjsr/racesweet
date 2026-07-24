@@ -26,7 +26,6 @@ import {
   type EntrantImportRecord,
   isPlaceholderEntrantName,
 } from "../processing/entrantImport.js";
-import { createSeedEventCatalogLedger } from "../ledger/createSeedEventCatalogLedger.js";
 import {
   type EventCatalogLedger,
   type EventCatalogMutation,
@@ -2034,12 +2033,10 @@ export class EventCatalogService {
     incrementLoadingMetric("Load event catalog service ledger");
     let ledger: EventCatalogLedger = await persistence.load();
     if (ledger.mutations.length === 0) {
-      incrementLoadingMetric("Create seed event catalog ledger");
-      ledger = createSeedEventCatalogLedger();
-      await persistence.save(ledger);
-      if (options.onPersistedLedger) {
-        await options.onPersistedLedger(ledger);
-      }
+      incrementLoadingMetric("Create initial empty event catalog");
+      const service = new EventCatalogService(persistence, ledger, options);
+      await service.createEvent();
+      return service;
     } else {
       const repairedLedger: EventCatalogLedger =
         await repairAndValidateLoadedLedger(ledger);

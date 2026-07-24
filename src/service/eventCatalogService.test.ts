@@ -269,14 +269,16 @@ describe("EventCatalogService", () => {
     );
   });
 
-  it("seeds the ledger when no events file exists yet", async () => {
+  it("creates an empty initial event when no events file exists yet", async () => {
     const emptyPersistence = createPersistence();
 
     const service = await EventCatalogService.create(emptyPersistence);
 
     expect(service.catalog.events).toHaveLength(1);
-    expect(service.catalog.activeEventId).toBe(SEED_EVENT_ID);
-    expect(service.catalog.entrants.length).toBeGreaterThan(0);
+    expect(service.catalog.activeEventId).toBe(service.catalog.events[0]?.id);
+    expect(service.catalog.categories).toEqual([]);
+    expect(service.catalog.entrants).toEqual([]);
+    expect(service.catalog.sessions).toEqual([]);
     expect(emptyPersistence.save).toHaveBeenCalledTimes(1);
   });
 
@@ -1521,7 +1523,7 @@ describe("EventCatalogService", () => {
     ).toEqual(["Fast Friends", "Alice RIDER"]);
   });
 
-  it("validates seed data through load, save, callback, and service state phases", async () => {
+  it("persists an empty initial event through load, save, callback, and service state phases", async () => {
     const emptyPersistence = createPersistence();
     const onPersistedLedger: (ledger: EventCatalogLedger) => Promise<void> =
       vi.fn(async (_ledger: EventCatalogLedger) => undefined);
@@ -1540,6 +1542,10 @@ describe("EventCatalogService", () => {
     expectLedgerPhaseIdsToBeValid(callbackLedger);
     expect(service.catalog).toEqual(savedState);
     expectCatalogStateIdsToBeValid(service.catalog);
+    expect(service.catalog.events).toHaveLength(1);
+    expect(service.catalog.categories).toEqual([]);
+    expect(service.catalog.entrants).toEqual([]);
+    expect(service.catalog.sessions).toEqual([]);
   });
 
   it("does not seed or save when create loads an existing persisted ledger", async () => {
