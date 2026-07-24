@@ -6,6 +6,7 @@ import { TimeRecordSourceId } from '../../model/types.js';
 import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
 import type { MrScatsDataFilePreview } from '../../parsers/mrScats/filePreview.js';
 import { DataSourceTypesPanel } from './dataSourceTypes.js';
+import { FileSelectionField } from './fileSelectionField.js';
 import type { InlineLoadingProgress } from './InlineLoadingIndicator.js';
 import { MrScatsDataSourcePanel } from './mrScatsDataSourcePanel.js';
 
@@ -398,46 +399,32 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                   ) : isRfidTimingCsv ? (
                     <>
                       <h4>RFID Timing CSV File</h4>
-                      <label>
-                        File Path
-                        <input
-                          aria-label={`RFID Timing CSV File Path ${source.id}`}
-                          readOnly
-                          type="text"
-                          value={source.fileConfig?.filePath || ''}
-                          placeholder="No file selected"
-                        />
-                      </label>
-                      <div className="events-actions">
-                        <button type="button" onClick={() => handleSelectRfidCsvFile(source)}>
-                          Edit File
-                        </button>
-                      </div>
+                      <FileSelectionField
+                        actions={[{ label: 'Select File', onClick: () => handleSelectRfidCsvFile(source) }]}
+                        ariaLabel={`RFID Timing CSV File Path ${source.id}`}
+                        label="File Path"
+                        placeholder="No file selected"
+                        value={source.fileConfig?.filePath || ''}
+                      />
                     </>
                   ) : isDorianCtcSrt ? (
                     <>
                       <h4>Dorian CTC SRT / ERF File</h4>
                       <p>Imports raw crossing times and transponder metadata without creating competitors.</p>
-                      <label>
-                        File Path
-                        <input
-                          aria-label={`Dorian CTC SRT / ERF File Path ${source.id}`}
-                          readOnly
-                          type="text"
-                          value={source.fileConfig?.filePath || ''}
-                          placeholder="No file selected"
-                        />
-                      </label>
-                      <label>
-                        TRACK.CFG File Path (optional)
-                        <input
-                          aria-label={`Dorian CTC TRACK.CFG File Path ${source.id}`}
-                          readOnly
-                          type="text"
-                          value={source.fileConfig?.trackConfigFilePath || ''}
-                          placeholder="No TRACK.CFG selected"
-                        />
-                      </label>
+                      <FileSelectionField
+                        actions={[{ label: 'Select File', onClick: () => handleSelectDorianCtcSrtFile(source) }]}
+                        ariaLabel={`Dorian CTC SRT / ERF File Path ${source.id}`}
+                        label="File Path"
+                        placeholder="No file selected"
+                        value={source.fileConfig?.filePath || ''}
+                      />
+                      <FileSelectionField
+                        actions={[{ label: 'Select File', onClick: () => handleSelectDorianCtcTrackConfigFile(source) }]}
+                        ariaLabel={`Dorian CTC TRACK.CFG File Path ${source.id}`}
+                        label="TRACK.CFG File Path (optional)"
+                        placeholder="No TRACK.CFG selected"
+                        value={source.fileConfig?.trackConfigFilePath || ''}
+                      />
                       <CtcTrackConfigDetails
                         onSave={(ctcTrackConfig) => {
                           const finishLineNumbers = ctcTrackConfig.networks
@@ -484,12 +471,6 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                         Import placeholder entrant for unknown transmitters
                       </label>
                       <div className="events-actions">
-                        <button type="button" onClick={() => handleSelectDorianCtcSrtFile(source)}>
-                          Edit File
-                        </button>
-                        <button type="button" onClick={() => handleSelectDorianCtcTrackConfigFile(source)}>
-                          Edit TRACK.CFG
-                        </button>
                         <button
                           type="button"
                           disabled={!source.fileConfig?.filePath || !props.onPreviewDorianCtcSrtFile}
@@ -505,10 +486,13 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                     <>
                       <h4>DURT FileMaker Database</h4>
                       <p>Imports entrant and crossing tables from a FileMaker .fp7 or .fmp12 file using the bundled fmp2json extractor.</p>
-                      <label>
-                        Database file
-                        <input aria-label={`DURT FileMaker Database Path ${source.id}`} readOnly type="text" value={source.durtFileMakerConfig?.databaseFilePath || ''} />
-                      </label>
+                      <FileSelectionField
+                        actions={[{ label: 'Select Database', onClick: () => handleSelectDurtFileMakerDatabase(source) }]}
+                        ariaLabel={`DURT FileMaker Database Path ${source.id}`}
+                        label="Database file"
+                        placeholder="No database selected"
+                        value={source.durtFileMakerConfig?.databaseFilePath || ''}
+                      />
                       <label>
                         fmp2json executable (bundled)
                         <details className="inline-info">
@@ -519,7 +503,13 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                             event.preventDefault(); void props.onOpenExternalUrl?.('https://github.com/evanmiller/fmptools/releases');
                           }}>fmptools releases</a>. A custom executable can be selected below only when troubleshooting or testing a different build.</p>
                         </details>
-                        <input aria-label={`DURT FileMaker Extractor Path ${source.id}`} readOnly type="text" value={source.durtFileMakerConfig?.extractorPath || ''} />
+                        <FileSelectionField
+                          actions={[{ label: 'Select Extractor', onClick: () => handleSelectDurtFileMakerExtractor(source) }]}
+                          ariaLabel={`DURT FileMaker Extractor Path ${source.id}`}
+                          label="fmp2json executable (bundled)"
+                          placeholder="Bundled extractor will be used"
+                          value={source.durtFileMakerConfig?.extractorPath || ''}
+                        />
                       </label>
                       <fieldset>
                         <legend>Data import mode</legend>
@@ -527,8 +517,6 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                         <label><input checked={source.durtFileMakerConfig?.importMode === 'update'} name={`durt-import-mode-${source.id}`} onChange={() => props.onSaveSource(source.id, { durtFileMakerConfig: { ...source.durtFileMakerConfig, importMode: 'update' } })} type="radio" />Update — merge imported records into the selected session.</label>
                       </fieldset>
                       <div className="events-actions">
-                        <button type="button" onClick={() => handleSelectDurtFileMakerDatabase(source)}>Select Database</button>
-                        <button type="button" onClick={() => handleSelectDurtFileMakerExtractor(source)}>Select Extractor</button>
                       </div>
                     </>
                   ) : isApicalApi && source.apiConfig ? (

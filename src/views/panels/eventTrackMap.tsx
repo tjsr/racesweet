@@ -2,6 +2,7 @@ import React from 'react';
 import { type FileWriteDiagnostics, getFileWriteFailure } from '../../app/fileWriteDiagnostics.js';
 import type { EventCatalogEvent, EventTrackMap, EventTrackTimingLine } from '../../catalog/eventCatalog.js';
 import { createTrackMapGeometry, getClosestTrackProgress, getTrackPointAtProgress, toSvgPolylinePoints } from '../reports/trackMapGeometry.js';
+import { FileSelectionField } from './fileSelectionField.js';
 
 interface TimingLineOption {
   label: string;
@@ -82,13 +83,21 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
     setStatus('');
   }, [props.selectedEvent]);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
+  const handleGpxFile = async (file: File): Promise<void> => {
     const gpxContent = await file.text();
     setDraft((current) => ({ ...current, gpxContent, gpxFileName: file.name, sourceType: 'gpx' }));
+    setStatus(`${file.name} loaded. Save the track map to persist it.`);
+  };
+
+  const handleTrackCsvFile = async (file: File): Promise<void> => {
+    const trackCsvContent = await file.text();
+    setDraft((current) => ({ ...current, sourceType: 'racetrack-csv', trackCsvContent, trackCsvFileName: file.name }));
+    setStatus(`${file.name} loaded. Save the track map to persist it.`);
+  };
+
+  const handleRacingLineCsvFile = async (file: File): Promise<void> => {
+    const racingLineCsvContent = await file.text();
+    setDraft((current) => ({ ...current, racingLineCsvContent, racingLineCsvFileName: file.name }));
     setStatus(`${file.name} loaded. Save the track map to persist it.`);
   };
 
@@ -150,49 +159,36 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
         </select>
       </label>
       {draft.sourceType === 'gpx' ? (
-        <label>
-          GPX track file
-          <input accept=".gpx,application/gpx+xml,application/xml,text/xml" aria-label="Event GPX File" onChange={(event) => void handleFileChange(event)} type="file" />
-        </label>
+        <FileSelectionField
+          accept=".gpx,application/gpx+xml,application/xml,text/xml"
+          ariaLabel="Event GPX File Path"
+          fileInputAriaLabel="Event GPX File"
+          label="GPX track file"
+          onSelectFile={handleGpxFile}
+          placeholder="No GPX file selected"
+          value={draft.gpxFileName || ''}
+        />
       ) : (
         <>
-          <label>
-            Racetrack database track CSV
-            <input
-              accept=".csv,text/csv"
-              aria-label="Event Track CSV File"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (!file) {
-                  return;
-                }
-                void file.text().then((trackCsvContent) => {
-                  setDraft((current) => ({ ...current, sourceType: 'racetrack-csv', trackCsvContent, trackCsvFileName: file.name }));
-                  setStatus(`${file.name} loaded. Save the track map to persist it.`);
-                });
-              }}
-              type="file"
-            />
-          </label>
+          <FileSelectionField
+            accept=".csv,text/csv"
+            ariaLabel="Event Track CSV File Path"
+            fileInputAriaLabel="Event Track CSV File"
+            label="Racetrack database track CSV"
+            onSelectFile={handleTrackCsvFile}
+            placeholder="No track CSV selected"
+            value={draft.trackCsvFileName || ''}
+          />
           <p>{draft.trackCsvFileName || 'No racetrack CSV configured.'}</p>
-          <label>
-            Optional racing-line CSV
-            <input
-              accept=".csv,text/csv"
-              aria-label="Event Racing Line CSV File"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (!file) {
-                  return;
-                }
-                void file.text().then((racingLineCsvContent) => {
-                  setDraft((current) => ({ ...current, racingLineCsvContent, racingLineCsvFileName: file.name }));
-                  setStatus(`${file.name} loaded. Save the track map to persist it.`);
-                });
-              }}
-              type="file"
-            />
-          </label>
+          <FileSelectionField
+            accept=".csv,text/csv"
+            ariaLabel="Event Racing Line CSV File Path"
+            fileInputAriaLabel="Event Racing Line CSV File"
+            label="Optional racing-line CSV"
+            onSelectFile={handleRacingLineCsvFile}
+            placeholder="No racing-line CSV selected"
+            value={draft.racingLineCsvFileName || ''}
+          />
           <p>{draft.racingLineCsvFileName || 'No racing line configured; entrants will follow the track centreline.'}</p>
         </>
       )}

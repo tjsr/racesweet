@@ -145,7 +145,7 @@ describe('DataSourcesPanel', () => {
     const trackConfigInput = container.querySelector('input[aria-label="Dorian CTC TRACK.CFG File Path source-dorian-ctc"]') as HTMLInputElement;
     expect(trackConfigInput).toBeTruthy();
     expect(trackConfigInput.placeholder).toBe('No TRACK.CFG selected');
-    const trackConfigButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Edit TRACK.CFG');
+    const trackConfigButton = container.querySelector('button[aria-label="Dorian CTC TRACK.CFG File Path source-dorian-ctc Select File"]');
     expect(trackConfigButton).toBeDefined();
     trackConfigButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await Promise.resolve();

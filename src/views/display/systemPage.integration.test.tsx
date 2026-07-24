@@ -529,7 +529,7 @@ describe('SystemPage integration', () => {
     expect(filePathInput).toBeDefined();
     expect(filePathInput.placeholder).toBe('No file selected');
 
-    const editFileButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Edit File');
+    const editFileButton = container.querySelector('button[aria-label="RFID Timing CSV File Path source-rfid-csv Select File"]');
     expect(editFileButton).toBeDefined();
 
     await act(async () => {

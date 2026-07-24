@@ -370,6 +370,29 @@
   resize: vertical;
 }
 
+.file-selection-field {
+  align-items: center;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.file-selection-field > .MuiFormControl-root {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.file-selection-field > .MuiButton-root {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.file-selection-field__native-input {
+  display: none;
+}
+
 .identification-editor {
   border-top: 1px solid rgba(127, 127, 127, 0.18);
   display: flex;

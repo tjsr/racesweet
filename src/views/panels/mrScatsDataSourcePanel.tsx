@@ -3,6 +3,7 @@ import type { DataSourceConfig } from '../../app/systemConfig.js';
 import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
 import type { MrScatsDataFilePreview, MrScatsPreviewValue } from '../../parsers/mrScats/filePreview.js';
 import type { InlineLoadingProgress } from './InlineLoadingIndicator.js';
+import { FileSelectionField } from './fileSelectionField.js';
 
 interface MrScatsDataSourcePanelProps {
   onLoadEvent?: (sourceId: string, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
@@ -202,16 +203,16 @@ export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): Reac
   return (
     <>
       <h4>MR-SCATS Data</h4>
-      <label>
-        Data files location
-        <input
-          aria-label={`MR-SCATS Data Files Location ${props.source.id}`}
-          readOnly
-          type="text"
-          value={config.dataLocationPath || ''}
-          placeholder="No file or directory selected"
-        />
-      </label>
+      <FileSelectionField
+        actions={[
+          { disabled: !props.onSelectDataDirectory, label: 'Select Directory', onClick: handleSelectDataDirectory },
+          { disabled: !props.onSelectDataArchive, label: 'Select Archive', onClick: handleSelectDataArchive },
+        ]}
+        ariaLabel={`MR-SCATS Data Files Location ${props.source.id}`}
+        label="Data files location"
+        placeholder="No file or directory selected"
+        value={config.dataLocationPath || ''}
+      />
       <label>
         Finish line numbers
         <input
@@ -242,12 +243,6 @@ export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): Reac
         ignore Line 1 from NO1 files if DBF file is present
       </label>
       <div className="events-actions">
-        <button type="button" onClick={handleSelectDataDirectory} disabled={!props.onSelectDataDirectory}>
-          Select Directory
-        </button>
-        <button type="button" onClick={handleSelectDataArchive} disabled={!props.onSelectDataArchive}>
-          Select Archive
-        </button>
       </div>
       <p>{formatFileCount(inventory)}</p>
       {config.files.length > 0 ? (
