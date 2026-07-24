@@ -2,7 +2,7 @@ import React from 'react';
 import type { DataSourceConfig } from '../../app/systemConfig.js';
 import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
 import type { MrScatsDataFilePreview, MrScatsPreviewValue } from '../../parsers/mrScats/filePreview.js';
-import { InlineLoadingIndicator, type InlineLoadingProgress } from './InlineLoadingIndicator.js';
+import type { InlineLoadingProgress } from './InlineLoadingIndicator.js';
 
 interface MrScatsDataSourcePanelProps {
   onLoadEvent?: (sourceId: string, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
@@ -102,18 +102,10 @@ const groupMrScatsFiles = (files: MrScatsDataFileSummary[]): {
   };
 };
 
-const waitForInlineProgressPaint = async (): Promise<void> => {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, 0);
-  });
-};
-
 export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): React.ReactElement => {
   const config = props.source.mrScatsConfig || { files: [] };
   const finishLineNumbersValue = (props.source.finishLineNumbers || [1]).join(', ');
   const ignoreLineOneNo1CrossingsWhenDbfPresent = config.ignoreLineOneNo1CrossingsWhenDbfPresent !== false;
-  const [isLoadingEvent, setIsLoadingEvent] = React.useState<boolean>(false);
-  const [loadEventProgress, setLoadEventProgress] = React.useState<InlineLoadingProgress>({ completed: 0, total: 1 });
   const [preview, setPreview] = React.useState<MrScatsDataFilePreview | undefined>();
   const [previewError, setPreviewError] = React.useState<string | undefined>();
   const [previewLoadingFile, setPreviewLoadingFile] = React.useState<string | undefined>();
@@ -161,34 +153,6 @@ export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): Reac
       setPreviewError(error instanceof Error ? error.message : String(error));
     } finally {
       setPreviewLoadingFile(undefined);
-    }
-  };
-
-  const handleLoadEvent = async (): Promise<void> => {
-    if (!props.onLoadEvent) {
-      return;
-    }
-
-    setIsLoadingEvent(true);
-    setLoadEventProgress({
-      callerName: 'handleLoadEvent',
-      completed: 0,
-      currentTask: 'Preparing MR-SCATS import',
-      total: 0,
-    });
-    await waitForInlineProgressPaint();
-    let lastProgressPaintAt = Date.now();
-    try {
-      await props.onLoadEvent(props.source.id, async (progress) => {
-        setLoadEventProgress(progress);
-        const shouldPaint = Date.now() - lastProgressPaintAt > 50 || progress.completed >= progress.total;
-        if (shouldPaint) {
-          lastProgressPaintAt = Date.now();
-          await waitForInlineProgressPaint();
-        }
-      });
-    } finally {
-      setIsLoadingEvent(false);
     }
   };
 
@@ -284,18 +248,6 @@ export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): Reac
         <button type="button" onClick={handleSelectDataArchive} disabled={!props.onSelectDataArchive}>
           Select Archive
         </button>
-        <button
-          type="button"
-          onClick={() => {
-            void handleLoadEvent();
-          }}
-          disabled={!config.dataLocationPath || isLoadingEvent}
-        >
-          Load event
-        </button>
-        {isLoadingEvent ? (
-          <InlineLoadingIndicator ariaLabel="Loading MR-SCATS event" progress={loadEventProgress} />
-        ) : null}
       </div>
       <p>{formatFileCount(inventory)}</p>
       {config.files.length > 0 ? (

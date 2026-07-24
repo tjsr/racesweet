@@ -127,6 +127,7 @@ describe('EventsScreen integration', () => {
     const onDeleteEvent = vi.fn();
     const onSaveEventAssignment = vi.fn();
     const onMakeSessionActive = vi.fn();
+    const onReloadEventSources = vi.fn();
     const onSelectEvent = vi.fn();
     const onSelectSession = vi.fn();
     const onUpdateEvent = vi.fn();
@@ -139,7 +140,13 @@ describe('EventsScreen integration', () => {
       return (
         <EventsScreen
           catalog={{ ...catalog, activeEventId }}
-          config={config}
+          config={{
+            ...config,
+            eventSourceAssignments: {
+              ...config.eventSourceAssignments,
+              'event-1': ['source-a'],
+            },
+          }}
           onActivateEvent={(eventId) => {
             onActivateEvent(eventId);
             setActiveEventId(eventId);
@@ -162,6 +169,7 @@ describe('EventsScreen integration', () => {
           onMakeSessionActive={(eventId, sessionId) => {
             onMakeSessionActive(eventId, sessionId);
           }}
+          onReloadEventSources={onReloadEventSources}
           onUpdateEvent={onUpdateEvent}
           selectedEventId={selectedEventId}
           selectedSessionId={selectedSessionId}
@@ -192,6 +200,14 @@ describe('EventsScreen integration', () => {
     expect(detailColumn).toBeTruthy();
     expect(detailColumn?.children).toHaveLength(3);
     expect(container.textContent).toContain('Track Map');
+    const reloadEventSourcesButton = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Re-load assigned sources into event sessions',
+    );
+    expect(reloadEventSourcesButton).toBeDefined();
+    await act(async () => {
+      reloadEventSourcesButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(onReloadEventSources).toHaveBeenCalledWith('event-1');
 
     const createSessionButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Create Session') as HTMLButtonElement | undefined;
     expect(createSessionButton).toBeDefined();

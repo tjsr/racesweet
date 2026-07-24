@@ -2169,6 +2169,22 @@ export const RaceSweetMainApp = () => {
             }
             systemConfigService.assignSourcesToEvent(eventId, sourceIds).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
           }}
+          onReloadEventSources={(eventId) => {
+            if (!eventCatalogState) {
+              return;
+            }
+
+            const eventSessions = getSessionsForEvent(eventCatalogState, eventId);
+            Promise.all(eventSessions.map((session) => reloadSessionSources(eventId, session.id, 'all')))
+              .then((summaries) => {
+                const summary = summaries.reduce<SessionSourceReloadSummary>(
+                  (current, item) => item ? addSessionSourceReloadSummaries(current, item) : current,
+                  createEmptySessionSourceReloadSummary(),
+                );
+                setReloadSummary(summary);
+              })
+              .catch((error: unknown) => setErrorState(error as Error));
+          }}
           onSaveTrackMap={(eventId, trackMap) => {
             if (!eventCatalogService) {
               return;

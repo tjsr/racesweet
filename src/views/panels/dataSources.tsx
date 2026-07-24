@@ -6,7 +6,7 @@ import { TimeRecordSourceId } from '../../model/types.js';
 import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
 import type { MrScatsDataFilePreview } from '../../parsers/mrScats/filePreview.js';
 import { DataSourceTypesPanel } from './dataSourceTypes.js';
-import { InlineLoadingIndicator, type InlineLoadingProgress } from './InlineLoadingIndicator.js';
+import type { InlineLoadingProgress } from './InlineLoadingIndicator.js';
 import { MrScatsDataSourcePanel } from './mrScatsDataSourcePanel.js';
 
 interface DataSourcesPanelProps {
@@ -154,10 +154,6 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
   const [selectedSourceId, setSelectedSourceId] = React.useState<string | undefined>(props.dataSources[0]?.id);
   const [sourceFetchErrors, setSourceFetchErrors] = React.useState<Record<string, SourceFetchError>>({});
   const [masterProfileDraftErrors, setMasterProfileDraftErrors] = React.useState<Record<string, string>>({});
-  const [dorianCtcLoadProgress, setDorianCtcLoadProgress] = React.useState<InlineLoadingProgress>({ completed: 0, total: 1 });
-  const [isLoadingDorianCtc, setIsLoadingDorianCtc] = React.useState<boolean>(false);
-  const [durtFileMakerLoadProgress, setDurtFileMakerLoadProgress] = React.useState<InlineLoadingProgress>({ completed: 0, total: 1 });
-  const [isLoadingDurtFileMaker, setIsLoadingDurtFileMaker] = React.useState<boolean>(false);
   const [dorianCtcPreview, setDorianCtcPreview] = React.useState<MrScatsDataFilePreview | undefined>();
   const [dorianCtcPreviewError, setDorianCtcPreviewError] = React.useState<string | undefined>();
   const [dorianCtcPreviewLoadingFile, setDorianCtcPreviewLoadingFile] = React.useState<string | undefined>();
@@ -193,52 +189,6 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
         [sourceId]: {
           details: formattedError,
           title: 'Failed to fetch Apical events',
-        },
-      }));
-    }
-  };
-
-  const handleFetchApicalDataNow = async (sourceId: TimeRecordSourceId): Promise<void> => {
-    setSourceFetchErrors((current) => {
-      const next = { ...current };
-      delete next[sourceId];
-      return next;
-    });
-
-    try {
-      await props.onFetchApicalDataNow(sourceId);
-    } catch (error: unknown) {
-      const formattedError = formatErrorForDisplay(error);
-      console.error(`Failed to fetch Apical event data for source ${sourceId}:\n${formattedError}`);
-      props.onDisplayError?.('System', error);
-      setSourceFetchErrors((current) => ({
-        ...current,
-        [sourceId]: {
-          details: formattedError,
-          title: 'Failed to fetch Apical event data',
-        },
-      }));
-    }
-  };
-
-  const handleReprocessApicalData = async (sourceId: TimeRecordSourceId): Promise<void> => {
-    setSourceFetchErrors((current) => {
-      const next = { ...current };
-      delete next[sourceId];
-      return next;
-    });
-
-    try {
-      await props.onReprocessApicalData(sourceId);
-    } catch (error: unknown) {
-      const formattedError = formatErrorForDisplay(error);
-      console.error(`Failed to reprocess cached Apical event data for source ${sourceId}:\n${formattedError}`);
-      props.onDisplayError?.('System', error);
-      setSourceFetchErrors((current) => ({
-        ...current,
-        [sourceId]: {
-          details: formattedError,
-          title: 'Failed to reprocess Apical event data',
         },
       }));
     }
@@ -320,60 +270,6 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
       return;
     }
     await props.onSaveSource(source.id, { durtFileMakerConfig: { ...source.durtFileMakerConfig, extractorPath } });
-  };
-
-  const handleLoadDorianCtcSrtFile = async (sourceId: TimeRecordSourceId): Promise<void> => {
-    if (!props.onLoadDorianCtcSrtFile) {
-      return;
-    }
-
-    setIsLoadingDorianCtc(true);
-    setDorianCtcLoadProgress({
-      callerName: 'Importing CTC file',
-      completed: 0,
-      currentTask: 'Preparing CTC file import',
-      total: 0,
-    });
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    let lastProgressPaintAt = Date.now();
-    try {
-      await props.onLoadDorianCtcSrtFile(sourceId, async (progress) => {
-        setDorianCtcLoadProgress(progress);
-        if (Date.now() - lastProgressPaintAt > 50 || progress.completed >= progress.total) {
-          lastProgressPaintAt = Date.now();
-          await new Promise<void>((resolve) => setTimeout(resolve, 0));
-        }
-      });
-    } finally {
-      setIsLoadingDorianCtc(false);
-    }
-  };
-
-  const handleLoadDurtFileMakerDatabase = async (sourceId: TimeRecordSourceId): Promise<void> => {
-    if (!props.onLoadDurtFileMakerDatabase) {
-      return;
-    }
-
-    setIsLoadingDurtFileMaker(true);
-    setDurtFileMakerLoadProgress({
-      callerName: 'Importing DURT FileMaker database',
-      completed: 0,
-      currentTask: 'Preparing DURT FileMaker database import',
-      total: 0,
-    });
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    let lastProgressPaintAt: number = Date.now();
-    try {
-      await props.onLoadDurtFileMakerDatabase(sourceId, async (progress: InlineLoadingProgress) => {
-        setDurtFileMakerLoadProgress(progress);
-        if (Date.now() - lastProgressPaintAt > 50 || progress.completed >= progress.total) {
-          lastProgressPaintAt = Date.now();
-          await new Promise<void>((resolve) => setTimeout(resolve, 0));
-        }
-      });
-    } finally {
-      setIsLoadingDurtFileMaker(false);
-    }
   };
 
   const handleSaveDorianCtcImportMode = (source: DataSourceConfig, importMode: DataImportMode): void => {
@@ -494,7 +390,6 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                   {isMrScatsData ? (
                     <MrScatsDataSourcePanel
                       source={source}
-                      onLoadEvent={props.onLoadMrScatsEvent}
                       onPreviewDataFile={props.onPreviewMrScatsDataFile}
                       onSaveSource={props.onSaveSource}
                       onSelectDataArchive={props.onSelectMrScatsDataArchive}
@@ -597,15 +492,6 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                         </button>
                         <button
                           type="button"
-                          disabled={!source.fileConfig?.filePath || isLoadingDorianCtc}
-                          onClick={() => {
-                            void handleLoadDorianCtcSrtFile(source.id);
-                          }}
-                        >
-                          Import CTC File
-                        </button>
-                        <button
-                          type="button"
                           disabled={!source.fileConfig?.filePath || !props.onPreviewDorianCtcSrtFile}
                           onClick={() => {
                             void handlePreviewDorianCtcSrtFile(source);
@@ -613,9 +499,6 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                         >
                           Preview
                         </button>
-                        {isLoadingDorianCtc ? (
-                          <InlineLoadingIndicator ariaLabel="Loading CTC file" progress={dorianCtcLoadProgress} />
-                        ) : null}
                       </div>
                     </>
                   ) : isDurtFileMaker ? (
@@ -646,12 +529,6 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                       <div className="events-actions">
                         <button type="button" onClick={() => handleSelectDurtFileMakerDatabase(source)}>Select Database</button>
                         <button type="button" onClick={() => handleSelectDurtFileMakerExtractor(source)}>Select Extractor</button>
-                        <button disabled={!source.durtFileMakerConfig?.databaseFilePath || isLoadingDurtFileMaker} type="button" onClick={() => {
-                          void handleLoadDurtFileMakerDatabase(source.id);
-                        }}>Import DURT Database</button>
-                        {isLoadingDurtFileMaker ? (
-                          <InlineLoadingIndicator ariaLabel="Importing DURT database" progress={durtFileMakerLoadProgress} />
-                        ) : null}
                       </div>
                     </>
                   ) : isApicalApi && source.apiConfig ? (
@@ -757,16 +634,7 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                           Fetch Apical Events
                         </button>
                       </div>
-                      <p>
-                        Data last retrieved: {source.dataLastRetrieved || 'Never'}{' '}
-                        <button
-                          type="button"
-                          onClick={() => handleReprocessApicalData(source.id)}
-                          disabled={!source.apicalDataFilePath}
-                        >
-                          Reprocess data
-                        </button>
-                      </p>
+                      <p>Data last retrieved: {source.dataLastRetrieved || 'Never'}</p>
                       {source.apicalDataFilePath ? (
                         <p>
                           <a
@@ -892,11 +760,6 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                   )}
 
                   <div className="events-actions">
-                    {isApicalApi ? (
-                      <button type="button" onClick={() => handleFetchApicalDataNow(source.id)}>
-                        Fetch event data now
-                      </button>
-                    ) : null}
                     <button type="button" onClick={() => props.onDeleteSource(source.id)}>
                       Delete Source
                     </button>

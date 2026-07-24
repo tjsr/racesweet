@@ -159,13 +159,8 @@ describe('DataSourcesPanel', () => {
     });
   });
 
-  it('selects DURT database and extractor paths before enabling import', async () => {
-    let completeImport: () => void = (): void => undefined;
-    let reportImportProgress: ((progress: { completed: number; currentTask?: string; total: number }) => void | Promise<void>) | undefined;
-    const onLoadDurtFileMakerDatabase = vi.fn((_sourceId: string, onProgress?: (progress: { completed: number; currentTask?: string; total: number }) => void | Promise<void>): Promise<void> => new Promise<void>((resolve) => {
-      completeImport = resolve;
-      reportImportProgress = onProgress;
-    }));
+  it('selects DURT database and extractor paths without importing from System', async () => {
+    const onLoadDurtFileMakerDatabase = vi.fn();
     const onOpenExternalUrl = vi.fn();
     const onSaveSource = vi.fn();
     const durtSource: DataSourceConfig = {
@@ -184,9 +179,8 @@ describe('DataSourcesPanel', () => {
     const buttons = Array.from(container.querySelectorAll('button'));
     const databaseButton = buttons.find((button) => button.textContent === 'Select Database');
     const extractorButton = buttons.find((button) => button.textContent === 'Select Extractor');
-    const importButton = buttons.find((button) => button.textContent === 'Import DURT Database');
     const extractorInfo = container.querySelector('summary[aria-label="About fmp2json"]');
-    expect(importButton?.disabled).toBe(true);
+    expect(buttons.find((button) => button.textContent === 'Import DURT Database')).toBeUndefined();
     expect(extractorInfo?.textContent).toBe('ⓘ');
     const releaseLink = container.querySelector('a[href="https://github.com/evanmiller/fmptools/releases"]');
     expect(releaseLink?.textContent).toBe('fmptools releases');
@@ -198,21 +192,7 @@ describe('DataSourcesPanel', () => {
     expect(onSaveSource).toHaveBeenCalledWith('source-durt', { durtFileMakerConfig: { databaseFilePath: 'C:/DURT/event.fp7', importMode: 'import' } });
     expect(onSaveSource).toHaveBeenCalledWith('source-durt', { durtFileMakerConfig: { extractorPath: 'C:/tools/fmp2json.exe', importMode: 'import' } });
 
-    const configuredDurtSource: DataSourceConfig = {
-      ...durtSource,
-      durtFileMakerConfig: { databaseFilePath: 'C:/DURT/event.fp7', importMode: 'import' },
-    };
-    flushSync(() => {
-      root?.render(<DataSourcesPanel dataSources={[configuredDurtSource]} onCreateSource={vi.fn()} onDeleteSource={vi.fn()} onFetchApicalDataNow={vi.fn()} onLoadApicalEvents={vi.fn()} onLoadDurtFileMakerDatabase={onLoadDurtFileMakerDatabase} onReprocessApicalData={vi.fn()} onSaveSource={onSaveSource} />);
-    });
-    const configuredImportButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Import DURT Database');
-    configuredImportButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    expect(onLoadDurtFileMakerDatabase).toHaveBeenCalledWith('source-durt', expect.any(Function));
-    await reportImportProgress?.({ completed: 1, currentTask: 'Converted DURT entrants and crossings', total: 1 });
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    expect(container.textContent).toContain('Converted DURT entrants and crossings');
-    completeImport();
+    expect(onLoadDurtFileMakerDatabase).not.toHaveBeenCalled();
   });
 
   it('displays parsed Dorian CTC TRACK.CFG networks, lines, and loop mappings', () => {
@@ -363,8 +343,7 @@ describe('DataSourcesPanel', () => {
         ignoreLineOneNo1CrossingsWhenDbfPresent: false,
       },
     });
-    const disabledLoadEventButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Load event') as HTMLButtonElement | undefined;
-    expect(disabledLoadEventButton?.disabled).toBe(true);
+    expect(Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Load event')).toBeUndefined();
 
     const selectDirectoryButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Select Directory');
     const selectArchiveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Select Archive');
@@ -389,15 +368,8 @@ describe('DataSourcesPanel', () => {
     });
   });
 
-  it('loads an MR-SCATS event from a selected data location', async () => {
-    let resolveLoadEvent: (() => void) | undefined;
-    const loadEventPromise = new Promise<void>((resolve) => {
-      resolveLoadEvent = resolve;
-    });
-    const onLoadMrScatsEvent = vi.fn((_sourceId: string, onProgress?: (progress: { callerName?: string; completed: number; total: number }) => void) => {
-      onProgress?.({ callerName: 'mockLoadMrScatsEvent', completed: 2, total: 7 });
-      return loadEventPromise;
-    });
+  it('does not load an MR-SCATS event from the System source configuration', async () => {
+    const onLoadMrScatsEvent = vi.fn();
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -448,39 +420,9 @@ describe('DataSourcesPanel', () => {
     });
 
     const loadEventButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Load event') as HTMLButtonElement | undefined;
-    expect(loadEventButton).toBeDefined();
-    expect(loadEventButton?.disabled).toBe(false);
-    flushSync(() => {
-      loadEventButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
+    expect(loadEventButton).toBeUndefined();
+    expect(onLoadMrScatsEvent).not.toHaveBeenCalled();
 
-    expect(loadEventButton?.disabled).toBe(true);
-    const initialLoadEventIndicator = container.querySelector('[role="status"][aria-label="Loading MR-SCATS event"]');
-    expect(initialLoadEventIndicator).not.toBeNull();
-    expect(initialLoadEventIndicator?.textContent).not.toContain('/');
-    expect(initialLoadEventIndicator?.textContent).toContain('handleLoadEvent');
-
-    await new Promise((resolve) => {
-      setTimeout(resolve, 0);
-    });
-
-    expect(onLoadMrScatsEvent).toHaveBeenCalledWith('source-mr-scats', expect.any(Function));
-    await new Promise((resolve) => {
-      setTimeout(resolve, 0);
-    });
-
-    const loadEventIndicator = container.querySelector('[role="status"][aria-label="Loading MR-SCATS event"]');
-    expect(loadEventIndicator).not.toBeNull();
-    expect(loadEventIndicator?.textContent).toContain('2/7');
-    expect(loadEventIndicator?.textContent).toContain('mockLoadMrScatsEvent');
-
-    resolveLoadEvent?.();
-    await loadEventPromise;
-    await new Promise((resolve) => {
-      setTimeout(resolve, 0);
-    });
-
-    expect(container.querySelector('[role="status"][aria-label="Loading MR-SCATS event"]')).toBeNull();
   });
 
   it('groups MR-SCATS data files into an open General section and collapsed per-session sections', () => {

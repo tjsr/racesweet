@@ -34,6 +34,7 @@ interface EventsScreenProps {
   onSelectEvent: (eventId: EventId) => void;
   onSelectSession: (sessionId: SessionId) => void;
   onMakeSessionActive: (eventId: EventId, sessionId: SessionId) => void | Promise<void>;
+  onReloadEventSources?: (eventId: EventId) => void | Promise<void>;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
   onUpdateEvent: (eventId: EventId, changes: { date?: string; discipline?: EventDiscipline; format?: EventCatalogEvent['format']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string; trackMap?: EventCatalogEvent['trackMap'] }) => void | Promise<void>;
   selectedEventId?: EventId;
@@ -174,6 +175,7 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
           <EventDataSourcesPanel
             assignedSourceIds={assignedSourceIds}
             dataSources={props.config.dataSources}
+            onReloadEventSources={props.onReloadEventSources || (() => undefined)}
             onSaveEventAssignment={props.onSaveEventAssignment}
             selectedEvent={selectedEvent}
           />

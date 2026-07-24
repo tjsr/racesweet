@@ -163,10 +163,8 @@ describe('SystemPage integration', () => {
     });
     expect(onLoadApicalEvents).toHaveBeenCalledWith('source-apical');
 
-    const fetchDataButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Fetch event data now');
-    expect(fetchDataButton).toBeDefined();
-    const disabledReprocessButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Reprocess data') as HTMLButtonElement | undefined;
-    expect(disabledReprocessButton?.disabled).toBe(true);
+    expect(Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Fetch event data now')).toBeUndefined();
+    expect(Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Reprocess data')).toBeUndefined();
 
     expect(container.textContent).toContain('Local storage location');
     expect(container.textContent).toContain('Storage Directory');
@@ -261,7 +259,7 @@ describe('SystemPage integration', () => {
     expect(errorLog.value).toBe(displayedErrorLog);
   });
 
-  it('dispatches manual Apical data fetches and shows the persisted retrieval timestamp', async () => {
+  it('shows persisted Apical retrieval metadata without loading event data from System', async () => {
     const onCreateSource = vi.fn();
     const onDeleteSource = vi.fn();
     const onFetchApicalDataNow = vi.fn();
@@ -309,24 +307,10 @@ describe('SystemPage integration', () => {
 
     expect(onOpenLocalFile).toHaveBeenCalledWith('../../src/generated/apical-excel-cache/apical-event-1001.xlsx');
 
-    const fetchDataButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Fetch event data now');
-    expect(fetchDataButton).toBeDefined();
-
-    await act(async () => {
-      fetchDataButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    expect(onFetchApicalDataNow).toHaveBeenCalledWith('source-apical');
-
-    const reprocessButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Reprocess data');
-    expect(reprocessButton).toBeDefined();
-    expect((reprocessButton as HTMLButtonElement).disabled).toBe(false);
-
-    await act(async () => {
-      reprocessButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    expect(onReprocessApicalData).toHaveBeenCalledWith('source-apical');
+    expect(Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Fetch event data now')).toBeUndefined();
+    expect(Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Reprocess data')).toBeUndefined();
+    expect(onFetchApicalDataNow).not.toHaveBeenCalled();
+    expect(onReprocessApicalData).not.toHaveBeenCalled();
   });
 
   it('shows fetched Apical events in dropdown and saves selected event id', async () => {

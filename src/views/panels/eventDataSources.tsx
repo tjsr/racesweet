@@ -5,6 +5,7 @@ import { type EventCatalogEvent } from '../../catalog/eventCatalog.js';
 interface EventDataSourcesPanelProps {
   assignedSourceIds: string[];
   dataSources: DataSourceConfig[];
+  onReloadEventSources: (eventId: string) => void | Promise<void>;
   onSaveEventAssignment: (eventId: string, sourceIds: string[]) => void | Promise<void>;
   selectedEvent?: EventCatalogEvent;
 }
@@ -47,5 +48,15 @@ export const EventDataSourcesPanel = (props: EventDataSourcesPanelProps): React.
     ) : (
       <p>No events are defined.</p>
     )}
+    {props.selectedEvent && props.assignedSourceIds.length > 0 ? (
+      <div className="events-actions">
+        <button
+          type="button"
+          onClick={() => props.onReloadEventSources(props.selectedEvent!.id)}
+        >
+          Re-load assigned sources into event sessions
+        </button>
+      </div>
+    ) : null}
   </section>
 );
