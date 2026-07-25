@@ -260,11 +260,14 @@ describe('EventsScreen integration', () => {
     await act(async () => {
       editTimingLinesButton!.click();
     });
-    const timingLineSelect = container.querySelector('select[aria-label="Track Map Timing Line"]') as HTMLSelectElement;
+    const timingLineSelect = container.querySelector<HTMLElement>('[aria-label="Track Map Timing Line"]')!;
     await act(async () => {
-      const descriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
-      descriptor?.set?.call(timingLineSelect, '1');
-      timingLineSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      timingLineSelect.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+    const timingLineOption = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'))
+      .find((option) => option.textContent === 'Start / finish')!;
+    await act(async () => {
+      timingLineOption.click();
     });
     const trackEditor = container.querySelector('svg[aria-label="Event Track Map Editor"]') as SVGSVGElement;
     Object.defineProperty(trackEditor, 'getBoundingClientRect', {
@@ -290,11 +293,14 @@ describe('EventsScreen integration', () => {
     await act(async () => {
       backToEventButton!.click();
     });
-    const trackFormatSelect = container.querySelector('select[aria-label="Event Track Data Format"]') as HTMLSelectElement;
+    const trackFormatSelect = container.querySelector<HTMLElement>('[aria-label="Event Track Data Format"]')!;
     await act(async () => {
-      const descriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
-      descriptor?.set?.call(trackFormatSelect, 'racetrack-csv');
-      trackFormatSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      trackFormatSelect.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+    const trackFormatOption = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'))
+      .find((option) => option.textContent === 'Racetrack database CSV')!;
+    await act(async () => {
+      trackFormatOption.click();
     });
     const trackCsvContent = '# x_m,y_m,w_tr_right_m,w_tr_left_m\n0,0,5,5\n10,0,5,5\n10,10,5,5';
     const racingLineCsvContent = '# x_m,y_m\n1,1\n9,1\n9,9';

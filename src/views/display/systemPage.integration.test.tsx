@@ -171,8 +171,10 @@ describe('SystemPage integration', () => {
     const localStorageDirectoryInput = container.querySelector('input[aria-label="Local Storage Directory"]') as HTMLInputElement;
     expect(localStorageDirectoryInput).toBeDefined();
     expect(path.isAbsolute(localStorageDirectoryInput.value)).toBe(true);
-    localStorageDirectoryInput.focus();
-    localStorageDirectoryInput.setSelectionRange(localStorageDirectoryInput.value.length, localStorageDirectoryInput.value.length);
+    await act(async () => {
+      localStorageDirectoryInput.focus();
+      localStorageDirectoryInput.setSelectionRange(localStorageDirectoryInput.value.length, localStorageDirectoryInput.value.length);
+    });
 
     await act(async () => {
       insertTextAtCursor(localStorageDirectoryInput, '-local');

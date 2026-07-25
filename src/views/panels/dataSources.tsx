@@ -1,3 +1,4 @@
+import { TextField } from '@mui/material';
 import React from 'react';
 import { formatErrorForDisplay } from '../../app/stackTrace.js';
 import { type DataImportMode, type DataSourceConfig, type DataSourceType, getDataSourceTypeLabel } from '../../app/systemConfig.js';
@@ -61,8 +62,8 @@ const DraftInput = (props: DraftInputProps): React.ReactElement => {
   };
 
   return (
-    <input
-      aria-label={props.ariaLabel}
+    <TextField
+      slotProps={{ htmlInput: { 'aria-label': props.ariaLabel } }}
       onBlur={commit}
       onChange={(event) => setDraft(event.target.value)}
       type={props.type || 'text'}

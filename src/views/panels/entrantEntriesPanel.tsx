@@ -1,3 +1,4 @@
+import { Button, MenuItem, TextField } from '@mui/material';
 import React from 'react';
 
 import type { EventCatalogCategory, EventCatalogEntrant, EventCatalogEntry } from '../../catalog/eventCatalog.js';
@@ -55,23 +56,19 @@ const DriverEditor = (props: {
   return (
     <fieldset className="entry-driver-form">
       <legend>Driver</legend>
-      <label>
-        First Name
-        <input
-          aria-label={`Entry Driver First Name ${props.driver.id}`}
-          value={firstName}
-          onChange={(event) => setFirstName(event.target.value)}
-        />
-      </label>
-      <label>
-        Surname
-        <input
-          aria-label={`Entry Driver Surname ${props.driver.id}`}
-          value={lastName}
-          onChange={(event) => setLastName(event.target.value)}
-        />
-      </label>
-      <button
+      <TextField
+        label="First Name"
+        slotProps={{ htmlInput: { 'aria-label': `Entry Driver First Name ${props.driver.id}` } }}
+        value={firstName}
+        onChange={(event) => setFirstName(event.target.value)}
+      />
+      <TextField
+        label="Surname"
+        slotProps={{ htmlInput: { 'aria-label': `Entry Driver Surname ${props.driver.id}` } }}
+        value={lastName}
+        onChange={(event) => setLastName(event.target.value)}
+      />
+      <Button
         type="button"
         onClick={() => void props.onUpdateDriver(props.driver.id, {
           firstName: firstName || undefined,
@@ -80,7 +77,7 @@ const DriverEditor = (props: {
         })}
       >
         Save Driver
-      </button>
+      </Button>
     </fieldset>
   );
 };
@@ -122,62 +119,50 @@ const EntryEditor = (props: EntrantEntriesPanelProps & { entry: EventCatalogEntr
   return (
     <fieldset className="entrant-entry-form">
       <legend>{draft.raceNumber ? `Entry #${draft.raceNumber}` : `Entry ${props.entry.id.toString().slice(0, 6)}`}</legend>
-      <label>
-        Entry Name
-        <input
-          aria-label={`Entry Name ${props.entry.id}`}
-          value={draft.name}
-          onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-        />
-      </label>
-      <label>
-        Category
-        <select
-          aria-label={`Entry Category ${props.entry.id}`}
-          value={draft.categoryId}
-          onChange={(event) => setDraft((current) => ({ ...current, categoryId: event.target.value }))}
-        >
-          <option value="">No category</option>
-          {props.categories.filter((category) => category.deleted !== true).map((category) => (
-            <option key={category.id} value={category.id}>{category.name}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Race Number
-        <input
-          aria-label={`Entry Race Number ${props.entry.id}`}
-          value={draft.raceNumber}
-          onChange={(event) => setDraft((current) => ({ ...current, raceNumber: event.target.value }))}
-        />
-      </label>
-      <label>
-        Transmitter
-        <input
-          aria-label={`Entry Transmitter ${props.entry.id}`}
-          value={draft.transmitter}
-          onChange={(event) => setDraft((current) => ({ ...current, transmitter: event.target.value }))}
-        />
-      </label>
-      <label>
-        Vehicle
-        <input
-          aria-label={`Entry Vehicle ${props.entry.id}`}
-          value={draft.vehicle}
-          onChange={(event) => setDraft((current) => ({ ...current, vehicle: event.target.value }))}
-        />
-      </label>
-      <label>
-        Start Order
-        <input
-          aria-label={`Entry Start Order ${props.entry.id}`}
-          min="1"
-          type="number"
-          value={draft.startOrder}
-          onChange={(event) => setDraft((current) => ({ ...current, startOrder: event.target.value }))}
-        />
-      </label>
-      <button type="button" onClick={saveEntry}>Save Entry</button>
+      <TextField
+        label="Entry Name"
+        slotProps={{ htmlInput: { 'aria-label': `Entry Name ${props.entry.id}` } }}
+        value={draft.name}
+        onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+      />
+      <TextField
+        label="Category"
+        select
+        slotProps={{ select: { 'aria-label': `Entry Category ${props.entry.id}` } }}
+        value={draft.categoryId}
+        onChange={(event) => setDraft((current) => ({ ...current, categoryId: event.target.value }))}
+      >
+        <MenuItem value="">No category</MenuItem>
+        {props.categories.filter((category) => category.deleted !== true).map((category) => (
+          <MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>
+        ))}
+      </TextField>
+      <TextField
+        label="Race Number"
+        slotProps={{ htmlInput: { 'aria-label': `Entry Race Number ${props.entry.id}` } }}
+        value={draft.raceNumber}
+        onChange={(event) => setDraft((current) => ({ ...current, raceNumber: event.target.value }))}
+      />
+      <TextField
+        label="Transmitter"
+        slotProps={{ htmlInput: { 'aria-label': `Entry Transmitter ${props.entry.id}` } }}
+        value={draft.transmitter}
+        onChange={(event) => setDraft((current) => ({ ...current, transmitter: event.target.value }))}
+      />
+      <TextField
+        label="Vehicle"
+        slotProps={{ htmlInput: { 'aria-label': `Entry Vehicle ${props.entry.id}` } }}
+        value={draft.vehicle}
+        onChange={(event) => setDraft((current) => ({ ...current, vehicle: event.target.value }))}
+      />
+      <TextField
+        label="Start Order"
+        slotProps={{ htmlInput: { 'aria-label': `Entry Start Order ${props.entry.id}`, min: 1 } }}
+        type="number"
+        value={draft.startOrder}
+        onChange={(event) => setDraft((current) => ({ ...current, startOrder: event.target.value }))}
+      />
+      <Button type="button" onClick={saveEntry}>Save Entry</Button>
       <div className="entry-driver-list">
         {drivers.map((driver) => (
           <DriverEditor driver={driver} key={driver.id} onUpdateDriver={props.onUpdateDriver} />

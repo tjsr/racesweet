@@ -1,3 +1,4 @@
+import { Button, Checkbox, FormControlLabel } from '@mui/material';
 import React from 'react';
 import { type EventCatalogCategory } from '../../catalog/eventCatalog.js';
 import { type EventCategoryId } from '../../model/eventcategory.js';
@@ -6,6 +7,8 @@ import { CategoryListCard } from '../../controls/categoryListCard.js';
 interface CategoryListPanelProps {
   allowCreateCategory?: boolean;
   categoryAction?: (category: EventCatalogCategory) => {
+    ariaLabel?: string;
+    icon?: React.ReactNode;
     label: string;
     onClick: () => void | Promise<void>;
     title?: string;
@@ -33,8 +36,7 @@ export const CategoryListPanel = (props: CategoryListPanelProps): React.ReactEle
       <h2>{props.title || 'Category List'}</h2>
       <div className="events-actions">
         {props.allowCreateCategory && props.onCreateCategory ? (
-          <button
-            type="button"
+          <Button
             onClick={() => {
               const onCreateCategory = props.onCreateCategory!;
               if (props.requestFormExit) {
@@ -44,20 +46,19 @@ export const CategoryListPanel = (props: CategoryListPanelProps): React.ReactEle
 
               void onCreateCategory();
             }}
-          >
+            size="medium"
+            sx={{
+              alignSelf: 'center',
+              flex: '0 0 auto',
+              minWidth: 0,
+              whiteSpace: 'nowrap',
+            }}
+            variant="contained">
             Create Category
-          </button>
+          </Button>
         ) : null}
         {props.enableShowAllCategories ? (
-          <label>
-            <input
-              aria-label="Show all categories"
-              type="checkbox"
-              checked={showAllCategories}
-              onChange={(event) => setShowAllCategories(event.target.checked)}
-            />
-            Show all
-          </label>
+          <FormControlLabel control={<Checkbox checked={showAllCategories} slotProps={{ input: { 'aria-label': 'Show all categories' } }} onChange={(event) => setShowAllCategories(event.target.checked)} />} label="Show all" />
         ) : null}
       </div>
       <div className="events-list" role={props.onSelectCategory ? 'listbox' : 'list'} aria-label="Categories for selected event">
@@ -69,6 +70,8 @@ export const CategoryListPanel = (props: CategoryListPanelProps): React.ReactEle
             return (
               <CategoryListCard
                 actionLabel={action?.label}
+                actionAriaLabel={action?.ariaLabel}
+                actionIcon={action?.icon}
                 actionTitle={action?.title}
                 key={category.id}
                 category={category}
@@ -82,6 +85,8 @@ export const CategoryListPanel = (props: CategoryListPanelProps): React.ReactEle
             <CategoryListCard
               key={category.id}
               category={category}
+              actionAriaLabel={action?.ariaLabel}
+              actionIcon={action?.icon}
               isSelected={isSelected}
               onClick={() => {
                 if (isSelected) {

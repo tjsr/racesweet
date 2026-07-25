@@ -1,3 +1,4 @@
+import { Button, Checkbox, FormControlLabel } from '@mui/material';
 import React from 'react';
 import { type DataSourceConfig } from '../../app/systemConfig.js';
 import { type EventCatalogEvent } from '../../catalog/eventCatalog.js';
@@ -30,15 +31,14 @@ export const EventDataSourcesPanel = (props: EventDataSourcesPanelProps): React.
               const checked = props.assignedSourceIds.includes(source.id);
               return (
                 <li key={`event-source-${source.id}`}>
-                  <label>
-                    <input
-                      aria-label={`Event Source ${selectedEventId} ${source.id}`}
-                      type="checkbox"
+                  <FormControlLabel
+                    control={<Checkbox
                       checked={checked}
                       onChange={() => props.onSaveEventAssignment(selectedEventId, toggleInList(props.assignedSourceIds, source.id))}
-                    />
-                    {source.name}
-                  </label>
+                      slotProps={{ input: { 'aria-label': `Event Source ${selectedEventId} ${source.id}` } }}
+                    />}
+                    label={source.name}
+                  />
                 </li>
               );
             });
@@ -50,12 +50,12 @@ export const EventDataSourcesPanel = (props: EventDataSourcesPanelProps): React.
     )}
     {props.selectedEvent && props.assignedSourceIds.length > 0 ? (
       <div className="events-actions">
-        <button
+        <Button
           type="button"
           onClick={() => props.onReloadEventSources(props.selectedEvent!.id)}
         >
           Re-load assigned sources into event sessions
-        </button>
+        </Button>
       </div>
     ) : null}
   </section>

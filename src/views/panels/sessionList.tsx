@@ -1,3 +1,4 @@
+import { Button } from '@mui/material';
 import React from 'react';
 import { type EventCatalogSession } from '../../catalog/eventCatalog.js';
 import { type SessionId } from '../../model/raceevent.js';
@@ -27,8 +28,7 @@ export const SessionListPanel = (props: SessionListPanelProps): React.ReactEleme
       {showActions ? (
         <div className="events-actions">
           {props.onCreateSession ? (
-            <button
-              type="button"
+            <Button
               onClick={() => {
                 if (!props.allowCreateSession) {
                   return;
@@ -37,21 +37,20 @@ export const SessionListPanel = (props: SessionListPanelProps): React.ReactEleme
                 requestFormExit(() => onCreateSession());
               }}
               disabled={!props.allowCreateSession}
-            >
+              variant="contained">
               Create Session
-            </button>
+            </Button>
           ) : null}
           {props.onMakeSessionActive ? (
-            <button
-              type="button"
+            <Button
               onClick={() => {
                 const onMakeSessionActive = props.onMakeSessionActive!;
                 void onMakeSessionActive();
               }}
               disabled={!props.selectedSession || props.selectedSession.id === props.activeSessionId}
-            >
+              variant="outlined">
               {props.selectedSession && props.selectedSession.id === props.activeSessionId ? 'Active Session' : 'Make Active'}
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}

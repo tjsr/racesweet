@@ -1,7 +1,10 @@
+import { IconButton } from '@mui/material';
 import React from 'react';
 import { type EventCatalogCategory } from '../catalog/eventCatalog.js';
 
 interface CategoryListCardProps {
+  actionAriaLabel?: string;
+  actionIcon?: React.ReactNode;
   actionLabel?: string;
   actionTitle?: string;
   category: EventCatalogCategory;
@@ -18,10 +21,24 @@ export const CategoryListCard = (props: CategoryListCardProps): React.ReactEleme
 
   const content = (
     <>
-      <strong className="categoryName">{props.category.name}</strong>
+      <div className="category-card-heading">
+        <strong className="categoryName">{props.category.name}</strong>
+        {props.actionIcon && props.onActionClick ? (
+          <IconButton
+            aria-label={props.actionAriaLabel || props.actionTitle || 'Remove category'}
+            onClick={() => {
+              void props.onActionClick?.();
+            }}
+            size="small"
+            title={props.actionTitle}
+          >
+            {props.actionIcon}
+          </IconButton>
+        ) : null}
+      </div>
       {props.category.code !== props.category.name ? <span className="categoryCode">{props.category.code}</span> : null}
       {props.category.description ? <span className="categoryDescription">{props.category.description}</span> : null}
-      {props.actionLabel && props.onActionClick ? (
+      {!props.actionIcon && props.actionLabel && props.onActionClick ? (
         <button
           title={props.actionTitle}
           type="button"

@@ -1,12 +1,19 @@
 // @vitest-environment jsdom
 
 import React from 'react';
+import { act } from 'react';
 import { flushSync } from 'react-dom';
 import { type Root, createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type EventCatalogEntrant } from '../../catalog/eventCatalog.js';
 import { type EventEntrantId } from '../../model/entrant.js';
 import { EntrantDetailsPanel, type EntrantDraft } from './entrantDetailsPanel.js';
+
+declare global {
+  var IS_REACT_ACT_ENVIRONMENT: boolean | undefined;
+}
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const riderEntrant: EventCatalogEntrant = {
   categoryId: 'category-1',
@@ -43,18 +50,39 @@ const categoriesWithDeleted = [
   { deleted: true, id: 'category-deleted', name: 'Deleted Category' },
 ];
 
+const getMuiSelect = (container: HTMLElement, label: string): HTMLElement => {
+  const select = container.querySelector<HTMLElement>(`[aria-label="${label}"]`);
+  if (!select) {
+    throw new Error(`Could not find MUI select with label ${label}.`);
+  }
+  return select;
+};
+
+const getMuiOptionLabels = async (select: HTMLElement): Promise<string[]> => {
+  await act(async () => {
+    select.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  });
+  const labels = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).map((option) => option.textContent || '');
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+  });
+  return labels;
+};
+
 describe('EntrantDetailsPanel', () => {
   let container: HTMLDivElement | undefined;
   let root: Root | undefined;
 
   afterEach(() => {
-    root?.unmount();
+    act(() => {
+      root?.unmount();
+    });
     container?.remove();
     root = undefined;
     container = undefined;
   });
 
-  it('renders rider fields and routes save/delete actions', () => {
+  it('renders rider fields and routes save/delete actions', async () => {
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -92,7 +120,7 @@ describe('EntrantDetailsPanel', () => {
     expect(container.textContent).toContain('Driver Details');
     expect(container.textContent).toContain('First Name');
     expect(container.textContent).toContain('Team: Fast Friends');
-    expect(Array.from(container.querySelector<HTMLSelectElement>('select[aria-label="Driver Entrant"]')?.options || []).map((option) => option.textContent)).toContain('Fast Friends (team-1)');
+    expect(await getMuiOptionLabels(getMuiSelect(container, 'Driver Entrant'))).toContain('Fast Friends (team-1)');
 
     const nameInput = container.querySelector<HTMLInputElement>('input[aria-label="Entrant Name"]');
     expect(nameInput?.value).toBe('Rider One');
@@ -141,7 +169,7 @@ describe('EntrantDetailsPanel', () => {
     expect(container.textContent).toContain('Rider One');
   });
 
-  it('omits deleted categories from the category dropdown', () => {
+  it('omits deleted categories from the category dropdown', async () => {
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -172,8 +200,7 @@ describe('EntrantDetailsPanel', () => {
       );
     });
 
-    const categorySelect = container.querySelector('select[aria-label="Entrant Category"]') as HTMLSelectElement;
-    expect(Array.from(categorySelect.options).map((option) => option.textContent)).toEqual(['No category', 'Premier']);
+    expect(await getMuiOptionLabels(getMuiSelect(container, 'Entrant Category'))).toEqual(['No category', 'Premier']);
   });
 
   it('keeps motorsport vehicle and category details on the entrant, not the driver', () => {
@@ -213,7 +240,7 @@ describe('EntrantDetailsPanel', () => {
     expect(container.textContent).toContain('Driver Details');
     expect(container.textContent).toContain('Entrant: Fast Friends');
     expect(container.querySelector('input[aria-label="Entrant Name"]')).toBeNull();
-    expect(container.querySelector('select[aria-label="Entrant Category"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Entrant Category"]')).toBeNull();
     expect(container.querySelector('input[aria-label="Entrant Vehicle"]')).toBeNull();
     expect(container.textContent).not.toContain('Team: Fast Friends');
   });
@@ -257,6 +284,6 @@ describe('EntrantDetailsPanel', () => {
     expect(container.textContent).not.toContain('Team Details');
     expect(container.querySelector<HTMLInputElement>('input[aria-label="Entrant Vehicle"]')?.value).toBe('Falcon GT');
     expect(container.querySelector<HTMLInputElement>('input[aria-label="Entrant Start Order"]')?.value).toBe('3');
-    expect(container.querySelector<HTMLSelectElement>('select[aria-label="Entrant Category"]')?.value).toBe('category-1');
+    expect(getMuiSelect(container, 'Entrant Category').textContent).toBe('Premier');
   });
 });

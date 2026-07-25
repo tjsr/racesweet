@@ -1,5 +1,6 @@
 import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 
+import { MenuItem, TextField } from '@mui/material';
 import React from 'react';
 import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent } from '../../catalog/eventCatalog.js';
 import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
@@ -565,19 +566,23 @@ const CategorySelector = (props: {
   onSelectCategory: (next: CategoryFilter) => void;
 }): React.ReactElement => {
   return (
-    <label className="page-filter-label">
-      Category
-      <select
-        aria-label="Race View Category"
-        value={props.selectedCategory}
-        onChange={(event) => props.onSelectCategory(event.target.value as CategoryFilter)}
-      >
-        <option value="overall">Overall</option>
-        {props.categories.map((category) => (
-          <option key={category.id} value={category.id}>{category.name}</option>
-        ))}
-      </select>
-    </label>
+    <TextField
+      className="page-filter-label"
+      label="Category"
+      select
+      slotProps={{
+        select: {
+          'aria-label': 'Race View Category',
+        },
+      }}
+      value={props.selectedCategory}
+      onChange={(event) => props.onSelectCategory(event.target.value as CategoryFilter)}
+    >
+      <MenuItem value="overall">Overall</MenuItem>
+      {props.categories.map((category) => (
+        <MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>
+      ))}
+    </TextField>
   );
 };
 
@@ -596,24 +601,24 @@ const EventSessionSelector = (props: {
     : selectableOptions[0]?.value || '';
 
   return (
-    <label className="page-filter-label">
-      Event/Session
-      <select
-        aria-label="Race View Event Session"
-        value={selectedValue}
-        onChange={(event) => {
-          if (!event.target.selectedOptions[0]?.disabled) {
-            props.onSelectEventSession?.(event.target.value);
-          }
-        }}
-      >
-        {props.options.map((option) => (
-          <option key={option.value} value={option.value} disabled={!option.sessionId}>
-            {option.sessionId ? `-> ${option.sessionName || option.sessionId}` : option.eventName}
-          </option>
-        ))}
-      </select>
-    </label>
+    <TextField
+      className="page-filter-label"
+      label="Event/Session"
+      select
+      slotProps={{
+        select: {
+          'aria-label': 'Race View Event Session',
+        },
+      }}
+      value={selectedValue}
+      onChange={(event) => props.onSelectEventSession?.(event.target.value)}
+    >
+      {props.options.map((option) => (
+        <MenuItem key={option.value} disabled={!option.sessionId} value={option.value}>
+          {option.sessionId ? `-> ${option.sessionName || option.sessionId}` : option.eventName}
+        </MenuItem>
+      ))}
+    </TextField>
   );
 };
 
@@ -680,17 +685,21 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
             selectedValue={props.selectedEventSessionValue}
           />
           <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
-          <label className="page-filter-label">
-            View
-            <select
-              aria-label="Results View Type"
-              value={viewType}
-              onChange={(event) => setViewType(event.target.value as 'results' | 'lap-chart')}
-            >
-              <option value="results">Results</option>
-              <option value="lap-chart">Lap Chart</option>
-            </select>
-          </label>
+          <TextField
+            className="page-filter-label"
+            label="View"
+            select
+            slotProps={{
+              select: {
+                'aria-label': 'Results View Type',
+              },
+            }}
+            value={viewType}
+            onChange={(event) => setViewType(event.target.value as 'results' | 'lap-chart')}
+          >
+            <MenuItem value="results">Results</MenuItem>
+            <MenuItem value="lap-chart">Lap Chart</MenuItem>
+          </TextField>
         </div>
       </section>
 
@@ -963,22 +972,26 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             options={props.eventSessionOptions}
             selectedValue={props.selectedEventSessionValue}
           />
-          <label className="page-filter-label">
-            Report
-            <select
-              aria-label="Reports View Type"
-              value={reportType}
-              onChange={(event) => setReportType(event.target.value as 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'yellow-flag-periods' | 'handicap-data' | 'track-map')}
-            >
-              <option value="fastest-laps">Fastest Laps</option>
-              <option value="fastest-lap-timeline">Fastest Lap Timeline</option>
-              <option value="lap-times">Lap Times</option>
-              <option value="lap-chart">Lap Chart</option>
-              <option value="yellow-flag-periods">Yellow Flag periods</option>
-              <option value="track-map">Track Map</option>
-              <option value="handicap-data">Handicap Data</option>
-            </select>
-          </label>
+          <TextField
+            className="page-filter-label"
+            label="Report"
+            select
+            slotProps={{
+              select: {
+                'aria-label': 'Reports View Type',
+              },
+            }}
+            value={reportType}
+            onChange={(event) => setReportType(event.target.value as 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'yellow-flag-periods' | 'handicap-data' | 'track-map')}
+          >
+            <MenuItem value="fastest-laps">Fastest Laps</MenuItem>
+            <MenuItem value="fastest-lap-timeline">Fastest Lap Timeline</MenuItem>
+            <MenuItem value="lap-times">Lap Times</MenuItem>
+            <MenuItem value="lap-chart">Lap Chart</MenuItem>
+            <MenuItem value="yellow-flag-periods">Yellow Flag periods</MenuItem>
+            <MenuItem value="track-map">Track Map</MenuItem>
+            <MenuItem value="handicap-data">Handicap Data</MenuItem>
+          </TextField>
           {reportType !== 'handicap-data' ? (
             <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
           ) : null}

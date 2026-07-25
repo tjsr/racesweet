@@ -1,3 +1,4 @@
+import { MenuItem, TextField } from '@mui/material';
 import React from 'react';
 import {
   type EntrantType,
@@ -22,6 +23,7 @@ import { EntrantListPanel, getParticipantsForEntrant } from '../panels/entrantLi
 import { EntrantDetailsPanel, type EntrantDraft } from '../panels/entrantDetailsPanel.js';
 import { EntrantEntriesPanel } from '../panels/entrantEntriesPanel.js';
 import { IdentificationPanel } from '../panels/identificationPanel.js';
+import { FileSelectionField } from '../panels/fileSelectionField.js';
 import { SessionListPanel } from '../panels/sessionList.js';
 import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
 
@@ -102,6 +104,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id);
   const raceStateParticipants = props.raceState?.participants || [];
   const [selectedCategoryFilter, setSelectedCategoryFilter] = React.useState<string>(CATEGORY_FILTER_ALL);
+  const [selectedImportFileName, setSelectedImportFileName] = React.useState<string>('');
   const [importStatus, setImportStatus] = React.useState<string>('');
   const teamEntrants = eventEntrants.filter((entrant) => entrant.entrantType === 'team');
   const eventCategoryIds = new Set(eventCategories.map((category) => category.id.toString()));
@@ -262,6 +265,39 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
     requestFormExit(() => props.onDeleteEntrant(selectedEvent.id, selectedEntrant.id));
   };
 
+  const handleImportFile = (file: File): void => {
+    if (!selectedEvent || !props.onImportEntrants) {
+      return;
+    }
+
+    setSelectedImportFileName(file.name);
+    setImportStatus(`Reading ${file.name}...`);
+    void file.arrayBuffer()
+      .then(async (buffer) => {
+        const records = parseEntrantImportBuffer(buffer);
+        setImportStatus(`Updating ${records.length} entrant record${records.length === 1 ? '' : 's'} from ${file.name}...`);
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+        const selectedContextCategoryId = eventCategories.some((category) => (
+          category.id.toString() === props.selectedCategoryId?.toString()
+        )) ? props.selectedCategoryId : undefined;
+        const defaultCategoryId = selectedContextCategoryId || (
+          selectedCategoryFilter !== CATEGORY_FILTER_ALL &&
+          selectedCategoryFilter !== CATEGORY_FILTER_UNASSIGNED
+            ? selectedCategoryFilter
+            : undefined
+        );
+        if (defaultCategoryId) {
+          await props.onImportEntrants?.(selectedEvent.id, records, file.name, defaultCategoryId);
+        } else {
+          await props.onImportEntrants?.(selectedEvent.id, records, file.name);
+        }
+        setImportStatus(`Imported ${records.length} entrant record${records.length === 1 ? '' : 's'} from ${file.name}.`);
+      })
+      .catch((error: unknown) => {
+        setImportStatus(error instanceof Error ? error.message : `Unable to import ${file.name}.`);
+      });
+  };
+
   const { requestExit: requestFormExit, warningModal } = useUnsavedChangesWarning({
     hasUnsavedChanges: hasUnsavedChanges && !!selectedEntrant,
     itemName: selectedEntrant?.name || selectedEntrant?.id,
@@ -273,76 +309,45 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   return (
     <section className="events-screen">
       <h1>Entrants</h1>
-      <label className="page-filter-label">
-        Event
-        <select
-          aria-label="Entrants Event"
-          value={selectedEvent?.id || ''}
-          onChange={(event) => {
-            const eventId = event.target.value;
-            requestFormExit(() => props.onSelectEvent(eventId));
-          }}
-        >
-          {props.catalog.events.map((event) => (
-            <option key={event.id} value={event.id}>{event.name}</option>
-          ))}
-        </select>
-      </label>
-      <label className="page-filter-label">
-        Entrant file
-        <input
-          accept=".csv,.txt,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain"
-          aria-label="Entrants Import File"
-          disabled={!selectedEvent || !props.onImportEntrants}
-          type="file"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (!file || !selectedEvent || !props.onImportEntrants) {
-              return;
-            }
-            setImportStatus(`Reading ${file.name}...`);
-            void file.arrayBuffer()
-              .then(async (buffer) => {
-                const records = parseEntrantImportBuffer(buffer);
-                setImportStatus(`Updating ${records.length} entrant record${records.length === 1 ? '' : 's'} from ${file.name}...`);
-                await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
-                const selectedContextCategoryId = eventCategories.some((category) => (
-                  category.id.toString() === props.selectedCategoryId?.toString()
-                )) ? props.selectedCategoryId : undefined;
-                const defaultCategoryId = selectedContextCategoryId || (
-                  selectedCategoryFilter !== CATEGORY_FILTER_ALL &&
-                  selectedCategoryFilter !== CATEGORY_FILTER_UNASSIGNED
-                    ? selectedCategoryFilter
-                    : undefined
-                );
-                if (defaultCategoryId) {
-                  await props.onImportEntrants?.(selectedEvent.id, records, file.name, defaultCategoryId);
-                } else {
-                  await props.onImportEntrants?.(selectedEvent.id, records, file.name);
-                }
-                setImportStatus(`Imported ${records.length} entrant record${records.length === 1 ? '' : 's'} from ${file.name}.`);
-              })
-              .catch((error: unknown) => {
-                setImportStatus(error instanceof Error ? error.message : `Unable to import ${file.name}.`);
-              });
-          }}
-        />
-      </label>
+      <TextField
+        className="page-filter-label"
+        label="Event"
+        select
+        slotProps={{ select: { 'aria-label': 'Entrants Event' } }}
+        value={selectedEvent?.id || ''}
+        onChange={(event) => {
+          const eventId = event.target.value;
+          requestFormExit(() => props.onSelectEvent(eventId));
+        }}
+      >
+        {props.catalog.events.map((event) => (
+          <MenuItem key={event.id} value={event.id}>{event.name}</MenuItem>
+        ))}
+      </TextField>
+      <FileSelectionField
+        accept=".csv,.txt,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain"
+        ariaLabel="Entrants Import File"
+        disabled={!selectedEvent || !props.onImportEntrants}
+        label="Entrant file"
+        onSelectFile={handleImportFile}
+        placeholder="No entrant file selected"
+        value={selectedImportFileName}
+      />
       {importStatus ? <p aria-live="polite" className="page-filter-status">{importStatus}</p> : null}
-      <label className="page-filter-label">
-        Category
-        <select
-          aria-label="Entrants Category"
-          value={selectedCategoryFilter}
-          onChange={(event) => setSelectedCategoryFilter(event.target.value)}
-        >
-          <option value={CATEGORY_FILTER_ALL}>All</option>
-          <option value={CATEGORY_FILTER_UNASSIGNED}>Unassigned</option>
-          {eventCategories.map((category) => (
-            <option key={category.id} value={category.id}>{category.name}</option>
-          ))}
-        </select>
-      </label>
+      <TextField
+        className="page-filter-label"
+        label="Category"
+        select
+        slotProps={{ select: { 'aria-label': 'Entrants Category' } }}
+        value={selectedCategoryFilter}
+        onChange={(event) => setSelectedCategoryFilter(event.target.value)}
+      >
+        <MenuItem value={CATEGORY_FILTER_ALL}>All</MenuItem>
+        <MenuItem value={CATEGORY_FILTER_UNASSIGNED}>Unassigned</MenuItem>
+        {eventCategories.map((category) => (
+          <MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>
+        ))}
+      </TextField>
       <div className="events-layout">
         <EntrantListPanel
           catalog={props.catalog}

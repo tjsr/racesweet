@@ -1,3 +1,4 @@
+import { Button, MenuItem, TextField } from '@mui/material';
 import React from 'react';
 import { type FileWriteDiagnostics, getFileWriteFailure } from '../../app/fileWriteDiagnostics.js';
 import type { EventCatalogEvent, EventTrackMap, EventTrackTimingLine } from '../../catalog/eventCatalog.js';
@@ -147,17 +148,16 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
   return (
     <section className="events-panel" aria-label="Event Track Map Configuration">
       <h2>Track Map</h2>
-      <label>
-        Track data format
-        <select
-          aria-label="Event Track Data Format"
-          onChange={(event) => setDraft((current) => ({ ...current, sourceType: event.target.value as EventTrackMap['sourceType'] }))}
-          value={draft.sourceType}
-        >
-          <option value="gpx">GPX</option>
-          <option value="racetrack-csv">Racetrack database CSV</option>
-        </select>
-      </label>
+      <TextField
+        label="Track data format"
+        select
+        slotProps={{ select: { 'aria-label': 'Event Track Data Format' } }}
+        onChange={(event) => setDraft((current) => ({ ...current, sourceType: event.target.value as EventTrackMap['sourceType'] }))}
+        value={draft.sourceType}
+      >
+        <MenuItem value="gpx">GPX</MenuItem>
+        <MenuItem value="racetrack-csv">Racetrack database CSV</MenuItem>
+      </TextField>
       {draft.sourceType === 'gpx' ? (
         <FileSelectionField
           accept=".gpx,application/gpx+xml,application/xml,text/xml"
@@ -194,10 +194,10 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
       )}
       <p>{draft.sourceType === 'gpx' ? draft.gpxFileName || 'No GPX file configured. Reports will use a circular track.' : null}</p>
       <div className="events-actions">
-        <button type="button" onClick={() => setEditing((current) => !current)}>
+        <Button type="button" onClick={() => setEditing((current) => !current)}>
           {editing ? 'Close timing-line editor' : 'Edit timing-line positions'}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={() => setDraft((current) => ({
             ...current,
@@ -210,8 +210,8 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
           }))}
         >
           Use circular track
-        </button>
-        <button
+        </Button>
+        <Button
           disabled={isSaving}
           type="button"
           onClick={() => {
@@ -219,9 +219,9 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
           }}
         >
           {isSaving ? 'Saving Track Map…' : 'Save Track Map'}
-        </button>
+        </Button>
         {status ? <span aria-label="Track Map Save Status" role="status">{status}</span> : null}
-        {saveFailure ? <button onClick={() => void navigator.clipboard.writeText(formatSaveDiagnostics(props.selectedEvent?.id.toString() || 'unavailable', saveFailure))} type="button">Copy save diagnostics</button> : null}
+        {saveFailure ? <Button onClick={() => void navigator.clipboard.writeText(formatSaveDiagnostics(props.selectedEvent?.id.toString() || 'unavailable', saveFailure))} type="button">Copy save diagnostics</Button> : null}
       </div>
       {editing ? (
         <div
@@ -233,8 +233,8 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
           <h3>Timing-line positions</h3>
           <p>Select a timing line, then click its location on the track.</p>
           <div className="events-actions">
-            <button onClick={() => setEditing(false)} type="button">Back to event</button>
-            <button
+            <Button onClick={() => setEditing(false)} type="button">Back to event</Button>
+            <Button
               disabled={isSaving}
               onClick={() => {
                 void saveTrackMap();
@@ -242,23 +242,22 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
               type="button"
             >
               {isSaving ? 'Saving Track Map…' : 'Save Track Map'}
-            </button>
+            </Button>
             {status ? <span aria-label="Track Map Save Status" role="status">{status}</span> : null}
-            {saveFailure ? <button onClick={() => void navigator.clipboard.writeText(formatSaveDiagnostics(props.selectedEvent?.id.toString() || 'unavailable', saveFailure))} type="button">Copy save diagnostics</button> : null}
+            {saveFailure ? <Button onClick={() => void navigator.clipboard.writeText(formatSaveDiagnostics(props.selectedEvent?.id.toString() || 'unavailable', saveFailure))} type="button">Copy save diagnostics</Button> : null}
           </div>
-          <label>
-            Timing line
-            <select
-              aria-label="Track Map Timing Line"
-              value={selectedLineNumber ?? ''}
-              onChange={(event) => setSelectedLineNumber(event.target.value ? Number(event.target.value) : undefined)}
-            >
-              <option value="">Select a timing line</option>
-              {availableTimingLines.map((line) => (
-                <option key={line.lineNumber} value={line.lineNumber}>{line.label}</option>
-              ))}
-            </select>
-          </label>
+          <TextField
+            label="Timing line"
+            select
+            slotProps={{ select: { 'aria-label': 'Track Map Timing Line' } }}
+            value={selectedLineNumber ?? ''}
+            onChange={(event) => setSelectedLineNumber(event.target.value ? Number(event.target.value) : undefined)}
+          >
+            <MenuItem value="">Select a timing line</MenuItem>
+            {availableTimingLines.map((line) => (
+              <MenuItem key={line.lineNumber} value={line.lineNumber}>{line.label}</MenuItem>
+            ))}
+          </TextField>
           <svg
             aria-label="Event Track Map Editor"
             onClick={handleMapClick}

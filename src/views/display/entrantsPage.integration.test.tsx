@@ -768,7 +768,7 @@ describe('EntrantsPage integration', () => {
       );
     });
 
-    const input = container.querySelector('input[aria-label="Entrants Import File"]') as HTMLInputElement;
+    const input = container.querySelector('input[aria-label="Entrants Import File File input"]') as HTMLInputElement;
     expect(input.accept).toContain('.xlsx');
     expect(container.querySelector('input[aria-label="Entrant Vehicle"]')).toBeNull();
     Object.defineProperty(input, 'files', { configurable: true, value: [file] });

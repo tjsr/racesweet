@@ -33,6 +33,32 @@ const ensureMatchMedia = (): void => {
   }
 };
 
+const getMuiSelect = (container: HTMLElement, label: string): HTMLElement => {
+  const select = container.querySelector<HTMLElement>(`[aria-label="${label}"]`);
+  if (!select) {
+    throw new Error(`Could not find MUI select with label ${label}.`);
+  }
+  return select;
+};
+
+const openMuiSelect = async (select: HTMLElement): Promise<HTMLElement[]> => {
+  await act(async () => {
+    select.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  });
+  return Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'));
+};
+
+const selectMuiOption = async (select: HTMLElement, optionText: string): Promise<void> => {
+  const options = await openMuiSelect(select);
+  const option = options.find((candidate) => candidate.textContent === optionText);
+  if (!option) {
+    throw new Error(`Could not find MUI select option ${optionText}.`);
+  }
+  await act(async () => {
+    option.click();
+  });
+};
+
 describe('TimingContext integration', () => {
   let container: HTMLDivElement;
   let originalMatchMedia: typeof window.matchMedia | undefined;
@@ -258,8 +284,9 @@ describe('TimingContext integration', () => {
       );
     });
 
-    const timingSessionSelect = container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement;
-    const optionLabels = Array.from(timingSessionSelect.options).map((option) => option.text);
+    const timingSessionSelect = getMuiSelect(container, 'Timing Session');
+    expect(timingSessionSelect.getAttribute('role')).toBe('combobox');
+    const optionLabels = (await openMuiSelect(timingSessionSelect)).map((option) => option.textContent);
 
     expect(optionLabels).toEqual([
       '[Fri 11:00] Friday Practice',
@@ -362,6 +389,18 @@ describe('TimingContext integration', () => {
       scheduledStart: '2026-05-29T10:00:00.000Z',
       status: 'scheduled',
     };
+    const secondaryEvent: EventCatalogState['events'][number] = {
+      ...event,
+      id: 'event-2',
+      name: 'Second Test Event',
+      sessionIds: ['session-2'],
+    };
+    const secondarySession: EventCatalogState['sessions'][number] = {
+      ...session,
+      id: 'session-2',
+      name: 'Sprint Race',
+      scheduledStart: 'not-a-date',
+    };
     const raceState: RaceStateLookup & { categories: EventCategory[]; records: ParticipantPassingRecord[] } = {
       categories: [],
       countTransponderCrossings: () => 0,
@@ -385,7 +424,7 @@ describe('TimingContext integration', () => {
           activeSession={session}
           categoryListSelected={() => undefined}
           eventTimeZone="Australia/Sydney"
-          events={[event]}
+          events={[event, secondaryEvent]}
           onAddRecord={() => undefined}
           onEditRecord={() => undefined}
           onAssignFlagCategory={() => undefined}
@@ -400,7 +439,7 @@ describe('TimingContext integration', () => {
           raceState={raceState}
           selectedCategories={new Set()}
           selectedParticipants={new Set()}
-          sessions={[session]}
+          sessions={[session, secondarySession]}
           timeDisplayZoneMode="event"
           timingEvent={event}
           timingSelectionLoading
@@ -412,18 +451,16 @@ describe('TimingContext integration', () => {
     expect(container.querySelector('[role="status"][aria-label="Loading Timing event"]')).not.toBeNull();
     expect(container.querySelector('[role="status"][aria-label="Loading Timing session"]')).not.toBeNull();
 
-    const timingEventSelect = container.querySelector('select[aria-label="Timing Event"]') as HTMLSelectElement;
-    await act(async () => {
-      timingEventSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    const timingEventSelect = getMuiSelect(container, 'Timing Event');
+    expect(timingEventSelect.getAttribute('role')).toBe('combobox');
+    await selectMuiOption(timingEventSelect, 'Second Test Event');
 
-    expect(onSelectEvent).toHaveBeenCalledWith(event.id);
+    expect(onSelectEvent).toHaveBeenCalledWith(secondaryEvent.id);
 
-    const timingSessionSelect = container.querySelector('select[aria-label="Timing Session"]') as HTMLSelectElement;
-    await act(async () => {
-      timingSessionSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    const timingSessionSelect = getMuiSelect(container, 'Timing Session');
+    expect(timingSessionSelect.getAttribute('role')).toBe('combobox');
+    await selectMuiOption(timingSessionSelect, 'Sprint Race');
 
-    expect(onSelectSession).toHaveBeenCalledWith(session.id);
+    expect(onSelectSession).toHaveBeenCalledWith(secondarySession.id);
   });
 });

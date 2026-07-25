@@ -1,3 +1,4 @@
+import { Button, MenuItem, TextField } from '@mui/material';
 import React from 'react';
 import {
   type EntrantType,
@@ -278,19 +279,19 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
       <h2>Entrant List</h2>
       <div className="events-actions">
         {props.teamsEnabled ? (
-          <label className="compact-action-label">
-            Create
-            <select
-              aria-label="Create Entrant Kind"
-              value={props.createKind}
-              onChange={(event) => props.setCreateKind(event.target.value as EntrantType)}
-            >
-              <option value="rider">Create {singularLabel.toLowerCase()}</option>
-              <option value="team">Create {groupLabel.toLowerCase().slice(0, -1)}</option>
-            </select>
-          </label>
+          <TextField
+            className="compact-action-label"
+            label="Create"
+            select
+            slotProps={{ select: { 'aria-label': 'Create Entrant Kind' } }}
+            value={props.createKind}
+            onChange={(event) => props.setCreateKind(event.target.value as EntrantType)}
+          >
+            <MenuItem value="rider">Create {singularLabel.toLowerCase()}</MenuItem>
+            <MenuItem value="team">Create {groupLabel.toLowerCase().slice(0, -1)}</MenuItem>
+          </TextField>
         ) : null}
-        <button
+        <Button
           type="button"
           onClick={() => {
             if (!props.selectedEventId) {
@@ -306,19 +307,19 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
           disabled={!props.selectedEventId}
         >
           {props.teamsEnabled && props.createKind === 'team' ? `Create ${groupLabel.slice(0, -1)}` : `Create ${singularLabel}`}
-        </button>
-        <label className="compact-action-label">
-          Sort
-          <select
-            aria-label="Sort Entrants"
-            value={sortOrder}
-            onChange={(event) => setSortOrder(event.target.value as EntrantListSortOrder)}
-          >
-            {entrantListSortOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </label>
+        </Button>
+        <TextField
+          className="compact-action-label"
+          label="Sort"
+          select
+          slotProps={{ select: { 'aria-label': 'Sort Entrants' } }}
+          value={sortOrder}
+          onChange={(event) => setSortOrder(event.target.value as EntrantListSortOrder)}
+        >
+          {entrantListSortOptions.map((option) => (
+            <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+          ))}
+        </TextField>
       </div>
       <div className="events-list" role="listbox" aria-label="Entrants for selected event">
         {displayedRiderEntrants.length > 0 ? (

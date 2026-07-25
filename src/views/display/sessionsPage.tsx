@@ -1,4 +1,5 @@
 
+import { TextField } from '@mui/material';
 import React from 'react';
 import {
   type EventCatalogSession,
@@ -104,21 +105,16 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
   return (
     <section className="events-screen">
       <h1>Sessions</h1>
-      <label className="page-filter-label">
-        Event
-        <select
-          aria-label="Sessions Event"
-          value={selectedEvent?.id || ''}
-          onChange={(event) => {
-            const eventId = event.target.value;
-            requestFormExit(() => props.onSelectEvent(eventId));
-          }}
-        >
-          {props.catalog.events.map((event) => (
-            <option key={event.id} value={event.id}>{event.name}</option>
-          ))}
-        </select>
-      </label>
+      <TextField className="page-filter-label" label="Event" select slotProps={{ select: { 'aria-label': 'Sessions Event', native: true } }}
+        aria-label="Sessions Event"
+        value={selectedEvent?.id || ''}
+        onChange={(event) => {
+          const eventId = event.target.value;
+          requestFormExit(() => props.onSelectEvent(eventId));
+        }}
+      >
+        {props.catalog.events.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
+      </TextField>
       <div className="events-layout">
         <SessionListPanel
           activeSessionId={props.catalog.activeSessionId}

@@ -29,6 +29,28 @@ const setSelectValue = (select: HTMLSelectElement, value: string): void => {
   select.dispatchEvent(new Event('change', { bubbles: true }));
 };
 
+const getMuiSelect = (container: HTMLElement, label: string): HTMLElement => {
+  const select = container.querySelector<HTMLElement>(`[aria-label="${label}"]`);
+  if (!select) {
+    throw new Error(`Could not find MUI select with label ${label}.`);
+  }
+  return select;
+};
+
+const selectMuiOption = async (select: HTMLElement, optionText: string): Promise<void> => {
+  await act(async () => {
+    select.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  });
+  const option = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'))
+    .find((candidate) => candidate.textContent === optionText);
+  if (!option) {
+    throw new Error(`Could not find MUI select option ${optionText}.`);
+  }
+  await act(async () => {
+    option.click();
+  });
+};
+
 const createLap = (
   id: string,
   participantId: EventParticipantId,
@@ -208,6 +230,7 @@ describe('race analytics views integration', () => {
   });
 
   it('shows correct overall and per-category standings for team and individual entrants', async () => {
+    const onSelectEventSession = vi.fn();
     await act(async () => {
       root.render(
         <ResultsPage
@@ -216,8 +239,9 @@ describe('race analytics views integration', () => {
           eventSessionOptions={[
             { eventId: createEventId('event-1'), eventName: 'Winter Round', value: 'event:event-1' },
             { eventId: createEventId('event-1'), eventName: 'Winter Round', sessionId: createSessionId('session-1'), sessionName: 'Feature Race', value: 'session:event-1:session-1' },
+            { eventId: createEventId('event-1'), eventName: 'Winter Round', sessionId: createSessionId('session-2'), sessionName: 'Sprint Race', value: 'session:event-1:session-2' },
           ]}
-          onSelectEventSession={vi.fn()}
+          onSelectEventSession={onSelectEventSession}
           raceState={raceState}
           selectedCategoryId={undefined}
           selectedEventSessionValue="session:event-1:session-1"
@@ -233,37 +257,28 @@ describe('race analytics views integration', () => {
     expect(container.textContent).toContain('1:03.000');
     expect(container.textContent).toContain('1:10.000');
 
-    const categorySelect = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
-    expect(categorySelect).toBeTruthy();
-    const eventSessionSelect = container.querySelector('select[aria-label="Race View Event Session"]') as HTMLSelectElement;
-    expect(eventSessionSelect).toBeTruthy();
-    expect(Array.from(eventSessionSelect.options).map((option) => option.textContent)).toEqual(['Winter Round', '-> Feature Race']);
-    expect(eventSessionSelect.options[0].disabled).toBe(true);
-    expect(eventSessionSelect.options[1].disabled).toBe(false);
+    const categorySelect = getMuiSelect(container, 'Race View Category');
+    const eventSessionSelect = getMuiSelect(container, 'Race View Event Session');
+    expect(categorySelect.getAttribute('role')).toBe('combobox');
+    expect(eventSessionSelect.getAttribute('role')).toBe('combobox');
+    expect(categorySelect.textContent).toContain('Overall');
 
-    const categoryOptions = Array.from(categorySelect.querySelectorAll('option')).map((option) => option.textContent);
-    expect(categoryOptions.filter((text) => text === 'Category A')).toHaveLength(1);
-    expect(categoryOptions).toContain('Timing Error List');
-
-    await act(async () => {
-      setSelectValue(categorySelect, createCategoryId('cat-a'));
-    });
+    await selectMuiOption(eventSessionSelect, '-> Sprint Race');
+    expect(onSelectEventSession).toHaveBeenCalledWith('session:event-1:session-2');
+    await selectMuiOption(categorySelect, 'Category A');
 
     expect(container.textContent).toContain('Team Rocket');
     expect(container.textContent).not.toContain('Solo Rider');
 
-    await act(async () => {
-      setSelectValue(categorySelect, createCategoryId('cat-b'));
-    });
+    await selectMuiOption(getMuiSelect(container, 'Race View Category'), 'Category B');
 
     expect(container.textContent).not.toContain('Team Rocket');
     expect(container.textContent).toContain('Solo Rider');
 
-    const viewSelect = container.querySelector('select[aria-label="Results View Type"]') as HTMLSelectElement;
-    await act(async () => {
-      setSelectValue(categorySelect, createCategoryId('cat-a'));
-      setSelectValue(viewSelect, 'lap-chart');
-    });
+    const viewSelect = getMuiSelect(container, 'Results View Type');
+    expect(viewSelect.getAttribute('role')).toBe('combobox');
+    await selectMuiOption(getMuiSelect(container, 'Race View Category'), 'Category A');
+    await selectMuiOption(getMuiSelect(container, 'Results View Type'), 'Lap Chart');
 
     expect(container.querySelector('table[aria-label="Results Lap Chart Table"]')).toBeTruthy();
     const lapEntryButton = container.querySelector('button.lap-entry-button') as HTMLButtonElement;
@@ -485,12 +500,11 @@ describe('race analytics views integration', () => {
       '2',
     ]);
 
-    const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
-    const categorySelect = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
-    await act(async () => {
-      setSelectValue(categorySelect, createCategoryId('cat-b'));
-      setSelectValue(reportSelect, 'lap-times');
-    });
+    const reportSelect = getMuiSelect(container, 'Reports View Type');
+    expect(reportSelect.getAttribute('role')).toBe('combobox');
+    const categorySelect = getMuiSelect(container, 'Race View Category');
+    await selectMuiOption(categorySelect, 'Category B');
+    await selectMuiOption(getMuiSelect(container, 'Reports View Type'), 'Lap Times');
 
     const lapRows = Array.from(container.querySelectorAll('table[aria-label="Lap Times Report Table"] tbody tr'));
     expect(lapRows).toHaveLength(2);
@@ -898,10 +912,9 @@ describe('race analytics views integration', () => {
       '2',
     ]);
 
-    const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
-    await act(async () => {
-      setSelectValue(reportSelect, 'fastest-lap-timeline');
-    });
+    const reportSelect = getMuiSelect(container, 'Reports View Type');
+    expect(reportSelect.getAttribute('role')).toBe('combobox');
+    await selectMuiOption(reportSelect, 'Fastest Lap Timeline');
 
     const timelineTable = container.querySelector('table[aria-label="Fastest Lap Timeline Report Table"]') as HTMLTableElement;
     expect(timelineTable).toBeTruthy();
@@ -957,19 +970,15 @@ describe('race analytics views integration', () => {
       ],
     ]);
 
-    const categorySelect = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
-    expect(container.querySelector('select[aria-label="Race View Event Session"]')).toBeTruthy();
+    const categorySelect = getMuiSelect(container, 'Race View Category');
+    expect(getMuiSelect(container, 'Race View Event Session')).toBeTruthy();
 
-    await act(async () => {
-      setSelectValue(categorySelect, createCategoryId('cat-a'));
-    });
+    await selectMuiOption(categorySelect, 'Category A');
 
     expect(container.textContent).toContain('Team Rocket');
     expect(container.textContent).not.toContain('Solo Rider');
 
-    await act(async () => {
-      setSelectValue(reportSelect, 'lap-times');
-    });
+    await selectMuiOption(getMuiSelect(container, 'Reports View Type'), 'Lap Times');
 
     expect(container.textContent).toContain('Lap Times Report');
     expect(container.textContent).toContain('Team Rocket');
@@ -999,21 +1008,15 @@ describe('race analytics views integration', () => {
     expect(container.textContent).toContain('1:05.000');
     expect(container.textContent).toContain('1:07.000');
 
-    await act(async () => {
-      setSelectValue(reportSelect, 'fastest-laps');
-    });
+    await selectMuiOption(getMuiSelect(container, 'Reports View Type'), 'Fastest Laps');
 
-    const categorySelectAfterViewChange = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
-    await act(async () => {
-      setSelectValue(categorySelectAfterViewChange, createCategoryId('cat-b'));
-    });
+    const categorySelectAfterViewChange = getMuiSelect(container, 'Race View Category');
+    await selectMuiOption(categorySelectAfterViewChange, 'Category B');
 
     expect(container.textContent).toContain('Solo Rider');
     expect(container.textContent).not.toContain('Team Rocket');
 
-    await act(async () => {
-      setSelectValue(reportSelect, 'lap-chart');
-    });
+    await selectMuiOption(getMuiSelect(container, 'Reports View Type'), 'Lap Chart');
 
     expect(container.querySelector('table[aria-label="Reports Lap Chart Table"]')).toBeTruthy();
   });
@@ -1030,10 +1033,8 @@ describe('race analytics views integration', () => {
       );
     });
 
-    const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
-    await act(async () => {
-      setSelectValue(reportSelect, 'lap-chart');
-    });
+    const reportSelect = getMuiSelect(container, 'Reports View Type');
+    await selectMuiOption(reportSelect, 'Lap Chart');
 
     const selectedCells = (): HTMLTableCellElement[] => {
       return Array.from(container.querySelectorAll('td.lap-chart-table__entrant-cell--selected'));
@@ -1093,10 +1094,8 @@ describe('race analytics views integration', () => {
       );
     });
 
-    const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
-    await act(async () => {
-      setSelectValue(reportSelect, 'lap-chart');
-    });
+    const reportSelect = getMuiSelect(container, 'Reports View Type');
+    await selectMuiOption(reportSelect, 'Lap Chart');
 
     expect(container.textContent).toContain('Draw line chart');
     expect(container.querySelector('svg.lap-chart-line-overlay')).toBeFalsy();
@@ -1157,10 +1156,8 @@ describe('race analytics views integration', () => {
         timeZone: 'Australia/Sydney',
       }} raceState={reportRaceState} />);
     });
-    const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
-    await act(async () => {
-      setSelectValue(reportSelect, 'yellow-flag-periods');
-    });
+    const reportSelect = getMuiSelect(container, 'Reports View Type');
+    await selectMuiOption(reportSelect, 'Yellow Flag periods');
 
     const table = container.querySelector('table[aria-label="Yellow Flag Periods Report Table"]') as HTMLTableElement;
     expect(Array.from(table.querySelectorAll('thead th')).map((cell) => cell.textContent)).toEqual(['From Lap', 'Time of Day', 'Duration', 'Leader at Flag', 'Until Lap', 'Until Time']);
@@ -1220,10 +1217,8 @@ describe('race analytics views integration', () => {
       );
     });
 
-    const reportSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
-    await act(async () => {
-      setSelectValue(reportSelect, 'track-map');
-    });
+    const reportSelect = getMuiSelect(container, 'Reports View Type');
+    await selectMuiOption(reportSelect, 'Track Map');
 
     expect(container.querySelector('svg[aria-label="Track Map"]')).toBeTruthy();
     expect(container.querySelector('g[aria-label="Track entrant 42"]')).toBeTruthy();

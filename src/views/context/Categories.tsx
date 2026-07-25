@@ -1,3 +1,4 @@
+import { TextField } from '@mui/material';
 import React from 'react';
 import { type EventCatalogCategory, getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent } from '../../catalog/eventCatalog.js';
 import { buildCategoryChanges } from '../../processing/categoryDraft.js';
@@ -89,21 +90,19 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
   return (
     <section className="events-screen">
       <h1>Categories</h1>
-      <label className="page-filter-label">
-        Event
-        <select
-          aria-label="Categories Event"
-          value={selectedEvent?.id || ''}
-          onChange={(event) => {
-            const eventId = event.target.value;
-            requestFormExit(() => props.onSelectEvent(eventId));
-          } }
-        >
-          {props.catalog.events.map((event) => (
-            <option key={event.id} value={event.id}>{event.name}</option>
-          ))}
-        </select>
-      </label>
+      <TextField
+        className="page-filter-label"
+        label="Event"
+        select
+        slotProps={{ select: { 'aria-label': 'Categories Event', native: true } }}
+        value={selectedEvent?.id || ''}
+        onChange={(event) => {
+          const eventId = event.target.value;
+          requestFormExit(() => props.onSelectEvent(eventId));
+        } }
+      >
+        {props.catalog.events.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
+      </TextField>
       <div className="events-layout categories-layout">
         <CategoryListPanel
           allowCreateCategory={!!selectedEvent}

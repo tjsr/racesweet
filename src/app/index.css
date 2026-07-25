@@ -292,6 +292,11 @@
   gap: 0.5rem;
 }
 
+.events-panel .MuiFormControlLabel-root {
+  align-items: center;
+  flex-direction: row;
+}
+
 .page-filter-label {
   display: inline-flex;
   flex-direction: column;
@@ -358,14 +363,14 @@
   }
 }
 
-.events-panel input,
-.events-panel select,
-.events-panel textarea {
+.events-panel input:not([class*='Mui']),
+.events-panel select:not([class*='Mui']),
+.events-panel textarea:not([class*='Mui']) {
   font: inherit;
   padding: 0.45rem 0.55rem;
 }
 
-.events-panel textarea {
+.events-panel textarea:not([class*='Mui']) {
   min-height: 7rem;
   resize: vertical;
 }
@@ -464,6 +469,14 @@
 
 .events-list-item.selected {
   box-shadow: inset 0 0 0 2px rgba(127, 127, 127, 0.2);
+}
+
+.category-card-heading {
+  align-items: center;
+  display: flex;
+  gap: 0.25rem;
+  justify-content: space-between;
+  width: 100%;
 }
 
 .session-list-card {
@@ -706,6 +719,13 @@
 .lap-chart-table td {
   text-align: center;
   vertical-align: top;
+}
+
+.fastest-time-indicator-color-input {
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
 }
 
 .lap-chart-table-wrapper {

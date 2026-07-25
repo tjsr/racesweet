@@ -1,3 +1,4 @@
+import { Button, MenuItem, TextField } from '@mui/material';
 import React from 'react';
 import { type EventCatalogEntrant } from '../../catalog/eventCatalog.js';
 import { type CategoryId } from '../../processing/category.js';
@@ -64,80 +65,64 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
       <h2>{isDriver ? `${entrantLabel} Details` : `${parentLabel} Details`}</h2>
       {props.selectedEntrant ? (
         <>
-          {!props.isMotorsport || !isDriver ? <label>
-            {isDriver ? `${entrantLabel} Name` : `${parentLabel} Name`}
-            <input
-              aria-label="Entrant Name"
-              type="text"
-              value={props.entrantDraft.name}
-              onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, name: event.target.value }))}
-            />
-          </label> : null}
+          {!props.isMotorsport || !isDriver ? <TextField
+            label={isDriver ? `${entrantLabel} Name` : `${parentLabel} Name`}
+            slotProps={{ htmlInput: { 'aria-label': 'Entrant Name' } }}
+            value={props.entrantDraft.name}
+            onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, name: event.target.value }))}
+          /> : null}
           {isDriver ? (
             <>
-              <label>
-                First Name
-                <input
-                  aria-label="Entrant First Name"
-                  type="text"
-                  value={props.entrantDraft.firstName}
-                  onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, firstName: event.target.value }))}
-                />
-              </label>
-              <label>
-                Surname
-                <input
-                  aria-label="Entrant Surname"
-                  type="text"
-                  value={props.entrantDraft.lastName}
-                  onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, lastName: event.target.value }))}
-                />
-              </label>
-              <label>
-                Gender
-                <select
-                  aria-label="Entrant Gender"
-                  value={props.entrantDraft.gender}
-                  onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, gender: event.target.value }))}
-                >
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value={UNSPECIFIED_GENDER}>Unspecified</option>
-                </select>
-              </label>
-              <label>
-                Date of Birth
-                <input
-                  aria-label="Entrant Date Of Birth"
-                  type="date"
-                  value={props.entrantDraft.dateOfBirth}
-                  onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, dateOfBirth: event.target.value }))}
-                />
-              </label>
-              {!props.isMotorsport ? <label>
-                Start Order
-                <input
-                  aria-label="Entrant Start Order"
-                  min="1"
-                  type="number"
-                  value={props.entrantDraft.startOrder}
-                  onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, startOrder: event.target.value }))}
-                />
-              </label> : null}
-              <label>
-                {parentLabel}
-                <select
-                  aria-label="Driver Entrant"
-                  disabled={props.entrantAssignmentIsDerived}
-                  value={props.entrantDraft.teamEntrantId}
-                  onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, teamEntrantId: event.target.value }))}
-                >
-                  <option value="">{props.isMotorsport ? 'No entrant' : 'Individual entry'}</option>
-                  {props.teamEntrants.map((team) => (
-                    <option key={team.id} value={team.id}>{`${team.name} (${team.id.toString().slice(0, 6)})`}</option>
-                  ))}
-                </select>
-              </label>
+              <TextField
+                label="First Name"
+                slotProps={{ htmlInput: { 'aria-label': 'Entrant First Name' } }}
+                value={props.entrantDraft.firstName}
+                onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, firstName: event.target.value }))}
+              />
+              <TextField
+                label="Surname"
+                slotProps={{ htmlInput: { 'aria-label': 'Entrant Surname' } }}
+                value={props.entrantDraft.lastName}
+                onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, lastName: event.target.value }))}
+              />
+              <TextField
+                label="Gender"
+                select
+                slotProps={{ select: { 'aria-label': 'Entrant Gender' } }}
+                value={props.entrantDraft.gender}
+                onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, gender: event.target.value }))}
+              >
+                <MenuItem value="male">Male</MenuItem>
+                <MenuItem value="female">Female</MenuItem>
+                <MenuItem value={UNSPECIFIED_GENDER}>Unspecified</MenuItem>
+              </TextField>
+              <TextField
+                label="Date of Birth"
+                slotProps={{ htmlInput: { 'aria-label': 'Entrant Date Of Birth' } }}
+                type="date"
+                value={props.entrantDraft.dateOfBirth}
+                onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, dateOfBirth: event.target.value }))}
+              />
+              {!props.isMotorsport ? <TextField
+                label="Start Order"
+                slotProps={{ htmlInput: { 'aria-label': 'Entrant Start Order', min: 1 } }}
+                type="number"
+                value={props.entrantDraft.startOrder}
+                onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, startOrder: event.target.value }))}
+              /> : null}
+              <TextField
+                disabled={props.entrantAssignmentIsDerived}
+                label={parentLabel}
+                select
+                slotProps={{ select: { 'aria-label': 'Driver Entrant' } }}
+                value={props.entrantDraft.teamEntrantId}
+                onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, teamEntrantId: event.target.value }))}
+              >
+                <MenuItem value="">{props.isMotorsport ? 'No entrant' : 'Individual entry'}</MenuItem>
+                {props.teamEntrants.map((team) => (
+                  <MenuItem key={team.id} value={team.id}>{`${team.name} (${team.id.toString().slice(0, 6)})`}</MenuItem>
+                ))}
+              </TextField>
             </>
           ) : props.showTeamMembers !== false ? (
             <>
@@ -148,65 +133,57 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
               />
             </>
           ) : null}
-          {!props.isMotorsport || !isDriver ? <label>
-            Category
-            <select
-              aria-label="Entrant Category"
-              value={props.entrantDraft.categoryId}
-              onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, categoryId: event.target.value }))}
-            >
-              <option value="">No category</option>
-              {props.eventCategories.filter(isActiveCategory).map((category) => (
-                <option key={category.id.toString()} value={category.id.toString()}>{category.name}</option>
-              ))}
-            </select>
-          </label> : null}
+          {!props.isMotorsport || !isDriver ? <TextField
+            label="Category"
+            select
+            slotProps={{ select: { 'aria-label': 'Entrant Category' } }}
+            value={props.entrantDraft.categoryId}
+            onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, categoryId: event.target.value }))}
+          >
+            <MenuItem value="">No category</MenuItem>
+            {props.eventCategories.filter(isActiveCategory).map((category) => (
+              <MenuItem key={category.id.toString()} value={category.id.toString()}>{category.name}</MenuItem>
+            ))}
+          </TextField> : null}
           {isDriver && props.selectedTeamName ? (
             <p className="readonly-summary">{parentLabel}: {props.selectedTeamName}</p>
           ) : null}
           {props.showVehicle && !isDriver ? (
-            <label>
-              Vehicle
-              <input
-                aria-label="Entrant Vehicle"
-                type="text"
-                value={props.entrantDraft.vehicle}
-                onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, vehicle: event.target.value }))}
-              />
-            </label>
+            <TextField
+              label="Vehicle"
+              slotProps={{ htmlInput: { 'aria-label': 'Entrant Vehicle' } }}
+              value={props.entrantDraft.vehicle}
+              onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, vehicle: event.target.value }))}
+            />
           ) : null}
           {props.isMotorsport && !isDriver ? (
-            <label>
-              Start Order
-              <input
-                aria-label="Entrant Start Order"
-                min="1"
-                type="number"
-                value={props.entrantDraft.startOrder}
-                onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, startOrder: event.target.value }))}
-              />
-            </label>
-          ) : null}
-          <label>
-            Notes
-            <textarea
-              aria-label="Entrant Notes"
-              value={props.entrantDraft.notes}
-              onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, notes: event.target.value }))}
+            <TextField
+              label="Start Order"
+              slotProps={{ htmlInput: { 'aria-label': 'Entrant Start Order', min: 1 } }}
+              type="number"
+              value={props.entrantDraft.startOrder}
+              onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, startOrder: event.target.value }))}
             />
-          </label>
+          ) : null}
+          <TextField
+            label="Notes"
+            multiline
+            slotProps={{ htmlInput: { 'aria-label': 'Entrant Notes' } }}
+            value={props.entrantDraft.notes}
+            onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, notes: event.target.value }))}
+          />
           <div className="events-actions">
-            <button
+            <Button
               type="button"
               onClick={() => {
                 void props.onSaveEntrant();
               }}
             >
               Save Entrant
-            </button>
-            <button type="button" onClick={props.onDeleteEntrant}>
+            </Button>
+            <Button type="button" onClick={props.onDeleteEntrant}>
               Delete Entrant
-            </button>
+            </Button>
           </div>
           <div className="entrant-id">Id: {props.selectedEntrant.id}</div>
           {props.warningModal}

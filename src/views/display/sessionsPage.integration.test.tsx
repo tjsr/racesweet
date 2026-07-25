@@ -335,8 +335,7 @@ describe('SessionsPage integration', () => {
 
     const enduranceCard = Array.from(sessionCategoriesPanel?.querySelectorAll('.events-list-item') || [])
       .find((card) => card.textContent?.includes('Endurance'));
-    const removeCategoryButton = Array.from(enduranceCard?.querySelectorAll('button') || [])
-      .find((button) => button.textContent === 'Remove from session');
+    const removeCategoryButton = enduranceCard?.querySelector<HTMLButtonElement>('[aria-label="Remove Endurance from session"]');
     expect(removeCategoryButton).toBeDefined();
 
     await act(async () => {

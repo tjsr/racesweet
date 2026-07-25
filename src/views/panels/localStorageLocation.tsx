@@ -1,4 +1,5 @@
 import React from 'react';
+import { TextField } from '@mui/material';
 
 interface LocalStorageLocationPanelProps {
   localStorageDirectoryPath: string;
@@ -19,10 +20,12 @@ const LocalStorageDirectoryInput = (props: LocalStorageLocationPanelProps): Reac
   };
 
   return (
-    <input
-      aria-label="Local Storage Directory"
+    <TextField
+      fullWidth
+      label="Storage Directory"
       onBlur={commit}
       onChange={(event) => setDraft(event.target.value)}
+      slotProps={{ htmlInput: { 'aria-label': 'Local Storage Directory' } }}
       type="text"
       value={draft}
     />
@@ -32,12 +35,9 @@ const LocalStorageDirectoryInput = (props: LocalStorageLocationPanelProps): Reac
 export const LocalStorageLocationPanel = (props: LocalStorageLocationPanelProps): React.ReactElement => (
   <section className="events-panel">
     <h2>Local storage location</h2>
-    <label>
-      Storage Directory
-      <LocalStorageDirectoryInput
-        localStorageDirectoryPath={props.localStorageDirectoryPath}
-        onSaveLocalStorageDirectoryPath={props.onSaveLocalStorageDirectoryPath}
-      />
-    </label>
+    <LocalStorageDirectoryInput
+      localStorageDirectoryPath={props.localStorageDirectoryPath}
+      onSaveLocalStorageDirectoryPath={props.onSaveLocalStorageDirectoryPath}
+    />
   </section>
 );

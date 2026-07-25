@@ -1,3 +1,4 @@
+import { Button, TextField } from '@mui/material';
 import React from 'react';
 import { getParticipantIdentifiers } from '../processing/participant.js';
 import { type EventParticipant, type ParticipantTransponder } from '../model/eventparticipant.js';
@@ -193,31 +194,27 @@ export const IdentifierListControl = (props: IdentifierListControlProps): React.
             <div className="identifier-list-rows">
               {rows.map((rowValue, rowIndex) => (
                 <div className="identifier-list-row" key={`${participantId}-${rowIndex}`}>
-                  <label className="identifier-list-input-wrapper">
-                    <span className="identifier-list-row-label">{`${props.rowLabel} ${rowIndex + 1}`}</span>
-                    <input
-                      aria-label={`${props.rowLabel} ${participantLabel} ${rowIndex + 1}`}
-                      className="identifier-list-input"
-                      type="text"
-                      value={rowValue.value}
-                      onBlur={() => commitParticipant(participantId, rows)}
-                      onChange={(event) => updateRow(participantId, rowIndex, { value: event.target.value })}
-                    />
-                  </label>
+                  <TextField
+                    className="identifier-list-input"
+                    label={`${props.rowLabel} ${rowIndex + 1}`}
+                    slotProps={{ htmlInput: { 'aria-label': `${props.rowLabel} ${participantLabel} ${rowIndex + 1}` } }}
+                    type="text"
+                    value={rowValue.value}
+                    onBlur={() => commitParticipant(participantId, rows)}
+                    onChange={(event) => updateRow(participantId, rowIndex, { value: event.target.value })}
+                  />
                   {props.showAssignmentTime ? (
-                    <label className="identifier-list-input-wrapper">
-                      <span className="identifier-list-row-label">Assignment time</span>
-                      <input
-                        aria-label={`Assignment time ${participantLabel} ${rowIndex + 1}`}
-                        className="identifier-list-input"
-                        type="datetime-local"
-                        value={rowValue.assignmentTime}
-                        onBlur={() => commitParticipant(participantId, rows)}
-                        onChange={(event) => updateRow(participantId, rowIndex, { assignmentTime: event.target.value })}
-                      />
-                    </label>
+                    <TextField
+                      className="identifier-list-input"
+                      label="Assignment time"
+                      slotProps={{ htmlInput: { 'aria-label': `Assignment time ${participantLabel} ${rowIndex + 1}` } }}
+                      type="datetime-local"
+                      value={rowValue.assignmentTime}
+                      onBlur={() => commitParticipant(participantId, rows)}
+                      onChange={(event) => updateRow(participantId, rowIndex, { assignmentTime: event.target.value })}
+                    />
                   ) : null}
-                  <button
+                  <Button
                     aria-label={`${props.removeButtonLabel} ${rowIndex + 1} for ${participantLabel}`}
                     className="identifier-list-remove-button"
                     disabled={!props.allowMultiple}
@@ -226,18 +223,18 @@ export const IdentifierListControl = (props: IdentifierListControlProps): React.
                     onMouseDown={(event) => event.preventDefault()}
                   >
                     ×
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
-            <button
+            <Button
               className="identifier-list-add-button"
               disabled={!props.allowMultiple && rows.length >= 1}
               type="button"
               onClick={() => addRow(participantId)}
             >
               {props.addButtonLabel}
-            </button>
+            </Button>
           </div>
         );
       })}

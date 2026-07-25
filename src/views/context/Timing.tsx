@@ -1,3 +1,4 @@
+import { MenuItem, TextField } from '@mui/material';
 import React from 'react';
 import { type EventCatalogState } from '../../catalog/eventCatalog.js';
 import { type FastestTimeIndicatorColors } from '../../app/systemConfig.js';
@@ -104,40 +105,50 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
     <>
       <h1>Timing</h1>
       <div className="timing-context-row">
-        <label className="page-filter-label">
-          Event
+        <div className="page-filter-label">
           <span className="timing-selection-select-row">
-            <select
-              aria-label="Timing Event"
+            <TextField
+              label="Event"
+              select
+              slotProps={{
+                select: {
+                  'aria-label': 'Timing Event',
+                },
+              }}
               value={props.timingEvent?.id || ''}
               onChange={(event) => props.onSelectEvent(event.target.value)}
             >
               {props.events.map((event: EventCatalogEvent) => (
-                <option key={event.id} value={event.id}>{event.name}</option>
+                <MenuItem key={event.id} value={event.id}>{event.name}</MenuItem>
               ))}
-            </select>
+            </TextField>
             {props.timingSelectionLoading ? (
               <InlineLoadingIndicator ariaLabel="Loading Timing event" />
             ) : null}
           </span>
-        </label>
-        <label className="page-filter-label">
-          Session
+        </div>
+        <div className="page-filter-label">
           <span className="timing-selection-select-row">
-            <select
-              aria-label="Timing Session"
+            <TextField
+              label="Session"
+              select
+              slotProps={{
+                select: {
+                  'aria-label': 'Timing Session',
+                },
+              }}
               value={props.timingSessionValue}
               onChange={(event) => props.onSelectSession(event.target.value)}
             >
               {sortedSessions.map((session) => (
-                <option key={session.id} value={session.id}>{formatTimingSessionOption(session)}{props.activeSession?.id === session.id ? ' (active)' : ''}</option>
+                <MenuItem key={session.id} value={session.id}>{formatTimingSessionOption(session)}{props.activeSession?.id === session.id ? ' (active)' : ''}</MenuItem>
               ))}
-            </select>
+            </TextField>
             {props.timingSelectionLoading ? (
               <InlineLoadingIndicator ariaLabel="Loading Timing session" />
             ) : null}
           </span>
-        </label>
+        </div>
       </div>
       <RecentRecords
         currentEventId={props.timingEvent?.id}

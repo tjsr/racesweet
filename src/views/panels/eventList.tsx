@@ -1,3 +1,4 @@
+import { Button } from '@mui/material';
 import React from 'react';
 import { type EventCatalogEvent } from '../../catalog/eventCatalog.js';
 import { type EventId } from '../../model/raceevent.js';
@@ -14,9 +15,9 @@ export const EventListPanel = (props: EventListPanelProps): React.ReactElement =
   <section className="events-panel events-list-panel">
     <div className="events-actions">
       <h2>Event List</h2>
-      <button type="button" onClick={() => props.onCreateEvent()}>
+      <Button type="button" onClick={() => props.onCreateEvent()}>
         New
-      </button>
+      </Button>
     </div>
     <div className="events-list" role="listbox" aria-label="Defined events">
       {props.events.map((event) => {

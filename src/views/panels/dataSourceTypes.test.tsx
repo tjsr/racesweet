@@ -1,29 +1,36 @@
 // @vitest-environment jsdom
 
-import { flushSync } from 'react-dom';
+import { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DataSourceTypesPanel } from './dataSourceTypes.js';
+
+declare global {
+  var IS_REACT_ACT_ENVIRONMENT: boolean | undefined;
+}
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('DataSourceTypesPanel', () => {
   let container: HTMLDivElement | undefined;
   let root: Root | undefined;
 
   afterEach(() => {
-    root?.unmount();
+    act(() => {
+      root?.unmount();
+    });
     container?.remove();
     root = undefined;
     container = undefined;
   });
 
-  it('renders the source type chooser and creates the selected source type', () => {
+  it('renders the source type chooser and creates the selected source type', async () => {
     const onCreateSource = vi.fn();
     const onChangeNewSourceType = vi.fn();
     container = document.createElement('div');
     document.body.append(container);
-    root = createRoot(container);
-
-    flushSync(() => {
+    act(() => {
+      root = createRoot(container!);
       root?.render(
         <DataSourceTypesPanel
           newSourceType="api-apical-excel-file"
@@ -35,18 +42,21 @@ describe('DataSourceTypesPanel', () => {
 
     expect(container.textContent).toContain('Data Source Type');
     expect(container.textContent).toContain('Add Data Source');
-    expect(container.textContent).toContain('MR-SCATS Data');
-    expect(container.textContent).toContain('Dorian CTC SRT / ERF File');
-    expect(container.textContent).toContain('DURT FileMaker Database');
+    const select = container.querySelector<HTMLElement>('[aria-label="New Data Source Type"]')!;
+    expect(select.getAttribute('role')).toBe('combobox');
+    expect(select.textContent).toContain('Apical Excel data');
 
-    expect(Array.from(container.querySelectorAll('option')).map((option) => option.value)).toContain('file-dorian-ctc-srt');
-    expect(Array.from(container.querySelectorAll('option')).map((option) => option.value)).toContain('file-durt-filemaker');
-
-    const select = container.querySelector('select[aria-label="New Data Source Type"]') as HTMLSelectElement;
-    expect(select.value).toBe('api-apical-excel-file');
-
-    select.value = 'file-racesweet-ledger';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await act(async () => {
+      select.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+    const options = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'));
+    expect(options.map((option) => option.textContent)).toContain('MR-SCATS Data');
+    expect(options.map((option) => option.textContent)).toContain('Dorian CTC SRT / ERF File');
+    expect(options.map((option) => option.textContent)).toContain('DURT FileMaker Database');
+    const ledgerOption = options.find((option) => option.textContent === 'RaceSweet Ledger')!;
+    await act(async () => {
+      ledgerOption.click();
+    });
     expect(onChangeNewSourceType).toHaveBeenCalledWith('file-racesweet-ledger');
 
     const button = Array.from(container.querySelectorAll('button')).find((element) => element.textContent === 'Add Data Source');
