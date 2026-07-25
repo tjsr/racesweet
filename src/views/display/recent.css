@@ -195,6 +195,22 @@
   z-index: 7;
 }
 
+.recent-records-table-container .MuiTableBody-root > .MuiTableRow-root:not(.recent-records-virtual-spacer-row),
+.recent-records-table-container .MuiTableBody-root > .MuiTableRow-root:not(.recent-records-virtual-spacer-row) > .MuiTableCell-root {
+  height: 2.25rem;
+  max-height: 2.25rem;
+}
+
+.recent-records-table-container .MuiTableBody-root > .MuiTableRow-root:not(.recent-records-virtual-spacer-row) > .MuiTableCell-root {
+  box-sizing: border-box;
+  overflow: hidden;
+  padding-bottom: 0;
+  padding-top: 0;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 .recent-records-timing-line-name {
   font-size: 0.72rem;
   line-height: 1.05;
