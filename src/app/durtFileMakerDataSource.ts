@@ -49,15 +49,16 @@ export const getDurtCompanionDatabasePaths = (sourceFilePath: string): Promise<s
     .catch((): string[] => []);
 };
 
-export const getBundledDurtFileMakerExtractorPath = (workspaceRoot: string = process.cwd()): string => {
+export const getBundledDurtFileMakerExtractorPath = (workspaceRoot: string = process.cwd(), architecture: NodeJS.Architecture = process.arch): string => {
+  const packageDirectory: string = architecture === 'arm64' ? 'fmptools-win32-arm64' : 'fmptools-win32-x64';
   if (process.resourcesPath) {
-    return path.join(process.resourcesPath, 'fmp2json.exe');
+    return path.join(process.resourcesPath, packageDirectory, 'fmp2json.exe');
   }
-  const installedPackagePath: string = path.join(workspaceRoot, 'node_modules', '@racesweet', 'fmptools-win32-x64', 'bin', 'fmp2json.exe');
+  const installedPackagePath: string = path.join(workspaceRoot, 'node_modules', '@racesweet', packageDirectory, 'bin', 'fmp2json.exe');
   if (existsSync(installedPackagePath)) {
     return installedPackagePath;
   }
-  return path.join(workspaceRoot, 'packages', 'fmptools-win32-x64', 'bin', 'fmp2json.exe');
+  return path.join(workspaceRoot, 'packages', packageDirectory, 'bin', 'fmp2json.exe');
 };
 
 export interface DurtFileMakerExtractor {

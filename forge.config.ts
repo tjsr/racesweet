@@ -18,7 +18,10 @@ const devServerPort = getRaceSweetServerPort();
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    extraResource: [path.resolve('packages', 'fmptools-win32-x64', 'bin', 'fmp2json.exe')],
+    extraResource: [
+      path.resolve('packages', 'fmptools-win32-arm64'),
+      path.resolve('packages', 'fmptools-win32-x64'),
+    ],
   },
   rebuildConfig: {},
   makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],

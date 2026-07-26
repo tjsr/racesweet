@@ -15,13 +15,19 @@ RaceSweet is an offline-capable event timing and results application. Its archit
 
 ## DURT FileMaker data source
 
-RaceSweet uses the bundled `fmp2json.exe` utility to extract tables from DURT FileMaker `.fp7` files. Build the Windows x64 utility with Docker:
+RaceSweet uses the bundled `fmp2json.exe` utility to extract tables from DURT FileMaker `.fp7` files. The Docker builder runs on Linux x64 and cross-compiles a Windows binary for the requested architecture, so an arm64 development CPU does not change the x64 output. Build the Windows x64 utility with Docker:
 
 ```powershell
 npm run build:fmptools:win32
 ```
 
-The executable is written to `packages\fmptools-win32-x64\bin\fmp2json.exe` beneath the repository root. In the DURT data source panel, this is the path to select when supplying an advanced extractor override. The default configuration uses this bundled executable automatically; packaged Electron builds copy it to the application resources directory.
+Build the native Windows arm64 utility separately with:
+
+```sh
+npm run build:fmptools:win32:arm64
+```
+
+The executables are written to `packages\fmptools-win32-x64\bin\fmp2json.exe` and `packages\fmptools-win32-arm64\bin\fmp2json.exe`. Each build verifies the PE machine type before succeeding. The app selects the matching binary at runtime; packaged Electron builds include both architecture-specific directories.
 
 ## Source layout and ownership
 

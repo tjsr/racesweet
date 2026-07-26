@@ -4,7 +4,11 @@ import { type DurtEventCatalogImportService, type DurtFileMakerExtractor, getBun
 
 describe('DURT FileMaker data source', () => {
   it('resolves the extractor from the Windows-only npm package', () => {
-    expect(getBundledDurtFileMakerExtractorPath('C:/RaceSweet')).toBe('C:\\RaceSweet\\packages\\fmptools-win32-x64\\bin\\fmp2json.exe');
+    expect(getBundledDurtFileMakerExtractorPath('C:/RaceSweet', 'x64')).toBe('C:\\RaceSweet\\packages\\fmptools-win32-x64\\bin\\fmp2json.exe');
+  });
+
+  it('resolves the arm64 extractor from its dedicated package', () => {
+    expect(getBundledDurtFileMakerExtractorPath('C:/RaceSweet', 'arm64')).toBe('C:\\RaceSweet\\packages\\fmptools-win32-arm64\\bin\\fmp2json.exe');
   });
 
   it('validates fmp2json output before converting it to race state', async () => {
