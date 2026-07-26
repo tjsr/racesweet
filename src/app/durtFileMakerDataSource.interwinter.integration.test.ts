@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createEventId, createSessionId } from '../model/ids.js';
 import { Session } from '../model/racestate.js';
+import { RECORD_TX_CROSSING } from '../model/timerecord.js';
 import { getBundledDurtFileMakerExtractorPath, loadDurtFileMakerRaceState } from './durtFileMakerDataSource.js';
 
 const interWinterDirectory: string = 'C:/Users/tim/OneDrive/Archived Timing/2013 InterWinter Round 3';
@@ -35,6 +36,8 @@ describe('DURT InterWinter FileMaker import', () => {
 
     expect(raceState.categories?.map((category) => category.name).sort()).toEqual(['A Grade', 'B Grade', 'C Grade', 'Women']);
     expect(raceState.participants).toHaveLength(198);
+    expect(raceState.records?.filter((record) => record.recordType === RECORD_TX_CROSSING)).toHaveLength(340);
+    expect(raceState.records?.filter((record) => record.recordType !== RECORD_TX_CROSSING)).toHaveLength(4);
     expect(durationFor('Russell', 'Nankervis')).toBe(10_902_000);
     expect(durationFor('Tasman', 'Nankervis')).toBe(11_092_000);
     expect(durationFor('Steven', 'Cusworth')).toBe(11_737_000);

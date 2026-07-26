@@ -62,6 +62,28 @@ const selectValue = async (element: HTMLSelectElement, value: string): Promise<v
   });
 };
 
+const getMuiSelect = (container: HTMLElement, label: string): HTMLElement => {
+  const select = container.querySelector<HTMLElement>(`[aria-label="${label}"]`);
+  if (!select) {
+    throw new Error(`Could not find MUI select with label ${label}.`);
+  }
+  return select;
+};
+
+const selectMuiOption = async (select: HTMLElement, optionText: string): Promise<void> => {
+  await act(async (): Promise<void> => {
+    select.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  });
+  const option = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'))
+    .find((candidate: HTMLElement) => candidate.textContent === optionText);
+  if (!option) {
+    throw new Error(`Could not find MUI select option ${optionText}.`);
+  }
+  await act(async (): Promise<void> => {
+    option.click();
+  });
+};
+
 describe('DURT Mt Beauty functional import', () => {
   useUiConsoleGuards();
   const runMtBeautyTest = hasMtBeautyFixture ? it : it.skip;
@@ -129,8 +151,8 @@ describe('DURT Mt Beauty functional import', () => {
       });
       const resultsTable = container.querySelector('table[aria-label="Results Table"]') as HTMLTableElement;
       expect(resultsTable.tBodies[0]?.rows).toHaveLength(importedEntrantIds.size);
-      const categorySelect = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
-      await selectValue(categorySelect, categories[0]!.id);
+      const categorySelect = getMuiSelect(container, 'Race View Category');
+      await selectMuiOption(categorySelect, categories[0]!.name);
       expect(resultsTable.tBodies[0]?.rows).toHaveLength(new Set(importedSession.participants
         .filter((participant) => participant.categoryId === categories[0]!.id)
         .map((participant) => participant.entrantId)).size);
@@ -138,7 +160,7 @@ describe('DURT Mt Beauty functional import', () => {
       await act(async (): Promise<void> => {
         root.render(<ReportsPage catalogEntries={getEntriesForEvent(catalog, event.id)} catalogEntrants={getEntrantsForEvent(catalog, event.id)} categories={categories} event={importedEvent} raceState={importedSession} />);
       });
-      await selectValue(container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement, 'lap-times');
+      await selectMuiOption(getMuiSelect(container, 'Reports View Type'), 'Lap Times');
       const participantSelect = container.querySelector('select[aria-label="Reports Participant"]') as HTMLSelectElement;
       const participantWithLaps = importedSession.participants.find((participant) => (importedSession.getParticipantLaps(participant.id) || []).some((lap) => (lap.lapNo || 0) > 0))!;
       const participantOption = Array.from(participantSelect.options).find((option) => (

@@ -920,10 +920,11 @@ export const RaceSweetMainApp = () => {
     const pulledRaceStates: Partial<RaceState>[] = [];
 
     for (const source of sources) {
-      if (source.type === 'file-mr-scats-data') {
+      switch (source.type) {
+      case 'file-mr-scats-data': {
         const locationPath = source.mrScatsConfig?.dataLocationPath;
         if (!locationPath) {
-          continue;
+          throw new Error(`Assigned MR-SCATS source "${source.name}" has no data location configured.`);
         }
 
         const mrScatsImport = await loadMrScatsCatalogFromLocation(locationPath, {
@@ -937,17 +938,50 @@ export const RaceSweetMainApp = () => {
             importedSession.categoryIds
           ));
         }
-        continue;
+        break;
       }
 
-      if (source.type !== 'api-apical-data-file' && source.type !== 'api-apical-excel-file') {
-        continue;
+      case 'file-durt-filemaker': {
+        const databaseFilePath = source.durtFileMakerConfig?.databaseFilePath;
+        if (!databaseFilePath) {
+          throw new Error(`Assigned DURT FileMaker source "${source.name}" has no database file configured.`);
+        }
+
+        pulledRaceStates.push(await loadDurtFileMakerRaceState({
+          eventId,
+          executablePath: source.durtFileMakerConfig?.extractorPath || getBundledDurtFileMakerExtractorPath(),
+          sessionId,
+          sourceFilePath: databaseFilePath,
+          timeZone: getEventTimeZone(eventId),
+        }));
+        break;
       }
 
-      pulledRaceStates.push(await pullApicalRaceState(source, eventId, {
-        localStorageDirectoryPath: systemConfigState.localStorageDirectoryPath,
-        timeZone: getEventTimeZone(eventId),
-      }));
+      case 'api-apical-data-file':
+      case 'api-apical-excel-file':
+        pulledRaceStates.push(await pullApicalRaceState(source, eventId, {
+          localStorageDirectoryPath: systemConfigState.localStorageDirectoryPath,
+          timeZone: getEventTimeZone(eventId),
+        }));
+        break;
+
+      case 'api-aws-sqs':
+      case 'api-http-request':
+      case 'file-apical-data-file':
+      case 'file-dorian-ctc-srt':
+      case 'file-racesweet-ledger':
+      case 'file-rfid-timing-csv':
+      case 'master-entrant-profiles':
+      case 'timing-dorian-data1-supernode':
+      case 'timing-mylaps-decoder':
+      case 'timing-rfid-decoder':
+        throw new Error(`Re-loading assigned source "${source.name}" (${source.type}) is not implemented.`);
+
+      default: {
+        const unsupportedSourceType: never = source.type;
+        throw new Error(`Re-loading assigned source "${source.name}" (${unsupportedSourceType}) is not implemented.`);
+      }
+      }
     }
 
     return mergePulledRaceStates(pulledRaceStates);
@@ -996,6 +1030,7 @@ export const RaceSweetMainApp = () => {
       sessionId,
     });
     await adminService?.applyChangesToSessionById(targetSessionState, sessionId);
+    updateEventCatalogState(catalog, eventId, sessionId, selectedCategoryId);
 
     if (eventCatalogState?.activeEventId === eventId && eventCatalogState.activeSessionId === sessionId) {
       setSessionState(targetSessionState);
@@ -1009,7 +1044,6 @@ export const RaceSweetMainApp = () => {
     if (missingCategoryWarnings.length > 0) {
       setLoadWarnings((warnings) => Array.from(new Set([...warnings, ...missingCategoryWarnings])));
     }
-    updateEventCatalogState(catalog, eventId, sessionId, selectedCategoryId);
     setRenderTick((tick) => tick + 1);
     return reloadSummary;
   };

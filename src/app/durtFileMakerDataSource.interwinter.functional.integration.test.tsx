@@ -10,6 +10,7 @@ import { createSeedEventCatalogLedger } from '../ledger/createSeedEventCatalogLe
 import type { EventCatalogLedger } from '../ledger/eventCatalogLedger.js';
 import { createEventId, createSessionId } from '../model/ids.js';
 import { type RaceState, Session } from '../model/racestate.js';
+import { RECORD_TX_CROSSING } from '../model/timerecord.js';
 import type { EventCatalogPersistence } from '../persistence/eventCatalogPersistence.js';
 import { EventCatalogService } from '../service/eventCatalogService.js';
 import { applyPulledRaceStateToSession } from '../service/sourceApplication.js';
@@ -52,6 +53,28 @@ const selectValue = async (element: HTMLSelectElement, value: string): Promise<v
   await act(async (): Promise<void> => {
     element.value = value;
     element.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+};
+
+const getMuiSelect = (container: HTMLElement, label: string): HTMLElement => {
+  const select = container.querySelector<HTMLElement>(`[aria-label="${label}"]`);
+  if (!select) {
+    throw new Error(`Could not find MUI select with label ${label}.`);
+  }
+  return select;
+};
+
+const selectMuiOption = async (select: HTMLElement, optionText: string): Promise<void> => {
+  await act(async (): Promise<void> => {
+    select.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  });
+  const option = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'))
+    .find((candidate: HTMLElement) => candidate.textContent === optionText);
+  if (!option) {
+    throw new Error(`Could not find MUI select option ${optionText}.`);
+  }
+  await act(async (): Promise<void> => {
+    option.click();
   });
 };
 
@@ -141,6 +164,7 @@ describe('DURT InterWinter functional import', () => {
           />,
         );
       });
+      expect(importedSession.records.filter((record) => record.recordType === RECORD_TX_CROSSING)).toHaveLength(340);
       expect(container.querySelectorAll('tr[data-record-id]').length).toBeGreaterThan(0);
 
       await act(async (): Promise<void> => {
@@ -156,13 +180,13 @@ describe('DURT InterWinter functional import', () => {
       });
       const resultsTable = container.querySelector('table[aria-label="Results Table"]') as HTMLTableElement;
       expect(resultsTable.tBodies[0]?.rows).toHaveLength(importedSession.participants.length);
-      const categorySelect = container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement;
+      const categorySelect = getMuiSelect(container, 'Race View Category');
       for (const category of importedSession.categories) {
-        await selectValue(categorySelect, category.id);
+        await selectMuiOption(categorySelect, category.name);
         const expectedRiderCount = importedSession.participants.filter((participant) => participant.categoryId === category.id).length;
         expect(resultsTable.tBodies[0]?.rows).toHaveLength(expectedRiderCount);
       }
-      await selectValue(categorySelect, aGrade.id);
+      await selectMuiOption(categorySelect, aGrade.name);
       const aGradeResultRows = Array.from(resultsTable.tBodies[0]!.rows).map((row) => row.textContent || '');
       expect(aGradeResultRows).toHaveLength(aGradeRiders.length);
       expect(aGradeResultRows.slice(0, 3)).toEqual([
@@ -182,8 +206,8 @@ describe('DURT InterWinter functional import', () => {
           />,
         );
       });
-      const reportTypeSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
-      await selectValue(reportTypeSelect, 'lap-times');
+      const reportTypeSelect = getMuiSelect(container, 'Reports View Type');
+      await selectMuiOption(reportTypeSelect, 'Lap Times');
       const participantSelect = container.querySelector('select[aria-label="Reports Participant"]') as HTMLSelectElement;
       const russellOption = Array.from(participantSelect.options).find((option) => option.textContent?.includes('Russell NANKERVIS'))!;
       await selectValue(participantSelect, russellOption.value);
