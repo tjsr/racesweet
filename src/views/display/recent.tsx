@@ -700,6 +700,7 @@ interface RecentRecordRowProps<RecordType extends EventTimeRecord = EventTimeRec
   selectedCategories?: Set<EventCategoryId>;
   selectedPlateNumber?: string;
   selectedParticipants?: Set<EventParticipantId>;
+  preserveSelectedParticipantSelection?: boolean;
   sessionValidCategoryIds?: Set<EventCategoryId>;
   categorySelected?: ((ids: Set<EventCategoryId>) => void) | undefined;
   participantSelected?: ((participantId: Set<EventParticipantId>) => void) | undefined;
@@ -1380,6 +1381,13 @@ const RecordRowComponent = (props: RecentRecordRowProps) => {
       }
 
       if (props.selectedParticipants?.has(selectionParticipant.id)) {
+        if (
+          props.preserveSelectedParticipantSelection &&
+          props.selectedRecordId !== undefined &&
+          props.selectedRecordId !== passingRecord.id
+        ) {
+          return;
+        }
         props.onSelectRecord?.(undefined);
         if (props.participantSelected !== undefined) {
           props.participantSelected(new Set<EventParticipantId>());
@@ -1493,6 +1501,7 @@ const recordRowPropsAreEqual = (previousProps: RecentRecordRowProps, nextProps: 
     previousProps.selectedCategoryKey === nextProps.selectedCategoryKey &&
     previousProps.selectedParticipantKey === nextProps.selectedParticipantKey &&
     previousProps.selectedPlateNumber === nextProps.selectedPlateNumber &&
+    previousProps.preserveSelectedParticipantSelection === nextProps.preserveSelectedParticipantSelection &&
     previousProps.sessionValidCategoryIds === nextProps.sessionValidCategoryIds &&
     previousProps.categorySelected === nextProps.categorySelected &&
     previousProps.participantSelected === nextProps.participantSelected &&
@@ -3235,6 +3244,7 @@ export const RecentRecords = (props: RecordsProps & {
                       selectedPlateNumber={rowSelectionState.selectedPlateNumber}
                       selectedParticipants={rowSelectionState.selectedParticipants}
                       selectedParticipantKey={rowSelectionState.selectedParticipantKey}
+                      preserveSelectedParticipantSelection={filterMode === 'participant'}
                       sessionValidCategoryIds={props.sessionValidCategoryIds}
                       categorySelected={handleCategorySelected}
                       participantSelected={handleParticipantSelected}

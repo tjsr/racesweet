@@ -2080,6 +2080,16 @@ describe('RecentRecords integration', () => {
       source: 'test-source',
       time: new Date(`2026-05-29T10:0${index + 1}:00.000Z`),
     }) as ParticipantPassingRecord);
+    const selectedRiderSecondCrossing: ParticipantPassingRecord = {
+      chipCode: 100105,
+      id: '2005',
+      isValid: true,
+      participantId: teamMemberOne.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 5,
+      source: 'test-source',
+      time: new Date('2026-05-29T10:05:30.000Z'),
+    } as ParticipantPassingRecord;
     const flagRecord: FlagRecord = {
       categoryIds: [categoryC.id],
       flagType: 'yellow',
@@ -2111,18 +2121,30 @@ describe('RecentRecords integration', () => {
       updateParticipantCategory: () => undefined,
     };
 
+    const Harness = (): React.ReactElement => {
+      const [selectedCategories, setSelectedCategories] = React.useState<Set<EventCategory['id']>>(new Set());
+      const [selectedParticipants, setSelectedParticipants] = React.useState<Set<EventParticipant['id']>>(new Set());
+
+      const handleParticipantSelected = (participantIds: Set<EventParticipant['id']>): void => {
+        setSelectedParticipants(participantIds);
+        setSelectedCategories(selectedCategoriesForParticipants(participantIds, raceStateLookup.getParticipantById));
+      };
+
+      return <RecentRecords
+        categorySelected={setSelectedCategories}
+        participantSelected={handleParticipantSelected}
+        raceStateLookup={raceStateLookup}
+        records={[...crossings, selectedRiderSecondCrossing, flagRecord]}
+        selectedCategories={selectedCategories}
+        selectedParticipants={selectedParticipants}
+      />;
+    };
+
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[...crossings, flagRecord]}
-          selectedCategories={new Set([categoryA.id])}
-          selectedParticipants={new Set([teamMemberOne.id])}
-        />
-      );
+      root.render(<Harness />);
     });
 
-    const allRecordIds = ['2001', '2002', '2003', '2004', 'flag-only'];
+    const allRecordIds = ['2001', '2002', '2003', '2004', 'flag-only', '2005'];
     expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
 
     await selectRecentRecordsFilter('Only flags');
@@ -2141,20 +2163,35 @@ describe('RecentRecords integration', () => {
     expect(container.querySelector('tr[data-record-id="flag-only"]')?.className).toContain('selected-row');
     expect(scrollTo).toHaveBeenCalled();
 
+    const initiallySelectedParticipantRow = container.querySelector('tr[data-record-id="2001"]');
+    expect(initiallySelectedParticipantRow).not.toBeNull();
+    await act(async () => {
+      initiallySelectedParticipantRow!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
     await selectRecentRecordsFilter('Only selected category');
-    expect(getDisplayedRecordIds(container)).toEqual(['2001', '2002']);
+    expect(getDisplayedRecordIds(container)).toEqual(['2001', '2002', '2005']);
 
     await selectRecentRecordsFilter('All records');
     expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
 
     await selectRecentRecordsFilter('Only selected driver');
-    expect(getDisplayedRecordIds(container)).toEqual(['2001']);
+    expect(getDisplayedRecordIds(container)).toEqual(['2001', '2005']);
+
+    const secondSelectedParticipantRow = container.querySelector('tr[data-record-id="2005"]');
+    expect(secondSelectedParticipantRow).not.toBeNull();
+    await act(async () => {
+      secondSelectedParticipantRow!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(getDisplayedRecordIds(container)).toEqual(['2001', '2005']);
+    expect(secondSelectedParticipantRow!.className).toContain('selected-row');
 
     await selectRecentRecordsFilter('All records');
     expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
 
     await selectRecentRecordsFilter('Only selected team');
-    expect(getDisplayedRecordIds(container)).toEqual(['2001', '2002']);
+    expect(getDisplayedRecordIds(container)).toEqual(['2001', '2002', '2005']);
 
     await selectRecentRecordsFilter('All records');
     expect(getDisplayedRecordIds(container)).toEqual(allRecordIds);
