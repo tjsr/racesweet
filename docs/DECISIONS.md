@@ -22,6 +22,10 @@ Too often services either lock the owners data behind their service, or in the e
 
 ## Testing coverage policy
 
+## MUI controls for new UI work
+
+All new interactive controls use Material UI components. This keeps keyboard behaviour, focus treatment, validation presentation, and visual consistency aligned across RaceSweet. A raw HTML control is permitted only when MUI cannot provide an accessible equivalent, and the exception must be documented in this decision record.
+
 All feature work should include automated tests that cover create, update, and delete behavior where that behavior exists.
 
 Required coverage for feature changes:

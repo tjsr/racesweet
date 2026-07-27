@@ -222,6 +222,29 @@ describe('SystemPage integration', () => {
     expect(onSaveFastestTimeIndicatorColors).toHaveBeenCalledWith({ sessionFastestTime: '#123456' });
   });
 
+  it('groups system configuration panels into the requested column layout', async () => {
+    await act(async () => {
+      root.render(
+        <SystemPage
+          config={config}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={vi.fn()}
+          onReprocessApicalData={vi.fn()}
+          onSaveLocalStorageDirectoryPath={vi.fn()}
+          onSaveSource={vi.fn()}
+        />,
+      );
+    });
+
+    const systemConfigurationGrid = container.querySelector('.system-configuration-grid');
+    expect(systemConfigurationGrid).toBeTruthy();
+    expect(systemConfigurationGrid?.querySelector('.system-configuration-grid__server [aria-label="RaceSweet server"]')).toBeTruthy();
+    expect(systemConfigurationGrid?.querySelector('.system-configuration-grid__storage')).toHaveTextContent('Local storage location');
+    expect(systemConfigurationGrid?.querySelector('.system-configuration-grid__fastest-time-indicators')).toHaveTextContent('Fastest time indicators');
+  });
+
   it('shows the application error log in a read-only textarea below configured data sources', async () => {
     const displayedErrorLog = [
       '[2026-06-23T01:02:03.004Z] Application',

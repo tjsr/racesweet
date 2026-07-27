@@ -1,5 +1,5 @@
 import React from 'react';
-import { type DataSourceConfig, type DataSourceType, type SystemConfiguration } from '../../app/systemConfig.js';
+import { type DataSourceConfig, type DataSourceType, type ListenerServerConfig, type RemoteServerConfig, type SystemConfiguration } from '../../app/systemConfig.js';
 import { getRuntimeVersions } from '../../app/versionInfo.js';
 import { TimeRecordSourceId } from '../../model/types.js';
 import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
@@ -11,6 +11,7 @@ import { LocalStorageLocationPanel } from '../panels/localStorageLocation.js';
 import { LogPanel } from '../panels/log.js';
 import { RaceSweetLogo } from '../panels/RaceSweetLogo.js';
 import { RuntimeInformationPanel } from '../panels/runtimeInformation.js';
+import { ServerConfigurationPanel } from '../panels/serverConfigurationPanel.js';
 
 interface SystemPageProps {
   config: SystemConfiguration;
@@ -30,6 +31,9 @@ interface SystemPageProps {
   onPreviewDorianCtcSrtFile?: (sourceId: TimeRecordSourceId) => Promise<MrScatsDataFilePreview>;
   onSaveFastestTimeIndicatorColors?: (changes: Partial<SystemConfiguration['fastestTimeIndicatorColors']>) => void | Promise<void>;
   onSaveLocalStorageDirectoryPath: (directoryPath: string) => void | Promise<void>;
+  onSaveListenerServer?: (changes: Partial<ListenerServerConfig>) => void | Promise<void>;
+  onSaveRemoteServer?: (changes: Partial<RemoteServerConfig>) => void | Promise<void>;
+  onSelectCertificateFile?: () => Promise<string | undefined>;
   onSaveSource: (sourceId: TimeRecordSourceId, changes: Partial<DataSourceConfig>) => void | Promise<void>;
   onSelectMrScatsDataArchive?: () => Promise<MrScatsDataFileInventory | undefined>;
   onSelectMrScatsDataDirectory?: () => Promise<MrScatsDataFileInventory | undefined>;
@@ -38,6 +42,7 @@ interface SystemPageProps {
   onSelectDorianCtcTrackConfigFile?: () => Promise<string | undefined>;
   onSelectDurtFileMakerDatabase?: () => Promise<string | undefined>;
   onSelectDurtFileMakerExtractor?: () => Promise<string | undefined>;
+  onSelectPrivateKeyFile?: () => Promise<string | undefined>;
 }
 
 export const SystemPage = (props: SystemPageProps): React.ReactElement => {
@@ -53,14 +58,30 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         <RaceSweetLogo className="system-runtime-summary__logo" />
       </div>
 
-      <LocalStorageLocationPanel
-        localStorageDirectoryPath={props.config.localStorageDirectoryPath}
-        onSaveLocalStorageDirectoryPath={props.onSaveLocalStorageDirectoryPath}
-      />
-      <FastestTimeIndicatorsPanel
-        colors={props.config.fastestTimeIndicatorColors}
-        onSaveFastestTimeIndicatorColors={props.onSaveFastestTimeIndicatorColors || (() => undefined)}
-      />
+      <div className="system-configuration-grid">
+        <div className="system-configuration-grid__server">
+          <ServerConfigurationPanel
+            listenerServer={props.config.listenerServer}
+            onSaveListenerServer={props.onSaveListenerServer || (() => undefined)}
+            onSaveRemoteServer={props.onSaveRemoteServer || (() => undefined)}
+            onSelectCertificateFile={props.onSelectCertificateFile}
+            onSelectPrivateKeyFile={props.onSelectPrivateKeyFile}
+            remoteServer={props.config.remoteServer}
+          />
+        </div>
+        <div className="system-configuration-grid__storage">
+          <LocalStorageLocationPanel
+            localStorageDirectoryPath={props.config.localStorageDirectoryPath}
+            onSaveLocalStorageDirectoryPath={props.onSaveLocalStorageDirectoryPath}
+          />
+        </div>
+        <div className="system-configuration-grid__fastest-time-indicators">
+          <FastestTimeIndicatorsPanel
+            colors={props.config.fastestTimeIndicatorColors}
+            onSaveFastestTimeIndicatorColors={props.onSaveFastestTimeIndicatorColors || (() => undefined)}
+          />
+        </div>
+      </div>
 
       <DataSourcesPanel
         dataSources={props.config.dataSources}
@@ -86,7 +107,6 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         onSelectDurtFileMakerDatabase={props.onSelectDurtFileMakerDatabase}
         onSelectDurtFileMakerExtractor={props.onSelectDurtFileMakerExtractor}
       />
-
       <LogPanel displayedErrorLog={props.displayedErrorLog} />
     </section>
   );

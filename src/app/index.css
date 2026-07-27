@@ -141,6 +141,22 @@
   margin: 0;
 }
 
+.system-configuration-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.system-configuration-grid__server {
+  grid-column: span 2;
+}
+
+.system-configuration-grid__fastest-time-indicators,
+.system-configuration-grid__storage,
+.system-configuration-grid__server {
+  min-width: 0;
+}
+
 .loading-progress__header {
   align-items: baseline;
   display: flex;
@@ -910,8 +926,13 @@
 
 @media (max-width: 640px) {
   .loading-progress-layout,
+  .system-configuration-grid,
   .system-runtime-summary {
     grid-template-columns: 1fr;
+  }
+
+  .system-configuration-grid__server {
+    grid-column: auto;
   }
 
   .loading-progress__logo,

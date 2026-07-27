@@ -123,6 +123,18 @@ export interface TimingContextSelectionConfig {
   sessionId?: SessionId;
 }
 
+export interface ListenerServerConfig {
+  certificatePath?: string;
+  enabled: boolean;
+  httpPort?: number;
+  httpsPort?: number;
+  privateKeyPath?: string;
+}
+
+export interface RemoteServerConfig {
+  baseUrl?: string;
+}
+
 export interface SystemConfiguration {
   apicalListedEvents?: ApicalListedEvent[];
   dataSources: DataSourceConfig[];
@@ -130,6 +142,8 @@ export interface SystemConfiguration {
   eventSourceAssignments: Record<string, string[]>;
   fastestTimeIndicatorColors: FastestTimeIndicatorColors;
   localStorageDirectoryPath: string;
+  listenerServer?: ListenerServerConfig;
+  remoteServer?: RemoteServerConfig;
   schemaVersion: 1;
   sessionSourceAssignments: Record<string, SessionSourceAssignment>;
   timingContextSelection: TimingContextSelectionConfig;
@@ -160,12 +174,38 @@ export const createDefaultSystemConfiguration = (): SystemConfiguration => ({
   eventSourceAssignments: {},
   fastestTimeIndicatorColors: DEFAULT_FASTEST_TIME_INDICATOR_COLORS,
   localStorageDirectoryPath: DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH,
+  listenerServer: { enabled: false },
+  remoteServer: {},
   schemaVersion: 1,
   sessionSourceAssignments: {},
   timingContextSelection: {
     selectionMode: 'active',
   },
 });
+
+const normalizePort = (port: number | undefined): number | undefined => (
+  Number.isInteger(port) && port! > 0 && port! <= 65535 ? port : undefined
+);
+
+const normalizeListenerServerConfig = (config: ListenerServerConfig | undefined): ListenerServerConfig => ({
+  certificatePath: normalizeOptionalSystemFilePath(config?.certificatePath),
+  enabled: config?.enabled === true,
+  httpPort: normalizePort(config?.httpPort),
+  httpsPort: normalizePort(config?.httpsPort),
+  privateKeyPath: normalizeOptionalSystemFilePath(config?.privateKeyPath),
+});
+
+const normalizeRemoteServerConfig = (config: RemoteServerConfig | undefined): RemoteServerConfig => {
+  const baseUrl = config?.baseUrl?.trim();
+  if (!baseUrl) {
+    return {};
+  }
+  try {
+    return { baseUrl: new URL(baseUrl).toString().replace(/\/$/, '') };
+  } catch {
+    return {};
+  }
+};
 
 const normalizeLocalStorageDirectoryPath = (
   directoryPath: string | undefined,
@@ -336,6 +376,8 @@ export const normalizeSystemConfiguration = (
       ...(config.fastestTimeIndicatorColors || {}),
     },
     localStorageDirectoryPath: normalizeLocalStorageDirectoryPath(config.localStorageDirectoryPath, config.apicalExcelCacheDirectoryPath),
+    listenerServer: normalizeListenerServerConfig(config.listenerServer),
+    remoteServer: normalizeRemoteServerConfig(config.remoteServer),
     schemaVersion: 1,
     sessionSourceAssignments: config.sessionSourceAssignments || {},
     timingContextSelection: normalizeTimingContextSelection(config.timingContextSelection),

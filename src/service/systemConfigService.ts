@@ -4,6 +4,8 @@ import {
     APICAL_DEFAULT_SOURCE_NAME,
     type DataSourceConfig,
     type DataSourceType,
+    type ListenerServerConfig,
+    type RemoteServerConfig,
     type SessionSourceAssignment,
     type SystemConfiguration,
     type TimingContextSelectionConfig,
@@ -150,6 +152,24 @@ export class SystemConfigService {
   }
 
   public get state(): SystemConfiguration {
+    return this.config;
+  }
+
+  public async updateListenerServer(changes: Partial<ListenerServerConfig>): Promise<SystemConfiguration> {
+    this.config = normalizeSystemConfiguration({
+      ...this.config,
+      listenerServer: { enabled: false, ...this.config.listenerServer, ...changes },
+    });
+    await this.persist();
+    return this.config;
+  }
+
+  public async updateRemoteServer(changes: Partial<RemoteServerConfig>): Promise<SystemConfiguration> {
+    this.config = normalizeSystemConfiguration({
+      ...this.config,
+      remoteServer: { ...this.config.remoteServer, ...changes },
+    });
+    await this.persist();
     return this.config;
   }
 

@@ -1,6 +1,7 @@
 import { Component, type ReactElement, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { validate as validateUuid } from 'uuid';
 import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getEntriesForEvent, getEventDisciplineLabels, getSessionsForEvent } from '../catalog/eventCatalog.ts';
+import { ReplicaListenerServer } from './replicaListenerServer.ts';
 import { fetchApicalEvents } from '../processing/apical/getResultListJson.ts';
 import { CategoryId } from '../processing/category.ts';
 import { type LoadingMetricsState, getLoadingMetricsSnapshot, incrementLoadingMetric, resetLoadingMetrics, subscribeLoadingMetrics } from '../loadingMetrics.ts';
@@ -380,9 +381,35 @@ export const RaceSweetMainApp = () => {
   const [activeSection, setActiveSection] = useState<AppSection>('System');
   const [adminService, setAdminService] = useState<RaceAdminService|undefined>(undefined);
   const [eventCatalogService, setEventCatalogService] = useState<EventCatalogService|undefined>(undefined);
+  const listenerServerRef = useRef<ReplicaListenerServer | undefined>(undefined);
   const [eventCatalogState, setEventCatalogState] = useState<EventCatalogState|undefined>(undefined);
   const [systemConfigService, setSystemConfigService] = useState<SystemConfigService|undefined>(undefined);
   const [systemConfigState, setSystemConfigState] = useState<SystemConfiguration>(createDefaultSystemConfiguration());
+
+  useEffect(() => {
+    if (!eventCatalogService) {
+      return undefined;
+    }
+    const listenerServer = listenerServerRef.current || new ReplicaListenerServer({
+      appendRemoteMutations: (mutations) => eventCatalogService.applyRemoteMutations(mutations).then((catalog) => {
+        setEventCatalogState(catalog);
+      }),
+      getMutationsAfter: (cursor) => {
+        const offset = Number.parseInt(cursor || '0', 10);
+        const mutations = eventCatalogService.mutations;
+        return {
+          cursor: mutations.length.toString(),
+          mutations: mutations.slice(Number.isSafeInteger(offset) && offset >= 0 ? offset : 0),
+        };
+      },
+    });
+    listenerServerRef.current = listenerServer;
+    listenerServer.reload(systemConfigState.listenerServer || { enabled: false }).catch((error: unknown) => setErrorState(error as Error));
+    return () => {
+      void listenerServer.close();
+      listenerServerRef.current = undefined;
+    };
+  }, [eventCatalogService, systemConfigState.listenerServer]);
   const [sessionState, setSessionState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [, setRenderTick] = useState(0);
   const [errorState, setErrorState] = useState<Error|undefined>(undefined);
@@ -1995,6 +2022,24 @@ export const RaceSweetMainApp = () => {
 
             saveSource().catch((error: unknown) => setErrorState(error as Error));
           }}
+          onSaveListenerServer={(changes) => {
+            if (!systemConfigService) {
+              return;
+            }
+            const persistChanges = (): Promise<void> => systemConfigService.updateListenerServer(changes)
+              .then(updateSystemConfigState);
+            if (changes.enabled === false && listenerServerRef.current) {
+              listenerServerRef.current.close().then(persistChanges).catch((error: unknown) => setErrorState(error as Error));
+              return;
+            }
+            persistChanges().catch((error: unknown) => setErrorState(error as Error));
+          }}
+          onSaveRemoteServer={(changes) => {
+            if (!systemConfigService) {
+              return;
+            }
+            systemConfigService.updateRemoteServer(changes).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+          }}
           onLoadDurtFileMakerDatabase={(sourceId, onProgress) => {
             if (!eventCatalogService || !systemConfigService) {
               return;
@@ -2110,6 +2155,10 @@ export const RaceSweetMainApp = () => {
               title: 'Select Dorian CTC SRT or ERF file',
             });
           }}
+          onSelectCertificateFile={() => window.api.selectLocalFile({
+            filters: [{ extensions: ['cer', 'crt', 'pem'], name: 'SSL certificate files' }],
+            title: 'Select SSL certificate file',
+          })}
           onSelectDorianCtcTrackConfigFile={() => {
             return window.api.selectLocalFile({
               filters: [{ extensions: ['cfg'], name: 'CTC TRACK.CFG files' }],
@@ -2123,6 +2172,10 @@ export const RaceSweetMainApp = () => {
           onSelectDurtFileMakerExtractor={() => window.api.selectLocalFile({
             filters: [{ extensions: ['exe'], name: 'fmp2json executable' }],
             title: 'Select fmp2json extractor',
+          })}
+          onSelectPrivateKeyFile={() => window.api.selectLocalFile({
+            filters: [{ extensions: ['key', 'pem'], name: 'SSL private key files' }],
+            title: 'Select SSL private key file',
           })}
           onSelectMrScatsDataArchive={() => {
             return window.api.selectLocalFile({

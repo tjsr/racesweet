@@ -326,6 +326,11 @@ describe('CategoriesPage integration', () => {
     const excludeFromResultsInput = container.querySelector('input[aria-label="Category Exclude From Results"]') as HTMLInputElement;
     const teamGenderRulesInput = container.querySelector('textarea[aria-label="Category Team Gender Rules"]') as HTMLTextAreaElement;
     const sessionAssignmentsInput = container.querySelector('select[aria-label="Category Session Assignments"]') as HTMLSelectElement;
+    expect(maxTeamSizeInput.inputMode).toBe('numeric');
+    expect(minRiderAgeInput.inputMode).toBe('numeric');
+    expect(maxRiderAgeInput.inputMode).toBe('numeric');
+    expect(container.querySelector('label[for="category-min-rider-age"]')?.textContent).toBe('Minimum Rider Age');
+    expect(container.querySelector('label[for="category-max-rider-age"]')?.textContent).toBe('Maximum Rider Age');
     await act(async () => {
       setInputValue(categoryNameInput, 'Development Cup');
       distanceRuleTypeInput.value = 'time';

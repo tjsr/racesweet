@@ -1,6 +1,7 @@
-import { Button, Checkbox, FormControlLabel, TextField } from '@mui/material';
+import { Button, Checkbox, FormControlLabel, Stack, TextField, Typography } from '@mui/material';
 import React from 'react';
 import { type CategoryDistanceRule, type EventCatalogCategory } from '../../catalog/eventCatalog.js';
+import { NumericInput } from '../../controls/numericInput.js';
 import { type SessionId } from '../../model/raceevent.js';
 import { type CategoryDraft } from '../display/categoriesPage.js';
 
@@ -17,9 +18,20 @@ export const CategoryDetailsPanel = (props: CategoryDetailsPanelProps): React.Re
     <TextField fullWidth label="Distance Type" select slotProps={{ select: { 'aria-label': 'Category Distance Rule Type', native: true } }} value={props.categoryDraft.distanceRuleKind} onChange={(event) => update('distanceRuleKind', event.target.value as CategoryDistanceRule['kind'])}><option value="unspecified">Unspecified</option><option value="time">Time</option><option value="laps">Laps</option></TextField>
     {props.categoryDraft.distanceRuleKind !== 'unspecified' ? <TextField fullWidth label="Distance Value" placeholder={props.categoryDraft.distanceRuleKind === 'time' ? '45 or 1:30' : '12'} slotProps={{ htmlInput: { 'aria-label': 'Category Distance Rule Value' } }} value={props.categoryDraft.distanceRuleValue} onChange={(event) => update('distanceRuleValue', event.target.value)} /> : null}
     <TextField fullWidth label="Entrant Identity" select slotProps={{ select: { 'aria-label': 'Category Entrant Identity', native: true } }} value={props.categoryDraft.identityMode} onChange={(event) => update('identityMode', event.target.value as 'single' | 'multiple')}><option value="single">Single identity</option><option value="multiple">Multiple identity</option></TextField>
-    <TextField fullWidth label="Max Team Size" slotProps={{ htmlInput: { 'aria-label': 'Category Max Team Size' } }} type="number" value={props.categoryDraft.maxTeamSize} onChange={(event) => update('maxTeamSize', event.target.value)} />
-    <TextField fullWidth label="Minimum Rider Age" slotProps={{ htmlInput: { 'aria-label': 'Category Min Rider Age' } }} type="number" value={props.categoryDraft.minRiderAge} onChange={(event) => update('minRiderAge', event.target.value)} />
-    <TextField fullWidth label="Maximum Rider Age" slotProps={{ htmlInput: { 'aria-label': 'Category Max Rider Age' } }} type="number" value={props.categoryDraft.maxRiderAge} onChange={(event) => update('maxRiderAge', event.target.value)} />
+    <Stack spacing={1}>
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+        <Typography component="label" htmlFor="category-max-team-size">Max Team Size</Typography>
+        <NumericInput ariaLabel="Category Max Team Size" id="category-max-team-size" onChange={(value) => update('maxTeamSize', value)} value={props.categoryDraft.maxTeamSize} />
+      </Stack>
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+        <Typography component="label" htmlFor="category-min-rider-age">Minimum Rider Age</Typography>
+        <NumericInput ariaLabel="Category Min Rider Age" id="category-min-rider-age" onChange={(value) => update('minRiderAge', value)} value={props.categoryDraft.minRiderAge} />
+      </Stack>
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+        <Typography component="label" htmlFor="category-max-rider-age">Maximum Rider Age</Typography>
+        <NumericInput ariaLabel="Category Max Rider Age" id="category-max-rider-age" onChange={(value) => update('maxRiderAge', value)} value={props.categoryDraft.maxRiderAge} />
+      </Stack>
+    </Stack>
     <TextField fullWidth label="Team Gender Rules" multiline placeholder="female:1:2; male:1:3" slotProps={{ htmlInput: { 'aria-label': 'Category Team Gender Rules' } }} value={props.categoryDraft.teamCompositionRules} onChange={(event) => update('teamCompositionRules', event.target.value)} />
     <TextField fullWidth label="Session Assignments" select slotProps={{ select: { 'aria-label': 'Category Session Assignments', multiple: true, native: true } }} value={props.categoryDraft.sessionIds.filter((sessionId) => props.eventSessions.some((session) => session.id === sessionId))} onChange={(event) => update('sessionIds', Array.from((event.target as unknown as HTMLSelectElement).selectedOptions).map((option) => option.value))}>{props.eventSessions.map((session) => <option key={session.id} value={session.id}>{session.name}</option>)}</TextField>
     <div className="events-actions"><div className="category-save-status"><Button onClick={() => props.onSaveCategory()} variant="contained">Save Category</Button>{props.formError ? <div className="error category-save-error" role="alert"><span className="warning-icon" aria-hidden="true">!</span><p>{props.formError}</p></div> : null}</div><Button color="error" onClick={() => props.onDeleteCategory()} variant="outlined">Delete Category</Button><span className="category-id-display">Category ID: {props.selectedCategory.id.toString()}</span></div>{props.warningModal}

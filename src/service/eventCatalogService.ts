@@ -2061,6 +2061,10 @@ export class EventCatalogService {
     return this.state;
   }
 
+  public get mutations(): EventCatalogMutation[] {
+    return [...this.ledger.mutations];
+  }
+
   public async applyRemoteMutations(
     mutations: EventCatalogMutation[],
   ): Promise<EventCatalogState> {
