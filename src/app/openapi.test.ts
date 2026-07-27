@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getOpenApiSpecification } from './openapi.js';
-import { getSwaggerUiHtml } from './replicaListenerServer.js';
+import { getSwaggerUiHtml, getSwaggerUiInit } from './replicaListenerServer.js';
 
 describe('RaceSweet OpenAPI documentation', () => {
   it('documents the mutation replication resource and its request and response contracts', () => {
@@ -18,8 +18,8 @@ describe('RaceSweet OpenAPI documentation', () => {
   it('generates a base-page Swagger UI that loads the published OpenAPI document', () => {
     const html = getSwaggerUiHtml();
 
-    expect(html).toContain('/openapi.json');
     expect(html).toContain('/swagger-ui/swagger-ui.css');
     expect(html).toContain('/swagger-ui/swagger-ui-bundle.js');
+    expect(getSwaggerUiInit()).toContain("url: '/openapi.json'");
   });
 });

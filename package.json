@@ -134,7 +134,8 @@
   "allowScripts": {
     "electron@37.1.0": true,
     "electron-winstaller@5.4.0": true,
-    "esbuild@0.28.1": true
+    "esbuild@0.28.1": true,
+    "@scarf/scarf@1.4.0": true
   },
   "overrides": {
     "tar": ">7.5.10",

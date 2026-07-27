@@ -1,10 +1,8 @@
-import path from 'node:path';
 import swaggerJsdoc, { type OAS3Options } from 'swagger-jsdoc';
-
-const apiDefinitionPath: string = path.resolve(process.cwd(), 'src/app/replicaListenerServer.ts');
+import YAML from 'yaml';
 
 const openApiOptions: OAS3Options = {
-  apis: [apiDefinitionPath],
+  apis: [],
   definition: {
     components: {
       schemas: {
@@ -63,6 +61,48 @@ const openApiOptions: OAS3Options = {
       version: '1.0.0',
     },
     openapi: '3.0.3',
+    paths: {
+      '/api/v1/mutations': {
+        get: {
+          operationId: 'pullMutations',
+          parameters: [{
+            description: 'The cursor returned by the preceding pull or push response.',
+            in: 'query',
+            name: 'cursor',
+            schema: { type: 'string' },
+          }],
+          responses: {
+            200: {
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/MutationPullResponse' } } },
+              description: 'Mutations and the cursor for the next pull.',
+            },
+            405: { description: 'Only GET and PUT are supported.' },
+          },
+          summary: 'Pull ledger mutations after a cursor',
+          tags: ['Mutations'],
+        },
+        put: {
+          operationId: 'pushMutations',
+          requestBody: {
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/MutationPushRequest' } } },
+            required: true,
+          },
+          responses: {
+            200: {
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/MutationPushResponse' } } },
+              description: 'Mutation identifiers acknowledged by the receiving store.',
+            },
+            400: {
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Problem' } } },
+              description: 'The request body is not valid JSON or cannot be applied.',
+            },
+            405: { description: 'Only GET and PUT are supported.' },
+          },
+          summary: 'Append remote ledger mutations',
+          tags: ['Mutations'],
+        },
+      },
+    },
     tags: [{ description: 'Immutable event-catalog ledger replication.', name: 'Mutations' }],
   },
 };
@@ -74,4 +114,12 @@ export interface OpenApiSpecification {
   paths: Record<string, Record<string, object>>;
 }
 
-export const getOpenApiSpecification = (): OpenApiSpecification => swaggerJsdoc(openApiOptions) as OpenApiSpecification;
+const prepareSwaggerJsdocYamlCompatibility = (): void => {
+  // swagger-jsdoc 6.x still accesses the YAML 1.x defaultOptions API although its dependency resolves to YAML 2.x.
+  Object.assign(YAML, { defaultOptions: {} });
+};
+
+export const getOpenApiSpecification = (): OpenApiSpecification => {
+  prepareSwaggerJsdocYamlCompatibility();
+  return swaggerJsdoc(openApiOptions) as OpenApiSpecification;
+};

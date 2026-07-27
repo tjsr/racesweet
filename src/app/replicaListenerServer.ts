@@ -18,6 +18,16 @@ type ListenerServer = HttpServer | HttpsServer;
 
 const swaggerUiPath: string = getAbsoluteSwaggerUiPath();
 export const getSwaggerUiHtml = (): string => swaggerUi.generateHTML(undefined, { swaggerUrl: '/openapi.json' }, undefined, undefined, undefined, '/openapi.json', 'RaceSweet API documentation').replaceAll('./', '/swagger-ui/');
+export const getSwaggerUiInit = (): string => `window.onload = function () {
+  window.ui = SwaggerUIBundle({
+    dom_id: '#swagger-ui',
+    deepLinking: true,
+    layout: 'StandaloneLayout',
+    plugins: [SwaggerUIBundle.plugins.DownloadUrl],
+    presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+    url: '/openapi.json'
+  });
+};`;
 
 const swaggerUiContentTypes: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
@@ -131,6 +141,10 @@ export class ReplicaListenerServer {
       return;
     }
     if (request.method === 'GET' && url.pathname.startsWith('/swagger-ui/')) {
+      if (url.pathname === '/swagger-ui/swagger-ui-init.js') {
+        response.writeHead(200, { 'content-type': 'application/javascript; charset=utf-8' }).end(getSwaggerUiInit());
+        return;
+      }
       await this.serveSwaggerUiAsset(url.pathname, response);
       return;
     }

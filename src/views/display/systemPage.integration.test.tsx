@@ -241,8 +241,8 @@ describe('SystemPage integration', () => {
     const systemConfigurationGrid = container.querySelector('.system-configuration-grid');
     expect(systemConfigurationGrid).toBeTruthy();
     expect(systemConfigurationGrid?.querySelector('.system-configuration-grid__server [aria-label="RaceSweet server"]')).toBeTruthy();
-    expect(systemConfigurationGrid?.querySelector('.system-configuration-grid__storage')).toHaveTextContent('Local storage location');
-    expect(systemConfigurationGrid?.querySelector('.system-configuration-grid__fastest-time-indicators')).toHaveTextContent('Fastest time indicators');
+    expect(systemConfigurationGrid?.querySelector('.system-configuration-grid__storage')?.textContent).toContain('Local storage location');
+    expect(systemConfigurationGrid?.querySelector('.system-configuration-grid__fastest-time-indicators')?.textContent).toContain('Fastest time indicators');
   });
 
   it('shows the application error log in a read-only textarea below configured data sources', async () => {
