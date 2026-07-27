@@ -15,11 +15,11 @@ describe('RaceSweet OpenAPI documentation', () => {
     expect(specification.components.schemas.MutationPullResponse).toBeDefined();
   });
 
-  it('generates a base-page Swagger UI that loads the published OpenAPI document', () => {
+  it('generates Swagger UI for the API route and loads the published OpenAPI document', () => {
     const html = getSwaggerUiHtml();
 
-    expect(html).toContain('/swagger-ui/swagger-ui.css');
-    expect(html).toContain('/swagger-ui/swagger-ui-bundle.js');
-    expect(getSwaggerUiInit()).toContain("url: '/openapi.json'");
+    expect(html).toContain('/api/swagger-ui/swagger-ui.css');
+    expect(html).toContain('/api/swagger-ui/swagger-ui-bundle.js');
+    expect(getSwaggerUiInit()).toContain("url: '/api/openapi.json'");
   });
 });

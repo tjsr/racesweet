@@ -3,10 +3,8 @@ import { readFile } from 'node:fs/promises';
 import { createServer as createHttpsServer, type Server as HttpsServer } from 'node:https';
 import type { Socket } from 'node:net';
 import path from 'node:path';
-import swaggerUi from 'swagger-ui-express';
 import getAbsoluteSwaggerUiPath from 'swagger-ui-dist/absolute-path';
 import type { EventCatalogMutation } from '../ledger/eventCatalogLedger.js';
-import { getOpenApiSpecification } from './openapi.js';
 import type { ListenerServerConfig } from './systemConfig.js';
 
 export interface ReplicaListenerStore {
@@ -17,7 +15,21 @@ export interface ReplicaListenerStore {
 type ListenerServer = HttpServer | HttpsServer;
 
 const swaggerUiPath: string = getAbsoluteSwaggerUiPath();
-export const getSwaggerUiHtml = (): string => swaggerUi.generateHTML(undefined, { swaggerUrl: '/openapi.json' }, undefined, undefined, undefined, '/openapi.json', 'RaceSweet API documentation').replaceAll('./', '/swagger-ui/');
+export const getSwaggerUiHtml = (): string => `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RaceSweet API documentation</title>
+  <link rel="stylesheet" href="/api/swagger-ui/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="/api/swagger-ui/swagger-ui-bundle.js"></script>
+  <script src="/api/swagger-ui/swagger-ui-standalone-preset.js"></script>
+  <script src="/api/swagger-ui/swagger-ui-init.js"></script>
+</body>
+</html>`;
 export const getSwaggerUiInit = (): string => `window.onload = function () {
   window.ui = SwaggerUIBundle({
     dom_id: '#swagger-ui',
@@ -25,7 +37,7 @@ export const getSwaggerUiInit = (): string => `window.onload = function () {
     layout: 'StandaloneLayout',
     plugins: [SwaggerUIBundle.plugins.DownloadUrl],
     presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
-    url: '/openapi.json'
+    url: '/api/openapi.json'
   });
 };`;
 
@@ -132,16 +144,17 @@ export class ReplicaListenerServer {
    */
   private readonly handleRequest = async (request: import('node:http').IncomingMessage, response: import('node:http').ServerResponse): Promise<void> => {
     const url = new URL(request.url || '/', 'http://localhost');
-    if (request.method === 'GET' && url.pathname === '/') {
+    if (request.method === 'GET' && (url.pathname === '/api' || url.pathname === '/api/')) {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(getSwaggerUiHtml());
       return;
     }
-    if (request.method === 'GET' && url.pathname === '/openapi.json') {
+    if (request.method === 'GET' && url.pathname === '/api/openapi.json') {
+      const { getOpenApiSpecification } = await import('./openapi.js');
       response.writeHead(200, { 'content-type': 'application/json; charset=utf-8' }).end(JSON.stringify(getOpenApiSpecification()));
       return;
     }
-    if (request.method === 'GET' && url.pathname.startsWith('/swagger-ui/')) {
-      if (url.pathname === '/swagger-ui/swagger-ui-init.js') {
+    if (request.method === 'GET' && url.pathname.startsWith('/api/swagger-ui/')) {
+      if (url.pathname === '/api/swagger-ui/swagger-ui-init.js') {
         response.writeHead(200, { 'content-type': 'application/javascript; charset=utf-8' }).end(getSwaggerUiInit());
         return;
       }
