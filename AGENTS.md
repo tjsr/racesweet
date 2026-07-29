@@ -69,6 +69,10 @@ These changes are sent either by the server as an update to all clients, or stor
 
 ## Additional TypeScript and UI code rules
 
+## Restart-required version gate
+
+When a code change requires a full Electron or web application-process restart, update the ISO date-time in `src/app/restartVersion.ts` (`RESTART_REQUIRED_AFTER`). Do not update it for a renderer reload or dynamic recompilation that is safe without a process restart. The application server captures this value when it starts; renderer code compares its current value with that captured launch value and blocks use with a restart-required dialog when the current value is later. This check must remain enabled for both Electron and web clients.
+
 All new interactive UI controls must use Material UI (MUI) components. Do not add raw HTML inputs, buttons, selects, checkboxes, or textareas for new controls unless an accessible MUI equivalent is impossible; document that exception in the relevant ADR.
 
 When writing TypeScript, all variables must have explicit, strong types at every definition, and every method or function parameter must be explicitly typed. Do not use implicit `any` or `unknown` unless it is absolutely necessary and cannot reasonably be resolved; document the reason when either is unavoidable.
