@@ -44,6 +44,7 @@ describe('SessionListCard', () => {
 
     const card = container.querySelector('button.session-list-card') as HTMLButtonElement;
     expect(card).toBeTruthy();
+    expect(card.classList.contains('object-card')).toBe(true);
     expect(card.classList.contains('selected')).toBe(true);
     expect(card.classList.contains('active')).toBe(true);
     expect(container.textContent).toContain('Feature Race');

@@ -162,9 +162,13 @@ export const normalizeSystemDirectoryPath = (directoryPath: string | undefined):
   return path.resolve(trimmedPath && trimmedPath.length > 0 ? trimmedPath : DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH);
 };
 
+const removeDuplicateWindowsDrivePrefixes = (filePath: string): string => {
+  return filePath.replace(/^([a-z]:)(?:[\\/][a-z]:)+(?=[\\/]|$)/iu, '$1');
+};
+
 export const normalizeOptionalSystemFilePath = (filePath: string | undefined): string | undefined => {
   const trimmedPath = filePath?.trim();
-  return trimmedPath && trimmedPath.length > 0 ? path.resolve(trimmedPath) : undefined;
+  return trimmedPath && trimmedPath.length > 0 ? path.resolve(removeDuplicateWindowsDrivePrefixes(trimmedPath)) : undefined;
 };
 
 export const createDefaultSystemConfiguration = (): SystemConfiguration => ({

@@ -1,4 +1,4 @@
-import { getFinishLineNumbersForSession, normalizeDataSourceConfig } from './systemConfig.js';
+import { getFinishLineNumbersForSession, normalizeDataSourceConfig, normalizeOptionalSystemFilePath } from './systemConfig.js';
 import { parseCtcTrackConfig } from '../parsers/ctc/trackConfig.js';
 
 const pitTrackConfig = {
@@ -13,6 +13,24 @@ const pitTrackConfig = {
 };
 
 describe('CTC finish line configuration', () => {
+  it('removes repeated Windows drive prefixes from Dorian CTC file paths', () => {
+    const source = normalizeDataSourceConfig({
+      enabled: true,
+      fileConfig: {
+        filePath: 'C:\\C:\\C:\\RaceTime\\timing\\race.SRT',
+        trackConfigFilePath: 'C:/C:/C:/RaceTime/timing/TRACK.CFG',
+      },
+      id: 'ctc',
+      name: 'CTC',
+      type: 'file-dorian-ctc-srt',
+    });
+
+    expect(source.fileConfig).toEqual(expect.objectContaining({
+      filePath: normalizeOptionalSystemFilePath('C:\\RaceTime\\timing\\race.SRT'),
+      trackConfigFilePath: normalizeOptionalSystemFilePath('C:\\RaceTime\\timing\\TRACK.CFG'),
+    }));
+  });
+
   it('adds detected pit start/finish lines to persisted/default finish lines', () => {
     const source = normalizeDataSourceConfig({
       enabled: true,

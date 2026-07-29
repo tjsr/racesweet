@@ -1,4 +1,4 @@
-import type { Configuration } from 'webpack';
+import webpack, { type Configuration } from 'webpack';
 import { plugins } from './webpack.plugins.ts';
 import { rules } from './webpack.rules.ts';
 
@@ -12,7 +12,12 @@ export const rendererConfig: Configuration = {
   module: {
     rules,
   },
-  plugins,
+  plugins: [
+    ...plugins,
+    new webpack.DefinePlugin({
+      RACESWEET_BUILD_TIMESTAMP: JSON.stringify(new Date().toISOString()),
+    }),
+  ],
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.css'],
     extensionAlias: {

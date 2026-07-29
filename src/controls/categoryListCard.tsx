@@ -16,6 +16,7 @@ interface CategoryListCardProps {
 export const CategoryListCard = (props: CategoryListCardProps): React.ReactElement => {
   const className = [
     'events-list-item',
+    'object-card',
     props.isSelected ? 'selected' : '',
   ].filter((value) => value.length > 0).join(' ');
 

@@ -40,6 +40,7 @@ describe('CategoryListCard', () => {
 
     const card = container.querySelector('button.events-list-item') as HTMLButtonElement;
     expect(card).toBeTruthy();
+    expect(card.classList.contains('object-card')).toBe(true);
     expect(card.classList.contains('selected')).toBe(true);
     expect(card.getAttribute('aria-selected')).toBe('true');
     expect(container.textContent).toContain('Premier');

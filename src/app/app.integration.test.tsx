@@ -3460,6 +3460,10 @@ describe('RaceSweetMainApp integration', () => {
     expect(loadedCssText).toContain('.MuiInputBase-root:not(.Mui-disabled)');
     expect(loadedCssText).toContain('background-color: #fff');
     expect(loadedCssText).toContain('.MuiInputBase-root.Mui-disabled');
+    expect(loadedCssText).toContain('.object-card.active');
+    expect(loadedCssText).toContain('background-color: #e8f5e9');
+    expect(loadedCssText).toContain('.object-card.active.selected');
+    expect(loadedCssText).toContain('background-color: #e3f2fd');
     expect(loadedCssText).toContain('@media (prefers-color-scheme: dark)');
   });
 

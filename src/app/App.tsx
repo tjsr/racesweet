@@ -47,7 +47,7 @@ import { updateCategorySelectionsForChangedParticipant } from './categoryChangeS
 import { type DurtFileMakerLoadProgress, getBundledDurtFileMakerExtractorPath, loadDurtFileMakerRaceState } from './durtFileMakerDataSource.ts';
 import './index.css';
 import { formatErrorForDisplay } from './stackTrace.ts';
-import { type DataSourceConfig, type EventTimeDisplayZoneMode, type ListenerServerConfig, type SystemConfiguration, type TimingContextSelectionConfig, createDefaultSystemConfiguration, getFinishLineNumbersForSession, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
+import { type DataSourceConfig, type EventTimeDisplayZoneMode, type ListenerServerConfig, type SystemConfiguration, type TimingContextSelectionConfig, createDefaultSystemConfiguration, getFinishLineNumbersForSession, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds, normalizeOptionalSystemFilePath } from './systemConfig.ts';
 import { getSystemTimeZone } from './utils/timeutils.ts';
 import { type EventSessionOption } from './views/results/resultsPage.tsx';
 
@@ -2089,7 +2089,7 @@ export const RaceSweetMainApp = () => {
             }
             const saveSource = async (): Promise<void> => {
               const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
-              const trackConfigFilePath = changes.fileConfig?.trackConfigFilePath;
+              const trackConfigFilePath = normalizeOptionalSystemFilePath(changes.fileConfig?.trackConfigFilePath);
               const nextChanges = source?.type === 'file-dorian-ctc-srt' && trackConfigFilePath
                 ? {
                   ...changes,
@@ -2097,6 +2097,7 @@ export const RaceSweetMainApp = () => {
                     ...source.fileConfig,
                     ...changes.fileConfig,
                     ctcTrackConfig: parseCtcTrackConfig(await window.api.requestBuffer(trackConfigFilePath), trackConfigFilePath),
+                    trackConfigFilePath,
                   },
                 }
                 : changes;

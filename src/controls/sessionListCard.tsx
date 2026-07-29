@@ -13,6 +13,7 @@ export const SessionListCard = (props: SessionListCardProps): React.ReactElement
   const isActive = props.session.id === props.activeSessionId;
 
   const className = [
+    'object-card',
     'session-list-card',
     props.selected ? 'selected' : '',
     isActive ? 'active' : '',

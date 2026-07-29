@@ -51,6 +51,9 @@ const config = {
       Buffer: ['buffer', 'Buffer'],
       process: resolveModule('process/browser.js'),
     }),
+    new webpack.DefinePlugin({
+      RACESWEET_BUILD_TIMESTAMP: JSON.stringify(new Date().toISOString()),
+    }),
   ],
   resolve: {
     alias: {

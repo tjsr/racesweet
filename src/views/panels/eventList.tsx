@@ -28,7 +28,7 @@ export const EventListPanel = (props: EventListPanelProps): React.ReactElement =
           <button
             key={event.id}
             type="button"
-            className={`events-list-item${isSelected ? ' selected' : ''}`}
+            className={`events-list-item object-card${isSelected ? ' selected' : ''}${isActive ? ' active' : ''}`}
             onClick={() => {
               if (!isSelected) {
                 void props.onSelectEvent(event.id);

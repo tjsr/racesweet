@@ -216,6 +216,10 @@ describe('EventsScreen integration', () => {
     const makeActiveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Make Active');
     expect(makeActiveButton).toBeDefined();
 
+    const winterRoundButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Winter Round'));
+    expect(winterRoundButton?.classList.contains('active')).toBe(true);
+    expect(winterRoundButton?.classList.contains('selected')).toBe(true);
+
     const springTestButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Spring Test'));
     expect(springTestButton).toBeDefined();
 
@@ -224,6 +228,10 @@ describe('EventsScreen integration', () => {
     });
 
     expect(onSelectEvent).toHaveBeenCalledWith('event-2');
+    expect(winterRoundButton?.classList.contains('active')).toBe(true);
+    expect(winterRoundButton?.classList.contains('selected')).toBe(false);
+    expect(springTestButton?.classList.contains('active')).toBe(false);
+    expect(springTestButton?.classList.contains('selected')).toBe(true);
 
     const eventNameInput = container.querySelector('input[aria-label="Event Name"]') as HTMLInputElement;
     const eventMinimumLapTimeInput = container.querySelector('input[aria-label="Event Minimum Lap Time"]') as HTMLInputElement;

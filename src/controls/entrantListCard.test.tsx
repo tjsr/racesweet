@@ -47,6 +47,7 @@ describe('EntrantListCard', () => {
     });
 
     const header = container.querySelector('.entrant-list-card-header');
+    const card = container.querySelector('button.events-list-item') as HTMLButtonElement;
     const identifiers = container.querySelector('.entrant-list-card-identifiers');
     const raceNumber = container.querySelector('.entrant-race-number');
     const timingDevices = container.querySelector('.entrant-timing-devices');
@@ -55,6 +56,7 @@ describe('EntrantListCard', () => {
     const entrantType = container.querySelector('.entrant-list-type');
 
     expect(header?.firstElementChild?.classList.contains('entrant-list-name')).toBe(true);
+    expect(card.classList.contains('object-card')).toBe(true);
     expect(header?.lastElementChild).toBe(identifiers);
     expect(identifiers?.children[0]).toBe(raceNumber);
     expect(identifiers?.children[1]).toBe(timingDevices);

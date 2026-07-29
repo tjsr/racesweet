@@ -24,6 +24,7 @@ describe('RuntimeInformationPanel', () => {
     flushSync(() => {
       root?.render(
         <RuntimeInformationPanel
+          buildTimestamp="2026-07-29T01:23:45.000Z"
           runtimeVersions={{
             chromium: '123.4.5',
             electron: '34.5.6',
@@ -37,5 +38,7 @@ describe('RuntimeInformationPanel', () => {
     expect(container.textContent).toContain('Electron: 34.5.6');
     expect(container.textContent).toContain('Node.js: 22.14.0');
     expect(container.textContent).toContain('Chromium: 123.4.5');
+    expect(container.textContent).toContain('Build date and time:');
+    expect(container.textContent).not.toContain('Build date and time: unknown');
   });
 });

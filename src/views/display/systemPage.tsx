@@ -1,6 +1,6 @@
 import React from 'react';
 import { type DataSourceConfig, type DataSourceType, type ListenerServerConfig, type RemoteServerConfig, type SystemConfiguration } from '../../app/systemConfig.js';
-import { getRuntimeVersions } from '../../app/versionInfo.js';
+import { getBuildTimestamp, getRuntimeVersions } from '../../app/versionInfo.js';
 import { TimeRecordSourceId } from '../../model/types.js';
 import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
 import type { MrScatsDataFilePreview } from '../../parsers/mrScats/filePreview.js';
@@ -47,6 +47,7 @@ interface SystemPageProps {
 
 export const SystemPage = (props: SystemPageProps): React.ReactElement => {
   const runtimeVersions = getRuntimeVersions();
+  const buildTimestamp = getBuildTimestamp();
 
   return (
     <section className="events-screen">
@@ -54,7 +55,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
       <p>Configure global data-source definitions and source connection settings.</p>
 
       <div className="system-runtime-summary">
-        <RuntimeInformationPanel runtimeVersions={runtimeVersions} />
+        <RuntimeInformationPanel buildTimestamp={buildTimestamp} runtimeVersions={runtimeVersions} />
         <RaceSweetLogo className="system-runtime-summary__logo" />
       </div>
 
