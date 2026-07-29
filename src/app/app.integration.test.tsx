@@ -3457,6 +3457,9 @@ describe('RaceSweetMainApp integration', () => {
     expect(loadedCssText).toContain('overflow-wrap: anywhere');
     expect(loadedCssText).toContain('.section-nav::-webkit-scrollbar');
     expect(loadedCssText).toContain('display: none');
+    expect(loadedCssText).toContain('.MuiInputBase-root:not(.Mui-disabled)');
+    expect(loadedCssText).toContain('background-color: #fff');
+    expect(loadedCssText).toContain('.MuiInputBase-root.Mui-disabled');
     expect(loadedCssText).toContain('@media (prefers-color-scheme: dark)');
   });
 

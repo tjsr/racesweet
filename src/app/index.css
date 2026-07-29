@@ -29,6 +29,15 @@
   --color-overlay: rgba(0, 0, 0, 0.45);
 }
 
+/* Keep editable MUI fields visibly distinct from the application surface. */
+.MuiInputBase-root:not(.Mui-disabled) {
+  background-color: #fff;
+}
+
+.MuiInputBase-root.Mui-disabled {
+  background-color: rgba(127, 127, 127, 0.16);
+}
+
 #app {
   min-height: 100vh;
 }
