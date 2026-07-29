@@ -1,4 +1,4 @@
-import { Button, MenuItem, TextField } from '@mui/material';
+import { Button, TextField } from '@mui/material';
 import React from 'react';
 import {
   type EntrantType,
@@ -283,12 +283,12 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
             className="compact-action-label"
             label="Create"
             select
-            slotProps={{ select: { 'aria-label': 'Create Entrant Kind' } }}
+            slotProps={{ select: { 'aria-label': 'Create Entrant Kind', native: true } }}
             value={props.createKind}
             onChange={(event) => props.setCreateKind(event.target.value as EntrantType)}
           >
-            <MenuItem value="rider">Create {singularLabel.toLowerCase()}</MenuItem>
-            <MenuItem value="team">Create {groupLabel.toLowerCase().slice(0, -1)}</MenuItem>
+            <option value="rider">Create {singularLabel.toLowerCase()}</option>
+            <option value="team">Create {groupLabel.toLowerCase().slice(0, -1)}</option>
           </TextField>
         ) : null}
         <Button
@@ -312,12 +312,12 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
           className="compact-action-label"
           label="Sort"
           select
-          slotProps={{ select: { 'aria-label': 'Sort Entrants' } }}
+          slotProps={{ select: { 'aria-label': 'Sort Entrants', native: true } }}
           value={sortOrder}
           onChange={(event) => setSortOrder(event.target.value as EntrantListSortOrder)}
         >
           {entrantListSortOptions.map((option) => (
-            <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+            <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </TextField>
       </div>

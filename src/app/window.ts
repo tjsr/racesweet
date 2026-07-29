@@ -44,6 +44,7 @@ export interface SelectLocalFileOptions {
 declare global {
   interface Window {
     api: {
+      persistenceMode?: 'native' | 'server';
       receive: (channel: AvailableReceiveChannels | string, func: (...args: unknown[]) => unknown) => void;
       requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType) => Promise<DataType>;
       requestExternalHttp: (request: ExternalHttpProxyRequest) => Promise<ExternalHttpProxyResponse>;

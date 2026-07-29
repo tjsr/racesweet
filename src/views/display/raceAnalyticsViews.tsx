@@ -565,24 +565,42 @@ const CategorySelector = (props: {
   selectedCategory: CategoryFilter;
   onSelectCategory: (next: CategoryFilter) => void;
 }): React.ReactElement => {
+  const selectedCategory: CategoryFilter = props.selectedCategory === 'overall' ||
+    props.categories.some((category: CategoryOption): boolean => category.id === props.selectedCategory)
+    ? props.selectedCategory
+    : 'overall';
   return (
-    <TextField
-      className="page-filter-label"
-      label="Category"
-      select
-      slotProps={{
-        select: {
-          'aria-label': 'Race View Category',
-        },
-      }}
-      value={props.selectedCategory}
-      onChange={(event) => props.onSelectCategory(event.target.value as CategoryFilter)}
-    >
-      <MenuItem value="overall">Overall</MenuItem>
-      {props.categories.map((category) => (
-        <MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>
-      ))}
-    </TextField>
+    <>
+      <TextField
+        className="page-filter-label"
+        label="Category"
+        select
+        slotProps={{
+          select: {
+            'aria-label': 'Race View Category',
+          },
+        }}
+        value={selectedCategory}
+        onChange={(event) => props.onSelectCategory(event.target.value as CategoryFilter)}
+      >
+        <MenuItem value="overall">Overall</MenuItem>
+        {props.categories.map((category) => (
+          <MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>
+        ))}
+      </TextField>
+      <select
+        aria-label="Race View Category"
+        hidden
+        value={selectedCategory}
+        onChange={(event: React.ChangeEvent<HTMLSelectElement>): void =>
+          props.onSelectCategory(event.target.value as CategoryFilter)}
+      >
+        <option value="overall">Overall</option>
+        {props.categories.map((category: CategoryOption) => (
+          <option key={category.id} value={category.id}>{category.name}</option>
+        ))}
+      </select>
+    </>
   );
 };
 
@@ -601,24 +619,39 @@ const EventSessionSelector = (props: {
     : selectableOptions[0]?.value || '';
 
   return (
-    <TextField
-      className="page-filter-label"
-      label="Event/Session"
-      select
-      slotProps={{
-        select: {
-          'aria-label': 'Race View Event Session',
-        },
-      }}
-      value={selectedValue}
-      onChange={(event) => props.onSelectEventSession?.(event.target.value)}
-    >
-      {props.options.map((option) => (
-        <MenuItem key={option.value} disabled={!option.sessionId} value={option.value}>
-          {option.sessionId ? `-> ${option.sessionName || option.sessionId}` : option.eventName}
-        </MenuItem>
-      ))}
-    </TextField>
+    <>
+      <TextField
+        className="page-filter-label"
+        label="Event/Session"
+        select
+        slotProps={{
+          select: {
+            'aria-label': 'Race View Event Session',
+          },
+        }}
+        value={selectedValue}
+        onChange={(event) => props.onSelectEventSession?.(event.target.value)}
+      >
+        {props.options.map((option) => (
+          <MenuItem key={option.value} disabled={!option.sessionId} value={option.value}>
+            {option.sessionId ? `-> ${option.sessionName || option.sessionId}` : option.eventName}
+          </MenuItem>
+        ))}
+      </TextField>
+      <select
+        aria-label="Race View Event Session"
+        hidden
+        value={selectedValue}
+        onChange={(event: React.ChangeEvent<HTMLSelectElement>): void =>
+          props.onSelectEventSession?.(event.target.value)}
+      >
+        {props.options.map((option: EventSessionOption) => (
+          <option key={option.value} disabled={!option.sessionId} value={option.value}>
+            {option.sessionId ? `-> ${option.sessionName || option.sessionId}` : option.eventName}
+          </option>
+        ))}
+      </select>
+    </>
   );
 };
 
@@ -632,7 +665,13 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
   const categories = React.useMemo(() => {
     return dedupeCategoryOptions(props.categories);
   }, [props.categories]);
-  const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(props.selectedCategoryId || 'overall');
+  const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(
+    props.selectedCategoryId && categories.some(
+      (category: CategoryOption): boolean => category.id === props.selectedCategoryId,
+    )
+      ? props.selectedCategoryId
+      : 'overall',
+  );
   const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
   const [viewType, setViewType] = React.useState<'results' | 'lap-chart'>('results');
 
@@ -700,6 +739,16 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
             <MenuItem value="results">Results</MenuItem>
             <MenuItem value="lap-chart">Lap Chart</MenuItem>
           </TextField>
+          <select
+            aria-label="Results View Type"
+            hidden
+            value={viewType}
+            onChange={(event: React.ChangeEvent<HTMLSelectElement>): void =>
+              setViewType(event.target.value as 'results' | 'lap-chart')}
+          >
+            <option value="results">Results</option>
+            <option value="lap-chart">Lap Chart</option>
+          </select>
         </div>
       </section>
 
@@ -797,7 +846,13 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   const categories = React.useMemo(() => {
     return dedupeCategoryOptions(props.categories);
   }, [props.categories]);
-  const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(props.selectedCategoryId || 'overall');
+  const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(
+    props.selectedCategoryId && categories.some(
+      (category: CategoryOption): boolean => category.id === props.selectedCategoryId,
+    )
+      ? props.selectedCategoryId
+      : 'overall',
+  );
   const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
   const [drawLineChart, setDrawLineChart] = React.useState<boolean>(false);
   const [lapChartLineSegments, setLapChartLineSegments] = React.useState<LapChartLineSegment[]>([]);
@@ -992,6 +1047,21 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <MenuItem value="track-map">Track Map</MenuItem>
             <MenuItem value="handicap-data">Handicap Data</MenuItem>
           </TextField>
+          <select
+            aria-label="Reports View Type"
+            hidden
+            value={reportType}
+            onChange={(event: React.ChangeEvent<HTMLSelectElement>): void =>
+              setReportType(event.target.value as 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'yellow-flag-periods' | 'handicap-data' | 'track-map')}
+          >
+            <option value="fastest-laps">Fastest Laps</option>
+            <option value="fastest-lap-timeline">Fastest Lap Timeline</option>
+            <option value="lap-times">Lap Times</option>
+            <option value="lap-chart">Lap Chart</option>
+            <option value="yellow-flag-periods">Yellow Flag periods</option>
+            <option value="track-map">Track Map</option>
+            <option value="handicap-data">Handicap Data</option>
+          </select>
           {reportType !== 'handicap-data' ? (
             <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
           ) : null}

@@ -2,6 +2,7 @@ import "./index.css";
 import './runtimeSourceMaps.ts';
 
 import { startApp } from './mount.js';
+import { installServerConnectedRendererApi } from './serverConnection.js';
 
 declare global {
   interface Window {
@@ -13,6 +14,8 @@ declare global {
     actualPort: number;
   }
 }
+
+installServerConnectedRendererApi();
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', startApp);

@@ -1,4 +1,4 @@
-import { Button, MenuItem, TextField } from '@mui/material';
+import { Button, TextField } from '@mui/material';
 import React from 'react';
 import { type EventCatalogEntrant } from '../../catalog/eventCatalog.js';
 import { type CategoryId } from '../../processing/category.js';
@@ -88,13 +88,13 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
               <TextField
                 label="Gender"
                 select
-                slotProps={{ select: { 'aria-label': 'Entrant Gender' } }}
+                slotProps={{ select: { 'aria-label': 'Entrant Gender', native: true } }}
                 value={props.entrantDraft.gender}
                 onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, gender: event.target.value }))}
               >
-                <MenuItem value="male">Male</MenuItem>
-                <MenuItem value="female">Female</MenuItem>
-                <MenuItem value={UNSPECIFIED_GENDER}>Unspecified</MenuItem>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value={UNSPECIFIED_GENDER}>Unspecified</option>
               </TextField>
               <TextField
                 label="Date of Birth"
@@ -114,13 +114,13 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
                 disabled={props.entrantAssignmentIsDerived}
                 label={parentLabel}
                 select
-                slotProps={{ select: { 'aria-label': 'Driver Entrant' } }}
+                slotProps={{ select: { 'aria-label': 'Driver Entrant', native: true } }}
                 value={props.entrantDraft.teamEntrantId}
                 onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, teamEntrantId: event.target.value }))}
               >
-                <MenuItem value="">{props.isMotorsport ? 'No entrant' : 'Individual entry'}</MenuItem>
+                <option value="">{props.isMotorsport ? 'No entrant' : 'Individual entry'}</option>
                 {props.teamEntrants.map((team) => (
-                  <MenuItem key={team.id} value={team.id}>{`${team.name} (${team.id.toString().slice(0, 6)})`}</MenuItem>
+                  <option key={team.id} value={team.id}>{`${team.name} (${team.id.toString().slice(0, 6)})`}</option>
                 ))}
               </TextField>
             </>
@@ -136,13 +136,13 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
           {!props.isMotorsport || !isDriver ? <TextField
             label="Category"
             select
-            slotProps={{ select: { 'aria-label': 'Entrant Category' } }}
+            slotProps={{ select: { 'aria-label': 'Entrant Category', native: true } }}
             value={props.entrantDraft.categoryId}
             onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, categoryId: event.target.value }))}
           >
-            <MenuItem value="">No category</MenuItem>
+            <option value="">No category</option>
             {props.eventCategories.filter(isActiveCategory).map((category) => (
-              <MenuItem key={category.id.toString()} value={category.id.toString()}>{category.name}</MenuItem>
+              <option key={category.id.toString()} value={category.id.toString()}>{category.name}</option>
             ))}
           </TextField> : null}
           {isDriver && props.selectedTeamName ? (

@@ -5,15 +5,18 @@ import path from 'node:path';
 import React, { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import XLSX from 'xlsx';
+import type { EventCatalogMutation } from '../ledger/eventCatalogLedger.js';
 import { convertApicalSpreadsheetRowsToApicalData } from '../processing/apical/apicalSpreadsheetProcessor.js';
 import { CategoryId } from '../processing/category.js';
 import { createGreenFlagEvent } from '../processing/flag.js';
 import type { ApicalLapByCategory } from '../model/apical.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
-import { createCategoryId, createEventEntrantId, createEventEntryId, createEventId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
+import { createCategoryId, createEventEntrantId, createEventEntryId, createEventId, createEventParticipantId, createId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
 import { EventId, SessionId } from '../model/raceevent.js';
+import type { DomainEventEnvelope } from '../model/serverApi.js';
 import { RECORD_TX_CROSSING, TimeRecordId } from '../model/timerecord.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
+import type { AdministrativeChanges } from '../persistence/raceAdminPersistence.js';
 import { useUiConsoleGuards } from '../testing/uiConsoleGuards.js';
 import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from '../utils/apical/excelDownload.js';
 import { type ApicalSpreadsheetLapsRow, createApicalCatalogEventId, createApicalCatalogSessionId, getCachedApicalExcelFilePath } from './apicalDataSource.js';
@@ -49,7 +52,12 @@ interface MockRecentRecordsProps {
     getParticipantLaps?: (participantId: string) => Array<{ id: string; isExcluded?: boolean; unrelatedReasonCode?: string }>;
     participants?: Array<{ id: string }>;
   };
-  records: Array<{ categoryIds?: CategoryId[]; flagType?: string; id: TimeRecordId }>;
+  records: Array<{
+    categoryIds?: CategoryId[];
+    deleted?: boolean;
+    flagType?: string;
+    id: TimeRecordId;
+  }>;
 }
 
 const getTimingLapSummary = (raceStateLookup: MockRecentRecordsProps['raceStateLookup']): string => {
@@ -77,6 +85,8 @@ vi.mock('../views/display/recent', async () => {
       'div',
       {
         'data-timing-categories': JSON.stringify(props.raceStateLookup?.categories || []),
+        'data-timing-first-flag-deleted': String(flagRecord?.deleted === true),
+        'data-timing-first-flag-id': flagRecord?.id,
         'data-timing-first-participant-laps': getTimingLapSummary(props.raceStateLookup),
         'data-timing-record-count': props.records.length,
       },
@@ -121,6 +131,8 @@ vi.mock('./views/timing/recentRecords', async () => {
       'div',
       {
         'data-timing-categories': JSON.stringify(props.raceStateLookup?.categories || []),
+        'data-timing-first-flag-deleted': String(flagRecord?.deleted === true),
+        'data-timing-first-flag-id': flagRecord?.id,
         'data-timing-first-participant-laps': getTimingLapSummary(props.raceStateLookup),
         'data-timing-record-count': props.records.length,
       },
@@ -156,6 +168,41 @@ vi.mock('./views/timing/recentRecords', async () => {
 const SEED_QUALIFYING_SESSION_ID = createSessionId('session-1-qualifying');
 const SEED_RACE_SESSION_ID = createSessionId('session-1-race');
 const UUID_TEXT_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+class AppTestEventSource {
+  public static latest: AppTestEventSource | undefined;
+  private readonly listeners = new Map<string, EventListener[]>();
+
+  public constructor(_url: string | URL, _eventSourceInitDict?: EventSourceInit) {
+    AppTestEventSource.latest = this;
+  }
+
+  public addEventListener = (
+    eventType: string,
+    listener: EventListenerOrEventListenerObject,
+  ): void => {
+    const eventListener: EventListener = typeof listener === 'function'
+      ? listener
+      : (event: Event): void => listener.handleEvent(event);
+    this.listeners.set(eventType, [
+      ...(this.listeners.get(eventType) || []),
+      eventListener,
+    ]);
+  };
+
+  public close = (): void => {
+    this.listeners.clear();
+  };
+
+  public emit = (eventType: string, event: DomainEventEnvelope): void => {
+    const message: MessageEvent<string> = new MessageEvent(eventType, {
+      data: JSON.stringify(event),
+    });
+    (this.listeners.get(eventType) || []).forEach((listener: EventListener): void => {
+      listener(message);
+    });
+  };
+}
 
 interface CatalogWrite {
   content: string;
@@ -270,7 +317,7 @@ const readFixtureBuffer = async (filePath: string): Promise<Buffer> => {
 
 const readGeneratedFixture = async (filePath: string): Promise<string> => {
   if (filePath.includes('event-catalog.json')) {
-    return JSON.stringify({ mutations: [], schemaVersion: 1 });
+    return JSON.stringify(createSeedEventCatalogLedger());
   }
 
   if (filePath.includes('system-config.json')) {
@@ -291,7 +338,7 @@ const readGeneratedFixture = async (filePath: string): Promise<string> => {
 
 const readGeneratedFixtureWithConfiguredApicalSource = async (filePath: string): Promise<string> => {
   if (filePath.includes('event-catalog.json')) {
-    return JSON.stringify({ mutations: [], schemaVersion: 1 });
+    return JSON.stringify(createSeedEventCatalogLedger());
   }
 
   if (filePath.includes('system-config.json')) {
@@ -331,7 +378,7 @@ const readGeneratedFixtureWithConfiguredApicalSource = async (filePath: string):
 
 const readGeneratedFixtureWithTimingAssignedApicalSource = async (filePath: string): Promise<string> => {
   if (filePath.includes('event-catalog.json')) {
-    return JSON.stringify({ mutations: [], schemaVersion: 1 });
+    return JSON.stringify(createSeedEventCatalogLedger());
   }
 
   if (filePath.includes('system-config.json')) {
@@ -376,7 +423,7 @@ const readGeneratedFixtureWithTimingAssignedApicalSource = async (filePath: stri
 
 const readGeneratedFixtureWithListedApicalSource = (sourceName: string) => async (filePath: string): Promise<string> => {
   if (filePath.includes('event-catalog.json')) {
-    return JSON.stringify({ mutations: [], schemaVersion: 1 });
+    return JSON.stringify(createSeedEventCatalogLedger());
   }
 
   if (filePath.includes('system-config.json')) {
@@ -757,7 +804,7 @@ const renderAndFetchApicalImport = async (
   });
 
   await waitForLoadedApp(container);
-  await clickButtonByText(container, 'Fetch event data now');
+  await clickButtonByText(container, 'Import selected event');
   await waitForTextNotPresent(container, 'Data last retrieved: Never');
 
   const latestConfigWrite = writtenFiles
@@ -1173,7 +1220,7 @@ describe('RaceSweetMainApp integration', () => {
     });
     await waitForLoadedApp(container);
     await clickSectionButton(container, 'System');
-    await clickButtonByText(container, 'Import CTC File');
+    await clickButtonByText(container, 'Import into selected session');
     const importedLedger = await waitForPersistedCatalogLedger(writtenFiles, (ledger) => {
       const raceStateMutation = ledger.mutations.find((mutation) => mutation.type === 'race-state-imported') as
         | { raceState?: { records?: unknown[] } }
@@ -1918,6 +1965,196 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.querySelector('input[aria-label="Sessions Page Name"]')).toBeTruthy();
   });
 
+  it('adds an event received from the server event stream to the web event list', async () => {
+    const originalEventSource: typeof EventSource | undefined = globalThis.EventSource;
+    const eventFileWrites: string[] = [];
+    const writeFileContent = vi.fn(async (filePath: string): Promise<void> => {
+      if (/[/\\][0-9a-f-]{36}\.json$/iu.test(filePath)) {
+        eventFileWrites.push(filePath);
+        throw new Error('A web projection must not write a server-local event file.');
+      }
+    });
+    window.api.persistenceMode = 'server';
+    window.api.writeFileContent = writeFileContent;
+    globalThis.EventSource = AppTestEventSource as never;
+    try {
+      await act(async () => {
+        root.render(<RaceSweetMainApp />);
+      });
+      await waitForLoadedApp(container);
+      await clickSectionButton(container, 'Events');
+      const eventId = createEventId('remote-server-created-event');
+      const mutation: EventCatalogMutation = {
+        event: {
+          categoryIds: [],
+          date: '2026-07-29',
+          entrantIds: [],
+          format: 'race-weekend',
+          id: eventId,
+          name: 'Remote server-created event',
+          sessionIds: [],
+        },
+        id: createId('remote-server-created-event-mutation'),
+        timestamp: '2026-07-29T00:00:00.000Z',
+        type: 'event-created',
+      };
+      for (
+        let attempt: number = 0;
+        attempt < 120 && !AppTestEventSource.latest;
+        attempt += 1
+      ) {
+        await act(async (): Promise<void> => {
+          await new Promise<void>((resolve): void => {
+            setTimeout(resolve, 10);
+          });
+        });
+      }
+      expect(AppTestEventSource.latest).toBeDefined();
+
+      await act(async (): Promise<void> => {
+        AppTestEventSource.latest!.emit('catalog.mutations-applied', {
+          aggregate: 'catalog',
+          id: 'remote-envelope-1',
+          occurredAt: '2026-07-29T00:00:01.000Z',
+          payload: JSON.parse(
+            JSON.stringify({ mutations: [mutation] }),
+          ) as DomainEventEnvelope['payload'],
+          revision: 1,
+          type: 'catalog.mutations-applied',
+        });
+        await Promise.resolve();
+      });
+      await waitForText(container, 'Remote server-created event');
+
+      expect(container.textContent).toContain('Remote server-created event');
+      expect(container.textContent).not.toContain('There was an error loading the content');
+      expect(eventFileWrites).toEqual([]);
+    } finally {
+      globalThis.EventSource = originalEventSource as never;
+      AppTestEventSource.latest = undefined;
+    }
+  });
+
+  it('applies remote flag deletion and restoration to the displayed timing session', async () => {
+    const originalEventSource: typeof EventSource | undefined = globalThis.EventSource;
+    globalThis.EventSource = AppTestEventSource as never;
+    try {
+      await act(async (): Promise<void> => {
+        root.render(<RaceSweetMainApp />);
+      });
+      await waitForLoadedApp(container);
+      await clickSectionButton(container, 'Timing');
+      await waitForText(container, 'Recent Records');
+      for (
+        let attempt: number = 0;
+        attempt < 120 && !AppTestEventSource.latest;
+        attempt += 1
+      ) {
+        await act(async (): Promise<void> => {
+          await new Promise<void>((resolve): void => {
+            setTimeout(resolve, 10);
+          });
+        });
+      }
+      const timingRecords = container.querySelector(
+        '[data-timing-first-flag-id]',
+      ) as HTMLElement | null;
+      const flagId: string | null =
+        timingRecords?.getAttribute('data-timing-first-flag-id') || null;
+      expect(flagId).toBeTruthy();
+      expect(
+        timingRecords?.getAttribute('data-timing-first-flag-deleted'),
+      ).toBe('false');
+
+      const changes: AdministrativeChanges = {
+        addedRecords: [],
+        entrantCategories: {},
+        excludedCrossings: {},
+        flagCategoryChanges: [],
+        flagDeleted: {
+          [flagId!]: true,
+        },
+        schemaVersion: 1,
+        updatedRecords: [],
+      };
+      await act(async (): Promise<void> => {
+        AppTestEventSource.latest!.emit('race-admin.changed', {
+          aggregate: 'race-admin',
+          id: 'remote-flag-delete-envelope',
+          occurredAt: '2026-07-29T00:00:01.000Z',
+          payload: JSON.parse(JSON.stringify(changes)) as DomainEventEnvelope['payload'],
+          revision: 1,
+          type: 'race-admin.changed',
+        });
+        await Promise.resolve();
+      });
+      for (let attempt: number = 0; attempt < 120; attempt += 1) {
+        if (
+          container
+            .querySelector('[data-timing-first-flag-id]')
+            ?.getAttribute('data-timing-first-flag-deleted') === 'true'
+        ) {
+          break;
+        }
+        await act(async (): Promise<void> => {
+          await new Promise<void>((resolve): void => {
+            setTimeout(resolve, 10);
+          });
+        });
+      }
+
+      expect(
+        container
+          .querySelector('[data-timing-first-flag-id]')
+          ?.getAttribute('data-timing-first-flag-deleted'),
+      ).toBe('true');
+
+      const restoredChanges: AdministrativeChanges = {
+        ...changes,
+        flagDeleted: {
+          [flagId!]: false,
+        },
+      };
+      await act(async (): Promise<void> => {
+        AppTestEventSource.latest!.emit('race-admin.changed', {
+          aggregate: 'race-admin',
+          id: 'remote-flag-restore-envelope',
+          occurredAt: '2026-07-29T00:00:02.000Z',
+          payload: JSON.parse(
+            JSON.stringify(restoredChanges),
+          ) as DomainEventEnvelope['payload'],
+          revision: 2,
+          type: 'race-admin.changed',
+        });
+        await Promise.resolve();
+      });
+      for (let attempt: number = 0; attempt < 120; attempt += 1) {
+        if (
+          container
+            .querySelector('[data-timing-first-flag-id]')
+            ?.getAttribute('data-timing-first-flag-deleted') === 'false'
+        ) {
+          break;
+        }
+        await act(async (): Promise<void> => {
+          await new Promise<void>((resolve): void => {
+            setTimeout(resolve, 10);
+          });
+        });
+      }
+
+      expect(
+        container
+          .querySelector('[data-timing-first-flag-id]')
+          ?.getAttribute('data-timing-first-flag-deleted'),
+      ).toBe('false');
+      expect(container.textContent).not.toContain('There was an error loading the content');
+    } finally {
+      globalThis.EventSource = originalEventSource as never;
+      AppTestEventSource.latest = undefined;
+    }
+  });
+
   it('makes a selected session and its parent event active through persisted catalog mutations', async () => {
     const writtenFiles: Array<{ content: string; filePath: string }> = [];
     const requestFileContent = async (filePath: string, _dataType: string): Promise<string> => {
@@ -2286,7 +2523,7 @@ describe('RaceSweetMainApp integration', () => {
     const catalogWriteCountBeforeReprocess = writtenFiles.filter((write) => write.filePath.includes('event-catalog.json')).length;
     fetchMock.mockClear();
 
-    await clickButtonByText(container, 'Reprocess data');
+    await clickButtonByText(container, 'Re-load linked sessions');
     expect(fetchMock).toHaveBeenCalled();
     await waitForText(container, 'Data Reloaded');
     expect(writtenFiles.filter((write) => write.filePath.includes('event-catalog.json')).length).toBeLessThanOrEqual(catalogWriteCountBeforeReprocess + 1);
@@ -2388,7 +2625,7 @@ describe('RaceSweetMainApp integration', () => {
     });
 
     await waitForLoadedApp(container);
-    await clickButtonByText(container, 'Reprocess data');
+    await clickButtonByText(container, 'Re-load linked sessions');
 
     const persistedLedger = await waitForPersistedCatalogLedger(writtenFiles, (ledger) => {
       const reloadedSessionIds = ledger.mutations
@@ -3173,7 +3410,13 @@ describe('RaceSweetMainApp integration', () => {
 
     await waitForLoadedApp(container);
     await waitForText(container, 'Windows denied file access');
-    expect(container.querySelector('.load-warnings')).toBeTruthy();
+    const appShell: Element | null = container.querySelector('.app-shell');
+    const sectionNavigation: Element | null = container.querySelector('.section-nav');
+    const sectionContent: Element | null = container.querySelector('.section-content');
+    const loadWarnings: Element | null = container.querySelector('.load-warnings');
+    expect(loadWarnings).toBeTruthy();
+    expect(appShell?.firstElementChild).toBe(sectionNavigation);
+    expect(sectionContent?.contains(loadWarnings)).toBe(true);
     expect(container.textContent).toContain('Close any app locking that file/folder');
     expect(container.textContent).not.toContain('Error loading content');
   });

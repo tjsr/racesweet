@@ -2,6 +2,7 @@ import type { AvailableReceiveChannels, AvailableSendChannels, ExternalHttpProxy
 import type { FileWriteOptions } from './fileWriteDiagnostics.js';
 
 type RendererApi = {
+  persistenceMode?: 'native' | 'server';
   receive: (channel: AvailableReceiveChannels | string, func: (...args: unknown[]) => unknown) => void;
   requestBuffer: (filePath: string) => Promise<Buffer>;
   requestExternalHttp: (request: ExternalHttpProxyRequest) => Promise<ExternalHttpProxyResponse>;

@@ -474,8 +474,10 @@ describe('SystemPage integration', () => {
 
     const sourceNameInput = container.querySelector('input[aria-label="Source Name source-apical"]') as HTMLInputElement;
     expect(sourceNameInput).toBeDefined();
-    sourceNameInput.focus();
-    sourceNameInput.setSelectionRange(7, 7);
+    await act(async () => {
+      sourceNameInput.focus();
+      sourceNameInput.setSelectionRange(7, 7);
+    });
 
     await act(async () => {
       insertTextAtCursor(sourceNameInput, 'Live ');
@@ -495,8 +497,10 @@ describe('SystemPage integration', () => {
     onSaveSource.mockClear();
     const baseUrlInput = container.querySelector('input[aria-label="Apical Base URL source-apical"]') as HTMLInputElement;
     expect(baseUrlInput).toBeDefined();
-    baseUrlInput.focus();
-    baseUrlInput.setSelectionRange(8, 8);
+    await act(async () => {
+      baseUrlInput.focus();
+      baseUrlInput.setSelectionRange(8, 8);
+    });
 
     await act(async () => {
       insertTextAtCursor(baseUrlInput, 'www.');

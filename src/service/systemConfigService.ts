@@ -155,6 +155,11 @@ export class SystemConfigService {
     return this.config;
   }
 
+  public applyRemoteConfiguration(config: SystemConfiguration): SystemConfiguration {
+    this.config = normalizeSystemConfiguration(config);
+    return this.config;
+  }
+
   public async updateListenerServer(changes: Partial<ListenerServerConfig>): Promise<SystemConfiguration> {
     this.config = normalizeSystemConfiguration({
       ...this.config,
@@ -302,6 +307,45 @@ export class SystemConfigService {
         ...selection,
       },
     };
+    await this.persist();
+    return this.config;
+  }
+
+  public async replaceSharedConfiguration(
+    sharedConfig: Pick<
+      SystemConfiguration,
+      'dataSources' | 'eventOptions' | 'eventSourceAssignments' | 'sessionSourceAssignments'
+    >,
+  ): Promise<SystemConfiguration> {
+    const existingSources = new Map(
+      this.config.dataSources.map((source: DataSourceConfig): [string, DataSourceConfig] => [
+        source.id,
+        source,
+      ]),
+    );
+    const dataSources: DataSourceConfig[] = sharedConfig.dataSources.map(
+      (source: DataSourceConfig): DataSourceConfig => {
+        const existingSource: DataSourceConfig | undefined = existingSources.get(source.id);
+        if (!source.apiConfig || !existingSource?.apiConfig) {
+          return source;
+        }
+        return {
+          ...source,
+          apiConfig: {
+            ...source.apiConfig,
+            authHeaderValue: source.apiConfig.authHeaderValue ||
+              existingSource.apiConfig.authHeaderValue,
+          },
+        };
+      },
+    );
+    this.config = normalizeSystemConfiguration({
+      ...this.config,
+      dataSources,
+      eventOptions: sharedConfig.eventOptions,
+      eventSourceAssignments: sharedConfig.eventSourceAssignments,
+      sessionSourceAssignments: sharedConfig.sessionSourceAssignments,
+    });
     await this.persist();
     return this.config;
   }

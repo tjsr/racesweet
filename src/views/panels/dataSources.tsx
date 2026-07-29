@@ -1,4 +1,4 @@
-import { TextField } from '@mui/material';
+import { Button, TextField } from '@mui/material';
 import React from 'react';
 import { formatErrorForDisplay } from '../../app/stackTrace.js';
 import { type DataImportMode, type DataSourceConfig, type DataSourceType, getDataSourceTypeLabel } from '../../app/systemConfig.js';
@@ -481,6 +481,17 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                         >
                           Preview
                         </button>
+                        {props.onLoadDorianCtcSrtFile ? (
+                          <Button
+                            disabled={!source.fileConfig?.filePath}
+                            onClick={() => {
+                              void props.onLoadDorianCtcSrtFile?.(source.id);
+                            }}
+                            variant="contained"
+                          >
+                            Import into selected session
+                          </Button>
+                        ) : null}
                       </div>
                     </>
                   ) : isDurtFileMaker ? (
@@ -622,6 +633,24 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                         <button type="button" onClick={() => handleLoadApicalEvents(source.id)}>
                           Fetch Apical Events
                         </button>
+                        <Button
+                          disabled={!selectedApicalEventId}
+                          onClick={() => {
+                            void props.onFetchApicalDataNow(source.id);
+                          }}
+                          variant="contained"
+                        >
+                          Import selected event
+                        </Button>
+                        <Button
+                          disabled={!source.apicalDataFilePath}
+                          onClick={() => {
+                            void props.onReprocessApicalData(source.id);
+                          }}
+                          variant="outlined"
+                        >
+                          Re-load linked sessions
+                        </Button>
                       </div>
                       <p>Data last retrieved: {source.dataLastRetrieved || 'Never'}</p>
                       {source.apicalDataFilePath ? (

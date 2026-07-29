@@ -64,6 +64,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
             listenerServer={props.config.listenerServer}
             onSaveListenerServer={props.onSaveListenerServer || (() => undefined)}
             onSaveRemoteServer={props.onSaveRemoteServer || (() => undefined)}
+            onOpenExternalUrl={props.onOpenExternalUrl}
             onSelectCertificateFile={props.onSelectCertificateFile}
             onSelectPrivateKeyFile={props.onSelectPrivateKeyFile}
             remoteServer={props.config.remoteServer}

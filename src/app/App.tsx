@@ -1,7 +1,6 @@
 import { Component, type ReactElement, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { validate as validateUuid } from 'uuid';
 import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getEntriesForEvent, getEventDisciplineLabels, getSessionsForEvent } from '../catalog/eventCatalog.ts';
-import { ReplicaListenerServer } from './replicaListenerServer.ts';
 import { fetchApicalEvents } from '../processing/apical/getResultListJson.ts';
 import { CategoryId } from '../processing/category.ts';
 import { type LoadingMetricsState, getLoadingMetricsSnapshot, incrementLoadingMetric, resetLoadingMetrics, subscribeLoadingMetrics } from '../loadingMetrics.ts';
@@ -20,12 +19,16 @@ import { listMrScatsDataFiles } from '../parsers/mrScats/fileInventory.ts';
 import { previewCtcRawCrossingBuffer, previewMrScatsDataFile } from '../parsers/mrScats/filePreview.ts';
 import { ElectronJsonEventCatalogPersistence } from '../persistence/eventCatalogPersistence.ts';
 import { ElectronJsonRaceAdminPersistence } from '../persistence/raceAdminPersistence.ts';
+import type { AdministrativeChanges } from '../persistence/raceAdminPersistence.ts';
 import { ElectronJsonSystemConfigPersistence } from '../persistence/systemConfigPersistence.ts';
 import { EventCatalogService } from '../service/eventCatalogService.ts';
 import { RaceAdminService } from '../service/raceAdminService.ts';
+import { HttpRaceSweetApiClient } from '../service/raceSweetApiClient.ts';
 import { type SessionSourceReloadMode, type SessionSourceReloadSummary, addSessionSourceReloadSummaries, createEmptySessionSourceReloadSummary, isMissingLinkedCategoryPlaceholder, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload } from '../service/sessionSourceReload.ts';
 import { applyPulledRaceStateToSession, getMinimumLapTimeMillisecondsForSession, getSessionAssignedCategoryIds } from '../service/sourceApplication.ts';
 import { SystemConfigService } from '../service/systemConfigService.ts';
+import type { DomainEventEnvelope } from '../model/serverApi.ts';
+import type { EventCatalogMutation } from '../ledger/eventCatalogLedger.ts';
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
 import { type TestSession, type TestSessionLoadProgressCallback } from '../testdata/testsession.ts';
 import { CategoriesContext } from '../views/context/Categories.tsx';
@@ -44,12 +47,17 @@ import { updateCategorySelectionsForChangedParticipant } from './categoryChangeS
 import { type DurtFileMakerLoadProgress, getBundledDurtFileMakerExtractorPath, loadDurtFileMakerRaceState } from './durtFileMakerDataSource.ts';
 import './index.css';
 import { formatErrorForDisplay } from './stackTrace.ts';
-import { type DataSourceConfig, type EventTimeDisplayZoneMode, type SystemConfiguration, type TimingContextSelectionConfig, createDefaultSystemConfiguration, getFinishLineNumbersForSession, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
+import { type DataSourceConfig, type EventTimeDisplayZoneMode, type ListenerServerConfig, type SystemConfiguration, type TimingContextSelectionConfig, createDefaultSystemConfiguration, getFinishLineNumbersForSession, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds } from './systemConfig.ts';
 import { getSystemTimeZone } from './utils/timeutils.ts';
 import { type EventSessionOption } from './views/results/resultsPage.tsx';
 
 type AppSection = 'System' | 'Events' | 'Entrants' | 'Categories' | 'Sessions' | 'Timing' | 'Results' | 'Reports';
 type TimingSessionSelection = 'active' | 'session';
+
+interface RemoteRaceAdminTarget {
+  raceState: (Session & RaceStateLookup) | undefined;
+  sessionId: SessionId | undefined;
+}
 
 const createStartupLoadingProgress = (): LoadingProgressState => createLoadingProgressState('Loading RaceSweet', [
   { id: 'services', label: 'Loading generated data files', total: 3 },
@@ -65,7 +73,7 @@ const createStartupLoadingProgress = (): LoadingProgressState => createLoadingPr
 ]);
 
 interface PageErrorFallbackProps {
-  error: Error;
+  error: unknown;
   onDismiss?: () => void;
   title?: string;
 }
@@ -114,6 +122,15 @@ const PageErrorFallback = ({ error, onDismiss, title = 'Error loading content' }
   </>
 );
 
+const createEmptySessionState = (): Session & RaceStateLookup => {
+  return new Session({
+    categories: [],
+    participants: [],
+    records: [],
+    teams: [],
+  }) as Session & RaceStateLookup;
+};
+
 class PageErrorBoundary extends Component<PageErrorBoundaryProps, PageErrorBoundaryState> {
   public state: PageErrorBoundaryState = {};
 
@@ -146,12 +163,14 @@ const loadAdminService = async (
   onAdminProgress?: LoadingProgressCallback,
 ): Promise<RaceAdminService> => {
   incrementLoadingMetric('Create admin service');
-  const apicalSession: TestSession = new ApicalElectronFile();
-  const eventSession: TestSession = apicalSession; // undefined!; // rfidSession;
-
   const persistence = new ElectronJsonRaceAdminPersistence('../../src/generated/admin-overrides.json', onError);
 
   return RaceAdminService.create(async () => {
+    if (window.api.persistenceMode === 'server') {
+      incrementLoadingMetric('Create empty server-backed startup race state');
+      return createEmptySessionState();
+    }
+    const eventSession: TestSession = new ApicalElectronFile();
     incrementLoadingMetric('Load startup test data');
     await eventSession.loadTestData(false, onSessionProgress);
     console.log("Test data loaded successfully.");
@@ -165,7 +184,10 @@ const loadEventCatalogService = async (
 ): Promise<EventCatalogService> => {
   incrementLoadingMetric('Create event catalog service');
   const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json', onError);
-  return EventCatalogService.create(persistence, { onProgress });
+  return EventCatalogService.create(persistence, {
+    onProgress,
+    persistAppliedRemoteMutations: false,
+  });
 };
 
 const loadSystemConfigService = async (
@@ -175,15 +197,6 @@ const loadSystemConfigService = async (
   incrementLoadingMetric('Create system config service');
   const persistence = new ElectronJsonSystemConfigPersistence('../../src/generated/system-config.json', onError);
   return SystemConfigService.create(persistence, { onProgress });
-};
-
-const createEmptySessionState = (): Session & RaceStateLookup => {
-  return new Session({
-    categories: [],
-    participants: [],
-    records: [],
-    teams: [],
-  }) as Session & RaceStateLookup;
 };
 
 const getImportedApicalDataFilePath = (
@@ -381,38 +394,12 @@ export const RaceSweetMainApp = () => {
   const [activeSection, setActiveSection] = useState<AppSection>('System');
   const [adminService, setAdminService] = useState<RaceAdminService|undefined>(undefined);
   const [eventCatalogService, setEventCatalogService] = useState<EventCatalogService|undefined>(undefined);
-  const listenerServerRef = useRef<ReplicaListenerServer | undefined>(undefined);
   const [eventCatalogState, setEventCatalogState] = useState<EventCatalogState|undefined>(undefined);
   const [systemConfigService, setSystemConfigService] = useState<SystemConfigService|undefined>(undefined);
   const [systemConfigState, setSystemConfigState] = useState<SystemConfiguration>(createDefaultSystemConfiguration());
-
-  useEffect(() => {
-    if (!eventCatalogService) {
-      return undefined;
-    }
-    const listenerServer = listenerServerRef.current || new ReplicaListenerServer({
-      appendRemoteMutations: (mutations) => eventCatalogService.applyRemoteMutations(mutations).then((catalog) => {
-        setEventCatalogState(catalog);
-      }),
-      getMutationsAfter: (cursor) => {
-        const offset = Number.parseInt(cursor || '0', 10);
-        const mutations = eventCatalogService.mutations;
-        return {
-          cursor: mutations.length.toString(),
-          mutations: mutations.slice(Number.isSafeInteger(offset) && offset >= 0 ? offset : 0),
-        };
-      },
-    });
-    listenerServerRef.current = listenerServer;
-    listenerServer.reload(systemConfigState.listenerServer || { enabled: false }).catch((error: unknown) => setErrorState(error as Error));
-    return () => {
-      void listenerServer.close();
-      listenerServerRef.current = undefined;
-    };
-  }, [eventCatalogService, systemConfigState.listenerServer]);
   const [sessionState, setSessionState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [, setRenderTick] = useState(0);
-  const [errorState, setErrorState] = useState<Error|undefined>(undefined);
+  const [errorState, setErrorState] = useState<unknown>(undefined);
   const [displayedErrorLogEntries, setDisplayedErrorLogEntries] = useState<DisplayedErrorLogEntry[]>([]);
   const [loadingMetrics, setLoadingMetrics] = useState<LoadingMetricsState>(getLoadingMetricsSnapshot);
   const [loadingProgress, setLoadingProgress] = useState<LoadingProgressState>(createStartupLoadingProgress);
@@ -432,10 +419,108 @@ export const RaceSweetMainApp = () => {
   const [timingRaceState, setTimingRaceState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
   const [timingSessionSelection, setTimingSessionSelection] = useState<TimingSessionSelection>('active');
   const [timingSelectionLoading, setTimingSelectionLoading] = useState<boolean>(false);
-  const [timingErrorState, setTimingErrorState] = useState<Error|undefined>(undefined);
+  const [timingErrorState, setTimingErrorState] = useState<unknown>(undefined);
   const [reloadSummary, setReloadSummary] = useState<SessionSourceReloadSummary|undefined>(undefined);
   const initialTimingSelectionHydrated = useRef<boolean>(false);
   const unsavedChangesGuards = useRef<Partial<Record<AppSection, UnsavedChangesGuard>>>({});
+  const remoteRaceAdminTarget = useRef<RemoteRaceAdminTarget>({
+    raceState: undefined,
+    sessionId: undefined,
+  });
+  remoteRaceAdminTarget.current = {
+    raceState: timingRaceState || sessionState,
+    sessionId: selectedTimingSessionId as SessionId | undefined,
+  };
+
+  useEffect(() => {
+    if (!eventCatalogService || !systemConfigService || typeof EventSource === 'undefined') {
+      return undefined;
+    }
+    const client = new HttpRaceSweetApiClient();
+    const applyRemoteAdminChanges = (
+      changes: AdministrativeChanges,
+    ): Promise<void> => {
+      if (!adminService) {
+        return Promise.resolve();
+      }
+      const target = remoteRaceAdminTarget.current;
+      return adminService.applyRemoteChanges(
+        changes,
+        target.raceState,
+        target.sessionId,
+      );
+    };
+    const applyRemoteEvent = (event: DomainEventEnvelope): void => {
+      if (event.type !== 'catalog.mutations-applied' || typeof event.payload !== 'object' || Array.isArray(event.payload) || event.payload === null) {
+        if (event.type === 'system-config.changed') {
+          fetch('/api/v1/system/configuration', { credentials: 'include' })
+            .then((response: Response) => {
+              if (!response.ok) {
+                throw new Error(`RaceSweet API returned HTTP ${response.status} while refreshing configuration.`);
+              }
+              return response.json() as Promise<SystemConfiguration>;
+            })
+            .then((config: SystemConfiguration) => {
+              updateSystemConfigState(systemConfigService.applyRemoteConfiguration(config));
+            })
+            .catch((error: unknown) => setErrorState(error as Error));
+        }
+        if (event.type === 'race-admin.changed' && adminService) {
+          applyRemoteAdminChanges(
+            event.payload as unknown as AdministrativeChanges,
+          )
+            .then(() => setRenderTick((tick: number): number => tick + 1))
+            .catch((error: unknown) => setErrorState(error as Error));
+        }
+        return;
+      }
+      const mutations = (event.payload as { mutations?: EventCatalogMutation[] }).mutations || [];
+      eventCatalogService.applyRemoteMutations(mutations)
+        .then(setEventCatalogState)
+        .catch((error: unknown) => setErrorState(error as Error));
+    };
+    const resync = (): void => {
+      const catalogRequest: Promise<{ mutations: EventCatalogMutation[] }> =
+        fetch('/api/v1/mutations', { credentials: 'include' })
+          .then((response: Response) => {
+            if (!response.ok) {
+              throw new Error(`RaceSweet API returned HTTP ${response.status} while resynchronising.`);
+            }
+            return response.json() as Promise<{ mutations: EventCatalogMutation[] }>;
+          });
+      const raceAdminRequest: Promise<AdministrativeChanges | undefined> =
+        adminService
+          ? fetch('/api/v1/race-admin', { credentials: 'include' })
+            .then((response: Response) => {
+              if (!response.ok) {
+                throw new Error(
+                  `RaceSweet API returned HTTP ${response.status} while resynchronising race changes.`,
+                );
+              }
+              return response.json() as Promise<AdministrativeChanges>;
+            })
+          : Promise.resolve(undefined);
+      Promise.all([catalogRequest, raceAdminRequest])
+        .then(([
+          catalogResult,
+          raceAdminChanges,
+        ]: [
+          { mutations: EventCatalogMutation[] },
+          AdministrativeChanges | undefined,
+        ]) => Promise.all([
+          eventCatalogService.applyRemoteMutations(catalogResult.mutations),
+          raceAdminChanges
+            ? applyRemoteAdminChanges(raceAdminChanges)
+            : Promise.resolve(),
+        ]))
+        .then(([catalogState, _adminResult]: [EventCatalogState, void]) => {
+          setEventCatalogState(catalogState);
+          setRenderTick((tick: number): number => tick + 1);
+        })
+        .catch((error: unknown) => setErrorState(error as Error));
+    };
+    return client.subscribe(applyRemoteEvent, resync);
+  }, [adminService, eventCatalogService, systemConfigService]);
   const setUnsavedChangesGuard = useCallback((section: AppSection, guard: UnsavedChangesGuard | undefined): void => {
     unsavedChangesGuards.current[section] = guard;
   }, []);
@@ -511,7 +596,7 @@ export const RaceSweetMainApp = () => {
   useEffect(() => {
     if (!sessionState && !eventCatalogState && !errorState) {
       const onLoadError = (error: unknown): void => {
-        const message = error instanceof Error ? error.message : String(error);
+        const message: string = formatErrorForDisplay(error);
         setLoadWarnings((existing) => existing.includes(message) ? existing : [...existing, message]);
       };
 
@@ -1323,17 +1408,6 @@ export const RaceSweetMainApp = () => {
 
   const renderShell = (content: ReactElement): ReactElement => (
     <div className="app-shell">
-      {loadWarnings.length > 0 && (
-        <div className="load-warnings" role="alert" aria-label="Load warnings">
-          <strong>Warnings:</strong>
-          <ul>
-            {loadWarnings.map((warning, index) => (
-              <li key={index}>{warning}</li>
-            ))}
-          </ul>
-          <button type="button" onClick={() => setLoadWarnings([])}>Dismiss</button>
-        </div>
-      )}
       <nav className="section-nav" aria-label="Application sections">
         {appSections.map((section) => {
           const isActive = activeSection === section.id;
@@ -1353,6 +1427,17 @@ export const RaceSweetMainApp = () => {
         })}
       </nav>
       <main className="section-content">
+        {loadWarnings.length > 0 && (
+          <div className="load-warnings" role="alert" aria-label="Load warnings">
+            <strong>Warnings:</strong>
+            <ul>
+              {loadWarnings.map((warning, index) => (
+                <li key={index}>{warning}</li>
+              ))}
+            </ul>
+            <button type="button" onClick={() => setLoadWarnings([])}>Dismiss</button>
+          </div>
+        )}
         {content}
       </main>
       {reloadSummary ? (
@@ -2026,13 +2111,24 @@ export const RaceSweetMainApp = () => {
             if (!systemConfigService) {
               return;
             }
-            const persistChanges = (): Promise<void> => systemConfigService.updateListenerServer(changes)
-              .then(updateSystemConfigState);
-            if (changes.enabled === false && listenerServerRef.current) {
-              listenerServerRef.current.close().then(persistChanges).catch((error: unknown) => setErrorState(error as Error));
-              return;
-            }
-            persistChanges().catch((error: unknown) => setErrorState(error as Error));
+            fetch('/api/v1/system/listener', {
+              body: JSON.stringify({ changes }),
+              credentials: 'include',
+              headers: { 'content-type': 'application/json' },
+              method: 'PUT',
+            }).then((response: Response): Promise<{ listenerServer: ListenerServerConfig }> => {
+              if (!response.ok) {
+                return response.json().then((problem: { error?: string }) => {
+                  throw new Error(problem.error || `RaceSweet API returned HTTP ${response.status}.`);
+                });
+              }
+              return response.json() as Promise<{ listenerServer: ListenerServerConfig }>;
+            }).then((result: { listenerServer: ListenerServerConfig }): void => {
+              updateSystemConfigState(systemConfigService.applyRemoteConfiguration({
+                ...systemConfigService.state,
+                listenerServer: result.listenerServer,
+              }));
+            }).catch((error: unknown) => setErrorState(error));
           }}
           onSaveRemoteServer={(changes) => {
             if (!systemConfigService) {

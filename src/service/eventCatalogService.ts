@@ -117,9 +117,20 @@ export interface ImportedRaceStateMetadata {
   raceState: Partial<RaceState>;
 }
 
+class EventCatalogPersistenceError extends Error {
+  public readonly originalError: Error;
+
+  public constructor(originalError: Error) {
+    super(originalError.message);
+    this.name = "EventCatalogPersistenceError";
+    this.originalError = originalError;
+  }
+}
+
 export interface EventCatalogServiceOptions {
   onPersistedLedger?: (ledger: EventCatalogLedger) => Promise<void>;
   onProgress?: LoadingProgressCallback;
+  persistAppliedRemoteMutations?: boolean;
 }
 
 const assertEventCatalogPersistence = (
@@ -2070,7 +2081,11 @@ export class EventCatalogService {
   ): Promise<EventCatalogState> {
     this.applyingRemoteMutations = true;
     try {
-      return await this.appendMutations(mutations);
+      return await this.appendMutations(
+        mutations,
+        NO_OP_COMPLETE_STEP,
+        this.options.persistAppliedRemoteMutations !== false,
+      );
     } finally {
       this.applyingRemoteMutations = false;
     }
@@ -4281,6 +4296,7 @@ export class EventCatalogService {
       currentTask: string,
       index: number,
     ) => Promise<void> = NO_OP_COMPLETE_STEP,
+    persistChanges: boolean = true,
   ): Promise<EventCatalogState> {
     const nextMutations = await removeDuplicateAndNoopMutations(
       this.ledger.mutations,
@@ -4291,11 +4307,26 @@ export class EventCatalogService {
       return this.state;
     }
 
+    const previousLedger: EventCatalogLedger = this.ledger;
+    const previousState: EventCatalogState = this.state;
     this.ledger = {
       ...this.ledger,
       mutations: nextMutations,
     };
-    await this.persist();
+    if (!persistChanges) {
+      this.state = applyEventCatalogLedger(this.ledger);
+      return this.state;
+    }
+    try {
+      await this.persist();
+    } catch (error: unknown) {
+      if (error instanceof EventCatalogPersistenceError) {
+        this.ledger = previousLedger;
+        this.state = previousState;
+        throw error.originalError;
+      }
+      throw error;
+    }
     return this.state;
   }
 
@@ -4310,15 +4341,40 @@ export class EventCatalogService {
   }
 
   private async runMutationBatch<T>(operation: () => Promise<T>): Promise<T> {
+    const isOutermostBatch: boolean = this.batchDepth === 0;
+    const previousLedger: EventCatalogLedger = this.ledger;
+    const previousState: EventCatalogState = this.state;
+    const previousPendingBatchPersist: boolean = this.pendingBatchPersist;
+    let operationCompleted: boolean = false;
+    let batchDepthReleased: boolean = false;
+
     this.batchDepth += 1;
     try {
-      return await operation();
-    } finally {
+      const result: T = await operation();
+      operationCompleted = true;
       this.batchDepth -= 1;
+      batchDepthReleased = true;
       if (this.batchDepth === 0 && this.pendingBatchPersist) {
         this.pendingBatchPersist = false;
         await this.persistCurrentLedger();
       }
+      return result;
+    } catch (error: unknown) {
+      if (!batchDepthReleased) {
+        this.batchDepth -= 1;
+      }
+      if (
+        isOutermostBatch &&
+        (!operationCompleted || error instanceof EventCatalogPersistenceError)
+      ) {
+        this.ledger = previousLedger;
+        this.state = previousState;
+        this.pendingBatchPersist = previousPendingBatchPersist;
+      }
+      if (error instanceof EventCatalogPersistenceError) {
+        throw error.originalError;
+      }
+      throw error;
     }
   }
 
@@ -4474,7 +4530,13 @@ export class EventCatalogService {
   }
 
   private async persistCurrentLedger(): Promise<void> {
-    await this.persistence.save(this.ledger);
+    try {
+      await this.persistence.save(this.ledger);
+    } catch (error: unknown) {
+      const persistenceError: Error =
+        error instanceof Error ? error : new Error(String(error));
+      throw new EventCatalogPersistenceError(persistenceError);
+    }
     if (this.options.onPersistedLedger && !this.applyingRemoteMutations) {
       await this.options.onPersistedLedger(this.ledger);
     }

@@ -80,6 +80,7 @@ ipcRenderer.on(WriteContentErrorIpcReceiveChannel,
   });
 
 const rendererApi: Window['api'] = {
+  persistenceMode: 'native',
   receive: (channel: string, func: (...args: unknown[]) => unknown): void => {
     if (VALID_RECEIVE_CHANNELS.includes(channel)) {
       ipcRenderer.on(channel, (_event: IpcRendererEvent, ...args: unknown[]) => func(...args));

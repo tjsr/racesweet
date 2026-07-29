@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { act } from 'react';
-import { flushSync } from 'react-dom';
 import { type Root, createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type EventCatalogEntrant } from '../../catalog/eventCatalog.js';
@@ -59,6 +58,9 @@ const getMuiSelect = (container: HTMLElement, label: string): HTMLElement => {
 };
 
 const getMuiOptionLabels = async (select: HTMLElement): Promise<string[]> => {
+  if (select instanceof HTMLSelectElement) {
+    return Array.from(select.options).map((option: HTMLOptionElement): string => option.textContent || '');
+  }
   await act(async () => {
     select.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
   });
@@ -67,6 +69,13 @@ const getMuiOptionLabels = async (select: HTMLElement): Promise<string[]> => {
     document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
   });
   return labels;
+};
+
+const getSelectedOptionLabel = (select: HTMLElement): string => {
+  if (select instanceof HTMLSelectElement) {
+    return select.selectedOptions[0]?.textContent || '';
+  }
+  return select.textContent || '';
 };
 
 describe('EntrantDetailsPanel', () => {
@@ -101,7 +110,7 @@ describe('EntrantDetailsPanel', () => {
       vehicle: '',
     };
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <EntrantDetailsPanel
           entrantDraft={entrantDraft}
@@ -138,7 +147,7 @@ describe('EntrantDetailsPanel', () => {
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <EntrantDetailsPanel
           entrantDraft={{
@@ -174,7 +183,7 @@ describe('EntrantDetailsPanel', () => {
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <EntrantDetailsPanel
           entrantDraft={{
@@ -208,7 +217,7 @@ describe('EntrantDetailsPanel', () => {
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <EntrantDetailsPanel
           entrantDraft={{
@@ -250,7 +259,7 @@ describe('EntrantDetailsPanel', () => {
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <EntrantDetailsPanel
           entrantDraft={{
@@ -284,6 +293,6 @@ describe('EntrantDetailsPanel', () => {
     expect(container.textContent).not.toContain('Team Details');
     expect(container.querySelector<HTMLInputElement>('input[aria-label="Entrant Vehicle"]')?.value).toBe('Falcon GT');
     expect(container.querySelector<HTMLInputElement>('input[aria-label="Entrant Start Order"]')?.value).toBe('3');
-    expect(getMuiSelect(container, 'Entrant Category').textContent).toBe('Premier');
+    expect(getSelectedOptionLabel(getMuiSelect(container, 'Entrant Category'))).toBe('Premier');
   });
 });

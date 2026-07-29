@@ -261,6 +261,58 @@ describe('ElectronJsonEventCatalogPersistence', () => {
     );
   });
 
+  it('sends a complete mutation ledger instead of split files in server mode', async () => {
+    const writeFileContent = vi.fn(
+      async (_filePath: string, _contents: string): Promise<void> => undefined,
+    );
+    (window as unknown as {
+      api: {
+        persistenceMode: 'server';
+        writeFileContent: (
+          filePath: string,
+          contents: string,
+          dataType?: string,
+          options?: object,
+        ) => Promise<void>;
+      };
+    }).api = {
+      persistenceMode: 'server',
+      writeFileContent,
+    };
+    const eventId = createEventId('server-backed-event');
+    const ledger = {
+      ...createDefaultEventCatalogLedger(),
+      mutations: [{
+        event: {
+          categoryIds: [],
+          date: '2026-07-29',
+          entrantIds: [],
+          format: 'race-weekend' as const,
+          id: eventId,
+          name: 'Server-backed event',
+          sessionIds: [],
+        },
+        id: createId('server-backed-event-mutation'),
+        timestamp: '2026-07-29T00:00:00.000Z',
+        type: 'event-created' as const,
+      }],
+    };
+
+    const persistence = new ElectronJsonEventCatalogPersistence(eventCatalogTestPath);
+    await persistence.save(ledger);
+
+    expect(writeFileContent).toHaveBeenCalledOnce();
+    expect(writeFileContent).toHaveBeenCalledWith(
+      eventCatalogTestPath,
+      JSON.stringify({
+        mutations: ledger.mutations,
+        schemaVersion: 1,
+      }),
+      'utf8',
+      { context: { operation: 'server event catalog persistence' } },
+    );
+  });
+
   it('keeps an event file eligible for retry when its write fails', async () => {
     const eventId = createEventId('retry-event');
     const ledger = {

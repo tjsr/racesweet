@@ -19,8 +19,10 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     extraResource: [
+      path.resolve('dist', 'web'),
       path.resolve('packages', 'fmptools-win32-arm64'),
       path.resolve('packages', 'fmptools-win32-x64'),
+      path.resolve('node_modules', 'swagger-ui-dist'),
     ],
   },
   rebuildConfig: {},

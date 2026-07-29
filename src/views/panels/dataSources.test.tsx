@@ -77,8 +77,51 @@ describe('DataSourcesPanel', () => {
     expect(container.textContent).toContain('Add Data Source');
   });
 
+  it('imports the selected Apical event and re-loads its linked sessions', () => {
+    const onFetchApicalDataNow = vi.fn();
+    const onReprocessApicalData = vi.fn();
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <DataSourcesPanel
+          dataSources={[{
+            ...dataSources[0]!,
+            apicalDataFilePath: 'C:/RaceSweet/apical-1001.xlsx',
+          }]}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={onFetchApicalDataNow}
+          onLoadApicalEvents={vi.fn()}
+          onReprocessApicalData={onReprocessApicalData}
+          onSaveSource={vi.fn()}
+        />,
+      );
+    });
+
+    const importButton = Array.from(container.querySelectorAll('button')).find(
+      (button: HTMLButtonElement): boolean => button.textContent === 'Import selected event',
+    );
+    const reloadButton = Array.from(container.querySelectorAll('button')).find(
+      (button: HTMLButtonElement): boolean => button.textContent === 'Re-load linked sessions',
+    );
+    expect(importButton).toBeDefined();
+    expect(reloadButton).toBeDefined();
+
+    flushSync(() => {
+      importButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      reloadButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onFetchApicalDataNow).toHaveBeenCalledWith('source-apical');
+    expect(onReprocessApicalData).toHaveBeenCalledWith('source-apical');
+  });
+
   it('persists the selected Dorian CTC Import or Update mode', async () => {
     const onSaveSource = vi.fn();
+    const onLoadDorianCtcSrtFile = vi.fn();
     const onSelectDorianCtcTrackConfigFile = vi.fn(async () => 'C:/RaceTime/timing/TRACK.CFG');
     const ctcSource: DataSourceConfig = {
       enabled: true,
@@ -102,6 +145,7 @@ describe('DataSourcesPanel', () => {
           onDeleteSource={vi.fn()}
           onFetchApicalDataNow={vi.fn()}
           onLoadApicalEvents={vi.fn()}
+          onLoadDorianCtcSrtFile={onLoadDorianCtcSrtFile}
           onReprocessApicalData={vi.fn()}
           onSaveSource={onSaveSource}
           onSelectDorianCtcTrackConfigFile={onSelectDorianCtcTrackConfigFile}
@@ -141,6 +185,15 @@ describe('DataSourcesPanel', () => {
         importPlaceholderEntrantsForUnknownTransmitters: true,
       },
     });
+
+    const importButton = Array.from(container.querySelectorAll('button')).find(
+      (button: HTMLButtonElement): boolean => button.textContent === 'Import into selected session',
+    );
+    expect(importButton).toBeDefined();
+    flushSync(() => {
+      importButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(onLoadDorianCtcSrtFile).toHaveBeenCalledWith('source-dorian-ctc');
 
     const trackConfigInput = container.querySelector('input[aria-label="Dorian CTC TRACK.CFG File Path source-dorian-ctc"]') as HTMLInputElement;
     expect(trackConfigInput).toBeTruthy();
@@ -605,9 +658,14 @@ describe('DataSourcesPanel', () => {
     const previewFileButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'DRIVERS.DBF');
     expect(previewFileButton).toBeDefined();
     previewFileButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await new Promise((resolve) => {
-      setTimeout(resolve, 0);
-    });
+    for (let attempt: number = 0; attempt < 120; attempt += 1) {
+      if (container.querySelector('[role="dialog"]')?.textContent?.includes('Alice Rider')) {
+        break;
+      }
+      await new Promise<void>((resolve): void => {
+        setTimeout(resolve, 10);
+      });
+    }
 
     expect(onPreviewMrScatsDataFile).toHaveBeenCalledWith('source-mr-scats', expect.objectContaining({
       relativePath: 'DRIVERS.DBF',

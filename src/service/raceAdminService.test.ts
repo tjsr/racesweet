@@ -326,4 +326,39 @@ describe('RaceAdminService', () => {
       { action: 'assign', categoryId: 'cat-d', flagId: 'flag-2' },
     ]);
   });
+
+  it('applies remote flag deletion changes to the displayed client session', async () => {
+    const startupSessionDouble = createSessionDouble();
+    const displayedSessionDouble = createSessionDouble();
+    const persistence = new MemoryPersistence();
+    const service = await RaceAdminService.create(
+      async () => startupSessionDouble.session as never,
+      persistence,
+    );
+    const remoteChanges: AdministrativeChanges = {
+      ...createDefaultAdministrativeChanges(),
+      flagDeleted: { 'remote-flag-1': true },
+    };
+
+    await service.applyRemoteChanges(
+      remoteChanges,
+      displayedSessionDouble.session as never,
+      'displayed-session' as SessionId,
+    );
+
+    expect(displayedSessionDouble.flagDeleted['remote-flag-1']).toBe(true);
+    expect(startupSessionDouble.flagDeleted['remote-flag-1']).toBeUndefined();
+    expect(persistence.snapshot.flagDeleted['remote-flag-1']).toBeUndefined();
+
+    await service.applyRemoteChanges(
+      {
+        ...remoteChanges,
+        flagDeleted: { 'remote-flag-1': false },
+      },
+      displayedSessionDouble.session as never,
+      'displayed-session' as SessionId,
+    );
+
+    expect(displayedSessionDouble.flagDeleted['remote-flag-1']).toBe(false);
+  });
 });

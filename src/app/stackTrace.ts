@@ -222,7 +222,34 @@ const removeDuplicateStackHeading = (error: Error, stack: string): string | unde
 
 export const formatErrorForDisplay = (error: unknown): string => {
   if (!(error instanceof Error)) {
-    return String(error);
+    if (typeof error === 'string') {
+      return error;
+    }
+    const seen: WeakSet<object> = new WeakSet<object>();
+    try {
+      const serialized: string | undefined = JSON.stringify(
+        error,
+        (_key: string, value: unknown): unknown => {
+          if (typeof value === 'bigint') {
+            return value.toString();
+          }
+          if (typeof value === 'object' && value !== null) {
+            if (seen.has(value)) {
+              return '[Circular]';
+            }
+            seen.add(value);
+          }
+          return value;
+        },
+        2,
+      );
+      return serialized ?? `${typeof error}: ${String(error)}`;
+    } catch (serializationError: unknown) {
+      const reason: string = serializationError instanceof Error
+        ? serializationError.message
+        : String(serializationError);
+      return `Unable to format ${Object.prototype.toString.call(error)}: ${reason}`;
+    }
   }
 
   const stackFrames = error.stack

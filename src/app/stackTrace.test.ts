@@ -161,4 +161,24 @@ describe('stack trace formatting', () => {
     expect(formattedError).toContain('Apical Excel download request returned HTTP 403 Forbidden.');
     expect(formattedError.match(/Apical Excel download request returned HTTP 403 Forbidden\./g)).toHaveLength(1);
   });
+
+  it('formats non-Error objects as structured JSON instead of object coercions', () => {
+    const details: { endpoint: string; status: number } = {
+      endpoint: '/api/v1/mutations',
+      status: 500,
+    };
+
+    const formattedError: string = formatErrorForDisplay(details);
+
+    expect(formattedError).toContain('"endpoint": "/api/v1/mutations"');
+    expect(formattedError).toContain('"status": 500');
+    expect(formattedError).not.toContain('[object Object]');
+  });
+
+  it('safely formats circular diagnostic objects', () => {
+    const details: { self?: object; type: string } = { type: 'startup' };
+    details.self = details;
+
+    expect(formatErrorForDisplay(details)).toContain('"self": "[Circular]"');
+  });
 });

@@ -1,10 +1,13 @@
 import { RaceSweetMainApp } from './App';
+import { AuthenticatedRaceSweetApp } from './authenticatedApp.js';
+import { RestartGate } from './restartGate.js';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 
 export const mountApp = (container: HTMLElement): void => {
   const root = createRoot(container);
-  root.render(React.createElement(RaceSweetMainApp));
+  const App = window.api ? AuthenticatedRaceSweetApp : RaceSweetMainApp;
+  root.render(React.createElement(RestartGate, undefined, React.createElement(App)));
 };
 
 export const startApp = (): void => {

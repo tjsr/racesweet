@@ -21,6 +21,7 @@ import { writeApplicationFile } from './fileWrite';
 import type { FileWriteOptions } from './fileWriteDiagnostics';
 import { waitForContentServer, waitForWindowContentLoad } from './startupContentServer';
 import type { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileWriteDataType, SelectLocalFileOptions } from './window';
+import { RaceSweetApplicationServer } from './server/raceSweetApplicationServer';
 
 import path from 'node:path';
 import { fetchExternalHttpProxy } from './externalHttpProxy';
@@ -28,6 +29,8 @@ import { fetchExternalHttpProxy } from './externalHttpProxy';
 export type IPCEventId = string;
 
 const __dirname = path.dirname(__filename);
+let applicationServer: RaceSweetApplicationServer | undefined;
+let internalApplicationOrigin: string | undefined;
 
 const resolveAppFilePath = (filename: string): string => {
   return path.isAbsolute(filename) ? filename : path.join(__dirname, filename);
@@ -89,7 +92,7 @@ const showStartupError = (error: Error): void => {
   dialog.showErrorBox('RaceSweet startup failed', error.message);
 };
 
-const createWindow = async (): Promise<void> => {
+const createWindow = async (contentUrl: string): Promise<void> => {
   await waitForContentServer(MAIN_WINDOW_WEBPACK_ENTRY);
 
   configureSecurityHeaders();
@@ -106,7 +109,7 @@ const createWindow = async (): Promise<void> => {
     width: 1024,
   });
 
-  await waitForWindowContentLoad(mainWindow, MAIN_WINDOW_WEBPACK_ENTRY);
+  await waitForWindowContentLoad(mainWindow, contentUrl);
   mainWindow.show();
 };
 
@@ -114,7 +117,28 @@ const createWindow = async (): Promise<void> => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
-  createWindow().catch((error: Error) => {
+  const startApplication = async (): Promise<void> => {
+    await waitForContentServer(MAIN_WINDOW_WEBPACK_ENTRY);
+    const dataDirectory: string = process.env.RACESWEET_DATA_DIRECTORY ||
+      (app.isPackaged ? app.getPath('userData') : path.resolve('src', 'generated'));
+    applicationServer = new RaceSweetApplicationServer({
+      assetSource: MAIN_WINDOW_WEBPACK_ENTRY,
+      dataDirectory,
+      externalAssetSource: app.isPackaged
+        ? path.join(process.resourcesPath, 'web')
+        : path.resolve('dist', 'web'),
+      swaggerAssetDirectory: app.isPackaged
+        ? path.join(process.resourcesPath, 'swagger-ui-dist')
+        : undefined,
+    });
+    await applicationServer.initialize();
+    const internalServer = await applicationServer.startInternal();
+    internalApplicationOrigin = internalServer.origin;
+    await applicationServer.reloadExternal(applicationServer.listenerConfig);
+    await createWindow(internalApplicationOrigin);
+  };
+
+  startApplication().catch((error: Error) => {
     showStartupError(error);
     app.quit();
   });
@@ -133,11 +157,19 @@ app.on('activate', (): void => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow().catch((error: Error) => {
+    if (!internalApplicationOrigin) {
+      showStartupError(new Error('The internal RaceSweet server is not available.'));
+      return;
+    }
+    createWindow(internalApplicationOrigin).catch((error: Error) => {
       showStartupError(error);
       app.quit();
     });
   }
+});
+
+app.on('will-quit', (): void => {
+  void applicationServer?.close();
 });
 
 // In this file you can include the rest of your app's specific main process
@@ -240,8 +272,8 @@ ipcMain.on(RequestWriteIpcSendChannel, (
 
 ipcMain.handle(RequestOpenExternalUrlIpcInvokeChannel, async (_event: Electron.IpcMainInvokeEvent, urlText: string): Promise<void> => {
   const url = new URL(urlText);
-  if (url.protocol !== 'https:') {
-    throw new Error('Only HTTPS URLs may be opened externally.');
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new Error('Only HTTP and HTTPS URLs may be opened externally.');
   }
   await shell.openExternal(url.toString());
 });

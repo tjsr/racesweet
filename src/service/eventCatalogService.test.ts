@@ -2024,6 +2024,111 @@ describe("EventCatalogService", () => {
     );
   });
 
+  it("rolls back an event creation when durable persistence fails", async () => {
+    const seededPersistence: EventCatalogPersistence = createPersistence(
+      createSeedEventCatalogLedger(),
+    );
+    const service: EventCatalogService =
+      await EventCatalogService.create(seededPersistence);
+    const originalCatalog: EventCatalogState = service.catalog;
+    const originalMutations: EventCatalogLedger["mutations"] =
+      service.mutations;
+    const persistenceFailure: Error = new Error(
+      "The event catalog could not be written to durable storage.",
+    );
+    vi.mocked(seededPersistence.save).mockRejectedValueOnce(persistenceFailure);
+
+    await expect(service.createEvent()).rejects.toThrow(
+      "The event catalog could not be written to durable storage.",
+    );
+
+    expect(service.catalog).toEqual(originalCatalog);
+    expect(service.mutations).toEqual(originalMutations);
+    expect(
+      service.catalog.events.some((event) => event.name === "New Event"),
+    ).toBe(false);
+
+    await service.createEvent();
+
+    expect(
+      service.catalog.events.some((event) => event.name === "New Event"),
+    ).toBe(true);
+    expect(seededPersistence.save).toHaveBeenCalledTimes(2);
+  });
+
+  it("rolls back every mutation in a batch when durable persistence fails", async () => {
+    const seededPersistence: EventCatalogPersistence = createPersistence(
+      createSeedEventCatalogLedger(),
+    );
+    const service: EventCatalogService =
+      await EventCatalogService.create(seededPersistence);
+    const originalCatalog: EventCatalogState = service.catalog;
+    const originalMutations: EventCatalogLedger["mutations"] =
+      service.mutations;
+    vi.mocked(seededPersistence.save).mockRejectedValueOnce(
+      new Error("The imported race state could not be persisted."),
+    );
+
+    await expect(
+      service.updateImportedRaceState(
+        SEED_EVENT_ID,
+        SEED_PRACTICE_SESSION_ID,
+        {
+          records: [
+            {
+              id: createTimeRecordId("failed-persistence-record"),
+              recordType: RECORD_TX_CROSSING,
+              sequence: 1,
+              source: createTimeRecordSourceId(
+                "failed-persistence-record-source",
+              ),
+              time: new Date("2026-01-01T00:00:01.000Z"),
+            } as EventTimeRecord,
+          ],
+        },
+      ),
+    ).rejects.toThrow("The imported race state could not be persisted.");
+
+    expect(service.catalog).toEqual(originalCatalog);
+    expect(service.mutations).toEqual(originalMutations);
+  });
+
+  it("applies remote mutations to a renderer projection without persisting them", async () => {
+    const seededPersistence: EventCatalogPersistence = createPersistence(
+      createSeedEventCatalogLedger(),
+    );
+    const onPersistedLedger = vi.fn(async (): Promise<void> => undefined);
+    const service: EventCatalogService = await EventCatalogService.create(
+      seededPersistence,
+      {
+        onPersistedLedger,
+        persistAppliedRemoteMutations: false,
+      },
+    );
+    const remoteEventId = createEventId("remote-renderer-projection-event");
+    const remoteMutation: EventCatalogLedger["mutations"][number] = {
+      event: {
+        categoryIds: [],
+        date: "2026-07-29",
+        entrantIds: [],
+        format: "race-weekend",
+        id: remoteEventId,
+        name: "Remote renderer projection event",
+        sessionIds: [],
+      },
+      id: createId("remote-renderer-projection-event-mutation"),
+      timestamp: "2026-07-29T00:00:00.000Z",
+      type: "event-created",
+    };
+
+    await service.applyRemoteMutations([remoteMutation]);
+
+    expect(service.catalog.events).toContainEqual(remoteMutation.event);
+    expect(service.mutations).toContainEqual(remoteMutation);
+    expect(seededPersistence.save).not.toHaveBeenCalled();
+    expect(onPersistedLedger).not.toHaveBeenCalled();
+  });
+
   it("creates team entrants through the ledger, persistence, and upstream callback flow", async () => {
     const seededPersistence = createPersistence(createSeedEventCatalogLedger());
     const onPersistedLedger = vi.fn(async () => undefined);

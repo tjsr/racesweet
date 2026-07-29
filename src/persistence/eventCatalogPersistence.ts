@@ -381,6 +381,20 @@ export class ElectronJsonEventCatalogPersistence implements EventCatalogPersiste
   public async save(ledger: EventCatalogLedger): Promise<void> {
     try {
       const api = getRendererApi(['writeFileContent']);
+      if (api.persistenceMode === 'server') {
+        await api.writeFileContent(
+          this.filePath,
+          JSON.stringify({
+            mutations: ledger.mutations,
+            schemaVersion: 1,
+          } satisfies EventCatalogLedger),
+          'utf8',
+          {
+            context: { operation: 'server event catalog persistence' },
+          },
+        );
+        return;
+      }
       const directoryPath = getDirectoryPath(this.filePath);
       const splitLedger = splitLedgerByEvent(ledger, this.inlineTrackMapMutationIdsByEvent, this.trackMapMutationIdsByEvent);
       const manifest: SplitEventCatalogManifest = {

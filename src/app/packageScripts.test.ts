@@ -8,7 +8,9 @@ describe('package scripts', () => {
     ) as { scripts?: Record<string, string> };
 
     expect(packageJson.scripts?.compile).toContain('npm run compile:electron');
-    expect(packageJson.scripts?.['compile:electron']).toBe('electron-forge package');
+    expect(packageJson.scripts?.['compile:electron']).toBe(
+      'npm run build:web && electron-forge package',
+    );
     expect(packageJson.scripts?.compile).not.toContain('webpack.main.config');
   });
 

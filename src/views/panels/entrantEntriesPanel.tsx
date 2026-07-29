@@ -1,4 +1,4 @@
-import { Button, MenuItem, TextField } from '@mui/material';
+import { Button, TextField } from '@mui/material';
 import React from 'react';
 
 import type { EventCatalogCategory, EventCatalogEntrant, EventCatalogEntry } from '../../catalog/eventCatalog.js';
@@ -128,13 +128,13 @@ const EntryEditor = (props: EntrantEntriesPanelProps & { entry: EventCatalogEntr
       <TextField
         label="Category"
         select
-        slotProps={{ select: { 'aria-label': `Entry Category ${props.entry.id}` } }}
+        slotProps={{ select: { 'aria-label': `Entry Category ${props.entry.id}`, native: true } }}
         value={draft.categoryId}
         onChange={(event) => setDraft((current) => ({ ...current, categoryId: event.target.value }))}
       >
-        <MenuItem value="">No category</MenuItem>
+        <option value="">No category</option>
         {props.categories.filter((category) => category.deleted !== true).map((category) => (
-          <MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>
+          <option key={category.id} value={category.id}>{category.name}</option>
         ))}
       </TextField>
       <TextField

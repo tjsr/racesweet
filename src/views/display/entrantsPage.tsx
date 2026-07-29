@@ -1,4 +1,4 @@
-import { MenuItem, TextField } from '@mui/material';
+import { TextField } from '@mui/material';
 import React from 'react';
 import {
   type EntrantType,
@@ -313,7 +313,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
         className="page-filter-label"
         label="Event"
         select
-        slotProps={{ select: { 'aria-label': 'Entrants Event' } }}
+        slotProps={{ select: { 'aria-label': 'Entrants Event', native: true } }}
         value={selectedEvent?.id || ''}
         onChange={(event) => {
           const eventId = event.target.value;
@@ -321,7 +321,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
         }}
       >
         {props.catalog.events.map((event) => (
-          <MenuItem key={event.id} value={event.id}>{event.name}</MenuItem>
+          <option key={event.id} value={event.id}>{event.name}</option>
         ))}
       </TextField>
       <FileSelectionField
@@ -338,14 +338,14 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
         className="page-filter-label"
         label="Category"
         select
-        slotProps={{ select: { 'aria-label': 'Entrants Category' } }}
+        slotProps={{ select: { 'aria-label': 'Entrants Category', native: true } }}
         value={selectedCategoryFilter}
         onChange={(event) => setSelectedCategoryFilter(event.target.value)}
       >
-        <MenuItem value={CATEGORY_FILTER_ALL}>All</MenuItem>
-        <MenuItem value={CATEGORY_FILTER_UNASSIGNED}>Unassigned</MenuItem>
+        <option value={CATEGORY_FILTER_ALL}>All</option>
+        <option value={CATEGORY_FILTER_UNASSIGNED}>Unassigned</option>
         {eventCategories.map((category) => (
-          <MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>
+          <option key={category.id} value={category.id}>{category.name}</option>
         ))}
       </TextField>
       <div className="events-layout">

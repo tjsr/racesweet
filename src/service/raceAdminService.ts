@@ -49,6 +49,15 @@ export class RaceAdminService {
     return this.session;
   }
 
+  public async applyRemoteChanges(
+    changes: AdministrativeChanges,
+    session: Session & RaceStateLookup = this.session,
+    sessionId: SessionId | undefined = this.sessionId,
+  ): Promise<void> {
+    this.changes = changes;
+    await this.applyChanges(session, sessionId);
+  }
+
   public async excludeCrossing(crossingId: TimeRecordId, exclude: boolean): Promise<void> {
     this.excludeCrossingInSession(this.session, crossingId, exclude);
     this.changes = {

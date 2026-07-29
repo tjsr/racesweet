@@ -58,4 +58,39 @@ describe('ServerConfigurationPanel', () => {
     expect(onSaveListenerServer).toHaveBeenCalledWith({ certificatePath: 'C:\\certificates\\listener.crt' });
     expect(onSaveListenerServer).toHaveBeenCalledWith({ privateKeyPath: 'C:\\certificates\\listener.key' });
   });
+
+  it('opens the API documentation and browser application links', async () => {
+    const onOpenExternalUrl = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <ServerConfigurationPanel
+          listenerServer={{ enabled: true, httpPort: 4800 }}
+          onOpenExternalUrl={onOpenExternalUrl}
+          onSaveListenerServer={vi.fn()}
+          onSaveRemoteServer={vi.fn()}
+          remoteServer={undefined}
+        />,
+      );
+    });
+
+    const apiDocumentationLink = Array.from(container.querySelectorAll('a')).find((link) => link.textContent === 'API documentation') as HTMLAnchorElement;
+    const browserAccessLink = Array.from(container.querySelectorAll('a')).find((link) => link.textContent === 'Access via browser') as HTMLAnchorElement;
+    const enabledCheckbox: HTMLInputElement =
+      container.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    const httpPortInput: HTMLInputElement =
+      container.querySelector('input[aria-label="HTTP listener port"]') as HTMLInputElement;
+    expect(enabledCheckbox.checked).toBe(true);
+    expect(httpPortInput.value).toBe('4800');
+    expect(apiDocumentationLink.href).toBe('http://localhost:4800/api');
+    expect(browserAccessLink.href).toBe('http://localhost:4800/');
+
+    await act(async () => {
+      apiDocumentationLink.click();
+      browserAccessLink.click();
+    });
+
+    expect(onOpenExternalUrl).toHaveBeenCalledWith('http://localhost:4800/api');
+    expect(onOpenExternalUrl).toHaveBeenCalledWith('http://localhost:4800/');
+  });
 });

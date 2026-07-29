@@ -3,6 +3,7 @@ import {
   Button,
   Checkbox,
   FormControlLabel,
+  Link,
   Stack,
   TextField,
 } from "@mui/material";
@@ -21,6 +22,7 @@ interface ServerConfigurationPanelProps {
   onSaveRemoteServer: (
     changes: Partial<RemoteServerConfig>,
   ) => void | Promise<void>;
+  onOpenExternalUrl?: (url: string) => void | Promise<void>;
   onSelectCertificateFile?: () => Promise<string | undefined>;
   onSelectPrivateKeyFile?: () => Promise<string | undefined>;
   remoteServer: RemoteServerConfig | undefined;
@@ -29,6 +31,24 @@ interface ServerConfigurationPanelProps {
 const parseOptionalPort = (value: string): number | undefined => {
   const port = Number(value);
   return Number.isInteger(port) && port > 0 && port <= 65535 ? port : undefined;
+};
+
+const getListenerServerUrl = (
+  listenerServer: ListenerServerConfig,
+): string | undefined => {
+  if (!listenerServer.enabled) {
+    return undefined;
+  }
+
+  if (
+    listenerServer.httpsPort
+  ) {
+    return `https://localhost:${listenerServer.httpsPort}`;
+  }
+
+  return listenerServer.httpPort
+    ? `http://localhost:${listenerServer.httpPort}`
+    : undefined;
 };
 
 export const ServerConfigurationPanel = (
@@ -42,6 +62,11 @@ export const ServerConfigurationPanel = (
   const [remoteServerDraft, setRemoteServerDraft] = React.useState(
     props.remoteServer?.baseUrl || "",
   );
+  const listenerServerUrl: string | undefined = getListenerServerUrl(listenerDraft);
+  const apiDocumentationUrl: string | undefined = listenerServerUrl
+    ? `${listenerServerUrl}/api`
+    : undefined;
+  const browserAccessUrl: string | undefined = listenerServerUrl;
 
   React.useEffect(() => {
     setListenerDraft({ enabled: false, ...props.listenerServer });
@@ -81,10 +106,41 @@ export const ServerConfigurationPanel = (
     });
   };
 
+  const openExternalUrl = (event: React.MouseEvent<HTMLAnchorElement>): void => {
+    if (!props.onOpenExternalUrl) {
+      return;
+    }
+
+    event.preventDefault();
+    void props.onOpenExternalUrl(event.currentTarget.href);
+  };
+
   return (
     <section className="events-panel" aria-label="RaceSweet server">
       <h2>RaceSweet server</h2>
       <Stack spacing={2}>
+        <Stack direction="row" spacing={2}>
+          <Link
+            aria-disabled={!apiDocumentationUrl}
+            component={apiDocumentationUrl ? 'a' : 'span'}
+            href={apiDocumentationUrl}
+            onClick={apiDocumentationUrl ? openExternalUrl : undefined}
+            tabIndex={apiDocumentationUrl ? undefined : -1}
+            underline="hover"
+          >
+            API documentation
+          </Link>
+          <Link
+            aria-disabled={!browserAccessUrl}
+            component={browserAccessUrl ? 'a' : 'span'}
+            href={browserAccessUrl}
+            onClick={browserAccessUrl ? openExternalUrl : undefined}
+            tabIndex={browserAccessUrl ? undefined : -1}
+            underline="hover"
+          >
+            Access via browser
+          </Link>
+        </Stack>
         <FormControlLabel
           control={
             <Checkbox

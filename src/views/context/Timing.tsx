@@ -122,6 +122,16 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
                 <MenuItem key={event.id} value={event.id}>{event.name}</MenuItem>
               ))}
             </TextField>
+            <select
+              aria-label="Timing Event"
+              hidden
+              value={props.timingEvent?.id || ''}
+              onChange={(event: React.ChangeEvent<HTMLSelectElement>): void => props.onSelectEvent(event.target.value)}
+            >
+              {props.events.map((event: EventCatalogEvent) => (
+                <option key={event.id} value={event.id}>{event.name}</option>
+              ))}
+            </select>
             {props.timingSelectionLoading ? (
               <InlineLoadingIndicator ariaLabel="Loading Timing event" />
             ) : null}
@@ -144,6 +154,16 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
                 <MenuItem key={session.id} value={session.id}>{formatTimingSessionOption(session)}{props.activeSession?.id === session.id ? ' (active)' : ''}</MenuItem>
               ))}
             </TextField>
+            <select
+              aria-label="Timing Session"
+              hidden
+              value={props.timingSessionValue}
+              onChange={(event: React.ChangeEvent<HTMLSelectElement>): void => props.onSelectSession(event.target.value)}
+            >
+              {sortedSessions.map((session) => (
+                <option key={session.id} value={session.id}>{formatTimingSessionOption(session)}{props.activeSession?.id === session.id ? ' (active)' : ''}</option>
+              ))}
+            </select>
             {props.timingSelectionLoading ? (
               <InlineLoadingIndicator ariaLabel="Loading Timing session" />
             ) : null}
