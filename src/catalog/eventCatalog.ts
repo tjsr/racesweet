@@ -76,6 +76,7 @@ export interface EventCatalogEntrant {
   categoryId?: EventCategoryId;
   categoryIds: EventCategoryId[];
   dateOfBirth?: string;
+  deleted?: boolean;
   entrantType: EntrantType;
   entryIds?: EventEntryId[];
   eventId: EventId;
@@ -335,7 +336,7 @@ export const getEntrantsForEvent = (
     return [];
   }
 
-  return state.entrants.filter((entrant) => entrant.eventId === eventId);
+  return state.entrants.filter((entrant) => entrant.eventId === eventId && entrant.deleted !== true);
 };
 
 export const getEntriesForEvent = (

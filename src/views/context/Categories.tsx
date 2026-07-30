@@ -1,6 +1,6 @@
 import { TextField } from '@mui/material';
 import React from 'react';
-import { type EventCatalogCategory, getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent } from '../../catalog/eventCatalog.js';
+import { getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent } from '../../catalog/eventCatalog.js';
 import { buildCategoryChanges } from '../../processing/categoryDraft.js';
 import { CategoriesPageProps, CategoryDraft, dedupeCategoriesForDisplay, getCategoryDraft } from '../display/categoriesPage.js';
 import { useUnsavedChangesWarning } from '../display/unsavedChangesWarning.js';
@@ -15,40 +15,23 @@ export const CategoriesContext = (props: CategoriesContextProps): React.ReactEle
   return <CategoriesPage {...props} />;
 };
 
-const getAllCategoriesForEvent = (
-  catalog: CategoriesPageProps['catalog'],
-  eventId: string | undefined
-): EventCatalogCategory[] => {
-  const event = catalog.events.find((candidate) => candidate.id.toString() === eventId?.toString());
-  if (!event) {
-    return [];
-  }
-
-  const eventCategoryIds = new Set(event.categoryIds.map((categoryId) => categoryId.toString()));
-  return catalog.categories.filter((category) => {
-    if (category.eventId.toString() !== event.id.toString()) {
-      return false;
-    }
-
-    return category.deleted === true || eventCategoryIds.has(category.id.toString());
-  });
-};
-
 export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement => {
   const selectedEvent = props.catalog.events.find((event) => event.id.toString() === props.selectedEventId?.toString()) ??
     props.catalog.events.find((event) => event.id.toString() === props.catalog.activeEventId?.toString()) ??
     props.catalog.events[0];
   const categoriesForEvent = getCategoriesForEvent(props.catalog, selectedEvent?.id?.toString());
-  const eventCategories = dedupeCategoriesForDisplay(getAllCategoriesForEvent(props.catalog, selectedEvent?.id?.toString()));
   const activeEventCategories = dedupeCategoriesForDisplay(categoriesForEvent);
   const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id?.toString());
-  const selectedCategory = eventCategories.find((category) => category.id.toString() === props.selectedCategoryId?.toString()) ?? activeEventCategories[0] ?? eventCategories[0];
+  const selectedCategory = activeEventCategories.find((category) => category.id.toString() === props.selectedCategoryId?.toString()) ?? activeEventCategories[0];
   const assignedSessionIdList = Array.from(getCategoryAssignedSessionIds(selectedCategory, eventSessions));
   const assignedSessionIdKey = assignedSessionIdList.slice().sort().join('|');
   const assignedSessionIds = new Set(assignedSessionIdList);
   const categorySessions = eventSessions.filter((session) => assignedSessionIds.has(session.id.toString()));
 
   const [formError, setFormError] = React.useState<string | undefined>(undefined);
+  const [deleteCategoryId, setDeleteCategoryId] = React.useState<string | undefined>(undefined);
+  const [deleteError, setDeleteError] = React.useState<string | undefined>(undefined);
+  const [deleteStatus, setDeleteStatus] = React.useState<'idle' | 'pending' | 'succeeded' | 'failed'>('idle');
   const [categoryDraft, setCategoryDraft] = React.useState<CategoryDraft>(getCategoryDraft(selectedCategory, assignedSessionIdList));
   const [savedCategoryDraft, setSavedCategoryDraft] = React.useState<CategoryDraft>(getCategoryDraft(selectedCategory, assignedSessionIdList));
   const selectedCategoryDraft = React.useMemo(() => getCategoryDraft(selectedCategory, assignedSessionIdList), [assignedSessionIdKey, selectedCategory]);
@@ -61,6 +44,12 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
     setSavedCategoryDraft(selectedCategoryDraft);
     setFormError(undefined);
   }, [selectedCategoryDraft]);
+
+  React.useEffect(() => {
+    if (selectedCategory && selectedCategory.id.toString() !== props.selectedCategoryId?.toString()) {
+      props.onSelectCategory(selectedCategory.id);
+    }
+  }, [props.onSelectCategory, props.selectedCategoryId, selectedCategory]);
 
   const saveCategory = async (): Promise<boolean> => {
     if (!selectedCategory) {
@@ -87,6 +76,23 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
     onSave: saveCategory,
     onUnsavedChangesGuardChange: props.onUnsavedChangesGuardChange,
   });
+  const deleteCategory = async (): Promise<void> => {
+    if (!selectedEvent || !selectedCategory) {
+      return;
+    }
+
+    setDeleteCategoryId(selectedCategory.id.toString());
+    setDeleteStatus('pending');
+    setDeleteError(undefined);
+    try {
+      await props.onDeleteCategory(selectedEvent.id, selectedCategory.id.toString());
+      setDeleteStatus('succeeded');
+    } catch (error: unknown) {
+      setDeleteError(error instanceof Error ? error.message : String(error));
+      setDeleteStatus('failed');
+    }
+  };
+  const isDeletingSelectedCategory = deleteCategoryId === selectedCategory?.id.toString();
   return (
     <section className="events-screen">
       <h1>Categories</h1>
@@ -106,8 +112,7 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
       <div className="events-layout categories-layout">
         <CategoryListPanel
           allowCreateCategory={!!selectedEvent}
-          categories={eventCategories}
-          enableShowAllCategories
+          categories={activeEventCategories}
           onCreateCategory={() => selectedEvent && props.onCreateCategory(selectedEvent.id)}
           onSelectCategory={props.onSelectCategory}
           requestFormExit={requestFormExit}
@@ -115,9 +120,11 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
         />
         <CategoryDetailsPanel
           categoryDraft={categoryDraft}
+          deleteError={isDeletingSelectedCategory ? deleteError : undefined}
+          deleteStatus={isDeletingSelectedCategory ? deleteStatus : 'idle'}
           eventSessions={eventSessions}
           formError={formError}
-          onDeleteCategory={() => selectedEvent && selectedCategory && requestFormExit(() => props.onDeleteCategory(selectedEvent.id, selectedCategory.id.toString()))}
+          onDeleteCategory={() => requestFormExit(deleteCategory)}
           onSaveCategory={() => {
             void saveCategory();
           }}

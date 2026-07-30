@@ -44,25 +44,12 @@ export interface CategoryDraft {
   teamCompositionRules: string;
 }
 
-const getCategorySeriesKey = (category: EventCatalogCategory): string => {
-  const code = (category.code || '').trim().toLowerCase();
-  const name = (category.name || '').trim().toLowerCase();
-  return `${code}|${name}`;
-};
-
 export const dedupeCategoriesForDisplay = (categories: EventCatalogCategory[]): EventCatalogCategory[] => {
-  const bySeriesKey = new Map<string, EventCatalogCategory>();
+  const byCategoryId = new Map<string, EventCatalogCategory>();
   categories.forEach((category) => {
-    const key = getCategorySeriesKey(category);
-    const existingCategory: EventCatalogCategory | undefined = bySeriesKey.get(key);
-    if (
-      existingCategory === undefined ||
-      (existingCategory.deleted === true && category.deleted !== true)
-    ) {
-      bySeriesKey.set(key, category);
-    }
+    byCategoryId.set(category.id.toString(), category);
   });
-  return Array.from(bySeriesKey.values());
+  return Array.from(byCategoryId.values());
 };
 
 export const getCategoryDraft = (category: EventCatalogCategory | undefined, sessionIds: string[] = []): CategoryDraft => ({

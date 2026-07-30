@@ -19,6 +19,7 @@ import { TrackMapReport } from '../reports/TrackMapReport.js';
 import { HandicapView } from './handicap.js';
 
 interface CategoryOption {
+  deleted?: boolean;
   excludeFromResults?: boolean;
   id: string;
   name: string;
@@ -175,14 +176,11 @@ const _categoryKeyFromId = (raceState: RaceState & RaceStateLookup, categoryId?:
 };
 
 const dedupeCategoryOptions = (categories: CategoryOption[]): CategoryOption[] => {
-  const byKey = new Map<string, CategoryOption>();
-  categories.forEach((category) => {
-    const key = categoryKeyFromName(category.name);
-    if (!byKey.has(key)) {
-      byKey.set(key, category);
-    }
+  const byId = new Map<string, CategoryOption>();
+  categories.filter((category) => category.deleted !== true).forEach((category) => {
+    byId.set(category.id, category);
   });
-  return Array.from(byKey.values());
+  return Array.from(byId.values());
 };
 
 const getExcludedCategoryKeys = (

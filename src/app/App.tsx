@@ -1843,22 +1843,8 @@ export const RaceSweetMainApp = () => {
     return [eventOption, ...sessionOptions];
   });
   const sessionScopedCategories = (() => {
-    const normalizeCategoryText = (value: string): string => value.trim().toLowerCase();
-    const categorySeriesKey = (_id: string, name: string): string => normalizeCategoryText(name);
-    const categoriesById = new Map(
-      getCategoriesForEvent(eventCatalogState, selectedResultsEventId)
-        .map((category) => [category.id.toString(), category.name]),
-    );
-
-    const dedupedBySeries = new Map<string, { id: string; name: string }>();
-    Array.from(categoriesById.entries()).forEach(([id, name]) => {
-      const key = categorySeriesKey(id, name);
-      if (!dedupedBySeries.has(key)) {
-        dedupedBySeries.set(key, { id, name });
-      }
-    });
-
-    return Array.from(dedupedBySeries.values());
+    return getCategoriesForEvent(eventCatalogState, selectedResultsEventId)
+      .map((category) => ({ id: category.id.toString(), name: category.name }));
   })();
 
   const sectionContent = (): ReactElement => {
@@ -2582,14 +2568,30 @@ export const RaceSweetMainApp = () => {
               updateEventCatalogState(catalog, eventId, selectedSessionId, category?.id.toString());
             }).catch((error: unknown) => setErrorState(error as Error));
           }}
-          onDeleteCategory={(eventId, categoryId) => {
+          onDeleteCategory={(eventId, categoryId): Promise<void> => {
             if (!eventCatalogService) {
-              return;
+              return Promise.reject(new Error('The event catalog service is not available.'));
             }
-            eventCatalogService.deleteCategory(eventId, categoryId).then((catalog) => {
+            if (window.api.persistenceMode === 'server') {
+              const categoryPath = `/api/v1/catalog/events/${encodeURIComponent(eventId)}/categories/${encodeURIComponent(categoryId)}`;
+              return fetch(categoryPath, {
+                credentials: 'include',
+                method: 'DELETE',
+              }).then(async (response: Response): Promise<{ mutations: EventCatalogMutation[] }> => {
+                if (!response.ok) {
+                  const problem = await response.json().catch((): { error?: string } => ({})) as { error?: string };
+                  throw new Error(problem.error || `RaceSweet API returned HTTP ${response.status} while deleting the category.`);
+                }
+                return response.json() as Promise<{ mutations: EventCatalogMutation[] }>;
+              }).then((result) => eventCatalogService.applyRemoteMutations(result.mutations)).then((catalog) => {
+                const nextCategoryId = getCategoriesForEvent(catalog, eventId)[0]?.id.toString();
+                updateEventCatalogState(catalog, eventId, selectedSessionId, nextCategoryId);
+              });
+            }
+            return eventCatalogService.deleteCategory(eventId, categoryId).then((catalog) => {
               const nextCategoryId = getCategoriesForEvent(catalog, eventId)[0]?.id.toString();
               updateEventCatalogState(catalog, eventId, selectedSessionId, nextCategoryId);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            });
           }}
           onDisplayError={logDisplayedError}
           onSelectCategory={setSelectedCategoryId}
@@ -2655,15 +2657,32 @@ export const RaceSweetMainApp = () => {
               setSelectedEntrantId(entrant?.id);
             }).catch((error: unknown) => setErrorState(error as Error));
           }}
-          onDeleteEntrant={(eventId, entrantId) => {
+          onDeleteEntrant={(eventId, entrantId): Promise<void> => {
             if (!eventCatalogService) {
-              return;
+              return Promise.reject(new Error('The event catalog service is not available.'));
             }
-            eventCatalogService.deleteEntrant(eventId, entrantId).then((catalog) => {
+            if (window.api.persistenceMode === 'server') {
+              const entrantPath = `/api/v1/catalog/events/${encodeURIComponent(eventId)}/entrants/${encodeURIComponent(entrantId)}`;
+              return fetch(entrantPath, {
+                credentials: 'include',
+                method: 'DELETE',
+              }).then(async (response: Response): Promise<{ mutations: EventCatalogMutation[] }> => {
+                if (!response.ok) {
+                  const problem = await response.json().catch((): { error?: string } => ({})) as { error?: string };
+                  throw new Error(problem.error || `RaceSweet API returned HTTP ${response.status} while deleting the entrant.`);
+                }
+                return response.json() as Promise<{ mutations: EventCatalogMutation[] }>;
+              }).then((result) => eventCatalogService.applyRemoteMutations(result.mutations)).then((catalog) => {
+                const nextEntrantId = getEntrantsForEvent(catalog, eventId)[0]?.id;
+                updateEventCatalogState(catalog, eventId, selectedSessionId, selectedCategoryId);
+                setSelectedEntrantId(nextEntrantId);
+              });
+            }
+            return eventCatalogService.deleteEntrant(eventId, entrantId).then((catalog) => {
               const nextEntrantId = getEntrantsForEvent(catalog, eventId)[0]?.id;
               updateEventCatalogState(catalog, eventId, selectedSessionId, selectedCategoryId);
               setSelectedEntrantId(nextEntrantId);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            });
           }}
           onImportEntrants={(eventId, records, _fileName, defaultCategoryId) => {
             if (!eventCatalogService) {

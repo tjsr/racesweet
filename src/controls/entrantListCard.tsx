@@ -30,6 +30,7 @@ export const EntrantListCard = (props: EntrantListCartProps): React.ReactElement
     <button
       type="button"
       className={`events-list-item object-card${props.isSelected ? ' selected' : ''}`}
+      data-entrant-id={props.entrant.id}
       onClick={() => {
         if (!props.isSelected) {
           props.onSelect();

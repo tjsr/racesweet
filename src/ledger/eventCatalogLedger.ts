@@ -341,7 +341,9 @@ export const applyEventCatalogMutation = (
     case 'entrant-deleted': {
       return {
         ...currentState,
-        entrants: currentState.entrants.filter((entrant) => entrant.id !== mutation.entrantId),
+        entrants: currentState.entrants.map((entrant) => entrant.id === mutation.entrantId
+          ? { ...entrant, deleted: true }
+          : entrant),
         events: currentState.events.map((event) => ({
           ...event,
           entrantIds: removeEntry(event.entrantIds, mutation.entrantId),

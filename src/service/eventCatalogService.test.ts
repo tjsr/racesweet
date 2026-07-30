@@ -5002,9 +5002,15 @@ describe("EventCatalogService", () => {
 
     await service.deleteCategory(SEED_EVENT_ID, SEED_CLUBMAN_CATEGORY_ID);
 
+    const deletedCategory = service.catalog.categories.find(
+      (item) => item.id === SEED_CLUBMAN_CATEGORY_ID,
+    );
     entrant = service.catalog.entrants.find(
       (item) => item.id === SEED_ENTRANT_ID,
     );
+    expect(deletedCategory?.deleted).toBe(true);
+    expect(getCategoriesForEvent(service.catalog, SEED_EVENT_ID)
+      .some((item) => item.id === SEED_CLUBMAN_CATEGORY_ID)).toBe(false);
     expect(entrant?.categoryId).toBeUndefined();
     expect(entrant?.categoryIds).toEqual([]);
   });
@@ -5385,6 +5391,7 @@ describe("EventCatalogService", () => {
       createdEntrantId!,
       onCompleteStep,
     );
+    expect(service.catalog.entrants.find((entrant) => entrant.id === createdEntrantId)?.deleted).toBe(true);
 
     sessions = getSessionsForEvent(service.catalog, SEED_EVENT_ID);
     categories = getCategoriesForEvent(service.catalog, SEED_EVENT_ID);

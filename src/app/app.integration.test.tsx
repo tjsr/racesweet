@@ -2030,6 +2030,26 @@ describe('RaceSweetMainApp integration', () => {
     await clickButtonByText(container, 'Delete Session');
     await waitForTextNotPresent(container, 'New Session');
 
+    await clickSectionButton(container, 'Categories');
+    await clickButtonByText(container, 'Create Category');
+    await waitForText(container, 'New Category');
+    expect(container.querySelector('[aria-label="Categories for selected event"]')?.textContent).toContain('New Category');
+    await clickButtonByText(container, 'Delete Category');
+    await waitForTextNotPresent(container, 'New Category');
+    expect(container.querySelector('[aria-label="Categories for selected event"]')?.textContent).not.toContain('New Category');
+
+    await clickSectionButton(container, 'Entrants');
+    expect(Array.from((container.querySelector('select[aria-label="Entrants Category"]') as HTMLSelectElement).options)
+      .map((option) => option.textContent)).not.toContain('New Category');
+
+    await clickSectionButton(container, 'Results');
+    expect(Array.from((container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement).options)
+      .map((option) => option.textContent)).not.toContain('New Category');
+
+    await clickSectionButton(container, 'Reports');
+    expect(Array.from((container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement).options)
+      .map((option) => option.textContent)).not.toContain('New Category');
+
     await clickSectionButton(container, 'Events');
     expect(container.querySelector('h1')?.textContent).toBe('Events');
     expect(container.textContent).toContain('Session List');
@@ -2045,6 +2065,30 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'Sessions');
     expect(container.querySelector('h1')?.textContent).toBe('Sessions');
     expect(container.querySelector('input[aria-label="Sessions Page Name"]')).toBeTruthy();
+  });
+
+  it('selects the remaining entrant card after deleting the displayed entrant', async () => {
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+
+    await waitForLoadedApp(container);
+    await clickSectionButton(container, 'Entrants');
+    await clickButtonByText(container, 'Create Driver');
+    await waitForInputValue(container, 'input[aria-label="Entrant Name"]', 'New Driver');
+    await clickButtonByText(container, 'Delete Entrant');
+    await waitForTextNotPresent(container, 'New Driver');
+
+    const displayedEntrantName = (container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement).value;
+    const displayedEntrantId = container.querySelector('.entrant-id')?.textContent?.replace('Id: ', '');
+    const displayedEntrantCard = Array.from(container.querySelectorAll<HTMLButtonElement>('[aria-label="Entrants for selected event"] button.events-list-item'))
+      .find((card) => card.dataset.entrantId === displayedEntrantId);
+
+    expect(displayedEntrantId).toBeTruthy();
+    expect(displayedEntrantCard?.querySelector('.entrant-list-name')?.textContent).toBe(displayedEntrantName);
+    expect(displayedEntrantCard).toBeTruthy();
+    expect(displayedEntrantCard?.getAttribute('aria-selected')).toBe('true');
+    expect(displayedEntrantCard?.classList.contains('selected')).toBe(true);
   });
 
   it('adds an event received from the server event stream to the web event list', async () => {

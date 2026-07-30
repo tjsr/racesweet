@@ -73,7 +73,7 @@ const createLap = (
   time: new Date(`2026-06-12T10:00:${String(lapNo).padStart(2, '0')}.000Z`),
 });
 
-const categories: Array<{ excludeFromResults?: boolean; id: CategoryId; name: string }> = [
+const categories: Array<{ deleted?: boolean; excludeFromResults?: boolean; id: CategoryId; name: string }> = [
   { id: createCategoryId('cat-a'), name: 'Category A' },
   { id: createCategoryId('cat-a-duplicate-id'), name: 'Category A' },
   { id: createCategoryId('cat-b'), name: 'Category B' },
@@ -290,6 +290,48 @@ describe('race analytics views integration', () => {
 
     expect(container.querySelector('[aria-label="Lap Entry Details"]')).toBeTruthy();
     expect(container.textContent).toContain(`Entrant: Team Rocket (${createEventEntrantId('team-1')})`);
+  });
+
+  it('does not render ledger-deleted categories in results or reports category selectors', async () => {
+    const deletedCategoryId = createCategoryId('cat-deleted');
+    const categoriesWithDeletedHistory = [
+      ...categories,
+      { deleted: true, id: deletedCategoryId, name: 'Deleted Category History' },
+    ];
+
+    await act(async () => {
+      root.render(
+        <ResultsPage
+          categories={categoriesWithDeletedHistory}
+          catalogEntrants={catalogEntrants}
+          raceState={raceState}
+          selectedCategoryId={deletedCategoryId}
+        />,
+      );
+    });
+
+    const resultsCategoryOptions = Array.from(
+      (container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement).options,
+    ).map((option) => option.textContent);
+    expect(resultsCategoryOptions).not.toContain('Deleted Category History');
+    expect(resultsCategoryOptions).toContain('Category A');
+
+    await act(async () => {
+      root.render(
+        <ReportsPage
+          categories={categoriesWithDeletedHistory}
+          catalogEntrants={catalogEntrants}
+          raceState={raceState}
+          selectedCategoryId={deletedCategoryId}
+        />,
+      );
+    });
+
+    const reportsCategoryOptions = Array.from(
+      (container.querySelector('select[aria-label="Race View Category"]') as HTMLSelectElement).options,
+    ).map((option) => option.textContent);
+    expect(reportsCategoryOptions).not.toContain('Deleted Category History');
+    expect(reportsCategoryOptions).toContain('Category B');
   });
 
   it('renders calculated INDY Entry laps without merging Penske drivers', async () => {

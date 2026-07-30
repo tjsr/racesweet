@@ -879,6 +879,7 @@ export class RaceSweetApplicationServer {
     const commandId: string | undefined =
       typeof body.commandId === 'string' ? body.commandId : undefined;
     const beforeCount: number = this.eventCatalogService!.mutations.length;
+    let accepted: EventCatalogMutation[] = [];
 
     await this.enqueueCommand(async (): Promise<void> => {
       const eventMatch: RegExpMatchArray | null = url.pathname.match(/^\/api\/v1\/catalog\/events(?:\/([^/]+))?(?:\/(activate))?$/u);
@@ -942,8 +943,7 @@ export class RaceSweetApplicationServer {
         throw new Error('Catalog command resource not found.');
       }
 
-      const accepted: EventCatalogMutation[] =
-        this.eventCatalogService!.mutations.slice(beforeCount);
+      accepted = this.eventCatalogService!.mutations.slice(beforeCount);
       if (accepted.length > 0) {
         this.eventHub.publish(
           'catalog',
@@ -955,6 +955,7 @@ export class RaceSweetApplicationServer {
     });
     sendJson(response, 200, {
       catalog: this.eventCatalogService!.catalog,
+      mutations: accepted,
       revision: this.eventHub.currentRevision,
     });
   };

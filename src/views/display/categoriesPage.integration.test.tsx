@@ -270,19 +270,10 @@ describe('CategoriesPage integration', () => {
     expect(sessionsForCategoryPanel.textContent).not.toContain('Practice');
 
     const categoryListPanel = getPanelByHeading(container, 'Category List');
-    const showAllCategories = categoryListPanel.querySelector('input[aria-label="Show all categories"]') as HTMLInputElement;
-    expect(showAllCategories).toBeTruthy();
     expect(categoryListPanel.textContent).not.toContain('Deleted Category');
     expect(categoryListPanel.textContent).toContain('Premier');
     expect(container.textContent).toContain('Category ID: cat-1');
     expect(container.textContent).not.toContain('Category ID: cat-1-deleted-history');
-
-    await act(async () => {
-      showAllCategories.click();
-    });
-
-    expect(showAllCategories.checked).toBe(true);
-    expect(categoryListPanel.textContent).toContain('Deleted Category');
 
     const clubmanButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Clubman'));
     expect(clubmanButton).toBeDefined();
@@ -381,6 +372,136 @@ describe('CategoriesPage integration', () => {
     });
 
     expect(onDeleteCategory).toHaveBeenCalledWith('event-2', 'cat-3');
+  });
+
+  it('keeps same-name active categories independently visible and deletes only the selected ID', async () => {
+    const catalogWithSameNameCategories: EventCatalogState = {
+      ...catalog,
+      events: catalog.events.map((event) => event.id === 'event-1'
+        ? { ...event, categoryIds: [...event.categoryIds, 'cat-2-duplicate'] }
+        : event),
+    };
+
+    const Harness = () => {
+      const [currentCatalog, setCurrentCatalog] = React.useState<EventCatalogState>(catalogWithSameNameCategories);
+      const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | undefined>('cat-2');
+      const deleteCategory = async (_eventId: string, categoryId: string): Promise<void> => {
+        setCurrentCatalog((current) => ({
+          ...current,
+          categories: current.categories.map((category) => category.id === categoryId
+            ? { ...category, deleted: true }
+            : category),
+          events: current.events.map((event) => event.id === 'event-1'
+            ? { ...event, categoryIds: event.categoryIds.filter((id) => id !== categoryId) }
+            : event),
+        }));
+      };
+
+      return <CategoriesPage
+        catalog={currentCatalog}
+        entrants={[]}
+        onCreateCategory={vi.fn()}
+        onDeleteCategory={deleteCategory}
+        onSelectCategory={setSelectedCategoryId}
+        onSelectEvent={vi.fn()}
+        onUpdateCategory={vi.fn()}
+        onUpdateCategorySessionAssignments={vi.fn()}
+        selectedCategoryId={selectedCategoryId}
+        selectedEventId="event-1"
+      />;
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    const clubmanCards = (): HTMLButtonElement[] => Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[aria-label="Categories for selected event"] button'),
+    ).filter((button) => button.textContent?.includes('Clubman'));
+    expect(clubmanCards()).toHaveLength(2);
+
+    const deleteButton = Array.from(container.querySelectorAll('button'))
+      .find((button) => button.textContent?.includes('Delete Category')) as HTMLButtonElement;
+    await act(async () => {
+      deleteButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(clubmanCards()).toHaveLength(1);
+    await act(async () => {
+      clubmanCards()[0]!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container.textContent).toContain('Category ID: cat-2-duplicate');
+  });
+
+  it('shows deletion progress, updates catalog-backed screens after success, and reports deletion failures inline', async () => {
+    let completeDeletion: (() => void) | undefined;
+
+    const Harness = () => {
+      const [currentCatalog, setCurrentCatalog] = React.useState<EventCatalogState>(catalog);
+      const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | undefined>('cat-1');
+      const deleteCategory = (eventId: string, categoryId: string): Promise<void> => {
+        if (categoryId === 'cat-2') {
+          return Promise.reject(new Error('Category is still assigned to a published result.'));
+        }
+
+        return new Promise<void>((resolve): void => {
+          completeDeletion = (): void => {
+            setCurrentCatalog((current) => ({
+              ...current,
+              categories: current.categories.map((category) => category.id === categoryId
+                ? { ...category, deleted: true }
+                : category),
+              events: current.events.map((event) => event.id !== eventId
+                ? event
+                : { ...event, categoryIds: event.categoryIds.filter((id) => id !== categoryId) }),
+              sessions: current.sessions.map((session) => session.eventId !== eventId
+                ? session
+                : { ...session, categoryIds: session.categoryIds.filter((id) => id !== categoryId) }),
+            }));
+            resolve();
+          };
+        });
+      };
+
+      return <CategoriesPage
+        catalog={currentCatalog}
+        entrants={entrantsByCategory[selectedCategoryId || ''] || []}
+        onCreateCategory={vi.fn()}
+        onDeleteCategory={deleteCategory}
+        onSelectCategory={setSelectedCategoryId}
+        onSelectEvent={vi.fn()}
+        onUpdateCategory={vi.fn()}
+        onUpdateCategorySessionAssignments={vi.fn()}
+        selectedCategoryId={selectedCategoryId}
+        selectedEventId="event-1"
+      />;
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+    const deleteButton = (): HTMLButtonElement => Array.from(container.querySelectorAll('button'))
+      .find((button) => button.textContent?.includes('Delete Category')) as HTMLButtonElement;
+
+    await act(async () => {
+      deleteButton().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(deleteButton().disabled).toBe(true);
+    expect(container.querySelector('[aria-label="Deleting category"]')).toBeTruthy();
+
+    await act(async () => {
+      completeDeletion?.();
+    });
+    expect(container.textContent).not.toContain('Category ID: cat-1');
+    expect(getPanelByHeading(container, 'Category List').textContent).not.toContain('Premier');
+    expect(container.textContent).toContain('Category ID: cat-2');
+
+    await act(async () => {
+      deleteButton().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container.querySelector('[aria-label="Category deletion failed"]')).toBeTruthy();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Category is still assigned to a published result.');
+    expect(container.textContent).toContain('Category ID: cat-2');
   });
 
   it('shows category save failures inline without hiding page content', async () => {

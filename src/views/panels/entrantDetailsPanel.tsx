@@ -1,4 +1,4 @@
-import { Button, TextField } from '@mui/material';
+import { Button, CircularProgress, TextField } from '@mui/material';
 import React from 'react';
 import { type EventCatalogEntrant } from '../../catalog/eventCatalog.js';
 import { type CategoryId } from '../../processing/category.js';
@@ -22,8 +22,10 @@ interface EntrantDetailsPanelProps {
   entrantAssignmentIsDerived?: boolean;
   entrantLabel?: string;
   entrantDraft: EntrantDraft;
+  deleteError?: string;
+  deleteStatus?: 'idle' | 'pending' | 'succeeded' | 'failed';
   eventCategories: EventCategory[];
-  onDeleteEntrant: () => void;
+  onDeleteEntrant: () => void | Promise<void>;
   onSaveEntrant: () => void | Promise<void>;
   onSetEntrantDraft: React.Dispatch<React.SetStateAction<EntrantDraft>>;
   selectedEntrant?: EventCatalogEntrant;
@@ -181,9 +183,19 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
             >
               Save Entrant
             </Button>
-            <Button type="button" onClick={props.onDeleteEntrant}>
-              Delete Entrant
-            </Button>
+            <div className="entrant-delete-status">
+              <Button
+                color="error"
+                disabled={props.deleteStatus === 'pending'}
+                endIcon={props.deleteStatus === 'pending' ? <CircularProgress aria-label="Deleting entrant" size={16} /> : props.deleteStatus === 'succeeded' ? <span aria-label="Entrant deleted" role="img">✓</span> : props.deleteStatus === 'failed' ? <span aria-label="Entrant deletion failed" role="img">!</span> : undefined}
+                onClick={props.onDeleteEntrant}
+                type="button"
+                variant="outlined"
+              >
+                Delete Entrant
+              </Button>
+              {props.deleteError ? <span className="error entrant-delete-error" role="alert">{props.deleteError}</span> : null}
+            </div>
           </div>
           <div className="entrant-id">Id: {props.selectedEntrant.id}</div>
           {props.warningModal}

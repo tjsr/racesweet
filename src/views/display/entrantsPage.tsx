@@ -106,6 +106,9 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = React.useState<string>(CATEGORY_FILTER_ALL);
   const [selectedImportFileName, setSelectedImportFileName] = React.useState<string>('');
   const [importStatus, setImportStatus] = React.useState<string>('');
+  const [deleteEntrantId, setDeleteEntrantId] = React.useState<string | undefined>(undefined);
+  const [deleteError, setDeleteError] = React.useState<string | undefined>(undefined);
+  const [deleteStatus, setDeleteStatus] = React.useState<'idle' | 'pending' | 'succeeded' | 'failed'>('idle');
   const teamEntrants = eventEntrants.filter((entrant) => entrant.entrantType === 'team');
   const eventCategoryIds = new Set(eventCategories.map((category) => category.id.toString()));
   const eventCategoryKey = eventCategories.map((category) => category.id.toString()).join('|');
@@ -191,6 +194,12 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
     setSavedEntrantDraft(selectedEntrantDraft);
   }, [selectedEntrantDraft]);
 
+  React.useEffect(() => {
+    if (deleteStatus === 'succeeded' && selectedEntrant && selectedEntrant.id !== props.selectedEntrantId) {
+      props.onSelectEntrant(selectedEntrant.id);
+    }
+  }, [deleteStatus, props.onSelectEntrant, props.selectedEntrantId, selectedEntrant]);
+
   const selectedEntrantSessionIds = getEntrantAssignedSessionIds(selectedEntrant, eventCategories, eventSessions, eventEntrants);
   const selectedEntrantSessions = eventSessions.filter((session) => selectedEntrantSessionIds.has(session.id));
   const selectedParentEntrantId = selectedOwningEntrantId || selectedEntrant?.teamEntrantId;
@@ -257,13 +266,23 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
     return true;
   };
 
-  const deleteEntrant = (): void => {
+  const deleteEntrant = async (): Promise<void> => {
     if (!selectedEvent || !selectedEntrant) {
       return;
     }
 
-    requestFormExit(() => props.onDeleteEntrant(selectedEvent.id, selectedEntrant.id));
+    setDeleteEntrantId(selectedEntrant.id.toString());
+    setDeleteStatus('pending');
+    setDeleteError(undefined);
+    try {
+      await props.onDeleteEntrant(selectedEvent.id, selectedEntrant.id);
+      setDeleteStatus('succeeded');
+    } catch (error: unknown) {
+      setDeleteError(error instanceof Error ? error.message : String(error));
+      setDeleteStatus('failed');
+    }
   };
+  const isDeletingSelectedEntrant = deleteEntrantId === selectedEntrant?.id.toString();
 
   const handleImportFile = (file: File): void => {
     if (!selectedEvent || !props.onImportEntrants) {
@@ -372,8 +391,10 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
             entrantAssignmentIsDerived={isMotorsport && !!selectedEntry}
             entrantLabel={disciplineLabels.singular}
             entrantDraft={entrantDraft}
+            deleteError={isDeletingSelectedEntrant ? deleteError : undefined}
+            deleteStatus={isDeletingSelectedEntrant ? deleteStatus : 'idle'}
             eventCategories={eventCategories}
-            onDeleteEntrant={deleteEntrant}
+            onDeleteEntrant={() => requestFormExit(deleteEntrant)}
             onSaveEntrant={() => {
               void saveEntrant();
             }}

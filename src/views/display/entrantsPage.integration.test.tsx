@@ -485,6 +485,69 @@ describe('EntrantsPage integration', () => {
     }));
   });
 
+  it('shows entrant deletion progress, removes the deleted entrant, selects a remaining entrant, and reports failures inline', async () => {
+    let completeDeletion: (() => void) | undefined;
+
+    const Harness = () => {
+      const [currentCatalog, setCurrentCatalog] = React.useState<EventCatalogState>(catalog);
+      const [selectedEntrantId, setSelectedEntrantId] = React.useState<string | undefined>('ent-1');
+      const deleteEntrant = (_eventId: string, entrantId: string): Promise<void> => {
+        if (entrantId === 'ent-empty') {
+          return Promise.reject(new Error('Entrant has published results.'));
+        }
+
+        return new Promise<void>((resolve): void => {
+          completeDeletion = (): void => {
+            setCurrentCatalog((current) => ({
+              ...current,
+              entrants: current.entrants.map((entrant) => entrant.id === entrantId
+                ? { ...entrant, deleted: true }
+                : entrant),
+            }));
+            resolve();
+          };
+        });
+      };
+
+      return <EntrantsPage
+        catalog={currentCatalog}
+        onCreateEntrant={vi.fn()}
+        onDeleteEntrant={deleteEntrant}
+        onSelectEntrant={setSelectedEntrantId}
+        onSelectEvent={vi.fn()}
+        onUpdateEntrant={vi.fn()}
+        selectedEntrantId={selectedEntrantId}
+        selectedEventId="event-1"
+      />;
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+    const deleteButton = (): HTMLButtonElement => Array.from(container.querySelectorAll('button'))
+      .find((button) => button.textContent?.includes('Delete Entrant')) as HTMLButtonElement;
+
+    await act(async () => {
+      deleteButton().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(deleteButton().disabled).toBe(true);
+    expect(container.querySelector('[aria-label="Deleting entrant"]')).toBeTruthy();
+
+    await act(async () => {
+      completeDeletion?.();
+    });
+    expect(container.querySelector('[aria-label="Entrants for selected event"]')?.textContent).not.toContain('Pat Rider');
+    expect(container.textContent).toContain('Empty Rider');
+    expect(container.textContent).toContain('Id: ent-empty');
+
+    await act(async () => {
+      deleteButton().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container.querySelector('[aria-label="Entrant deletion failed"]')).toBeTruthy();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Entrant has published results.');
+    expect(container.textContent).toContain('Id: ent-empty');
+  });
+
   it('shows imported Entry owners and their linked Drivers in the Entry category', async () => {
     const importedCatalog: EventCatalogState = {
       ...catalog,

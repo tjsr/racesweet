@@ -512,6 +512,60 @@ describe('RaceSweetApplicationServer', () => {
     expect(mutations.mutations.filter((mutation) => mutation.type === 'event-created')).toHaveLength(2);
   });
 
+  it('deletes a category through HTTP, persists its mutations, and broadcasts the removal', async () => {
+    const createEventResponse: Response = await fetch(`${testServer.origin}/api/v1/catalog/events`, {
+      body: JSON.stringify({}),
+      headers: {
+        'content-type': 'application/json',
+        cookie: testServer.adminCookie,
+        origin: testServer.origin,
+      },
+      method: 'POST',
+    });
+    const createdEvent = await createEventResponse.json() as { catalog: { events: Array<{ id: string }> } };
+    const eventId: string = createdEvent.catalog.events[0]!.id;
+    const createCategoryResponse: Response = await fetch(`${testServer.origin}/api/v1/catalog/events/${eventId}/categories`, {
+      body: JSON.stringify({}),
+      headers: {
+        'content-type': 'application/json',
+        cookie: testServer.adminCookie,
+        origin: testServer.origin,
+      },
+      method: 'POST',
+    });
+    const createdCategory = await createCategoryResponse.json() as { catalog: { categories: Array<{ eventId: string; id: string }> } };
+    const categoryId: string = createdCategory.catalog.categories.find((category) => category.eventId === eventId)!.id;
+    const abortController: AbortController = new AbortController();
+    const streamResponse: Response = await fetch(`${testServer.origin}/api/v1/events`, {
+      headers: { cookie: testServer.adminCookie },
+      signal: abortController.signal,
+    });
+    const reader: ReadableStreamDefaultReader<Uint8Array> = streamResponse.body!.getReader();
+
+    const deleteResponse: Response = await fetch(`${testServer.origin}/api/v1/catalog/events/${eventId}/categories/${categoryId}`, {
+      headers: {
+        cookie: testServer.adminCookie,
+        origin: testServer.origin,
+      },
+      method: 'DELETE',
+    });
+    const deletion = await deleteResponse.json() as { mutations: EventCatalogMutation[] };
+    const eventText: string = await readSseEvent(reader, 'catalog.mutations-applied');
+    abortController.abort();
+    await reader.cancel().catch((): void => undefined);
+
+    expect(deleteResponse.status).toBe(200);
+    expect(deletion.mutations.map((mutation) => mutation.type)).toEqual(['category-deleted']);
+    expect(eventText).toContain(categoryId);
+    const mutationsResponse: Response = await fetch(`${testServer.origin}/api/v1/mutations`, {
+      headers: { cookie: testServer.adminCookie },
+    });
+    const persisted = await mutationsResponse.json() as { mutations: EventCatalogMutation[] };
+    expect(persisted.mutations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ categoryId, type: 'category-deleted' }),
+    ]));
+  });
+
   it('broadcasts an Electron replica event mutation to every connected client', async () => {
     const abortControllers: AbortController[] = [
       new AbortController(),
