@@ -592,6 +592,39 @@ describe('RaceSweetApplicationServer', () => {
     ));
   });
 
+  it('accepts a DATA-1-sized mutation ledger write', async () => {
+    const eventId = createEventId('data-1-large-ledger-event');
+    const mutation: EventCatalogMutation = {
+      event: {
+        categoryIds: [],
+        date: '2026-07-30',
+        entrantIds: [],
+        format: 'race-weekend',
+        id: eventId,
+        name: 'DATA-1 crossing '.repeat(800_000),
+        sessionIds: [],
+      },
+      id: createId('data-1-large-ledger-mutation'),
+      timestamp: '2026-07-30T00:00:00.000Z',
+      type: 'event-created',
+    };
+
+    const response: Response = await fetch(`${testServer.origin}/api/v1/mutations`, {
+      body: JSON.stringify({ mutations: [mutation] }),
+      headers: {
+        'content-type': 'application/json',
+        cookie: testServer.adminCookie,
+        origin: testServer.origin,
+      },
+      method: 'PUT',
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      acknowledgedMutationIds: [mutation.id.toString()],
+    }));
+  });
+
   it('broadcasts an Electron flag deletion to every connected client', async () => {
     const abortControllers: AbortController[] = [
       new AbortController(),

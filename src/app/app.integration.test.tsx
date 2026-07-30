@@ -968,6 +968,80 @@ describe('RaceSweetMainApp integration', () => {
     expect(entrantCategories.every((category) => !UUID_TEXT_PATTERN.test(category.name))).toBe(true);
   });
 
+  it('does not scaffold startup fixture entities into an active real event without imported session data', async () => {
+    const realEventId = createEventId('real-event-without-imported-race-state');
+    const realSessionId = createSessionId('real-event-without-imported-race-state-session');
+    const writtenFiles: Array<{ content: string; filePath: string }> = [];
+    const requestFileContent = async (filePath: string): Promise<string> => {
+      if (filePath.includes('event-catalog.json')) {
+        return JSON.stringify({
+          ...createSeedEventCatalogLedger(),
+          mutations: [
+            ...createSeedEventCatalogLedger().mutations,
+            {
+              event: {
+                categoryIds: [],
+                date: '2026-07-30',
+                entrantIds: [],
+                format: 'race-weekend',
+                id: realEventId,
+                name: 'Real Event Without Imported Data',
+                sessionIds: [realSessionId],
+              },
+              id: 'mutation-real-event-without-imported-race-state',
+              timestamp: '2026-07-30T00:00:00.000Z',
+              type: 'event-created',
+            },
+            {
+              id: 'mutation-real-event-without-imported-race-state-session',
+              session: {
+                categoryIds: [],
+                eventId: realEventId,
+                id: realSessionId,
+                kind: 'practice',
+                name: 'Practice',
+                status: 'scheduled',
+              },
+              timestamp: '2026-07-30T00:00:01.000Z',
+              type: 'session-created',
+            },
+            {
+              eventId: realEventId,
+              id: 'mutation-real-event-without-imported-race-state-active',
+              timestamp: '2026-07-30T00:00:02.000Z',
+              type: 'event-activated',
+            },
+          ],
+        });
+      }
+      return readGeneratedFixture(filePath);
+    };
+    (window as unknown as {
+      api: {
+        requestBuffer: (filePath: string) => Promise<Buffer>;
+        requestFileContent: <T>(filePath: string, dataType: string) => Promise<T>;
+        writeFileContent: (filePath: string, content: string) => Promise<void>;
+      };
+    }).api = {
+      requestBuffer: readFixtureBuffer,
+      requestFileContent: requestFileContent as <T>(filePath: string, dataType: string) => Promise<T>,
+      writeFileContent: async (filePath: string, content: string) => {
+        writtenFiles.push({ content, filePath });
+      },
+    };
+
+    await act(async () => {
+      root.render(<RaceSweetMainApp />);
+    });
+    await waitForLoadedApp(container);
+    await clickSectionButton(container, 'Categories');
+
+    expect(container.textContent).toContain('Real Event Without Imported Data');
+    expect(container.textContent).not.toContain('Category A');
+    expect(container.textContent).not.toContain('Category B');
+    expect(writtenFiles.filter((write) => getCatalogWriteFileName(write.filePath) === 'event-catalog.json')).toEqual([]);
+  });
+
   it('hydrates persisted CTC timing records and the current category after an application restart', async () => {
     const importedEventId = createEventId('ctc-startup-event');
     const importedSessionId = createSessionId('ctc-startup-session');
@@ -1228,6 +1302,14 @@ describe('RaceSweetMainApp integration', () => {
       return raceStateMutation?.raceState?.records?.length === 2;
     });
     expect(importedLedger.mutations.some((mutation) => mutation.type === 'race-state-imported')).toBe(true);
+
+    await clickSectionButton(container, 'Sessions');
+    await waitForText(container, 'Effective sources: 1');
+    requestBuffer.mockClear();
+    await clickButtonByText(container, 'Re-load from sources');
+    await waitForText(container, 'Data Reloaded');
+    expect(requestBuffer).toHaveBeenCalledWith(ctcFilePath.replace(/\//g, '\\'));
+    expect(container.textContent).not.toContain('is not implemented');
 
     let persistedSystemConfig: { timingContextSelection?: { eventId?: string; selectionMode?: string; sessionId?: string } } | undefined;
     for (let attempt = 0; attempt < 120; attempt += 1) {

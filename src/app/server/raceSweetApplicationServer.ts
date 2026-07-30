@@ -95,6 +95,8 @@ interface LoginAttemptState {
   failures: number[];
 }
 
+const MAXIMUM_JSON_REQUEST_BODY_BYTES: number = 100 * 1024 * 1024;
+
 const jsonValue = (value: object): JsonValue =>
   JSON.parse(JSON.stringify(value)) as JsonValue;
 
@@ -104,8 +106,8 @@ const readRequestBody = async <TValue>(request: IncomingMessage): Promise<TValue
     request.setEncoding('utf8');
     request.on('data', (chunk: string): void => {
       body += chunk;
-      if (body.length > 10 * 1024 * 1024) {
-        reject(new Error('Request body exceeds the 10 MiB JSON limit.'));
+      if (Buffer.byteLength(body, 'utf8') > MAXIMUM_JSON_REQUEST_BODY_BYTES) {
+        reject(new Error('Request body exceeds the 100 MiB JSON limit.'));
         request.destroy();
       }
     });

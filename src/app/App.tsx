@@ -9,6 +9,7 @@ import { type EventCategory, EventCategoryId } from '../model/eventcategory.ts';
 import { getParticipantEntryId } from '../model/entry.ts';
 import { type EventParticipant, type EventParticipantId, type ParticipantTransponder } from '../model/eventparticipant.ts';
 import type { EventTeam } from '../model/eventteam.ts';
+import { createEventId } from '../model/ids.ts';
 import { EventId, SessionId } from '../model/raceevent.ts';
 import { type RaceState, RaceStateLookup, Session, getEffectiveParticipantCategoryId } from '../model/racestate.ts';
 import { type EventTimeRecord, type TimeRecordId } from '../model/timerecord.ts';
@@ -53,6 +54,8 @@ import { type EventSessionOption } from './views/results/resultsPage.tsx';
 
 type AppSection = 'System' | 'Events' | 'Entrants' | 'Categories' | 'Sessions' | 'Timing' | 'Results' | 'Reports';
 type TimingSessionSelection = 'active' | 'session';
+
+const SEED_FIXTURE_EVENT_ID: EventId = createEventId('event-2026-racesweet-round-1');
 
 interface RemoteRaceAdminTarget {
   raceState: (Session & RaceStateLookup) | undefined;
@@ -689,7 +692,9 @@ export const RaceSweetMainApp = () => {
           : undefined;
         const session = persistedInitialRaceState
           ? sessionFromPartialRaceState(persistedInitialRaceState)
-          : raceService.raceState;
+          : initialEventId === SEED_FIXTURE_EVENT_ID
+            ? raceService.raceState
+            : createEmptySessionState();
         const catalogValidationTotal = Math.max(1, initialCatalog.events.length + session.participants.length + 4);
         let catalogValidationCompleted = 0;
         for (const event of initialCatalog.events) {
@@ -1077,10 +1082,53 @@ export const RaceSweetMainApp = () => {
         }));
         break;
 
+      case 'file-dorian-ctc-srt': {
+        const filePath = source.fileConfig?.filePath;
+        const catalog = eventCatalogService?.catalog;
+        const event = catalog?.events.find((item) => item.id === eventId);
+        if (!filePath || !catalog || !event) {
+          throw new Error(`Assigned Dorian CTC SRT / ERF source "${source.name}" requires a configured file and event.`);
+        }
+
+        const existingRaceState = eventCatalogService?.getImportedRaceState(eventId, sessionId) || {};
+        const knownTransmitterNumbers = [
+          ...getEntrantsForEvent(catalog, eventId).flatMap((entrant) => (
+            entrant.isPlaceholder === true || entrant.name.trim().toLowerCase().startsWith('unknown participant')
+              ? []
+              : (entrant.identifiers || [])
+                .filter((identifier) => 'txNo' in identifier)
+                .map((identifier) => (identifier as ParticipantTransponder).txNo)
+          )),
+          ...(existingRaceState.participants || []).flatMap((participant) => (
+            participant.isPlaceholder === true || (!participant.firstname.trim() && !participant.surname.trim())
+              ? []
+              : participant.identifiers
+                .filter((identifier) => 'txNo' in identifier)
+                .map((identifier) => (identifier as ParticipantTransponder).txNo)
+          )),
+        ];
+        const trackConfigFilePath = source.fileConfig?.trackConfigFilePath;
+        const trackConfig = trackConfigFilePath
+          ? await window.api.requestBuffer(trackConfigFilePath)
+            .then((buffer) => parseCtcTrackConfig(buffer, trackConfigFilePath))
+          : source.fileConfig?.ctcTrackConfig;
+        const importedRaceState = await window.api.requestBuffer(filePath)
+          .then((buffer) => loadDorianCtcSrtCatalogForSession(filePath, buffer, {
+            eventDate: event.date,
+            eventId,
+            importPlaceholderEntrantsForUnknownTransmitters: source.fileConfig?.importPlaceholderEntrantsForUnknownTransmitters === true,
+            knownTransmitterNumbers,
+            sessionId,
+            timeZone: event.timeZone,
+            trackConfig,
+          }));
+        pulledRaceStates.push(importedRaceState);
+        break;
+      }
+
       case 'api-aws-sqs':
       case 'api-http-request':
       case 'file-apical-data-file':
-      case 'file-dorian-ctc-srt':
       case 'file-racesweet-ledger':
       case 'file-rfid-timing-csv':
       case 'master-entrant-profiles':
