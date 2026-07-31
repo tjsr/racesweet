@@ -149,9 +149,7 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
               props.onSaveSessionAssignment(selectedSession.id, mode, sourceIds);
             }
           }}
-          onSaveSession={() => {
-            void saveSession();
-          }}
+          onSaveSession={() => saveSession().then(() => undefined)}
           onSetSessionDraft={setSessionDraft}
           requestFormExit={requestFormExit}
           selectedEvent={selectedEvent}

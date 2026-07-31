@@ -462,7 +462,9 @@ export const RaceSweetMainApp = () => {
     catalogReplicaOutbox.current = outbox;
     eventCatalogService.setOnPersistedLedger((ledger) => outbox.enqueueNewPersistedMutations(ledger).then(() => controller.syncNow()));
     const subscriber = new ReplicaLiveMutationSubscriber(new HttpRaceSweetApiClient(remoteServerUrl), { applyRemoteMutations: (mutations) => eventCatalogService.applyRemoteMutations(mutations).then((): void => undefined) });
-    subscriber.start(() => { void controller.syncNow(); });
+    subscriber.start(() => {
+      void controller.syncNow();
+    });
     void controller.start();
     return () => {
       subscriber.stop();

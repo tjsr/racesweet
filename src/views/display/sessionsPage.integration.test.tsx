@@ -360,6 +360,17 @@ describe('SessionsPage integration', () => {
     });
 
     expect(onDeleteSession).toHaveBeenCalledWith('event-2', 'session-3');
+    expect(container.querySelector('[aria-label="Session saved"]')).toBeTruthy();
+
+    const sprintSessionButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Sprint Session'));
+    expect(sprintSessionButton).toBeDefined();
+
+    await act(async () => {
+      sprintSessionButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.querySelector('.warning-modal-backdrop')).toBeFalsy();
+    expect((container.querySelector('input[aria-label="Sessions Page Name"]') as HTMLInputElement).value).toBe('Sprint Session');
   });
 
   it('prompts before replacing a dirty session form and saves before continuing', async () => {
@@ -417,5 +428,54 @@ describe('SessionsPage integration', () => {
 
     expect(onUpdateSession).toHaveBeenCalledWith('session-1', expect.objectContaining({ name: 'Practice Edited' }));
     expect((container.querySelector('input[aria-label="Sessions Page Name"]') as HTMLInputElement).value).toBe('Feature Race');
+  });
+
+  it('shows an error status when saving the session fails', async () => {
+    let rejectSave: (reason?: Error) => void = () => undefined;
+    const onUpdateSession = vi.fn().mockImplementation(() => new Promise<void>((_resolve: () => void, reject: (reason?: Error) => void) => {
+      rejectSave = reject;
+    }));
+
+    await act(async () => {
+      root.render(
+        <SessionsPage
+          catalog={catalog}
+          config={config}
+          onApplySessionSources={() => undefined}
+          onCreateSession={() => undefined}
+          onDeleteSession={() => undefined}
+          onMakeSessionActive={() => undefined}
+          onReloadSessionSources={() => undefined}
+          onSaveSessionCategoryAssignment={() => undefined}
+          onSaveSessionAssignment={() => undefined}
+          onSelectEvent={() => undefined}
+          onSelectSession={() => undefined}
+          onUpdateSession={onUpdateSession}
+          selectedEventId="event-1"
+          selectedSessionId="session-1"
+        />,
+      );
+    });
+
+    await act(async () => {
+      setInputValue(container.querySelector('input[aria-label="Sessions Page Name"]') as HTMLInputElement, 'Unsaveable Session');
+    });
+
+    const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Session');
+    expect(saveButton).toBeDefined();
+
+    await act(async () => {
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.querySelector('[aria-label="Saving session"]')).toBeTruthy();
+
+    await act(async () => {
+      rejectSave(new Error('Session could not be saved'));
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector('[aria-label="Session save failed"]')).toBeTruthy();
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Session could not be saved');
   });
 });
