@@ -12,6 +12,35 @@ const mutation = {
 } as unknown as EventCatalogMutation;
 
 describe('ReplicaSyncService', () => {
+  it('converges an offline replica to the authoritative host ledger when it reconnects', async () => {
+    const hostMutations: EventCatalogMutation[] = [];
+    const createReplica = (applied: EventCatalogMutation[]) => new ReplicaSyncService(
+      { applyRemoteMutations: async (mutations): Promise<void> => { applied.push(...mutations); } },
+      { load: async () => ({ acknowledgedMutationIds: [], pendingMutations: [] }), save: async (): Promise<void> => undefined },
+      new SyncStore(),
+      {
+        pull: async (cursor) => ({ cursor: String(hostMutations.length), mutations: hostMutations.slice(Number(cursor || 0)) }),
+        push: async (mutations) => {
+          hostMutations.push(...mutations.filter((incoming) => !hostMutations.some((existing) => existing.id === incoming.id)));
+          return { acknowledgedMutationIds: mutations.map((incoming) => incoming.id.toString()), cursor: String(hostMutations.length) };
+        },
+      },
+    );
+    const electronApplied: EventCatalogMutation[] = [];
+    const webApplied: EventCatalogMutation[] = [];
+    const electron = createReplica(electronApplied);
+    await electron.initialize();
+    await electron.enqueuePersistedMutations([mutation]);
+    await electron.sync();
+
+    const reopenedWeb = createReplica(webApplied);
+    await reopenedWeb.initialize();
+    await reopenedWeb.sync();
+
+    expect(hostMutations).toEqual([mutation]);
+    expect(webApplied).toEqual([mutation]);
+  });
+
   it('retains a locally durable mutation after a push failure and retries its original ID', async () => {
     let savedState: ReplicaOutboxState = {
       acknowledgedMutationIds: [],
