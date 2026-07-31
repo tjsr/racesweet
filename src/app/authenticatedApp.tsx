@@ -3,7 +3,9 @@ import {
   AlertTitle,
   Box,
   Button,
+  Checkbox,
   CircularProgress,
+  FormControlLabel,
   Stack,
   TextField,
   Typography,
@@ -16,11 +18,12 @@ import type {
 } from '../model/serverApi.js';
 import { HttpRaceSweetApiClient } from '../service/raceSweetApiClient.js';
 import { RaceSweetMainApp } from './App.js';
+import { clearSavedLoginCredentials, loadSavedLoginCredentials, saveLoginCredentials } from './savedLoginCredentials.js';
 import { formatErrorForDisplay } from './stackTrace.js';
 
 interface CredentialsFormProps {
   error?: string;
-  onSubmit: (credentials: LoginRequest) => Promise<void>;
+  onSubmit: (credentials: LoginRequest) => Promise<boolean>;
   setupRequired: boolean;
 }
 
@@ -70,19 +73,31 @@ export const StartupConnectionFailure = ({
   </Box>
 );
 
-const CredentialsForm = ({
+export const CredentialsForm = ({
   error,
   onSubmit,
   setupRequired,
 }: CredentialsFormProps): React.ReactElement => {
-  const [password, setPassword] = useState<string>('');
-  const [username, setUsername] = useState<string>('');
+  const savedCredentials: LoginRequest | undefined = loadSavedLoginCredentials();
+  const [password, setPassword] = useState<string>(savedCredentials?.password || '');
+  const [username, setUsername] = useState<string>(savedCredentials?.username || '');
+  const [saveCredentials, setSaveCredentials] = useState<boolean>(savedCredentials !== undefined);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     setSubmitting(true);
-    onSubmit({ password, username }).finally((): void => setSubmitting(false));
+    onSubmit({ password, username })
+      .then((authenticationSucceeded: boolean): void => {
+        if (authenticationSucceeded && !setupRequired) {
+          if (saveCredentials) {
+            saveLoginCredentials({ password, username });
+          } else {
+            clearSavedLoginCredentials();
+          }
+        }
+      })
+      .finally((): void => setSubmitting(false));
   };
 
   return (
@@ -120,6 +135,18 @@ const CredentialsForm = ({
           type="password"
           value={password}
         />
+        {!setupRequired ? (
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={saveCredentials}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
+                  setSaveCredentials(event.target.checked)}
+              />
+            }
+            label="Save credentials"
+          />
+        ) : null}
         <Button disabled={submitting} type="submit" variant="contained">
           {setupRequired ? 'Create administrator' : 'Sign in'}
         </Button>
@@ -183,7 +210,9 @@ export const AuthenticatedRaceSweetApp = (): React.ReactElement => {
     );
   }
 
-  const authenticate = async (credentials: LoginRequest): Promise<void> => {
+  const authenticate = async (
+    credentials: LoginRequest,
+  ): Promise<boolean> => {
     setError(undefined);
     try {
       const user: AuthenticatedUser = status?.setupRequired
@@ -193,8 +222,10 @@ export const AuthenticatedRaceSweetApp = (): React.ReactElement => {
         setupRequired: false,
         user,
       });
+      return true;
     } catch (authenticationError: unknown) {
       setError(formatErrorForDisplay(authenticationError));
+      return false;
     }
   };
 
