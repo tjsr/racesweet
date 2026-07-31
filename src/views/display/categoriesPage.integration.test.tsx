@@ -7,22 +7,22 @@ import React from 'react';
 import { act } from 'react';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 
-const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: string): void => {
+const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: string,): void => {
   const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
   const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
   descriptor?.set?.call(input, value);
   input.dispatchEvent(new Event('input', { bubbles: true }));
 };
 
-const setMultiSelectValues = (select: HTMLSelectElement, values: string[]): void => {
+const setMultiSelectValues = (select: HTMLSelectElement, values: string[],): void => {
   Array.from(select.options).forEach((option) => {
     option.selected = values.includes(option.value);
   });
   select.dispatchEvent(new Event('change', { bubbles: true }));
 };
 
-const getPanelByHeading = (container: HTMLElement, headingText: string): HTMLElement => {
-  const heading = Array.from(container.querySelectorAll('h2')).find((item) => item.textContent === headingText);
+const getPanelByHeading = (container: HTMLElement, headingText: string,): HTMLElement => {
+  const heading = Array.from(container.querySelectorAll('h2')).find((item) => item.textContent === headingText,);
   const panel = heading?.closest('section');
   if (!panel) {
     throw new Error(`Panel ${headingText} was not rendered.`);
@@ -32,61 +32,61 @@ const getPanelByHeading = (container: HTMLElement, headingText: string): HTMLEle
 };
 
 const catalog: EventCatalogState = {
-  activeEventId: 'event-1',
+  activeEventId: "event-1",
   categories: [
     {
-      code: 'PW',
+      code: "PW",
       deleted: true,
-      distanceRule: { kind: 'laps', value: 8 },
-      eventId: 'event-1',
-      id: 'cat-1-deleted-history',
-      name: 'Premier',
+      distanceRule: { kind: "laps", value: 8 },
+      eventId: "event-1",
+      id: "cat-1-deleted-history",
+      name: "Premier",
       teamRules: { teamCompositionRules: [] },
     },
     {
-      code: 'PW',
-      distanceRule: { kind: 'laps', value: 8 },
-      eventId: 'event-1',
-      id: 'cat-1',
-      name: 'Premier',
+      code: "PW",
+      distanceRule: { kind: "laps", value: 8 },
+      eventId: "event-1",
+      id: "cat-1",
+      name: "Premier",
       teamRules: {
         maxRiderAge: 60,
         maxTeamSize: 2,
         minRiderAge: 16,
-        teamCompositionRules: [{ gender: 'female', max: 2, min: 0 }],
+        teamCompositionRules: [{ gender: "female", max: 2, min: 0 }],
       },
     },
     {
-      code: 'CLB',
-      distanceRule: { kind: 'time', value: '45' },
-      eventId: 'event-1',
-      id: 'cat-2',
-      name: 'Clubman',
+      code: "CLB",
+      distanceRule: { kind: "time", value: "45" },
+      eventId: "event-1",
+      id: "cat-2",
+      name: "Clubman",
       teamRules: { teamCompositionRules: [] },
     },
     {
-      code: 'CLB',
-      distanceRule: { kind: 'time', value: '45' },
-      eventId: 'event-1',
-      id: 'cat-2-duplicate',
-      name: 'Clubman',
+      code: "CLB",
+      distanceRule: { kind: "time", value: "45" },
+      eventId: "event-1",
+      id: "cat-2-duplicate",
+      name: "Clubman",
       teamRules: { teamCompositionRules: [] },
     },
     {
-      code: 'OLD',
+      code: "OLD",
       deleted: true,
-      distanceRule: { kind: 'unspecified' },
-      eventId: 'event-1',
-      id: 'cat-deleted',
-      name: 'Deleted Category',
+      distanceRule: { kind: "unspecified" },
+      eventId: "event-1",
+      id: "cat-deleted",
+      name: "Deleted Category",
       teamRules: { teamCompositionRules: [] },
     },
     {
-      code: 'DEV',
-      distanceRule: { kind: 'unspecified' },
-      eventId: 'event-2',
-      id: 'cat-3',
-      name: 'Development',
+      code: "DEV",
+      distanceRule: { kind: "unspecified" },
+      eventId: "event-2",
+      id: "cat-3",
+      name: "Development",
       teamRules: { teamCompositionRules: [] },
     },
   ],
@@ -94,124 +94,124 @@ const catalog: EventCatalogState = {
   entrants: [],
   events: [
     {
-      categoryIds: ['cat-1', 'cat-2'],
-      date: '2026-06-12',
-      entrantIds: ['ent-1', 'ent-2'],
-      format: 'race-weekend',
-      id: 'event-1',
-      name: 'Winter Round',
-      sessionIds: ['session-1', 'session-2'],
+      categoryIds: ["cat-1", "cat-2"],
+      date: "2026-06-12",
+      entrantIds: ["ent-1", "ent-2"],
+      format: "race-weekend",
+      id: "event-1",
+      name: "Winter Round",
+      sessionIds: ["session-1", "session-2"],
     },
     {
-      categoryIds: ['cat-3'],
-      date: '2026-07-10',
-      entrantIds: ['ent-3'],
-      format: 'test-day',
-      id: 'event-2',
-      name: 'Spring Test',
-      sessionIds: ['session-3'],
+      categoryIds: ["cat-3"],
+      date: "2026-07-10",
+      entrantIds: ["ent-3"],
+      format: "test-day",
+      id: "event-2",
+      name: "Spring Test",
+      sessionIds: ["session-3"],
     },
   ],
   sessions: [
     {
-      categoryIds: ['cat-1'],
-      eventId: 'event-1',
-      id: 'session-1',
-      kind: 'race',
-      name: 'Feature Race',
-      scheduledStart: '2026-06-12T09:00:00.000Z',
-      status: 'scheduled',
+      categoryIds: ["cat-1"],
+      eventId: "event-1",
+      id: "session-1",
+      kind: "race",
+      name: "Feature Race",
+      scheduledStart: "2026-06-12T09:00:00.000Z",
+      status: "scheduled",
     },
     {
-      categoryIds: ['cat-2'],
-      eventId: 'event-1',
-      id: 'session-2',
-      kind: 'practice',
-      name: 'Practice',
-      scheduledStart: '2026-06-12T08:00:00.000Z',
-      status: 'scheduled',
+      categoryIds: ["cat-2"],
+      eventId: "event-1",
+      id: "session-2",
+      kind: "practice",
+      name: "Practice",
+      scheduledStart: "2026-06-12T08:00:00.000Z",
+      status: "scheduled",
     },
     {
-      categoryIds: ['cat-3'],
-      eventId: 'event-2',
-      id: 'session-3',
-      kind: 'race',
-      name: 'Development Race',
-      scheduledStart: '2026-07-10T10:30:00.000Z',
-      status: 'scheduled',
+      categoryIds: ["cat-3"],
+      eventId: "event-2",
+      id: "session-3",
+      kind: "race",
+      name: "Development Race",
+      scheduledStart: "2026-07-10T10:30:00.000Z",
+      status: "scheduled",
     },
   ],
 };
 
-const entrantsByCategory: Record<string, EventCatalogState['entrants']> = {
-  'cat-1': [
+const entrantsByCategory: Record<string, EventCatalogState["entrants"]> = {
+  "cat-1": [
     {
-      categoryId: 'cat-1',
-      categoryIds: ['cat-1'],
-      entrantType: 'team',
-      eventId: 'event-1',
-      id: 'team-1',
-      memberParticipantIds: ['p-1', 'p-2'],
-      name: 'Team Red',
-      sessionIds: ['session-1'],
+      categoryId: "cat-1",
+      categoryIds: ["cat-1"],
+      entrantType: "team",
+      eventId: "event-1",
+      id: "team-1",
+      memberParticipantIds: ["p-1", "p-2"],
+      name: "Team Red",
+      sessionIds: ["session-1"],
     },
     {
-      categoryId: 'cat-1',
-      categoryIds: ['cat-1'],
-      entrantType: 'rider',
-      eventId: 'event-1',
-      id: 'p-1',
-      memberParticipantIds: ['p-1'],
-      name: 'Pat Rider',
-      sessionIds: ['session-1'],
-      teamEntrantId: 'team-1',
+      categoryId: "cat-1",
+      categoryIds: ["cat-1"],
+      entrantType: "rider",
+      eventId: "event-1",
+      id: "p-1",
+      memberParticipantIds: ["p-1"],
+      name: "Pat Rider",
+      sessionIds: ["session-1"],
+      teamEntrantId: "team-1",
     },
     {
-      categoryId: 'cat-1',
-      categoryIds: ['cat-1'],
-      entrantType: 'rider',
-      eventId: 'event-1',
-      id: 'p-2',
-      memberParticipantIds: ['p-2'],
-      name: 'Quinn Rider',
-      sessionIds: ['session-1'],
-      teamEntrantId: 'team-1',
-    },
-  ],
-  'cat-2': [
-    {
-      categoryId: 'cat-2',
-      categoryIds: ['cat-2'],
-      entrantType: 'rider',
-      eventId: 'event-1',
-      id: 'p-3',
-      memberParticipantIds: ['p-3'],
-      name: 'Taylor Rider',
-      sessionIds: ['session-2'],
+      categoryId: "cat-1",
+      categoryIds: ["cat-1"],
+      entrantType: "rider",
+      eventId: "event-1",
+      id: "p-2",
+      memberParticipantIds: ["p-2"],
+      name: "Quinn Rider",
+      sessionIds: ["session-1"],
+      teamEntrantId: "team-1",
     },
   ],
-  'cat-3': [
+  "cat-2": [
     {
-      categoryId: 'cat-3',
-      categoryIds: ['cat-3'],
-      entrantType: 'rider',
-      eventId: 'event-2',
-      id: 'p-4',
-      memberParticipantIds: ['p-4'],
-      name: 'Jordan Rider',
-      sessionIds: ['session-3'],
+      categoryId: "cat-2",
+      categoryIds: ["cat-2"],
+      entrantType: "rider",
+      eventId: "event-1",
+      id: "p-3",
+      memberParticipantIds: ["p-3"],
+      name: "Taylor Rider",
+      sessionIds: ["session-2"],
+    },
+  ],
+  "cat-3": [
+    {
+      categoryId: "cat-3",
+      categoryIds: ["cat-3"],
+      entrantType: "rider",
+      eventId: "event-2",
+      id: "p-4",
+      memberParticipantIds: ["p-4"],
+      name: "Jordan Rider",
+      sessionIds: ["session-3"],
     },
   ],
 };
 
-describe('CategoriesPage integration', () => {
+describe("CategoriesPage integration", () => {
   let container: HTMLDivElement;
   let root: Root;
 
   useUiConsoleGuards();
 
   beforeEach(() => {
-    container = document.createElement('div');
+    container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
   });
@@ -223,29 +223,39 @@ describe('CategoriesPage integration', () => {
     container.remove();
   });
 
-  it('defaults to active event, shows category entrant summary, and saves category rules', async () => {
+  it("defaults to active event, shows category entrant summary, and saves category rules", async () => {
     const onCreateCategory = vi.fn();
     const onDeleteCategory = vi.fn();
     const onUpdateCategory = vi.fn();
     const onUpdateCategorySessionAssignments = vi.fn();
 
     const Harness = () => {
-      const [selectedEventId, setSelectedEventId] = React.useState<string | undefined>(catalog.activeEventId);
-      const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | undefined>('cat-1');
+      const [selectedEventId, setSelectedEventId] = React.useState<
+        string | undefined
+      >(catalog.activeEventId);
+      const [selectedCategoryId, setSelectedCategoryId] = React.useState<
+        string | undefined
+      >("cat-1");
 
       return (
         <CategoriesPage
           catalog={catalog}
-          entrants={entrantsByCategory[selectedCategoryId || ''] || []}
+          entrants={entrantsByCategory[selectedCategoryId || ""] || []}
           onCreateCategory={onCreateCategory}
           onDeleteCategory={onDeleteCategory}
           onSelectCategory={setSelectedCategoryId}
           onSelectEvent={(eventId) => {
             setSelectedEventId(eventId);
-            setSelectedCategoryId(catalog.categories.find((category) => category.eventId === eventId)?.id);
+            setSelectedCategoryId(
+              catalog.categories.find(
+                (category) => category.eventId === eventId,
+              )?.id,
+            );
           }}
           onUpdateCategory={onUpdateCategory}
-          onUpdateCategorySessionAssignments={onUpdateCategorySessionAssignments}
+          onUpdateCategorySessionAssignments={
+            onUpdateCategorySessionAssignments
+          }
           selectedCategoryId={selectedCategoryId}
           selectedEventId={selectedEventId}
         />
@@ -256,307 +266,498 @@ describe('CategoriesPage integration', () => {
       root.render(<Harness />);
     });
 
-    expect(container.querySelector('h1')?.textContent).toBe('Categories');
-    const eventSelect = container.querySelector('select[aria-label="Categories Event"]') as HTMLSelectElement;
-    expect(eventSelect.value).toBe('event-1');
-    expect(container.textContent).toContain('Pat Rider');
-    expect(container.textContent).toContain('Quinn Rider');
-    expect(container.textContent).toContain('Team Red');
-    expect(container.textContent).toContain('Teams');
-    expect(container.textContent).not.toContain('Individual Entrants');
-    expect(container.textContent).toContain('Category List');
-    let sessionsForCategoryPanel = getPanelByHeading(container, 'Sessions for Category');
-    expect(sessionsForCategoryPanel.textContent).toContain('Feature Race');
-    expect(sessionsForCategoryPanel.textContent).not.toContain('Practice');
+    expect(container.querySelector("h1")?.textContent).toBe("Categories");
+    const eventSelect = container.querySelector(
+      'select[aria-label="Categories Event"]',
+    ) as HTMLSelectElement;
+    expect(eventSelect.value).toBe("event-1");
+    expect(container.textContent).toContain("Pat Rider");
+    expect(container.textContent).toContain("Quinn Rider");
+    expect(container.textContent).toContain("Team Red");
+    expect(container.textContent).toContain("Teams");
+    expect(container.textContent).not.toContain("Individual Entrants");
+    expect(container.textContent).toContain("Category List");
+    let sessionsForCategoryPanel = getPanelByHeading(
+      container,
+      "Sessions for Category",
+    );
+    expect(sessionsForCategoryPanel.textContent).toContain("Feature Race");
+    expect(sessionsForCategoryPanel.textContent).not.toContain("Practice");
 
-    const categoryListPanel = getPanelByHeading(container, 'Category List');
-    expect(categoryListPanel.textContent).not.toContain('Deleted Category');
-    expect(categoryListPanel.textContent).toContain('Premier');
-    expect(container.textContent).toContain('Category ID: cat-1');
-    expect(container.textContent).not.toContain('Category ID: cat-1-deleted-history');
+    const categoryListPanel = getPanelByHeading(container, "Category List");
+    expect(categoryListPanel.textContent).not.toContain("Deleted Category");
+    expect(categoryListPanel.textContent).toContain("Premier");
+    expect(container.textContent).toContain("Category ID: cat-1");
+    expect(container.textContent).not.toContain(
+      "Category ID: cat-1-deleted-history",
+    );
 
-    const clubmanButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Clubman'));
+    const clubmanButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Clubman"),
+    );
     expect(clubmanButton).toBeDefined();
-    expect(Array.from(container.querySelectorAll('button')).filter((button) => button.textContent?.includes('Clubman'))).toHaveLength(1);
+    expect(
+      Array.from(container.querySelectorAll("button")).filter((button) =>
+        button.textContent?.includes("Clubman"),
+      ),
+    ).toHaveLength(1);
 
     await act(async () => {
-      clubmanButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      clubmanButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain('Taylor Rider');
-    expect(container.textContent).not.toContain('Pat Rider');
-    sessionsForCategoryPanel = getPanelByHeading(container, 'Sessions for Category');
-    expect(sessionsForCategoryPanel.textContent).toContain('Practice');
-    expect(sessionsForCategoryPanel.textContent).not.toContain('Feature Race');
+    expect(container.textContent).toContain("Taylor Rider");
+    expect(container.textContent).not.toContain("Pat Rider");
+    sessionsForCategoryPanel = getPanelByHeading(
+      container,
+      "Sessions for Category",
+    );
+    expect(sessionsForCategoryPanel.textContent).toContain("Practice");
+    expect(sessionsForCategoryPanel.textContent).not.toContain("Feature Race");
 
     await act(async () => {
-      eventSelect.value = 'event-2';
-      eventSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      eventSelect.value = "event-2";
+      eventSelect.dispatchEvent(new Event("change", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain('Development');
-    expect(container.textContent).toContain('Jordan Rider');
-    sessionsForCategoryPanel = getPanelByHeading(container, 'Sessions for Category');
-    expect(sessionsForCategoryPanel.textContent).toContain('Development Race');
-    expect(sessionsForCategoryPanel.textContent).not.toContain('Feature Race');
+    expect(container.textContent).toContain("Development");
+    expect(container.textContent).toContain("Jordan Rider");
+    sessionsForCategoryPanel = getPanelByHeading(
+      container,
+      "Sessions for Category",
+    );
+    expect(sessionsForCategoryPanel.textContent).toContain("Development Race");
+    expect(sessionsForCategoryPanel.textContent).not.toContain("Feature Race");
 
-    const createButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Create Category');
+    const createButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Create Category",
+    );
     expect(createButton).toBeDefined();
 
     await act(async () => {
-      createButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      createButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(onCreateCategory).toHaveBeenCalledWith('event-2');
+    expect(onCreateCategory).toHaveBeenCalledWith("event-2");
 
-    const categoryNameInput = container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement;
-    const distanceRuleTypeInput = container.querySelector('select[aria-label="Category Distance Rule Type"]') as HTMLSelectElement;
-    const maxTeamSizeInput = container.querySelector('input[aria-label="Category Max Team Size"]') as HTMLInputElement;
-    const minRiderAgeInput = container.querySelector('input[aria-label="Category Min Rider Age"]') as HTMLInputElement;
-    const maxRiderAgeInput = container.querySelector('input[aria-label="Category Max Rider Age"]') as HTMLInputElement;
-    const excludeFromResultsInput = container.querySelector('input[aria-label="Category Exclude From Results"]') as HTMLInputElement;
-    const teamGenderRulesInput = container.querySelector('textarea[aria-label="Category Team Gender Rules"]') as HTMLTextAreaElement;
-    const sessionAssignmentsInput = container.querySelector('select[aria-label="Category Session Assignments"]') as HTMLSelectElement;
-    expect(maxTeamSizeInput.inputMode).toBe('numeric');
-    expect(minRiderAgeInput.inputMode).toBe('numeric');
-    expect(maxRiderAgeInput.inputMode).toBe('numeric');
-    expect(container.querySelector('label[for="category-min-rider-age"]')?.textContent).toBe('Minimum Rider Age');
-    expect(container.querySelector('label[for="category-max-rider-age"]')?.textContent).toBe('Maximum Rider Age');
+    const categoryNameInput = container.querySelector(
+      'input[aria-label="Category Name"]',
+    ) as HTMLInputElement;
+    const distanceRuleTypeInput = container.querySelector(
+      'select[aria-label="Category Distance Rule Type"]',
+    ) as HTMLSelectElement;
+    const maxTeamSizeInput = container.querySelector(
+      'input[aria-label="Category Max Team Size"]',
+    ) as HTMLInputElement;
+    const minRiderAgeInput = container.querySelector(
+      'input[aria-label="Category Min Rider Age"]',
+    ) as HTMLInputElement;
+    const maxRiderAgeInput = container.querySelector(
+      'input[aria-label="Category Max Rider Age"]',
+    ) as HTMLInputElement;
+    const excludeFromResultsInput = container.querySelector(
+      'input[aria-label="Category Exclude From Results"]',
+    ) as HTMLInputElement;
+    const teamGenderRulesInput = container.querySelector(
+      'textarea[aria-label="Category Team Gender Rules"]',
+    ) as HTMLTextAreaElement;
+    const sessionAssignmentsInput = container.querySelector(
+      'select[aria-label="Category Session Assignments"]',
+    ) as HTMLSelectElement;
+    expect(maxTeamSizeInput.inputMode).toBe("numeric");
+    expect(minRiderAgeInput.inputMode).toBe("numeric");
+    expect(maxRiderAgeInput.inputMode).toBe("numeric");
+    expect(
+      container.querySelector('label[for="category-min-rider-age"]')
+        ?.textContent,
+    ).toBe("Minimum Rider Age");
+    expect(
+      container.querySelector('label[for="category-max-rider-age"]')
+        ?.textContent,
+    ).toBe("Maximum Rider Age");
     await act(async () => {
-      setInputValue(categoryNameInput, 'Development Cup');
-      distanceRuleTypeInput.value = 'time';
-      distanceRuleTypeInput.dispatchEvent(new Event('change', { bubbles: true }));
+      setInputValue(categoryNameInput, "Development Cup");
+      distanceRuleTypeInput.value = "time";
+      distanceRuleTypeInput.dispatchEvent(
+        new Event("change", { bubbles: true }),
+      );
     });
 
-    const distanceRuleValueInput = container.querySelector('input[aria-label="Category Distance Rule Value"]') as HTMLInputElement;
+    const distanceRuleValueInput = container.querySelector(
+      'input[aria-label="Category Distance Rule Value"]',
+    ) as HTMLInputElement;
     await act(async () => {
-      setInputValue(distanceRuleValueInput, '1:30');
-      setInputValue(maxTeamSizeInput, '3');
-      setInputValue(minRiderAgeInput, '15');
-      setInputValue(maxRiderAgeInput, '55');
-      excludeFromResultsInput.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      setInputValue(teamGenderRulesInput, 'female:1:2; male:1:3');
-      setMultiSelectValues(sessionAssignmentsInput, ['session-3']);
+      setInputValue(distanceRuleValueInput, "1:30");
+      setInputValue(maxTeamSizeInput, "3");
+      setInputValue(minRiderAgeInput, "15");
+      setInputValue(maxRiderAgeInput, "55");
+      excludeFromResultsInput.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+      setInputValue(teamGenderRulesInput, "female:1:2; male:1:3");
+      setMultiSelectValues(sessionAssignmentsInput, ["session-3"]);
     });
 
-    const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Category');
+    const saveButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Save Category",
+    );
     expect(saveButton).toBeDefined();
 
     await act(async () => {
-      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      saveButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(onUpdateCategory).toHaveBeenCalledWith('cat-3', expect.objectContaining({
-      distanceRule: { kind: 'time', value: '1:30' },
-      excludeFromResults: true,
-      name: 'Development Cup',
-      teamRules: {
-        identityMode: 'single',
-        maxRiderAge: 55,
-        maxTeamSize: 3,
-        minRiderAge: 15,
-        teamCompositionRules: [
-          { gender: 'female', max: 2, min: 1 },
-          { gender: 'male', max: 3, min: 1 },
-        ],
-      },
-    }));
-    expect(onUpdateCategorySessionAssignments).toHaveBeenCalledWith('cat-3', ['session-3']);
+    expect(onUpdateCategory).toHaveBeenCalledWith(
+      "cat-3",
+      expect.objectContaining({
+        distanceRule: { kind: "time", value: "1:30" },
+        excludeFromResults: true,
+        name: "Development Cup",
+        teamRules: {
+          identityMode: "single",
+          maxRiderAge: 55,
+          maxTeamSize: 3,
+          minRiderAge: 15,
+          teamCompositionRules: [
+            { gender: "female", max: 2, min: 1 },
+            { gender: "male", max: 3, min: 1 },
+          ],
+        },
+      }),
+    );
+    expect(onUpdateCategorySessionAssignments).toHaveBeenCalledWith("cat-3", [
+      "session-3",
+    ]);
 
-    const deleteButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Delete Category');
+    const deleteButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Delete Category",
+    );
     expect(deleteButton).toBeDefined();
-    expect(container.textContent).toContain('Category ID: cat-3');
+    expect(container.textContent).toContain("Category ID: cat-3");
 
     await act(async () => {
-      deleteButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      deleteButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(onDeleteCategory).toHaveBeenCalledWith('event-2', 'cat-3');
+    expect(onDeleteCategory).toHaveBeenCalledWith("event-2", "cat-3");
   });
 
-  it('keeps same-name active categories independently visible and deletes only the selected ID', async () => {
+  it("keeps same-name active categories independently visible and deletes only the selected ID", async () => {
     const catalogWithSameNameCategories: EventCatalogState = {
       ...catalog,
-      events: catalog.events.map((event) => event.id === 'event-1'
-        ? { ...event, categoryIds: [...event.categoryIds, 'cat-2-duplicate'] }
-        : event),
+      events: catalog.events.map((event) =>
+        event.id === "event-1"
+          ? { ...event, categoryIds: [...event.categoryIds, "cat-2-duplicate"] }
+          : event,
+      ),
     };
 
     const Harness = () => {
-      const [currentCatalog, setCurrentCatalog] = React.useState<EventCatalogState>(catalogWithSameNameCategories);
-      const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | undefined>('cat-2');
-      const deleteCategory = async (_eventId: string, categoryId: string): Promise<void> => {
+      const [currentCatalog, setCurrentCatalog] =
+        React.useState<EventCatalogState>(catalogWithSameNameCategories);
+      const [selectedCategoryId, setSelectedCategoryId] = React.useState<
+        string | undefined
+      >("cat-2");
+      const deleteCategory = async (
+        _eventId: string,
+        categoryId: string,
+      ): Promise<void> => {
         setCurrentCatalog((current) => ({
           ...current,
-          categories: current.categories.map((category) => category.id === categoryId
-            ? { ...category, deleted: true }
-            : category),
-          events: current.events.map((event) => event.id === 'event-1'
-            ? { ...event, categoryIds: event.categoryIds.filter((id) => id !== categoryId) }
-            : event),
+          categories: current.categories.map((category) =>
+            category.id === categoryId
+              ? { ...category, deleted: true }
+              : category,
+          ),
+          events: current.events.map((event) =>
+            event.id === "event-1"
+              ? {
+                ...event,
+                categoryIds: event.categoryIds.filter(
+                  (id) => id !== categoryId,
+                ),
+              }
+              : event,
+          ),
         }));
       };
 
-      return <CategoriesPage
-        catalog={currentCatalog}
-        entrants={[]}
-        onCreateCategory={vi.fn()}
-        onDeleteCategory={deleteCategory}
-        onSelectCategory={setSelectedCategoryId}
-        onSelectEvent={vi.fn()}
-        onUpdateCategory={vi.fn()}
-        onUpdateCategorySessionAssignments={vi.fn()}
-        selectedCategoryId={selectedCategoryId}
-        selectedEventId="event-1"
-      />;
+      return (
+        <CategoriesPage
+          catalog={currentCatalog}
+          entrants={[]}
+          onCreateCategory={vi.fn()}
+          onDeleteCategory={deleteCategory}
+          onSelectCategory={setSelectedCategoryId}
+          onSelectEvent={vi.fn()}
+          onUpdateCategory={vi.fn()}
+          onUpdateCategorySessionAssignments={vi.fn()}
+          selectedCategoryId={selectedCategoryId}
+          selectedEventId="event-1"
+        />
+      );
     };
 
     await act(async () => {
       root.render(<Harness />);
     });
 
-    const clubmanCards = (): HTMLButtonElement[] => Array.from(
-      container.querySelectorAll<HTMLButtonElement>('[aria-label="Categories for selected event"] button'),
-    ).filter((button) => button.textContent?.includes('Clubman'));
+    const clubmanCards = (): HTMLButtonElement[] =>
+      Array.from(
+        container.querySelectorAll<HTMLButtonElement>(
+          '[aria-label="Categories for selected event"] button',
+        ),
+      ).filter((button) => button.textContent?.includes("Clubman"));
     expect(clubmanCards()).toHaveLength(2);
 
-    const deleteButton = Array.from(container.querySelectorAll('button'))
-      .find((button) => button.textContent?.includes('Delete Category')) as HTMLButtonElement;
+    const deleteButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Delete Category"),
+    ) as HTMLButtonElement;
     await act(async () => {
-      deleteButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      deleteButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
     expect(clubmanCards()).toHaveLength(1);
     await act(async () => {
-      clubmanCards()[0]!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      clubmanCards()[0]!.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
     });
-    expect(container.textContent).toContain('Category ID: cat-2-duplicate');
+    expect(container.textContent).toContain("Category ID: cat-2-duplicate");
   });
 
-  it('shows deletion progress, updates catalog-backed screens after success, and reports deletion failures inline', async () => {
+  it("shows deletion progress, updates catalog-backed screens after success, and reports deletion failures inline", async () => {
     let completeDeletion: (() => void) | undefined;
 
     const Harness = () => {
-      const [currentCatalog, setCurrentCatalog] = React.useState<EventCatalogState>(catalog);
-      const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | undefined>('cat-1');
-      const deleteCategory = (eventId: string, categoryId: string): Promise<void> => {
-        if (categoryId === 'cat-2') {
-          return Promise.reject(new Error('Category is still assigned to a published result.'));
+      const [currentCatalog, setCurrentCatalog] =
+        React.useState<EventCatalogState>(catalog);
+      const [selectedCategoryId, setSelectedCategoryId] = React.useState<
+        string | undefined
+      >("cat-1");
+      const deleteCategory = (
+        eventId: string,
+        categoryId: string,
+      ): Promise<void> => {
+        if (categoryId === "cat-2") {
+          return Promise.reject(
+            new Error("Category is still assigned to a published result."),
+          );
         }
 
         return new Promise<void>((resolve): void => {
           completeDeletion = (): void => {
             setCurrentCatalog((current) => ({
               ...current,
-              categories: current.categories.map((category) => category.id === categoryId
-                ? { ...category, deleted: true }
-                : category),
-              events: current.events.map((event) => event.id !== eventId
-                ? event
-                : { ...event, categoryIds: event.categoryIds.filter((id) => id !== categoryId) }),
-              sessions: current.sessions.map((session) => session.eventId !== eventId
-                ? session
-                : { ...session, categoryIds: session.categoryIds.filter((id) => id !== categoryId) }),
+              categories: current.categories.map((category) =>
+                category.id === categoryId
+                  ? { ...category, deleted: true }
+                  : category,
+              ),
+              events: current.events.map((event) =>
+                event.id !== eventId
+                  ? event
+                  : {
+                    ...event,
+                    categoryIds: event.categoryIds.filter(
+                      (id) => id !== categoryId,
+                    ),
+                  },
+              ),
+              sessions: current.sessions.map((session) =>
+                session.eventId !== eventId
+                  ? session
+                  : {
+                    ...session,
+                    categoryIds: session.categoryIds.filter(
+                      (id) => id !== categoryId,
+                    ),
+                  },
+              ),
             }));
             resolve();
           };
         });
       };
 
-      return <CategoriesPage
-        catalog={currentCatalog}
-        entrants={entrantsByCategory[selectedCategoryId || ''] || []}
-        onCreateCategory={vi.fn()}
-        onDeleteCategory={deleteCategory}
-        onSelectCategory={setSelectedCategoryId}
-        onSelectEvent={vi.fn()}
-        onUpdateCategory={vi.fn()}
-        onUpdateCategorySessionAssignments={vi.fn()}
-        selectedCategoryId={selectedCategoryId}
-        selectedEventId="event-1"
-      />;
+      return (
+        <CategoriesPage
+          catalog={currentCatalog}
+          entrants={entrantsByCategory[selectedCategoryId || ""] || []}
+          onCreateCategory={vi.fn()}
+          onDeleteCategory={deleteCategory}
+          onSelectCategory={setSelectedCategoryId}
+          onSelectEvent={vi.fn()}
+          onUpdateCategory={vi.fn()}
+          onUpdateCategorySessionAssignments={vi.fn()}
+          selectedCategoryId={selectedCategoryId}
+          selectedEventId="event-1"
+        />
+      );
     };
 
     await act(async () => {
       root.render(<Harness />);
     });
-    const deleteButton = (): HTMLButtonElement => Array.from(container.querySelectorAll('button'))
-      .find((button) => button.textContent?.includes('Delete Category')) as HTMLButtonElement;
+    const deleteButton = (): HTMLButtonElement =>
+      Array.from(container.querySelectorAll("button")).find((button) =>
+        button.textContent?.includes("Delete Category"),
+      ) as HTMLButtonElement;
 
     await act(async () => {
-      deleteButton().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      deleteButton().dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(deleteButton().disabled).toBe(true);
-    expect(container.querySelector('[aria-label="Deleting category"]')).toBeTruthy();
+    expect(
+      container.querySelector('[aria-label="Deleting category"]'),
+    ).toBeTruthy();
 
     await act(async () => {
       completeDeletion?.();
     });
-    expect(container.textContent).not.toContain('Category ID: cat-1');
-    expect(getPanelByHeading(container, 'Category List').textContent).not.toContain('Premier');
-    expect(container.textContent).toContain('Category ID: cat-2');
+    expect(container.textContent).not.toContain("Category ID: cat-1");
+    expect(
+      getPanelByHeading(container, "Category List").textContent,
+    ).not.toContain("Premier");
+    expect(container.textContent).toContain("Category ID: cat-2");
 
     await act(async () => {
-      deleteButton().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      deleteButton().dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    expect(container.querySelector('[aria-label="Category deletion failed"]')).toBeTruthy();
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Category is still assigned to a published result.');
-    expect(container.textContent).toContain('Category ID: cat-2');
+    expect(
+      container.querySelector('[aria-label="Category deletion failed"]'),
+    ).toBeTruthy();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Category is still assigned to a published result.",
+    );
+    expect(container.textContent).toContain("Category ID: cat-2");
   });
 
-  it('shows category save failures inline without hiding page content', async () => {
+  it("shows category save failures inline without hiding page content", async () => {
     const onCreateCategory = vi.fn();
     const onDeleteCategory = vi.fn();
-    const onUpdateCategory = vi.fn().mockRejectedValue(new Error('Category cat-1 does not exist.'));
+    const onUpdateCategory = vi
+      .fn()
+      .mockRejectedValue(new Error("Category cat-1 does not exist."));
     const onUpdateCategorySessionAssignments = vi.fn();
 
     await act(async () => {
       root.render(
         <CategoriesPage
           catalog={catalog}
-          entrants={entrantsByCategory['cat-1']}
+          entrants={entrantsByCategory["cat-1"]}
           onCreateCategory={onCreateCategory}
           onDeleteCategory={onDeleteCategory}
           onSelectCategory={vi.fn()}
           onSelectEvent={vi.fn()}
           onUpdateCategory={onUpdateCategory}
-          onUpdateCategorySessionAssignments={onUpdateCategorySessionAssignments}
+          onUpdateCategorySessionAssignments={
+            onUpdateCategorySessionAssignments
+          }
           selectedCategoryId="cat-1"
           selectedEventId="event-1"
-        />
+        />,
       );
     });
 
-    const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Category');
+    const saveButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Save Category",
+    );
     expect(saveButton).toBeDefined();
 
     await act(async () => {
-      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      saveButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
       await Promise.resolve();
     });
 
-    const errorPane = container.querySelector('.category-save-error.error');
+    const errorPane = container.querySelector(".category-save-error.error");
     expect(errorPane).toBeTruthy();
-    expect(errorPane?.getAttribute('role')).toBe('alert');
-    expect(errorPane?.textContent).toContain('!');
-    expect(errorPane?.textContent).toContain('Category cat-1 does not exist.');
-    expect(container.textContent).toContain('Category Details');
-    expect(container.textContent).toContain('Entrants In Category');
-    expect(container.textContent).not.toContain('Error loading content');
+    expect(errorPane?.getAttribute("role")).toBe("alert");
+    expect(
+      container.querySelector('[aria-label="Category save failed"]'),
+    ).toBeTruthy();
+    expect(errorPane?.textContent).toContain("Category cat-1 does not exist.");
+    expect(container.textContent).toContain("Category Details");
+    expect(container.textContent).toContain("Entrants In Category");
+    expect(container.textContent).not.toContain("Error loading content");
   });
 
-  it('does not display or log a category that is missing from the parent event category list', async () => {
+  it("shows category save progress until all persistence calls succeed", async () => {
+    let resolveAssignments: (() => void) | undefined;
+    const onUpdateCategory = vi.fn().mockResolvedValue(undefined);
+    const onUpdateCategorySessionAssignments = vi.fn(
+      (): Promise<void> =>
+        new Promise<void>((resolve: () => void): void => {
+          resolveAssignments = resolve;
+        }),
+    );
+
+    await act(async () => {
+      root.render(
+        <CategoriesPage
+          catalog={catalog}
+          entrants={entrantsByCategory["cat-1"]}
+          onCreateCategory={vi.fn()}
+          onDeleteCategory={vi.fn()}
+          onSelectCategory={vi.fn()}
+          onSelectEvent={vi.fn()}
+          onUpdateCategory={onUpdateCategory}
+          onUpdateCategorySessionAssignments={
+            onUpdateCategorySessionAssignments
+          }
+          selectedCategoryId="cat-1"
+          selectedEventId="event-1"
+        />,
+      );
+    });
+
+    const saveButton = Array.from(container.querySelectorAll("button")).find(
+      (button: HTMLButtonElement): boolean =>
+        button.textContent === "Save Category",
+    );
+    expect(saveButton).toBeDefined();
+
+    await act(async () => {
+      saveButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(saveButton?.disabled).toBe(true);
+    expect(
+      container.querySelector('[aria-label="Saving category"]'),
+    ).toBeTruthy();
+    expect(onUpdateCategory).toHaveBeenCalledOnce();
+    expect(onUpdateCategorySessionAssignments).toHaveBeenCalledWith("cat-1", [
+      "session-1",
+    ]);
+
+    await act(async () => {
+      resolveAssignments?.();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(saveButton?.disabled).toBe(false);
+    expect(
+      container.querySelector('[aria-label="Category saved"]'),
+    ).toBeTruthy();
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it("does not display or log a category that is missing from the parent event category list", async () => {
     const onDisplayError = vi.fn();
     const mismatchedCatalog: EventCatalogState = {
       ...catalog,
       categories: [
         ...catalog.categories,
         {
-          code: 'ORP',
-          distanceRule: { kind: 'unspecified' },
-          eventId: 'event-1',
-          id: 'cat-orphan',
-          name: 'Orphan',
+          code: "ORP",
+          distanceRule: { kind: "unspecified" },
+          eventId: "event-1",
+          id: "cat-orphan",
+          name: "Orphan",
           teamRules: { teamCompositionRules: [] },
         },
       ],
@@ -576,72 +777,101 @@ describe('CategoriesPage integration', () => {
           onUpdateCategorySessionAssignments={vi.fn()}
           selectedCategoryId="cat-orphan"
           selectedEventId="event-1"
-        />
+        />,
       );
     });
 
-    const parentEventError = container.querySelector('.category-parent-event-error');
-    const categoryButtons = Array.from(container.querySelectorAll('[aria-label="Categories for selected event"] button')).map((button) => button.textContent || '');
-    expect(categoryButtons.some((buttonText) => buttonText.includes('Orphan'))).toBe(false);
-    expect(container.textContent).not.toContain('Category ID: cat-orphan');
-    expect(container.textContent).toContain('Category ID: cat-1');
+    const parentEventError = container.querySelector(
+      ".category-parent-event-error",
+    );
+    const categoryButtons = Array.from(
+      container.querySelectorAll(
+        '[aria-label="Categories for selected event"] button',
+      ),
+    ).map((button) => button.textContent || "");
+    expect(
+      categoryButtons.some((buttonText) => buttonText.includes("Orphan")),
+    ).toBe(false);
+    expect(container.textContent).not.toContain("Category ID: cat-orphan");
+    expect(container.textContent).toContain("Category ID: cat-1");
     expect(parentEventError).toBeNull();
     expect(onDisplayError).not.toHaveBeenCalled();
   });
 
-  it('uses the selected event category and sessions when the previous event selection is stale', async () => {
-    const onUpdateCategorySessionAssignments = vi.fn().mockResolvedValue(undefined);
+  it("uses the selected event category and sessions when the previous event selection is stale", async () => {
+    const onUpdateCategorySessionAssignments = vi
+      .fn()
+      .mockResolvedValue(undefined);
 
     await act(async () => {
       root.render(
         <CategoriesPage
           catalog={catalog}
-          entrants={entrantsByCategory['cat-3']}
+          entrants={entrantsByCategory["cat-3"]}
           onCreateCategory={vi.fn()}
           onDeleteCategory={vi.fn()}
           onSelectCategory={vi.fn()}
           onSelectEvent={vi.fn()}
           onUpdateCategory={vi.fn().mockResolvedValue(undefined)}
-          onUpdateCategorySessionAssignments={onUpdateCategorySessionAssignments}
+          onUpdateCategorySessionAssignments={
+            onUpdateCategorySessionAssignments
+          }
           selectedCategoryId="cat-1"
           selectedEventId="event-2"
-        />
+        />,
       );
     });
 
-    expect(container.textContent).toContain('Category ID: cat-3');
-    const sessionAssignments = container.querySelector('select[aria-label="Category Session Assignments"]') as HTMLSelectElement;
-    expect(Array.from(sessionAssignments.options).map((option) => option.value)).toEqual(['session-3']);
+    expect(container.textContent).toContain("Category ID: cat-3");
+    const sessionAssignments = container.querySelector(
+      'select[aria-label="Category Session Assignments"]',
+    ) as HTMLSelectElement;
+    expect(
+      Array.from(sessionAssignments.options).map((option) => option.value),
+    ).toEqual(["session-3"]);
 
-    const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Category');
+    const saveButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Save Category",
+    );
     await act(async () => {
       saveButton!.click();
       await Promise.resolve();
     });
 
-    expect(onUpdateCategorySessionAssignments).toHaveBeenCalledWith('cat-3', ['session-3']);
-    expect(onUpdateCategorySessionAssignments).not.toHaveBeenCalledWith('cat-1', expect.anything());
+    expect(onUpdateCategorySessionAssignments).toHaveBeenCalledWith("cat-3", [
+      "session-3",
+    ]);
+    expect(onUpdateCategorySessionAssignments).not.toHaveBeenCalledWith(
+      "cat-1",
+      expect.anything(),
+    );
   });
 
-  it('prompts before replacing a dirty category form and handles save discard and cancel', async () => {
+  it("prompts before replacing a dirty category form and handles save discard and cancel", async () => {
     const onCreateCategory = vi.fn();
     const onDeleteCategory = vi.fn();
     const onUpdateCategory = vi.fn().mockResolvedValue(undefined);
-    const onUpdateCategorySessionAssignments = vi.fn().mockResolvedValue(undefined);
+    const onUpdateCategorySessionAssignments = vi
+      .fn()
+      .mockResolvedValue(undefined);
 
     const Harness = () => {
-      const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | undefined>('cat-1');
+      const [selectedCategoryId, setSelectedCategoryId] = React.useState<
+        string | undefined
+      >("cat-1");
 
       return (
         <CategoriesPage
           catalog={catalog}
-          entrants={entrantsByCategory[selectedCategoryId || ''] || []}
+          entrants={entrantsByCategory[selectedCategoryId || ""] || []}
           onCreateCategory={onCreateCategory}
           onDeleteCategory={onDeleteCategory}
           onSelectCategory={setSelectedCategoryId}
           onSelectEvent={vi.fn()}
           onUpdateCategory={onUpdateCategory}
-          onUpdateCategorySessionAssignments={onUpdateCategorySessionAssignments}
+          onUpdateCategorySessionAssignments={
+            onUpdateCategorySessionAssignments
+          }
           selectedCategoryId={selectedCategoryId}
           selectedEventId="event-1"
         />
@@ -652,75 +882,119 @@ describe('CategoriesPage integration', () => {
       root.render(<Harness />);
     });
 
-    const categoryNameInput = container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement;
+    const categoryNameInput = container.querySelector(
+      'input[aria-label="Category Name"]',
+    ) as HTMLInputElement;
     await act(async () => {
-      setInputValue(categoryNameInput, 'Premier Edited');
+      setInputValue(categoryNameInput, "Premier Edited");
     });
 
-    const clubmanButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Clubman'));
+    const clubmanButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Clubman"),
+    );
     expect(clubmanButton).toBeDefined();
 
     await act(async () => {
-      clubmanButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      clubmanButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(container.querySelector('.warning-modal-backdrop')).toBeTruthy();
-    expect(container.querySelector('.warning-modal')).toBeTruthy();
-    expect(container.textContent).toContain('You have unsaved changes to category Premier - save or discard changes?');
+    expect(container.querySelector(".warning-modal-backdrop")).toBeTruthy();
+    expect(container.querySelector(".warning-modal")).toBeTruthy();
+    expect(container.textContent).toContain(
+      "You have unsaved changes to category Premier - save or discard changes?",
+    );
 
-    const cancelButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Cancel');
+    const cancelButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Cancel",
+    );
     expect(cancelButton).toBeDefined();
 
     await act(async () => {
-      cancelButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      cancelButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
     expect(onUpdateCategory).not.toHaveBeenCalled();
-    expect((container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement).value).toBe('Premier Edited');
-    expect(container.textContent).toContain('Pat Rider');
-    expect(container.textContent).not.toContain('You have unsaved changes');
+    expect(
+      (
+        container.querySelector(
+          'input[aria-label="Category Name"]',
+        ) as HTMLInputElement
+      ).value,
+    ).toBe("Premier Edited");
+    expect(container.textContent).toContain("Pat Rider");
+    expect(container.textContent).not.toContain("You have unsaved changes");
 
     await act(async () => {
-      clubmanButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      clubmanButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    const promptSaveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save');
+    const promptSaveButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent === "Save");
     expect(promptSaveButton).toBeDefined();
 
     await act(async () => {
-      promptSaveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      promptSaveButton!.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
       await Promise.resolve();
     });
 
-    expect(onUpdateCategory).toHaveBeenCalledWith('cat-1', expect.objectContaining({ name: 'Premier Edited' }));
-    expect(onUpdateCategorySessionAssignments).toHaveBeenCalledWith('cat-1', ['session-1']);
-    expect(container.textContent).toContain('Taylor Rider');
-    expect((container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement).value).toBe('Clubman');
+    expect(onUpdateCategory).toHaveBeenCalledWith(
+      "cat-1",
+      expect.objectContaining({ name: "Premier Edited" }),
+    );
+    expect(onUpdateCategorySessionAssignments).toHaveBeenCalledWith("cat-1", [
+      "session-1",
+    ]);
+    expect(container.textContent).toContain("Taylor Rider");
+    expect(
+      (
+        container.querySelector(
+          'input[aria-label="Category Name"]',
+        ) as HTMLInputElement
+      ).value,
+    ).toBe("Clubman");
 
     await act(async () => {
-      setInputValue(container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement, 'Clubman Edited');
+      setInputValue(
+        container.querySelector(
+          'input[aria-label="Category Name"]',
+        ) as HTMLInputElement,
+        "Clubman Edited",
+      );
     });
 
-    const premierButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Premier'));
+    const premierButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Premier"),
+    );
     expect(premierButton).toBeDefined();
 
     await act(async () => {
-      premierButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      premierButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    const discardButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Discard');
+    const discardButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Discard",
+    );
     expect(discardButton).toBeDefined();
 
     await act(async () => {
-      discardButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      discardButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
     expect(onUpdateCategory).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain('Pat Rider');
-    expect((container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement).value).toBe('Premier');
+    expect(container.textContent).toContain("Pat Rider");
+    expect(
+      (
+        container.querySelector(
+          'input[aria-label="Category Name"]',
+        ) as HTMLInputElement
+      ).value,
+    ).toBe("Premier");
   });
 
-  it('registers an unsaved-change guard for external page navigation', async () => {
+  it("registers an unsaved-change guard for external page navigation", async () => {
     let guard: ((action: () => void | Promise<void>) => void) | undefined;
     let navigationCompleted = false;
 
@@ -728,7 +1002,7 @@ describe('CategoriesPage integration', () => {
       root.render(
         <CategoriesPage
           catalog={catalog}
-          entrants={entrantsByCategory['cat-1']}
+          entrants={entrantsByCategory["cat-1"]}
           onCreateCategory={vi.fn()}
           onDeleteCategory={vi.fn()}
           onSelectCategory={vi.fn()}
@@ -740,14 +1014,19 @@ describe('CategoriesPage integration', () => {
           onUpdateCategorySessionAssignments={vi.fn()}
           selectedCategoryId="cat-1"
           selectedEventId="event-1"
-        />
+        />,
       );
     });
 
     expect(guard).toBeDefined();
 
     await act(async () => {
-      setInputValue(container.querySelector('input[aria-label="Category Name"]') as HTMLInputElement, 'Premier Edited');
+      setInputValue(
+        container.querySelector(
+          'input[aria-label="Category Name"]',
+        ) as HTMLInputElement,
+        "Premier Edited",
+      );
     });
 
     await act(async () => {
@@ -757,15 +1036,19 @@ describe('CategoriesPage integration', () => {
     });
 
     expect(navigationCompleted).toBe(false);
-    expect(container.querySelector('.warning-modal-backdrop')).toBeTruthy();
-    expect(container.querySelector('.warning-modal')).toBeTruthy();
-    expect(container.textContent).toContain('You have unsaved changes to category Premier - save or discard changes?');
+    expect(container.querySelector(".warning-modal-backdrop")).toBeTruthy();
+    expect(container.querySelector(".warning-modal")).toBeTruthy();
+    expect(container.textContent).toContain(
+      "You have unsaved changes to category Premier - save or discard changes?",
+    );
 
-    const discardButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Discard');
+    const discardButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Discard",
+    );
     expect(discardButton).toBeDefined();
 
     await act(async () => {
-      discardButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      discardButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
     expect(navigationCompleted).toBe(true);

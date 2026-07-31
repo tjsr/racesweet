@@ -24,6 +24,15 @@ import type { MapOf, TimeRecordSourceId } from "./types.js";
 
 export type SessionItemLoadedCallback<TItem> = (item: TItem, index: number, total: number) => Promise<void>;
 
+const normalizeRecordTime = <TRecord extends TimeRecord>(record: TRecord): TRecord => {
+  const time = record.time;
+  if (time === undefined || (time instanceof Date && !Number.isNaN(time.getTime()))) {
+    return record;
+  }
+
+  return { ...record, time: undefined };
+};
+
 export interface RaceStateLookup {
   getParticipantById(participantId: EventParticipantId): EventParticipant | undefined;
   getCategoryById(categoryId: EventCategoryId): EventCategory | undefined;
@@ -97,7 +106,7 @@ export class Session implements RaceState, RaceStateLookup {
     this._participants = listToMap(state.participants);
     this._teams = listToMap(state.teams);
     this._timeRecordSources = listToMap(state.timeRecordSources || []);
-    this._records = listToMap(state.records);
+    this._records = listToMap(state.records.map(normalizeRecordTime));
     this._cachedTransponderCrossings = new Map<ChipCrossingData["chipCode"], ChipCrossingData[]>();
     if (this._records.size > 0 || this._participants.size > 0) {
       assignParticpantsToCrossings(this.getProcessingParticipants(), this.records, this._sessionValidCategoryIds);
@@ -440,8 +449,9 @@ export class Session implements RaceState, RaceStateLookup {
     validate: boolean = true,
     onItemLoaded?: SessionItemLoadedCallback<TimeRecord>,
   ): Promise<void> {
+    const normalizedRecords = records.map(normalizeRecordTime);
     try {
-      this._validateRecords(records);
+      this._validateRecords(normalizedRecords);
     } catch (error: unknown) {
       if (validate) {
         throw error;
@@ -449,7 +459,7 @@ export class Session implements RaceState, RaceStateLookup {
     }
 
     if (!onItemLoaded) {
-      records.forEach((record: TimeRecord) => {
+      normalizedRecords.forEach((record: TimeRecord) => {
         incrementLoadingMetric('Add session record', record.id.toString());
         if (!isValidId(record.id)) {
           throw new InvalidIdError(`Record ID ${record.id} is not a valid Id type.`);
@@ -463,7 +473,7 @@ export class Session implements RaceState, RaceStateLookup {
       return;
     }
 
-    for (const [index, record] of records.entries()) {
+    for (const [index, record] of normalizedRecords.entries()) {
       incrementLoadingMetric('Add session record', record.id.toString());
       if (!isValidId(record.id)) {
         throw new InvalidIdError(`Record ID ${record.id} is not a valid Id type.`);
@@ -473,20 +483,21 @@ export class Session implements RaceState, RaceStateLookup {
       if (!this._bulkProcess) {
         this._processRecord(record);
       }
-      await onItemLoaded(record, index, records.length);
+      await onItemLoaded(record, index, normalizedRecords.length);
     }
   }
 
   public updateRecord(record: EventTimeRecord): void {
-    if (!isValidId(record.id)) {
-      throw new InvalidIdError(`Record ID ${record.id} is not a valid Id type.`);
+    const normalizedRecord = normalizeRecordTime(record);
+    if (!isValidId(normalizedRecord.id)) {
+      throw new InvalidIdError(`Record ID ${normalizedRecord.id} is not a valid Id type.`);
     }
-    if (!this._records.has(record.id.toString())) {
-      throw new Error(`Record ${record.id} does not exist in this session.`);
+    if (!this._records.has(normalizedRecord.id.toString())) {
+      throw new Error(`Record ${normalizedRecord.id} does not exist in this session.`);
     }
 
-    this._validateRecords([record]);
-    const updatedRecord = { ...record } as EventTimeRecord;
+    this._validateRecords([normalizedRecord]);
+    const updatedRecord = { ...normalizedRecord } as EventTimeRecord;
     if (isCrossingRecord(updatedRecord)) {
       const crossing = updatedRecord as ParticipantPassingRecord;
       crossing.entryId = undefined;

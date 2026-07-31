@@ -1,8 +1,8 @@
 import { TextField } from '@mui/material';
 import React from 'react';
-import { getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent } from '../../catalog/eventCatalog.js';
+import { getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent, } from '../../catalog/eventCatalog.js';
 import { buildCategoryChanges } from '../../processing/categoryDraft.js';
-import { CategoriesPageProps, CategoryDraft, dedupeCategoriesForDisplay, getCategoryDraft } from '../display/categoriesPage.js';
+import { CategoriesPageProps, CategoryDraft, dedupeCategoriesForDisplay, getCategoryDraft, } from '../display/categoriesPage.js';
 import { useUnsavedChangesWarning } from '../display/unsavedChangesWarning.js';
 import { CategoryDetailsPanel } from '../panels/categoryDetails.js';
 import { CategoryListPanel } from '../panels/categoryList.js';
@@ -11,30 +11,30 @@ import { SessionListPanel } from '../panels/sessionList.js';
 
 type CategoriesContextProps = React.ComponentProps<typeof CategoriesPage>;
 
-export const CategoriesContext = (props: CategoriesContextProps): React.ReactElement => {
+export const CategoriesContext = (props: CategoriesContextProps,): React.ReactElement => {
   return <CategoriesPage {...props} />;
 };
 
-export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement => {
-  const selectedEvent = props.catalog.events.find((event) => event.id.toString() === props.selectedEventId?.toString()) ??
-    props.catalog.events.find((event) => event.id.toString() === props.catalog.activeEventId?.toString()) ??
+export const CategoriesPage = (props: CategoriesPageProps,): React.ReactElement => {
+  const selectedEvent = props.catalog.events.find((event) => event.id.toString() === props.selectedEventId?.toString(),) ??
+    props.catalog.events.find((event) => event.id.toString() === props.catalog.activeEventId?.toString(),) ??
     props.catalog.events[0];
-  const categoriesForEvent = getCategoriesForEvent(props.catalog, selectedEvent?.id?.toString());
+  const categoriesForEvent = getCategoriesForEvent(props.catalog, selectedEvent?.id?.toString(),);
   const activeEventCategories = dedupeCategoriesForDisplay(categoriesForEvent);
-  const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id?.toString());
-  const selectedCategory = activeEventCategories.find((category) => category.id.toString() === props.selectedCategoryId?.toString()) ?? activeEventCategories[0];
-  const assignedSessionIdList = Array.from(getCategoryAssignedSessionIds(selectedCategory, eventSessions));
+  const eventSessions = getSessionsForEvent(props.catalog, selectedEvent?.id?.toString(),);
+  const selectedCategory = activeEventCategories.find((category) => category.id.toString() === props.selectedCategoryId?.toString(),) ?? activeEventCategories[0];
+  const assignedSessionIdList = Array.from(getCategoryAssignedSessionIds(selectedCategory, eventSessions),);
   const assignedSessionIdKey = assignedSessionIdList.slice().sort().join('|');
   const assignedSessionIds = new Set(assignedSessionIdList);
-  const categorySessions = eventSessions.filter((session) => assignedSessionIds.has(session.id.toString()));
+  const categorySessions = eventSessions.filter((session) => assignedSessionIds.has(session.id.toString()),);
 
-  const [formError, setFormError] = React.useState<string | undefined>(undefined);
+  const [formError, setFormError] = React.useState<string | undefined>(undefined,);
   const [deleteCategoryId, setDeleteCategoryId] = React.useState<string | undefined>(undefined);
-  const [deleteError, setDeleteError] = React.useState<string | undefined>(undefined);
+  const [deleteError, setDeleteError] = React.useState<string | undefined>(undefined,);
   const [deleteStatus, setDeleteStatus] = React.useState<'idle' | 'pending' | 'succeeded' | 'failed'>('idle');
-  const [categoryDraft, setCategoryDraft] = React.useState<CategoryDraft>(getCategoryDraft(selectedCategory, assignedSessionIdList));
-  const [savedCategoryDraft, setSavedCategoryDraft] = React.useState<CategoryDraft>(getCategoryDraft(selectedCategory, assignedSessionIdList));
-  const selectedCategoryDraft = React.useMemo(() => getCategoryDraft(selectedCategory, assignedSessionIdList), [assignedSessionIdKey, selectedCategory]);
+  const [categoryDraft, setCategoryDraft] = React.useState<CategoryDraft>(getCategoryDraft(selectedCategory, assignedSessionIdList),);
+  const [savedCategoryDraft, setSavedCategoryDraft] = React.useState<CategoryDraft>(getCategoryDraft(selectedCategory, assignedSessionIdList),);
+  const selectedCategoryDraft = React.useMemo(() => getCategoryDraft(selectedCategory, assignedSessionIdList), [assignedSessionIdKey, selectedCategory],);
   const hasUnsavedChanges = selectedCategory
     ? JSON.stringify(categoryDraft) !== JSON.stringify(savedCategoryDraft)
     : false;
@@ -57,8 +57,8 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
     }
 
     try {
-      await props.onUpdateCategory(selectedCategory.id, buildCategoryChanges(categoryDraft));
-      await props.onUpdateCategorySessionAssignments(selectedCategory.id, categoryDraft.sessionIds);
+      await props.onUpdateCategory(selectedCategory.id, buildCategoryChanges(categoryDraft),);
+      await props.onUpdateCategorySessionAssignments(selectedCategory.id, categoryDraft.sessionIds,);
       setSavedCategoryDraft(categoryDraft);
       setFormError(undefined);
       return true;
@@ -85,7 +85,7 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
     setDeleteStatus('pending');
     setDeleteError(undefined);
     try {
-      await props.onDeleteCategory(selectedEvent.id, selectedCategory.id.toString());
+      await props.onDeleteCategory(selectedEvent.id, selectedCategory.id.toString(),);
       setDeleteStatus('succeeded');
     } catch (error: unknown) {
       setDeleteError(error instanceof Error ? error.message : String(error));
@@ -100,14 +100,14 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
         className="page-filter-label"
         label="Event"
         select
-        slotProps={{ select: { 'aria-label': 'Categories Event', native: true } }}
-        value={selectedEvent?.id || ''}
+        slotProps={{ select: { 'aria-label': 'Categories Event', native: true }, }}
+        value={selectedEvent?.id || ""}
         onChange={(event) => {
           const eventId = event.target.value;
           requestFormExit(() => props.onSelectEvent(eventId));
         } }
       >
-        {props.catalog.events.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
+        {props.catalog.events.map((event) => ( <option key={event.id} value={event.id}>{event.name}</option>))}
       </TextField>
       <div className="events-layout categories-layout">
         <CategoryListPanel
@@ -125,9 +125,7 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
           eventSessions={eventSessions}
           formError={formError}
           onDeleteCategory={() => requestFormExit(deleteCategory)}
-          onSaveCategory={() => {
-            void saveCategory();
-          }}
+          onSaveCategory={saveCategory}
           onSetCategoryDraft={setCategoryDraft}
           selectedCategory={selectedCategory}
           warningModal={warningModal}
@@ -144,4 +142,3 @@ export const CategoriesPage = (props: CategoriesPageProps): React.ReactElement =
     </section>
   );
 };
-

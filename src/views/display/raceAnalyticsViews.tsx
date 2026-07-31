@@ -14,7 +14,7 @@ import type { EventParticipant, EventParticipantId } from '../../model/eventpart
 import { EventCategoryId } from '../../model/index.js';
 import { EventId, SessionId } from '../../model/raceevent.js';
 import type { ParticipantPassingRecord } from '../../model/timerecord.js';
-import { LapTimesReport } from '../reports/LapTimesReport.js';
+import { LapTimesReport, type LapTimesReportState } from '../reports/LapTimesReport.js';
 import { TrackMapReport } from '../reports/TrackMapReport.js';
 import { HandicapView } from './handicap.js';
 
@@ -132,8 +132,32 @@ interface ResultsPageProps extends BaseRaceAnalyticsProps {
   selectedCategoryId?: EventCategoryId;
 }
 
+export type ReportType = 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'yellow-flag-periods' | 'handicap-data' | 'track-map';
+
+export interface ReportsViewState {
+  drawLineChart: boolean;
+  handicapShowFilter: 'all' | 'event-participants-only';
+  ignoreFirstLapForFastestLaps: boolean;
+  ignoreFirstLapForTimeline: boolean;
+  lapTimes: LapTimesReportState;
+  reportType: ReportType;
+  selectedCategory: CategoryFilter;
+}
+
+export const createDefaultReportsViewState = (): ReportsViewState => ({
+  drawLineChart: false,
+  handicapShowFilter: 'all',
+  ignoreFirstLapForFastestLaps: true,
+  ignoreFirstLapForTimeline: true,
+  lapTimes: { selectedCategoryId: '__all__', selectedParticipantId: '', showAs: 'individual' },
+  reportType: 'fastest-laps',
+  selectedCategory: 'overall',
+});
+
 interface ReportsPageProps extends BaseRaceAnalyticsProps {
+  onViewStateChange?: (changes: Partial<ReportsViewState>) => void;
   selectedCategoryId?: EventCategoryId;
+  viewState?: ReportsViewState;
 }
 
 type CategoryFilter = 'overall' | string;
@@ -844,25 +868,30 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   const categories = React.useMemo(() => {
     return dedupeCategoryOptions(props.categories);
   }, [props.categories]);
-  const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(
-    props.selectedCategoryId && categories.some(
+  const [localViewState, setLocalViewState] = React.useState<ReportsViewState>({
+    ...createDefaultReportsViewState(),
+    selectedCategory: props.selectedCategoryId && categories.some(
       (category: CategoryOption): boolean => category.id === props.selectedCategoryId,
-    )
-      ? props.selectedCategoryId
-      : 'overall',
-  );
+    ) ? props.selectedCategoryId : 'overall',
+  });
+  const viewState = props.viewState || localViewState;
+  const updateViewState = (changes: Partial<ReportsViewState>): void => {
+    setLocalViewState((currentState: ReportsViewState): ReportsViewState => ({ ...currentState, ...changes }));
+    props.onViewStateChange?.(changes);
+  };
+  const selectedCategory = viewState.selectedCategory;
   const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
-  const [drawLineChart, setDrawLineChart] = React.useState<boolean>(false);
+  const drawLineChart = viewState.drawLineChart;
   const [lapChartLineSegments, setLapChartLineSegments] = React.useState<LapChartLineSegment[]>([]);
-  const [reportType, setReportType] = React.useState<'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'yellow-flag-periods' | 'handicap-data' | 'track-map'>('fastest-laps');
-  const [ignoreFirstLapForFastestLaps, setIgnoreFirstLapForFastestLaps] = React.useState<boolean>(true);
-  const [ignoreFirstLapForTimeline, setIgnoreFirstLapForTimeline] = React.useState<boolean>(true);
-  const [handicapShowFilter, setHandicapShowFilter] = React.useState<'all' | 'event-participants-only'>('all');
+  const reportType = viewState.reportType;
+  const ignoreFirstLapForFastestLaps = viewState.ignoreFirstLapForFastestLaps;
+  const ignoreFirstLapForTimeline = viewState.ignoreFirstLapForTimeline;
+  const handicapShowFilter = viewState.handicapShowFilter;
   const lapChartWrapperRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     if (selectedCategory !== 'overall' && !categories.some((category) => category.id === selectedCategory)) {
-      setSelectedCategory('overall');
+      updateViewState({ selectedCategory: 'overall' });
     }
   }, [categories, selectedCategory]);
 
@@ -1035,7 +1064,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
               },
             }}
             value={reportType}
-            onChange={(event) => setReportType(event.target.value as 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'yellow-flag-periods' | 'handicap-data' | 'track-map')}
+            onChange={(event) => updateViewState({ reportType: event.target.value as ReportType })}
           >
             <MenuItem value="fastest-laps">Fastest Laps</MenuItem>
             <MenuItem value="fastest-lap-timeline">Fastest Lap Timeline</MenuItem>
@@ -1050,7 +1079,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             hidden
             value={reportType}
             onChange={(event: React.ChangeEvent<HTMLSelectElement>): void =>
-              setReportType(event.target.value as 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'yellow-flag-periods' | 'handicap-data' | 'track-map')}
+              updateViewState({ reportType: event.target.value as ReportType })}
           >
             <option value="fastest-laps">Fastest Laps</option>
             <option value="fastest-lap-timeline">Fastest Lap Timeline</option>
@@ -1061,7 +1090,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <option value="handicap-data">Handicap Data</option>
           </select>
           {reportType !== 'handicap-data' ? (
-            <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
+            <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={(category: CategoryFilter) => updateViewState({ selectedCategory: category })} />
           ) : null}
           {reportType === 'handicap-data' ? (
             <label className="page-filter-label">
@@ -1069,7 +1098,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
               <select
                 aria-label="Handicap Show Filter"
                 value={handicapShowFilter}
-                onChange={(event) => setHandicapShowFilter(event.target.value as 'all' | 'event-participants-only')}
+                onChange={(event) => updateViewState({ handicapShowFilter: event.target.value as 'all' | 'event-participants-only' })}
               >
                 <option value="all">All known participants</option>
                 <option value="event-participants-only">Event participants only</option>
@@ -1087,7 +1116,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
               aria-label="Ignore first lap"
               type="checkbox"
               checked={ignoreFirstLapForFastestLaps}
-              onChange={(event) => setIgnoreFirstLapForFastestLaps(event.target.checked)}
+              onChange={(event) => updateViewState({ ignoreFirstLapForFastestLaps: event.target.checked })}
             />
             Ignore first lap
           </label>
@@ -1126,7 +1155,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
               aria-label="Ignore first lap"
               type="checkbox"
               checked={ignoreFirstLapForTimeline}
-              onChange={(event) => setIgnoreFirstLapForTimeline(event.target.checked)}
+              onChange={(event) => updateViewState({ ignoreFirstLapForTimeline: event.target.checked })}
             />
             Ignore first lap
           </label>
@@ -1163,7 +1192,9 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
         <LapTimesReport
           participants={reportParticipants}
           categories={categories}
+          onStateChange={(lapTimes: LapTimesReportState) => updateViewState({ lapTimes })}
           passings={lapTimePassings}
+          state={viewState.lapTimes}
         />
       ) : null}
 
@@ -1174,7 +1205,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <input
               type="checkbox"
               checked={drawLineChart}
-              onChange={(event) => setDrawLineChart(event.target.checked)}
+              onChange={(event) => updateViewState({ drawLineChart: event.target.checked })}
             />
             Draw line chart
           </label>

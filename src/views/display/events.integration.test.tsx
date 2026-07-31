@@ -580,6 +580,116 @@ describe('EventsScreen integration', () => {
     expect(container.textContent).toContain('Winter Round');
   });
 
+  it('shows pending and success status while persisting event details', async () => {
+    let resolveSave: () => void = () => undefined;
+    const pendingSave = new Promise<void>((resolve: () => void) => {
+      resolveSave = resolve;
+    });
+    const onUpdateEvent = vi.fn();
+
+    const Harness = (): React.ReactElement => {
+      const [catalogState, setCatalogState] = React.useState<EventCatalogState>(catalog);
+
+      return (
+        <EventsScreen
+          catalog={catalogState}
+          config={config}
+          onActivateEvent={() => undefined}
+          onCreateEvent={() => undefined}
+          onCreateSession={() => undefined}
+          onDeleteEvent={() => undefined}
+          onMakeSessionActive={() => undefined}
+          onSaveEventAssignment={() => undefined}
+          onSelectEvent={() => undefined}
+          onSelectSession={() => undefined}
+          onUpdateEvent={(eventId, changes) => {
+            onUpdateEvent(eventId, changes);
+            return pendingSave.then(() => {
+              setCatalogState((current: EventCatalogState): EventCatalogState => ({
+                ...current,
+                events: current.events.map((event) => event.id === eventId ? { ...event, ...changes } : event),
+              }));
+            });
+          }}
+          selectedEventId="event-1"
+          selectedSessionId="session-1"
+        />
+      );
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    await act(async () => {
+      setInputValue(container.querySelector('input[aria-label="Event Name"]') as HTMLInputElement, 'Persisted Winter Round');
+    });
+
+    const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Event Details') as HTMLButtonElement | undefined;
+    expect(saveButton).toBeDefined();
+
+    await act(async () => {
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onUpdateEvent).toHaveBeenCalledWith('event-1', expect.objectContaining({ name: 'Persisted Winter Round' }));
+    expect(saveButton?.disabled).toBe(true);
+    expect(container.querySelector('[aria-label="Saving event details"]')).toBeTruthy();
+
+    await act(async () => {
+      resolveSave();
+      await pendingSave;
+    });
+
+    expect(container.querySelector('[aria-label="Event details saved"]')).toBeTruthy();
+    expect((container.querySelector('input[aria-label="Event Name"]') as HTMLInputElement).value).toBe('Persisted Winter Round');
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('shows an inline error when saving event details fails', async () => {
+    let rejectSave: (reason: Error) => void = () => undefined;
+    const pendingSave = new Promise<void>((_resolve: () => void, reject: (reason: Error) => void) => {
+      rejectSave = reject;
+    });
+
+    await act(async () => {
+      root.render(
+        <EventsScreen
+          catalog={catalog}
+          config={config}
+          onActivateEvent={() => undefined}
+          onCreateEvent={() => undefined}
+          onCreateSession={() => undefined}
+          onDeleteEvent={() => undefined}
+          onMakeSessionActive={() => undefined}
+          onSaveEventAssignment={() => undefined}
+          onSelectEvent={() => undefined}
+          onSelectSession={() => undefined}
+          onUpdateEvent={() => pendingSave}
+          selectedEventId="event-1"
+          selectedSessionId="session-1"
+        />,
+      );
+    });
+
+    const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Event Details');
+    expect(saveButton).toBeDefined();
+
+    await act(async () => {
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.querySelector('[aria-label="Saving event details"]')).toBeTruthy();
+
+    await act(async () => {
+      rejectSave(new Error('Event details could not be saved'));
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector('[aria-label="Event details save failed"]')).toBeTruthy();
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Event details could not be saved');
+  });
+
   it('prompts before replacing a dirty event form and saves before continuing', async () => {
     const onUpdateEvent = vi.fn().mockResolvedValue(undefined);
 

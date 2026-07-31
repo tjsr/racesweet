@@ -73,17 +73,28 @@ export const compareByTime = (
   b: TimeRecord
 ): number => compareTimes(a.time, b.time);
 
-export const compareTimes = (a: Date | undefined, b: Date | undefined): number => {
-  if (a === undefined && b === undefined) {
+const getTimeMilliseconds = (value: Date | null | undefined): number | undefined => {
+  if (!(value instanceof Date)) {
+    return undefined;
+  }
+
+  const milliseconds = value.getTime();
+  return Number.isNaN(milliseconds) ? undefined : milliseconds;
+};
+
+export const compareTimes = (a: Date | null | undefined, b: Date | null | undefined): number => {
+  const aMilliseconds = getTimeMilliseconds(a);
+  const bMilliseconds = getTimeMilliseconds(b);
+  if (aMilliseconds === undefined && bMilliseconds === undefined) {
     return 0;
   }
-  if (a === undefined) {
+  if (aMilliseconds === undefined) {
     return 1;
   }
-  if (b === undefined) {
+  if (bMilliseconds === undefined) {
     return -1;
   }
-  return a.getTime() - b.getTime();
+  return aMilliseconds - bMilliseconds;
 };
 
 export const filterToEventsBetween = (data: TimeRecord[], start: Date, end: Date): TimeRecord[] => {
@@ -159,15 +170,7 @@ export const addTimeRecord = (crossings: TimeRecord[], record: TimeRecord): void
 };
 
 export const hasTime = (event: TimeRecord): boolean => {
-  if (event?.time === undefined) {
-    return false;
-  }
-  try {
-    event.time.getTime();
-  } catch (_error: unknown) {
-    return false;
-  }
-  return true;
+  return getTimeMilliseconds(event?.time) !== undefined;
 };
 
 export const noTimeRecordFilter = (event: TimeRecord): boolean => !hasTime(event);

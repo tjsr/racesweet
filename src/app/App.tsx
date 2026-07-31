@@ -1,23 +1,23 @@
-import { Component, type ReactElement, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, type ReactElement, type ReactNode, useCallback, useEffect, useMemo, useRef, useState, } from 'react';
 import { validate as validateUuid } from 'uuid';
-import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getEntriesForEvent, getEventDisciplineLabels, getSessionsForEvent } from '../catalog/eventCatalog.ts';
+import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getEntriesForEvent, getEventDisciplineLabels, getSessionsForEvent, } from '../catalog/eventCatalog.ts';
 import { fetchApicalEvents } from '../processing/apical/getResultListJson.ts';
 import { CategoryId } from '../processing/category.ts';
-import { type LoadingMetricsState, getLoadingMetricsSnapshot, incrementLoadingMetric, resetLoadingMetrics, subscribeLoadingMetrics } from '../loadingMetrics.ts';
-import { type LoadingProgressCallback, type LoadingProgressState, completeLoadingProgressStage, createLoadingProgressState, updateLoadingProgressStage, waitForLoadingProgressPaint } from '../loadingProgress.ts';
+import { type LoadingMetricsState, getLoadingMetricsSnapshot, incrementLoadingMetric, resetLoadingMetrics, subscribeLoadingMetrics, } from '../loadingMetrics.ts';
+import { type LoadingProgressCallback, type LoadingProgressState, completeLoadingProgressStage, createLoadingProgressState, updateLoadingProgressStage, waitForLoadingProgressPaint, } from '../loadingProgress.ts';
 import { type EventCategory, EventCategoryId } from '../model/eventcategory.ts';
 import { getParticipantEntryId } from '../model/entry.ts';
-import { type EventParticipant, type EventParticipantId, type ParticipantTransponder } from '../model/eventparticipant.ts';
+import { type EventParticipant, type EventParticipantId, type ParticipantTransponder, } from '../model/eventparticipant.ts';
 import type { EventTeam } from '../model/eventteam.ts';
 import { createEventId } from '../model/ids.ts';
 import { EventId, SessionId } from '../model/raceevent.ts';
-import { type RaceState, RaceStateLookup, Session, getEffectiveParticipantCategoryId } from '../model/racestate.ts';
-import { type EventTimeRecord, type TimeRecordId } from '../model/timerecord.ts';
+import { type RaceState, RaceStateLookup, Session, getEffectiveParticipantCategoryId, } from '../model/racestate.ts';
+import { type EventTimeRecord, type TimeRecordId, } from '../model/timerecord.ts';
 import { loadDorianCtcSrtCatalogForSession } from '../parsers/ctc/srtCatalogImport.ts';
 import { parseCtcTrackConfig } from '../parsers/ctc/trackConfig.ts';
-import { type MrScatsCatalogImport, type MrScatsCatalogLoadProgress, loadMrScatsCatalogFromLocation } from '../parsers/mrScats/catalogImport.ts';
+import { type MrScatsCatalogImport, type MrScatsCatalogLoadProgress, loadMrScatsCatalogFromLocation, } from '../parsers/mrScats/catalogImport.ts';
 import { listMrScatsDataFiles } from '../parsers/mrScats/fileInventory.ts';
-import { previewCtcRawCrossingBuffer, previewMrScatsDataFile } from '../parsers/mrScats/filePreview.ts';
+import { previewCtcRawCrossingBuffer, previewMrScatsDataFile, } from '../parsers/mrScats/filePreview.ts';
 import { ElectronJsonEventCatalogPersistence } from '../persistence/eventCatalogPersistence.ts';
 import { JsonReplicaOutboxPersistence } from '../persistence/jsonReplicaOutboxPersistence.ts';
 import { ElectronJsonRaceAdminPersistence } from '../persistence/raceAdminPersistence.ts';
@@ -31,14 +31,14 @@ import { ReplicaSyncController } from '../service/replicaSyncController.ts';
 import { ReplicaSyncService } from '../service/replicaSyncService.ts';
 import { RaceAdminService } from '../service/raceAdminService.ts';
 import { HttpRaceSweetApiClient } from '../service/raceSweetApiClient.ts';
-import { type SessionSourceReloadMode, type SessionSourceReloadSummary, addSessionSourceReloadSummaries, createEmptySessionSourceReloadSummary, isMissingLinkedCategoryPlaceholder, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload } from '../service/sessionSourceReload.ts';
-import { applyPulledRaceStateToSession, getCategoryTimingStartCalculationsForSession, getMinimumLapTimeMillisecondsForSession, getSessionAssignedCategoryIds } from '../service/sourceApplication.ts';
+import { type SessionSourceReloadMode, type SessionSourceReloadSummary, addSessionSourceReloadSummaries, createEmptySessionSourceReloadSummary, isMissingLinkedCategoryPlaceholder, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload, } from '../service/sessionSourceReload.ts';
+import { applyPulledRaceStateToSession, getCategoryTimingStartCalculationsForSession, getMinimumLapTimeMillisecondsForSession, getSessionAssignedCategoryIds, } from '../service/sourceApplication.ts';
 import { SystemConfigService } from '../service/systemConfigService.ts';
 import { SyncStore } from '../state/syncStore.ts';
 import type { DomainEventEnvelope } from '../model/serverApi.ts';
 import type { EventCatalogMutation } from '../ledger/eventCatalogLedger.ts';
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
-import { type TestSession, type TestSessionLoadProgressCallback } from '../testdata/testsession.ts';
+import { type TestSession, type TestSessionLoadProgressCallback, } from '../testdata/testsession.ts';
 import { CategoriesContext } from '../views/context/Categories.tsx';
 import { EntrantsContext } from '../views/context/Entrants.tsx';
 import { EventsContext } from '../views/context/Events.tsx';
@@ -48,21 +48,25 @@ import { SessionsContext } from '../views/context/Sessions.tsx';
 import { SystemContext } from '../views/context/System.tsx';
 import { TimingContext } from '../views/context/Timing.tsx';
 import { ReloadSummaryDialog } from '../views/display/reloadSummaryDialog.tsx';
+import { type ReportsViewState,
+  createDefaultReportsViewState,
+} from "../views/display/raceAnalyticsViews.tsx";
 import { type UnsavedChangesGuard } from '../views/display/unsavedChangesWarning.tsx';
 import { LoadingProgress } from '../views/panels/LoadingProgress.tsx';
-import { PulledApicalRaceState, createApicalCatalogEventId, createApicalCatalogSessionId, fetchApicalRaceStateNow, getConfiguredApicalEventId, pullApicalRaceState } from './apicalDataSource.ts';
+import { PulledApicalRaceState, createApicalCatalogEventId, createApicalCatalogSessionId, fetchApicalRaceStateNow, getConfiguredApicalEventId, pullApicalRaceState, } from './apicalDataSource.ts';
 import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
-import { type DurtFileMakerLoadProgress, getBundledDurtFileMakerExtractorPath, loadDurtFileMakerRaceState } from './durtFileMakerDataSource.ts';
+import { type DurtFileMakerLoadProgress, getBundledDurtFileMakerExtractorPath, loadDurtFileMakerRaceState, } from './durtFileMakerDataSource.ts';
 import './index.css';
 import { formatErrorForDisplay } from './stackTrace.ts';
-import { type DataSourceConfig, type EventTimeDisplayZoneMode, type ListenerServerConfig, type SystemConfiguration, type TimingContextSelectionConfig, createDefaultSystemConfiguration, getFinishLineNumbersForSession, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds, normalizeOptionalSystemFilePath } from './systemConfig.ts';
+import { type DataSourceConfig, type EventTimeDisplayZoneMode, type ListenerServerConfig, type SystemConfiguration, type TimingContextSelectionConfig, createDefaultSystemConfiguration, getFinishLineNumbersForSession, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds, normalizeOptionalSystemFilePath, } from './systemConfig.ts';
 import { getSystemTimeZone } from './utils/timeutils.ts';
 import { type EventSessionOption } from './views/results/resultsPage.tsx';
 
-type AppSection = 'System' | 'Events' | 'Entrants' | 'Categories' | 'Sessions' | 'Timing' | 'Results' | 'Reports';
+type AppSection =
+  | 'System' | 'Events' | 'Entrants' | 'Categories' | 'Sessions' | 'Timing' | 'Results' | 'Reports';
 type TimingSessionSelection = 'active' | 'session';
 
-const SEED_FIXTURE_EVENT_ID: EventId = createEventId('event-2026-racesweet-round-1');
+const SEED_FIXTURE_EVENT_ID: EventId = createEventId('event-2026-racesweet-round-1',);
 
 interface RemoteRaceAdminTarget {
   raceState: (Session & RaceStateLookup) | undefined;
@@ -74,9 +78,9 @@ const createStartupLoadingProgress = (): LoadingProgressState => createLoadingPr
   { id: 'test-session', label: 'Loading startup race data', total: 1 },
   { id: 'admin-changes', label: 'Applying administrative changes', total: 1 },
   { id: 'catalog-load', label: 'Rebuilding event catalog', total: 1 },
-  { id: 'system-config', label: 'Normalising system configuration', total: 1 },
+  { id: 'system-config', label: 'Normalising system configuration', total: 1, },
   { id: 'source-metadata', label: 'Restoring source metadata', total: 1 },
-  { id: 'catalog-validation', label: 'Checking event catalog links', total: 1 },
+  { id: 'catalog-validation', label: 'Checking event catalog links', total: 1, },
   { id: 'session-state', label: 'Preparing active session state', total: 1 },
   { id: 'scaffold', label: 'Synchronising event scaffold', total: 1 },
   { id: 'publish', label: 'Displaying application', total: 1 },
@@ -117,7 +121,7 @@ interface DisplayedErrorLogEntry {
   timestamp: string;
 }
 
-const PageErrorFallback = ({ error, onDismiss, title = 'Error loading content' }: PageErrorFallbackProps): ReactElement => (
+const PageErrorFallback = ({ error, onDismiss, title = 'Error loading content', }: PageErrorFallbackProps): ReactElement => (
   <>
     <h1>{title}</h1>
     <div className="error" role="alert">
@@ -160,7 +164,8 @@ class PageErrorBoundary extends Component<PageErrorBoundaryProps, PageErrorBound
 
   public render(): ReactNode {
     if (this.state.error) {
-      return <PageErrorFallback error={this.state.error} title={this.props.fallbackTitle} />;
+      return ( <PageErrorFallback error={this.state.error} title={this.props.fallbackTitle} />
+      );
     }
 
     return this.props.children;
@@ -173,7 +178,7 @@ const loadAdminService = async (
   onAdminProgress?: LoadingProgressCallback,
 ): Promise<RaceAdminService> => {
   incrementLoadingMetric('Create admin service');
-  const persistence = new ElectronJsonRaceAdminPersistence('../../src/generated/admin-overrides.json', onError);
+  const persistence = new ElectronJsonRaceAdminPersistence('../../src/generated/admin-overrides.json', onError,);
 
   return RaceAdminService.create(async () => {
     if (window.api.persistenceMode === 'server') {
@@ -185,7 +190,7 @@ const loadAdminService = async (
     await eventSession.loadTestData(false, onSessionProgress);
     console.log("Test data loaded successfully.");
     return eventSession as Session & RaceStateLookup;
-  }, persistence, undefined, { onProgress: onAdminProgress });
+  }, persistence, undefined, { onProgress: onAdminProgress },);
 };
 
 const loadEventCatalogService = async (
@@ -193,7 +198,7 @@ const loadEventCatalogService = async (
   onProgress?: LoadingProgressCallback,
 ): Promise<EventCatalogService> => {
   incrementLoadingMetric('Create event catalog service');
-  const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json', onError);
+  const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json', onError,);
   return EventCatalogService.create(persistence, {
     onProgress,
     persistAppliedRemoteMutations: false,
@@ -205,14 +210,14 @@ const loadSystemConfigService = async (
   onProgress?: LoadingProgressCallback,
 ): Promise<SystemConfigService> => {
   incrementLoadingMetric('Create system config service');
-  const persistence = new ElectronJsonSystemConfigPersistence('../../src/generated/system-config.json', onError);
+  const persistence = new ElectronJsonSystemConfigPersistence('../../src/generated/system-config.json', onError,);
   return SystemConfigService.create(persistence, { onProgress });
 };
 
 const getImportedApicalDataFilePath = (
   config: SystemConfiguration,
   eventCatalogService: EventCatalogService,
-  source: DataSourceConfig
+  source: DataSourceConfig,
 ): string | undefined => {
   const candidateEventIds = new Set<string>();
   const candidateSessionIds = new Set<string>();
@@ -222,13 +227,13 @@ const getImportedApicalDataFilePath = (
     if (sourceIds.includes(source.id)) {
       candidateEventIds.add(eventId);
     }
-  });
+  },);
 
   Object.entries(config.sessionSourceAssignments).forEach(([sessionId, assignment]) => {
     if (assignment.sourceIds.includes(source.id)) {
       candidateSessionIds.add(sessionId);
     }
-  });
+  },);
 
   if (apicalEventId) {
     candidateEventIds.add(createApicalCatalogEventId(apicalEventId));
@@ -237,7 +242,7 @@ const getImportedApicalDataFilePath = (
 
   for (const eventId of candidateEventIds) {
     for (const sessionId of candidateSessionIds) {
-      const apicalDataFilePath = eventCatalogService.getImportedRaceStateMetadata(eventId, sessionId)?.apicalDataFilePath;
+      const apicalDataFilePath = eventCatalogService.getImportedRaceStateMetadata(eventId, sessionId,)?.apicalDataFilePath;
       if (apicalDataFilePath) {
         return apicalDataFilePath;
       }
@@ -257,17 +262,27 @@ const loadSystemConfigWithImportedApicalPaths = async (
   const total = Math.max(1, sources.length);
   let completed = 0;
 
-  await onProgress?.({ completed, currentTask: 'Preparing source metadata', total });
+  await onProgress?.({ completed, currentTask: 'Preparing source metadata', total, });
   for (const source of sources) {
     if ((source.type !== 'api-apical-data-file' && source.type !== 'api-apical-excel-file') || source.apicalDataFilePath || !source.dataLastRetrieved) {
       completed += 1;
-      await onProgress?.({ completed, currentTask: `Check source metadata ${source.name || source.id}`, total });
+      await onProgress?.({ completed, currentTask: `Check source metadata ${source.name || source.id}`,
+        total,
+      });
       continue;
     }
 
-    sourceFilePaths[source.id] = getImportedApicalDataFilePath(systemConfigService.state, eventCatalogService, source);
+    sourceFilePaths[source.id] = getImportedApicalDataFilePath(
+      systemConfigService.state,
+      eventCatalogService,
+      source,
+    );
     completed += 1;
-    await onProgress?.({ completed, currentTask: `Restore source metadata ${source.name || source.id}`, total });
+    await onProgress?.({
+      completed,
+      currentTask: `Restore source metadata ${source.name || source.id}`,
+      total,
+    });
   }
 
   return systemConfigService.persistApicalDataFilePaths(sourceFilePaths);
@@ -283,50 +298,71 @@ const raceStateSnapshot = (raceState: RaceState): RaceState => ({
   timeRecordSources: [...(raceState.timeRecordSources || [])],
 });
 
-const sessionFromPartialRaceState = (raceState: Partial<RaceState>): Session => new Session({
-  categories: raceState.categories || [],
-  entries: raceState.entries || [],
-  eventStartTime: raceState.eventStartTime,
-  participants: raceState.participants || [],
-  records: raceState.records || [],
-  teams: raceState.teams || [],
-  timeRecordSources: raceState.timeRecordSources || [],
-});
+const sessionFromPartialRaceState = (raceState: Partial<RaceState>): Session =>
+  new Session({
+    categories: raceState.categories || [],
+    entries: raceState.entries || [],
+    eventStartTime: raceState.eventStartTime,
+    participants: raceState.participants || [],
+    records: raceState.records || [],
+    teams: raceState.teams || [],
+    timeRecordSources: raceState.timeRecordSources || [],
+  });
 
-const cloneSessionState = (raceState: Session & RaceStateLookup): Session & RaceStateLookup => {
-  return Object.assign(sessionFromPartialRaceState(raceState), raceState) as Session & RaceStateLookup;
+const cloneSessionState = (
+  raceState: Session & RaceStateLookup,
+): Session & RaceStateLookup => {
+  return Object.assign(
+    sessionFromPartialRaceState(raceState),
+    raceState,
+  ) as Session & RaceStateLookup;
 };
 
 const applyCatalogSessionScopeToRaceState = (
   raceState: (Session & RaceStateLookup) | undefined,
   catalog: EventCatalogState,
   eventId: EventId | undefined,
-  sessionId: SessionId | undefined
+  sessionId: SessionId | undefined,
 ): void => {
   if (!raceState || !eventId || !sessionId) {
     return;
   }
 
-  const assignedCategoryIds = getSessionAssignedCategoryIds(catalog, eventId, sessionId) || new Set<EventCategoryId>();
+  const assignedCategoryIds =
+    getSessionAssignedCategoryIds(catalog, eventId, sessionId) ||
+    new Set<EventCategoryId>();
   raceState.ensureCategories?.(getCategoriesForEvent(catalog, eventId));
-  raceState.setMinimumLapTimeMilliseconds?.(getMinimumLapTimeMillisecondsForSession(catalog, eventId, sessionId));
-  raceState.setCategoryTimingStartCalculations?.(getCategoryTimingStartCalculationsForSession(catalog, eventId, sessionId));
+  raceState.setMinimumLapTimeMilliseconds?.(
+    getMinimumLapTimeMillisecondsForSession(catalog, eventId, sessionId),
+  );
+  raceState.setCategoryTimingStartCalculations?.(
+    getCategoryTimingStartCalculationsForSession(catalog, eventId, sessionId),
+  );
   raceState.setSessionValidCategoryIds?.(assignedCategoryIds);
 };
 
 const filterMrScatsRaceStateForSession = (
   raceState: Partial<RaceState>,
   sessionId: SessionId,
-  categoryIds: string[]
+  categoryIds: string[],
 ): Partial<RaceState> => {
   const categoryIdSet = new Set(categoryIds);
-  const entriesById = new Map((raceState.entries || []).map((entry) => [entry.id.toString(), entry]));
+  const entriesById = new Map(
+    (raceState.entries || []).map((entry) => [entry.id.toString(), entry]),
+  );
   return {
     ...raceState,
-    categories: (raceState.categories || []).filter((category) => categoryIdSet.has(category.id.toString())),
+    categories: (raceState.categories || []).filter((category) =>
+      categoryIdSet.has(category.id.toString()),
+    ),
     participants: (raceState.participants || []).filter((participant) => {
-      const categoryId = participant.categoryId || entriesById.get(getParticipantEntryId(participant).toString())?.categoryId;
-      return categoryId !== undefined && categoryIdSet.has(categoryId.toString());
+      const categoryId =
+        participant.categoryId ||
+        entriesById.get(getParticipantEntryId(participant).toString())
+          ?.categoryId;
+      return (
+        categoryId !== undefined && categoryIdSet.has(categoryId.toString())
+      );
     }),
     records: (raceState.records || []).filter((record) => {
       const recordSessionId = (record as EventTimeRecord).sessionId?.toString();
@@ -339,9 +375,9 @@ const filterMrScatsRaceStateForSession = (
 
 const createParticipantFromEntrant = (
   entrant: EventCatalogEntrant,
-  participantId: EventParticipantId
+  participantId: EventParticipantId,
 ): EventParticipant => ({
-  categoryId: entrant.categoryId || entrant.categoryIds[0] || '',
+  categoryId: entrant.categoryId || entrant.categoryIds[0] || "",
   currentResult: undefined,
   entrantId: entrant.id,
   firstname: entrant.firstName || entrant.name,
@@ -349,12 +385,12 @@ const createParticipantFromEntrant = (
   identifiers: [...(entrant.identifiers || [])],
   lastRecordTime: null,
   resultDuration: null,
-  surname: entrant.lastName || '',
+  surname: entrant.lastName || "",
 });
 
 const sortSessionsByScheduledStart = (
-  sessions: EventCatalogState['sessions']
-): EventCatalogState['sessions'] => {
+  sessions: EventCatalogState["sessions"],
+): EventCatalogState["sessions"] => {
   return [...sessions].sort((left, right) => {
     const leftTime = Date.parse(left.scheduledStart);
     const rightTime = Date.parse(right.scheduledStart);
@@ -375,20 +411,26 @@ const sortSessionsByScheduledStart = (
 
 const resolveTimingContextSelection = (
   catalog: EventCatalogState,
-  savedSelection: TimingContextSelectionConfig | undefined
+  savedSelection: TimingContextSelectionConfig | undefined,
 ): {
   eventId: EventId | undefined;
   selectionMode: TimingSessionSelection;
   sessionId: SessionId | undefined;
 } => {
-  if (savedSelection?.selectionMode === 'session' && savedSelection.eventId) {
-    const savedEvent = catalog.events.find((event) => event.id === savedSelection.eventId);
+  if (savedSelection?.selectionMode === "session" && savedSelection.eventId) {
+    const savedEvent = catalog.events.find(
+      (event) => event.id === savedSelection.eventId,
+    );
     if (savedEvent) {
-      const sessions = sortSessionsByScheduledStart(getSessionsForEvent(catalog, savedEvent.id));
-      const sessionId = sessions.find((session) => session.id === savedSelection.sessionId)?.id ?? sessions[0]?.id;
+      const sessions = sortSessionsByScheduledStart(
+        getSessionsForEvent(catalog, savedEvent.id),
+      );
+      const sessionId =
+        sessions.find((session) => session.id === savedSelection.sessionId)
+          ?.id ?? sessions[0]?.id;
       return {
         eventId: savedEvent.id,
-        selectionMode: 'session',
+        selectionMode: "session",
         sessionId,
       };
     }
@@ -396,49 +438,103 @@ const resolveTimingContextSelection = (
 
   return {
     eventId: catalog.activeEventId || catalog.events[0]?.id,
-    selectionMode: 'active',
+    selectionMode: "active",
     sessionId: catalog.activeSessionId,
   };
 };
 
 export const RaceSweetMainApp = () => {
-  const [activeSection, setActiveSection] = useState<AppSection>('System');
-  const [adminService, setAdminService] = useState<RaceAdminService|undefined>(undefined);
-  const [eventCatalogService, setEventCatalogService] = useState<EventCatalogService|undefined>(undefined);
-  const [eventCatalogState, setEventCatalogState] = useState<EventCatalogState|undefined>(undefined);
-  const [systemConfigService, setSystemConfigService] = useState<SystemConfigService|undefined>(undefined);
-  const [systemConfigState, setSystemConfigState] = useState<SystemConfiguration>(createDefaultSystemConfiguration());
-  const [sessionState, setSessionState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
+  const [activeSection, setActiveSection] = useState<AppSection>("System");
+  const [adminService, setAdminService] = useState<
+    RaceAdminService | undefined
+  >(undefined);
+  const [eventCatalogService, setEventCatalogService] = useState<
+    EventCatalogService | undefined
+  >(undefined);
+  const [eventCatalogState, setEventCatalogState] = useState<
+    EventCatalogState | undefined
+  >(undefined);
+  const [systemConfigService, setSystemConfigService] = useState<
+    SystemConfigService | undefined
+  >(undefined);
+  const [systemConfigState, setSystemConfigState] =
+    useState<SystemConfiguration>(createDefaultSystemConfiguration());
+  const [sessionState, setSessionState] = useState<
+    (Session & RaceStateLookup) | undefined
+      >(undefined);
   const [, setRenderTick] = useState(0);
   const [errorState, setErrorState] = useState<unknown>(undefined);
-  const [displayedErrorLogEntries, setDisplayedErrorLogEntries] = useState<DisplayedErrorLogEntry[]>([]);
-  const [loadingMetrics, setLoadingMetrics] = useState<LoadingMetricsState>(getLoadingMetricsSnapshot);
-  const [loadingProgress, setLoadingProgress] = useState<LoadingProgressState>(createStartupLoadingProgress);
+  const [displayedErrorLogEntries, setDisplayedErrorLogEntries] = useState<
+    DisplayedErrorLogEntry[]
+  >([]);
+  const [loadingMetrics, setLoadingMetrics] = useState<LoadingMetricsState>(
+    getLoadingMetricsSnapshot,
+  );
+  const [loadingProgress, setLoadingProgress] = useState<LoadingProgressState>(
+    createStartupLoadingProgress,
+  );
   const [loadWarnings, setLoadWarnings] = useState<string[]>([]);
-  const [selectedCategories, setCategorySelected] = useState<Set<EventCategoryId>>(new Set<EventCategoryId>());
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string|undefined>(undefined);
-  const [selectedCategoriesEventId, setSelectedCategoriesEventId] = useState<string|undefined>(undefined);
-  const [selectedEventId, setSelectedEventId] = useState<string|undefined>(undefined);
-  const [selectedEntrantId, setSelectedEntrantId] = useState<string|undefined>(undefined);
-  const [selectedEntrantsEventId, setSelectedEntrantsEventId] = useState<string|undefined>(undefined);
-  const [recordSelectedCategories, setRecordSelectedCategories] = useState<Set<EventCategoryId>>(new Set<EventCategoryId>());
-  const [recordSelectedParticipants, setRecordSelectedParticipants] = useState<Set<EventParticipantId>>(new Set<EventParticipantId>());
-  const [selectedSessionsEventId, setSelectedSessionsEventId] = useState<string|undefined>(undefined);
-  const [selectedSessionId, setSelectedSessionId] = useState<string|undefined>(undefined);
-  const [selectedTimingEventId, setSelectedTimingEventId] = useState<string|undefined>(undefined);
-  const [selectedTimingSessionId, setSelectedTimingSessionId] = useState<string|undefined>(undefined);
-  const [timingRaceState, setTimingRaceState] = useState<(Session&RaceStateLookup)|undefined>(undefined);
-  const [timingSessionSelection, setTimingSessionSelection] = useState<TimingSessionSelection>('active');
-  const [timingSelectionLoading, setTimingSelectionLoading] = useState<boolean>(false);
+  const [selectedCategories, setCategorySelected] = useState<
+    Set<EventCategoryId>
+  >(new Set<EventCategoryId>());
+  const [selectedCategoryId, setSelectedCategoryId] = useState<
+    string | undefined
+  >(undefined);
+  const [reportsViewState, setReportsViewState] = useState<ReportsViewState>(
+    createDefaultReportsViewState,
+  );
+  const [selectedCategoriesEventId, setSelectedCategoriesEventId] = useState<
+    string | undefined
+  >(undefined);
+  const [selectedEventId, setSelectedEventId] = useState<string | undefined>(
+    undefined,
+  );
+  const [selectedEntrantId, setSelectedEntrantId] = useState<
+    string | undefined
+  >(undefined);
+  const [selectedEntrantsEventId, setSelectedEntrantsEventId] = useState<
+    string | undefined
+  >(undefined);
+  const [recordSelectedCategories, setRecordSelectedCategories] = useState<
+    Set<EventCategoryId>
+  >(new Set<EventCategoryId>());
+  const [recordSelectedParticipants, setRecordSelectedParticipants] = useState<
+    Set<EventParticipantId>
+  >(new Set<EventParticipantId>());
+  const [selectedSessionsEventId, setSelectedSessionsEventId] = useState<
+    string | undefined
+  >(undefined);
+  const [selectedSessionId, setSelectedSessionId] = useState<
+    string | undefined
+  >(undefined);
+  const [selectedTimingEventId, setSelectedTimingEventId] = useState<
+    string | undefined
+  >(undefined);
+  const [selectedTimingSessionId, setSelectedTimingSessionId] = useState<
+    string | undefined
+  >(undefined);
+  const [timingRaceState, setTimingRaceState] = useState<
+    (Session & RaceStateLookup) | undefined
+      >(undefined);
+  const [timingSessionSelection, setTimingSessionSelection] =
+    useState<TimingSessionSelection>("active");
+  const [timingSelectionLoading, setTimingSelectionLoading] =
+    useState<boolean>(false);
   const [timingErrorState, setTimingErrorState] = useState<unknown>(undefined);
-  const [reloadSummary, setReloadSummary] = useState<SessionSourceReloadSummary|undefined>(undefined);
+  const [reloadSummary, setReloadSummary] = useState<
+    SessionSourceReloadSummary | undefined
+  >(undefined);
   const initialTimingSelectionHydrated = useRef<boolean>(false);
-  const unsavedChangesGuards = useRef<Partial<Record<AppSection, UnsavedChangesGuard>>>({});
+  const unsavedChangesGuards = useRef<
+    Partial<Record<AppSection, UnsavedChangesGuard>>
+  >({});
   const remoteRaceAdminTarget = useRef<RemoteRaceAdminTarget>({
     raceState: undefined,
     sessionId: undefined,
   });
-  const catalogReplicaOutbox = useRef<CatalogReplicaOutbox | undefined>(undefined);
+  const catalogReplicaOutbox = useRef<CatalogReplicaOutbox | undefined>(
+    undefined,
+  );
   remoteRaceAdminTarget.current = {
     raceState: timingRaceState || sessionState,
     sessionId: selectedTimingSessionId as SessionId | undefined,
@@ -446,22 +542,53 @@ export const RaceSweetMainApp = () => {
 
   useEffect(() => {
     const remoteServerUrl = systemConfigState.remoteServer?.baseUrl?.trim();
-    if (!eventCatalogService || window.api.persistenceMode !== 'native' || !remoteServerUrl) {
+    if (
+      !eventCatalogService ||
+      window.api.persistenceMode !== "native" ||
+      !remoteServerUrl
+    ) {
       catalogReplicaOutbox.current = undefined;
       return undefined;
     }
-    const outboxPath = `${systemConfigState.localStorageDirectoryPath.replace(/[\\/]$/u, '')}/replica-outbox.json`;
+    const outboxPath = `${systemConfigState.localStorageDirectoryPath.replace(/[\\/]$/u, "")}/replica-outbox.json`;
     const outboxPersistence = new JsonReplicaOutboxPersistence(outboxPath, {
-      readFile: (filePath) => window.api.requestFileContent<string>(filePath, 'utf8'),
-      writeFile: (filePath, contents) => window.api.writeFileContent(filePath, contents, 'utf8'),
+      readFile: (filePath) =>
+        window.api.requestFileContent<string>(filePath, "utf8"),
+      writeFile: (filePath, contents) =>
+        window.api.writeFileContent(filePath, contents, "utf8"),
     });
-    const syncService = new ReplicaSyncService({ applyRemoteMutations: (mutations) => eventCatalogService.applyRemoteMutations(mutations).then((): void => undefined) }, outboxPersistence, new SyncStore(), new HttpReplicaTransport(remoteServerUrl));
+    const syncService = new ReplicaSyncService(
+      {
+        applyRemoteMutations: (mutations) =>
+          eventCatalogService
+            .applyRemoteMutations(mutations)
+            .then((): void => undefined),
+      },
+      outboxPersistence,
+      new SyncStore(),
+      new HttpReplicaTransport(remoteServerUrl),
+    );
     const controller = new ReplicaSyncController(syncService);
     const outbox = new CatalogReplicaOutbox(syncService);
-    outbox.initialize({ mutations: eventCatalogService.mutations, schemaVersion: 1 });
+    outbox.initialize({
+      mutations: eventCatalogService.mutations,
+      schemaVersion: 1,
+    });
     catalogReplicaOutbox.current = outbox;
-    eventCatalogService.setOnPersistedLedger((ledger) => outbox.enqueueNewPersistedMutations(ledger).then(() => controller.syncNow()));
-    const subscriber = new ReplicaLiveMutationSubscriber(new HttpRaceSweetApiClient(remoteServerUrl), { applyRemoteMutations: (mutations) => eventCatalogService.applyRemoteMutations(mutations).then((): void => undefined) });
+    eventCatalogService.setOnPersistedLedger((ledger) =>
+      outbox
+        .enqueueNewPersistedMutations(ledger)
+        .then(() => controller.syncNow()),
+    );
+    const subscriber = new ReplicaLiveMutationSubscriber(
+      new HttpRaceSweetApiClient(remoteServerUrl),
+      {
+        applyRemoteMutations: (mutations) =>
+          eventCatalogService
+            .applyRemoteMutations(mutations)
+            .then((): void => undefined),
+      },
+    );
     subscriber.start(() => {
       void controller.syncNow();
     });
@@ -472,10 +599,18 @@ export const RaceSweetMainApp = () => {
       catalogReplicaOutbox.current = undefined;
       eventCatalogService.setOnPersistedLedger(undefined);
     };
-  }, [eventCatalogService, systemConfigState.localStorageDirectoryPath, systemConfigState.remoteServer?.baseUrl]);
+  }, [
+    eventCatalogService,
+    systemConfigState.localStorageDirectoryPath,
+    systemConfigState.remoteServer?.baseUrl,
+  ]);
 
   useEffect(() => {
-    if (!eventCatalogService || !systemConfigService || typeof EventSource === 'undefined') {
+    if (
+      !eventCatalogService ||
+      !systemConfigService ||
+      typeof EventSource === "undefined"
+    ) {
       return undefined;
     }
     const client = new HttpRaceSweetApiClient();
@@ -493,21 +628,30 @@ export const RaceSweetMainApp = () => {
       );
     };
     const applyRemoteEvent = (event: DomainEventEnvelope): void => {
-      if (event.type !== 'catalog.mutations-applied' || typeof event.payload !== 'object' || Array.isArray(event.payload) || event.payload === null) {
-        if (event.type === 'system-config.changed') {
-          fetch('/api/v1/system/configuration', { credentials: 'include' })
+      if (
+        event.type !== "catalog.mutations-applied" ||
+        typeof event.payload !== "object" ||
+        Array.isArray(event.payload) ||
+        event.payload === null
+      ) {
+        if (event.type === "system-config.changed") {
+          fetch("/api/v1/system/configuration", { credentials: "include" })
             .then((response: Response) => {
               if (!response.ok) {
-                throw new Error(`RaceSweet API returned HTTP ${response.status} while refreshing configuration.`);
+                throw new Error(
+                  `RaceSweet API returned HTTP ${response.status} while refreshing configuration.`,
+                );
               }
               return response.json() as Promise<SystemConfiguration>;
             })
             .then((config: SystemConfiguration) => {
-              updateSystemConfigState(systemConfigService.applyRemoteConfiguration(config));
+              updateSystemConfigState(
+                systemConfigService.applyRemoteConfiguration(config),
+              );
             })
             .catch((error: unknown) => setErrorState(error as Error));
         }
-        if (event.type === 'race-admin.changed' && adminService) {
+        if (event.type === "race-admin.changed" && adminService) {
           applyRemoteAdminChanges(
             event.payload as unknown as AdministrativeChanges,
           )
@@ -516,45 +660,54 @@ export const RaceSweetMainApp = () => {
         }
         return;
       }
-      const mutations = (event.payload as { mutations?: EventCatalogMutation[] }).mutations || [];
-      eventCatalogService.applyRemoteMutations(mutations)
+      const mutations =
+        (event.payload as { mutations?: EventCatalogMutation[] }).mutations ||
+        [];
+      eventCatalogService
+        .applyRemoteMutations(mutations)
         .then(setEventCatalogState)
         .catch((error: unknown) => setErrorState(error as Error));
     };
     const resync = (): void => {
       const catalogRequest: Promise<{ mutations: EventCatalogMutation[] }> =
-        fetch('/api/v1/mutations', { credentials: 'include' })
-          .then((response: Response) => {
+        fetch("/api/v1/mutations", { credentials: "include" }).then(
+          (response: Response) => {
             if (!response.ok) {
-              throw new Error(`RaceSweet API returned HTTP ${response.status} while resynchronising.`);
+              throw new Error(
+                `RaceSweet API returned HTTP ${response.status} while resynchronising.`,
+              );
             }
-            return response.json() as Promise<{ mutations: EventCatalogMutation[] }>;
-          });
+            return response.json() as Promise<{
+              mutations: EventCatalogMutation[];
+            }>;
+          },
+        );
       const raceAdminRequest: Promise<AdministrativeChanges | undefined> =
         adminService
-          ? fetch('/api/v1/race-admin', { credentials: 'include' })
-            .then((response: Response) => {
+          ? fetch("/api/v1/race-admin", { credentials: "include" }).then(
+            (response: Response) => {
               if (!response.ok) {
                 throw new Error(
                   `RaceSweet API returned HTTP ${response.status} while resynchronising race changes.`,
                 );
               }
               return response.json() as Promise<AdministrativeChanges>;
-            })
+            },
+          )
           : Promise.resolve(undefined);
       Promise.all([catalogRequest, raceAdminRequest])
-        .then(([
-          catalogResult,
-          raceAdminChanges,
-        ]: [
-          { mutations: EventCatalogMutation[] },
-          AdministrativeChanges | undefined,
-        ]) => Promise.all([
-          eventCatalogService.applyRemoteMutations(catalogResult.mutations),
-          raceAdminChanges
-            ? applyRemoteAdminChanges(raceAdminChanges)
-            : Promise.resolve(),
-        ]))
+        .then(
+          ([catalogResult, raceAdminChanges]: [
+            { mutations: EventCatalogMutation[] },
+            AdministrativeChanges | undefined,
+          ]) =>
+            Promise.all([
+              eventCatalogService.applyRemoteMutations(catalogResult.mutations),
+              raceAdminChanges
+                ? applyRemoteAdminChanges(raceAdminChanges)
+                : Promise.resolve(),
+            ]),
+        )
         .then(([catalogState, _adminResult]: [EventCatalogState, void]) => {
           setEventCatalogState(catalogState);
           setRenderTick((tick: number): number => tick + 1);
@@ -563,34 +716,42 @@ export const RaceSweetMainApp = () => {
     };
     return client.subscribe(applyRemoteEvent, resync);
   }, [adminService, eventCatalogService, systemConfigService]);
-  const setUnsavedChangesGuard = useCallback((section: AppSection, guard: UnsavedChangesGuard | undefined): void => {
-    unsavedChangesGuards.current[section] = guard;
-  }, []);
+  const setUnsavedChangesGuard = useCallback(
+    (section: AppSection, guard: UnsavedChangesGuard | undefined): void => {
+      unsavedChangesGuards.current[section] = guard;
+    },
+    [],
+  );
 
-  const logDisplayedError = useCallback((source: string, error: unknown): void => {
-    const timestamp = new Date().toISOString();
-    setDisplayedErrorLogEntries((current) => [
-      ...current,
-      {
-        details: formatErrorForDisplay(error),
-        id: `${timestamp}-${current.length}`,
-        source,
-        timestamp,
-      },
-    ]);
-  }, []);
+  const logDisplayedError = useCallback(
+    (source: string, error: unknown): void => {
+      const timestamp = new Date().toISOString();
+      setDisplayedErrorLogEntries((current) => [
+        ...current,
+        {
+          details: formatErrorForDisplay(error),
+          id: `${timestamp}-${current.length}`,
+          source,
+          timestamp,
+        },
+      ]);
+    },
+    [],
+  );
 
-  const persistTimingContextSelection = useCallback((
-    selection: TimingContextSelectionConfig
-  ): void => {
-    if (!systemConfigService) {
-      return;
-    }
+  const persistTimingContextSelection = useCallback(
+    (selection: TimingContextSelectionConfig): void => {
+      if (!systemConfigService) {
+        return;
+      }
 
-    systemConfigService.updateTimingContextSelection(selection)
-      .then(setSystemConfigState)
-      .catch((error: unknown) => setErrorState(error as Error));
-  }, [systemConfigService]);
+      systemConfigService
+        .updateTimingContextSelection(selection)
+        .then(setSystemConfigState)
+        .catch((error: unknown) => setErrorState(error as Error));
+    },
+    [systemConfigService],
+  );
 
   useEffect(() => {
     return subscribeLoadingMetrics(() => {
@@ -604,9 +765,11 @@ export const RaceSweetMainApp = () => {
   }, []);
 
   const displayedErrorLogText = useMemo((): string => {
-    return displayedErrorLogEntries.map((entry) => {
-      return `[${entry.timestamp}] ${entry.source}\n${entry.details}`;
-    }).join('\n\n');
+    return displayedErrorLogEntries
+      .map((entry) => {
+        return `[${entry.timestamp}] ${entry.source}\n${entry.details}`;
+      })
+      .join("\n\n");
   }, [displayedErrorLogEntries]);
 
   const changeActiveSection = (section: AppSection): void => {
@@ -625,13 +788,13 @@ export const RaceSweetMainApp = () => {
 
   useEffect(() => {
     if (errorState) {
-      logDisplayedError('Application', errorState);
+      logDisplayedError("Application", errorState);
     }
   }, [errorState, logDisplayedError]);
 
   useEffect(() => {
     if (timingErrorState) {
-      logDisplayedError('Timing', timingErrorState);
+      logDisplayedError("Timing", timingErrorState);
     }
   }, [timingErrorState, logDisplayedError]);
 
@@ -639,7 +802,9 @@ export const RaceSweetMainApp = () => {
     if (!sessionState && !eventCatalogState && !errorState) {
       const onLoadError = (error: unknown): void => {
         const message: string = formatErrorForDisplay(error);
-        setLoadWarnings((existing) => existing.includes(message) ? existing : [...existing, message]);
+        setLoadWarnings((existing) =>
+          existing.includes(message) ? existing : [...existing, message],
+        );
       };
 
       resetLoadingMetrics();
@@ -653,31 +818,46 @@ export const RaceSweetMainApp = () => {
         trackMetric: boolean = true,
       ): void => {
         if (trackMetric) {
-          incrementLoadingMetric(`Startup stage: ${stageId}`, `${completed}/${total}`);
+          incrementLoadingMetric(
+            `Startup stage: ${stageId}`,
+            `${completed}/${total}`,
+          );
         }
-        setLoadingProgress((current) => updateLoadingProgressStage(current, stageId, {
-          active,
-          completed,
-          total,
-        }));
+        setLoadingProgress((current) =>
+          updateLoadingProgressStage(current, stageId, {
+            active,
+            completed,
+            total,
+          }),
+        );
       };
       const progressCompletedByStage = new Map<string, number>();
       const progressPaintTimes = new Map<string, number>();
-      const reportWorkProgress = (stageId: string): LoadingProgressCallback => async (update): Promise<void> => {
-        const previousCompleted = progressCompletedByStage.get(stageId) || 0;
-        const completed = Math.min(update.total, Math.max(previousCompleted, update.completed));
-        progressCompletedByStage.set(stageId, completed);
-        const now = Date.now();
-        const lastPaintAt = progressPaintTimes.get(stageId) || 0;
-        const shouldPaint = completed === 0 || completed >= update.total || now - lastPaintAt >= 32;
-        if (shouldPaint) {
-          progressPaintTimes.set(stageId, now);
-          updateProgressStage(stageId, update.total, completed, true, false);
-          await waitForLoadingProgressPaint();
-        }
-      };
-      const reportSessionProgress: TestSessionLoadProgressCallback = async (update): Promise<void> => {
-        await reportWorkProgress('test-session')({
+      const reportWorkProgress =
+        (stageId: string): LoadingProgressCallback =>
+          async (update): Promise<void> => {
+            const previousCompleted = progressCompletedByStage.get(stageId) || 0;
+            const completed = Math.min(
+              update.total,
+              Math.max(previousCompleted, update.completed),
+            );
+            progressCompletedByStage.set(stageId, completed);
+            const now = Date.now();
+            const lastPaintAt = progressPaintTimes.get(stageId) || 0;
+            const shouldPaint =
+            completed === 0 ||
+            completed >= update.total ||
+            now - lastPaintAt >= 32;
+            if (shouldPaint) {
+              progressPaintTimes.set(stageId, now);
+              updateProgressStage(stageId, update.total, completed, true, false);
+              await waitForLoadingProgressPaint();
+            }
+          };
+      const reportSessionProgress: TestSessionLoadProgressCallback = async (
+        update,
+      ): Promise<void> => {
+        await reportWorkProgress("test-session")({
           completed: update.completed,
           currentTask: update.currentTask,
           total: update.total,
@@ -685,183 +865,348 @@ export const RaceSweetMainApp = () => {
       };
       const completeProgressStage = (stageId: string): void => {
         incrementLoadingMetric(`Complete startup stage: ${stageId}`);
-        setLoadingProgress((current) => completeLoadingProgressStage(current, stageId));
+        setLoadingProgress((current) =>
+          completeLoadingProgressStage(current, stageId),
+        );
       };
       const markServiceLoaded = (): void => {
         loadedServiceCount += 1;
-        incrementLoadingMetric('Startup service loaded', `${loadedServiceCount}/3`);
-        updateProgressStage('services', 3, loadedServiceCount);
+        incrementLoadingMetric(
+          "Startup service loaded",
+          `${loadedServiceCount}/3`,
+        );
+        updateProgressStage("services", 3, loadedServiceCount);
       };
       const adminServicePromise = loadAdminService(
         onLoadError,
         reportSessionProgress,
-        reportWorkProgress('admin-changes'),
+        reportWorkProgress("admin-changes"),
       ).then((service) => {
-        completeProgressStage('test-session');
-        completeProgressStage('admin-changes');
+        completeProgressStage("test-session");
+        completeProgressStage("admin-changes");
         markServiceLoaded();
         return service;
       });
-      const catalogServicePromise = loadEventCatalogService(onLoadError, reportWorkProgress('catalog-load')).then((service) => {
-        completeProgressStage('catalog-load');
+      const catalogServicePromise = loadEventCatalogService(
+        onLoadError,
+        reportWorkProgress("catalog-load"),
+      ).then((service) => {
+        completeProgressStage("catalog-load");
         markServiceLoaded();
         return service;
       });
-      const systemServicePromise = loadSystemConfigService(onLoadError, reportWorkProgress('system-config')).then((service) => {
-        completeProgressStage('system-config');
+      const systemServicePromise = loadSystemConfigService(
+        onLoadError,
+        reportWorkProgress("system-config"),
+      ).then((service) => {
+        completeProgressStage("system-config");
         markServiceLoaded();
         return service;
       });
 
-      Promise.all([adminServicePromise, catalogServicePromise, systemServicePromise]).then(async ([raceService, catalogService, systemService]) => {
-        completeProgressStage('services');
-        const initialCatalog = catalogService.catalog;
-        updateProgressStage('source-metadata', Math.max(1, systemService.state.dataSources.length), 0);
-        const initialSystemConfig = await loadSystemConfigWithImportedApicalPaths(systemService, catalogService, reportWorkProgress('source-metadata'));
-        completeProgressStage('source-metadata');
-        const initialEventId: EventId = initialCatalog.activeEventId || initialCatalog.events[0]?.id;
-        if (!validateUuid(initialEventId)) {
-          throw new Error(`Invalid initial event ID in catalog: ${initialEventId}`);
-        };
-        const initialSessionId = getSessionsForEvent(initialCatalog, initialEventId)
-          .find((session) => session.id === initialCatalog.activeSessionId)?.id ||
-          getSessionsForEvent(initialCatalog, initialEventId)[0]?.id;
-        const persistedInitialRaceState = initialSessionId
-          ? catalogService.getImportedRaceState(initialEventId, initialSessionId)
-          : undefined;
-        const session = persistedInitialRaceState
-          ? sessionFromPartialRaceState(persistedInitialRaceState)
-          : initialEventId === SEED_FIXTURE_EVENT_ID
-            ? raceService.raceState
-            : createEmptySessionState();
-        const catalogValidationTotal = Math.max(1, initialCatalog.events.length + session.participants.length + 4);
-        let catalogValidationCompleted = 0;
-        for (const event of initialCatalog.events) {
-          incrementLoadingMetric('Validate catalog event', event.name);
-          if (!validateUuid(event.id)) {
-            throw new Error(`Invalid event ID in catalog: ${event.id}`);
+      Promise.all([
+        adminServicePromise,
+        catalogServicePromise,
+        systemServicePromise,
+      ])
+        .then(async ([raceService, catalogService, systemService]) => {
+          completeProgressStage("services");
+          const initialCatalog = catalogService.catalog;
+          updateProgressStage(
+            "source-metadata",
+            Math.max(1, systemService.state.dataSources.length),
+            0,
+          );
+          const initialSystemConfig =
+            await loadSystemConfigWithImportedApicalPaths(
+              systemService,
+              catalogService,
+              reportWorkProgress("source-metadata"),
+            );
+          completeProgressStage("source-metadata");
+          const initialEventId: EventId =
+            initialCatalog.activeEventId || initialCatalog.events[0]?.id;
+          if (!validateUuid(initialEventId)) {
+            throw new Error(
+              `Invalid initial event ID in catalog: ${initialEventId}`,
+            );
           }
-          catalogValidationCompleted += 1;
-          await reportWorkProgress('catalog-validation')({ completed: catalogValidationCompleted, currentTask: `Validate catalog event ${event.name}`, total: catalogValidationTotal });
-        }
-        const participantCategoryIds = new Set(session.participants.flatMap((participant) =>
-          participant.categoryId ? [participant.categoryId.toString()] : [],
-        ));
-        for (const participant of session.participants) {
-          incrementLoadingMetric('Read startup participant category', participant.id.toString());
-          catalogValidationCompleted += 1;
-          await reportWorkProgress('catalog-validation')({ completed: catalogValidationCompleted, currentTask: `Read participant category ${participant.id}`, total: catalogValidationTotal });
-        }
-        const participantEntrantIds = new Set(session.participants.map((participant) => participant.entrantId.toString()));
-        const catalogCategoryIds = new Set(getCategoriesForEvent(initialCatalog, initialEventId).map((category) => category.id.toString()));
-        catalogValidationCompleted += 1;
-        await reportWorkProgress('catalog-validation')({ completed: catalogValidationCompleted, currentTask: 'Collect catalog categories', total: catalogValidationTotal });
-        const catalogEntrantIds = new Set(getEntrantsForEvent(initialCatalog, initialEventId).map((entrant) => entrant.id.toString()));
-        catalogValidationCompleted += 1;
-        await reportWorkProgress('catalog-validation')({ completed: catalogValidationCompleted, currentTask: 'Collect catalog entrants', total: catalogValidationTotal });
-        const expectedCategoryCount = Math.max(session.categories.length, participantCategoryIds.size, catalogCategoryIds.size);
-        const missingCategoryIds = Array.from(participantCategoryIds).filter((categoryId) => !catalogCategoryIds.has(categoryId));
-        catalogValidationCompleted += 1;
-        await reportWorkProgress('catalog-validation')({ completed: catalogValidationCompleted, currentTask: 'Compare catalog categories', total: catalogValidationTotal });
-        const missingEntrantIds = Array.from(participantEntrantIds).filter((entrantId) => !catalogEntrantIds.has(entrantId));
-        catalogValidationCompleted += 1;
-        await reportWorkProgress('catalog-validation')({ completed: catalogValidationCompleted, currentTask: 'Compare catalog entrants', total: catalogValidationTotal });
-        const shouldSyncScaffold = !persistedInitialRaceState && !!initialEventId && (
-          getCategoriesForEvent(initialCatalog, initialEventId).length !== expectedCategoryCount || 
-          (initialCatalog.events.find((event) => event.id === initialEventId)?.entrantIds.length || 0) !== participantEntrantIds.size ||
-          missingCategoryIds.length > 0 ||
-          missingEntrantIds.length > 0
-        );
-
-        const finalizeLoad = async (catalog: EventCatalogState): Promise<void> => {
-          incrementLoadingMetric('Finalize startup catalog');
-          const sessionList = getSessionsForEvent(catalog, initialEventId);
-          const categoryList = getCategoriesForEvent(catalog, initialEventId);
-          const entrantList = getEntrantsForEvent(catalog, initialEventId);
-          const selectedInitialSessionId = sessionList.find((session) => session.id === catalog.activeSessionId)?.id || sessionList[0]?.id;
-
-          const sessionPreparationTotal = Math.max(1, session.categories.length + session.participants.length + session.records.length);
-          updateProgressStage('session-state', sessionPreparationTotal, 0);
-          if (selectedInitialSessionId) {
-            incrementLoadingMetric('Apply admin changes to startup session', selectedInitialSessionId);
-            await raceService.applyChangesToSessionById(session, selectedInitialSessionId, reportWorkProgress('admin-changes'));
+          const initialSessionId =
+            getSessionsForEvent(initialCatalog, initialEventId).find(
+              (session) => session.id === initialCatalog.activeSessionId,
+            )?.id || getSessionsForEvent(initialCatalog, initialEventId)[0]?.id;
+          const persistedInitialRaceState = initialSessionId
+            ? catalogService.getImportedRaceState(
+              initialEventId,
+              initialSessionId,
+            )
+            : undefined;
+          const session = persistedInitialRaceState
+            ? sessionFromPartialRaceState(persistedInitialRaceState)
+            : initialEventId === SEED_FIXTURE_EVENT_ID
+              ? raceService.raceState
+              : createEmptySessionState();
+          const catalogValidationTotal = Math.max(
+            1,
+            initialCatalog.events.length + session.participants.length + 4,
+          );
+          let catalogValidationCompleted = 0;
+          for (const event of initialCatalog.events) {
+            incrementLoadingMetric("Validate catalog event", event.name);
+            if (!validateUuid(event.id)) {
+              throw new Error(`Invalid event ID in catalog: ${event.id}`);
+            }
+            catalogValidationCompleted += 1;
+            await reportWorkProgress("catalog-validation")({
+              completed: catalogValidationCompleted,
+              currentTask: `Validate catalog event ${event.name}`,
+              total: catalogValidationTotal,
+            });
           }
-          let sessionPreparationCompleted = 0;
-          for (const category of session.categories) {
-            sessionPreparationCompleted += 1;
-            await reportWorkProgress('session-state')({ completed: sessionPreparationCompleted, currentTask: `Prepare category ${category.name || category.id}`, total: sessionPreparationTotal });
-          }
+          const participantCategoryIds = new Set(
+            session.participants.flatMap((participant) =>
+              participant.categoryId ? [participant.categoryId.toString()] : [],
+            ),
+          );
           for (const participant of session.participants) {
-            sessionPreparationCompleted += 1;
-            await reportWorkProgress('session-state')({ completed: sessionPreparationCompleted, currentTask: `Prepare participant ${participant.id}`, total: sessionPreparationTotal });
+            incrementLoadingMetric(
+              "Read startup participant category",
+              participant.id.toString(),
+            );
+            catalogValidationCompleted += 1;
+            await reportWorkProgress("catalog-validation")({
+              completed: catalogValidationCompleted,
+              currentTask: `Read participant category ${participant.id}`,
+              total: catalogValidationTotal,
+            });
           }
-          for (const record of session.records) {
-            sessionPreparationCompleted += 1;
-            await reportWorkProgress('session-state')({ completed: sessionPreparationCompleted, currentTask: `Prepare record ${record.id}`, total: sessionPreparationTotal });
-          }
-          completeProgressStage('admin-changes');
-          completeProgressStage('session-state');
-          updateProgressStage('publish', 1, 0);
-          setAdminService(raceService);
-          setEventCatalogService(catalogService);
-          setSystemConfigService(systemService);
-          setSystemConfigState(initialSystemConfig);
-          setSessionState(session);
-          setEventCatalogState(catalog);
-          setSelectedCategoriesEventId(initialEventId);
-          setSelectedCategoryId(categoryList[0]?.id.toString());
-          setSelectedEventId(initialEventId);
-          setSelectedEntrantsEventId(initialEventId);
-          setSelectedEntrantId(entrantList[0]?.id);
-          setSelectedSessionsEventId(initialEventId);
-          setSelectedSessionId(selectedInitialSessionId);
-          const restoredTimingSelection = resolveTimingContextSelection(catalog, initialSystemConfig.timingContextSelection);
-          setTimingSessionSelection(restoredTimingSelection.selectionMode);
-          setSelectedTimingEventId(restoredTimingSelection.eventId);
-          setSelectedTimingSessionId(restoredTimingSelection.sessionId);
-          setTimingRaceState(restoredTimingSelection.selectionMode === 'active' ? session : createEmptySessionState());
-          initialTimingSelectionHydrated.current = restoredTimingSelection.selectionMode === 'active';
-          setErrorState(undefined);
-          updateProgressStage('publish', 1, 1);
-        };
+          const participantEntrantIds = new Set(
+            session.participants.map((participant) =>
+              participant.entrantId.toString(),
+            ),
+          );
+          const catalogCategoryIds = new Set(
+            getCategoriesForEvent(initialCatalog, initialEventId).map(
+              (category) => category.id.toString(),
+            ),
+          );
+          catalogValidationCompleted += 1;
+          await reportWorkProgress("catalog-validation")({
+            completed: catalogValidationCompleted,
+            currentTask: "Collect catalog categories",
+            total: catalogValidationTotal,
+          });
+          const catalogEntrantIds = new Set(
+            getEntrantsForEvent(initialCatalog, initialEventId).map((entrant) =>
+              entrant.id.toString(),
+            ),
+          );
+          catalogValidationCompleted += 1;
+          await reportWorkProgress("catalog-validation")({
+            completed: catalogValidationCompleted,
+            currentTask: "Collect catalog entrants",
+            total: catalogValidationTotal,
+          });
+          const expectedCategoryCount = Math.max(
+            session.categories.length,
+            participantCategoryIds.size,
+            catalogCategoryIds.size,
+          );
+          const missingCategoryIds = Array.from(participantCategoryIds).filter(
+            (categoryId) => !catalogCategoryIds.has(categoryId),
+          );
+          catalogValidationCompleted += 1;
+          await reportWorkProgress("catalog-validation")({
+            completed: catalogValidationCompleted,
+            currentTask: "Compare catalog categories",
+            total: catalogValidationTotal,
+          });
+          const missingEntrantIds = Array.from(participantEntrantIds).filter(
+            (entrantId) => !catalogEntrantIds.has(entrantId),
+          );
+          catalogValidationCompleted += 1;
+          await reportWorkProgress("catalog-validation")({
+            completed: catalogValidationCompleted,
+            currentTask: "Compare catalog entrants",
+            total: catalogValidationTotal,
+          });
+          const shouldSyncScaffold =
+            !persistedInitialRaceState &&
+            !!initialEventId &&
+            (getCategoriesForEvent(initialCatalog, initialEventId).length !==
+              expectedCategoryCount ||
+              (initialCatalog.events.find(
+                (event) => event.id === initialEventId,
+              )?.entrantIds.length || 0) !== participantEntrantIds.size ||
+              missingCategoryIds.length > 0 ||
+              missingEntrantIds.length > 0);
 
-        if (shouldSyncScaffold) {
-          const masterProfiles = getMasterEntrantProfilesForEvent(initialSystemConfig, initialEventId!);
-          const scaffoldTotal = Math.max(1, session.categories.length + session.participants.length + masterProfiles.length);
-          updateProgressStage('scaffold', scaffoldTotal, 0);
-          let scaffoldCompleted = 0;
-          const onScaffoldStep = async (currentTask: string): Promise<void> => {
-            scaffoldCompleted = Math.min(scaffoldTotal, scaffoldCompleted + 1);
-            await reportWorkProgress('scaffold')({ completed: scaffoldCompleted, currentTask, total: scaffoldTotal });
+          const finalizeLoad = async (
+            catalog: EventCatalogState,
+          ): Promise<void> => {
+            incrementLoadingMetric("Finalize startup catalog");
+            const sessionList = getSessionsForEvent(catalog, initialEventId);
+            const categoryList = getCategoriesForEvent(catalog, initialEventId);
+            const entrantList = getEntrantsForEvent(catalog, initialEventId);
+            const selectedInitialSessionId =
+              sessionList.find(
+                (session) => session.id === catalog.activeSessionId,
+              )?.id || sessionList[0]?.id;
+
+            const sessionPreparationTotal = Math.max(
+              1,
+              session.categories.length +
+                session.participants.length +
+                session.records.length,
+            );
+            updateProgressStage("session-state", sessionPreparationTotal, 0);
+            if (selectedInitialSessionId) {
+              incrementLoadingMetric(
+                "Apply admin changes to startup session",
+                selectedInitialSessionId,
+              );
+              await raceService.applyChangesToSessionById(
+                session,
+                selectedInitialSessionId,
+                reportWorkProgress("admin-changes"),
+              );
+            }
+            let sessionPreparationCompleted = 0;
+            for (const category of session.categories) {
+              sessionPreparationCompleted += 1;
+              await reportWorkProgress("session-state")({
+                completed: sessionPreparationCompleted,
+                currentTask: `Prepare category ${category.name || category.id}`,
+                total: sessionPreparationTotal,
+              });
+            }
+            for (const participant of session.participants) {
+              sessionPreparationCompleted += 1;
+              await reportWorkProgress("session-state")({
+                completed: sessionPreparationCompleted,
+                currentTask: `Prepare participant ${participant.id}`,
+                total: sessionPreparationTotal,
+              });
+            }
+            for (const record of session.records) {
+              sessionPreparationCompleted += 1;
+              await reportWorkProgress("session-state")({
+                completed: sessionPreparationCompleted,
+                currentTask: `Prepare record ${record.id}`,
+                total: sessionPreparationTotal,
+              });
+            }
+            completeProgressStage("admin-changes");
+            completeProgressStage("session-state");
+            updateProgressStage("publish", 1, 0);
+            setAdminService(raceService);
+            setEventCatalogService(catalogService);
+            setSystemConfigService(systemService);
+            setSystemConfigState(initialSystemConfig);
+            setSessionState(session);
+            setEventCatalogState(catalog);
+            setSelectedCategoriesEventId(initialEventId);
+            setSelectedCategoryId(categoryList[0]?.id.toString());
+            setSelectedEventId(initialEventId);
+            setSelectedEntrantsEventId(initialEventId);
+            setSelectedEntrantId(entrantList[0]?.id);
+            setSelectedSessionsEventId(initialEventId);
+            setSelectedSessionId(selectedInitialSessionId);
+            const restoredTimingSelection = resolveTimingContextSelection(
+              catalog,
+              initialSystemConfig.timingContextSelection,
+            );
+            setTimingSessionSelection(restoredTimingSelection.selectionMode);
+            setSelectedTimingEventId(restoredTimingSelection.eventId);
+            setSelectedTimingSessionId(restoredTimingSelection.sessionId);
+            setTimingRaceState(
+              restoredTimingSelection.selectionMode === "active"
+                ? session
+                : createEmptySessionState(),
+            );
+            initialTimingSelectionHydrated.current =
+              restoredTimingSelection.selectionMode === "active";
+            setErrorState(undefined);
+            updateProgressStage("publish", 1, 1);
           };
 
-          catalogService.syncEventScaffold(initialEventId!, session.categories, session.participants, masterProfiles, [], undefined, onScaffoldStep).then(async (catalog) => {
-            incrementLoadingMetric('Startup scaffold synced', initialEventId);
-            updateProgressStage('scaffold', scaffoldTotal, scaffoldTotal);
-            await finalizeLoad(catalog);
-          }).catch((error: unknown) => {
-            setErrorState(error as Error);
-          });
-          return;
-        }
+          if (shouldSyncScaffold) {
+            const masterProfiles = getMasterEntrantProfilesForEvent(
+              initialSystemConfig,
+              initialEventId!,
+            );
+            const scaffoldTotal = Math.max(
+              1,
+              session.categories.length +
+                session.participants.length +
+                masterProfiles.length,
+            );
+            updateProgressStage("scaffold", scaffoldTotal, 0);
+            let scaffoldCompleted = 0;
+            const onScaffoldStep = async (
+              currentTask: string,
+            ): Promise<void> => {
+              scaffoldCompleted = Math.min(
+                scaffoldTotal,
+                scaffoldCompleted + 1,
+              );
+              await reportWorkProgress("scaffold")({
+                completed: scaffoldCompleted,
+                currentTask,
+                total: scaffoldTotal,
+              });
+            };
 
-        updateProgressStage('scaffold', 1, 1);
-        await finalizeLoad(initialCatalog);
-      }).catch((error: unknown) => {
-        setErrorState(error as Error);
-      });
+            catalogService
+              .syncEventScaffold(
+                initialEventId!,
+                session.categories,
+                session.participants,
+                masterProfiles,
+                [],
+                undefined,
+                onScaffoldStep,
+              )
+              .then(async (catalog) => {
+                incrementLoadingMetric(
+                  "Startup scaffold synced",
+                  initialEventId,
+                );
+                updateProgressStage("scaffold", scaffoldTotal, scaffoldTotal);
+                await finalizeLoad(catalog);
+              })
+              .catch((error: unknown) => {
+                setErrorState(error as Error);
+              });
+            return;
+          }
+
+          updateProgressStage("scaffold", 1, 1);
+          await finalizeLoad(initialCatalog);
+        })
+        .catch((error: unknown) => {
+          setErrorState(error as Error);
+        });
     }
   }, [sessionState, eventCatalogState, errorState]);
-  
+
   const selectEvent = (eventId: EventId) => {
     if (!eventCatalogState) {
       return;
     }
     setSelectedEventId(eventId);
     const nextSessions = getSessionsForEvent(eventCatalogState, eventId);
-    setSelectedSessionId((current) => nextSessions.find((session) => session.id === current)?.id || nextSessions[0]?.id);
+    setSelectedSessionId(
+      (current) =>
+        nextSessions.find((session) => session.id === current)?.id ||
+        nextSessions[0]?.id,
+    );
     const nextEntrants = getEntrantsForEvent(eventCatalogState, eventId);
-    setSelectedEntrantId((current) => nextEntrants.find((entrant) => entrant.id === current)?.id || nextEntrants[0]?.id);
+    setSelectedEntrantId(
+      (current) =>
+        nextEntrants.find((entrant) => entrant.id === current)?.id ||
+        nextEntrants[0]?.id,
+    );
   };
 
   const selectSessionsEvent = (eventId: EventId) => {
@@ -891,16 +1236,35 @@ export const RaceSweetMainApp = () => {
     setSelectedEntrantId(nextEntrants[0]?.id);
   };
 
-  const updateEventCatalogState = (catalog: EventCatalogState, preferredEventId?: EventId, preferredSessionId?: SessionId, preferredCategoryId?: CategoryId) => {
+  const updateEventCatalogState = (
+    catalog: EventCatalogState,
+    preferredEventId?: EventId,
+    preferredSessionId?: SessionId,
+    preferredCategoryId?: CategoryId,
+  ) => {
     setEventCatalogState(catalog);
-    const nextEventId = preferredEventId || catalog.activeEventId || catalog.events[0]?.id;
+    const nextEventId =
+      preferredEventId || catalog.activeEventId || catalog.events[0]?.id;
     const nextSessions = getSessionsForEvent(catalog, nextEventId);
     const nextCategories = getCategoriesForEvent(catalog, nextEventId);
-    const activeSessionId = nextSessions.find((session) => session.id === catalog.activeSessionId)?.id;
-    const nextSessionId = preferredSessionId || activeSessionId || nextSessions.find((session) => session.id === selectedSessionId)?.id || nextSessions[0]?.id;
-    const nextCategoryId = preferredCategoryId || nextCategories.find((category) => category.id.toString() === selectedCategoryId)?.id?.toString() || nextCategories[0]?.id?.toString();
+    const activeSessionId = nextSessions.find(
+      (session) => session.id === catalog.activeSessionId,
+    )?.id;
+    const nextSessionId =
+      preferredSessionId ||
+      activeSessionId ||
+      nextSessions.find((session) => session.id === selectedSessionId)?.id ||
+      nextSessions[0]?.id;
+    const nextCategoryId =
+      preferredCategoryId ||
+      nextCategories
+        .find((category) => category.id.toString() === selectedCategoryId)
+        ?.id?.toString() ||
+      nextCategories[0]?.id?.toString();
     const nextEntrants = getEntrantsForEvent(catalog, nextEventId);
-    const nextEntrantId = nextEntrants.find((entrant) => entrant.id === selectedEntrantId)?.id || nextEntrants[0]?.id;
+    const nextEntrantId =
+      nextEntrants.find((entrant) => entrant.id === selectedEntrantId)?.id ||
+      nextEntrants[0]?.id;
     setSelectedEventId(nextEventId);
     setSelectedEntrantsEventId(nextEventId);
     setSelectedEntrantId(nextEntrantId);
@@ -910,12 +1274,22 @@ export const RaceSweetMainApp = () => {
     setSelectedCategoryId(nextCategoryId);
     if (sessionState) {
       const nextSessionState = cloneSessionState(sessionState);
-      applyCatalogSessionScopeToRaceState(nextSessionState, catalog, catalog.activeEventId, catalog.activeSessionId);
+      applyCatalogSessionScopeToRaceState(
+        nextSessionState,
+        catalog,
+        catalog.activeEventId,
+        catalog.activeSessionId,
+      );
       setSessionState(nextSessionState);
     }
     if (timingRaceState) {
       const nextTimingRaceState = cloneSessionState(timingRaceState);
-      applyCatalogSessionScopeToRaceState(nextTimingRaceState, catalog, selectedTimingEventId, selectedTimingSessionId);
+      applyCatalogSessionScopeToRaceState(
+        nextTimingRaceState,
+        catalog,
+        selectedTimingEventId,
+        selectedTimingSessionId,
+      );
       setTimingRaceState(nextTimingRaceState);
     }
   };
@@ -933,14 +1307,22 @@ export const RaceSweetMainApp = () => {
     eventId: EventId,
     source: DataSourceConfig,
     targetSessionState?: Session & RaceStateLookup,
-    options: { cachedSpreadsheetOnly?: boolean; preferCachedSpreadsheet?: boolean; sessionId?: SessionId } = {}
+    options: {
+      cachedSpreadsheetOnly?: boolean;
+      preferCachedSpreadsheet?: boolean;
+      sessionId?: SessionId;
+    } = {},
   ): Promise<void> => {
     if (!validateUuid(eventId)) {
       throw new Error(`Invalid eventId provided: ${eventId}`);
     }
     const sessionTarget = targetSessionState || sessionState;
-    
-    if ((source.type !== 'api-apical-data-file' && source.type !== 'api-apical-excel-file') || !sessionTarget) {
+
+    if (
+      (source.type !== "api-apical-data-file" &&
+        source.type !== "api-apical-excel-file") ||
+      !sessionTarget
+    ) {
       return;
     }
 
@@ -953,7 +1335,13 @@ export const RaceSweetMainApp = () => {
     await applyPulledRaceStateToSession(sessionTarget, raceState, {
       catalog: eventCatalogService?.catalog || eventCatalogState,
       eventId,
-      finishLineNumbers: options.sessionId ? getFinishLineNumbersForSession(systemConfigState, eventId, options.sessionId) : undefined,
+      finishLineNumbers: options.sessionId
+        ? getFinishLineNumbersForSession(
+          systemConfigState,
+          eventId,
+          options.sessionId,
+        )
+        : undefined,
       sessionId: options.sessionId,
     });
     if (!targetSessionState) {
@@ -961,8 +1349,15 @@ export const RaceSweetMainApp = () => {
     }
   };
 
-  const applyPersistedRaceStateToSession = async (eventId: EventId, sessionId: SessionId, targetSessionState: Session & RaceStateLookup): Promise<boolean> => {
-    const raceState = eventCatalogService?.getImportedRaceState(eventId, sessionId);
+  const applyPersistedRaceStateToSession = async (
+    eventId: EventId,
+    sessionId: SessionId,
+    targetSessionState: Session & RaceStateLookup,
+  ): Promise<boolean> => {
+    const raceState = eventCatalogService?.getImportedRaceState(
+      eventId,
+      sessionId,
+    );
     if (!raceState) {
       return false;
     }
@@ -970,14 +1365,24 @@ export const RaceSweetMainApp = () => {
     await applyPulledRaceStateToSession(targetSessionState, raceState, {
       catalog: eventCatalogService?.catalog || eventCatalogState,
       eventId,
-      finishLineNumbers: getFinishLineNumbersForSession(systemConfigState, eventId, sessionId),
+      finishLineNumbers: getFinishLineNumbersForSession(
+        systemConfigState,
+        eventId,
+        sessionId,
+      ),
       sessionId,
     });
     return true;
   };
 
-  const applyPersistedRaceStateForSourceToSession = async (source: DataSourceConfig, targetSessionState: Session & RaceStateLookup): Promise<boolean> => {
-    if (source.type !== 'api-apical-data-file' && source.type !== 'api-apical-excel-file') {
+  const applyPersistedRaceStateForSourceToSession = async (
+    source: DataSourceConfig,
+    targetSessionState: Session & RaceStateLookup,
+  ): Promise<boolean> => {
+    if (
+      source.type !== "api-apical-data-file" &&
+      source.type !== "api-apical-excel-file"
+    ) {
       return false;
     }
 
@@ -989,7 +1394,7 @@ export const RaceSweetMainApp = () => {
     return applyPersistedRaceStateToSession(
       createApicalCatalogEventId(apicalEventId),
       createApicalCatalogSessionId(apicalEventId),
-      targetSessionState
+      targetSessionState,
     );
   };
 
@@ -1003,7 +1408,7 @@ export const RaceSweetMainApp = () => {
       preferPersistedRaceState?: boolean;
       replaceSessionState?: boolean;
       targetSessionState?: Session & RaceStateLookup;
-    }
+    },
   ): Promise<(Session & RaceStateLookup) | undefined> => {
     if (!validateUuid(eventId)) {
       throw new Error(`Invalid eventId provided: ${eventId}`);
@@ -1022,14 +1427,27 @@ export const RaceSweetMainApp = () => {
       setRecordSelectedCategories(new Set<EventCategoryId>());
     }
 
-    const sourceIds = getSessionAssignedSourceIds(systemConfigState, eventId, sessionId);
-    const sources = systemConfigState.dataSources.filter((source) => source.enabled && sourceIds.includes(source.id));
+    const sourceIds = getSessionAssignedSourceIds(
+      systemConfigState,
+      eventId,
+      sessionId,
+    );
+    const sources = systemConfigState.dataSources.filter(
+      (source) => source.enabled && sourceIds.includes(source.id),
+    );
 
     if (targetSessionState && options?.preferPersistedRaceState) {
-      const loadedPersistedState = await applyPersistedRaceStateToSession(eventId, sessionId, targetSessionState);
+      const loadedPersistedState = await applyPersistedRaceStateToSession(
+        eventId,
+        sessionId,
+        targetSessionState,
+      );
       if (loadedPersistedState) {
         if (adminService) {
-          await adminService.applyChangesToSessionById(targetSessionState, sessionId);
+          await adminService.applyChangesToSessionById(
+            targetSessionState,
+            sessionId,
+          );
         }
         if (options?.replaceSessionState) {
           setSessionState(targetSessionState);
@@ -1038,10 +1456,17 @@ export const RaceSweetMainApp = () => {
       }
 
       for (const source of sources) {
-        const loadedSourcePersistedState = await applyPersistedRaceStateForSourceToSession(source, targetSessionState);
+        const loadedSourcePersistedState =
+          await applyPersistedRaceStateForSourceToSession(
+            source,
+            targetSessionState,
+          );
         if (loadedSourcePersistedState) {
           if (adminService) {
-            await adminService.applyChangesToSessionById(targetSessionState, sessionId);
+            await adminService.applyChangesToSessionById(
+              targetSessionState,
+              sessionId,
+            );
           }
           if (options?.replaceSessionState) {
             setSessionState(targetSessionState);
@@ -1060,7 +1485,10 @@ export const RaceSweetMainApp = () => {
     }
 
     if (targetSessionState && adminService) {
-      await adminService.applyChangesToSessionById(targetSessionState, sessionId);
+      await adminService.applyChangesToSessionById(
+        targetSessionState,
+        sessionId,
+      );
     }
 
     if (targetSessionState && options?.replaceSessionState) {
@@ -1070,115 +1498,169 @@ export const RaceSweetMainApp = () => {
     return targetSessionState;
   };
 
-  const pullAssignedSessionSourceRaceState = async (eventId: EventId, sessionId: SessionId): Promise<Partial<RaceState>> => {
-    const sourceIds = getSessionAssignedSourceIds(systemConfigState, eventId, sessionId);
-    const sources = systemConfigState.dataSources.filter((source) => source.enabled && sourceIds.includes(source.id));
+  const pullAssignedSessionSourceRaceState = async (
+    eventId: EventId,
+    sessionId: SessionId,
+  ): Promise<Partial<RaceState>> => {
+    const sourceIds = getSessionAssignedSourceIds(
+      systemConfigState,
+      eventId,
+      sessionId,
+    );
+    const sources = systemConfigState.dataSources.filter(
+      (source) => source.enabled && sourceIds.includes(source.id),
+    );
     const pulledRaceStates: Partial<RaceState>[] = [];
 
     for (const source of sources) {
       switch (source.type) {
-      case 'file-mr-scats-data': {
+      case "file-mr-scats-data": {
         const locationPath = source.mrScatsConfig?.dataLocationPath;
         if (!locationPath) {
-          throw new Error(`Assigned MR-SCATS source "${source.name}" has no data location configured.`);
+          throw new Error(
+            `Assigned MR-SCATS source "${source.name}" has no data location configured.`,
+          );
         }
 
-        const mrScatsImport = await loadMrScatsCatalogFromLocation(locationPath, {
-          ignoreLineOneNo1CrossingsWhenDbfPresent: source.mrScatsConfig?.ignoreLineOneNo1CrossingsWhenDbfPresent,
-        });
-        const importedSession = mrScatsImport.sessions.find((session) => session.id === sessionId);
+        const mrScatsImport = await loadMrScatsCatalogFromLocation(
+          locationPath,
+          {
+            ignoreLineOneNo1CrossingsWhenDbfPresent:
+                source.mrScatsConfig?.ignoreLineOneNo1CrossingsWhenDbfPresent,
+          },
+        );
+        const importedSession = mrScatsImport.sessions.find(
+          (session) => session.id === sessionId,
+        );
         if (importedSession) {
-          pulledRaceStates.push(filterMrScatsRaceStateForSession(
-            mrScatsImport.raceState,
-            sessionId,
-            importedSession.categoryIds
-          ));
+          pulledRaceStates.push(
+            filterMrScatsRaceStateForSession(
+              mrScatsImport.raceState,
+              sessionId,
+              importedSession.categoryIds,
+            ),
+          );
         }
         break;
       }
 
-      case 'file-durt-filemaker': {
+      case "file-durt-filemaker": {
         const databaseFilePath = source.durtFileMakerConfig?.databaseFilePath;
         if (!databaseFilePath) {
-          throw new Error(`Assigned DURT FileMaker source "${source.name}" has no database file configured.`);
+          throw new Error(
+            `Assigned DURT FileMaker source "${source.name}" has no database file configured.`,
+          );
         }
 
-        pulledRaceStates.push(await loadDurtFileMakerRaceState({
-          eventId,
-          executablePath: source.durtFileMakerConfig?.extractorPath || getBundledDurtFileMakerExtractorPath(),
-          sessionId,
-          sourceFilePath: databaseFilePath,
-          timeZone: getEventTimeZone(eventId),
-        }));
+        pulledRaceStates.push(
+          await loadDurtFileMakerRaceState({
+            eventId,
+            executablePath:
+                source.durtFileMakerConfig?.extractorPath ||
+                getBundledDurtFileMakerExtractorPath(),
+            sessionId,
+            sourceFilePath: databaseFilePath,
+            timeZone: getEventTimeZone(eventId),
+          }),
+        );
         break;
       }
 
-      case 'api-apical-data-file':
-      case 'api-apical-excel-file':
-        pulledRaceStates.push(await pullApicalRaceState(source, eventId, {
-          localStorageDirectoryPath: systemConfigState.localStorageDirectoryPath,
-          timeZone: getEventTimeZone(eventId),
-        }));
+      case "api-apical-data-file":
+      case "api-apical-excel-file":
+        pulledRaceStates.push(
+          await pullApicalRaceState(source, eventId, {
+            localStorageDirectoryPath:
+                systemConfigState.localStorageDirectoryPath,
+            timeZone: getEventTimeZone(eventId),
+          }),
+        );
         break;
 
-      case 'file-dorian-ctc-srt': {
+      case "file-dorian-ctc-srt": {
         const filePath = source.fileConfig?.filePath;
         const catalog = eventCatalogService?.catalog;
         const event = catalog?.events.find((item) => item.id === eventId);
         if (!filePath || !catalog || !event) {
-          throw new Error(`Assigned Dorian CTC SRT / ERF source "${source.name}" requires a configured file and event.`);
+          throw new Error(
+            `Assigned Dorian CTC SRT / ERF source "${source.name}" requires a configured file and event.`,
+          );
         }
 
-        const existingRaceState = eventCatalogService?.getImportedRaceState(eventId, sessionId) || {};
+        const existingRaceState =
+            eventCatalogService?.getImportedRaceState(eventId, sessionId) || {};
         const knownTransmitterNumbers = [
-          ...getEntrantsForEvent(catalog, eventId).flatMap((entrant) => (
-            entrant.isPlaceholder === true || entrant.name.trim().toLowerCase().startsWith('unknown participant')
+          ...getEntrantsForEvent(catalog, eventId).flatMap((entrant) =>
+            entrant.isPlaceholder === true ||
+              entrant.name
+                .trim()
+                .toLowerCase()
+                .startsWith("unknown participant")
               ? []
               : (entrant.identifiers || [])
-                .filter((identifier) => 'txNo' in identifier)
-                .map((identifier) => (identifier as ParticipantTransponder).txNo)
-          )),
-          ...(existingRaceState.participants || []).flatMap((participant) => (
-            participant.isPlaceholder === true || (!participant.firstname.trim() && !participant.surname.trim())
+                .filter((identifier) => "txNo" in identifier)
+                .map(
+                  (identifier) =>
+                    (identifier as ParticipantTransponder).txNo,
+                ),
+          ),
+          ...(existingRaceState.participants || []).flatMap((participant) =>
+            participant.isPlaceholder === true ||
+              (!participant.firstname.trim() && !participant.surname.trim())
               ? []
               : participant.identifiers
-                .filter((identifier) => 'txNo' in identifier)
-                .map((identifier) => (identifier as ParticipantTransponder).txNo)
-          )),
+                .filter((identifier) => "txNo" in identifier)
+                .map(
+                  (identifier) =>
+                    (identifier as ParticipantTransponder).txNo,
+                ),
+          ),
         ];
         const trackConfigFilePath = source.fileConfig?.trackConfigFilePath;
         const trackConfig = trackConfigFilePath
-          ? await window.api.requestBuffer(trackConfigFilePath)
-            .then((buffer) => parseCtcTrackConfig(buffer, trackConfigFilePath))
+          ? await window.api
+            .requestBuffer(trackConfigFilePath)
+            .then((buffer) =>
+              parseCtcTrackConfig(buffer, trackConfigFilePath),
+            )
           : source.fileConfig?.ctcTrackConfig;
-        const importedRaceState = await window.api.requestBuffer(filePath)
-          .then((buffer) => loadDorianCtcSrtCatalogForSession(filePath, buffer, {
-            eventDate: event.date,
-            eventId,
-            importPlaceholderEntrantsForUnknownTransmitters: source.fileConfig?.importPlaceholderEntrantsForUnknownTransmitters === true,
-            knownTransmitterNumbers,
-            sessionId,
-            timeZone: event.timeZone,
-            trackConfig,
-          }));
+        const importedRaceState = await window.api
+          .requestBuffer(filePath)
+          .then((buffer) =>
+            loadDorianCtcSrtCatalogForSession(filePath, buffer, {
+              eventDate: event.date,
+              eventId,
+              importPlaceholderEntrantsForUnknownTransmitters:
+                  source.fileConfig
+                    ?.importPlaceholderEntrantsForUnknownTransmitters === true,
+              knownTransmitterNumbers,
+              sessionId,
+              timeZone: event.timeZone,
+              trackConfig,
+            }),
+          );
         pulledRaceStates.push(importedRaceState);
         break;
       }
 
-      case 'api-aws-sqs':
-      case 'api-http-request':
-      case 'file-apical-data-file':
-      case 'file-racesweet-ledger':
-      case 'file-rfid-timing-csv':
-      case 'master-entrant-profiles':
-      case 'timing-dorian-data1-supernode':
-      case 'timing-mylaps-decoder':
-      case 'timing-rfid-decoder':
-        throw new Error(`Re-loading assigned source "${source.name}" (${source.type}) is not implemented.`);
+      case "api-aws-sqs":
+      case "api-http-request":
+      case "file-apical-data-file":
+      case "file-racesweet-ledger":
+      case "file-rfid-timing-csv":
+      case "master-entrant-profiles":
+      case "timing-dorian-data1-supernode":
+      case "timing-mylaps-decoder":
+      case "timing-rfid-decoder":
+        throw new Error(
+          `Re-loading assigned source "${source.name}" (${source.type}) is not implemented.`,
+        );
 
       default: {
         const unsupportedSourceType: never = source.type;
-        throw new Error(`Re-loading assigned source "${source.name}" (${unsupportedSourceType}) is not implemented.`);
+        throw new Error(
+          `Re-loading assigned source "${source.name}" (${unsupportedSourceType}) is not implemented.`,
+        );
       }
       }
     }
@@ -1186,7 +1668,11 @@ export const RaceSweetMainApp = () => {
     return mergePulledRaceStates(pulledRaceStates);
   };
 
-  const reloadSessionSources = async (eventId: EventId, sessionId: SessionId, mode: SessionSourceReloadMode): Promise<SessionSourceReloadSummary | undefined> => {
+  const reloadSessionSources = async (
+    eventId: EventId,
+    sessionId: SessionId,
+    mode: SessionSourceReloadMode,
+  ): Promise<SessionSourceReloadSummary | undefined> => {
     if (!validateUuid(eventId)) {
       throw new Error(`Invalid eventId provided: ${eventId}`);
     }
@@ -1197,68 +1683,122 @@ export const RaceSweetMainApp = () => {
       return undefined;
     }
 
-    const pulledRaceState = await pullAssignedSessionSourceRaceState(eventId, sessionId);
-    const existingRaceState = eventCatalogService.getImportedRaceState(eventId, sessionId);
-    const eventCategories = getCategoriesForEvent(eventCatalogService.catalog, eventId);
-    const eventSessions = getSessionsForEvent(eventCatalogService.catalog, eventId);
-    const eventCategoryIds = new Set(eventCategories.map((category) => category.id.toString()));
-    const categoryIdsAssignedToSessions = new Set(eventSessions
-      .flatMap((session) => session.categoryIds || [])
-      .filter((categoryId) => eventCategoryIds.has(categoryId.toString()))
-      .map((categoryId) => categoryId.toString()));
-    const nextRaceState = mergeRaceStateForReload(existingRaceState, pulledRaceState, mode, {
-      categoryIdsAssignedToSessions,
-      pruneEmptyReloadEntities: true,
-    });
-    const reloadSummary = summarizeSessionSourceReload(existingRaceState, nextRaceState, mode);
+    const pulledRaceState = await pullAssignedSessionSourceRaceState(
+      eventId,
+      sessionId,
+    );
+    const existingRaceState = eventCatalogService.getImportedRaceState(
+      eventId,
+      sessionId,
+    );
+    const eventCategories = getCategoriesForEvent(
+      eventCatalogService.catalog,
+      eventId,
+    );
+    const eventSessions = getSessionsForEvent(
+      eventCatalogService.catalog,
+      eventId,
+    );
+    const eventCategoryIds = new Set(
+      eventCategories.map((category) => category.id.toString()),
+    );
+    const categoryIdsAssignedToSessions = new Set(
+      eventSessions
+        .flatMap((session) => session.categoryIds || [])
+        .filter((categoryId) => eventCategoryIds.has(categoryId.toString()))
+        .map((categoryId) => categoryId.toString()),
+    );
+    const nextRaceState = mergeRaceStateForReload(
+      existingRaceState,
+      pulledRaceState,
+      mode,
+      {
+        categoryIdsAssignedToSessions,
+        pruneEmptyReloadEntities: true,
+      },
+    );
+    const reloadSummary = summarizeSessionSourceReload(
+      existingRaceState,
+      nextRaceState,
+      mode,
+    );
     const missingCategoryWarnings = (nextRaceState.categories || [])
       .filter((category) => isMissingLinkedCategoryPlaceholder(category))
-      .map((category) => category.description || `${category.name} could not be found.`);
+      .map(
+        (category) =>
+          category.description || `${category.name} could not be found.`,
+      );
     const catalog = await eventCatalogService.reloadImportedRaceState(
       eventId,
       sessionId,
       nextRaceState,
-      eventCatalogService.getImportedRaceStateMetadata(eventId, sessionId)?.apicalDataFilePath,
-      getMasterEntrantProfilesForEvent(systemConfigState, eventId)
+      eventCatalogService.getImportedRaceStateMetadata(eventId, sessionId)
+        ?.apicalDataFilePath,
+      getMasterEntrantProfilesForEvent(systemConfigState, eventId),
     );
     const targetSessionState = createEmptySessionState();
     await applyPulledRaceStateToSession(targetSessionState, nextRaceState, {
       catalog: eventCatalogService.catalog,
       eventId,
-      finishLineNumbers: getFinishLineNumbersForSession(systemConfigState, eventId, sessionId),
+      finishLineNumbers: getFinishLineNumbersForSession(
+        systemConfigState,
+        eventId,
+        sessionId,
+      ),
       sessionId,
     });
-    await adminService?.applyChangesToSessionById(targetSessionState, sessionId);
+    await adminService?.applyChangesToSessionById(
+      targetSessionState,
+      sessionId,
+    );
     updateEventCatalogState(catalog, eventId, sessionId, selectedCategoryId);
 
-    if (eventCatalogState?.activeEventId === eventId && eventCatalogState.activeSessionId === sessionId) {
+    if (
+      eventCatalogState?.activeEventId === eventId &&
+      eventCatalogState.activeSessionId === sessionId
+    ) {
       setSessionState(targetSessionState);
     }
-    if (selectedTimingEventId === eventId && selectedTimingSessionId === sessionId) {
+    if (
+      selectedTimingEventId === eventId &&
+      selectedTimingSessionId === sessionId
+    ) {
       setTimingRaceState(targetSessionState);
     }
     setRecordSelectedParticipants(new Set<EventParticipantId>());
     setCategorySelected(new Set<EventCategoryId>());
     setRecordSelectedCategories(new Set<EventCategoryId>());
     if (missingCategoryWarnings.length > 0) {
-      setLoadWarnings((warnings) => Array.from(new Set([...warnings, ...missingCategoryWarnings])));
+      setLoadWarnings((warnings) =>
+        Array.from(new Set([...warnings, ...missingCategoryWarnings])),
+      );
     }
     setRenderTick((tick) => tick + 1);
     return reloadSummary;
   };
 
-  const reloadSessionsLinkedToSource = async (sourceId: string): Promise<SessionSourceReloadSummary | undefined> => {
+  const reloadSessionsLinkedToSource = async (
+    sourceId: string,
+  ): Promise<SessionSourceReloadSummary | undefined> => {
     if (!eventCatalogState) {
       return undefined;
     }
 
     const linkedSessions = eventCatalogState.sessions.filter((session) => {
-      return getSessionAssignedSourceIds(systemConfigState, session.eventId, session.id).includes(sourceId);
+      return getSessionAssignedSourceIds(
+        systemConfigState,
+        session.eventId,
+        session.id,
+      ).includes(sourceId);
     });
     let summary = createEmptySessionSourceReloadSummary();
 
     for (const session of linkedSessions) {
-      const sessionSummary = await reloadSessionSources(session.eventId, session.id, 'all');
+      const sessionSummary = await reloadSessionSources(
+        session.eventId,
+        session.id,
+        "all",
+      );
       if (sessionSummary) {
         summary = addSessionSourceReloadSummaries(summary, sessionSummary);
       }
@@ -1267,39 +1807,65 @@ export const RaceSweetMainApp = () => {
     return summary;
   };
 
-  const summarizeMrScatsImport = (importData: MrScatsCatalogImport, onCompleteStep: (currentTask: string, index: number) => Promise<void>): SessionSourceReloadSummary => {
+  const summarizeMrScatsImport = (
+    importData: MrScatsCatalogImport,
+    onCompleteStep: (currentTask: string, index: number) => Promise<void>,
+  ): SessionSourceReloadSummary => {
     const summary = createEmptySessionSourceReloadSummary();
     if (!eventCatalogService) {
       return summary;
     }
 
-    const existingEvent = eventCatalogService.catalog.events.find((event) => event.id === importData.eventId);
+    const existingEvent = eventCatalogService.catalog.events.find(
+      (event) => event.id === importData.eventId,
+    );
     summary.events = existingEvent
       ? { created: 0, deleted: 0, updated: 1 }
       : { created: 1, deleted: 0, updated: 0 };
 
     importData.sessions.forEach((session) => {
-      const existingSession = eventCatalogService.catalog.sessions.find((item) => item.id === session.id);
-      summary.sessions[existingSession ? 'updated' : 'created'] += 1;
+      const existingSession = eventCatalogService.catalog.sessions.find(
+        (item) => item.id === session.id,
+      );
+      summary.sessions[existingSession ? "updated" : "created"] += 1;
 
-      const existingRaceState = eventCatalogService.getImportedRaceState(importData.eventId, session.id);
-      const nextRaceState = filterMrScatsRaceStateForSession(importData.raceState, session.id, session.categoryIds);
-      const sessionSummary = summarizeSessionSourceReload(existingRaceState, nextRaceState, 'all');
-      const accumulatedSummary = addSessionSourceReloadSummaries(summary, sessionSummary);
+      const existingRaceState = eventCatalogService.getImportedRaceState(
+        importData.eventId,
+        session.id,
+      );
+      const nextRaceState = filterMrScatsRaceStateForSession(
+        importData.raceState,
+        session.id,
+        session.categoryIds,
+      );
+      const sessionSummary = summarizeSessionSourceReload(
+        existingRaceState,
+        nextRaceState,
+        "all",
+      );
+      const accumulatedSummary = addSessionSourceReloadSummaries(
+        summary,
+        sessionSummary,
+      );
       summary.categories = accumulatedSummary.categories;
       summary.crossings = accumulatedSummary.crossings;
       summary.flags = accumulatedSummary.flags;
       summary.participants = accumulatedSummary.participants;
       summary.teams = accumulatedSummary.teams;
-      onCompleteStep(`Summarizing session ${session.name}`, 0).catch((error: unknown) => {
-        setErrorState(error as Error);
-      });
+      onCompleteStep(`Summarizing session ${session.name}`, 0).catch(
+        (error: unknown) => {
+          setErrorState(error as Error);
+        },
+      );
     });
 
     return summary;
   };
 
-  const loadTimingSession = async (eventId: EventId, sessionId: SessionId): Promise<void> => {
+  const loadTimingSession = async (
+    eventId: EventId,
+    sessionId: SessionId,
+  ): Promise<void> => {
     if (!validateUuid(eventId)) {
       throw new Error(`Invalid eventId provided: ${eventId}`);
     }
@@ -1320,7 +1886,10 @@ export const RaceSweetMainApp = () => {
   };
 
   const runAfterTimingLoadingPaint = (operation: () => void): void => {
-    if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+    if (
+      typeof window === "undefined" ||
+      typeof window.requestAnimationFrame !== "function"
+    ) {
       setTimeout(operation, 0);
       return;
     }
@@ -1330,7 +1899,10 @@ export const RaceSweetMainApp = () => {
     });
   };
 
-  const selectTimingEventSession = (eventId: EventId, sessionId: SessionId): void => {
+  const selectTimingEventSession = (
+    eventId: EventId,
+    sessionId: SessionId,
+  ): void => {
     if (!validateUuid(eventId)) {
       throw new Error(`Invalid eventId provided: ${eventId}`);
     }
@@ -1338,22 +1910,24 @@ export const RaceSweetMainApp = () => {
       throw new Error(`Invalid sessionId provided: ${sessionId}`);
     }
 
-    setTimingSessionSelection('session');
+    setTimingSessionSelection("session");
     setSelectedTimingEventId(eventId);
     setSelectedTimingSessionId(sessionId);
     persistTimingContextSelection({
       eventId,
-      selectionMode: 'session',
+      selectionMode: "session",
       sessionId,
     });
     setTimingSelectionLoading(true);
     setTimingRaceState(createEmptySessionState());
     runAfterTimingLoadingPaint(() => {
-      loadTimingSession(eventId, sessionId).catch((error: unknown) => {
-        setTimingErrorState(error as Error);
-      }).finally(() => {
-        setTimingSelectionLoading(false);
-      });
+      loadTimingSession(eventId, sessionId)
+        .catch((error: unknown) => {
+          setTimingErrorState(error as Error);
+        })
+        .finally(() => {
+          setTimingSelectionLoading(false);
+        });
     });
   };
 
@@ -1365,15 +1939,19 @@ export const RaceSweetMainApp = () => {
       return;
     }
 
-    const nextSessions = sortSessionsByScheduledStart(getSessionsForEvent(eventCatalogState, eventId));
-    const nextSessionId = nextSessions.find((session) => session.id === selectedTimingSessionId)?.id || nextSessions[0]?.id;
+    const nextSessions = sortSessionsByScheduledStart(
+      getSessionsForEvent(eventCatalogState, eventId),
+    );
+    const nextSessionId =
+      nextSessions.find((session) => session.id === selectedTimingSessionId)
+        ?.id || nextSessions[0]?.id;
     if (!nextSessionId) {
-      setTimingSessionSelection('session');
+      setTimingSessionSelection("session");
       setSelectedTimingEventId(eventId);
       setSelectedTimingSessionId(undefined);
       persistTimingContextSelection({
         eventId,
-        selectionMode: 'session',
+        selectionMode: "session",
       });
       setTimingRaceState(createEmptySessionState());
       setTimingSelectionLoading(false);
@@ -1385,13 +1963,13 @@ export const RaceSweetMainApp = () => {
 
   const selectTimingSession = (sessionId: SessionId): void => {
     setTimingSelectionLoading(true);
-    if (sessionId === 'active') {
+    if (sessionId === "active") {
       runAfterTimingLoadingPaint(() => {
-        setTimingSessionSelection('active');
+        setTimingSessionSelection("active");
         setSelectedTimingEventId(eventCatalogState?.activeEventId);
         setSelectedTimingSessionId(eventCatalogState?.activeSessionId);
         persistTimingContextSelection({
-          selectionMode: 'active',
+          selectionMode: "active",
         });
         setTimingRaceState(sessionState);
         setTimingErrorState(undefined);
@@ -1409,7 +1987,10 @@ export const RaceSweetMainApp = () => {
     selectTimingEventSession(eventId, sessionId);
   };
 
-  const encodeEventSessionValue = (eventId: EventId, sessionId?: SessionId): string => {
+  const encodeEventSessionValue = (
+    eventId: EventId,
+    sessionId?: SessionId,
+  ): string => {
     return sessionId ? `session:${eventId}:${sessionId}` : `event:${eventId}`;
   };
 
@@ -1418,14 +1999,16 @@ export const RaceSweetMainApp = () => {
       return;
     }
 
-    const [kind, eventId, sessionId] = value.split(':');
-    if (kind !== 'session' || !eventId || !sessionId) {
+    const [kind, eventId, sessionId] = value.split(":");
+    if (kind !== "session" || !eventId || !sessionId) {
       return;
     }
 
     const nextEventId = eventId;
     const eventSessions = getSessionsForEvent(eventCatalogState, nextEventId);
-    const nextSessionId = eventSessions.find((session) => session.id === sessionId)?.id;
+    const nextSessionId = eventSessions.find(
+      (session) => session.id === sessionId,
+    )?.id;
 
     if (!nextSessionId) {
       return;
@@ -1435,7 +2018,7 @@ export const RaceSweetMainApp = () => {
   };
 
   useEffect(() => {
-    if (timingSessionSelection !== 'active') {
+    if (timingSessionSelection !== "active") {
       return;
     }
 
@@ -1444,45 +2027,76 @@ export const RaceSweetMainApp = () => {
     setTimingRaceState(sessionState);
     setTimingErrorState(undefined);
     setTimingSelectionLoading(false);
-  }, [eventCatalogState?.activeEventId, eventCatalogState?.activeSessionId, sessionState, timingSessionSelection]);
+  }, [
+    eventCatalogState?.activeEventId,
+    eventCatalogState?.activeSessionId,
+    sessionState,
+    timingSessionSelection,
+  ]);
 
   useEffect(() => {
-    if (initialTimingSelectionHydrated.current ||
-      timingSessionSelection !== 'session' ||
+    if (
+      initialTimingSelectionHydrated.current ||
+      timingSessionSelection !== "session" ||
       !selectedTimingEventId ||
-      !selectedTimingSessionId) {
+      !selectedTimingSessionId
+    ) {
       return;
     }
 
     initialTimingSelectionHydrated.current = true;
     setTimingSelectionLoading(true);
-    loadTimingSession(selectedTimingEventId, selectedTimingSessionId).catch((error: unknown) => {
-      setTimingErrorState(error as Error);
-    }).finally(() => {
-      setTimingSelectionLoading(false);
-    });
-  }, [loadTimingSession, selectedTimingEventId, selectedTimingSessionId, timingSessionSelection]);
+    loadTimingSession(selectedTimingEventId, selectedTimingSessionId)
+      .catch((error: unknown) => {
+        setTimingErrorState(error as Error);
+      })
+      .finally(() => {
+        setTimingSelectionLoading(false);
+      });
+  }, [
+    loadTimingSession,
+    selectedTimingEventId,
+    selectedTimingSessionId,
+    timingSessionSelection,
+  ]);
 
   useEffect(() => {
-    if (!eventCatalogState || !sessionState || !selectedSessionsEventId || !selectedSessionId) {
+    if (
+      !eventCatalogState ||
+      !sessionState ||
+      !selectedSessionsEventId ||
+      !selectedSessionId
+    ) {
       return;
     }
 
-    const sourceIds = getSessionAssignedSourceIds(systemConfigState, selectedSessionsEventId, selectedSessionId);
+    const sourceIds = getSessionAssignedSourceIds(
+      systemConfigState,
+      selectedSessionsEventId,
+      selectedSessionId,
+    );
     const liveSources = systemConfigState.dataSources.filter((source) => {
-      return sourceIds.includes(source.id) &&
+      return (
+        sourceIds.includes(source.id) &&
         source.enabled &&
-        (source.type === 'api-apical-data-file' || source.type === 'api-apical-excel-file') &&
-        !!source.apiConfig?.live;
+        (source.type === "api-apical-data-file" ||
+          source.type === "api-apical-excel-file") &&
+        !!source.apiConfig?.live
+      );
     });
 
     const timers = liveSources.map((source) => {
-      applySourceToSessionState(selectedSessionsEventId, source, undefined, { sessionId: selectedSessionId }).catch((error: unknown) => {
+      applySourceToSessionState(selectedSessionsEventId, source, undefined, {
+        sessionId: selectedSessionId,
+      }).catch((error: unknown) => {
         setErrorState(error as Error);
       });
-      const intervalMs = Math.max(1, source.apiConfig!.pollIntervalSeconds) * 1000;
+      const intervalMs =
+        Math.max(1, source.apiConfig!.pollIntervalSeconds) * 1000;
       return window.setInterval(() => {
-        applySourceToSessionState(selectedSessionsEventId, source, undefined, { sessionId: selectedSessionId }).catch((error: unknown) => {
+        applySourceToSessionState(selectedSessionsEventId, source, undefined, {
+          sessionId: selectedSessionId,
+        }).catch((error: unknown) => {
           setErrorState(error as Error);
         });
       }, intervalMs);
@@ -1491,7 +2105,12 @@ export const RaceSweetMainApp = () => {
     return () => {
       timers.forEach((timer) => clearInterval(timer));
     };
-  }, [eventCatalogState, selectedSessionId, selectedSessionsEventId, systemConfigState]);
+  }, [
+    eventCatalogState,
+    selectedSessionId,
+    selectedSessionsEventId,
+    systemConfigState,
+  ]);
 
   const renderShell = (content: ReactElement): ReactElement => (
     <div className="app-shell">
@@ -1502,12 +2121,14 @@ export const RaceSweetMainApp = () => {
             <button
               key={section.id}
               type="button"
-              className={`section-tile${isActive ? ' active' : ''}`}
+              className={`section-tile${isActive ? ' active' : ""}`}
               onClick={() => changeActiveSection(section.id)}
-              aria-current={isActive ? 'page' : undefined}
+              aria-current={isActive ? "page" : undefined}
               aria-label={section.label}
             >
-              <span className="section-icon" aria-hidden="true">{section.icon}</span>
+              <span className="section-icon" aria-hidden="true">
+                {section.icon}
+              </span>
               <span className="section-label">{section.label}</span>
             </button>
           );
@@ -1515,14 +2136,20 @@ export const RaceSweetMainApp = () => {
       </nav>
       <main className="section-content">
         {loadWarnings.length > 0 && (
-          <div className="load-warnings" role="alert" aria-label="Load warnings">
+          <div
+            className="load-warnings"
+            role="alert"
+            aria-label="Load warnings"
+          >
             <strong>Warnings:</strong>
             <ul>
               {loadWarnings.map((warning, index) => (
                 <li key={index}>{warning}</li>
               ))}
             </ul>
-            <button type="button" onClick={() => setLoadWarnings([])}>Dismiss</button>
+            <button type="button" onClick={() => setLoadWarnings([])}>
+              Dismiss
+            </button>
           </div>
         )}
         {content}
@@ -1542,7 +2169,7 @@ export const RaceSweetMainApp = () => {
     participants: EventParticipant[];
     records: EventTimeRecord[];
     teams: EventTeam[];
-    timeRecordSources: Session['timeRecordSources'] | undefined;
+    timeRecordSources: Session["timeRecordSources"] | undefined;
   } = (() => {
     if (!displayedTimingRaceState || !eventCatalogState) {
       return {
@@ -1566,52 +2193,85 @@ export const RaceSweetMainApp = () => {
       };
     }
 
-    const timingEventId = timingSessionSelection === 'active'
-      ? eventCatalogState.activeEventId
-      : selectedTimingEventId || eventCatalogState.activeEventId;
+    const timingEventId =
+      timingSessionSelection === "active"
+        ? eventCatalogState.activeEventId
+        : selectedTimingEventId || eventCatalogState.activeEventId;
     const participantById = new Map<EventParticipantId, EventParticipant>(
-      displayedTimingRaceState.participants.map((participant) => [participant.id, participant])
+      displayedTimingRaceState.participants.map((participant) => [
+        participant.id,
+        participant,
+      ]),
     );
 
     getEntrantsForEvent(eventCatalogState, timingEventId).forEach((entrant) => {
-      if (entrant.entrantType !== 'rider') {
+      if (entrant.entrantType !== "rider") {
         return;
       }
 
-      const fallbackParticipantId = entrant.memberParticipantIds[0] || entrant.id;
+      const fallbackParticipantId =
+        entrant.memberParticipantIds[0] || entrant.id;
       if (!participantById.has(fallbackParticipantId)) {
-        participantById.set(fallbackParticipantId, createParticipantFromEntrant(entrant, fallbackParticipantId));
+        participantById.set(
+          fallbackParticipantId,
+          createParticipantFromEntrant(entrant, fallbackParticipantId),
+        );
       }
     });
 
-    const eventCategories = getCategoriesForEvent(eventCatalogState, timingEventId);
+    const eventCategories = getCategoriesForEvent(
+      eventCatalogState,
+      timingEventId,
+    );
     const categoriesById = new Map<EventCategoryId, EventCategory>(
-      eventCategories.map((category) => [category.id, category])
+      eventCategories.map((category) => [category.id, category]),
     );
 
     return {
-      canAssignFlagCategory: (flagId, categoryId) => displayedTimingRaceState.canAssignFlagCategory(flagId, categoryId),
+      canAssignFlagCategory: (flagId, categoryId) =>
+        displayedTimingRaceState.canAssignFlagCategory(flagId, categoryId),
       categories: Array.from(categoriesById.values()),
-      countTransponderCrossings: (txNo, untilTime) => displayedTimingRaceState.countTransponderCrossings(txNo, untilTime),
-      excludeCrossing: (crossingId, exclude) => displayedTimingRaceState.excludeCrossing(crossingId, exclude),
+      countTransponderCrossings: (txNo, untilTime) =>
+        displayedTimingRaceState.countTransponderCrossings(txNo, untilTime),
+      excludeCrossing: (crossingId, exclude) =>
+        displayedTimingRaceState.excludeCrossing(crossingId, exclude),
       getCategoryById: (categoryId) => categoriesById.get(categoryId),
-      getCategoryIdForParticipant: (participantId) => displayedTimingRaceState.getCategoryIdForParticipant(participantId),
-      getEntrantIdForParticipant: (participantId) => participantById.get(participantId)?.entrantId || displayedTimingRaceState.getEntrantIdForParticipant(participantId),
-      getFinishLineNumbers: () => displayedTimingRaceState.getFinishLineNumbers?.(),
+      getCategoryIdForParticipant: (participantId) =>
+        displayedTimingRaceState.getCategoryIdForParticipant(participantId),
+      getEntrantIdForParticipant: (participantId) =>
+        participantById.get(participantId)?.entrantId ||
+        displayedTimingRaceState.getEntrantIdForParticipant(participantId),
+      getFinishLineNumbers: () =>
+        displayedTimingRaceState.getFinishLineNumbers?.(),
       getParticipantById: (participantId) => participantById.get(participantId),
-      getParticipantLaps: (participantId) => displayedTimingRaceState.getParticipantLaps(participantId),
-      getTimeRecordSourceById: (sourceId) => displayedTimingRaceState.getTimeRecordSourceById?.(sourceId),
-      getTransponderCrossings: (txNo, untilTime) => displayedTimingRaceState.getTransponderCrossings(txNo, untilTime),
+      getParticipantLaps: (participantId) =>
+        displayedTimingRaceState.getParticipantLaps(participantId),
+      getTimeRecordSourceById: (sourceId) =>
+        displayedTimingRaceState.getTimeRecordSourceById?.(sourceId),
+      getTransponderCrossings: (txNo, untilTime) =>
+        displayedTimingRaceState.getTransponderCrossings(txNo, untilTime),
       participants: Array.from(participantById.values()),
       records: displayedTimingRaceState.records as EventTimeRecord[],
       teams: displayedTimingRaceState.teams || [],
       timeRecordSources: displayedTimingRaceState.timeRecordSources,
-      updateCategoryDetails: (categoryId, changes) => displayedTimingRaceState.updateCategoryDetails(categoryId, changes),
-      updateEntrantCategory: (entrantId, categoryId) => displayedTimingRaceState.updateEntrantCategory(entrantId, categoryId),
-      updateParticipantCategory: (participantId, categoryId) => displayedTimingRaceState.updateParticipantCategory(participantId, categoryId),
-      updateParticipantIdentifiers: displayedTimingRaceState.updateParticipantIdentifiers
-        ? (participantId, identifierType, values) => displayedTimingRaceState.updateParticipantIdentifiers?.(participantId, identifierType, values)
-        : undefined,
+      updateCategoryDetails: (categoryId, changes) =>
+        displayedTimingRaceState.updateCategoryDetails(categoryId, changes),
+      updateEntrantCategory: (entrantId, categoryId) =>
+        displayedTimingRaceState.updateEntrantCategory(entrantId, categoryId),
+      updateParticipantCategory: (participantId, categoryId) =>
+        displayedTimingRaceState.updateParticipantCategory(
+          participantId,
+          categoryId,
+        ),
+      updateParticipantIdentifiers:
+        displayedTimingRaceState.updateParticipantIdentifiers
+          ? (participantId, identifierType, values) =>
+            displayedTimingRaceState.updateParticipantIdentifiers?.(
+              participantId,
+              identifierType,
+              values,
+            )
+          : undefined,
       updateRecord: displayedTimingRaceState.updateRecord
         ? (record) => displayedTimingRaceState.updateRecord?.(record)
         : undefined,
@@ -1619,18 +2279,29 @@ export const RaceSweetMainApp = () => {
   })();
 
   if (errorState) {
-    return renderShell(<PageErrorFallback error={errorState} onDismiss={() => setErrorState(undefined)} />);
+    return renderShell(
+      <PageErrorFallback
+        error={errorState}
+        onDismiss={() => setErrorState(undefined)}
+      />,
+    );
   }
   if (!sessionState || !eventCatalogState) {
-    return renderShell(<LoadingProgress metrics={loadingMetrics} progress={loadingProgress} />);
+    return renderShell(
+      <LoadingProgress metrics={loadingMetrics} progress={loadingProgress} />,
+    );
   }
 
-  const handleExcludeCrossing = (crossingId: TimeRecordId, exclude: boolean) => {
+  const handleExcludeCrossing = (
+    crossingId: TimeRecordId,
+    exclude: boolean,
+  ) => {
     if (!adminService) {
       return;
     }
     const targetRaceState = timingRaceState || sessionState;
-    adminService.excludeCrossingForSession(targetRaceState, crossingId, exclude)
+    adminService
+      .excludeCrossingForSession(targetRaceState, crossingId, exclude)
       .then(() => setRenderTick((tick) => tick + 1))
       .catch((error: unknown) => setTimingErrorState(error as Error));
   };
@@ -1640,27 +2311,36 @@ export const RaceSweetMainApp = () => {
       return;
     }
     const targetRaceState = timingRaceState || sessionState;
-    adminService.markFlagDeletedForSession(targetRaceState, flagId, deleted)
+    adminService
+      .markFlagDeletedForSession(targetRaceState, flagId, deleted)
       .then(() => setRenderTick((tick) => tick + 1))
       .catch((error: unknown) => setTimingErrorState(error as Error));
   };
 
-  const handleRemoveFlagCategory = (flagId: TimeRecordId, categoryId: EventCategoryId) => {
+  const handleRemoveFlagCategory = (
+    flagId: TimeRecordId,
+    categoryId: EventCategoryId,
+  ) => {
     if (!adminService) {
       return;
     }
     const targetRaceState = timingRaceState || sessionState;
-    adminService.removeFlagCategoryForSession(targetRaceState, flagId, categoryId)
+    adminService
+      .removeFlagCategoryForSession(targetRaceState, flagId, categoryId)
       .then(() => setRenderTick((tick) => tick + 1))
       .catch((error: unknown) => setTimingErrorState(error as Error));
   };
 
-  const handleAssignFlagCategory = (flagId: TimeRecordId, categoryId: EventCategoryId) => {
+  const handleAssignFlagCategory = (
+    flagId: TimeRecordId,
+    categoryId: EventCategoryId,
+  ) => {
     if (!adminService) {
       return;
     }
     const targetRaceState = timingRaceState || sessionState;
-    adminService.assignFlagCategoryForSession(targetRaceState, flagId, categoryId)
+    adminService
+      .assignFlagCategoryForSession(targetRaceState, flagId, categoryId)
       .then(() => setRenderTick((tick) => tick + 1))
       .catch((error: unknown) => setTimingErrorState(error as Error));
   };
@@ -1670,7 +2350,8 @@ export const RaceSweetMainApp = () => {
       return;
     }
     const targetRaceState = timingRaceState || sessionState;
-    adminService.addRecordForSession(targetRaceState, record.sessionId, record)
+    adminService
+      .addRecordForSession(targetRaceState, record.sessionId, record)
       .then(() => setRenderTick((tick) => tick + 1))
       .catch((error: unknown) => setTimingErrorState(error as Error));
   };
@@ -1680,12 +2361,17 @@ export const RaceSweetMainApp = () => {
       return;
     }
     const targetRaceState = timingRaceState || sessionState;
-    adminService.updateRecordForSession(targetRaceState, record.sessionId, record)
+    adminService
+      .updateRecordForSession(targetRaceState, record.sessionId, record)
       .then(() => setRenderTick((tick) => tick + 1))
       .catch((error: unknown) => setTimingErrorState(error as Error));
   };
 
-  const handleUpdateSourceOffset = (sourceId: string, previousTime: Date, nextTime: Date): void => {
+  const handleUpdateSourceOffset = (
+    sourceId: string,
+    previousTime: Date,
+    nextTime: Date,
+  ): void => {
     if (!adminService) {
       return;
     }
@@ -1697,21 +2383,35 @@ export const RaceSweetMainApp = () => {
     }
 
     const recordsToUpdate = targetRaceState.records
-      .filter((record): record is EventTimeRecord => record.source.toString() === sourceId && record.time !== undefined)
+      .filter(
+        (record): record is EventTimeRecord =>
+          record.source.toString() === sourceId && record.time !== undefined,
+      )
       .map((record) => ({
         ...record,
         time: new Date(record.time!.getTime() + offsetMilliseconds),
       }));
 
-    Promise.all(recordsToUpdate.map((record) => {
-      const sessionId = record.sessionId || timingSessionId;
-      return sessionId ? adminService.updateRecordForSession(targetRaceState, sessionId, record) : Promise.resolve();
-    }))
+    Promise.all(
+      recordsToUpdate.map((record) => {
+        const sessionId = record.sessionId || timingSessionId;
+        return sessionId
+          ? adminService.updateRecordForSession(
+            targetRaceState,
+            sessionId,
+            record,
+          )
+          : Promise.resolve();
+      }),
+    )
       .then(() => setRenderTick((tick) => tick + 1))
       .catch((error: unknown) => setTimingErrorState(error as Error));
   };
 
-  const handleChangeCategory = (participantId: EventParticipantId, categoryId: EventCategoryId) => {
+  const handleChangeCategory = (
+    participantId: EventParticipantId,
+    categoryId: EventCategoryId,
+  ) => {
     if (!adminService) {
       return;
     }
@@ -1722,9 +2422,11 @@ export const RaceSweetMainApp = () => {
       return;
     }
 
-    adminService.updateEntrantCategoryForSession(targetRaceState, entrantId, categoryId).catch((error: unknown) => {
-      setTimingErrorState(error as Error);
-    });
+    adminService
+      .updateEntrantCategoryForSession(targetRaceState, entrantId, categoryId)
+      .catch((error: unknown) => {
+        setTimingErrorState(error as Error);
+      });
 
     const updatedSelections = updateCategorySelectionsForChangedParticipant({
       categoryId,
@@ -1740,15 +2442,19 @@ export const RaceSweetMainApp = () => {
     setRenderTick((tick) => tick + 1);
   };
 
-  const handleParticipantSelected = (participantIds: Set<EventParticipantId>) => {
+  const handleParticipantSelected = (
+    participantIds: Set<EventParticipantId>,
+  ) => {
     const targetRaceState = timingRaceState || sessionState;
-    const participantCategories = new Set(Array.from(participantIds).flatMap((participantId) => {
-      const categoryId = getEffectiveParticipantCategoryId(
-        targetRaceState,
-        targetRaceState.getParticipantById(participantId),
-      );
-      return categoryId ? [categoryId] : [];
-    }));
+    const participantCategories = new Set(
+      Array.from(participantIds).flatMap((participantId) => {
+        const categoryId = getEffectiveParticipantCategoryId(
+          targetRaceState,
+          targetRaceState.getParticipantById(participantId),
+        );
+        return categoryId ? [categoryId] : [];
+      }),
+    );
 
     setRecordSelectedParticipants(participantIds);
     setCategorySelected(participantCategories);
@@ -1773,26 +2479,45 @@ export const RaceSweetMainApp = () => {
     });
   }
 
-  const timingEventId = timingSessionSelection === 'active'
-    ? eventCatalogState.activeEventId
-    : selectedTimingEventId || eventCatalogState.activeEventId;
-  const timingEvent = eventCatalogState.events.find((event) => event.id === timingEventId) ??
-    eventCatalogState.events.find((event) => event.id === eventCatalogState.activeEventId) ??
+  const timingEventId =
+    timingSessionSelection === "active"
+      ? eventCatalogState.activeEventId
+      : selectedTimingEventId || eventCatalogState.activeEventId;
+  const timingEvent =
+    eventCatalogState.events.find((event) => event.id === timingEventId) ??
+    eventCatalogState.events.find(
+      (event) => event.id === eventCatalogState.activeEventId,
+    ) ??
     eventCatalogState.events[0];
-  const timingSessions = sortSessionsByScheduledStart(getSessionsForEvent(eventCatalogState, timingEvent?.id));
-  const activeSession = eventCatalogState.sessions.find((session) => session.id === eventCatalogState.activeSessionId);
-  const timingSessionValue = timingSessionSelection === 'active'
-    ? activeSession?.id || timingSessions[0]?.id || ''
-    : selectedTimingSessionId || timingSessions[0]?.id || '';
+  const timingSessions = sortSessionsByScheduledStart(
+    getSessionsForEvent(eventCatalogState, timingEvent?.id),
+  );
+  const activeSession = eventCatalogState.sessions.find(
+    (session) => session.id === eventCatalogState.activeSessionId,
+  );
+  const timingSessionValue =
+    timingSessionSelection === "active"
+      ? activeSession?.id || timingSessions[0]?.id || ""
+      : selectedTimingSessionId || timingSessions[0]?.id || "";
   const timingSessionId = timingSessionValue || undefined;
-  const timingSessionValidCategoryIds = getSessionAssignedCategoryIds(eventCatalogState, timingEvent?.id, timingSessionId) as Set<EventCategoryId> | undefined;
-  const timingTimeDisplayZoneMode = (timingEvent?.id ? systemConfigState.eventOptions[timingEvent.id]?.timeDisplayZoneMode : undefined) || 'event';
-  const updateTimingTimeDisplayZoneMode = (mode: EventTimeDisplayZoneMode): void => {
+  const timingSessionValidCategoryIds = getSessionAssignedCategoryIds(
+    eventCatalogState,
+    timingEvent?.id,
+    timingSessionId,
+  ) as Set<EventCategoryId> | undefined;
+  const timingTimeDisplayZoneMode =
+    (timingEvent?.id
+      ? systemConfigState.eventOptions[timingEvent.id]?.timeDisplayZoneMode
+      : undefined) || "event";
+  const updateTimingTimeDisplayZoneMode = (
+    mode: EventTimeDisplayZoneMode,
+  ): void => {
     if (!timingEvent?.id || !systemConfigService) {
       return;
     }
 
-    systemConfigService.updateEventOptions(timingEvent.id, { timeDisplayZoneMode: mode })
+    systemConfigService
+      .updateEventOptions(timingEvent.id, { timeDisplayZoneMode: mode })
       .then(updateSystemConfigState)
       .catch((error: unknown) => setTimingErrorState(error as Error));
   };
@@ -1800,11 +2525,15 @@ export const RaceSweetMainApp = () => {
   const timingPage = (
     <PageErrorBoundary
       fallbackTitle="Timing"
-      onError={(error) => logDisplayedError('Timing render', error)}
-      resetKey={`${activeSection}:${timingEvent?.id || ''}:${timingSessionValue}`}
+      onError={(error) => logDisplayedError("Timing render", error)}
+      resetKey={`${activeSection}:${timingEvent?.id || ""}:${timingSessionValue}`}
     >
       {timingErrorState ? (
-        <PageErrorFallback error={timingErrorState} onDismiss={() => setTimingErrorState(undefined)} title="Timing" />
+        <PageErrorFallback
+          error={timingErrorState}
+          onDismiss={() => setTimingErrorState(undefined)}
+          title="Timing"
+        />
       ) : (
         <TimingContext
           activeSession={activeSession}
@@ -1827,7 +2556,9 @@ export const RaceSweetMainApp = () => {
           selectedCategories={hilightCategories}
           selectedParticipants={recordSelectedParticipants}
           sessions={timingSessions}
-          fastestTimeIndicatorColors={systemConfigState.fastestTimeIndicatorColors}
+          fastestTimeIndicatorColors={
+            systemConfigState.fastestTimeIndicatorColors
+          }
           timeDisplayZoneMode={timingTimeDisplayZoneMode}
           timingEvent={timingEvent}
           timingSelectionLoading={timingSelectionLoading}
@@ -1838,60 +2569,107 @@ export const RaceSweetMainApp = () => {
     </PageErrorBoundary>
   );
 
-  const activeEvent = eventCatalogState.events.find((event) => event.id === eventCatalogState.activeEventId) ??
+  const activeEvent =
+    eventCatalogState.events.find(
+      (event) => event.id === eventCatalogState.activeEventId,
+    ) ??
     eventCatalogState.events.find((event) => event.id === selectedEventId) ??
     eventCatalogState.events[0];
-  const activeEventSessions = getSessionsForEvent(eventCatalogState, activeEvent?.id);
-  const selectedCategoryEventId = selectedCategoriesEventId || eventCatalogState.activeEventId || eventCatalogState.events[0]?.id;
-  const selectedCategoryEventCategories = getCategoriesForEvent(eventCatalogState, selectedCategoryEventId);
-  const resolvedSelectedCategoryId = selectedCategoryEventCategories.find((category) => category.id.toString() === selectedCategoryId)?.id.toString() ??
-    selectedCategoryEventCategories[0]?.id.toString();
-  const selectedCategoryEntrants = getEntrantsForCategory(eventCatalogState, selectedCategoryEventId, resolvedSelectedCategoryId);
-  const selectedEntrantsResolvedEventId = selectedEntrantsEventId || eventCatalogState.activeEventId || eventCatalogState.events[0]?.id;
+  const activeEventSessions = getSessionsForEvent(
+    eventCatalogState,
+    activeEvent?.id,
+  );
+  const selectedCategoryEventId =
+    selectedCategoriesEventId ||
+    eventCatalogState.activeEventId ||
+    eventCatalogState.events[0]?.id;
+  const selectedCategoryEventCategories = getCategoriesForEvent(
+    eventCatalogState,
+    selectedCategoryEventId,
+  );
+  const resolvedSelectedCategoryId =
+    selectedCategoryEventCategories
+      .find((category) => category.id.toString() === selectedCategoryId)
+      ?.id.toString() ?? selectedCategoryEventCategories[0]?.id.toString();
+  const selectedCategoryEntrants = getEntrantsForCategory(
+    eventCatalogState,
+    selectedCategoryEventId,
+    resolvedSelectedCategoryId,
+  );
+  const selectedEntrantsResolvedEventId =
+    selectedEntrantsEventId ||
+    eventCatalogState.activeEventId ||
+    eventCatalogState.events[0]?.id;
   const selectedEntrantsResolvedSessionId = selectedEntrantsResolvedEventId
     ? eventCatalogState.activeEventId === selectedEntrantsResolvedEventId
-      ? eventCatalogState.activeSessionId || getSessionsForEvent(eventCatalogState, selectedEntrantsResolvedEventId)[0]?.id
-      : getSessionsForEvent(eventCatalogState, selectedEntrantsResolvedEventId)[0]?.id
+      ? eventCatalogState.activeSessionId ||
+        getSessionsForEvent(
+          eventCatalogState,
+          selectedEntrantsResolvedEventId,
+        )[0]?.id
+      : getSessionsForEvent(
+        eventCatalogState,
+        selectedEntrantsResolvedEventId,
+      )[0]?.id
     : undefined;
-  const selectedEntrantsImportedRaceState = eventCatalogService && selectedEntrantsResolvedEventId && selectedEntrantsResolvedSessionId
-    ? eventCatalogService.getImportedRaceState(selectedEntrantsResolvedEventId, selectedEntrantsResolvedSessionId)
-    : undefined;
-  const displayedEntrantsRaceState = selectedEntrantsResolvedEventId === eventCatalogState.activeEventId &&
+  const selectedEntrantsImportedRaceState =
+    eventCatalogService &&
+    selectedEntrantsResolvedEventId &&
+    selectedEntrantsResolvedSessionId
+      ? eventCatalogService.getImportedRaceState(
+        selectedEntrantsResolvedEventId,
+        selectedEntrantsResolvedSessionId,
+      )
+      : undefined;
+  const displayedEntrantsRaceState =
+    selectedEntrantsResolvedEventId === eventCatalogState.activeEventId &&
     selectedEntrantsResolvedSessionId === eventCatalogState.activeSessionId
-    ? sessionState
-    : selectedEntrantsImportedRaceState;
-  const selectedResultsEventId = timingEvent?.id || eventCatalogState.activeEventId || eventCatalogState.events[0]?.id;
-  const selectedResultsSessionId = timingSessionId || eventCatalogState.activeSessionId || getSessionsForEvent(eventCatalogState, selectedResultsEventId)[0]?.id;
+      ? sessionState
+      : selectedEntrantsImportedRaceState;
+  const selectedResultsEventId =
+    timingEvent?.id ||
+    eventCatalogState.activeEventId ||
+    eventCatalogState.events[0]?.id;
+  const selectedResultsSessionId =
+    timingSessionId ||
+    eventCatalogState.activeSessionId ||
+    getSessionsForEvent(eventCatalogState, selectedResultsEventId)[0]?.id;
   const displayedAnalyticsRaceState = timingRaceStateLookup;
   const selectedEventSessionValue = selectedResultsEventId
     ? encodeEventSessionValue(selectedResultsEventId, selectedResultsSessionId)
-    : '';
-  const eventSessionOptions = eventCatalogState.events.flatMap((event): EventSessionOption[] => {
-    const eventOption = {
-      eventId: event.id,
-      eventName: event.name,
-      value: encodeEventSessionValue(event.id),
-    };
-    const sessionOptions = getSessionsForEvent(eventCatalogState, event.id).map((session) => ({
-      eventId: event.id,
-      eventName: event.name,
-      sessionId: session.id,
-      sessionName: session.name,
-      value: encodeEventSessionValue(event.id, session.id),
-    }));
-    return [eventOption, ...sessionOptions];
-  });
+    : "";
+  const eventSessionOptions = eventCatalogState.events.flatMap(
+    (event): EventSessionOption[] => {
+      const eventOption = {
+        eventId: event.id,
+        eventName: event.name,
+        value: encodeEventSessionValue(event.id),
+      };
+      const sessionOptions = getSessionsForEvent(
+        eventCatalogState,
+        event.id,
+      ).map((session) => ({
+        eventId: event.id,
+        eventName: event.name,
+        sessionId: session.id,
+        sessionName: session.name,
+        value: encodeEventSessionValue(event.id, session.id),
+      }));
+      return [eventOption, ...sessionOptions];
+    },
+  );
   const sessionScopedCategories = (() => {
-    return getCategoriesForEvent(eventCatalogState, selectedResultsEventId)
-      .map((category) => ({ id: category.id.toString(), name: category.name }));
+    return getCategoriesForEvent(eventCatalogState, selectedResultsEventId).map(
+      (category) => ({ id: category.id.toString(), name: category.name }),
+    );
   })();
 
   const sectionContent = (): ReactElement => {
-    if (activeSection === 'Timing') {
+    if (activeSection === "Timing") {
       return timingPage;
     }
 
-    if (activeSection === 'System') {
+    if (activeSection === "System") {
       return (
         <SystemContext
           config={systemConfigState}
@@ -1901,39 +2679,57 @@ export const RaceSweetMainApp = () => {
             if (!systemConfigService) {
               return;
             }
-            systemConfigService.createSource(type).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+            systemConfigService
+              .createSource(type)
+              .then(updateSystemConfigState)
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onDeleteSource={(sourceId) => {
             if (!systemConfigService) {
               return;
             }
-            systemConfigService.deleteSource(sourceId).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+            systemConfigService
+              .deleteSource(sourceId)
+              .then(updateSystemConfigState)
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onFetchApicalDataNow={(sourceId) => {
             if (!eventCatalogService || !systemConfigService) {
               return;
             }
-            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+            const source = systemConfigState.dataSources.find(
+              (item) => item.id === sourceId,
+            );
             if (!source) {
               return;
             }
 
-            const apicalEventId = source.apiConfig?.selectedEventIds[0] || source.apiConfig?.apicalEventId;
-            const importEventId = apicalEventId ? createApicalCatalogEventId(apicalEventId) : undefined;
+            const apicalEventId =
+              source.apiConfig?.selectedEventIds[0] ||
+              source.apiConfig?.apicalEventId;
+            const importEventId = apicalEventId
+              ? createApicalCatalogEventId(apicalEventId)
+              : undefined;
             return fetchApicalRaceStateNow(source, {
-              localStorageDirectoryPath: systemConfigState.localStorageDirectoryPath,
+              localStorageDirectoryPath:
+                systemConfigState.localStorageDirectoryPath,
               timeZone: getEventTimeZone(importEventId),
             })
               .then(async (importData: PulledApicalRaceState) => {
-                const catalog = await eventCatalogService.importApicalRaceState(importData);
-                updateEventCatalogState(catalog, importData.eventId, importData.sessionId);
+                const catalog =
+                  await eventCatalogService.importApicalRaceState(importData);
+                updateEventCatalogState(
+                  catalog,
+                  importData.eventId,
+                  importData.sessionId,
+                );
                 return systemConfigService.persistApicalDataFetch(
                   sourceId,
                   importData.eventId,
                   importData.sessionId,
                   importData.retrievedAt,
                   importData.apicalDataFilePath,
-                  importData.eventName
+                  importData.eventName,
                 );
               })
               .then(updateSystemConfigState);
@@ -1942,7 +2738,9 @@ export const RaceSweetMainApp = () => {
             if (!eventCatalogService || !systemConfigService) {
               return;
             }
-            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+            const source = systemConfigState.dataSources.find(
+              (item) => item.id === sourceId,
+            );
             if (!source || !source.apicalDataFilePath) {
               return;
             }
@@ -1955,12 +2753,16 @@ export const RaceSweetMainApp = () => {
             if (!systemConfigService) {
               return;
             }
-            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+            const source = systemConfigState.dataSources.find(
+              (item) => item.id === sourceId,
+            );
             if (!source) {
               return;
             }
             return fetchApicalEvents(source)
-              .then((events) => systemConfigService.persistListedApicalEvents(sourceId, events))
+              .then((events) =>
+                systemConfigService.persistListedApicalEvents(sourceId, events),
+              )
               .then(updateSystemConfigState);
           }}
           onLoadMrScatsEvent={(sourceId, onProgress) => {
@@ -1968,26 +2770,42 @@ export const RaceSweetMainApp = () => {
               return;
             }
 
-            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+            const source = systemConfigState.dataSources.find(
+              (item) => item.id === sourceId,
+            );
             const locationPath = source?.mrScatsConfig?.dataLocationPath;
-            if (!source || source.type !== 'file-mr-scats-data' || !locationPath) {
-              throw new Error('MR-SCATS data files location must be selected before loading the event.');
+            if (
+              !source ||
+              source.type !== "file-mr-scats-data" ||
+              !locationPath
+            ) {
+              throw new Error(
+                "MR-SCATS data files location must be selected before loading the event.",
+              );
             }
 
             const postParseStepCount = 5;
             let latestProgress: MrScatsCatalogLoadProgress | undefined;
-            const publishProgress = async (progress: MrScatsCatalogLoadProgress): Promise<void> => {
+            const publishProgress = async (
+              progress: MrScatsCatalogLoadProgress,
+            ): Promise<void> => {
               latestProgress = progress;
               await onProgress?.(progress);
             };
-            const completeImportStep = async (currentTask: string, index: number): Promise<void> => {
+            const completeImportStep = async (
+              currentTask: string,
+              index: number,
+            ): Promise<void> => {
               if (!latestProgress) {
                 return;
               }
               latestProgress = {
                 ...latestProgress,
                 callerName: `${currentTask}:${index}`,
-                completed: Math.min(latestProgress.total, latestProgress.completed + 1),
+                completed: Math.min(
+                  latestProgress.total,
+                  latestProgress.completed + 1,
+                ),
                 currentFile: undefined,
                 currentTask,
               };
@@ -1996,29 +2814,49 @@ export const RaceSweetMainApp = () => {
 
             return loadMrScatsCatalogFromLocation(locationPath, {
               extraSteps: postParseStepCount,
-              ignoreLineOneNo1CrossingsWhenDbfPresent: source.mrScatsConfig?.ignoreLineOneNo1CrossingsWhenDbfPresent,
+              ignoreLineOneNo1CrossingsWhenDbfPresent:
+                source.mrScatsConfig?.ignoreLineOneNo1CrossingsWhenDbfPresent,
               onProgress: publishProgress,
             })
               .then(async (importData) => {
                 const validationMessages = importData.validationMessages || [];
                 if (validationMessages.length > 0) {
-                  logDisplayedError('MR-SCATS import validation', new Error(validationMessages.join('\n')));
+                  logDisplayedError(
+                    "MR-SCATS import validation",
+                    new Error(validationMessages.join("\n")),
+                  );
                 }
-                await completeImportStep('Summarising MR-SCATS import', 1);
-                const importSummary = summarizeMrScatsImport(importData, completeImportStep);
-                await completeImportStep('Writing MR-SCATS event catalog', 2);
-                const catalog = await eventCatalogService.importMrScatsCatalog(importData, completeImportStep);
-                await completeImportStep('Updating event display', 3);
-                updateEventCatalogState(catalog, importData.eventId, importData.sessions[0]?.id);
-                await completeImportStep('Assigning MR-SCATS source', 4);
-                let config = await systemConfigService.assignSourcesToEvent(importData.eventId, [sourceId]);
+                await completeImportStep("Summarising MR-SCATS import", 1);
+                const importSummary = summarizeMrScatsImport(
+                  importData,
+                  completeImportStep,
+                );
+                await completeImportStep("Writing MR-SCATS event catalog", 2);
+                const catalog = await eventCatalogService.importMrScatsCatalog(
+                  importData,
+                  completeImportStep,
+                );
+                await completeImportStep("Updating event display", 3);
+                updateEventCatalogState(
+                  catalog,
+                  importData.eventId,
+                  importData.sessions[0]?.id,
+                );
+                await completeImportStep("Assigning MR-SCATS source", 4);
+                let config = await systemConfigService.assignSourcesToEvent(
+                  importData.eventId,
+                  [sourceId],
+                );
                 for (const session of importData.sessions) {
-                  config = await systemConfigService.assignSourcesToSession(session.id, {
-                    mode: 'specific',
-                    sourceIds: [sourceId],
-                  });
+                  config = await systemConfigService.assignSourcesToSession(
+                    session.id,
+                    {
+                      mode: "specific",
+                      sourceIds: [sourceId],
+                    },
+                  );
                 }
-                await completeImportStep('Showing MR-SCATS import summary', 5);
+                await completeImportStep("Showing MR-SCATS import summary", 5);
                 updateSystemConfigState(config);
                 setReloadSummary(importSummary);
               })
@@ -2032,66 +2870,105 @@ export const RaceSweetMainApp = () => {
               return;
             }
 
-            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+            const source = systemConfigState.dataSources.find(
+              (item) => item.id === sourceId,
+            );
             const filePath = source?.fileConfig?.filePath;
-            if (!source || source.type !== 'file-dorian-ctc-srt' || !filePath) {
-              throw new Error('A Dorian CTC SRT or ERF file must be selected before importing.');
+            if (!source || source.type !== "file-dorian-ctc-srt" || !filePath) {
+              throw new Error(
+                "A Dorian CTC SRT or ERF file must be selected before importing.",
+              );
             }
 
             const eventId = selectedEventId;
             const sessionId = selectedSessionId;
-            const event = eventCatalogState.events.find((item) => item.id === eventId);
-            const session = eventCatalogState.sessions.find((item) => item.id === sessionId && item.eventId === eventId);
+            const event = eventCatalogState.events.find(
+              (item) => item.id === eventId,
+            );
+            const session = eventCatalogState.sessions.find(
+              (item) => item.id === sessionId && item.eventId === eventId,
+            );
             if (!eventId || !sessionId || !event || !session) {
-              throw new Error('Select an event and session before importing a Dorian CTC SRT or ERF file.');
+              throw new Error(
+                "Select an event and session before importing a Dorian CTC SRT or ERF file.",
+              );
             }
 
-            const isActiveSession = eventId === eventCatalogState.activeEventId && sessionId === eventCatalogState.activeSessionId;
-            const importMode = source.fileConfig?.importMode || 'import';
+            const isActiveSession =
+              eventId === eventCatalogState.activeEventId &&
+              sessionId === eventCatalogState.activeSessionId;
+            const importMode = source.fileConfig?.importMode || "import";
             const existingRaceState = isActiveSession
               ? raceStateSnapshot(sessionState)
-              : eventCatalogService.getImportedRaceState(eventId, sessionId) || {};
-            const targetSessionState = sessionFromPartialRaceState(importMode === 'import' ? {} : existingRaceState);
+              : eventCatalogService.getImportedRaceState(eventId, sessionId) ||
+                {};
+            const targetSessionState = sessionFromPartialRaceState(
+              importMode === "import" ? {} : existingRaceState,
+            );
             const knownTransmitterNumbers = [
-              ...getEntrantsForEvent(eventCatalogState, eventId).flatMap((entrant) =>
-                entrant.isPlaceholder === true || entrant.name.trim().toLowerCase().startsWith('unknown participant')
-                  ? []
-                  : (entrant.identifiers || [])
-                    .filter((identifier) => 'txNo' in identifier)
-                    .map((identifier) => (identifier as ParticipantTransponder).txNo),
+              ...getEntrantsForEvent(eventCatalogState, eventId).flatMap(
+                (entrant) =>
+                  entrant.isPlaceholder === true ||
+                  entrant.name
+                    .trim()
+                    .toLowerCase()
+                    .startsWith("unknown participant")
+                    ? []
+                    : (entrant.identifiers || [])
+                      .filter((identifier) => "txNo" in identifier)
+                      .map(
+                        (identifier) =>
+                          (identifier as ParticipantTransponder).txNo,
+                      ),
               ),
-              ...(existingRaceState.participants || []).flatMap((participant) =>
-                participant.isPlaceholder === true ||
-                (!participant.firstname.trim() && !participant.surname.trim())
-                  ? []
-                  : participant.identifiers
-                    .filter((identifier) => 'txNo' in identifier)
-                    .map((identifier) => (identifier as ParticipantTransponder).txNo),
+              ...(existingRaceState.participants || []).flatMap(
+                (participant) =>
+                  participant.isPlaceholder === true ||
+                  (!participant.firstname.trim() && !participant.surname.trim())
+                    ? []
+                    : participant.identifiers
+                      .filter((identifier) => "txNo" in identifier)
+                      .map(
+                        (identifier) =>
+                          (identifier as ParticipantTransponder).txNo,
+                      ),
               ),
             ];
 
             const trackConfigFilePath = source.fileConfig?.trackConfigFilePath;
             const trackConfigPromise = trackConfigFilePath
-              ? window.api.requestBuffer(trackConfigFilePath)
-                .then((trackConfigBuffer) => parseCtcTrackConfig(trackConfigBuffer, trackConfigFilePath))
+              ? window.api
+                .requestBuffer(trackConfigFilePath)
+                .then((trackConfigBuffer) =>
+                  parseCtcTrackConfig(trackConfigBuffer, trackConfigFilePath),
+                )
               : Promise.resolve(source.fileConfig?.ctcTrackConfig);
 
-            return Promise.all([window.api.requestBuffer(filePath), trackConfigPromise])
+            return Promise.all([
+              window.api.requestBuffer(filePath),
+              trackConfigPromise,
+            ])
               .then(async ([buffer, trackConfig]) => {
                 if (trackConfigFilePath && trackConfig) {
-                  const updatedConfig = await systemConfigService.updateSource(sourceId, {
-                    fileConfig: {
-                      ...source.fileConfig,
-                      ctcTrackConfig: trackConfig,
+                  const updatedConfig = await systemConfigService.updateSource(
+                    sourceId,
+                    {
+                      fileConfig: {
+                        ...source.fileConfig,
+                        ctcTrackConfig: trackConfig,
+                      },
                     },
-                  });
+                  );
                   updateSystemConfigState(updatedConfig);
                 }
 
                 return loadDorianCtcSrtCatalogForSession(filePath, buffer, {
                   eventDate: event.date,
                   eventId,
-                  importPlaceholderEntrantsForUnknownTransmitters: source.fileConfig?.importPlaceholderEntrantsForUnknownTransmitters === true,
+                  importPlaceholderEntrantsForUnknownTransmitters:
+                    source.fileConfig
+                      ?.importPlaceholderEntrantsForUnknownTransmitters ===
+                    true,
                   knownTransmitterNumbers,
                   onProgress,
                   sessionId,
@@ -2100,41 +2977,69 @@ export const RaceSweetMainApp = () => {
                 });
               })
               .then(async (importedRaceState) => {
-                const scaffoldCatalog = await eventCatalogService.syncEventScaffold(
-                  eventId,
-                  importedRaceState.categories || [],
-                  importedRaceState.participants || [],
-                  [],
-                  importedRaceState.teams || [],
-                  sessionId,
+                const scaffoldCatalog =
+                  await eventCatalogService.syncEventScaffold(
+                    eventId,
+                    importedRaceState.categories || [],
+                    importedRaceState.participants || [],
+                    [],
+                    importedRaceState.teams || [],
+                    sessionId,
+                  );
+                await applyPulledRaceStateToSession(
+                  targetSessionState,
+                  importedRaceState,
+                  {
+                    catalog: scaffoldCatalog,
+                    eventId,
+                    finishLineNumbers: getFinishLineNumbersForSession(
+                      systemConfigState,
+                      eventId,
+                      sessionId,
+                    ),
+                    sessionId,
+                  },
                 );
-                await applyPulledRaceStateToSession(targetSessionState, importedRaceState, {
-                  catalog: scaffoldCatalog,
-                  eventId,
-                  finishLineNumbers: getFinishLineNumbersForSession(systemConfigState, eventId, sessionId),
-                  sessionId,
-                });
-                const catalog = importMode === 'import'
-                  ? await eventCatalogService.replaceImportedRaceState(eventId, sessionId, raceStateSnapshot(targetSessionState))
-                  : await eventCatalogService.updateImportedRaceState(eventId, sessionId, raceStateSnapshot(targetSessionState));
+                const catalog =
+                  importMode === "import"
+                    ? await eventCatalogService.replaceImportedRaceState(
+                      eventId,
+                      sessionId,
+                      raceStateSnapshot(targetSessionState),
+                    )
+                    : await eventCatalogService.updateImportedRaceState(
+                      eventId,
+                      sessionId,
+                      raceStateSnapshot(targetSessionState),
+                    );
                 updateEventCatalogState(catalog, eventId, sessionId);
                 if (isActiveSession) {
                   setSessionState(targetSessionState);
                   setRenderTick((tick) => tick + 1);
                 }
-                setTimingSessionSelection(isActiveSession ? 'active' : 'session');
+                setTimingSessionSelection(
+                  isActiveSession ? "active" : "session",
+                );
                 setSelectedTimingEventId(eventId);
                 setSelectedTimingSessionId(sessionId);
                 setTimingRaceState(targetSessionState);
-                await systemConfigService.assignSourcesToEvent(eventId, [sourceId]);
-                await systemConfigService.assignSourcesToSession(sessionId, { mode: 'specific', sourceIds: [sourceId] });
-                const selectedConfig = await systemConfigService.updateTimingContextSelection(isActiveSession
-                  ? { selectionMode: 'active' }
-                  : {
-                    eventId,
-                    selectionMode: 'session',
-                    sessionId,
-                  });
+                await systemConfigService.assignSourcesToEvent(eventId, [
+                  sourceId,
+                ]);
+                await systemConfigService.assignSourcesToSession(sessionId, {
+                  mode: "specific",
+                  sourceIds: [sourceId],
+                });
+                const selectedConfig =
+                  await systemConfigService.updateTimingContextSelection(
+                    isActiveSession
+                      ? { selectionMode: "active" }
+                      : {
+                        eventId,
+                        selectionMode: "session",
+                        sessionId,
+                      },
+                  );
                 updateSystemConfigState(selectedConfig);
               })
               .catch((error: unknown) => {
@@ -2148,95 +3053,162 @@ export const RaceSweetMainApp = () => {
             if (!systemConfigService) {
               return;
             }
-            systemConfigService.updateLocalStorageDirectoryPath(directoryPath).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+            systemConfigService
+              .updateLocalStorageDirectoryPath(directoryPath)
+              .then(updateSystemConfigState)
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onSaveFastestTimeIndicatorColors={(changes) => {
             if (!systemConfigService) {
               return;
             }
-            systemConfigService.updateFastestTimeIndicatorColors(changes).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+            systemConfigService
+              .updateFastestTimeIndicatorColors(changes)
+              .then(updateSystemConfigState)
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onSaveSource={(sourceId, changes) => {
             if (!systemConfigService) {
               return;
             }
             const saveSource = async (): Promise<void> => {
-              const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
-              const trackConfigFilePath = normalizeOptionalSystemFilePath(changes.fileConfig?.trackConfigFilePath);
-              const nextChanges = source?.type === 'file-dorian-ctc-srt' && trackConfigFilePath
-                ? {
-                  ...changes,
-                  fileConfig: {
-                    ...source.fileConfig,
-                    ...changes.fileConfig,
-                    ctcTrackConfig: parseCtcTrackConfig(await window.api.requestBuffer(trackConfigFilePath), trackConfigFilePath),
-                    trackConfigFilePath,
-                  },
-                }
-                : changes;
+              const source = systemConfigState.dataSources.find(
+                (item) => item.id === sourceId,
+              );
+              const trackConfigFilePath = normalizeOptionalSystemFilePath(
+                changes.fileConfig?.trackConfigFilePath,
+              );
+              const nextChanges =
+                source?.type === "file-dorian-ctc-srt" && trackConfigFilePath
+                  ? {
+                    ...changes,
+                    fileConfig: {
+                      ...source.fileConfig,
+                      ...changes.fileConfig,
+                      ctcTrackConfig: parseCtcTrackConfig(
+                        await window.api.requestBuffer(trackConfigFilePath),
+                        trackConfigFilePath,
+                      ),
+                      trackConfigFilePath,
+                    },
+                  }
+                  : changes;
 
-              const config = await systemConfigService.updateSource(sourceId, nextChanges);
+              const config = await systemConfigService.updateSource(
+                sourceId,
+                nextChanges,
+              );
               updateSystemConfigState(config);
             };
 
-            saveSource().catch((error: unknown) => setErrorState(error as Error));
+            saveSource().catch((error: unknown) =>
+              setErrorState(error as Error),
+            );
           }}
           onSaveListenerServer={(changes) => {
             if (!systemConfigService) {
               return;
             }
-            fetch('/api/v1/system/listener', {
+            fetch("/api/v1/system/listener", {
               body: JSON.stringify({ changes }),
-              credentials: 'include',
-              headers: { 'content-type': 'application/json' },
-              method: 'PUT',
-            }).then((response: Response): Promise<{ listenerServer: ListenerServerConfig }> => {
-              if (!response.ok) {
-                return response.json().then((problem: { error?: string }) => {
-                  throw new Error(problem.error || `RaceSweet API returned HTTP ${response.status}.`);
-                });
-              }
-              return response.json() as Promise<{ listenerServer: ListenerServerConfig }>;
-            }).then((result: { listenerServer: ListenerServerConfig }): void => {
-              updateSystemConfigState(systemConfigService.applyRemoteConfiguration({
-                ...systemConfigService.state,
-                listenerServer: result.listenerServer,
-              }));
-            }).catch((error: unknown) => setErrorState(error));
+              credentials: "include",
+              headers: { "content-type": "application/json" },
+              method: "PUT",
+            })
+              .then(
+                (
+                  response: Response,
+                ): Promise<{ listenerServer: ListenerServerConfig }> => {
+                  if (!response.ok) {
+                    return response
+                      .json()
+                      .then((problem: { error?: string }) => {
+                        throw new Error(
+                          problem.error ||
+                            `RaceSweet API returned HTTP ${response.status}.`,
+                        );
+                      });
+                  }
+                  return response.json() as Promise<{
+                    listenerServer: ListenerServerConfig;
+                  }>;
+                },
+              )
+              .then(
+                (result: { listenerServer: ListenerServerConfig }): void => {
+                  updateSystemConfigState(
+                    systemConfigService.applyRemoteConfiguration({
+                      ...systemConfigService.state,
+                      listenerServer: result.listenerServer,
+                    }),
+                  );
+                },
+              )
+              .catch((error: unknown) => setErrorState(error));
           }}
           onSaveRemoteServer={(changes) => {
             if (!systemConfigService) {
               return;
             }
-            systemConfigService.updateRemoteServer(changes).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+            systemConfigService
+              .updateRemoteServer(changes)
+              .then(updateSystemConfigState)
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onLoadDurtFileMakerDatabase={(sourceId, onProgress) => {
             if (!eventCatalogService || !systemConfigService) {
               return;
             }
-            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
-            const databaseFilePath = source?.durtFileMakerConfig?.databaseFilePath;
-            const extractorPath = source?.durtFileMakerConfig?.extractorPath || getBundledDurtFileMakerExtractorPath();
+            const source = systemConfigState.dataSources.find(
+              (item) => item.id === sourceId,
+            );
+            const databaseFilePath =
+              source?.durtFileMakerConfig?.databaseFilePath;
+            const extractorPath =
+              source?.durtFileMakerConfig?.extractorPath ||
+              getBundledDurtFileMakerExtractorPath();
             const eventId = selectedEventId;
             const sessionId = selectedSessionId;
-            if (!source || source.type !== 'file-durt-filemaker' || !databaseFilePath || !eventId || !sessionId) {
-              throw new Error('Select an event and session, then select a DURT FileMaker database.');
+            if (
+              !source ||
+              source.type !== "file-durt-filemaker" ||
+              !databaseFilePath ||
+              !eventId ||
+              !sessionId
+            ) {
+              throw new Error(
+                "Select an event and session, then select a DURT FileMaker database.",
+              );
             }
-            const importMode = source.durtFileMakerConfig?.importMode || 'import';
-            const isActiveSession = eventId === eventCatalogState.activeEventId && sessionId === eventCatalogState.activeSessionId;
+            const importMode =
+              source.durtFileMakerConfig?.importMode || "import";
+            const isActiveSession =
+              eventId === eventCatalogState.activeEventId &&
+              sessionId === eventCatalogState.activeSessionId;
             const existingRaceState = isActiveSession
               ? raceStateSnapshot(sessionState)
-              : eventCatalogService.getImportedRaceState(eventId, sessionId) || {};
-            const targetSessionState = sessionFromPartialRaceState(importMode === 'import' ? {} : existingRaceState);
-            let latestProgress: DurtFileMakerLoadProgress = { completed: 0, total: 1 };
+              : eventCatalogService.getImportedRaceState(eventId, sessionId) ||
+                {};
+            const targetSessionState = sessionFromPartialRaceState(
+              importMode === "import" ? {} : existingRaceState,
+            );
+            let latestProgress: DurtFileMakerLoadProgress = {
+              completed: 0,
+              total: 1,
+            };
             const completeImportStep = (currentTask: string): Promise<void> => {
               latestProgress = {
                 ...latestProgress,
-                completed: Math.min(latestProgress.completed + 1, latestProgress.total),
+                completed: Math.min(
+                  latestProgress.completed + 1,
+                  latestProgress.total,
+                ),
                 currentFile: undefined,
                 currentTask,
               };
-              return onProgress ? Promise.resolve(onProgress(latestProgress)) : Promise.resolve();
+              return onProgress
+                ? Promise.resolve(onProgress(latestProgress))
+                : Promise.resolve();
             };
 
             return loadDurtFileMakerRaceState({
@@ -2250,122 +3222,219 @@ export const RaceSweetMainApp = () => {
               sessionId,
               sourceFilePath: databaseFilePath,
               timeZone: getEventTimeZone(eventId),
-            }).then(async (raceState) => {
-              await completeImportStep('Synchronising DURT entrants and categories');
-              const scaffoldCatalog = await eventCatalogService.syncEventScaffold(eventId, raceState.categories || [], raceState.participants || [], raceState.entries || [], raceState.teams || [], sessionId);
-              await completeImportStep('Applying DURT crossings to the timing session');
-              await applyPulledRaceStateToSession(targetSessionState, raceState, {
-                catalog: scaffoldCatalog,
-                eventId,
-                finishLineNumbers: getFinishLineNumbersForSession(systemConfigState, eventId, sessionId),
-                sessionId,
-              });
-              const importedSessionRaceState = raceStateSnapshot(targetSessionState);
-              const importSummary = summarizeSessionSourceReload(existingRaceState, importedSessionRaceState, 'all');
-              await completeImportStep('Writing DURT timing records');
-              const catalog = importMode === 'update'
-                ? await eventCatalogService.updateImportedRaceState(eventId, sessionId, importedSessionRaceState)
-                : await eventCatalogService.replaceImportedRaceState(eventId, sessionId, importedSessionRaceState);
-              updateEventCatalogState(catalog, eventId, sessionId);
-              if (isActiveSession) {
-                setSessionState(targetSessionState);
-                setRenderTick((tick) => tick + 1);
-              }
-              setTimingSessionSelection(isActiveSession ? 'active' : 'session');
-              setSelectedTimingEventId(eventId);
-              setSelectedTimingSessionId(sessionId);
-              setTimingRaceState(targetSessionState);
-              await completeImportStep('Refreshing imported DURT data');
-              await systemConfigService.assignSourcesToEvent(eventId, [sourceId]);
-              await systemConfigService.assignSourcesToSession(sessionId, { mode: 'specific', sourceIds: [sourceId] });
-              const config = await systemConfigService.updateTimingContextSelection(isActiveSession
-                ? { selectionMode: 'active' }
-                : {
-                  eventId,
-                  selectionMode: 'session',
-                  sessionId,
+            })
+              .then(async (raceState) => {
+                await completeImportStep(
+                  "Synchronising DURT entrants and categories",
+                );
+                const scaffoldCatalog =
+                  await eventCatalogService.syncEventScaffold(
+                    eventId,
+                    raceState.categories || [],
+                    raceState.participants || [],
+                    raceState.entries || [],
+                    raceState.teams || [],
+                    sessionId,
+                  );
+                await completeImportStep(
+                  "Applying DURT crossings to the timing session",
+                );
+                await applyPulledRaceStateToSession(
+                  targetSessionState,
+                  raceState,
+                  {
+                    catalog: scaffoldCatalog,
+                    eventId,
+                    finishLineNumbers: getFinishLineNumbersForSession(
+                      systemConfigState,
+                      eventId,
+                      sessionId,
+                    ),
+                    sessionId,
+                  },
+                );
+                const importedSessionRaceState =
+                  raceStateSnapshot(targetSessionState);
+                const importSummary = summarizeSessionSourceReload(
+                  existingRaceState,
+                  importedSessionRaceState,
+                  "all",
+                );
+                await completeImportStep("Writing DURT timing records");
+                const catalog =
+                  importMode === "update"
+                    ? await eventCatalogService.updateImportedRaceState(
+                      eventId,
+                      sessionId,
+                      importedSessionRaceState,
+                    )
+                    : await eventCatalogService.replaceImportedRaceState(
+                      eventId,
+                      sessionId,
+                      importedSessionRaceState,
+                    );
+                updateEventCatalogState(catalog, eventId, sessionId);
+                if (isActiveSession) {
+                  setSessionState(targetSessionState);
+                  setRenderTick((tick) => tick + 1);
+                }
+                setTimingSessionSelection(
+                  isActiveSession ? "active" : "session",
+                );
+                setSelectedTimingEventId(eventId);
+                setSelectedTimingSessionId(sessionId);
+                setTimingRaceState(targetSessionState);
+                await completeImportStep("Refreshing imported DURT data");
+                await systemConfigService.assignSourcesToEvent(eventId, [
+                  sourceId,
+                ]);
+                await systemConfigService.assignSourcesToSession(sessionId, {
+                  mode: "specific",
+                  sourceIds: [sourceId],
                 });
-              updateSystemConfigState(config);
-              await completeImportStep('Assigning DURT source to session');
-              await completeImportStep('Showing DURT import summary');
-              setReloadSummary(importSummary);
-            }).catch((error: unknown) => {
-              setErrorState(error as Error);
-              throw error;
-            });
+                const config =
+                  await systemConfigService.updateTimingContextSelection(
+                    isActiveSession
+                      ? { selectionMode: "active" }
+                      : {
+                        eventId,
+                        selectionMode: "session",
+                        sessionId,
+                      },
+                  );
+                updateSystemConfigState(config);
+                await completeImportStep("Assigning DURT source to session");
+                await completeImportStep("Showing DURT import summary");
+                setReloadSummary(importSummary);
+              })
+              .catch((error: unknown) => {
+                setErrorState(error as Error);
+                throw error;
+              });
           }}
           onPreviewMrScatsDataFile={(sourceId, file) => {
-            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+            const source = systemConfigState.dataSources.find(
+              (item) => item.id === sourceId,
+            );
             const locationPath = source?.mrScatsConfig?.dataLocationPath;
             if (!locationPath) {
-              throw new Error('MR-SCATS data files location must be selected before previewing files.');
+              throw new Error(
+                "MR-SCATS data files location must be selected before previewing files.",
+              );
             }
 
-            return previewMrScatsDataFile(locationPath, file.relativePath, file.kind);
+            return previewMrScatsDataFile(
+              locationPath,
+              file.relativePath,
+              file.kind,
+            );
           }}
           onPreviewDorianCtcSrtFile={(sourceId) => {
-            const source = systemConfigState.dataSources.find((item) => item.id === sourceId);
+            const source = systemConfigState.dataSources.find(
+              (item) => item.id === sourceId,
+            );
             const filePath = source?.fileConfig?.filePath;
             if (!filePath) {
-              throw new Error('A Dorian CTC SRT or ERF file must be selected before previewing.');
+              throw new Error(
+                "A Dorian CTC SRT or ERF file must be selected before previewing.",
+              );
             }
 
-            return window.api.requestBuffer(filePath)
+            return window.api
+              .requestBuffer(filePath)
               .then((buffer) => previewCtcRawCrossingBuffer(filePath, buffer));
           }}
           onSelectLocalFile={() => {
             return window.api.selectLocalFile({
-              filters: [{ extensions: ['csv'], name: 'CSV files' }],
-              title: 'Select RFID Timing CSV file',
+              filters: [{ extensions: ["csv"], name: "CSV files" }],
+              title: "Select RFID Timing CSV file",
             });
           }}
           onSelectDorianCtcSrtFile={() => {
             return window.api.selectLocalFile({
-              filters: [{ extensions: ['srt', 'erf'], name: 'Dorian CTC SRT or ERF files' }],
-              title: 'Select Dorian CTC SRT or ERF file',
+              filters: [
+                {
+                  extensions: ["srt", "erf"],
+                  name: "Dorian CTC SRT or ERF files",
+                },
+              ],
+              title: "Select Dorian CTC SRT or ERF file",
             });
           }}
-          onSelectCertificateFile={() => window.api.selectLocalFile({
-            filters: [{ extensions: ['cer', 'crt', 'pem'], name: 'SSL certificate files' }],
-            title: 'Select SSL certificate file',
-          })}
+          onSelectCertificateFile={() =>
+            window.api.selectLocalFile({
+              filters: [
+                {
+                  extensions: ["cer", "crt", "pem"],
+                  name: "SSL certificate files",
+                },
+              ],
+              title: "Select SSL certificate file",
+            })
+          }
           onSelectDorianCtcTrackConfigFile={() => {
             return window.api.selectLocalFile({
-              filters: [{ extensions: ['cfg'], name: 'CTC TRACK.CFG files' }],
-              title: 'Select CTC TRACK.CFG file',
+              filters: [{ extensions: ["cfg"], name: "CTC TRACK.CFG files" }],
+              title: "Select CTC TRACK.CFG file",
             });
           }}
-          onSelectDurtFileMakerDatabase={() => window.api.selectLocalFile({
-            filters: [{ extensions: ['fp7', 'fmp12'], name: 'FileMaker database files' }],
-            title: 'Select DURT FileMaker database',
-          })}
-          onSelectDurtFileMakerExtractor={() => window.api.selectLocalFile({
-            filters: [{ extensions: ['exe'], name: 'fmp2json executable' }],
-            title: 'Select fmp2json extractor',
-          })}
-          onSelectPrivateKeyFile={() => window.api.selectLocalFile({
-            filters: [{ extensions: ['key', 'pem'], name: 'SSL private key files' }],
-            title: 'Select SSL private key file',
-          })}
+          onSelectDurtFileMakerDatabase={() =>
+            window.api.selectLocalFile({
+              filters: [
+                {
+                  extensions: ["fp7", "fmp12"],
+                  name: "FileMaker database files",
+                },
+              ],
+              title: "Select DURT FileMaker database",
+            })
+          }
+          onSelectDurtFileMakerExtractor={() =>
+            window.api.selectLocalFile({
+              filters: [{ extensions: ["exe"], name: "fmp2json executable" }],
+              title: "Select fmp2json extractor",
+            })
+          }
+          onSelectPrivateKeyFile={() =>
+            window.api.selectLocalFile({
+              filters: [
+                { extensions: ["key", "pem"], name: "SSL private key files" },
+              ],
+              title: "Select SSL private key file",
+            })
+          }
           onSelectMrScatsDataArchive={() => {
-            return window.api.selectLocalFile({
-              filters: [{ extensions: ['zip', 'arj'], name: 'MR-SCATS archive files' }],
-              properties: ['openFile'],
-              title: 'Select MR-SCATS archive file',
-            }).then((locationPath) => {
-              return locationPath ? listMrScatsDataFiles(locationPath) : undefined;
-            });
+            return window.api
+              .selectLocalFile({
+                filters: [
+                  {
+                    extensions: ["zip", "arj"],
+                    name: "MR-SCATS archive files",
+                  },
+                ],
+                properties: ["openFile"],
+                title: "Select MR-SCATS archive file",
+              })
+              .then((locationPath) => {
+                return locationPath
+                  ? listMrScatsDataFiles(locationPath)
+                  : undefined;
+              });
           }}
           onSelectMrScatsDataDirectory={() => {
-            return window.api.selectLocalDirectory('Select MR-SCATS data directory').then((locationPath) => {
-              return locationPath ? listMrScatsDataFiles(locationPath) : undefined;
-            });
+            return window.api
+              .selectLocalDirectory("Select MR-SCATS data directory")
+              .then((locationPath) => {
+                return locationPath
+                  ? listMrScatsDataFiles(locationPath)
+                  : undefined;
+              });
           }}
         />
       );
     }
 
-    if (activeSection === 'Events') {
+    if (activeSection === "Events") {
       return (
         <EventsContext
           catalog={eventCatalogState}
@@ -2374,20 +3443,30 @@ export const RaceSweetMainApp = () => {
             if (!eventCatalogService) {
               return;
             }
-            eventCatalogService.activateEvent(eventId).then((catalog) => {
-              updateEventCatalogState(catalog, eventId);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            eventCatalogService
+              .activateEvent(eventId)
+              .then((catalog) => {
+                updateEventCatalogState(catalog, eventId);
+              })
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onCreateEvent={() => {
             if (!eventCatalogService) {
               return;
             }
 
-            const existingEventIds = new Set(eventCatalogState.events.map((event) => event.id));
-            eventCatalogService.createEvent().then((catalog) => {
-              const createdEvent = catalog.events.find((event) => !existingEventIds.has(event.id));
-              updateEventCatalogState(catalog, createdEvent?.id);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            const existingEventIds = new Set(
+              eventCatalogState.events.map((event) => event.id),
+            );
+            eventCatalogService
+              .createEvent()
+              .then((catalog) => {
+                const createdEvent = catalog.events.find(
+                  (event) => !existingEventIds.has(event.id),
+                );
+                updateEventCatalogState(catalog, createdEvent?.id);
+              })
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onCreateSession={(eventId: EventId) => {
             if (!validateUuid(eventId)) {
@@ -2396,27 +3475,48 @@ export const RaceSweetMainApp = () => {
             if (!eventCatalogService) {
               return;
             }
-            eventCatalogService.createSession(eventId).then((catalog) => {
-              const session = getSessionsForEvent(catalog, eventId).find((item) => item.name === 'New Session');
-              updateEventCatalogState(catalog, eventId, session?.id, selectedCategoryId);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            eventCatalogService
+              .createSession(eventId)
+              .then((catalog) => {
+                const session = getSessionsForEvent(catalog, eventId).find(
+                  (item) => item.name === "New Session",
+                );
+                updateEventCatalogState(
+                  catalog,
+                  eventId,
+                  session?.id,
+                  selectedCategoryId,
+                );
+              })
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onDeleteEvent={(eventId) => {
             if (!eventCatalogService) {
               return;
             }
 
-            eventCatalogService.deleteEvent(eventId).then((catalog) => {
-              updateEventCatalogState(catalog);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            eventCatalogService
+              .deleteEvent(eventId)
+              .then((catalog) => {
+                updateEventCatalogState(catalog);
+              })
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onMakeSessionActive={(eventId: EventId, sessionId: SessionId) => {
             if (!eventCatalogService) {
               return;
             }
-            eventCatalogService.activateSession(eventId, sessionId).then((catalog) => {
-              updateEventCatalogState(catalog, eventId, sessionId, selectedCategoryId);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            eventCatalogService
+              .activateSession(eventId, sessionId)
+              .then((catalog) => {
+                updateEventCatalogState(
+                  catalog,
+                  eventId,
+                  sessionId,
+                  selectedCategoryId,
+                );
+              })
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onSelectEvent={selectEvent}
           onSelectSession={setSelectedSessionId}
@@ -2424,18 +3524,31 @@ export const RaceSweetMainApp = () => {
             if (!systemConfigService) {
               return;
             }
-            systemConfigService.assignSourcesToEvent(eventId, sourceIds).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+            systemConfigService
+              .assignSourcesToEvent(eventId, sourceIds)
+              .then(updateSystemConfigState)
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onReloadEventSources={(eventId) => {
             if (!eventCatalogState) {
               return;
             }
 
-            const eventSessions = getSessionsForEvent(eventCatalogState, eventId);
-            Promise.all(eventSessions.map((session) => reloadSessionSources(eventId, session.id, 'all')))
+            const eventSessions = getSessionsForEvent(
+              eventCatalogState,
+              eventId,
+            );
+            Promise.all(
+              eventSessions.map((session) =>
+                reloadSessionSources(eventId, session.id, "all"),
+              ),
+            )
               .then((summaries) => {
                 const summary = summaries.reduce<SessionSourceReloadSummary>(
-                  (current, item) => item ? addSessionSourceReloadSummaries(current, item) : current,
+                  (current, item) =>
+                    item
+                      ? addSessionSourceReloadSummaries(current, item)
+                      : current,
                   createEmptySessionSourceReloadSummary(),
                 );
                 setReloadSummary(summary);
@@ -2446,23 +3559,26 @@ export const RaceSweetMainApp = () => {
             if (!eventCatalogService) {
               return;
             }
-            return eventCatalogService.updateEvent(eventId, { trackMap }).then((catalog) => {
-              updateEventCatalogState(catalog, eventId);
-              setRenderTick((tick) => tick + 1);
-            });
+            return eventCatalogService
+              .updateEvent(eventId, { trackMap })
+              .then((catalog) => {
+                updateEventCatalogState(catalog, eventId);
+                setRenderTick((tick) => tick + 1);
+              });
           }}
-          onUnsavedChangesGuardChange={(guard) => setUnsavedChangesGuard('Events', guard)}
+          onUnsavedChangesGuardChange={(guard) =>
+            setUnsavedChangesGuard("Events", guard)
+          }
           onUpdateEvent={(eventId, changes) => {
             if (!eventCatalogService) {
               return;
             }
-            return eventCatalogService.updateEvent(eventId, changes).then((catalog) => {
-              updateEventCatalogState(catalog, eventId);
-              setRenderTick((tick) => tick + 1);
-            }).catch((error: unknown) => {
-              setErrorState(error as Error);
-              throw error;
-            });
+            return eventCatalogService
+              .updateEvent(eventId, changes)
+              .then((catalog) => {
+                updateEventCatalogState(catalog, eventId);
+                setRenderTick((tick) => tick + 1);
+              });
           }}
           selectedEventId={selectedEventId}
           selectedSessionId={selectedSessionId}
@@ -2470,7 +3586,7 @@ export const RaceSweetMainApp = () => {
       );
     }
 
-    if (activeSection === 'Sessions') {
+    if (activeSection === "Sessions") {
       return (
         <SessionsContext
           catalog={eventCatalogState}
@@ -2487,19 +3603,38 @@ export const RaceSweetMainApp = () => {
             if (!eventCatalogService) {
               return;
             }
-            eventCatalogService.createSession(eventId).then((catalog) => {
-              const session = getSessionsForEvent(catalog, eventId).find((item) => item.name === 'New Session');
-              updateEventCatalogState(catalog, eventId, session?.id, selectedCategoryId);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            eventCatalogService
+              .createSession(eventId)
+              .then((catalog) => {
+                const session = getSessionsForEvent(catalog, eventId).find(
+                  (item) => item.name === "New Session",
+                );
+                updateEventCatalogState(
+                  catalog,
+                  eventId,
+                  session?.id,
+                  selectedCategoryId,
+                );
+              })
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onDeleteSession={(eventId, sessionId) => {
             if (!eventCatalogService) {
               return;
             }
-            eventCatalogService.deleteSession(eventId, sessionId).then((catalog) => {
-              const nextSessionId = getSessionsForEvent(catalog, eventId)[0]?.id;
-              updateEventCatalogState(catalog, eventId, nextSessionId, selectedCategoryId);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            eventCatalogService
+              .deleteSession(eventId, sessionId)
+              .then((catalog) => {
+                const nextSessionId = getSessionsForEvent(catalog, eventId)[0]
+                  ?.id;
+                updateEventCatalogState(
+                  catalog,
+                  eventId,
+                  nextSessionId,
+                  selectedCategoryId,
+                );
+              })
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onMakeSessionActive={(eventId: EventId, sessionId: SessionId) => {
             if (!validateUuid(eventId)) {
@@ -2514,8 +3649,16 @@ export const RaceSweetMainApp = () => {
               setSelectedEventId(eventId);
 
               if (eventCatalogService) {
-                const catalog = await eventCatalogService.activateSession(eventId, sessionId);
-                updateEventCatalogState(catalog, eventId, sessionId, selectedCategoryId);
+                const catalog = await eventCatalogService.activateSession(
+                  eventId,
+                  sessionId,
+                );
+                updateEventCatalogState(
+                  catalog,
+                  eventId,
+                  sessionId,
+                  selectedCategoryId,
+                );
               }
 
               await applySessionSources(eventId, sessionId, {
@@ -2534,30 +3677,49 @@ export const RaceSweetMainApp = () => {
             if (!eventCatalogService) {
               return;
             }
-            eventCatalogService.moveSessionToEvent(sessionId, eventId).then((catalog) => {
-              updateEventCatalogState(catalog, eventId, sessionId, selectedCategoryId);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            eventCatalogService
+              .moveSessionToEvent(sessionId, eventId)
+              .then((catalog) => {
+                updateEventCatalogState(
+                  catalog,
+                  eventId,
+                  sessionId,
+                  selectedCategoryId,
+                );
+              })
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onReloadSessionSources={(eventId, sessionId, mode) => {
-            reloadSessionSources(eventId, sessionId, mode).then((summary) => {
-              setReloadSummary(summary);
-            }).catch((error: unknown) => {
-              setErrorState(error as Error);
-            });
+            reloadSessionSources(eventId, sessionId, mode)
+              .then((summary) => {
+                setReloadSummary(summary);
+              })
+              .catch((error: unknown) => {
+                setErrorState(error as Error);
+              });
           }}
           onSelectEvent={selectSessionsEvent}
           onSaveSessionAssignment={(sessionId, mode, sourceIds) => {
             if (!systemConfigService) {
               return;
             }
-            systemConfigService.assignSourcesToSession(sessionId, { mode, sourceIds }).then(updateSystemConfigState).catch((error: unknown) => setErrorState(error as Error));
+            systemConfigService
+              .assignSourcesToSession(sessionId, { mode, sourceIds })
+              .then(updateSystemConfigState)
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
-          onSaveSessionCategoryAssignment={(sessionId, categoryId, assigned) => {
+          onSaveSessionCategoryAssignment={(
+            sessionId,
+            categoryId,
+            assigned,
+          ) => {
             if (!eventCatalogService) {
               return;
             }
 
-            const session = eventCatalogState.sessions.find((item) => item.id === sessionId);
+            const session = eventCatalogState.sessions.find(
+              (item) => item.id === sessionId,
+            );
             if (!session) {
               return;
             }
@@ -2567,25 +3729,43 @@ export const RaceSweetMainApp = () => {
               ? Array.from(new Set([...existingCategoryIds, categoryId]))
               : existingCategoryIds.filter((id) => id !== categoryId);
 
-            return eventCatalogService.updateSession(sessionId, { categoryIds: nextCategoryIds }).then((catalog) => {
-              updateEventCatalogState(catalog, selectedSessionsEventId, sessionId, categoryId);
-            }).catch((error: unknown) => {
-              setErrorState(error as Error);
-              throw error;
-            });
+            return eventCatalogService
+              .updateSession(sessionId, { categoryIds: nextCategoryIds })
+              .then((catalog) => {
+                updateEventCatalogState(
+                  catalog,
+                  selectedSessionsEventId,
+                  sessionId,
+                  categoryId,
+                );
+              })
+              .catch((error: unknown) => {
+                setErrorState(error as Error);
+                throw error;
+              });
           }}
           onSelectSession={setSelectedSessionId}
-          onUnsavedChangesGuardChange={(guard) => setUnsavedChangesGuard('Sessions', guard)}
+          onUnsavedChangesGuardChange={(guard) =>
+            setUnsavedChangesGuard("Sessions", guard)
+          }
           onUpdateSession={(sessionId, changes) => {
             if (!eventCatalogService) {
               return;
             }
-            return eventCatalogService.updateSession(sessionId, changes).then((catalog) => {
-              updateEventCatalogState(catalog, selectedSessionsEventId, sessionId, selectedCategoryId);
-            }).catch((error: unknown) => {
-              setErrorState(error as Error);
-              throw error;
-            });
+            return eventCatalogService
+              .updateSession(sessionId, changes)
+              .then((catalog) => {
+                updateEventCatalogState(
+                  catalog,
+                  selectedSessionsEventId,
+                  sessionId,
+                  selectedCategoryId,
+                );
+              })
+              .catch((error: unknown) => {
+                setErrorState(error as Error);
+                throw error;
+              });
           }}
           selectedEventId={selectedSessionsEventId}
           selectedSessionId={selectedSessionId}
@@ -2593,7 +3773,7 @@ export const RaceSweetMainApp = () => {
       );
     }
 
-    if (activeSection === 'Categories') {
+    if (activeSection === "Categories") {
       return (
         <CategoriesContext
           catalog={eventCatalogState}
@@ -2602,74 +3782,139 @@ export const RaceSweetMainApp = () => {
             if (!eventCatalogService) {
               return;
             }
-            eventCatalogService.createCategory(eventId).then((catalog) => {
-              const category = getCategoriesForEvent(catalog, eventId).find((item) => item.name === 'New Category');
-              updateEventCatalogState(catalog, eventId, selectedSessionId, category?.id.toString());
-            }).catch((error: unknown) => setErrorState(error as Error));
+            eventCatalogService
+              .createCategory(eventId)
+              .then((catalog) => {
+                const category = getCategoriesForEvent(catalog, eventId).find(
+                  (item) => item.name === "New Category",
+                );
+                updateEventCatalogState(
+                  catalog,
+                  eventId,
+                  selectedSessionId,
+                  category?.id.toString(),
+                );
+              })
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onDeleteCategory={(eventId, categoryId): Promise<void> => {
             if (!eventCatalogService) {
-              return Promise.reject(new Error('The event catalog service is not available.'));
+              return Promise.reject(
+                new Error("The event catalog service is not available."),
+              );
             }
-            if (window.api.persistenceMode === 'server') {
+            if (window.api.persistenceMode === "server") {
               const categoryPath = `/api/v1/catalog/events/${encodeURIComponent(eventId)}/categories/${encodeURIComponent(categoryId)}`;
               return fetch(categoryPath, {
-                credentials: 'include',
-                method: 'DELETE',
-              }).then(async (response: Response): Promise<{ mutations: EventCatalogMutation[] }> => {
-                if (!response.ok) {
-                  const problem = await response.json().catch((): { error?: string } => ({})) as { error?: string };
-                  throw new Error(problem.error || `RaceSweet API returned HTTP ${response.status} while deleting the category.`);
-                }
-                return response.json() as Promise<{ mutations: EventCatalogMutation[] }>;
-              }).then((result) => eventCatalogService.applyRemoteMutations(result.mutations)).then((catalog) => {
-                const nextCategoryId = getCategoriesForEvent(catalog, eventId)[0]?.id.toString();
-                updateEventCatalogState(catalog, eventId, selectedSessionId, nextCategoryId);
-              });
+                credentials: "include",
+                method: "DELETE",
+              })
+                .then(
+                  async (
+                    response: Response,
+                  ): Promise<{ mutations: EventCatalogMutation[] }> => {
+                    if (!response.ok) {
+                      const problem = (await response
+                        .json()
+                        .catch((): { error?: string } => ({}))) as {
+                        error?: string;
+                      };
+                      throw new Error(
+                        problem.error ||
+                          `RaceSweet API returned HTTP ${response.status} while deleting the category.`,
+                      );
+                    }
+                    return response.json() as Promise<{
+                      mutations: EventCatalogMutation[];
+                    }>;
+                  },
+                )
+                .then((result) =>
+                  eventCatalogService.applyRemoteMutations(result.mutations),
+                )
+                .then((catalog) => {
+                  const nextCategoryId = getCategoriesForEvent(
+                    catalog,
+                    eventId,
+                  )[0]?.id.toString();
+                  updateEventCatalogState(
+                    catalog,
+                    eventId,
+                    selectedSessionId,
+                    nextCategoryId,
+                  );
+                });
             }
-            return eventCatalogService.deleteCategory(eventId, categoryId).then((catalog) => {
-              const nextCategoryId = getCategoriesForEvent(catalog, eventId)[0]?.id.toString();
-              updateEventCatalogState(catalog, eventId, selectedSessionId, nextCategoryId);
-            });
+            return eventCatalogService
+              .deleteCategory(eventId, categoryId)
+              .then((catalog) => {
+                const nextCategoryId = getCategoriesForEvent(
+                  catalog,
+                  eventId,
+                )[0]?.id.toString();
+                updateEventCatalogState(
+                  catalog,
+                  eventId,
+                  selectedSessionId,
+                  nextCategoryId,
+                );
+              });
           }}
           onDisplayError={logDisplayedError}
           onSelectCategory={setSelectedCategoryId}
           onSelectEvent={selectCategoriesEvent}
-          onUnsavedChangesGuardChange={(guard) => setUnsavedChangesGuard('Categories', guard)}
+          onUnsavedChangesGuardChange={(guard) =>
+            setUnsavedChangesGuard("Categories", guard)
+          }
           onUpdateCategory={(categoryId: EventCategoryId, changes) => {
             if (!eventCatalogService) {
               return;
             }
 
-            return eventCatalogService.updateCategory(categoryId, changes).then((catalog) => {
-              const activeEventId = eventCatalogState.activeEventId;
-              if (
-                selectedCategoryEventId &&
-                selectedCategoryEventId === activeEventId &&
-                sessionState.categories.some((category) => category.id === categoryId)
-              ) {
-                sessionState.updateCategoryDetails(categoryId, {
-                  code: changes.code,
-                  description: changes.description,
-                  excludeFromResults: changes.excludeFromResults,
-                  name: changes.name,
-                });
-                setRenderTick((tick) => tick + 1);
-              }
-              updateEventCatalogState(catalog, selectedCategoryEventId, selectedSessionId, categoryId);
-            });
+            return eventCatalogService
+              .updateCategory(categoryId, changes)
+              .then((catalog) => {
+                const activeEventId = eventCatalogState.activeEventId;
+                if (
+                  selectedCategoryEventId &&
+                  selectedCategoryEventId === activeEventId &&
+                  sessionState.categories.some(
+                    (category) => category.id === categoryId,
+                  )
+                ) {
+                  sessionState.updateCategoryDetails(categoryId, {
+                    code: changes.code,
+                    description: changes.description,
+                    excludeFromResults: changes.excludeFromResults,
+                    name: changes.name,
+                  });
+                  setRenderTick((tick) => tick + 1);
+                }
+                updateEventCatalogState(
+                  catalog,
+                  selectedCategoryEventId,
+                  selectedSessionId,
+                  categoryId,
+                );
+              });
           }}
           onUpdateCategorySessionAssignments={(categoryId, sessionIds) => {
             if (!eventCatalogService) {
               return;
             }
-            const category = eventCatalogService.catalog.categories.find((candidate) => candidate.id === categoryId);
-            return eventCatalogService.updateCategorySessionAssignments(categoryId, sessionIds).then((catalog) => {
-              updateEventCatalogState(catalog, category?.eventId, selectedSessionId, categoryId);
-            }).catch((error: unknown) => {
-              setErrorState(error as Error);
-              throw error;
-            });
+            const category = eventCatalogService.catalog.categories.find(
+              (candidate) => candidate.id === categoryId,
+            );
+            return eventCatalogService
+              .updateCategorySessionAssignments(categoryId, sessionIds)
+              .then((catalog) => {
+                updateEventCatalogState(
+                  catalog,
+                  category?.eventId,
+                  selectedSessionId,
+                  categoryId,
+                );
+              });
           }}
           selectedCategoryId={resolvedSelectedCategoryId}
           selectedEventId={selectedCategoryEventId}
@@ -2677,7 +3922,7 @@ export const RaceSweetMainApp = () => {
       );
     }
 
-    if (activeSection === 'Entrants') {
+    if (activeSection === "Entrants") {
       return (
         <EntrantsContext
           catalog={eventCatalogState}
@@ -2685,187 +3930,366 @@ export const RaceSweetMainApp = () => {
             if (!eventCatalogService) {
               return;
             }
-            eventCatalogService.createEntrant(eventId, entrantType).then((catalog) => {
-              const event = catalog.events.find((item) => item.id === eventId);
-              const entrantLabels = getEventDisciplineLabels(event?.discipline);
-              const entrantName = entrantType === 'team'
-                ? event?.discipline === 'motorsport' ? 'New Entrant' : 'New Team'
-                : `New ${entrantLabels.singular}`;
-              const entrant = getEntrantsForEvent(catalog, eventId).find((item) => item.name === entrantName);
-              updateEventCatalogState(catalog, eventId, selectedSessionId, selectedCategoryId);
-              setSelectedEntrantId(entrant?.id);
-            }).catch((error: unknown) => setErrorState(error as Error));
+            eventCatalogService
+              .createEntrant(eventId, entrantType)
+              .then((catalog) => {
+                const event = catalog.events.find(
+                  (item) => item.id === eventId,
+                );
+                const entrantLabels = getEventDisciplineLabels(
+                  event?.discipline,
+                );
+                const entrantName =
+                  entrantType === "team"
+                    ? event?.discipline === "motorsport"
+                      ? "New Entrant"
+                      : "New Team"
+                    : `New ${entrantLabels.singular}`;
+                const entrant = getEntrantsForEvent(catalog, eventId).find(
+                  (item) => item.name === entrantName,
+                );
+                updateEventCatalogState(
+                  catalog,
+                  eventId,
+                  selectedSessionId,
+                  selectedCategoryId,
+                );
+                setSelectedEntrantId(entrant?.id);
+              })
+              .catch((error: unknown) => setErrorState(error as Error));
           }}
           onDeleteEntrant={(eventId, entrantId): Promise<void> => {
             if (!eventCatalogService) {
-              return Promise.reject(new Error('The event catalog service is not available.'));
+              return Promise.reject(
+                new Error("The event catalog service is not available."),
+              );
             }
-            if (window.api.persistenceMode === 'server') {
+            if (window.api.persistenceMode === "server") {
               const entrantPath = `/api/v1/catalog/events/${encodeURIComponent(eventId)}/entrants/${encodeURIComponent(entrantId)}`;
               return fetch(entrantPath, {
-                credentials: 'include',
-                method: 'DELETE',
-              }).then(async (response: Response): Promise<{ mutations: EventCatalogMutation[] }> => {
-                if (!response.ok) {
-                  const problem = await response.json().catch((): { error?: string } => ({})) as { error?: string };
-                  throw new Error(problem.error || `RaceSweet API returned HTTP ${response.status} while deleting the entrant.`);
-                }
-                return response.json() as Promise<{ mutations: EventCatalogMutation[] }>;
-              }).then((result) => eventCatalogService.applyRemoteMutations(result.mutations)).then((catalog) => {
-                const nextEntrantId = getEntrantsForEvent(catalog, eventId)[0]?.id;
-                updateEventCatalogState(catalog, eventId, selectedSessionId, selectedCategoryId);
+                credentials: "include",
+                method: "DELETE",
+              })
+                .then(
+                  async (
+                    response: Response,
+                  ): Promise<{ mutations: EventCatalogMutation[] }> => {
+                    if (!response.ok) {
+                      const problem = (await response
+                        .json()
+                        .catch((): { error?: string } => ({}))) as {
+                        error?: string;
+                      };
+                      throw new Error(
+                        problem.error ||
+                          `RaceSweet API returned HTTP ${response.status} while deleting the entrant.`,
+                      );
+                    }
+                    return response.json() as Promise<{
+                      mutations: EventCatalogMutation[];
+                    }>;
+                  },
+                )
+                .then((result) =>
+                  eventCatalogService.applyRemoteMutations(result.mutations),
+                )
+                .then((catalog) => {
+                  const nextEntrantId = getEntrantsForEvent(catalog, eventId)[0]
+                    ?.id;
+                  updateEventCatalogState(
+                    catalog,
+                    eventId,
+                    selectedSessionId,
+                    selectedCategoryId,
+                  );
+                  setSelectedEntrantId(nextEntrantId);
+                });
+            }
+            return eventCatalogService
+              .deleteEntrant(eventId, entrantId)
+              .then((catalog) => {
+                const nextEntrantId = getEntrantsForEvent(catalog, eventId)[0]
+                  ?.id;
+                updateEventCatalogState(
+                  catalog,
+                  eventId,
+                  selectedSessionId,
+                  selectedCategoryId,
+                );
                 setSelectedEntrantId(nextEntrantId);
               });
-            }
-            return eventCatalogService.deleteEntrant(eventId, entrantId).then((catalog) => {
-              const nextEntrantId = getEntrantsForEvent(catalog, eventId)[0]?.id;
-              updateEventCatalogState(catalog, eventId, selectedSessionId, selectedCategoryId);
-              setSelectedEntrantId(nextEntrantId);
-            });
           }}
           onDeleteEntrants={(eventId, entrantIds): Promise<void> => {
             if (!eventCatalogService) {
-              return Promise.reject(new Error('The event catalog service is not available.'));
+              return Promise.reject(
+                new Error("The event catalog service is not available."),
+              );
             }
-            if (window.api.persistenceMode === 'server') {
+            if (window.api.persistenceMode === "server") {
               const entrantPath = `/api/v1/catalog/events/${encodeURIComponent(eventId)}/entrants`;
               return fetch(entrantPath, {
                 body: JSON.stringify({ entrantIds }),
-                credentials: 'include',
-                headers: { 'content-type': 'application/json' },
-                method: 'DELETE',
-              }).then(async (response: Response): Promise<{ mutations: EventCatalogMutation[] }> => {
-                if (!response.ok) {
-                  const problem = await response.json().catch((): { error?: string } => ({})) as { error?: string };
-                  throw new Error(problem.error || `RaceSweet API returned HTTP ${response.status} while deleting entrants.`);
-                }
-                return response.json() as Promise<{ mutations: EventCatalogMutation[] }>;
-              }).then((result) => eventCatalogService.applyRemoteMutations(result.mutations)).then((catalog) => {
-                const nextEntrantId = getEntrantsForEvent(catalog, eventId)[0]?.id;
-                updateEventCatalogState(catalog, eventId, selectedSessionId, selectedCategoryId);
+                credentials: "include",
+                headers: { "content-type": "application/json" },
+                method: "DELETE",
+              })
+                .then(
+                  async (
+                    response: Response,
+                  ): Promise<{ mutations: EventCatalogMutation[] }> => {
+                    if (!response.ok) {
+                      const problem = (await response
+                        .json()
+                        .catch((): { error?: string } => ({}))) as {
+                        error?: string;
+                      };
+                      throw new Error(
+                        problem.error ||
+                          `RaceSweet API returned HTTP ${response.status} while deleting entrants.`,
+                      );
+                    }
+                    return response.json() as Promise<{
+                      mutations: EventCatalogMutation[];
+                    }>;
+                  },
+                )
+                .then((result) =>
+                  eventCatalogService.applyRemoteMutations(result.mutations),
+                )
+                .then((catalog) => {
+                  const nextEntrantId = getEntrantsForEvent(catalog, eventId)[0]
+                    ?.id;
+                  updateEventCatalogState(
+                    catalog,
+                    eventId,
+                    selectedSessionId,
+                    selectedCategoryId,
+                  );
+                  setSelectedEntrantId(nextEntrantId);
+                });
+            }
+            return eventCatalogService
+              .deleteEntrants(eventId, entrantIds)
+              .then((catalog) => {
+                const nextEntrantId = getEntrantsForEvent(catalog, eventId)[0]
+                  ?.id;
+                updateEventCatalogState(
+                  catalog,
+                  eventId,
+                  selectedSessionId,
+                  selectedCategoryId,
+                );
                 setSelectedEntrantId(nextEntrantId);
               });
-            }
-            return eventCatalogService.deleteEntrants(eventId, entrantIds).then((catalog) => {
-              const nextEntrantId = getEntrantsForEvent(catalog, eventId)[0]?.id;
-              updateEventCatalogState(catalog, eventId, selectedSessionId, selectedCategoryId);
-              setSelectedEntrantId(nextEntrantId);
-            });
           }}
-          onImportEntrants={(eventId, records, _fileName, defaultCategoryId) => {
+          onImportEntrants={(
+            eventId,
+            records,
+            _fileName,
+            defaultCategoryId,
+          ) => {
             if (!eventCatalogService) {
               return;
             }
-            return eventCatalogService.importEntrants(eventId, records, defaultCategoryId).then((catalog) => {
-              const sessionId = selectedEntrantsResolvedEventId === eventId
-                ? selectedEntrantsResolvedSessionId
-                : getSessionsForEvent(catalog, eventId)[0]?.id;
-              const importedRaceState = sessionId ? eventCatalogService.getImportedRaceState(eventId, sessionId) : undefined;
-              updateEventCatalogState(catalog, eventId, sessionId, selectedCategoryId);
-              if (sessionId && importedRaceState) {
-                const importedSessionState = sessionFromPartialRaceState(importedRaceState);
-                applyCatalogSessionScopeToRaceState(importedSessionState, catalog, eventId, sessionId);
-                if (eventId === catalog.activeEventId && sessionId === catalog.activeSessionId) {
-                  setSessionState(importedSessionState);
+            return eventCatalogService
+              .importEntrants(eventId, records, defaultCategoryId)
+              .then((catalog) => {
+                const sessionId =
+                  selectedEntrantsResolvedEventId === eventId
+                    ? selectedEntrantsResolvedSessionId
+                    : getSessionsForEvent(catalog, eventId)[0]?.id;
+                const importedRaceState = sessionId
+                  ? eventCatalogService.getImportedRaceState(eventId, sessionId)
+                  : undefined;
+                updateEventCatalogState(
+                  catalog,
+                  eventId,
+                  sessionId,
+                  selectedCategoryId,
+                );
+                if (sessionId && importedRaceState) {
+                  const importedSessionState =
+                    sessionFromPartialRaceState(importedRaceState);
+                  applyCatalogSessionScopeToRaceState(
+                    importedSessionState,
+                    catalog,
+                    eventId,
+                    sessionId,
+                  );
+                  if (
+                    eventId === catalog.activeEventId &&
+                    sessionId === catalog.activeSessionId
+                  ) {
+                    setSessionState(importedSessionState);
+                  }
+                  const timingShowsImportedSession =
+                    (timingSessionSelection === "active" &&
+                      eventId === catalog.activeEventId &&
+                      sessionId === catalog.activeSessionId) ||
+                    (selectedTimingEventId === eventId &&
+                      selectedTimingSessionId === sessionId);
+                  if (timingShowsImportedSession) {
+                    setTimingRaceState(importedSessionState);
+                  }
                 }
-                const timingShowsImportedSession =
-                  (timingSessionSelection === 'active' && eventId === catalog.activeEventId && sessionId === catalog.activeSessionId) ||
-                  (selectedTimingEventId === eventId && selectedTimingSessionId === sessionId);
-                if (timingShowsImportedSession) {
-                  setTimingRaceState(importedSessionState);
-                }
-              }
-              setSelectedEntrantId(getEntrantsForEvent(catalog, eventId).find((entrant) => entrant.entrantType === 'rider')?.id);
-              setRenderTick((tick) => tick + 1);
-            }).catch((error: unknown) => {
-              setErrorState(error as Error);
-              throw error;
-            });
+                setSelectedEntrantId(
+                  getEntrantsForEvent(catalog, eventId).find(
+                    (entrant) => entrant.entrantType === "rider",
+                  )?.id,
+                );
+                setRenderTick((tick) => tick + 1);
+              })
+              .catch((error: unknown) => {
+                setErrorState(error as Error);
+                throw error;
+              });
           }}
           onSelectEntrant={setSelectedEntrantId}
           onSelectEvent={selectEntrantsEvent}
-          onUnsavedChangesGuardChange={(guard) => setUnsavedChangesGuard('Entrants', guard)}
-          onUpdateParticipantIdentifiers={(participantId, identifierType, values) => {
-            if (!eventCatalogService || !selectedEntrantsResolvedEventId || !selectedEntrantsResolvedSessionId) {
+          onUnsavedChangesGuardChange={(guard) =>
+            setUnsavedChangesGuard("Entrants", guard)
+          }
+          onUpdateParticipantIdentifiers={(
+            participantId,
+            identifierType,
+            values,
+          ) => {
+            if (
+              !eventCatalogService ||
+              !selectedEntrantsResolvedEventId ||
+              !selectedEntrantsResolvedSessionId
+            ) {
               return;
             }
 
-            const isActiveSession = selectedEntrantsResolvedEventId === eventCatalogState.activeEventId &&
-              selectedEntrantsResolvedSessionId === eventCatalogState.activeSessionId;
-            const raceStateForUpdate = isActiveSession && sessionState
-              ? sessionState
-              : selectedEntrantsImportedRaceState
-                ? sessionFromPartialRaceState(selectedEntrantsImportedRaceState)
-                : undefined;
+            const isActiveSession =
+              selectedEntrantsResolvedEventId ===
+                eventCatalogState.activeEventId &&
+              selectedEntrantsResolvedSessionId ===
+                eventCatalogState.activeSessionId;
+            const raceStateForUpdate =
+              isActiveSession && sessionState
+                ? sessionState
+                : selectedEntrantsImportedRaceState
+                  ? sessionFromPartialRaceState(
+                    selectedEntrantsImportedRaceState,
+                  )
+                  : undefined;
             if (!raceStateForUpdate) {
               return;
             }
 
             if (!raceStateForUpdate.getParticipantById(participantId)) {
-              const selectedEntrant = getEntrantsForEvent(eventCatalogState, selectedEntrantsResolvedEventId)
-                .find((entrant) => entrant.id === selectedEntrantId || entrant.memberParticipantIds.includes(participantId));
-              if (!selectedEntrant || selectedEntrant.entrantType !== 'rider') {
+              const selectedEntrant = getEntrantsForEvent(
+                eventCatalogState,
+                selectedEntrantsResolvedEventId,
+              ).find(
+                (entrant) =>
+                  entrant.id === selectedEntrantId ||
+                  entrant.memberParticipantIds.includes(participantId),
+              );
+              if (!selectedEntrant || selectedEntrant.entrantType !== "rider") {
                 return;
               }
 
-              raceStateForUpdate.addParticipants([createParticipantFromEntrant(selectedEntrant, participantId)]);
+              raceStateForUpdate.addParticipants([
+                createParticipantFromEntrant(selectedEntrant, participantId),
+              ]);
             }
-            raceStateForUpdate.updateParticipantIdentifiers(participantId, identifierType, values);
+            raceStateForUpdate.updateParticipantIdentifiers(
+              participantId,
+              identifierType,
+              values,
+            );
             const nextRaceState = raceStateSnapshot(raceStateForUpdate);
 
-            return eventCatalogService.updateImportedRaceState(
-              selectedEntrantsResolvedEventId,
-              selectedEntrantsResolvedSessionId,
-              nextRaceState,
-            ).then((catalog) => {
-              if (isActiveSession) {
-                setSessionState(raceStateForUpdate);
-              }
-              updateEventCatalogState(catalog, selectedEntrantsResolvedEventId, selectedEntrantsResolvedSessionId, selectedCategoryId);
-              setRenderTick((tick) => tick + 1);
-            }).catch((error: unknown) => {
-              setErrorState(error as Error);
-              throw error;
-            });
+            return eventCatalogService
+              .updateImportedRaceState(
+                selectedEntrantsResolvedEventId,
+                selectedEntrantsResolvedSessionId,
+                nextRaceState,
+              )
+              .then((catalog) => {
+                if (isActiveSession) {
+                  setSessionState(raceStateForUpdate);
+                }
+                updateEventCatalogState(
+                  catalog,
+                  selectedEntrantsResolvedEventId,
+                  selectedEntrantsResolvedSessionId,
+                  selectedCategoryId,
+                );
+                setRenderTick((tick) => tick + 1);
+              })
+              .catch((error: unknown) => {
+                setErrorState(error as Error);
+                throw error;
+              });
           }}
           onUpdateEntrant={(entrantId, changes) => {
             if (!eventCatalogService) {
               return;
             }
-            return eventCatalogService.updateEntrant(entrantId, changes).then((catalog) => {
-              updateEventCatalogState(catalog, selectedEntrantsEventId, selectedSessionId, selectedCategoryId);
-              setSelectedEntrantId(entrantId);
-            }).catch((error: unknown) => {
-              setErrorState(error as Error);
-              throw error;
-            });
+            return eventCatalogService
+              .updateEntrant(entrantId, changes)
+              .then((catalog) => {
+                updateEventCatalogState(
+                  catalog,
+                  selectedEntrantsEventId,
+                  selectedSessionId,
+                  selectedCategoryId,
+                );
+                setSelectedEntrantId(entrantId);
+              })
+              .catch((error: unknown) => {
+                setErrorState(error as Error);
+                throw error;
+              });
           }}
           onUpdateEntry={(entryId, changes) => {
             if (!eventCatalogService) {
               return;
             }
-            return eventCatalogService.updateEntry(entryId, changes).then((catalog) => {
-              updateEventCatalogState(catalog, selectedEntrantsEventId, selectedSessionId, selectedCategoryId);
-            }).catch((error: unknown) => {
-              setErrorState(error as Error);
-              throw error;
-            });
+            return eventCatalogService
+              .updateEntry(entryId, changes)
+              .then((catalog) => {
+                updateEventCatalogState(
+                  catalog,
+                  selectedEntrantsEventId,
+                  selectedSessionId,
+                  selectedCategoryId,
+                );
+              })
+              .catch((error: unknown) => {
+                setErrorState(error as Error);
+                throw error;
+              });
           }}
           raceState={displayedEntrantsRaceState}
-          selectedCategoryId={selectedCategoryEventId === selectedEntrantsResolvedEventId ? resolvedSelectedCategoryId : undefined}
+          selectedCategoryId={
+            selectedCategoryEventId === selectedEntrantsResolvedEventId
+              ? resolvedSelectedCategoryId
+              : undefined
+          }
           selectedEntrantId={selectedEntrantId}
           selectedEventId={selectedEntrantsResolvedEventId}
         />
       );
     }
 
-    if (activeSection === 'Results') {
+    if (activeSection === "Results") {
       return (
         <ResultsContext
           categories={sessionScopedCategories}
-          catalogEntries={getEntriesForEvent(eventCatalogState, selectedResultsEventId)}
+          catalogEntries={getEntriesForEvent(
+            eventCatalogState,
+            selectedResultsEventId,
+          )}
           eventSessionOptions={eventSessionOptions}
-          catalogEntrants={getEntrantsForEvent(eventCatalogState, selectedResultsEventId)}
+          catalogEntrants={getEntrantsForEvent(
+            eventCatalogState,
+            selectedResultsEventId,
+          )}
           event={timingEvent}
           onSelectEventSession={selectAnalyticsEventSession}
           raceState={displayedAnalyticsRaceState}
@@ -2875,18 +4299,33 @@ export const RaceSweetMainApp = () => {
       );
     }
 
-    if (activeSection === 'Reports') {
+    if (activeSection === "Reports") {
       return (
         <ReportsContext
           categories={sessionScopedCategories}
-          catalogEntries={getEntriesForEvent(eventCatalogState, selectedResultsEventId)}
+          catalogEntries={getEntriesForEvent(
+            eventCatalogState,
+            selectedResultsEventId,
+          )}
           eventSessionOptions={eventSessionOptions}
-          catalogEntrants={getEntrantsForEvent(eventCatalogState, selectedResultsEventId)}
+          catalogEntrants={getEntrantsForEvent(
+            eventCatalogState,
+            selectedResultsEventId,
+          )}
           event={timingEvent}
           onSelectEventSession={selectAnalyticsEventSession}
           raceState={displayedAnalyticsRaceState}
           selectedCategoryId={selectedCategoryId}
           selectedEventSessionValue={selectedEventSessionValue}
+          onViewStateChange={(changes: Partial<ReportsViewState>): void =>
+            setReportsViewState(
+              (currentState: ReportsViewState): ReportsViewState => ({
+                ...currentState,
+                ...changes,
+              }),
+            )
+          }
+          viewState={reportsViewState}
         />
       );
     }
@@ -2898,9 +4337,13 @@ export const RaceSweetMainApp = () => {
         <h2>Active Event</h2>
         {activeEvent ? (
           <>
-            <p>{activeEvent.name} Â· {activeEvent.format} Â· {activeEvent.date}</p>
             <p>
-              {activeEvent.categoryIds.length} categories, {activeEvent.entrantIds.length} entrants, {activeEventSessions.length} sessions in scope.
+              {activeEvent.name} Â· {activeEvent.format} Â· {activeEvent.date}
+            </p>
+            <p>
+              {activeEvent.categoryIds.length} categories,{" "}
+              {activeEvent.entrantIds.length} entrants,{" "}
+              {activeEventSessions.length} sessions in scope.
             </p>
           </>
         ) : (
@@ -2912,5 +4355,3 @@ export const RaceSweetMainApp = () => {
 
   return renderShell(sectionContent());
 };
-
-

@@ -1,9 +1,9 @@
-import type { EventCategoryId } from "../../model/eventcategory.js";
-import type { FlagRecord } from "../../model/flag.js";
-import type { TimeRecord } from "../../model/timerecord.js";
-import { TZDate } from "@date-fns/tz";
-import { findSessionStart } from "../../processing/session.js";
-import { formatRFC3339 } from "date-fns";
+import { TZDate } from '@date-fns/tz';
+import { formatRFC3339 } from 'date-fns';
+import type { EventCategoryId } from '../../model/eventcategory.js';
+import type { FlagRecord } from '../../model/flag.js';
+import type { TimeRecord } from '../../model/timerecord.js';
+import { findSessionStart } from '../../processing/session.js';
 
 export const useRFCTime = false;
 
@@ -21,13 +21,8 @@ const isValidTimeTenthOfMillisecond = (value: number | null | undefined): value 
   return value !== null && value !== undefined && Number.isInteger(value) && value >= 0 && value <= 9;
 };
 
-const appendTimeTenthOfMillisecond = (
-  formattedTime: string,
-  timeTenthOfMillisecond: number | null | undefined
-): string => {
-  return isValidTimeTenthOfMillisecond(timeTenthOfMillisecond)
-    ? `${formattedTime}${timeTenthOfMillisecond}`
-    : formattedTime;
+const appendTimeTenthOfMillisecond = (formattedTime: string, timeTenthOfMillisecond: number | null | undefined): string => {
+  return isValidTimeTenthOfMillisecond(timeTenthOfMillisecond) ? `${formattedTime}${timeTenthOfMillisecond}` : formattedTime;
 };
 
 export const getSystemTimeZone = (): string => {
@@ -44,10 +39,7 @@ export const normalizeTimeZone = (timeZone: string | undefined): string => {
   }
 };
 
-export const resolveDisplayTimeZone = (
-  mode: TimeDisplayZoneMode | undefined,
-  eventTimeZone: string | undefined
-): string => {
+export const resolveDisplayTimeZone = (mode: TimeDisplayZoneMode | undefined, eventTimeZone: string | undefined): string => {
   if (mode === 'gmt') {
     return 'UTC';
   }
@@ -60,9 +52,7 @@ export const resolveDisplayTimeZone = (
 export const getSupportedTimeZones = (): string[] => {
   const supportedValuesOf = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf;
   const systemTimeZone = getSystemTimeZone();
-  const zones = typeof supportedValuesOf === 'function'
-    ? supportedValuesOf('timeZone')
-    : ['UTC', 'Australia/Sydney', 'Australia/Melbourne', 'Australia/Brisbane', systemTimeZone];
+  const zones = typeof supportedValuesOf === 'function' ? supportedValuesOf('timeZone') : ['UTC', 'Australia/Sydney', 'Australia/Melbourne', 'Australia/Brisbane', systemTimeZone];
   return Array.from(new Set([systemTimeZone, ...zones])).sort((left, right) => left.localeCompare(right));
 };
 
@@ -95,11 +85,7 @@ const describeTimeValue = (time: Date | undefined): string => {
   return `toString="${time.toString()}", getTime=${time.getTime()}`;
 };
 
-export const tableTimeStringInTimeZone = (
-  time: Date | undefined,
-  timeZone: string | undefined,
-  timeTenthOfMillisecond?: number | null
-): string => {
+export const tableTimeStringInTimeZone = (time: Date | undefined, timeZone: string | undefined, timeTenthOfMillisecond?: number | null): string => {
   if (!time) {
     return 'Unknown time';
   }
@@ -114,50 +100,47 @@ export const tableTimeStringInTimeZone = (
       timeZone: normalizeTimeZone(timeZone),
     });
     const parts = Object.fromEntries(formatter.formatToParts(time).map((part) => [part.type, part.value]));
-    return appendTimeTenthOfMillisecond(
-      `${parts.hour}:${parts.minute}:${parts.second}.${parts.fractionalSecond}`,
-      timeTenthOfMillisecond
-    );
+    return appendTimeTenthOfMillisecond(`${parts.hour}:${parts.minute}:${parts.second}.${parts.fractionalSecond}`, timeTenthOfMillisecond);
   } catch (error) {
     console.error(`Error formatting time value ${describeTimeValue(time)} for time zone ${timeZone}`);
     throw error;
   }
 };
 
-export const timeOfDayInputStringInTimeZone = (
-  time: Date | undefined,
-  timeZone: string | undefined
-): string => {
+export const timeOfDayInputStringInTimeZone = (time: Date | undefined, timeZone: string | undefined): string => {
   return tableTimeStringInTimeZone(time, timeZone);
 };
 
-export const parseTimeOfDayInputInTimeZone = (
-  anchorTime: Date | undefined,
-  value: string,
-  timeZone: string | undefined
-): Date | undefined => {
+export const parseTimeOfDayInputInTimeZone = (anchorTime: Date | undefined, value: string, timeZone: string | undefined): Date | undefined => {
   if (!anchorTime) {
     return undefined;
   }
 
-  const match = value.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/);
-  if (!match) {
+  return parseDateAndTimeInputInTimeZone(dateStringInTimeZone(anchorTime, timeZone), value, timeZone);
+};
+
+export const parseDateAndTimeInputInTimeZone = (dateValue: string, timeValue: string, timeZone: string | undefined): Date | undefined => {
+  const dateMatch = dateValue.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const timeMatch = timeValue.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/);
+  if (!dateMatch || !timeMatch) {
     return undefined;
   }
 
-  const [, hoursText, minutesText, secondsText = '0', millisecondsText = '0'] = match;
+  const [, yearText, monthText, dayText] = dateMatch;
+  const [, hoursText, minutesText, secondsText = '0', millisecondsText = '0'] = timeMatch;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hours = Number(hoursText);
+  const minutes = Number(minutesText);
+  const seconds = Number(secondsText);
+  const calendarDate = new Date(Date.UTC(year, month - 1, day));
+  if (hours > 23 || minutes > 59 || seconds > 59 || calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() !== month - 1 || calendarDate.getUTCDate() !== day) {
+    return undefined;
+  }
+
   const normalizedTimeZone = normalizeTimeZone(timeZone);
-  const { day, month, year } = getDatePartsInTimeZone(anchorTime, normalizedTimeZone);
-  const zonedDate = new TZDate(
-    year,
-    month - 1,
-    day,
-    Number(hoursText),
-    Number(minutesText),
-    Number(secondsText),
-    Number(millisecondsText.padEnd(3, '0')),
-    normalizedTimeZone
-  );
+  const zonedDate = new TZDate(year, month - 1, day, hours, minutes, seconds, Number(millisecondsText.padEnd(3, '0')), normalizedTimeZone);
   return new Date(zonedDate.getTime());
 };
 
@@ -170,11 +153,7 @@ export const dateStringInTimeZone = (date: Date | undefined, timeZone: string | 
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 };
 
-export const tableDateTimeStringInTimeZone = (
-  time: Date | undefined,
-  timeZone: string | undefined,
-  timeTenthOfMillisecond?: number | null
-): string => {
+export const tableDateTimeStringInTimeZone = (time: Date | undefined, timeZone: string | undefined, timeTenthOfMillisecond?: number | null): string => {
   if (!time) {
     return 'Unknown time';
   }
@@ -188,9 +167,7 @@ export const millisecondsToTime = (milliseconds: MillisecondsDuration): Duration
   const hours = Math.floor(milliseconds / (1000 * 60 * 60));
   milliseconds = Math.floor(milliseconds % 1000);
   const secondsText = `${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
-  const formattedTime = hours > 0
-    ? `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${secondsText}`
-    : `${minutes}:${secondsText}`;
+  const formattedTime = hours > 0 ? `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${secondsText}` : `${minutes}:${secondsText}`;
   return formattedTime as DurationString;
 };
 
@@ -226,13 +203,11 @@ export const parseMinimumLapTimeInputToMilliseconds = (value: string): number | 
       return null;
     }
 
-    return (((hours * 60) + minutes) * 60 * 1000) + (seconds * 1000) + milliseconds;
+    return (hours * 60 + minutes) * 60 * 1000 + seconds * 1000 + milliseconds;
   }
 
   const numericSeconds = Number(trimmedValue);
-  return Number.isFinite(numericSeconds) && numericSeconds >= 0
-    ? Math.round(numericSeconds * 1000)
-    : null;
+  return Number.isFinite(numericSeconds) && numericSeconds >= 0 ? Math.round(numericSeconds * 1000) : null;
 };
 
 export const elapsedTimeMilliseconds = (start: Date, end: Date): MillisecondsDuration => {
@@ -262,10 +237,7 @@ export const elapsedTimeMilliseconds = (start: Date, end: Date): MillisecondsDur
 //     }
 //   }
 // };
-export const getElapsedTimeStart = (
-  eventFlagEvents: FlagRecord[],
-  categoryId: EventCategoryId
-): Date | undefined => {
+export const getElapsedTimeStart = (eventFlagEvents: FlagRecord[], categoryId: EventCategoryId): Date | undefined => {
   const startTime: FlagRecord | undefined = findSessionStart(eventFlagEvents, categoryId);
   if (!startTime || startTime.time === undefined) {
     console.debug(`Tried to calculate elapsed time for category ${categoryId} with no start time`);
@@ -274,11 +246,7 @@ export const getElapsedTimeStart = (
   return startTime.time;
 };
 
-export const tableTimeString = (
-  time: Date | undefined,
-  timeZone?: string,
-  timeTenthOfMillisecond?: number | null
-): string => {
+export const tableTimeString = (time: Date | undefined, timeZone?: string, timeTenthOfMillisecond?: number | null): string => {
   if (!time) {
     return 'Unknown time';
   }

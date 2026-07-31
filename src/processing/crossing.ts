@@ -7,6 +7,7 @@ import type { ChipCrossingData } from "../model/chipcrossing.js";
 import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
 import type { PlateCrossingData } from "../model/platecrossing.js";
 import { isGeneratedMissingCrossing, type TimeRecord } from "../model/timerecord.js";
+import { hasTime } from './timerecord.js';
 import assert from "node:assert/strict";
 import { validateCategoriesToCreate } from '../validators/categories.ts';
 
@@ -18,8 +19,7 @@ export const assignEntrantToPlateCrossing = (
   preferredCategoryIds: Set<EventCategoryId> | EventCategoryId[] | undefined = undefined
 ): void => {
   validateCategoriesToCreate(categoryList, createUnknownEntrants);
-  if (crossing.time === undefined) {
-    console.error(`Crossing for plate ${crossing.plateNumber} has no time`);
+  if (!hasTime(crossing)) {
     return;
   }
   const entrant = findEntrantByPlateNumber(entrants, crossing.plateNumber, crossing.time, preferredCategoryIds);
@@ -74,8 +74,7 @@ export const assignEntrantToChipCrossing = (
   preferredCategoryIds: Set<EventCategoryId> | EventCategoryId[] | undefined = undefined
 ): void => {
   validateCategoriesToCreate(categoryList, createUnknownEntrants);
-  if (crossing.time === undefined) {
-    console.error(`Crossing for chip ${crossing.chipCode} has no time`);
+  if (!hasTime(crossing)) {
     return;
   }
   let entrant = findEntrantByChipCode(entrants, crossing.chipCode, crossing.time, preferredCategoryIds);

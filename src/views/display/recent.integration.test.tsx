@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 
+import React, { act } from 'react';
+
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import React, { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import { updateCategorySelectionsForChangedParticipant } from '../../app/categoryChangeState.js';
 import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
-import { createGreenFlagEvent } from '../../processing/flag.js';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
 import type { EventTeam } from '../../model/eventteam.js';
@@ -18,6 +18,7 @@ import { type RaceStateLookup, Session } from '../../model/racestate.js';
 import { type ParticipantPassingRecord, RECORD_TX_CROSSING, TimeRecordId } from '../../model/timerecord.js';
 import { loadMrScatsCatalogFromLocation } from '../../parsers/mrScats/catalogImport.js';
 import { type AdministrativeChanges, type RaceAdminPersistence, createDefaultAdministrativeChanges } from '../../persistence/raceAdminPersistence.js';
+import { createGreenFlagEvent } from '../../processing/flag.js';
 import { RaceAdminService } from '../../service/raceAdminService.js';
 import { applyPulledRaceStateToSession } from '../../service/sourceApplication.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
@@ -50,9 +51,9 @@ class MemoryRaceAdminPersistence implements RaceAdminPersistence {
 }
 
 const createDbfBuffer = (fields: DbfField[], rows: Record<string, string | number | undefined>[]): Buffer => {
-  const headerLength = 32 + (fields.length * 32) + 1;
+  const headerLength = 32 + fields.length * 32 + 1;
   const recordLength = 1 + fields.reduce((total, field) => total + field.length, 0);
-  const buffer = Buffer.alloc(headerLength + (recordLength * rows.length), 0x20);
+  const buffer = Buffer.alloc(headerLength + recordLength * rows.length, 0x20);
   buffer[0] = 3;
   buffer[1] = 97;
   buffer[2] = 6;
@@ -62,7 +63,7 @@ const createDbfBuffer = (fields: DbfField[], rows: Record<string, string | numbe
   buffer.writeUInt16LE(recordLength, 10);
 
   fields.forEach((field, index) => {
-    const offset = 32 + (index * 32);
+    const offset = 32 + index * 32;
     buffer.write(field.name, offset, 'latin1');
     buffer.write(field.type, offset + 11, 'latin1');
     buffer[offset + 16] = field.length;
@@ -70,7 +71,7 @@ const createDbfBuffer = (fields: DbfField[], rows: Record<string, string | numbe
   buffer[headerLength - 1] = 0x0d;
 
   rows.forEach((row, rowIndex) => {
-    const recordOffset = headerLength + (rowIndex * recordLength);
+    const recordOffset = headerLength + rowIndex * recordLength;
     buffer[recordOffset] = 0x20;
     let fieldOffset = recordOffset + 1;
     fields.forEach((field) => {
@@ -112,14 +113,16 @@ const getDisplayedRecordIds = (container: HTMLElement): Array<string | null> => 
 
 const getRecentRecordsFilterSelect = (): Element | undefined => {
   return Array.from(document.querySelectorAll('[role="combobox"]')).find((element) => {
-    return element.textContent?.includes('All records') ||
+    return (
+      element.textContent?.includes('All records') ||
       element.textContent?.includes('Only flags') ||
       element.textContent?.includes('Only potential missing crossings') ||
       element.textContent?.includes('Only selected category') ||
       element.textContent?.includes('Only selected entrant') ||
       element.textContent?.includes('Only selected team') ||
       element.textContent?.includes('Only selected driver') ||
-      element.textContent?.includes('Only selected rider');
+      element.textContent?.includes('Only selected rider')
+    );
   });
 };
 
@@ -347,7 +350,8 @@ describe('RecentRecords integration', () => {
       firstMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'center', inline: 'nearest' });
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'center', inline: 'nearest',
+    });
     expect(container.querySelector('tr[data-record-id="toolbar-earliest-green"]')?.className).toContain('selected-row');
     HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
   });
@@ -378,23 +382,11 @@ describe('RecentRecords integration', () => {
       sequence: minute,
       source: 'test-source',
       time: new Date(`2026-05-29T10:${minute.toString().padStart(2, '0')}:00.000Z`),
-    } as ParticipantPassingRecord);
-    const crossings = [
-      createCrossing('tx-other-line-before', 1, 2),
-      createCrossing('tx-selected-line', 2, 1),
-      createCrossing('tx-other-line-after', 3, 2),
-      createCrossing('tx-selected-line-after', 4, 1),
-    ];
+    }) as ParticipantPassingRecord;
+    const crossings = [createCrossing('tx-other-line-before', 1, 2), createCrossing('tx-selected-line', 2, 1), createCrossing('tx-other-line-after', 3, 2), createCrossing('tx-selected-line-after', 4, 1)];
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={crossings}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={crossings} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     const goToButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Go to');
@@ -517,7 +509,7 @@ describe('RecentRecords integration', () => {
       categories: [category],
       countTransponderCrossings: () => 0,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === category.id ? category : undefined,
+      getCategoryById: (categoryId) => (categoryId === category.id ? category : undefined),
       getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
       getParticipantById: (participantId) => participants.get(participantId),
       getParticipantLaps: () => crossings,
@@ -593,8 +585,16 @@ describe('RecentRecords integration', () => {
   });
 
   it('selects categories from the recent records toolbar', async () => {
-    const categoryA: EventCategory = { code: 'A', id: 'cat-a', name: 'Category A' };
-    const categoryB: EventCategory = { code: 'B', id: 'cat-b', name: 'Category B' };
+    const categoryA: EventCategory = {
+      code: 'A',
+      id: 'cat-a',
+      name: 'Category A',
+    };
+    const categoryB: EventCategory = {
+      code: 'B',
+      id: 'cat-b',
+      name: 'Category B',
+    };
     const selectedCategorySets: string[][] = [];
     const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
       categories: [categoryA, categoryB],
@@ -612,13 +612,7 @@ describe('RecentRecords integration', () => {
 
     await act(async () => {
       root.render(
-        <RecentRecords
-          categorySelected={(categoryIds) => selectedCategorySets.push(Array.from(categoryIds).sort())}
-          raceStateLookup={raceStateLookup}
-          records={[]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
+        <RecentRecords categorySelected={(categoryIds) => selectedCategorySets.push(Array.from(categoryIds).sort())} raceStateLookup={raceStateLookup} records={[]} selectedCategories={new Set()} selectedParticipants={new Set()} />
       );
     });
 
@@ -669,9 +663,9 @@ describe('RecentRecords integration', () => {
       categories: [category],
       countTransponderCrossings: () => 0,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === category.id ? category : undefined,
+      getCategoryById: (categoryId) => (categoryId === category.id ? category : undefined),
       getEntrantIdForParticipant: () => undefined,
-      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantById: (participantId) => (participantId === participant.id ? participant : undefined),
       getParticipantLaps: () => [crossing],
       getTransponderCrossings: () => [],
       updateCategoryDetails: () => undefined,
@@ -680,14 +674,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[crossing]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[crossing]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     const anchor = container.querySelector('.recent-records-toolbar-anchor') as HTMLDivElement;
@@ -827,12 +814,14 @@ describe('RecentRecords integration', () => {
     expect(categorySelection.has(categoryA.id)).toBe(true);
 
     await act(async () => {
-      row!.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 60,
-        clientY: 80,
-      }));
+      row!.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 60,
+          clientY: 80,
+        })
+      );
     });
 
     const menuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => {
@@ -913,14 +902,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={records}
-          selectedCategories={new Set([categoryA.id])}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={records} selectedCategories={new Set([categoryA.id])} selectedParticipants={new Set()} />);
     });
 
     const firstRow = container.querySelector('tr[data-record-id="2001"]');
@@ -940,12 +922,14 @@ describe('RecentRecords integration', () => {
     expect(secondRow!.className).toContain('selected-category');
 
     await act(async () => {
-      secondRow!.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 60,
-        clientY: 80,
-      }));
+      secondRow!.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 60,
+          clientY: 80,
+        })
+      );
     });
 
     expect(firstRow!.className).not.toContain('selected-row');
@@ -982,7 +966,7 @@ describe('RecentRecords integration', () => {
         recordType: RECORD_TX_CROSSING,
         sequence: index + 1,
         source: 'test-source',
-        time: new Date(baseTime + (index * 60000)),
+        time: new Date(baseTime + index * 60000),
       } as ParticipantPassingRecord;
 
       participants.set(participantId, participant);
@@ -1005,14 +989,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={records}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={records} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     const tableContainer = container.querySelector('.recent-records-table-container') as HTMLDivElement;
@@ -1035,14 +1012,7 @@ describe('RecentRecords integration', () => {
     });
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={records}
-          selectedCategories={new Set([categoryA.id])}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={records} selectedCategories={new Set([categoryA.id])} selectedParticipants={new Set()} />);
     });
 
     const firstVisibleRow = container.querySelector(`tr[data-record-id="${records[0]!.id}"]`) as HTMLTableRowElement;
@@ -1100,9 +1070,9 @@ describe('RecentRecords integration', () => {
       categories: [categoryA],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
-      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
-      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getCategoryById: (categoryId) => (categoryId === categoryA.id ? categoryA : undefined),
+      getEntrantIdForParticipant: (participantId) => (participantId === participant.id ? participant.entrantId : undefined),
+      getParticipantById: (participantId) => (participantId === participant.id ? participant : undefined),
       getParticipantLaps: () => [crossing],
       getTransponderCrossings: () => [],
       updateCategoryDetails: () => undefined,
@@ -1112,15 +1082,7 @@ describe('RecentRecords integration', () => {
     const onExclude = vi.fn();
     const renderRecords = async (): Promise<void> => {
       await act(async () => {
-        root.render(
-          <RecentRecords
-            onExclude={onExclude}
-            raceStateLookup={raceStateLookup}
-            records={[crossing]}
-            selectedCategories={new Set()}
-            selectedParticipants={new Set()}
-          />
-        );
+        root.render(<RecentRecords onExclude={onExclude} raceStateLookup={raceStateLookup} records={[crossing]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
       });
     };
     const openMenu = async (): Promise<void> => {
@@ -1128,12 +1090,14 @@ describe('RecentRecords integration', () => {
       expect(row).not.toBeNull();
 
       await act(async () => {
-        row!.dispatchEvent(new MouseEvent('contextmenu', {
-          bubbles: true,
-          cancelable: true,
-          clientX: 60,
-          clientY: 80,
-        }));
+        row!.dispatchEvent(
+          new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            clientX: 60,
+            clientY: 80,
+          })
+        );
       });
     };
     const clickMenuItem = async (label: string): Promise<void> => {
@@ -1204,12 +1168,14 @@ describe('RecentRecords integration', () => {
       expect(row).not.toBeNull();
 
       await act(async () => {
-        row!.dispatchEvent(new MouseEvent('contextmenu', {
-          bubbles: true,
-          cancelable: true,
-          clientX: 60,
-          clientY: 80,
-        }));
+        row!.dispatchEvent(
+          new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            clientX: 60,
+            clientY: 80,
+          })
+        );
       });
     };
 
@@ -1284,7 +1250,9 @@ describe('RecentRecords integration', () => {
     const persistence = new MemoryRaceAdminPersistence();
     const service = await RaceAdminService.create(async () => session, persistence);
     let latestMutation: Promise<void> = Promise.resolve();
-    const createMergedLookup = (): RaceStateLookup & { categories: EventCategory[] } => ({
+    const createMergedLookup = (): RaceStateLookup & {
+      categories: EventCategory[];
+    } => ({
       canAssignFlagCategory: (flagId, categoryId) => session.canAssignFlagCategory(flagId, categoryId),
       categories: [categoryA, categoryB],
       countTransponderCrossings: (txNo, untilTime) => session.countTransponderCrossings(txNo, untilTime),
@@ -1300,17 +1268,17 @@ describe('RecentRecords integration', () => {
     });
     const openMenu = async (): Promise<void> => {
       await act(async () => {
-        container.querySelector(`tr[data-record-id="${flag.id}"]`)!.dispatchEvent(new MouseEvent('contextmenu', {
-          bubbles: true,
-          cancelable: true,
-          clientX: 60,
-          clientY: 80,
-        }));
+        container.querySelector(`tr[data-record-id="${flag.id}"]`)!.dispatchEvent(
+          new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            clientX: 60,
+            clientY: 80,
+          })
+        );
       });
     };
-    const getMenuItem = (label: string): Element | undefined => Array.from(
-      document.querySelectorAll('li[role="menuitem"]'),
-    ).find((item) => item.textContent?.trim() === label);
+    const getMenuItem = (label: string): Element | undefined => Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === label);
     const renderRecords = async (): Promise<void> => {
       await act(async () => {
         root.render(
@@ -1359,8 +1327,16 @@ describe('RecentRecords integration', () => {
     const crossingId = createTimeRecordId('recent-flow-crossing');
     const source = createTimeRecordSourceId('recent-flow-source');
     const categories: EventCategory[] = [
-      { id: categoryAId, name: 'Category A', startTime: '2026-05-29T09:00:00.000Z' },
-      { id: categoryBId, name: 'Category B', startTime: '2026-05-29T09:00:00.000Z' },
+      {
+        id: categoryAId,
+        name: 'Category A',
+        startTime: '2026-05-29T09:00:00.000Z',
+      },
+      {
+        id: categoryBId,
+        name: 'Category B',
+        startTime: '2026-05-29T09:00:00.000Z',
+      },
     ];
     const participant: EventParticipant = {
       categoryId: categoryBId,
@@ -1423,12 +1399,14 @@ describe('RecentRecords integration', () => {
       expect(row).not.toBeNull();
 
       await act(async () => {
-        row!.dispatchEvent(new MouseEvent('contextmenu', {
-          bubbles: true,
-          cancelable: true,
-          clientX: 60,
-          clientY: 80,
-        }));
+        row!.dispatchEvent(
+          new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            clientX: 60,
+            clientY: 80,
+          })
+        );
       });
     };
     const clickMenuItem = async (label: string): Promise<void> => {
@@ -1566,12 +1544,14 @@ describe('RecentRecords integration', () => {
       expect(row).not.toBeNull();
 
       await act(async () => {
-        row!.dispatchEvent(new MouseEvent('contextmenu', {
-          bubbles: true,
-          cancelable: true,
-          clientX: 60,
-          clientY: 80,
-        }));
+        row!.dispatchEvent(
+          new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            clientX: 60,
+            clientY: 80,
+          })
+        );
       });
     };
     const clickMenuItem = async (label: string): Promise<void> => {
@@ -1672,7 +1652,7 @@ describe('RecentRecords integration', () => {
       categories: [categoryA],
       countTransponderCrossings: () => 0,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getCategoryById: (categoryId) => (categoryId === categoryA.id ? categoryA : undefined),
       getEntrantIdForParticipant: () => undefined,
       getParticipantById: () => undefined,
       getParticipantLaps: () => [],
@@ -1683,14 +1663,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[systemFlag as unknown as ParticipantPassingRecord, crossing]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[systemFlag as unknown as ParticipantPassingRecord, crossing]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     expect(getDisplayedRecordIds(container)).toEqual(['crossing-1']);
@@ -1706,9 +1679,7 @@ describe('RecentRecords integration', () => {
       entrantId: '101',
       firstname: 'Pat',
       id: '101',
-      identifiers: [
-        { fromTime: undefined, racePlate: '101', toTime: undefined },
-      ] as unknown as EventParticipant['identifiers'],
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
       lastRecordTime: null,
       resultDuration: null,
       surname: 'Rider',
@@ -1801,7 +1772,7 @@ describe('RecentRecords integration', () => {
       categories: [categoryA],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getCategoryById: (categoryId) => (categoryId === categoryA.id ? categoryA : undefined),
       getEntrantIdForParticipant: () => participant.entrantId,
       getParticipantById: () => participant,
       getParticipantLaps: () => [crossing],
@@ -1921,14 +1892,17 @@ describe('RecentRecords integration', () => {
       [teamMember.id, teamMember],
       [individualEntrant.id, individualEntrant],
     ]);
-    const raceStateLookup: RaceStateLookup & { categories: EventCategory[], teams: EventTeam[] } = {
+    const raceStateLookup: RaceStateLookup & {
+      categories: EventCategory[];
+      teams: EventTeam[];
+    } = {
       categories: [categoryA],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getCategoryById: (categoryId) => (categoryId === categoryA.id ? categoryA : undefined),
       getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
       getParticipantById: (participantId) => participants.get(participantId),
-      getParticipantLaps: (participantId) => participantId === teamMember.id ? [teamCrossing] : [individualCrossing],
+      getParticipantLaps: (participantId) => (participantId === teamMember.id ? [teamCrossing] : [individualCrossing]),
       getTransponderCrossings: () => [],
       teams: [team],
       updateCategoryDetails: () => undefined,
@@ -1937,14 +1911,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[teamCrossing, individualCrossing]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[teamCrossing, individualCrossing]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     expect(container.querySelector('tr[data-record-id="2001"]')?.textContent).toContain('Pat RIDER (Rocket Squad)');
@@ -1953,7 +1920,10 @@ describe('RecentRecords integration', () => {
   });
 
   it('shows the team name for crossings after imported race state teams are applied to the Timing session', async () => {
-    const category: EventCategory = { id: createCategoryId('imported-team-category'), name: 'Imported Teams' };
+    const category: EventCategory = {
+      id: createCategoryId('imported-team-category'),
+      name: 'Imported Teams',
+    };
     const teamId = createEventEntrantId('imported-team-rocket-squad');
     const participantId = createEventParticipantId('imported-team-pat-rider');
     const recordId = createTimeRecordId('imported-team-crossing');
@@ -2002,14 +1972,7 @@ describe('RecentRecords integration', () => {
     });
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={session}
-          records={session.records as EventTimeRecord[]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={session} records={session.records as EventTimeRecord[]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     expect(container.querySelector(`tr[data-record-id="${recordId}"]`)?.textContent).toContain('Pat RIDER (Rocket Squad)');
@@ -2070,16 +2033,19 @@ describe('RecentRecords integration', () => {
       members: [teamMemberOne.id, teamMemberTwo.id],
       name: 'Rocket Squad',
     };
-    const crossings: ParticipantPassingRecord[] = [teamMemberOne, teamMemberTwo, soloRider, otherTeamRider].map((participant, index) => ({
-      chipCode: 100100 + index,
-      id: `200${index + 1}`,
-      isValid: true,
-      participantId: participant.id,
-      recordType: RECORD_TX_CROSSING,
-      sequence: index + 1,
-      source: 'test-source',
-      time: new Date(`2026-05-29T10:0${index + 1}:00.000Z`),
-    }) as ParticipantPassingRecord);
+    const crossings: ParticipantPassingRecord[] = [teamMemberOne, teamMemberTwo, soloRider, otherTeamRider].map(
+      (participant, index) =>
+        ({
+          chipCode: 100100 + index,
+          id: `200${index + 1}`,
+          isValid: true,
+          participantId: participant.id,
+          recordType: RECORD_TX_CROSSING,
+          sequence: index + 1,
+          source: 'test-source',
+          time: new Date(`2026-05-29T10:0${index + 1}:00.000Z`),
+        }) as ParticipantPassingRecord
+    );
     const selectedRiderSecondCrossing: ParticipantPassingRecord = {
       chipCode: 100105,
       id: '2005',
@@ -2106,7 +2072,10 @@ describe('RecentRecords integration', () => {
       [soloRider.id, soloRider],
       [otherTeamRider.id, otherTeamRider],
     ]);
-    const raceStateLookup: RaceStateLookup & { categories: EventCategory[], teams: EventTeam[] } = {
+    const raceStateLookup: RaceStateLookup & {
+      categories: EventCategory[];
+      teams: EventTeam[];
+    } = {
       categories: [categoryA, categoryB, categoryC],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
@@ -2130,14 +2099,16 @@ describe('RecentRecords integration', () => {
         setSelectedCategories(selectedCategoriesForParticipants(participantIds, raceStateLookup.getParticipantById));
       };
 
-      return <RecentRecords
-        categorySelected={setSelectedCategories}
-        participantSelected={handleParticipantSelected}
-        raceStateLookup={raceStateLookup}
-        records={[...crossings, selectedRiderSecondCrossing, flagRecord]}
-        selectedCategories={selectedCategories}
-        selectedParticipants={selectedParticipants}
-      />;
+      return (
+        <RecentRecords
+          categorySelected={setSelectedCategories}
+          participantSelected={handleParticipantSelected}
+          raceStateLookup={raceStateLookup}
+          records={[...crossings, selectedRiderSecondCrossing, flagRecord]}
+          selectedCategories={selectedCategories}
+          selectedParticipants={selectedParticipants}
+        />
+      );
     };
 
     await act(async () => {
@@ -2234,16 +2205,19 @@ describe('RecentRecords integration', () => {
       resultDuration: null,
       surname: 'SOLO',
     };
-    const crossings: ParticipantPassingRecord[] = [teamMemberOne, teamMemberTwo, soloRider].map((participant, index) => ({
-      chipCode: 100100 + index,
-      id: `200${index + 1}`,
-      isValid: true,
-      participantId: participant.id,
-      recordType: RECORD_TX_CROSSING,
-      sequence: index + 1,
-      source: 'test-source',
-      time: new Date(`2026-05-29T10:0${index + 1}:00.000Z`),
-    }) as ParticipantPassingRecord);
+    const crossings: ParticipantPassingRecord[] = [teamMemberOne, teamMemberTwo, soloRider].map(
+      (participant, index) =>
+        ({
+          chipCode: 100100 + index,
+          id: `200${index + 1}`,
+          isValid: true,
+          participantId: participant.id,
+          recordType: RECORD_TX_CROSSING,
+          sequence: index + 1,
+          source: 'test-source',
+          time: new Date(`2026-05-29T10:0${index + 1}:00.000Z`),
+        }) as ParticipantPassingRecord
+    );
     const participants = new Map<EventParticipant['id'], EventParticipant>([
       [teamMemberOne.id, teamMemberOne],
       [teamMemberTwo.id, teamMemberTwo],
@@ -2256,7 +2230,10 @@ describe('RecentRecords integration', () => {
       members: [teamMemberOne.id, teamMemberTwo.id],
       name: 'Rocket Squad',
     };
-    const raceStateLookup: RaceStateLookup & { categories: EventCategory[], teams: EventTeam[] } = {
+    const raceStateLookup: RaceStateLookup & {
+      categories: EventCategory[];
+      teams: EventTeam[];
+    } = {
       categories: [categoryA, categoryB],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
@@ -2400,36 +2377,62 @@ describe('RecentRecords integration', () => {
       time: new Date('2026-05-29T10:06:00.000Z'),
     };
     const crossings: ParticipantPassingRecord[] = [
-      { id: 'before-start-a', participantId: teamMemberOne.id, sequence: 0, time: '2026-05-29T09:59:00.000Z' },
-      { id: 'in-window-a', participantId: teamMemberOne.id, sequence: 2, time: '2026-05-29T10:01:00.000Z' },
-      { id: 'first-team-after-finish-a', participantId: teamMemberOne.id, sequence: 5, time: '2026-05-29T10:03:00.000Z' },
-      { id: 'second-team-after-finish-a', participantId: teamMemberTwo.id, sequence: 7, time: '2026-05-29T10:04:00.000Z' },
-      { id: 'before-start-b', participantId: soloRider.id, sequence: 8, time: '2026-05-29T10:04:30.000Z' },
-      { id: 'first-solo-after-event-finish', participantId: soloRider.id, sequence: 10, time: '2026-05-29T10:07:00.000Z' },
-      { id: 'second-solo-after-event-finish', participantId: soloRider.id, sequence: 11, time: '2026-05-29T10:08:00.000Z' },
-    ].map((crossing) => ({
-      chipCode: 100100,
-      id: crossing.id,
-      isValid: true,
-      participantId: crossing.participantId,
-      recordType: RECORD_TX_CROSSING,
-      sequence: crossing.sequence,
-      source: 'test-source',
-      time: new Date(crossing.time),
-    }) as ParticipantPassingRecord);
-    const records = [
-      crossings[0],
-      categoryStartA,
-      crossings[1],
-      categoryFinishA,
-      crossings[2],
-      categoryStartB,
-      crossings[3],
-      crossings[4],
-      eventFinish,
-      crossings[5],
-      crossings[6],
-    ] as Array<ParticipantPassingRecord | FlagRecord>;
+      {
+        id: 'before-start-a',
+        participantId: teamMemberOne.id,
+        sequence: 0,
+        time: '2026-05-29T09:59:00.000Z',
+      },
+      {
+        id: 'in-window-a',
+        participantId: teamMemberOne.id,
+        sequence: 2,
+        time: '2026-05-29T10:01:00.000Z',
+      },
+      {
+        id: 'first-team-after-finish-a',
+        participantId: teamMemberOne.id,
+        sequence: 5,
+        time: '2026-05-29T10:03:00.000Z',
+      },
+      {
+        id: 'second-team-after-finish-a',
+        participantId: teamMemberTwo.id,
+        sequence: 7,
+        time: '2026-05-29T10:04:00.000Z',
+      },
+      {
+        id: 'before-start-b',
+        participantId: soloRider.id,
+        sequence: 8,
+        time: '2026-05-29T10:04:30.000Z',
+      },
+      {
+        id: 'first-solo-after-event-finish',
+        participantId: soloRider.id,
+        sequence: 10,
+        time: '2026-05-29T10:07:00.000Z',
+      },
+      {
+        id: 'second-solo-after-event-finish',
+        participantId: soloRider.id,
+        sequence: 11,
+        time: '2026-05-29T10:08:00.000Z',
+      },
+    ].map(
+      (crossing) =>
+        ({
+          chipCode: 100100,
+          id: crossing.id,
+          isValid: true,
+          participantId: crossing.participantId,
+          recordType: RECORD_TX_CROSSING,
+          sequence: crossing.sequence,
+          source: 'test-source',
+          time: new Date(crossing.time),
+        }) as ParticipantPassingRecord
+    );
+    const records = [crossings[0], categoryStartA, crossings[1], categoryFinishA, crossings[2], categoryStartB, crossings[3], crossings[4], eventFinish, crossings[5], crossings[6]] as Array<ParticipantPassingRecord | FlagRecord>;
     const participants = new Map<EventParticipant['id'], EventParticipant>([
       [teamMemberOne.id, teamMemberOne],
       [teamMemberTwo.id, teamMemberTwo],
@@ -2450,14 +2453,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={records as ParticipantPassingRecord[]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={records as ParticipantPassingRecord[]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     expect(getDisplayedRecordIds(container)).toEqual([
@@ -2476,15 +2472,7 @@ describe('RecentRecords integration', () => {
 
     await toggleIgnoreRecordsFilter('Outside event window');
 
-    expect(getDisplayedRecordIds(container)).toEqual([
-      'start-a',
-      'in-window-a',
-      'finish-a',
-      'first-team-after-finish-a',
-      'start-b',
-      'finish-event',
-      'first-solo-after-event-finish',
-    ]);
+    expect(getDisplayedRecordIds(container)).toEqual(['start-a', 'in-window-a', 'finish-a', 'first-team-after-finish-a', 'start-b', 'finish-event', 'first-solo-after-event-finish']);
   });
 
   it('ignores unrecognised crossings while keeping flag records visible', async () => {
@@ -2562,7 +2550,7 @@ describe('RecentRecords integration', () => {
       categories: [categoryA],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getCategoryById: (categoryId) => (categoryId === categoryA.id ? categoryA : undefined),
       getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
       getParticipantById: (participantId) => participants.get(participantId),
       getParticipantLaps: () => [knownCrossing],
@@ -2576,33 +2564,18 @@ describe('RecentRecords integration', () => {
       root.render(
         <RecentRecords
           raceStateLookup={raceStateLookup}
-          records={[
-            knownCrossing,
-            unassignedCrossing,
-            unknownParticipantCrossing,
-            unknownCategoryCrossing,
-            flag as unknown as ParticipantPassingRecord,
-          ]}
+          records={[knownCrossing, unassignedCrossing, unknownParticipantCrossing, unknownCategoryCrossing, flag as unknown as ParticipantPassingRecord]}
           selectedCategories={new Set()}
           selectedParticipants={new Set()}
         />
       );
     });
 
-    expect(getDisplayedRecordIds(container)).toEqual([
-      'known-crossing',
-      'unassigned-crossing',
-      'unknown-participant-crossing',
-      'unknown-category-crossing',
-      'finish-flag',
-    ]);
+    expect(getDisplayedRecordIds(container)).toEqual(['known-crossing', 'unassigned-crossing', 'unknown-participant-crossing', 'unknown-category-crossing', 'finish-flag']);
 
     await toggleIgnoreRecordsFilter('Unrecognised');
 
-    expect(getDisplayedRecordIds(container)).toEqual([
-      'known-crossing',
-      'finish-flag',
-    ]);
+    expect(getDisplayedRecordIds(container)).toEqual(['known-crossing', 'finish-flag']);
   });
 
   it('ignores sector loop crossings while keeping lap crossings and flags visible', async () => {
@@ -2729,25 +2702,15 @@ describe('RecentRecords integration', () => {
       source: 'test-source',
       time: new Date('2026-05-29T10:02:00.000Z'),
     };
-    const crossings = [
-      startFinishCrossing,
-      noLoopCrossing,
-      speedTrapCrossing,
-      sectorLoopCrossing,
-      sectorLoopOneCrossing,
-      explicitNonLapCrossing,
-      pitEntryLapCrossing,
-      tableMarkedLineCrossing,
-      explicitLapCrossing,
-    ];
+    const crossings = [startFinishCrossing, noLoopCrossing, speedTrapCrossing, sectorLoopCrossing, sectorLoopOneCrossing, explicitNonLapCrossing, pitEntryLapCrossing, tableMarkedLineCrossing, explicitLapCrossing];
     const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
       categories: [categoryA],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
-      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getCategoryById: (categoryId) => (categoryId === categoryA.id ? categoryA : undefined),
+      getEntrantIdForParticipant: (participantId) => (participantId === participant.id ? participant.entrantId : undefined),
       getFinishLineNumbers: () => [1, 7],
-      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantById: (participantId) => (participantId === participant.id ? participant : undefined),
       getParticipantLaps: () => crossings,
       getTransponderCrossings: () => [],
       updateCategoryDetails: () => undefined,
@@ -2756,14 +2719,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[...crossings, flag as unknown as ParticipantPassingRecord]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[...crossings, flag as unknown as ParticipantPassingRecord]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     expect(getDisplayedRecordIds(container)).toEqual([
@@ -2782,17 +2738,15 @@ describe('RecentRecords integration', () => {
     await toggleIgnoreRecordsFilter('Sector loops');
     await expectIgnoreRecordsFilterChecked('Sector loops');
 
-    expect(getDisplayedRecordIds(container)).toEqual([
-      'start-finish-crossing',
-      'no-loop-crossing',
-      'pit-entry-lap-crossing',
-      'explicit-lap-crossing',
-      'finish-flag',
-    ]);
+    expect(getDisplayedRecordIds(container)).toEqual(['start-finish-crossing', 'no-loop-crossing', 'pit-entry-lap-crossing', 'explicit-lap-crossing', 'finish-flag']);
   });
 
   it('keeps excluded-result category crossings visible but unrelated to selected category filters', async () => {
-    const timingErrorCategory: EventCategory = { excludeFromResults: true, id: 'error-cat', name: 'Timing Error List' };
+    const timingErrorCategory: EventCategory = {
+      excludeFromResults: true,
+      id: 'error-cat',
+      name: 'Timing Error List',
+    };
     const participant: EventParticipant = {
       categoryId: timingErrorCategory.id,
       currentResult: undefined,
@@ -2819,7 +2773,7 @@ describe('RecentRecords integration', () => {
       categories: [timingErrorCategory],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === timingErrorCategory.id ? timingErrorCategory : undefined,
+      getCategoryById: (categoryId) => (categoryId === timingErrorCategory.id ? timingErrorCategory : undefined),
       getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
       getParticipantById: (participantId) => participants.get(participantId),
       getParticipantLaps: () => [crossing],
@@ -2830,14 +2784,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[crossing]}
-          selectedCategories={new Set([timingErrorCategory.id])}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[crossing]} selectedCategories={new Set([timingErrorCategory.id])} selectedParticipants={new Set()} />);
     });
 
     expect(getDisplayedRecordIds(container)).toEqual(['timing-error-crossing']);
@@ -2850,7 +2797,11 @@ describe('RecentRecords integration', () => {
   });
 
   it('hides excluded-result category crossings when unrecognised records are ignored', async () => {
-    const timingErrorCategory: EventCategory = { excludeFromResults: true, id: 'error-cat', name: 'Timing Error List' };
+    const timingErrorCategory: EventCategory = {
+      excludeFromResults: true,
+      id: 'error-cat',
+      name: 'Timing Error List',
+    };
     const participant: EventParticipant = {
       categoryId: timingErrorCategory.id,
       currentResult: undefined,
@@ -2877,7 +2828,7 @@ describe('RecentRecords integration', () => {
       categories: [timingErrorCategory],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === timingErrorCategory.id ? timingErrorCategory : undefined,
+      getCategoryById: (categoryId) => (categoryId === timingErrorCategory.id ? timingErrorCategory : undefined),
       getEntrantIdForParticipant: (participantId) => participants.get(participantId)?.entrantId,
       getParticipantById: (participantId) => participants.get(participantId),
       getParticipantLaps: () => [crossing],
@@ -2888,14 +2839,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[crossing]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[crossing]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     expect(getDisplayedRecordIds(container)).toEqual(['timing-error-crossing']);
@@ -2916,9 +2860,7 @@ describe('RecentRecords integration', () => {
       entrantId: '101',
       firstname: 'Pat',
       id: '101',
-      identifiers: [
-        { fromTime: undefined, racePlate: '101', toTime: undefined },
-      ] as unknown as EventParticipant['identifiers'],
+      identifiers: [{ fromTime: undefined, racePlate: '101', toTime: undefined }] as unknown as EventParticipant['identifiers'],
       lastRecordTime: null,
       resultDuration: null,
       surname: 'Rider',
@@ -2972,10 +2914,12 @@ describe('RecentRecords integration', () => {
             selectedCategories={selectedCategories}
             selectedParticipants={recordSelectedParticipants}
           />
-          <pre data-selection-state>{JSON.stringify({
-            recordSelectedParticipants: [...recordSelectedParticipants].sort(),
-            selectedCategories: [...selectedCategories].sort(),
-          })}</pre>
+          <pre data-selection-state>
+            {JSON.stringify({
+              recordSelectedParticipants: [...recordSelectedParticipants].sort(),
+              selectedCategories: [...selectedCategories].sort(),
+            })}
+          </pre>
         </>
       );
     };
@@ -3089,7 +3033,10 @@ describe('RecentRecords integration', () => {
       [participant3.id, participant3],
     ]);
     const records = [crossing1, crossing2, crossing3];
-    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; teams: EventTeam[] } = {
+    const raceStateLookup: RaceStateLookup & {
+      categories: EventCategory[];
+      teams: EventTeam[];
+    } = {
       categories,
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
@@ -3199,7 +3146,10 @@ describe('RecentRecords integration', () => {
       [participant2.id, participant2],
     ]);
     const records = [crossing1, crossing2];
-    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; teams: EventTeam[] } = {
+    const raceStateLookup: RaceStateLookup & {
+      categories: EventCategory[];
+      teams: EventTeam[];
+    } = {
       categories,
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
@@ -3208,7 +3158,15 @@ describe('RecentRecords integration', () => {
       getParticipantById: (participantId) => participants.get(participantId),
       getParticipantLaps: () => records,
       getTransponderCrossings: () => [],
-      teams: [{ categoryId: categoryA.id, description: '', id: 'team-a', members: [participant1.id, participant2.id], name: 'Team A' }],
+      teams: [
+        {
+          categoryId: categoryA.id,
+          description: '',
+          id: 'team-a',
+          members: [participant1.id, participant2.id],
+          name: 'Team A',
+        },
+      ],
       updateCategoryDetails: () => undefined,
       updateEntrantCategory: () => undefined,
       updateParticipantCategory: () => undefined,
@@ -3216,15 +3174,7 @@ describe('RecentRecords integration', () => {
     const participantSelected = vi.fn();
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          participantSelected={participantSelected}
-          raceStateLookup={raceStateLookup}
-          records={records}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords participantSelected={participantSelected} raceStateLookup={raceStateLookup} records={records} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     const selectedRow = container.querySelector('tr[data-record-id="2001"]');
@@ -3354,11 +3304,13 @@ describe('RecentRecords integration', () => {
             selectedCategories={hilightCategories}
             selectedParticipants={recordSelectedParticipants}
           />
-          <pre data-selection-state>{JSON.stringify({
-            recordSelectedCategories: [...recordSelectedCategories].sort(),
-            recordSelectedParticipants: [...recordSelectedParticipants].sort(),
-            selectedCategories: [...selectedCategories].sort(),
-          })}</pre>
+          <pre data-selection-state>
+            {JSON.stringify({
+              recordSelectedCategories: [...recordSelectedCategories].sort(),
+              recordSelectedParticipants: [...recordSelectedParticipants].sort(),
+              selectedCategories: [...selectedCategories].sort(),
+            })}
+          </pre>
         </>
       );
     };
@@ -3380,12 +3332,14 @@ describe('RecentRecords integration', () => {
     expect(firstRow!.className).toContain('selected-category');
 
     await act(async () => {
-      firstRow!.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 60,
-        clientY: 80,
-      }));
+      firstRow!.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 60,
+          clientY: 80,
+        })
+      );
     });
 
     const changeToCategoryB = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => {
@@ -3480,15 +3434,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={records}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-          sessionValidCategoryIds={new Set([categoryA.id])}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={records} selectedCategories={new Set()} selectedParticipants={new Set()} sessionValidCategoryIds={new Set([categoryA.id])} />);
     });
 
     const relatedRow = container.querySelector('tr[data-record-id="crossing-a"]');
@@ -3566,14 +3512,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[crossing1, chequeredFlag as unknown as ParticipantPassingRecord, crossing2]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[crossing1, chequeredFlag as unknown as ParticipantPassingRecord, crossing2]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     const orderedRowIds = Array.from(container.querySelectorAll('tr[data-record-id]')).map((row) => row.getAttribute('data-record-id'));
@@ -3596,16 +3535,17 @@ describe('RecentRecords integration', () => {
       resultDuration: null,
       surname: 'Driver',
     };
-    const createCrossing = (id: string, sequence: number, time: string): ParticipantPassingRecord => ({
-      chipCode: 100101,
-      id,
-      isValid: true,
-      participantId: participant.id,
-      recordType: RECORD_TX_CROSSING,
-      sequence,
-      source: 'test-source',
-      time: new Date(time),
-    } as ParticipantPassingRecord);
+    const createCrossing = (id: string, sequence: number, time: string): ParticipantPassingRecord =>
+      ({
+        chipCode: 100101,
+        id,
+        isValid: true,
+        participantId: participant.id,
+        recordType: RECORD_TX_CROSSING,
+        sequence,
+        source: 'test-source',
+        time: new Date(time),
+      }) as ParticipantPassingRecord;
     const crossingBefore = createCrossing('crossing-before', 1, '2026-05-29T10:05:00.000Z');
     const cautionStart: FlagRecord = {
       categoryIds: [categoryA.id],
@@ -3651,14 +3591,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[crossingBefore, cautionStart, crossingDuring, cautionEnd, crossingAfter]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[crossingBefore, cautionStart, crossingDuring, cautionEnd, crossingAfter]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     expect(container.querySelector('tr[data-record-id="caution-start"]')?.textContent).toContain('Caution Period Start');
@@ -3694,13 +3627,16 @@ describe('RecentRecords integration', () => {
       source: 'test-source',
       time: new Date('2026-05-29T10:06:00.000Z'),
     } as ParticipantPassingRecord & { plateNumber: string };
-    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
+    const raceStateLookup: RaceStateLookup & {
+      categories: EventCategory[];
+      participants: EventParticipant[];
+    } = {
       categories: [categoryA],
       countTransponderCrossings: () => 0,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
-      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
-      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getCategoryById: (categoryId) => (categoryId === categoryA.id ? categoryA : undefined),
+      getEntrantIdForParticipant: (participantId) => (participantId === participant.id ? participant.entrantId : undefined),
+      getParticipantById: (participantId) => (participantId === participant.id ? participant : undefined),
       getParticipantLaps: () => [crossing],
       getTransponderCrossings: () => [],
       participants: [participant],
@@ -3710,14 +3646,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[crossing]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[crossing]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     const row = container.querySelector('tr[data-record-id="plate-crossing-1"]');
@@ -3752,13 +3681,16 @@ describe('RecentRecords integration', () => {
       source: 'test-source',
       time: new Date('2026-05-29T10:06:00.000Z'),
     } as ParticipantPassingRecord;
-    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
+    const raceStateLookup: RaceStateLookup & {
+      categories: EventCategory[];
+      participants: EventParticipant[];
+    } = {
       categories: [categoryA, categoryB],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
       getCategoryById: (categoryId) => [categoryA, categoryB].find((category) => category.id === categoryId),
-      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
-      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getEntrantIdForParticipant: (participantId) => (participantId === participant.id ? participant.entrantId : undefined),
+      getParticipantById: (participantId) => (participantId === participant.id ? participant : undefined),
       getParticipantLaps: () => undefined,
       getTransponderCrossings: () => [],
       participants: [participant],
@@ -3768,15 +3700,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[crossing]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-          sessionValidCategoryIds={new Set([categoryA.id])}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[crossing]} selectedCategories={new Set()} selectedParticipants={new Set()} sessionValidCategoryIds={new Set([categoryA.id])} />);
     });
 
     const row = container.querySelector('tr[data-record-id="tx-only-crossing"]');
@@ -3820,11 +3744,14 @@ describe('RecentRecords integration', () => {
       source: 'test-source',
       time: new Date('2026-05-29T10:08:00.000Z'),
     } as ParticipantPassingRecord & { plateNumber: string };
-    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
+    const raceStateLookup: RaceStateLookup & {
+      categories: EventCategory[];
+      participants: EventParticipant[];
+    } = {
       categories: [categoryA],
       countTransponderCrossings: () => 0,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
+      getCategoryById: (categoryId) => (categoryId === categoryA.id ? categoryA : undefined),
       getEntrantIdForParticipant: () => undefined,
       getParticipantById: () => undefined,
       getParticipantLaps: () => [],
@@ -3836,14 +3763,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[firstCrossing, secondCrossing, otherCrossing]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[firstCrossing, secondCrossing, otherCrossing]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     const firstRow = container.querySelector('tr[data-record-id="unknown-plate-1"]');
@@ -3863,20 +3783,21 @@ describe('RecentRecords integration', () => {
     expect(otherRow!.className).not.toContain('selected-plate-number');
 
     await act(async () => {
-      secondRow!.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 100,
-        clientY: 100,
-      }));
+      secondRow!.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 100,
+          clientY: 100,
+        })
+      );
     });
 
     expect(firstRow!.className).not.toContain('selected-row');
     expect(firstRow!.className).toContain('selected-plate-number');
     expect(secondRow!.className).toContain('selected-row');
     expect(secondRow!.className).toContain('selected-plate-number');
-    expect(Array.from(document.querySelectorAll('li[role="menuitem"]')).map((item) => item.textContent?.trim()))
-      .toEqual(expect.arrayContaining(['Insert record', 'Edit record', 'Exclude crossing']));
+    expect(Array.from(document.querySelectorAll('li[role="menuitem"]')).map((item) => item.textContent?.trim())).toEqual(expect.arrayContaining(['Insert record', 'Edit record', 'Exclude crossing']));
   });
 
   it('renders system-generated green race-start flags inline with crossings', async () => {
@@ -3912,13 +3833,16 @@ describe('RecentRecords integration', () => {
       source: 'test-source',
       time: new Date('2026-05-29T10:06:00.000Z'),
     } as ParticipantPassingRecord & { plateNumber: string };
-    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
+    const raceStateLookup: RaceStateLookup & {
+      categories: EventCategory[];
+      participants: EventParticipant[];
+    } = {
       categories: [categoryA],
       countTransponderCrossings: () => 0,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
-      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
-      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getCategoryById: (categoryId) => (categoryId === categoryA.id ? categoryA : undefined),
+      getEntrantIdForParticipant: (participantId) => (participantId === participant.id ? participant.entrantId : undefined),
+      getParticipantById: (participantId) => (participantId === participant.id ? participant : undefined),
       getParticipantLaps: () => [crossing],
       getTransponderCrossings: () => [],
       participants: [participant],
@@ -3928,14 +3852,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[crossing, greenFlag as unknown as ParticipantPassingRecord]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[crossing, greenFlag as unknown as ParticipantPassingRecord]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     const orderedRowIds = getDisplayedRecordIds(container);
@@ -3943,11 +3860,7 @@ describe('RecentRecords integration', () => {
     expect(container.querySelector('tr[data-record-id="677318b9-31a4-5606-a7b9-d1a9e2e79499"]')?.textContent).toContain('Green flag');
   });
 
-  it.each(recentRecordTimeZoneCases)('opens the add-record dialog for $eventTimeZone and builds a passing record with looked-up entrant details', async ({
-    eventTimeZone,
-    expectedInitialTime,
-    expectedSavedTime,
-  }) => {
+  it.each(recentRecordTimeZoneCases)('opens the add-record dialog for $eventTimeZone and builds a passing record with looked-up entrant details', async ({ eventTimeZone, expectedInitialTime, expectedSavedTime }) => {
     const categoryA: EventCategory = { id: '1', name: 'Category A' };
     const participant: EventParticipant = {
       categoryId: categoryA.id,
@@ -3980,13 +3893,17 @@ describe('RecentRecords integration', () => {
       source: 'test-source',
       time: new Date('2026-05-29T10:06:00.000Z'),
     } as ParticipantPassingRecord;
-    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[]; teams: EventTeam[] } = {
+    const raceStateLookup: RaceStateLookup & {
+      categories: EventCategory[];
+      participants: EventParticipant[];
+      teams: EventTeam[];
+    } = {
       categories: [categoryA],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
-      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
-      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getCategoryById: (categoryId) => (categoryId === categoryA.id ? categoryA : undefined),
+      getEntrantIdForParticipant: (participantId) => (participantId === participant.id ? participant.entrantId : undefined),
+      getParticipantById: (participantId) => (participantId === participant.id ? participant : undefined),
       getParticipantLaps: () => [crossing],
       getTransponderCrossings: () => [],
       participants: [participant],
@@ -4017,12 +3934,14 @@ describe('RecentRecords integration', () => {
     expect(row?.getAttribute('title')).toBe('Record ID: crossing-1');
 
     await act(async () => {
-      row!.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 80,
-        clientY: 80,
-      }));
+      row!.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 80,
+          clientY: 80,
+        })
+      );
     });
 
     const insertRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Insert record');
@@ -4071,17 +3990,25 @@ describe('RecentRecords integration', () => {
     });
 
     expect(onAddRecord).toHaveBeenCalledTimes(1);
-    expect(onAddRecord).toHaveBeenCalledWith(expect.objectContaining({
-      chipCode: 100101,
-      eventId: 'event-1',
-      lineNumber: 1,
-      loopNumber: 4,
-      plateNumber: '101',
-      recordType: RECORD_TX_CROSSING,
-      sessionId: 'session-1',
-      source: expect.any(String),
-    }));
-    expect((onAddRecord.mock.calls[0]?.[0] as ParticipantPassingRecord & { time?: Date }).time?.toISOString()).toBe(expectedSavedTime);
+    expect(onAddRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chipCode: 100101,
+        eventId: 'event-1',
+        lineNumber: 1,
+        loopNumber: 4,
+        plateNumber: '101',
+        recordType: RECORD_TX_CROSSING,
+        sessionId: 'session-1',
+        source: expect.any(String),
+      })
+    );
+    expect(
+      (
+        onAddRecord.mock.calls[0]?.[0] as ParticipantPassingRecord & {
+          time?: Date;
+        }
+      ).time?.toISOString()
+    ).toBe(expectedSavedTime);
   });
 
   it('opens the add-record dialog from a flag row and builds a category-scoped flag record', async () => {
@@ -4130,12 +4057,14 @@ describe('RecentRecords integration', () => {
     expect(row).not.toBeNull();
 
     await act(async () => {
-      row!.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 90,
-        clientY: 90,
-      }));
+      row!.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 90,
+          clientY: 90,
+        })
+      );
     });
 
     const insertRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Insert record');
@@ -4186,15 +4115,106 @@ describe('RecentRecords integration', () => {
       addButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(onAddRecord).toHaveBeenCalledWith(expect.objectContaining({
-      categoryIds: [categoryB.id],
-      eventId: 'event-1',
-      flagType: 'red',
-      flagValue: 'course',
-      sessionId: 'session-1',
-      source: expect.any(String),
-    }));
+    expect(onAddRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        categoryIds: [categoryB.id],
+        eventId: 'event-1',
+        flagType: 'red',
+        flagValue: 'course',
+        sessionId: 'session-1',
+        source: expect.any(String),
+      })
+    );
     await waitForNoDialog();
+  });
+
+  it('edits both the date and millisecond time of a flag record', async () => {
+    const category: EventCategory = { id: '1', name: 'Category A' };
+    const flag: FlagRecord = {
+      categoryIds: [category.id],
+      flagType: 'yellow',
+      flagValue: 'caution',
+      id: 'editable-flag',
+      recordType: 4,
+      sequence: 1,
+      sessionId: 'session-1',
+      source: 'test-source',
+      time: new Date('2026-05-29T03:00:00.000Z'),
+    };
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [category],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => (categoryId === category.id ? category : undefined),
+      getEntrantIdForParticipant: () => undefined,
+      getParticipantById: () => undefined,
+      getParticipantLaps: () => [],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+    const onEditRecord = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <RecentRecords
+          currentEventId="event-1"
+          currentSessionId="session-1"
+          eventTimeZone="Australia/Sydney"
+          onEditRecord={onEditRecord}
+          raceStateLookup={raceStateLookup}
+          records={[flag]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+          timeDisplayZoneMode="event"
+        />
+      );
+    });
+
+    await act(async () => {
+      container.querySelector('tr[data-record-id="editable-flag"]')!.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 90,
+          clientY: 90,
+        })
+      );
+    });
+
+    const editRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Edit record');
+    expect(editRecordMenuItem).toBeDefined();
+
+    await act(async () => {
+      editRecordMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const dateInput = document.querySelector('input[aria-label="Record date"]') as HTMLInputElement;
+    const timeInput = document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement;
+    expect(dateInput.disabled).toBe(false);
+
+    await act(async () => {
+      setInputValue(dateInput, '2026-05-30');
+      setInputValue(timeInput, '13:30:00.000');
+    });
+
+    const saveButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Save record');
+    expect(saveButton).toBeDefined();
+
+    await act(async () => {
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onEditRecord).toHaveBeenCalledTimes(1);
+    expect(onEditRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flagType: 'yellow',
+        id: flag.id,
+        sessionId: 'session-1',
+      })
+    );
+    expect((onEditRecord.mock.calls[0]?.[0] as FlagRecord).time?.toISOString()).toBe('2026-05-30T03:30:00.000Z');
   });
 
   it('opens the edit-record dialog with existing values populated and saves through the edit callback', async () => {
@@ -4226,22 +4246,26 @@ describe('RecentRecords integration', () => {
       source: createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.DBF'),
       time: new Date('2026-05-29T10:06:00.000Z'),
     } as ParticipantPassingRecord & { plateNumber: string };
-    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
+    const raceStateLookup: RaceStateLookup & {
+      categories: EventCategory[];
+      participants: EventParticipant[];
+    } = {
       categories: [categoryA],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
-      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getCategoryById: (categoryId) => (categoryId === categoryA.id ? categoryA : undefined),
+      getEntrantIdForParticipant: (participantId) => (participantId === participant.id ? participant.entrantId : undefined),
       getFinishLineNumbers: () => [1, 7],
-      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantById: (participantId) => (participantId === participant.id ? participant : undefined),
       getParticipantLaps: () => [crossing],
-      getTimeRecordSourceById: (sourceId) => sourceId === crossing.source
-        ? {
-          filePath: 'W9721R01.DBF',
-          id: crossing.source,
-          name: 'W9721R01.DBF',
-        }
-        : undefined,
+      getTimeRecordSourceById: (sourceId) =>
+        sourceId === crossing.source
+          ? {
+            filePath: 'W9721R01.DBF',
+            id: crossing.source,
+            name: 'W9721R01.DBF',
+          }
+          : undefined,
       getTransponderCrossings: () => [],
       participants: [participant],
       updateCategoryDetails: () => undefined,
@@ -4272,12 +4296,14 @@ describe('RecentRecords integration', () => {
     expect(row).not.toBeNull();
 
     await act(async () => {
-      row!.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 100,
-        clientY: 100,
-      }));
+      row!.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 100,
+          clientY: 100,
+        })
+      );
     });
 
     const editRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Edit record');
@@ -4332,17 +4358,25 @@ describe('RecentRecords integration', () => {
 
     expect(onAddRecord).not.toHaveBeenCalled();
     expect(onEditRecord).toHaveBeenCalledTimes(1);
-    expect(onEditRecord).toHaveBeenCalledWith(expect.objectContaining({
-      chipCode: 100101,
-      id: 'crossing-1',
-      lineNumber: 9,
-      loopNumber: 3,
-      plateNumber: '101',
-      sequence: 1,
-      sessionId: 'session-1',
-      source: createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.DBF'),
-    }));
-    expect((onEditRecord.mock.calls[0]?.[0] as ParticipantPassingRecord & { time?: Date }).time?.toISOString()).toBe('2026-05-29T10:06:30.500Z');
+    expect(onEditRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chipCode: 100101,
+        id: 'crossing-1',
+        lineNumber: 9,
+        loopNumber: 3,
+        plateNumber: '101',
+        sequence: 1,
+        sessionId: 'session-1',
+        source: createTimeRecordSourceId('mr-scats:W9721:source:W9721R01:W9721R01.DBF'),
+      })
+    );
+    expect(
+      (
+        onEditRecord.mock.calls[0]?.[0] as ParticipantPassingRecord & {
+          time?: Date;
+        }
+      ).time?.toISOString()
+    ).toBe('2026-05-29T10:06:30.500Z');
   });
 
   it('uses the selected recent-records display timezone inside the edit dialog', async () => {
@@ -4368,13 +4402,16 @@ describe('RecentRecords integration', () => {
       source: 'test-source',
       time: new Date('2026-05-29T10:06:00.000Z'),
     } as ParticipantPassingRecord;
-    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
+    const raceStateLookup: RaceStateLookup & {
+      categories: EventCategory[];
+      participants: EventParticipant[];
+    } = {
       categories: [categoryA],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
-      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
-      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getCategoryById: (categoryId) => (categoryId === categoryA.id ? categoryA : undefined),
+      getEntrantIdForParticipant: (participantId) => (participantId === participant.id ? participant.entrantId : undefined),
+      getParticipantById: (participantId) => (participantId === participant.id ? participant : undefined),
       getParticipantLaps: () => [crossing],
       getTransponderCrossings: () => [],
       participants: [participant],
@@ -4384,16 +4421,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          eventTimeZone="Australia/Sydney"
-          raceStateLookup={raceStateLookup}
-          records={[crossing]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-          timeDisplayZoneMode="gmt"
-        />
-      );
+      root.render(<RecentRecords eventTimeZone="Australia/Sydney" raceStateLookup={raceStateLookup} records={[crossing]} selectedCategories={new Set()} selectedParticipants={new Set()} timeDisplayZoneMode="gmt" />);
     });
 
     expect(container.querySelector('tr[data-record-id="crossing-utc-zone"]')?.textContent).toContain('2026-05-29 10:06:00.000');
@@ -4402,12 +4430,14 @@ describe('RecentRecords integration', () => {
     expect(row).not.toBeNull();
 
     await act(async () => {
-      row!.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 100,
-        clientY: 100,
-      }));
+      row!.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 100,
+          clientY: 100,
+        })
+      );
     });
 
     const editRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Edit record');
@@ -4424,41 +4454,72 @@ describe('RecentRecords integration', () => {
 
   it('shows original T9743R10 DBF filename in the edit-record source file field after NO1 metadata merges', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'racesweet-mrscats-recent-'));
-    await writeFile(path.join(tempDir, 'PRGMME.DBF'), createDbfBuffer([
-      { length: 8, name: 'EV_CODE', type: 'C' },
-      { length: 8, name: 'CATEGORY', type: 'C' },
-      { length: 60, name: 'EVENTNAME', type: 'C' },
-      { length: 8, name: 'STARTDATE', type: 'D' },
-      { length: 8, name: 'ACTUALSTRT', type: 'C' },
-    ], [
-      { ACTUALSTRT: '20:02:29', CATEGORY: 'CAT-A', EVENTNAME: 'Race 10', EV_CODE: 'T9743R10', STARTDATE: '19971206' },
-    ]));
-    await writeFile(path.join(tempDir, 'DRIVERS.DBF'), createDbfBuffer([
-      { length: 4, name: 'CARNUMBER', type: 'N' },
-      { length: 4, name: 'TXNUM', type: 'N' },
-      { length: 8, name: 'DRIV_CLASS', type: 'C' },
-      { length: 50, name: 'DRIVER', type: 'C' },
-    ], [
-      { CARNUMBER: 13, DRIVER: 'Race Ten Driver', DRIV_CLASS: 'CAT-A', TXNUM: 1234 },
-    ]));
+    await writeFile(
+      path.join(tempDir, 'PRGMME.DBF'),
+      createDbfBuffer(
+        [
+          { length: 8, name: 'EV_CODE', type: 'C' },
+          { length: 8, name: 'CATEGORY', type: 'C' },
+          { length: 60, name: 'EVENTNAME', type: 'C' },
+          { length: 8, name: 'STARTDATE', type: 'D' },
+          { length: 8, name: 'ACTUALSTRT', type: 'C' },
+        ],
+        [
+          {
+            ACTUALSTRT: '20:02:29',
+            CATEGORY: 'CAT-A',
+            EVENTNAME: 'Race 10',
+            EV_CODE: 'T9743R10',
+            STARTDATE: '19971206',
+          },
+        ]
+      )
+    );
+    await writeFile(
+      path.join(tempDir, 'DRIVERS.DBF'),
+      createDbfBuffer(
+        [
+          { length: 4, name: 'CARNUMBER', type: 'N' },
+          { length: 4, name: 'TXNUM', type: 'N' },
+          { length: 8, name: 'DRIV_CLASS', type: 'C' },
+          { length: 50, name: 'DRIVER', type: 'C' },
+        ],
+        [
+          {
+            CARNUMBER: 13,
+            DRIVER: 'Race Ten Driver',
+            DRIV_CLASS: 'CAT-A',
+            TXNUM: 1234,
+          },
+        ]
+      )
+    );
     await writeFile(path.join(tempDir, 'T9743R10.SRT'), '12348814387450006 071 20:27:45.0006 00\r');
-    await writeFile(path.join(tempDir, 'T9743R10.NO1'), createDbfBuffer([
-      { length: 4, name: 'CAR', type: 'N' },
-      { length: 4, name: 'TXNUM', type: 'N' },
-      { length: 9, name: 'ELAPSED', type: 'N' },
-      { length: 3, name: 'LINE_NO', type: 'N' },
-      { length: 3, name: 'LANE_NO', type: 'N' },
-    ], [
-      { CAR: 13, ELAPSED: 200000, LANE_NO: 2, LINE_NO: 3, TXNUM: 1234 },
-    ]));
-    await writeFile(path.join(tempDir, 'T9743R10.DBF'), createDbfBuffer([
-      { length: 4, name: 'CARNUMBER', type: 'N' },
-      { length: 4, name: 'TXNUM', type: 'N' },
-      { length: 9, name: 'ELAPSED', type: 'N' },
-      { length: 4, name: 'COUNTER', type: 'N' },
-    ], [
-      { CARNUMBER: 13, COUNTER: 1, ELAPSED: 300000, TXNUM: 1234 },
-    ]));
+    await writeFile(
+      path.join(tempDir, 'T9743R10.NO1'),
+      createDbfBuffer(
+        [
+          { length: 4, name: 'CAR', type: 'N' },
+          { length: 4, name: 'TXNUM', type: 'N' },
+          { length: 9, name: 'ELAPSED', type: 'N' },
+          { length: 3, name: 'LINE_NO', type: 'N' },
+          { length: 3, name: 'LANE_NO', type: 'N' },
+        ],
+        [{ CAR: 13, ELAPSED: 200000, LANE_NO: 2, LINE_NO: 3, TXNUM: 1234 }]
+      )
+    );
+    await writeFile(
+      path.join(tempDir, 'T9743R10.DBF'),
+      createDbfBuffer(
+        [
+          { length: 4, name: 'CARNUMBER', type: 'N' },
+          { length: 4, name: 'TXNUM', type: 'N' },
+          { length: 9, name: 'ELAPSED', type: 'N' },
+          { length: 4, name: 'COUNTER', type: 'N' },
+        ],
+        [{ CARNUMBER: 13, COUNTER: 1, ELAPSED: 300000, TXNUM: 1234 }]
+      )
+    );
     const imported = await loadMrScatsCatalogFromLocation(tempDir);
     const session = new Session({
       categories: imported.raceState.categories || [],
@@ -4468,21 +4529,10 @@ describe('RecentRecords integration', () => {
       timeRecordSources: imported.raceState.timeRecordSources || [],
     });
     const sourceFileById = new Map(session.timeRecordSources.map((source) => [source.id, source.filePath || source.name]));
-    const crossingBySourceFile = new Map(
-      (session.records as ParticipantPassingRecord[])
-        .filter((record) => record.recordType === RECORD_TX_CROSSING)
-        .map((record) => [sourceFileById.get(record.source), record] as const)
-    );
+    const crossingBySourceFile = new Map((session.records as ParticipantPassingRecord[]).filter((record) => record.recordType === RECORD_TX_CROSSING).map((record) => [sourceFileById.get(record.source), record] as const));
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={session}
-          records={session.records as EventTimeRecord[]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={session} records={session.records as EventTimeRecord[]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     for (const expectedFileName of ['T9743R10.DBF']) {
@@ -4492,12 +4542,14 @@ describe('RecentRecords integration', () => {
       expect(row).not.toBeNull();
 
       await act(async () => {
-        row!.dispatchEvent(new MouseEvent('contextmenu', {
-          bubbles: true,
-          cancelable: true,
-          clientX: 100,
-          clientY: 100,
-        }));
+        row!.dispatchEvent(
+          new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            clientX: 100,
+            clientY: 100,
+          })
+        );
       });
 
       const editRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Edit record');
@@ -4550,31 +4602,48 @@ describe('RecentRecords integration', () => {
       source: 'test-source',
       time: new Date('2026-05-29T10:06:00.000Z'),
     } as ParticipantPassingRecord;
-    const raceStateLookup: RaceStateLookup & { categories: EventCategory[]; participants: EventParticipant[] } = {
+    const raceStateLookup: RaceStateLookup & {
+      categories: EventCategory[];
+      participants: EventParticipant[];
+    } = {
       categories: [categoryA],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === categoryA.id ? categoryA : undefined,
-      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
-      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getCategoryById: (categoryId) => (categoryId === categoryA.id ? categoryA : undefined),
+      getEntrantIdForParticipant: (participantId) => (participantId === participant.id ? participant.entrantId : undefined),
+      getParticipantById: (participantId) => (participantId === participant.id ? participant : undefined),
       getParticipantLaps: () => [crossing],
-      getTimeRecordSourceById: (sourceId) => sourceId === crossing.source ? {
-        ctcTrackConfig: {
-          eventDescriptions: {},
-          networks: [{
-            lines: [{
-              line: 3,
-              loops: [{ card: 2, comPort: 1, loopNumber: 6, siteAddress: 64 }],
-              name: 'Pit Exit : Pits',
-            }],
-            name: 'South Network',
-          }],
-        },
-        description: 'Imported MR-SCATS timing records from T9743R10.DBF.',
-        filePath: 'T9743R10.DBF',
-        id: crossing.source,
-        name: 'MR-SCATS T9743R10.DBF',
-      } : undefined,
+      getTimeRecordSourceById: (sourceId) =>
+        sourceId === crossing.source
+          ? {
+            ctcTrackConfig: {
+              eventDescriptions: {},
+              networks: [
+                {
+                  lines: [
+                    {
+                      line: 3,
+                      loops: [
+                        {
+                          card: 2,
+                          comPort: 1,
+                          loopNumber: 6,
+                          siteAddress: 64,
+                        },
+                      ],
+                      name: 'Pit Exit : Pits',
+                    },
+                  ],
+                  name: 'South Network',
+                },
+              ],
+            },
+            description: 'Imported MR-SCATS timing records from T9743R10.DBF.',
+            filePath: 'T9743R10.DBF',
+            id: crossing.source,
+            name: 'MR-SCATS T9743R10.DBF',
+          }
+          : undefined,
       getTransponderCrossings: () => [],
       participants: [participant],
       updateCategoryDetails: () => undefined,
@@ -4583,14 +4652,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[crossing]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[crossing]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     const row = container.querySelector('tr[data-record-id="crossing-with-confidence"]');
@@ -4598,11 +4660,7 @@ describe('RecentRecords integration', () => {
     const cells = Array.from(row!.querySelectorAll('td'));
     expect(cells[1]?.textContent).toBe('3:6 (255.4)Pit Exit : Pits');
     expect(cells[1]?.querySelector('.recent-records-timing-line-name')?.textContent).toBe('Pit Exit : Pits');
-    expect(cells[1]?.getAttribute('title')).toBe([
-      'Data source: MR-SCATS T9743R10.DBF',
-      'File: T9743R10.DBF',
-      'Record/line 17',
-    ].join('\n'));
+    expect(cells[1]?.getAttribute('title')).toBe(['Data source: MR-SCATS T9743R10.DBF', 'File: T9743R10.DBF', 'Record/line 17'].join('\n'));
     expect(row?.className).toContain('passing-pit');
   });
 
@@ -4637,9 +4695,9 @@ describe('RecentRecords integration', () => {
       categories: [category],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === category.id ? category : undefined,
-      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
-      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getCategoryById: (categoryId) => (categoryId === category.id ? category : undefined),
+      getEntrantIdForParticipant: (participantId) => (participantId === participant.id ? participant.entrantId : undefined),
+      getParticipantById: (participantId) => (participantId === participant.id ? participant : undefined),
       getParticipantLaps: () => [crossing],
       getTransponderCrossings: () => [],
       updateCategoryDetails: () => undefined,
@@ -4648,14 +4706,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[crossing]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[crossing]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     const row = container.querySelector('tr[data-record-id="under-minimum-crossing"]');
@@ -4722,10 +4773,10 @@ describe('RecentRecords integration', () => {
       categories: [category],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === category.id ? category : undefined,
-      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getCategoryById: (categoryId) => (categoryId === category.id ? category : undefined),
+      getEntrantIdForParticipant: (participantId) => (participantId === participant.id ? participant.entrantId : undefined),
       getFinishLineNumbers: () => [1],
-      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantById: (participantId) => (participantId === participant.id ? participant : undefined),
       getParticipantLaps: () => [crossing, finishLineCrossing],
       getTransponderCrossings: () => [],
       updateCategoryDetails: () => undefined,
@@ -4734,14 +4785,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[crossing, finishLineCrossing]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[crossing, finishLineCrossing]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     const row = container.querySelector('tr[data-record-id="sector-under-minimum-crossing"]');
@@ -4805,10 +4849,10 @@ describe('RecentRecords integration', () => {
       categories: [category],
       countTransponderCrossings: () => 1,
       excludeCrossing: () => undefined,
-      getCategoryById: (categoryId) => categoryId === category.id ? category : undefined,
-      getEntrantIdForParticipant: (participantId) => participantId === participant.id ? participant.entrantId : undefined,
+      getCategoryById: (categoryId) => (categoryId === category.id ? category : undefined),
+      getEntrantIdForParticipant: (participantId) => (participantId === participant.id ? participant.entrantId : undefined),
       getFinishLineNumbers: () => [1],
-      getParticipantById: (participantId) => participantId === participant.id ? participant : undefined,
+      getParticipantById: (participantId) => (participantId === participant.id ? participant : undefined),
       getParticipantLaps: () => [crossing, finishLineCrossing],
       getTransponderCrossings: () => [],
       updateCategoryDetails: () => undefined,
@@ -4817,14 +4861,7 @@ describe('RecentRecords integration', () => {
     };
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[crossing, finishLineCrossing]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[crossing, finishLineCrossing]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     const row = container.querySelector('tr[data-record-id="sector-loop-one-no-lap-flag-crossing"]');
@@ -4849,30 +4886,23 @@ describe('RecentRecords integration', () => {
       resultDuration: null,
       surname: 'Rider',
     };
-    const createPassing = (id: string, seconds: number, lapTime: number): ParticipantPassingRecord => ({
-      chipCode: 100101,
-      id,
-      isLapCompletion: true,
-      isValid: true,
-      lapNo: seconds / 100,
-      lapTime,
-      lineNumber: 1,
-      participantId: participant.id,
-      recordType: RECORD_TX_CROSSING,
-      sequence: seconds,
-      source: 'test-source',
-      time: new Date(seconds * 1_000),
-    } as ParticipantPassingRecord);
-    const records = [
-      createPassing('lap-1', 100, 100_000),
-      createPassing('lap-2', 200, 100_000),
-      createPassing('lap-3', 300, 100_000),
-      createPassing('lap-long', 500, 200_000),
-    ];
-    const possibleRecords = [
-      ...records.slice(0, 3),
-      createPassing('lap-question', 495, 195_000),
-    ];
+    const createPassing = (id: string, seconds: number, lapTime: number): ParticipantPassingRecord =>
+      ({
+        chipCode: 100101,
+        id,
+        isLapCompletion: true,
+        isValid: true,
+        lapNo: seconds / 100,
+        lapTime,
+        lineNumber: 1,
+        participantId: participant.id,
+        recordType: RECORD_TX_CROSSING,
+        sequence: seconds,
+        source: 'test-source',
+        time: new Date(seconds * 1_000),
+      }) as ParticipantPassingRecord;
+    const records = [createPassing('lap-1', 100, 100_000), createPassing('lap-2', 200, 100_000), createPassing('lap-3', 300, 100_000), createPassing('lap-long', 500, 200_000)];
+    const possibleRecords = [...records.slice(0, 3), createPassing('lap-question', 495, 195_000)];
     const onAddRecord = vi.fn();
     const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
       categories: [category],
@@ -4881,7 +4911,7 @@ describe('RecentRecords integration', () => {
       getCategoryById: () => category,
       getEntrantIdForParticipant: () => participant.entrantId,
       getFinishLineNumbers: () => [1],
-      getParticipantById: (id) => id === participant.id ? participant : undefined,
+      getParticipantById: (id) => (id === participant.id ? participant : undefined),
       getParticipantLaps: () => records,
       getTransponderCrossings: () => [],
       updateCategoryDetails: () => undefined,
@@ -4891,15 +4921,7 @@ describe('RecentRecords integration', () => {
 
     await act(async () => {
       root.render(
-        <RecentRecords
-          currentEventId="event-1"
-          currentSessionId="session-1"
-          onAddRecord={onAddRecord}
-          raceStateLookup={raceStateLookup}
-          records={possibleRecords}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
+        <RecentRecords currentEventId="event-1" currentSessionId="session-1" onAddRecord={onAddRecord} raceStateLookup={raceStateLookup} records={possibleRecords} selectedCategories={new Set()} selectedParticipants={new Set()} />
       );
     });
 
@@ -4908,17 +4930,7 @@ describe('RecentRecords integration', () => {
     expect(possibleRow?.querySelector('[aria-label="Likely missing crossing"]')).toBeNull();
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          currentEventId="event-1"
-          currentSessionId="session-1"
-          onAddRecord={onAddRecord}
-          raceStateLookup={raceStateLookup}
-          records={records}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords currentEventId="event-1" currentSessionId="session-1" onAddRecord={onAddRecord} raceStateLookup={raceStateLookup} records={records} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
 
     let row = container.querySelector('tr[data-record-id="lap-long"]');
@@ -4931,7 +4943,13 @@ describe('RecentRecords integration', () => {
     row = container.querySelector('tr[data-record-id="lap-long"]');
 
     await act(async () => {
-      row?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 100, clientY: 100 }));
+      row?.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          clientX: 100,
+          clientY: 100,
+        })
+      );
     });
     const insertOption = Array.from(document.querySelectorAll('li')).find((item) => item.textContent === 'Insert missing crossing');
     expect(insertOption).toBeDefined();
@@ -4950,28 +4968,23 @@ describe('RecentRecords integration', () => {
       addButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(onAddRecord).toHaveBeenCalledWith(expect.objectContaining({
-      entrantId: participant.entrantId,
-      generatedReason: 'missing-crossing',
-      isGenerated: true,
-      lineNumber: 1,
-      participantId: participant.id,
-      plateNumber: '101',
-    }));
+    expect(onAddRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entrantId: participant.entrantId,
+        generatedReason: 'missing-crossing',
+        isGenerated: true,
+        lineNumber: 1,
+        participantId: participant.id,
+        plateNumber: '101',
+      })
+    );
     const addedRecord = onAddRecord.mock.calls[0]?.[0] as ParticipantPassingRecord & { chipCode?: number };
     expect(addedRecord.chipCode).toBeUndefined();
     expect(addedRecord.isExcluded).not.toBe(true);
     expect(addedRecord.time?.toISOString()).toBe('1970-01-01T00:06:40.000Z');
 
     await act(async () => {
-      root.render(
-        <RecentRecords
-          raceStateLookup={raceStateLookup}
-          records={[...records, addedRecord]}
-          selectedCategories={new Set()}
-          selectedParticipants={new Set()}
-        />
-      );
+      root.render(<RecentRecords raceStateLookup={raceStateLookup} records={[...records, addedRecord]} selectedCategories={new Set()} selectedParticipants={new Set()} />);
     });
     const generatedRow = container.querySelector(`tr[data-record-id="${addedRecord.id}"]`);
     expect(generatedRow?.className).toContain('generated-crossing');

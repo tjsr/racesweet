@@ -169,9 +169,7 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
             eventDraft={eventDraft}
             onActivateEvent={selectedEvent ? () => props.onActivateEvent(selectedEvent.id) : undefined}
             onDeleteEvent={handleDeleteEvent}
-            onSaveEventDetails={() => {
-              void saveEvent();
-            }}
+            onSaveEventDetails={() => saveEvent().then(() => undefined)}
             onUpdateEventDraft={setEventDraft}
             selectedEvent={selectedEvent}
             timeZoneOptions={timeZoneOptions}

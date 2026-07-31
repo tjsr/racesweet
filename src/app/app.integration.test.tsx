@@ -601,6 +601,22 @@ const waitForText = async (container: HTMLDivElement, text: string): Promise<voi
   throw new Error(`Timed out waiting for text: ${text}; current text: ${container.textContent?.slice(0, 1000) || ''}`);
 };
 
+const waitForAriaLabel = async (container: HTMLDivElement, ariaLabel: string): Promise<void> => {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    if (container.querySelector(`[aria-label="${ariaLabel}"]`)) {
+      return;
+    }
+
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 10);
+      });
+    });
+  }
+
+  throw new Error(`Timed out waiting for aria-label: ${ariaLabel}`);
+};
+
 const waitForInputValue = async (container: HTMLDivElement, selector: string, value: string): Promise<void> => {
   for (let attempt = 0; attempt < 120; attempt += 1) {
     const input = container.querySelector(selector) as HTMLInputElement | null;
@@ -1548,12 +1564,40 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.textContent).toContain('Show as');
     expect(container.textContent).toContain('Participant');
 
+    const showAsSelect = Array.from(container.querySelectorAll('label')).find((label) => label.textContent?.includes('Show as'))?.querySelector('select') as HTMLSelectElement;
+    await act(async () => {
+      showAsSelect.value = 'table';
+      showAsSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
     await act(async () => {
       reportViewSelect.value = 'fastest-laps';
       reportViewSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
     expect(container.querySelector('table[aria-label="Fastest Laps Report Table"]')).toBeTruthy();
+
+    const ignoreFirstLapInput = container.querySelector('input[aria-label="Ignore first lap"]') as HTMLInputElement;
+    await act(async () => {
+      ignoreFirstLapInput.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(ignoreFirstLapInput.checked).toBe(false);
+
+    await clickSectionButton(container, 'Timing');
+    await clickSectionButton(container, 'Reports');
+
+    const restoredReportViewSelect = container.querySelector('select[aria-label="Reports View Type"]') as HTMLSelectElement;
+    expect(restoredReportViewSelect.value).toBe('fastest-laps');
+    expect((container.querySelector('input[aria-label="Ignore first lap"]') as HTMLInputElement).checked).toBe(false);
+
+    await act(async () => {
+      restoredReportViewSelect.value = 'lap-times';
+      restoredReportViewSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    const restoredShowAsSelect = Array.from(container.querySelectorAll('label')).find((label) => label.textContent?.includes('Show as'))?.querySelector('select') as HTMLSelectElement;
+    expect(restoredShowAsSelect.value).toBe('table');
   });
 
   it('loads selected Reports sessions from persisted imported MR-SCATS ledger data', async () => {
@@ -3500,6 +3544,7 @@ describe('RaceSweetMainApp integration', () => {
     });
 
     await clickButtonByText(container, 'Save Event Details');
+    await waitForAriaLabel(container, 'Event details saved');
     await waitForInputValue(container, 'input[aria-label="Event Minimum Lap Time"]', '0:00:45.0000');
 
     await clickSectionButton(container, 'Timing');

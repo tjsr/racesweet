@@ -3,6 +3,7 @@ import {
   dateStringInTimeZone,
   formatMinimumLapTimeInput,
   millisecondsToTime,
+  parseDateAndTimeInputInTimeZone,
   parseMinimumLapTimeInputToMilliseconds,
   parseTimeOfDayInputInTimeZone,
   tableDateTimeStringInTimeZone,
@@ -78,6 +79,17 @@ describe('parseTimeOfDayInputInTimeZone', () => {
       '10:06:30.500',
       'Australia/Sydney'
     )?.toISOString()).toBe('2026-05-29T00:06:30.500Z');
+  });
+});
+
+describe('parseDateAndTimeInputInTimeZone', () => {
+  it('parses an editable record date and millisecond time in the displayed timezone', () => {
+    expect(parseDateAndTimeInputInTimeZone('2026-05-30', '13:30:00.000', 'Australia/Sydney')?.toISOString()).toBe('2026-05-30T03:30:00.000Z');
+  });
+
+  it('rejects invalid calendar dates and times of day', () => {
+    expect(parseDateAndTimeInputInTimeZone('2026-02-30', '13:30:00.000', 'UTC')).toBeUndefined();
+    expect(parseDateAndTimeInputInTimeZone('2026-05-30', '24:00:00.000', 'UTC')).toBeUndefined();
   });
 });
 

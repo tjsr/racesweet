@@ -1,51 +1,42 @@
-import { TZDate } from '@date-fns/tz';
-import { Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip } from '@mui/material';
 import React, { type JSX } from 'react';
+
+import { TZDate } from '@date-fns/tz';
+import { Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip,
+} from '@mui/material';
 import { DEFAULT_FASTEST_TIME_INDICATOR_COLORS, type FastestTimeIndicatorColors } from '../../app/systemConfig.ts';
 import type { MillisecondsDuration, TimeDisplayZoneMode } from '../../app/utils/timeutils.ts';
 import {
   dateStringInTimeZone,
   elapsedTimeMilliseconds,
   millisecondsToTime,
+  parseDateAndTimeInputInTimeZone,
   parseTimeOfDayInputInTimeZone,
   resolveDisplayTimeZone,
   tableDateTimeStringInTimeZone,
   timeOfDayInputStringInTimeZone,
 } from '../../app/utils/timeutils.ts';
 import type { EventDiscipline, EventSessionKind } from '../../catalog/eventCatalog.ts';
-import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../processing/category.ts';
-import { isFlagRecord } from '../../processing/flag';
-import { getLapTimeCell, getPassingLineNumber, getPassingLoopNumber, getSourceLapCompletion, getTimingLineKey, isFastestLapCandidate, isFinishLinePassing, isLapCompletionPassing } from '../../processing/laps.ts';
-import { getParticipantNumber, getParticipantTransponders } from '../../processing/participant.ts';
-import { findEntrantByChipCode, findEntrantByPlateNumber } from '../../processing/participantSearch.ts';
-import { buildManualFlagRecord, buildManualPassingRecord } from '../../processing/manualRecords.ts';
-import {
-  type MissingCrossingIndicator,
-  estimateMissingCrossingTime,
-  getPotentialMissingCrossingIndicators,
-} from '../../processing/missingCrossing.ts';
-import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../processing/timerecord.ts';
 import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../model';
 import { findCtcTrackLineName } from '../../model/ctcTrackConfig.ts';
-import { EventCategory, EventCategoryId } from '../../model/eventcategory';
 import type { EventEntry } from '../../model/entry.ts';
+import { EventCategory, EventCategoryId } from '../../model/eventcategory';
 import { EventTeam } from '../../model/eventteam.ts';
 import { FlagRecord } from '../../model/flag';
 import { createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.ts';
 import { getParticipantDisplayName } from '../../model/participantDisplay.js';
 import { EventId, SessionId } from '../../model/raceevent.ts';
 import { RaceStateLookup, getEffectiveParticipantCategoryId } from '../../model/racestate.ts';
-import {
-  EVENT_SESSION_END,
-  ParticipantPassingRecord,
-  RECORD_TX_CROSSING,
-  TimeRecordId,
-  type TimeRecordSource,
-  isPassingExcluded,
-  isPassingValid,
-} from '../../model/timerecord.ts';
+import { EVENT_SESSION_END, ParticipantPassingRecord, RECORD_TX_CROSSING, TimeRecordId, type TimeRecordSource, isPassingExcluded, isPassingValid } from '../../model/timerecord.ts';
+import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../processing/category.ts';
+import { isFlagRecord } from '../../processing/flag';
+import { getLapTimeCell, getPassingLineNumber, getPassingLoopNumber, getSourceLapCompletion, getTimingLineKey, isFastestLapCandidate, isFinishLinePassing, isLapCompletionPassing } from '../../processing/laps.ts';
+import { buildManualFlagRecord, buildManualPassingRecord } from '../../processing/manualRecords.ts';
+import { type MissingCrossingIndicator, estimateMissingCrossingTime, getPotentialMissingCrossingIndicators } from '../../processing/missingCrossing.ts';
+import { getParticipantNumber, getParticipantTransponders } from '../../processing/participant.ts';
+import { findEntrantByChipCode, findEntrantByPlateNumber } from '../../processing/participantSearch.ts';
+import { getAutomaticIdentifier, getTimeRecordIdentifier, isCrossingRecord } from '../../processing/timerecord.ts';
 import { InvalidCategoryIdError, NoCrossingError, NoParticipantError, ParticipantNotFoundError } from '../../validators/errors.ts';
-import "./recent.css";
+import './recent.css';
 
 type RecentRecordsFilterMode = 'all' | 'category' | 'entrant' | 'flags' | 'participant' | 'potentialMissingCrossings' | 'team';
 type RecentRecordsIgnoreMode = 'outsideEventWindow' | 'sectorLoops' | 'unrecognised';
@@ -202,13 +193,7 @@ const formatRecordIdTitle = (recordId: TimeRecordId): string => {
   return `Record ID: ${recordId}`;
 };
 
-const RecordInsertionMenuItem = ({
-  onClose,
-  onInsert,
-}: {
-  onClose: () => void;
-  onInsert: (recordType: AddableRecordType) => void;
-}): JSX.Element => {
+const RecordInsertionMenuItem = ({ onClose, onInsert }: { onClose: () => void; onInsert: (recordType: AddableRecordType) => void }): JSX.Element => {
   const [submenuAnchor, setSubmenuAnchor] = React.useState<HTMLElement | null>(null);
   const openSubmenu = (event: React.MouseEvent<HTMLElement>): void => {
     setSubmenuAnchor(event.currentTarget);
@@ -222,21 +207,17 @@ const RecordInsertionMenuItem = ({
     onClose();
   };
 
-  return <>
-    <MenuItem aria-haspopup="menu" aria-expanded={submenuAnchor !== null} onClick={openSubmenu}>
-      Insert record
-    </MenuItem>
-    <Menu
-      anchorEl={submenuAnchor}
-      anchorOrigin={{ horizontal: 'right', vertical: 'top' }}
-      onClose={closeSubmenu}
-      open={submenuAnchor !== null}
-      transformOrigin={{ horizontal: 'left', vertical: 'top' }}
-    >
-      <MenuItem onClick={() => insertRecord('passing')}>Passing</MenuItem>
-      <MenuItem onClick={() => insertRecord('flag')}>Flag</MenuItem>
-    </Menu>
-  </>;
+  return (
+    <>
+      <MenuItem aria-haspopup="menu" aria-expanded={submenuAnchor !== null} onClick={openSubmenu}>
+        Insert record
+      </MenuItem>
+      <Menu anchorEl={submenuAnchor} anchorOrigin={{ horizontal: 'right', vertical: 'top' }} onClose={closeSubmenu} open={submenuAnchor !== null} transformOrigin={{ horizontal: 'left', vertical: 'top' }}>
+        <MenuItem onClick={() => insertRecord('passing')}>Passing</MenuItem>
+        <MenuItem onClick={() => insertRecord('flag')}>Flag</MenuItem>
+      </Menu>
+    </>
+  );
 };
 
 const buildSelectionKey = <IdType extends string>(ids: Set<IdType>): string => {
@@ -255,17 +236,10 @@ const cloneSelectionState = (selectionState: RowSelectionState): RowSelectionSta
 };
 
 const selectionStateMatches = (left: RowSelectionState, right: RowSelectionState): boolean => {
-  return left.selectedCategoryKey === right.selectedCategoryKey &&
-    left.selectedParticipantKey === right.selectedParticipantKey &&
-    left.selectedPlateNumber === right.selectedPlateNumber &&
-    left.selectedRecordId === right.selectedRecordId;
+  return left.selectedCategoryKey === right.selectedCategoryKey && left.selectedParticipantKey === right.selectedParticipantKey && left.selectedPlateNumber === right.selectedPlateNumber && left.selectedRecordId === right.selectedRecordId;
 };
 
-const buildImmediateSelectionWindow = (
-  totalRows: number,
-  visibleRowRange: RowIndexRange,
-  rowBuffer: number = IMMEDIATE_SELECTION_ROW_BUFFER,
-): RowIndexRange => {
+const buildImmediateSelectionWindow = (totalRows: number, visibleRowRange: RowIndexRange, rowBuffer: number = IMMEDIATE_SELECTION_ROW_BUFFER): RowIndexRange => {
   if (totalRows <= 0) {
     return EMPTY_ROW_RANGE;
   }
@@ -287,11 +261,7 @@ const isRowIndexWithinRange = (index: number, rowRange: RowIndexRange): boolean 
   return index >= rowRange.start && index <= rowRange.end;
 };
 
-const buildVirtualRecordRowWindow = (
-  records: EventTimeRecord[],
-  visibleRowRange: RowIndexRange,
-  rowHeight: number
-): VirtualRecordRowWindow => {
+const buildVirtualRecordRowWindow = (records: EventTimeRecord[], visibleRowRange: RowIndexRange, rowHeight: number): VirtualRecordRowWindow => {
   if (records.length === 0) {
     return {
       end: -1,
@@ -307,18 +277,17 @@ const buildVirtualRecordRowWindow = (
       end: records.length - 1,
       paddingBottom: 0,
       paddingTop: 0,
-      rows: records.map((record, index): VirtualRecordRow => ({ index, record })),
+      rows: records.map((record, index): VirtualRecordRow => ({
+        index,
+        record,
+      })),
       start: 0,
     };
   }
 
   const hasVisibleRange = visibleRowRange.end >= visibleRowRange.start;
-  const start = hasVisibleRange
-    ? Math.max(0, visibleRowRange.start - RECENT_RECORD_ROW_OVERSCAN)
-    : 0;
-  const end = hasVisibleRange
-    ? Math.min(records.length - 1, visibleRowRange.end + RECENT_RECORD_ROW_OVERSCAN)
-    : Math.min(records.length - 1, INITIAL_RECENT_RECORD_RENDER_COUNT - 1);
+  const start = hasVisibleRange ? Math.max(0, visibleRowRange.start - RECENT_RECORD_ROW_OVERSCAN) : 0;
+  const end = hasVisibleRange ? Math.min(records.length - 1, visibleRowRange.end + RECENT_RECORD_ROW_OVERSCAN) : Math.min(records.length - 1, INITIAL_RECENT_RECORD_RENDER_COUNT - 1);
   const rows = records.slice(start, end + 1).map((record, offset): VirtualRecordRow => {
     return {
       index: start + offset,
@@ -336,9 +305,7 @@ const buildVirtualRecordRowWindow = (
 };
 
 const isElementConfiguredForVerticalScroll = (element: HTMLElement): boolean => {
-  const overflowY = typeof window !== 'undefined' && window.getComputedStyle
-    ? window.getComputedStyle(element).overflowY
-    : '';
+  const overflowY = typeof window !== 'undefined' && window.getComputedStyle ? window.getComputedStyle(element).overflowY : '';
   return overflowY === 'auto' || overflowY === 'scroll';
 };
 
@@ -368,10 +335,7 @@ const participantMapFromLookup = (raceStateLookup: RaceStateLookup): Map<EventPa
   return new Map(participantArrayFromLookup(raceStateLookup).map((participant) => [participant.id, participant]));
 };
 
-const resolveCrossingParticipant = (
-  passing: ParticipantPassingRecord,
-  raceStateLookup: RaceStateLookup
-): EventParticipant | undefined => {
+const resolveCrossingParticipant = (passing: ParticipantPassingRecord, raceStateLookup: RaceStateLookup): EventParticipant | undefined => {
   if (passing.participantId) {
     return raceStateLookup.getParticipantById(passing.participantId);
   }
@@ -394,11 +358,7 @@ const resolveCrossingParticipant = (
   return undefined;
 };
 
-const resolveParticipantForManualEntry = (
-  participantMap: Map<EventParticipantId, EventParticipant>,
-  txNo: string,
-  plate: string
-): EventParticipant | undefined => {
+const resolveParticipantForManualEntry = (participantMap: Map<EventParticipantId, EventParticipant>, txNo: string, plate: string): EventParticipant | undefined => {
   const normalizedTx = txNo.trim();
   if (normalizedTx.length > 0 && !Number.isNaN(Number(normalizedTx))) {
     const txMatch = findEntrantByChipCode(participantMap, Number(normalizedTx));
@@ -454,7 +414,9 @@ const getEditablePassingTxNo = (record: EventTimeRecord): string => {
 };
 
 const getEditablePassingPlate = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): string => {
-  const passingRecord = record as ParticipantPassingRecord & { plateNumber?: string | number };
+  const passingRecord = record as ParticipantPassingRecord & {
+    plateNumber?: string | number;
+  };
   if (passingRecord.plateNumber !== undefined) {
     return passingRecord.plateNumber.toString();
   }
@@ -472,24 +434,21 @@ const formatPassingTimingPoint = (record: ParticipantPassingRecord): string => {
   const loopNumber = getPassingLoopNumber(record);
   const confidenceFactor = (record as ParticipantPassingRecord & { confidenceFactor?: number }).confidenceFactor;
   const hitCount = (record as ParticipantPassingRecord & { hitCount?: number }).hitCount;
-  const detailText = confidenceFactor !== undefined || hitCount !== undefined
-    ? ` (${[
-      confidenceFactor !== undefined ? confidenceFactor.toString() : undefined,
-      hitCount !== undefined ? hitCount.toString() : undefined,
-    ].filter((value): value is string => value !== undefined).join('.')})`
-    : '';
+  const detailText =
+    confidenceFactor !== undefined || hitCount !== undefined
+      ? ` (${[
+        confidenceFactor !== undefined ? confidenceFactor.toString() : undefined,
+        hitCount !== undefined ? hitCount.toString() : undefined].filter((value): value is string => value !== undefined).join('.')})`
+      : '';
   if (lineNumber !== undefined) {
     return `${lineNumber}${loopNumber !== undefined ? `:${loopNumber}` : ''}${detailText}`;
   }
 
   const antenna = (record as ParticipantPassingRecord & { antenna?: number }).antenna;
-  return typeof antenna === 'number' && Number.isInteger(antenna) && antenna > 0
-    ? `${antenna}${detailText}`
-    : '';
+  return typeof antenna === 'number' && Number.isInteger(antenna) && antenna > 0 ? `${antenna}${detailText}` : '';
 };
 
-const getRecordSource = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): TimeRecordSource | undefined =>
-  raceStateLookup.getTimeRecordSourceById?.(record.source);
+const getRecordSource = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): TimeRecordSource | undefined => raceStateLookup.getTimeRecordSourceById?.(record.source);
 
 const getRecordSourceName = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): string => {
   const source = getRecordSource(record, raceStateLookup);
@@ -498,44 +457,27 @@ const getRecordSourceName = (record: EventTimeRecord, raceStateLookup: RaceState
 
 const getEditablePassingSourceFile = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): string => {
   const source = getRecordSource(record, raceStateLookup);
-  return source?.filePath ||
-    source?.name ||
-    '';
+  return source?.filePath || source?.name || '';
 };
 
-const getPassingTimingPointLineName = (
-  record: ParticipantPassingRecord,
-  raceStateLookup: RaceStateLookup
-): string | undefined => {
+const getPassingTimingPointLineName = (record: ParticipantPassingRecord, raceStateLookup: RaceStateLookup): string | undefined => {
   const source = getRecordSource(record, raceStateLookup);
   return findCtcTrackLineName(source?.ctcTrackConfig, getPassingLineNumber(record), getPassingLoopNumber(record));
 };
 
-const getPassingRecordDisplayClass = (
-  passing: ParticipantPassingRecord,
-  timingPointLineName: string | undefined,
-  raceStateLookup: RaceStateLookup
-): string => {
+const getPassingRecordDisplayClass = (passing: ParticipantPassingRecord, timingPointLineName: string | undefined, raceStateLookup: RaceStateLookup): string => {
   if (isFinishLinePassing(passing, raceStateLookup.getFinishLineNumbers?.())) {
     return 'passing-finish';
   }
 
-  return timingPointLineName?.toLowerCase().includes('pit')
-    ? 'passing-pit'
-    : 'passing-sector';
+  return timingPointLineName?.toLowerCase().includes('pit') ? 'passing-pit' : 'passing-sector';
 };
 
 const getRecordSourceLocation = (record: EventTimeRecord): string => {
-  return record.originRecordNumber !== undefined
-    ? `Record/line ${record.originRecordNumber}`
-    : '';
+  return record.originRecordNumber !== undefined ? `Record/line ${record.originRecordNumber}` : '';
 };
 
-const getEditableSourceOffsets = (
-  records: EventTimeRecord[],
-  raceStateLookup: RaceStateLookup,
-  eventTimeZone: string | undefined
-): EditableSourceOffset[] => {
+const getEditableSourceOffsets = (records: EventTimeRecord[], raceStateLookup: RaceStateLookup, eventTimeZone: string | undefined): EditableSourceOffset[] => {
   const firstRecordBySource = new Map<string, EventTimeRecord>();
   records.forEach((record) => {
     if (!record.time || firstRecordBySource.has(record.source.toString())) {
@@ -544,15 +486,17 @@ const getEditableSourceOffsets = (
     firstRecordBySource.set(record.source.toString(), record);
   });
 
-  return Array.from(firstRecordBySource.entries()).map(([sourceId, record]) => {
-    const source = raceStateLookup.getTimeRecordSourceById?.(record.source);
-    return {
-      initialTime: record.time!,
-      sourceId,
-      sourceName: source?.name || sourceId,
-      timeZone: source?.timezone || eventTimeZone || 'UTC',
-    };
-  }).sort((left, right) => left.sourceName.localeCompare(right.sourceName));
+  return Array.from(firstRecordBySource.entries())
+    .map(([sourceId, record]) => {
+      const source = raceStateLookup.getTimeRecordSourceById?.(record.source);
+      return {
+        initialTime: record.time!,
+        sourceId,
+        sourceName: source?.name || sourceId,
+        timeZone: source?.timezone || eventTimeZone || 'UTC',
+      };
+    })
+    .sort((left, right) => left.sourceName.localeCompare(right.sourceName));
 };
 
 const SourceOffsetsDialog = ({
@@ -583,46 +527,46 @@ const SourceOffsetsDialog = ({
     <Dialog fullWidth maxWidth="md" onClose={onClose} open={open}>
       <DialogTitle>Edit offsets</DialogTitle>
       <DialogContent>
-        {offsets.length === 0 ? <p>No data sources with time-of-day records are available.</p> : offsets.map((offset) => {
-          const currentTime = offsetTimes.get(offset.sourceId) || offset.initialTime;
-          return (
-            <Box key={offset.sourceId} sx={{ alignItems: 'center', display: 'flex', gap: 2, mt: 2 }}>
-              <span>{offset.sourceName}</span>
-              <TextField
-                label="Date"
-                slotProps={{ inputLabel: { shrink: true } }}
-                type="date"
-                value={dateStringInTimeZone(currentTime, offset.timeZone)}
-                onChange={(event) => {
-                  const dateParts = event.target.value.split('-').map((part) => Number(part));
-                  const timeParts = timeOfDayInputStringInTimeZone(currentTime, offset.timeZone).match(/^(\d{2}):(\d{2}):(\d{2})\.(\d{3})$/u);
-                  if (dateParts.length !== 3 || dateParts.some((part) => !Number.isInteger(part)) || !timeParts) {
-                    return;
-                  }
-                  const [year, month, day] = dateParts;
-                  const [, hour, minute, second, millisecond] = timeParts;
-                  updateOffset(offset.sourceId, currentTime, new Date(new TZDate(
-                    year!, month! - 1, day!, Number(hour), Number(minute), Number(second), Number(millisecond), offset.timeZone
-                  ).getTime()));
-                }}
-              />
-              <TextField
-                label="Time"
-                slotProps={{ inputLabel: { shrink: true } }}
-                type="time"
-                value={timeOfDayInputStringInTimeZone(currentTime, offset.timeZone)}
-                onChange={(event) => updateOffset(
-                  offset.sourceId,
-                  currentTime,
-                  parseTimeOfDayInputInTimeZone(currentTime, event.target.value, offset.timeZone)
-                )}
-              />
-              <span>{offset.timeZone}</span>
-            </Box>
-          );
-        })}
+        {offsets.length === 0 ? (
+          <p>No data sources with time-of-day records are available.</p>
+        ) : (
+          offsets.map((offset) => {
+            const currentTime = offsetTimes.get(offset.sourceId) || offset.initialTime;
+            return (
+              <Box key={offset.sourceId} sx={{ alignItems: 'center', display: 'flex', gap: 2, mt: 2 }}>
+                <span>{offset.sourceName}</span>
+                <TextField
+                  label="Date"
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  type="date"
+                  value={dateStringInTimeZone(currentTime, offset.timeZone)}
+                  onChange={(event) => {
+                    const dateParts = event.target.value.split('-').map((part) => Number(part));
+                    const timeParts = timeOfDayInputStringInTimeZone(currentTime, offset.timeZone).match(/^(\d{2}):(\d{2}):(\d{2})\.(\d{3})$/u);
+                    if (dateParts.length !== 3 || dateParts.some((part) => !Number.isInteger(part)) || !timeParts) {
+                      return;
+                    }
+                    const [year, month, day] = dateParts;
+                    const [, hour, minute, second, millisecond] = timeParts;
+                    updateOffset(offset.sourceId, currentTime, new Date(new TZDate(year!, month! - 1, day!, Number(hour), Number(minute), Number(second), Number(millisecond), offset.timeZone).getTime()));
+                  }}
+                />
+                <TextField
+                  label="Time"
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  type="time"
+                  value={timeOfDayInputStringInTimeZone(currentTime, offset.timeZone)}
+                  onChange={(event) => updateOffset(offset.sourceId, currentTime, parseTimeOfDayInputInTimeZone(currentTime, event.target.value, offset.timeZone))}
+                />
+                <span>{offset.timeZone}</span>
+              </Box>
+            );
+          })
+        )}
       </DialogContent>
-      <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
     </Dialog>
   );
 };
@@ -632,11 +576,7 @@ const getRecordSourceTooltip = (record: EventTimeRecord, raceStateLookup: RaceSt
   const sourceFile = getEditablePassingSourceFile(record, raceStateLookup);
   const sourceLocation = getRecordSourceLocation(record);
 
-  return [
-    sourceName ? `Data source: ${sourceName}` : undefined,
-    sourceFile && sourceFile !== sourceName ? `File: ${sourceFile}` : undefined,
-    sourceLocation || undefined,
-  ].filter((value): value is string => value !== undefined).join('\n');
+  return [sourceName ? `Data source: ${sourceName}` : undefined, sourceFile && sourceFile !== sourceName ? `File: ${sourceFile}` : undefined, sourceLocation || undefined].filter((value): value is string => value !== undefined).join('\n');
 };
 
 const formatRecordJson = (record: EventTimeRecord | undefined): string => {
@@ -647,10 +587,7 @@ const formatFinishLineNumbers = (raceStateLookup: RaceStateLookup): string => {
   return (raceStateLookup.getFinishLineNumbers?.() || [1]).join(', ');
 };
 
-const isLapControlCrossing = (
-  record: EventTimeRecord,
-  raceStateLookup: RaceStateLookup
-): boolean => {
+const isLapControlCrossing = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): boolean => {
   if (!isCrossingRecord(record)) {
     return false;
   }
@@ -658,12 +595,8 @@ const isLapControlCrossing = (
   return isLapCompletionForRaceState(record, raceStateLookup);
 };
 
-const isLapCompletionForRaceState = (
-  record: ParticipantPassingRecord,
-  raceStateLookup: RaceStateLookup
-): boolean => isLapCompletionPassing(record, raceStateLookup.getFinishLineNumbers?.(), (passing) => (
-  getSourceLapCompletion(passing, raceStateLookup.getTimeRecordSourceById?.(passing.source))
-));
+const isLapCompletionForRaceState = (record: ParticipantPassingRecord, raceStateLookup: RaceStateLookup): boolean =>
+  isLapCompletionPassing(record, raceStateLookup.getFinishLineNumbers?.(), (passing) => getSourceLapCompletion(passing, raceStateLookup.getTimeRecordSourceById?.(passing.source)));
 
 const getCrossingUnrelatedReason = (passing: ParticipantPassingRecord): string | undefined => {
   return passing.unrelatedReason;
@@ -742,7 +675,7 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
   const prettyType = normalizedFlagType.charAt(0).toUpperCase() + normalizedFlagType.slice(1);
   const flagText = record.description || `${prettyType} flag`;
   let flagClass = `flag ${normalizedFlagType}`;
-  
+
   if (record.categoryIds?.some((id: EventCategoryId) => props.selectedCategories?.has(id))) {
     flagClass += ' selected-category';
   }
@@ -769,9 +702,7 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
       return false;
     }
   };
-  const unassignedCategories = allCategories.filter((category) => (
-    !assignedCategoryIds.has(category.id) && categoryCanBeAssigned(category.id)
-  ));
+  const unassignedCategories = allCategories.filter((category) => !assignedCategoryIds.has(category.id) && categoryCanBeAssigned(category.id));
   const handleContextMenu = (event: React.MouseEvent): void => {
     event.preventDefault();
     props.onSelectRecord?.(record.id);
@@ -808,71 +739,66 @@ export const FlagRecordRow = (props: FlagRecordRowProps<FlagRecord>) => {
     handleClose();
   };
 
-  return (<>
-    <TableRow
-      className={flagClass}
-      data-record-id={record.id}
-      key={record.id || props.index}
-      onContextMenu={handleContextMenu}
-      style={{ cursor: 'context-menu' }}
-      title={formatRecordIdTitle(record.id)}
-      onClick={() => {
-        props.onSelectRecord?.(record.id);
-        if (props.onSelect) {
-          props.onSelect(record);
-        }
-      }}>
-      <TableCell colSpan={1}>{record.sequence}</TableCell>
-      <TableCell colSpan={2}>{flagText}</TableCell>
-      <TableCell colSpan={1}>{tableDateTimeStringInTimeZone(record.time, props.timeZone, record.timeTenthOfMillisecond)}</TableCell>
-      <TableCell colSpan={4}>{categoryText}</TableCell>
-      <TableCell colSpan={props.showSectorColumn ? 3 : 2}>{elapsedTime}</TableCell>
-    </TableRow>
-    <Menu
-      open={contextMenu !== null}
-      onClose={handleClose}
-      anchorReference="anchorPosition"
-      anchorPosition={
-        contextMenu !== null
-          ? { left: contextMenu.mouseX, top: contextMenu.mouseY }
-          : undefined
-      }
-    >
-      <RecordInsertionMenuItem onClose={handleClose} onInsert={handleInsertRecord} />
-      <MenuItem onClick={handleEditRecord}>
-        Edit record
-      </MenuItem>
-      <MenuItem onClick={handleMarkDeleted}>
-        {record.deleted ? 'Restore flag' : 'Mark deleted'}
-      </MenuItem>
-      <MenuItem disabled sx={{ fontWeight: 'bold', opacity: '1 !important' }}>
-        Remove category
-      </MenuItem>
-      {assignedCategories.length === 0 ? (
-        <MenuItem disabled sx={{ pl: 4 }}>No assigned categories</MenuItem>
-      ) : assignedCategories.map((category) => (
-        <MenuItem key={`remove-${category.id}`} onClick={() => handleRemoveCategory(category.id)} sx={{ pl: 4 }}>
-          {category.name || category.id}
+  return (
+    <>
+      <TableRow
+        className={flagClass}
+        data-record-id={record.id}
+        key={record.id || props.index}
+        onContextMenu={handleContextMenu}
+        style={{ cursor: 'context-menu' }}
+        title={formatRecordIdTitle(record.id)}
+        onClick={() => {
+          props.onSelectRecord?.(record.id);
+          if (props.onSelect) {
+            props.onSelect(record);
+          }
+        }}
+      >
+        <TableCell colSpan={1}>{record.sequence}</TableCell>
+        <TableCell colSpan={2}>{flagText}</TableCell>
+        <TableCell colSpan={1}>{tableDateTimeStringInTimeZone(record.time, props.timeZone, record.timeTenthOfMillisecond)}</TableCell>
+        <TableCell colSpan={4}>{categoryText}</TableCell>
+        <TableCell colSpan={props.showSectorColumn ? 3 : 2}>{elapsedTime}</TableCell>
+      </TableRow>
+      <Menu open={contextMenu !== null} onClose={handleClose} anchorReference="anchorPosition" anchorPosition={contextMenu !== null ? { left: contextMenu.mouseX, top: contextMenu.mouseY } : undefined}>
+        <RecordInsertionMenuItem onClose={handleClose} onInsert={handleInsertRecord} />
+        <MenuItem onClick={handleEditRecord}>Edit record</MenuItem>
+        <MenuItem onClick={handleMarkDeleted}>{record.deleted ? 'Restore flag' : 'Mark deleted'}</MenuItem>
+        <MenuItem disabled sx={{ fontWeight: 'bold', opacity: '1 !important' }}>
+          Remove category
         </MenuItem>
-      ))}
-      <MenuItem disabled sx={{ fontWeight: 'bold', opacity: '1 !important' }}>
-        Assign category
-      </MenuItem>
-      {unassignedCategories.length === 0 ? (
-        <MenuItem disabled sx={{ pl: 4 }}>No available categories</MenuItem>
-      ) : unassignedCategories.map((category) => (
-        <MenuItem key={`assign-${category.id}`} onClick={() => handleAssignCategory(category.id)} sx={{ pl: 4 }}>
-          {category.name || category.id}
+        {assignedCategories.length === 0 ? (
+          <MenuItem disabled sx={{ pl: 4 }}>
+            No assigned categories
+          </MenuItem>
+        ) : (
+          assignedCategories.map((category) => (
+            <MenuItem key={`remove-${category.id}`} onClick={() => handleRemoveCategory(category.id)} sx={{ pl: 4 }}>
+              {category.name || category.id}
+            </MenuItem>
+          ))
+        )}
+        <MenuItem disabled sx={{ fontWeight: 'bold', opacity: '1 !important' }}>
+          Assign category
         </MenuItem>
-      ))}
-    </Menu>
-  </>);
+        {unassignedCategories.length === 0 ? (
+          <MenuItem disabled sx={{ pl: 4 }}>
+            No available categories
+          </MenuItem>
+        ) : (
+          unassignedCategories.map((category) => (
+            <MenuItem key={`assign-${category.id}`} onClick={() => handleAssignCategory(category.id)} sx={{ pl: 4 }}>
+              {category.name || category.id}
+            </MenuItem>
+          ))
+        )}
+      </Menu>
+    </>
+  );
 };
 
-const categoryStringFromId = (
-  categoryId: EventCategoryId | undefined,
-  categoryLookup: (id: EventCategoryId) => EventCategory | undefined
-): string => {
+const categoryStringFromId = (categoryId: EventCategoryId | undefined, categoryLookup: (id: EventCategoryId) => EventCategory | undefined): string => {
   if (!categoryId) {
     throw new InvalidCategoryIdError(`No category ID provided for lookup.`);
   }
@@ -883,21 +809,14 @@ const categoryStringFromId = (
   return category.name || `Unnamed Category &${categoryId}`;
 };
 
-const categoryStringFromParticipant = (
-  participant: EventParticipant,
-  categoryLookup: (id: EventCategoryId) => EventCategory | undefined
-): string => {
+const categoryStringFromParticipant = (participant: EventParticipant, categoryLookup: (id: EventCategoryId) => EventCategory | undefined): string => {
   if (!participant.categoryId) {
     return 'No category';
   }
   return categoryStringFromId(participant.categoryId, categoryLookup);
 };
 
-const categoryStringFromParticipantId = (
-  participantId: EventParticipantId,
-  participantLookup: (id: EventParticipantId) => EventParticipant | undefined,
-  categoryLookup: (id: EventCategoryId) => EventCategory | undefined
-): string => {
+const categoryStringFromParticipantId = (participantId: EventParticipantId, participantLookup: (id: EventParticipantId) => EventParticipant | undefined, categoryLookup: (id: EventCategoryId) => EventCategory | undefined): string => {
   if (!participantId) {
     throw new NoParticipantError(`No participant ID provided for lookup.`);
   }
@@ -908,11 +827,7 @@ const categoryStringFromParticipantId = (
   return categoryStringFromParticipant(participant, categoryLookup);
 };
 
-const _categoriesFromCrossing = (
-  crossing: ParticipantPassingRecord | undefined,
-  participantLookup: (id: EventParticipantId) => EventParticipant | undefined,
-  categoryLookup: (id: EventCategoryId) => EventCategory | undefined
-): string => {
+const _categoriesFromCrossing = (crossing: ParticipantPassingRecord | undefined, participantLookup: (id: EventParticipantId) => EventParticipant | undefined, categoryLookup: (id: EventCategoryId) => EventCategory | undefined): string => {
   if (!crossing) {
     throw new NoCrossingError();
   }
@@ -938,43 +853,55 @@ interface _CompletedLapProps {
   elapsedTime: MillisecondsDuration;
 }
 
-const UnknownChipRow = (
-  { timeRecordId, sequenceNumber, txNo, passingTime, rs, identifier, antennae, cautionRecordIds, onOpenAddRecordDialog, onOpenEditRecordDialog, onSelectRecord, onSelectUnrecognisedPlateNumber, plateNumber, record, selectedPlateNumber, selectedRecordId, showSectorColumn, timeZone }: {
-    antennae: string
-    cautionRecordIds?: Set<string>,
-    onOpenAddRecordDialog?: (record: EventTimeRecord, recordType: AddableRecordType) => void,
-    onOpenEditRecordDialog?: (record: EventTimeRecord) => void,
-    onSelectRecord?: (recordId: TimeRecordId | undefined) => void,
-    onSelectUnrecognisedPlateNumber?: (plateNumber: string | undefined) => void,
-    plateNumber?: string,
-    record: EventTimeRecord,
-    selectedPlateNumber?: string,
-    selectedRecordId?: TimeRecordId,
-    showSectorColumn?: boolean,
-    txNo: number | undefined,
-    sequenceNumber: number
-    passingTime: Date,
-    timeRecordId: TimeRecordId,
-    rs: RaceStateLookup,
-    identifier: string,
-    timeZone?: string,
-  }
-): JSX.Element => {
+const UnknownChipRow = ({
+  timeRecordId,
+  sequenceNumber,
+  txNo,
+  passingTime,
+  rs,
+  identifier,
+  antennae,
+  cautionRecordIds,
+  onOpenAddRecordDialog,
+  onOpenEditRecordDialog,
+  onSelectRecord,
+  onSelectUnrecognisedPlateNumber,
+  plateNumber,
+  record,
+  selectedPlateNumber,
+  selectedRecordId,
+  showSectorColumn,
+  timeZone,
+}: {
+  antennae: string;
+  cautionRecordIds?: Set<string>;
+  onOpenAddRecordDialog?: (record: EventTimeRecord, recordType: AddableRecordType) => void;
+  onOpenEditRecordDialog?: (record: EventTimeRecord) => void;
+  onSelectRecord?: (recordId: TimeRecordId | undefined) => void;
+  onSelectUnrecognisedPlateNumber?: (plateNumber: string | undefined) => void;
+  plateNumber?: string;
+  record: EventTimeRecord;
+  selectedPlateNumber?: string;
+  selectedRecordId?: TimeRecordId;
+  showSectorColumn?: boolean;
+  txNo: number | undefined;
+  sequenceNumber: number;
+  passingTime: Date;
+  timeRecordId: TimeRecordId;
+  rs: RaceStateLookup;
+  identifier: string;
+  timeZone?: string;
+}): JSX.Element => {
   const [contextMenu, setContextMenu] = React.useState<{
     mouseX: number;
     mouseY: number;
   } | null>(null);
   const txCount = txNo !== undefined ? rs.countTransponderCrossings(txNo, passingTime) : undefined;
-  const content = plateNumber
-    ? `Unknown race number #${plateNumber}`
-    : `Unknown transponder ${identifier} (${txCount})`;
+  const content = plateNumber ? `Unknown race number #${plateNumber}` : `Unknown transponder ${identifier} (${txCount})`;
   const timeString = tableDateTimeStringInTimeZone(passingTime, timeZone);
   const isSelectedPlate = plateNumber !== undefined && plateNumber.length > 0 && plateNumber === selectedPlateNumber;
   const cautionCellClassName = cautionRecordIds?.has(timeRecordId.toString()) ? 'caution-period-cell' : undefined;
-  const rowClassName = [
-    timeRecordId === selectedRecordId ? 'selected-row' : '',
-    isSelectedPlate ? 'selected-plate-number' : '',
-  ].filter((value) => value.length > 0).join(' ') || undefined;
+  const rowClassName = [timeRecordId === selectedRecordId ? 'selected-row' : '', isSelectedPlate ? 'selected-plate-number' : ''].filter((value) => value.length > 0).join(' ') || undefined;
   const handleSelect = (): void => {
     onSelectRecord?.(timeRecordId);
     onSelectUnrecognisedPlateNumber?.(plateNumber);
@@ -1004,15 +931,7 @@ const UnknownChipRow = (
 
   return (
     <>
-      <TableRow
-        className={rowClassName}
-        key={timeRecordId}
-        data-record-id={timeRecordId}
-        onContextMenu={handleContextMenu}
-        onClick={handleSelect}
-        style={{ cursor: 'context-menu' }}
-        title={formatRecordIdTitle(timeRecordId)}
-      >
+      <TableRow className={rowClassName} key={timeRecordId} data-record-id={timeRecordId} onContextMenu={handleContextMenu} onClick={handleSelect} style={{ cursor: 'context-menu' }} title={formatRecordIdTitle(timeRecordId)}>
         <TableCell className={cautionCellClassName}>{sequenceNumber}</TableCell>
         <TableCell className={cautionCellClassName}>{antennae}</TableCell>
         <TableCell className={cautionCellClassName}>{txNo ?? ''}</TableCell>
@@ -1020,20 +939,9 @@ const UnknownChipRow = (
         <TableCell>{plateNumber || ''}</TableCell>
         <TableCell colSpan={showSectorColumn ? 7 : 6}>{content}</TableCell>
       </TableRow>
-      <Menu
-        open={contextMenu !== null}
-        onClose={handleClose}
-        anchorReference="anchorPosition"
-        anchorPosition={
-          contextMenu !== null
-            ? { left: contextMenu.mouseX, top: contextMenu.mouseY }
-            : undefined
-        }
-      >
+      <Menu open={contextMenu !== null} onClose={handleClose} anchorReference="anchorPosition" anchorPosition={contextMenu !== null ? { left: contextMenu.mouseX, top: contextMenu.mouseY } : undefined}>
         <RecordInsertionMenuItem onClose={handleClose} onInsert={handleInsertRecord} />
-        <MenuItem onClick={handleEditRecord}>
-          Edit record
-        </MenuItem>
+        <MenuItem onClick={handleEditRecord}>Edit record</MenuItem>
       </Menu>
     </>
   );
@@ -1064,18 +972,16 @@ interface PassingRecordRowProps {
   showSectorColumn?: boolean;
 }
 
-export const PassingRecordRow = (
-  props: PassingRecordRowProps
-): JSX.Element => {
+export const PassingRecordRow = (props: PassingRecordRowProps): JSX.Element => {
   const passing: ParticipantPassingRecord = props.passing;
   const rs: RaceStateLookup = props.raceStateLookup;
-  
+
   const [contextMenu, setContextMenu] = React.useState<{
     mouseX: number;
     mouseY: number;
   } | null>(null);
 
-  const recordPlateNumber = ((passing as ParticipantPassingRecord & { plateNumber?: string | number }).plateNumber);
+  const recordPlateNumber = (passing as ParticipantPassingRecord & { plateNumber?: string | number }).plateNumber;
   const normalizedRecordPlateNumber = recordPlateNumber === undefined || recordPlateNumber === null ? undefined : recordPlateNumber.toString().trim();
   const automaticIdentifier = getAutomaticIdentifier(passing);
   const txNo = automaticIdentifier !== undefined && automaticIdentifier > 0 ? automaticIdentifier : undefined;
@@ -1102,7 +1008,7 @@ export const PassingRecordRow = (
           mouseX: event.clientX + 2,
           mouseY: event.clientY - 6,
         }
-        : null,
+        : null
     );
   };
 
@@ -1159,10 +1065,7 @@ export const PassingRecordRow = (
   if (resolvedParticipant) {
     const categoryLookup = props.raceStateLookup.getCategoryById.bind(props.raceStateLookup);
     const effectiveCategoryId = getEffectiveParticipantCategoryId(props.raceStateLookup, resolvedParticipant);
-    categoryStr = categoryStringFromParticipant(
-      effectiveCategoryId ? { ...resolvedParticipant, categoryId: effectiveCategoryId } : resolvedParticipant,
-      categoryLookup,
-    );
+    categoryStr = categoryStringFromParticipant(effectiveCategoryId ? { ...resolvedParticipant, categoryId: effectiveCategoryId } : resolvedParticipant, categoryLookup);
   }
 
   if (entrant) {
@@ -1172,7 +1075,7 @@ export const PassingRecordRow = (
     }
     plateNumber = getParticipantNumber(entrant);
     entrantName = getPassingEntrantName(entrant, rs);
-    const entrantLaps: ParticipantPassingRecord[] | undefined |null = rs.getParticipantLaps(entrant.id);
+    const entrantLaps: ParticipantPassingRecord[] | undefined | null = rs.getParticipantLaps(entrant.id);
     if (entrantLaps) {
       // const lap = entrantLaps.find((l) => l.timeRecordId === evt.id);
       lapNo = passingIsValid ? passing?.lapNo?.toString() || '' : '';
@@ -1239,15 +1142,11 @@ export const PassingRecordRow = (
     props.lapTimeIndicators?.entrantFaster ? 'entrantFaster' : '',
     props.lapTimeIndicators?.entrantFastest ? 'entrantFastest' : '',
     props.lapTimeIndicators?.overallFastest ? 'overallFastest' : '',
-  ].filter((classItem) => classItem.length > 0).join(' ');
-  const lapNumberCellClasses = [
-    cellClasses,
-    props.lapTimeIndicators?.sameLapAsLeader ? 'same-lap-as-leader' : '',
-  ].filter((classItem) => classItem.length > 0).join(' ');
-  const cautionCellClasses = [
-    cellClasses,
-    props.cautionRecordIds?.has(passing.id.toString()) ? 'caution-period-cell' : '',
-  ].filter((classItem) => classItem.length > 0).join(' ');
+  ]
+    .filter((classItem) => classItem.length > 0)
+    .join(' ');
+  const lapNumberCellClasses = [cellClasses, props.lapTimeIndicators?.sameLapAsLeader ? 'same-lap-as-leader' : ''].filter((classItem) => classItem.length > 0).join(' ');
+  const cautionCellClasses = [cellClasses, props.cautionRecordIds?.has(passing.id.toString()) ? 'caution-period-cell' : ''].filter((classItem) => classItem.length > 0).join(' ');
   const unrelatedReason = getCrossingUnrelatedReason(passing);
 
   return (
@@ -1259,13 +1158,12 @@ export const PassingRecordRow = (
         onContextMenu={handleContextMenu}
         style={{ cursor: 'context-menu' }}
         title={passing.isGenerated ? `Generated missing crossing · ${formatRecordIdTitle(passing.id)}` : formatRecordIdTitle(passing.id)}
-        onClick={handleSelect}>
+        onClick={handleSelect}
+      >
         <TableCell className={cautionCellClasses}>{passing.sequence}</TableCell>
         <TableCell className={cautionCellClasses} title={sourceTooltip}>
           {timingPoint}
-          {timingPointLineName ? (
-            <div className="recent-records-timing-line-name">{timingPointLineName}</div>
-          ) : null}
+          {timingPointLineName ? <div className="recent-records-timing-line-name">{timingPointLineName}</div> : null}
         </TableCell>
         <TableCell className={cautionCellClasses}>{identifier}</TableCell>
         <TableCell className={cautionCellClasses}>{timeString}</TableCell>
@@ -1279,68 +1177,48 @@ export const PassingRecordRow = (
           <span>{lapTime}</span>
           {props.lapTimeIndicators?.missingCrossingIndicator === 'possible' ? (
             <Tooltip title="Lap time is more than 190% but less than 198% of this entrant's fastest lap; it may be too fast to represent two laps">
-              <span aria-label="Possible missing crossing" className="missing-crossing-indicator missing-crossing-question" role="img">?</span>
+              <span aria-label="Possible missing crossing" className="missing-crossing-indicator missing-crossing-question" role="img">
+                ?
+              </span>
             </Tooltip>
           ) : null}
           {props.lapTimeIndicators?.missingCrossingIndicator === 'likely' ? (
             <Tooltip title="Lap time is at least 198% of this entrant's fastest lap; a crossing is likely to be missing">
-              <span aria-label="Likely missing crossing" className="missing-crossing-indicator missing-crossing-warning" role="img">!</span>
+              <span aria-label="Likely missing crossing" className="missing-crossing-indicator missing-crossing-warning" role="img">
+                !
+              </span>
             </Tooltip>
           ) : null}
           {unrelatedReason ? (
             <Tooltip title={unrelatedReason}>
-              <span
-                aria-label={unrelatedReason}
-                className="unrelated-reason-marker"
-                role="img"
-              >
+              <span aria-label={unrelatedReason} className="unrelated-reason-marker" role="img">
                 !
               </span>
             </Tooltip>
           ) : null}
         </TableCell>
       </TableRow>
-      <Menu
-        open={contextMenu !== null}
-        onClose={handleClose}
-        anchorReference="anchorPosition"
-        anchorPosition={
-          contextMenu !== null
-            ? { left: contextMenu.mouseX, top: contextMenu.mouseY,  }
-            : undefined
-        }
-      >
+      <Menu open={contextMenu !== null} onClose={handleClose} anchorReference="anchorPosition" anchorPosition={contextMenu !== null ? { left: contextMenu.mouseX, top: contextMenu.mouseY } : undefined}>
         <RecordInsertionMenuItem onClose={handleClose} onInsert={handleInsertRecord} />
-        <MenuItem onClick={handleEditRecord}>
-          Edit record
-        </MenuItem>
-        {props.lapTimeIndicators?.missingCrossingIndicator ? (
-          <MenuItem onClick={handleInsertMissingCrossing}>Insert missing crossing</MenuItem>
-        ) : null}
-        <MenuItem onClick={handleExclude}>
-          {passing.isExcluded === true ? 'Include crossing' : 'Exclude crossing'}
-        </MenuItem>
-        
-        {resolvedParticipant && allCategories.length > 0 && [
+        <MenuItem onClick={handleEditRecord}>Edit record</MenuItem>
+        {props.lapTimeIndicators?.missingCrossingIndicator ? <MenuItem onClick={handleInsertMissingCrossing}>Insert missing crossing</MenuItem> : null}
+        <MenuItem onClick={handleExclude}>{passing.isExcluded === true ? 'Include crossing' : 'Exclude crossing'}</MenuItem>
+
+        {resolvedParticipant &&
+          allCategories.length > 0 && [
           <MenuItem key="cat-header" disabled sx={{ fontWeight: 'bold', opacity: '1 !important' }}>
-            Change Category
+              Change Category
           </MenuItem>,
           ...allCategories.map((cat) => (
-            <MenuItem 
-              key={cat.id} 
-              onClick={() => handleChangeCategory(cat.id)}
-              selected={getEffectiveParticipantCategoryId(props.raceStateLookup, resolvedParticipant) === cat.id}
-              sx={{ pl: 4 }}
-            >
+            <MenuItem key={cat.id} onClick={() => handleChangeCategory(cat.id)} selected={getEffectiveParticipantCategoryId(props.raceStateLookup, resolvedParticipant) === cat.id} sx={{ pl: 4 }}>
               {cat.name}
             </MenuItem>
-          ))
+          )),
         ]}
       </Menu>
     </>
   );
 };
-
 
 const RecordRowComponent = (props: RecentRecordRowProps) => {
   const flagRecordSelected = (record: FlagRecord): void => {
@@ -1350,24 +1228,26 @@ const RecordRowComponent = (props: RecentRecordRowProps) => {
   };
   const record = props.record;
   if (isFlagRecord(record)) {
-    return <FlagRecordRow
-      record={record}
-      index={props.index}
-      raceStateLookup={props.raceStateLookup}
-      selectedCategories={props.selectedCategories}
-      selectedPlateNumber={props.selectedPlateNumber}
-      selectedRecordId={props.selectedRecordId}
-      onAssignFlagCategory={props.onAssignFlagCategory}
-      onMarkFlagDeleted={props.onMarkFlagDeleted}
-      onOpenAddRecordDialog={props.onOpenAddRecordDialog}
-      onOpenEditRecordDialog={props.onOpenEditRecordDialog}
-      onRemoveFlagCategory={props.onRemoveFlagCategory}
-      onSelectRecord={props.onSelectRecord}
-      onSelectUnrecognisedPlateNumber={props.onSelectUnrecognisedPlateNumber}
-      onSelect={flagRecordSelected}
-      showSectorColumn={props.showSectorColumn}
-      timeZone={props.timeZone}
-    />;
+    return (
+      <FlagRecordRow
+        record={record}
+        index={props.index}
+        raceStateLookup={props.raceStateLookup}
+        selectedCategories={props.selectedCategories}
+        selectedPlateNumber={props.selectedPlateNumber}
+        selectedRecordId={props.selectedRecordId}
+        onAssignFlagCategory={props.onAssignFlagCategory}
+        onMarkFlagDeleted={props.onMarkFlagDeleted}
+        onOpenAddRecordDialog={props.onOpenAddRecordDialog}
+        onOpenEditRecordDialog={props.onOpenEditRecordDialog}
+        onRemoveFlagCategory={props.onRemoveFlagCategory}
+        onSelectRecord={props.onSelectRecord}
+        onSelectUnrecognisedPlateNumber={props.onSelectUnrecognisedPlateNumber}
+        onSelect={flagRecordSelected}
+        showSectorColumn={props.showSectorColumn}
+        timeZone={props.timeZone}
+      />
+    );
   }
 
   let passing: ParticipantPassingRecord;
@@ -1381,11 +1261,7 @@ const RecordRowComponent = (props: RecentRecordRowProps) => {
       }
 
       if (props.selectedParticipants?.has(selectionParticipant.id)) {
-        if (
-          props.preserveSelectedParticipantSelection &&
-          props.selectedRecordId !== undefined &&
-          props.selectedRecordId !== passingRecord.id
-        ) {
+        if (props.preserveSelectedParticipantSelection && props.selectedRecordId !== undefined && props.selectedRecordId !== passingRecord.id) {
           return;
         }
         props.onSelectRecord?.(undefined);
@@ -1412,65 +1288,69 @@ const RecordRowComponent = (props: RecentRecordRowProps) => {
       }
     };
 
-    return <PassingRecordRow
-      cautionRecordIds={props.cautionRecordIds}
-      displayedLapTime={props.displayedLapTime?.(passing)}
-      lapTimeIndicators={props.lapTimeIndicators}
-      raceStateLookup={props.raceStateLookup}
-      passing={passing}
-      resolvedParticipant={resolveCrossingParticipant(passing, props.raceStateLookup)}
-      selectedCategories={props.selectedCategories}
-      selectedPlateNumber={props.selectedPlateNumber}
-      selectedParticipants={props.selectedParticipants}
-      sectorTime={props.sectorTimesByRecordId?.get(passing.id)}
-      sessionValidCategoryIds={props.sessionValidCategoryIds}
-      selectedRecordId={props.selectedRecordId}
-      showSectorColumn={props.showSectorColumn}
-      onSelect={passingRecordSelected}
-      onExclude={props.onExclude}
-      onChangeCategory={props.onChangeCategory}
-      onOpenAddRecordDialog={props.onOpenAddRecordDialog}
-      onOpenEditRecordDialog={props.onOpenEditRecordDialog}
-      onOpenMissingCrossingDialog={props.onOpenMissingCrossingDialog}
-      onSelectRecord={props.onSelectRecord}
-      onSelectUnrecognisedPlateNumber={props.onSelectUnrecognisedPlateNumber}
-      timeZone={props.timeZone}
-    />;
+    return (
+      <PassingRecordRow
+        cautionRecordIds={props.cautionRecordIds}
+        displayedLapTime={props.displayedLapTime?.(passing)}
+        lapTimeIndicators={props.lapTimeIndicators}
+        raceStateLookup={props.raceStateLookup}
+        passing={passing}
+        resolvedParticipant={resolveCrossingParticipant(passing, props.raceStateLookup)}
+        selectedCategories={props.selectedCategories}
+        selectedPlateNumber={props.selectedPlateNumber}
+        selectedParticipants={props.selectedParticipants}
+        sectorTime={props.sectorTimesByRecordId?.get(passing.id)}
+        sessionValidCategoryIds={props.sessionValidCategoryIds}
+        selectedRecordId={props.selectedRecordId}
+        showSectorColumn={props.showSectorColumn}
+        onSelect={passingRecordSelected}
+        onExclude={props.onExclude}
+        onChangeCategory={props.onChangeCategory}
+        onOpenAddRecordDialog={props.onOpenAddRecordDialog}
+        onOpenEditRecordDialog={props.onOpenEditRecordDialog}
+        onOpenMissingCrossingDialog={props.onOpenMissingCrossingDialog}
+        onSelectRecord={props.onSelectRecord}
+        onSelectUnrecognisedPlateNumber={props.onSelectUnrecognisedPlateNumber}
+        timeZone={props.timeZone}
+      />
+    );
   }
 
   const identifier = getTimeRecordIdentifier(record, true);
   const automaticIdentifier = getAutomaticIdentifier(record);
   const txNo = automaticIdentifier !== undefined && automaticIdentifier > 0 ? automaticIdentifier : undefined;
-  const plateNumber = ((record as EventTimeRecord & { plateNumber?: string | number }).plateNumber);
+  const plateNumber = (record as EventTimeRecord & { plateNumber?: string | number }).plateNumber;
   const normalizedPlateNumber = plateNumber === undefined || plateNumber === null ? undefined : plateNumber.toString();
   // if (!plateNumber) {
-  return <UnknownChipRow
-    sequenceNumber={record.sequence}
-    timeRecordId={record.id}
-    antennae={isCrossingRecord(record) ? formatPassingTimingPoint(record as ParticipantPassingRecord) : '?'}
-    onOpenAddRecordDialog={props.onOpenAddRecordDialog}
-    onOpenEditRecordDialog={props.onOpenEditRecordDialog}
-    onSelectRecord={props.onSelectRecord}
-    onSelectUnrecognisedPlateNumber={props.onSelectUnrecognisedPlateNumber}
-    passingTime={record.time!}
-    plateNumber={normalizedPlateNumber}
-    record={record}
-    selectedPlateNumber={props.selectedPlateNumber}
-    selectedRecordId={props.selectedRecordId}
-    showSectorColumn={props.showSectorColumn}
-    cautionRecordIds={props.cautionRecordIds}
-    txNo={txNo}
-    identifier={identifier}
-    rs={props.raceStateLookup}
-    timeZone={props.timeZone}
-  />;
+  return (
+    <UnknownChipRow
+      sequenceNumber={record.sequence}
+      timeRecordId={record.id}
+      antennae={isCrossingRecord(record) ? formatPassingTimingPoint(record as ParticipantPassingRecord) : '?'}
+      onOpenAddRecordDialog={props.onOpenAddRecordDialog}
+      onOpenEditRecordDialog={props.onOpenEditRecordDialog}
+      onSelectRecord={props.onSelectRecord}
+      onSelectUnrecognisedPlateNumber={props.onSelectUnrecognisedPlateNumber}
+      passingTime={record.time!}
+      plateNumber={normalizedPlateNumber}
+      record={record}
+      selectedPlateNumber={props.selectedPlateNumber}
+      selectedRecordId={props.selectedRecordId}
+      showSectorColumn={props.showSectorColumn}
+      cautionRecordIds={props.cautionRecordIds}
+      txNo={txNo}
+      identifier={identifier}
+      rs={props.raceStateLookup}
+      timeZone={props.timeZone}
+    />
+  );
   // (passing, rs, identifier, ant, timeString);
   // }
   // const plateNumberString: string = plateNumber?.toString() || '';
 
   // if (!entrantName) {
   //   entrantName = '';
-  // } 
+  // }
 
   // let categoryName = 'No category';
   // const timeString = tableTimeString(record.time);
@@ -1493,7 +1373,8 @@ const RecordRowComponent = (props: RecentRecordRowProps) => {
 };
 
 const recordRowPropsAreEqual = (previousProps: RecentRecordRowProps, nextProps: RecentRecordRowProps): boolean => {
-  return previousProps.record === nextProps.record &&
+  return (
+    previousProps.record === nextProps.record &&
     previousProps.index === nextProps.index &&
     previousProps.raceStateLookup === nextProps.raceStateLookup &&
     previousProps.lapTimeIndicators === nextProps.lapTimeIndicators &&
@@ -1518,7 +1399,8 @@ const recordRowPropsAreEqual = (previousProps: RecentRecordRowProps, nextProps: 
     previousProps.cautionRecordIds === nextProps.cautionRecordIds &&
     previousProps.sectorTimesByRecordId === nextProps.sectorTimesByRecordId &&
     previousProps.showSectorColumn === nextProps.showSectorColumn &&
-    previousProps.timeZone === nextProps.timeZone;
+    previousProps.timeZone === nextProps.timeZone
+  );
 };
 
 export const RecordRow = React.memo(RecordRowComponent, recordRowPropsAreEqual);
@@ -1551,25 +1433,9 @@ export const Warnings = ({ warnings }: { warnings: string[] }): JSX.Element => {
   );
 };
 
-const getHeadings = (showSectorColumn: boolean): string[] => ([
-  'Seq',
-  'Timing',
-  'TxNo',
-  'Date/time',
-  'Number',
-  'Entrant',
-  'Category',
-  'Lap#',
-  'Elapsed Time',
-  ...(showSectorColumn ? ['Sector'] : []),
-  'Lap Time',
-]);
+const getHeadings = (showSectorColumn: boolean): string[] => ['Seq', 'Timing', 'TxNo', 'Date/time', 'Number', 'Entrant', 'Category', 'Lap#', 'Elapsed Time', ...(showSectorColumn ? ['Sector'] : []), 'Lap Time'];
 
-const recordMatchesSelectedCategory = (
-  record: EventTimeRecord,
-  raceStateLookup: RaceStateLookup,
-  selectedCategories: Set<EventCategoryId>
-): boolean => {
+const recordMatchesSelectedCategory = (record: EventTimeRecord, raceStateLookup: RaceStateLookup, selectedCategories: Set<EventCategoryId>): boolean => {
   if (selectedCategories.size === 0) {
     return false;
   }
@@ -1588,11 +1454,11 @@ const recordMatchesSelectedCategory = (
   return !!categoryId && selectedCategories.has(categoryId) && !shouldExcludeCategoryFromResults(category);
 };
 
-const selectedTeamMemberIds = (
-  raceStateLookup: RaceStateLookup,
-  selectedParticipants: Set<EventParticipantId>
-): Set<EventParticipantId> => {
-  const raceState = raceStateLookup as RaceStateLookup & { entries?: EventEntry[]; teams?: EventTeam[] };
+const selectedTeamMemberIds = (raceStateLookup: RaceStateLookup, selectedParticipants: Set<EventParticipantId>): Set<EventParticipantId> => {
+  const raceState = raceStateLookup as RaceStateLookup & {
+    entries?: EventEntry[];
+    teams?: EventTeam[];
+  };
   const teams = raceState.teams || [];
   const selectedTeam = teams.find((team) => team.members.some((memberId) => selectedParticipants.has(memberId)));
   const selectedEntryId = Array.from(selectedParticipants)
@@ -1603,10 +1469,7 @@ const selectedTeamMemberIds = (
   return new Set<EventParticipantId>(selectedTeam?.members || selectedEntry?.participantIds || []);
 };
 
-const selectedEntrantIds = (
-  raceStateLookup: RaceStateLookup,
-  selectedParticipants: Set<EventParticipantId>
-): Set<string> => {
+const selectedEntrantIds = (raceStateLookup: RaceStateLookup, selectedParticipants: Set<EventParticipantId>): Set<string> => {
   return new Set<string>(
     Array.from(selectedParticipants)
       .map((participantId) => raceStateLookup.getEntrantIdForParticipant(participantId)?.toString())
@@ -1619,23 +1482,14 @@ const hasMultiParticipantEntry = (raceStateLookup: RaceStateLookup): boolean => 
     entries?: Array<{ participantIds: EventParticipantId[] }>;
     teams?: EventTeam[];
   };
-  return (raceState.entries || []).some((entry) => entry.participantIds.length > 1) ||
-    (raceState.teams || []).some((team) => team.members.length > 1);
+  return (raceState.entries || []).some((entry) => entry.participantIds.length > 1) || (raceState.teams || []).some((team) => team.members.length > 1);
 };
 
-const recordMatchesSelectedParticipants = (
-  record: EventTimeRecord,
-  raceStateLookup: RaceStateLookup,
-  selectedParticipants: Set<EventParticipantId>
-): boolean => {
+const recordMatchesSelectedParticipants = (record: EventTimeRecord, raceStateLookup: RaceStateLookup, selectedParticipants: Set<EventParticipantId>): boolean => {
   return isCrossingRecord(record) && !!resolveCrossingParticipant(record, raceStateLookup)?.id && selectedParticipants.has(resolveCrossingParticipant(record, raceStateLookup)!.id);
 };
 
-const recordMatchesSelectedEntrants = (
-  record: EventTimeRecord,
-  raceStateLookup: RaceStateLookup,
-  entrantIds: Set<string>
-): boolean => {
+const recordMatchesSelectedEntrants = (record: EventTimeRecord, raceStateLookup: RaceStateLookup, entrantIds: Set<string>): boolean => {
   if (!isCrossingRecord(record)) {
     return false;
   }
@@ -1669,12 +1523,7 @@ const isCautionBoundaryFlag = (flag: FlagRecord): boolean => isCautionStartFlag(
 const isWhiteFlag = (flag: FlagRecord): boolean => flag.flagType?.toLowerCase() === 'white';
 
 const isSystemGeneratedFlag = (record: EventTimeRecord): boolean => {
-  return isFlagRecord(record) &&
-    record.systemGenerated === true &&
-    !isStartFlag(record) &&
-    !isCautionBoundaryFlag(record) &&
-    !isFinishFlag(record) &&
-    !isWhiteFlag(record);
+  return isFlagRecord(record) && record.systemGenerated === true && !isStartFlag(record) && !isCautionBoundaryFlag(record) && !isFinishFlag(record) && !isWhiteFlag(record);
 };
 
 const isFinishFlag = (flag: FlagRecord): boolean => {
@@ -1709,10 +1558,7 @@ const buildCautionRecordIds = (records: EventTimeRecord[]): Set<string> => {
   return cautionRecordIds;
 };
 
-const compareRecordsByTimeAndInputOrder = (
-  left: { index: number; record: EventTimeRecord },
-  right: { index: number; record: EventTimeRecord }
-): number => {
+const compareRecordsByTimeAndInputOrder = (left: { index: number; record: EventTimeRecord }, right: { index: number; record: EventTimeRecord }): number => {
   const leftTime = left.record.time?.getTime();
   const rightTime = right.record.time?.getTime();
 
@@ -1732,10 +1578,7 @@ const getKnownCategoryIds = (raceStateLookup: RaceStateLookup): EventCategoryId[
   return ((raceStateLookup as unknown as { categories?: EventCategory[] }).categories || []).map((category) => category.id);
 };
 
-const buildCategoryStartTimes = (
-  records: EventTimeRecord[],
-  raceStateLookup: RaceStateLookup
-): Map<EventCategoryId, Date> => {
+const buildCategoryStartTimes = (records: EventTimeRecord[], raceStateLookup: RaceStateLookup): Map<EventCategoryId, Date> => {
   const categoryStartTimes = new Map<EventCategoryId, Date>();
   const knownCategoryIds = getKnownCategoryIds(raceStateLookup);
 
@@ -1757,10 +1600,7 @@ const buildCategoryStartTimes = (
   return categoryStartTimes;
 };
 
-const isUnrecognisedCrossing = (
-  record: EventTimeRecord,
-  raceStateLookup: RaceStateLookup
-): boolean => {
+const isUnrecognisedCrossing = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): boolean => {
   if (isFlagRecord(record) || !isCrossingRecord(record)) {
     return false;
   }
@@ -1776,12 +1616,7 @@ const isUnrecognisedCrossing = (
   return !category || shouldExcludeCategoryFromResults(category);
 };
 
-const getPostFinishAcceptanceKeys = (
-  categoryId: EventCategoryId,
-  entrantKey: string,
-  eventFinished: boolean,
-  finishedCategoryIds: Set<EventCategoryId>
-): string[] => {
+const getPostFinishAcceptanceKeys = (categoryId: EventCategoryId, entrantKey: string, eventFinished: boolean, finishedCategoryIds: Set<EventCategoryId>): string[] => {
   const acceptanceKeys: string[] = [];
 
   if (eventFinished) {
@@ -1794,13 +1629,8 @@ const getPostFinishAcceptanceKeys = (
   return acceptanceKeys;
 };
 
-const getEntrantKey = (
-  participant: EventParticipant,
-  raceStateLookup: RaceStateLookup
-): string => {
-  return raceStateLookup.getEntrantIdForParticipant(participant.id)?.toString() ||
-    participant.entrantId?.toString() ||
-    participant.id.toString();
+const getEntrantKey = (participant: EventParticipant, raceStateLookup: RaceStateLookup): string => {
+  return raceStateLookup.getEntrantIdForParticipant(participant.id)?.toString() || participant.entrantId?.toString() || participant.id.toString();
 };
 
 const createEmptyLapTimeIndicators = (): LapTimeIndicators => ({
@@ -1815,9 +1645,7 @@ const buildLapTimeIndicatorMap = (
   records: EventTimeRecord[],
   raceStateLookup: RaceStateLookup,
   sessionKind: EventSessionKind | undefined = 'race',
-  missingCrossingIndicators: Map<TimeRecordId, MissingCrossingIndicator> = (
-    getPotentialMissingCrossingIndicators(records, raceStateLookup)
-  )
+  missingCrossingIndicators: Map<TimeRecordId, MissingCrossingIndicator> = getPotentialMissingCrossingIndicators(records, raceStateLookup)
 ): Map<TimeRecordId, LapTimeIndicators> => {
   const indicatorsByRecordId = new Map<TimeRecordId, LapTimeIndicators>();
   const bestLapTimeByEntrant = new Map<string, MillisecondsDuration>();
@@ -1847,11 +1675,7 @@ const buildLapTimeIndicatorMap = (
 
       const indicators = createEmptyLapTimeIndicators();
       const entrantKey = getEntrantKey(participant, raceStateLookup);
-      const isCountedLap = isFastestLapCandidate(
-        passingRecord,
-        raceStateLookup.getFinishLineNumbers?.(),
-        (passing) => getSourceLapCompletion(passing, raceStateLookup.getTimeRecordSourceById?.(passing.source))
-      );
+      const isCountedLap = isFastestLapCandidate(passingRecord, raceStateLookup.getFinishLineNumbers?.(), (passing) => getSourceLapCompletion(passing, raceStateLookup.getTimeRecordSourceById?.(passing.source)));
 
       if (isCountedLap) {
         const lapTime = passingRecord.lapTime;
@@ -1893,10 +1717,7 @@ const buildLapTimeIndicatorMap = (
   return indicatorsByRecordId;
 };
 
-const getLeaderLapAtVisibleRange = (
-  sortedRecords: EventTimeRecord[],
-  visibleRowRange: RowIndexRange
-): number | undefined => {
+const getLeaderLapAtVisibleRange = (sortedRecords: EventTimeRecord[], visibleRowRange: RowIndexRange): number | undefined => {
   const start = Math.max(0, visibleRowRange.start);
   const end = Math.min(sortedRecords.length - 1, visibleRowRange.end);
   if (end < start) {
@@ -1911,10 +1732,7 @@ const getLeaderLapAtVisibleRange = (
   }, undefined);
 };
 
-const buildSectorTimesByRecordId = (
-  records: EventTimeRecord[],
-  raceStateLookup: RaceStateLookup
-): Map<TimeRecordId, number> => {
+const buildSectorTimesByRecordId = (records: EventTimeRecord[], raceStateLookup: RaceStateLookup): Map<TimeRecordId, number> => {
   const sectorTimesByRecordId = new Map<TimeRecordId, number>();
   const previousCrossingsByParticipant = new Map<EventParticipantId, ParticipantPassingRecord[]>();
   const finishLineNumbers = raceStateLookup.getFinishLineNumbers?.();
@@ -1929,9 +1747,7 @@ const buildSectorTimesByRecordId = (
 
       const previousCrossings = previousCrossingsByParticipant.get(record.participantId) || [];
       const currentLineKey = getTimingLineKey(record, finishLineNumbers);
-      const previousCrossingOnAnotherLine = [...previousCrossings]
-        .reverse()
-        .find((crossing) => crossing.time && getTimingLineKey(crossing, finishLineNumbers) !== currentLineKey);
+      const previousCrossingOnAnotherLine = [...previousCrossings].reverse().find((crossing) => crossing.time && getTimingLineKey(crossing, finishLineNumbers) !== currentLineKey);
 
       if (previousCrossingOnAnotherLine?.time) {
         sectorTimesByRecordId.set(record.id, record.time.getTime() - previousCrossingOnAnotherLine.time.getTime());
@@ -1944,10 +1760,7 @@ const buildSectorTimesByRecordId = (
   return sectorTimesByRecordId;
 };
 
-const shouldShowSectorColumnForLookup = (
-  records: EventTimeRecord[],
-  raceStateLookup: RaceStateLookup
-): boolean => {
+const shouldShowSectorColumnForLookup = (records: EventTimeRecord[], raceStateLookup: RaceStateLookup): boolean => {
   const lineKeys = new Set<string>();
   const finishLineNumbers = raceStateLookup.getFinishLineNumbers?.();
   records.forEach((record) => {
@@ -1959,10 +1772,7 @@ const shouldShowSectorColumnForLookup = (
   return lineKeys.size > 1;
 };
 
-const getOutsideEventWindowIgnoredRecordIds = (
-  records: EventTimeRecord[],
-  raceStateLookup: RaceStateLookup
-): Set<string> => {
+const getOutsideEventWindowIgnoredRecordIds = (records: EventTimeRecord[], raceStateLookup: RaceStateLookup): Set<string> => {
   const ignoredRecordIds = new Set<string>();
   const categoryStartTimes = buildCategoryStartTimes(records, raceStateLookup);
   const finishedCategoryIds = new Set<EventCategoryId>();
@@ -2015,12 +1825,7 @@ const getOutsideEventWindowIgnoredRecordIds = (
   return ignoredRecordIds;
 };
 
-const shouldIgnoreRecord = (
-  record: EventTimeRecord,
-  ignoredRecordIds: Set<string>,
-  ignoreModes: RecentRecordsIgnoreMode[],
-  raceStateLookup: RaceStateLookup
-): boolean => {
+const shouldIgnoreRecord = (record: EventTimeRecord, ignoredRecordIds: Set<string>, ignoreModes: RecentRecordsIgnoreMode[], raceStateLookup: RaceStateLookup): boolean => {
   if (ignoreModes.includes('outsideEventWindow') && ignoredRecordIds.has(record.id.toString())) {
     return true;
   }
@@ -2030,10 +1835,7 @@ const shouldIgnoreRecord = (
   return ignoreModes.includes('unrecognised') && isUnrecognisedCrossing(record, raceStateLookup);
 };
 
-const isNonLapCrossing = (
-  record: EventTimeRecord,
-  raceStateLookup: RaceStateLookup
-): boolean => {
+const isNonLapCrossing = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): boolean => {
   if (!isCrossingRecord(record)) {
     return false;
   }
@@ -2070,6 +1872,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   const categories = (props.raceStateLookup as unknown as { categories?: EventCategory[] }).categories || [];
   const participantMap = React.useMemo(() => participantMapFromLookup(props.raceStateLookup), [props.raceStateLookup]);
   const participants = React.useMemo(() => participantArrayFromLookup(props.raceStateLookup), [props.raceStateLookup]);
+  const [recordDate, setRecordDate] = React.useState<string>('');
   const [timeOfDay, setTimeOfDay] = React.useState<string>('');
   const [recordType, setRecordType] = React.useState<AddableRecordType>('passing');
   const [flagType, setFlagType] = React.useState<AddableFlagType>('yellow');
@@ -2079,6 +1882,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   const [passingLineNumber, setPassingLineNumber] = React.useState<string>('');
   const [passingLoopNumber, setPassingLoopNumber] = React.useState<string>('');
   const [showRawRecordJson, setShowRawRecordJson] = React.useState<boolean>(false);
+  const [dateError, setDateError] = React.useState<string>('');
   const [timeError, setTimeError] = React.useState<string>('');
 
   React.useEffect(() => {
@@ -2086,15 +1890,17 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       return;
     }
     if (sourceRecord) {
+      setRecordDate(dateStringInTimeZone(sourceRecord.time, props.displayTimeZone));
       setTimeOfDay(timeOfDayInputStringInTimeZone(sourceRecord.time, props.displayTimeZone));
       setRecordType(isFlagRecord(sourceRecord) ? 'flag' : 'passing');
-      setFlagType(isFlagRecord(sourceRecord) ? sourceRecord.flagType as AddableFlagType : 'yellow');
+      setFlagType(isFlagRecord(sourceRecord) ? (sourceRecord.flagType as AddableFlagType) : 'yellow');
       setSelectedFlagCategoryIds(getEditableFlagCategoryIds(sourceRecord));
       setPassingTxNo(getEditablePassingTxNo(sourceRecord));
       setPassingPlate(getEditablePassingPlate(sourceRecord, props.raceStateLookup));
       setPassingLineNumber(formatOptionalNumber(getPassingLineNumber(sourceRecord as ParticipantPassingRecord)));
       setPassingLoopNumber(formatOptionalNumber(getPassingLoopNumber(sourceRecord as ParticipantPassingRecord)));
     } else {
+      setRecordDate(dateStringInTimeZone(anchorRecord.time, props.displayTimeZone));
       setTimeOfDay(timeOfDayInputStringInTimeZone(anchorRecord.time, props.displayTimeZone));
       setRecordType(props.openState?.initialRecordType || 'passing');
       setFlagType('yellow');
@@ -2104,6 +1910,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       setPassingLineNumber('');
       setPassingLoopNumber('');
     }
+    setDateError('');
     setTimeError('');
   }, [anchorRecord, props.displayTimeZone, props.openState?.initialRecordType, props.raceStateLookup, sourceRecord]);
   React.useEffect(() => {
@@ -2128,10 +1935,10 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   }, [participants]);
 
   const resolvedParticipant = React.useMemo(() => {
-    return resolveParticipantForManualEntry(participantMap, passingTxNo, passingPlate) ||
-      (sourceRecord && isCrossingRecord(sourceRecord) && sourceRecord.participantId
-        ? props.raceStateLookup.getParticipantById(sourceRecord.participantId)
-        : undefined);
+    return (
+      resolveParticipantForManualEntry(participantMap, passingTxNo, passingPlate) ||
+      (sourceRecord && isCrossingRecord(sourceRecord) && sourceRecord.participantId ? props.raceStateLookup.getParticipantById(sourceRecord.participantId) : undefined)
+    );
   }, [participantMap, passingPlate, passingTxNo, props.raceStateLookup, sourceRecord]);
 
   const resolvedCategoryId = getEffectiveParticipantCategoryId(props.raceStateLookup, resolvedParticipant);
@@ -2140,7 +1947,6 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   const resolvedTeamName = getParticipantTeamName(resolvedParticipant, props.raceStateLookup);
   const resolvedCategoryName = resolvedCategory?.name || '';
   const editablePassingRecord = editingRecord && isCrossingRecord(editingRecord) ? editingRecord : undefined;
-  const displayedRecordDate = dateStringInTimeZone(editingRecord?.time || anchorRecord?.time, props.displayTimeZone);
   const editablePassingLapControl = editablePassingRecord ? (isLapControlCrossing(editablePassingRecord, props.raceStateLookup) ? 'Yes' : 'No') : '';
   const editableFinishLineNumbers = editablePassingRecord ? formatFinishLineNumbers(props.raceStateLookup) : '';
   const editablePassingSourceName = editablePassingRecord ? getRecordSourceName(editablePassingRecord, props.raceStateLookup) : '';
@@ -2161,40 +1967,22 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
     if (!anchorRecord) {
       return;
     }
-    const parsedTime = parseTimeOfDayInputInTimeZone(anchorRecord.time, timeOfDay, props.displayTimeZone);
+    const parsedTime = parseDateAndTimeInputInTimeZone(recordDate, timeOfDay, props.displayTimeZone);
     if (!parsedTime) {
+      setDateError(recordDate.trim().match(/^\d{4}-\d{2}-\d{2}$/) ? '' : 'Enter a valid date');
       setTimeError('Enter a valid time of day like 09:15:03.250');
       return;
     }
+    setDateError('');
     setTimeError('');
-    if (recordType === 'passing' && passingTxNo.trim().length === 0 && passingPlate.trim().length === 0 &&
-      !(sourceRecord && isCrossingRecord(sourceRecord) && sourceRecord.participantId)) {
+    if (recordType === 'passing' && passingTxNo.trim().length === 0 && passingPlate.trim().length === 0 && !(sourceRecord && isCrossingRecord(sourceRecord) && sourceRecord.participantId)) {
       setTimeError('Enter a TxNo or Plate for a passing record');
       return;
     }
-    const record = recordType === 'flag'
-      ? buildManualFlagRecord(
-        anchorRecord,
-        props.currentEventId,
-        props.currentSessionId,
-        props.records,
-        parsedTime,
-        flagType,
-        selectedFlagCategoryIds,
-        editingRecord
-      )
-      : buildManualPassingRecord(
-        anchorRecord,
-        props.currentEventId,
-        props.currentSessionId,
-        props.records,
-        parsedTime,
-        passingTxNo,
-        passingPlate,
-        passingLineNumber,
-        passingLoopNumber,
-        sourceRecord
-      );
+    const record =
+      recordType === 'flag'
+        ? buildManualFlagRecord(anchorRecord, props.currentEventId, props.currentSessionId, props.records, parsedTime, flagType, selectedFlagCategoryIds, editingRecord)
+        : buildManualPassingRecord(anchorRecord, props.currentEventId, props.currentSessionId, props.records, parsedTime, passingTxNo, passingPlate, passingLineNumber, passingLoopNumber, sourceRecord);
     props.onSave(record, dialogMode);
     props.onClose();
   };
@@ -2214,30 +2002,18 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
             slotProps={{ htmlInput: { 'aria-label': 'Time of day' } }}
             value={timeOfDay}
           />
+          <TextField disabled label="Shown in" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Displayed time zone' } }} value={props.displayTimeZone} />
           <TextField
-            disabled
-            label="Shown in"
-            margin="dense"
-            slotProps={{ htmlInput: { 'aria-label': 'Displayed time zone' } }}
-            value={props.displayTimeZone}
-          />
-          <TextField
-            disabled
+            error={dateError.length > 0}
+            helperText={dateError || ' '}
             label="Record date"
             margin="dense"
+            onChange={(event) => setRecordDate(event.target.value)}
             slotProps={{ htmlInput: { 'aria-label': 'Record date' } }}
-            value={displayedRecordDate}
+            type="date"
+            value={recordDate}
           />
-          {dialogMode === 'edit' ? (
-            <TextField
-              disabled
-              label="Record ID"
-              margin="dense"
-              slotProps={{ htmlInput: { 'aria-label': 'Record ID' } }}
-              sx={{ gridColumn: 'span 2', minWidth: 520 }}
-              value={editingRecordId}
-            />
-          ) : null}
+          {dialogMode === 'edit' ? <TextField disabled label="Record ID" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Record ID' } }} sx={{ gridColumn: 'span 2', minWidth: 520 }} value={editingRecordId} /> : null}
           {dialogMode === 'edit' && editingRecord ? (
             <div style={{ gridColumn: '1 / -1' }}>
               <Button onClick={() => setShowRawRecordJson((current) => !current)} size="small" variant="outlined">
@@ -2248,11 +2024,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
           <div className="event-details-form-row">
             <label className="page-filter-label">
               Record type
-              <select
-                aria-label="Record type"
-                onChange={(event) => setRecordType(event.target.value as AddableRecordType)}
-                value={recordType}
-              >
+              <select aria-label="Record type" onChange={(event) => setRecordType(event.target.value as AddableRecordType)} value={recordType}>
                 <option value="passing">Passing</option>
                 <option value="flag">Flag</option>
               </select>
@@ -2260,13 +2032,11 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
             {recordType === 'flag' ? (
               <label className="page-filter-label">
                 Flag type
-                <select
-                  aria-label="Flag type"
-                  onChange={(event) => setFlagType(event.target.value as AddableFlagType)}
-                  value={flagType}
-                >
+                <select aria-label="Flag type" onChange={(event) => setFlagType(event.target.value as AddableFlagType)} value={flagType}>
                   {(Object.keys(manualFlagLabelByType) as AddableFlagType[]).map((value) => (
-                    <option key={value} value={value}>{manualFlagLabelByType[value]}</option>
+                    <option key={value} value={value}>
+                      {manualFlagLabelByType[value]}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -2274,7 +2044,9 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
           </div>
           {recordType === 'flag' ? (
             <FormControl fullWidth margin="dense">
-              <InputLabel id="manual-record-categories-label" shrink>For category</InputLabel>
+              <InputLabel id="manual-record-categories-label" shrink>
+                For category
+              </InputLabel>
               <Select
                 displayEmpty
                 id="manual-record-categories"
@@ -2283,14 +2055,16 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
                 multiple
                 onChange={(event) => {
                   const value = event.target.value;
-                  setSelectedFlagCategoryIds(typeof value === 'string' ? value.split(',') as EventCategoryId[] : value as EventCategoryId[]);
+                  setSelectedFlagCategoryIds(typeof value === 'string' ? (value.split(',') as EventCategoryId[]) : (value as EventCategoryId[]));
                 }}
-                renderValue={(selected) => (selected as string[]).length > 0
-                  ? categories
-                    .filter((category) => (selected as string[]).includes(category.id))
-                    .map((category) => category.name || category.id)
-                    .join(', ')
-                  : 'All'}
+                renderValue={(selected) =>
+                  (selected as string[]).length > 0
+                    ? categories
+                      .filter((category) => (selected as string[]).includes(category.id))
+                      .map((category) => category.name || category.id)
+                      .join(', ')
+                    : 'All'
+                }
                 value={selectedFlagCategoryIds}
               >
                 {categories.map((category) => (
@@ -2309,36 +2083,38 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
                   label="TxNo"
                   margin="dense"
                   onChange={(event) => handleTxNoChange(event.target.value)}
-                  slotProps={{ htmlInput: { 'aria-label': 'TxNo', list: 'manual-record-tx-options' } }}
+                  slotProps={{
+                    htmlInput: {
+                      'aria-label': 'TxNo',
+                      list: 'manual-record-tx-options',
+                    },
+                  }}
                   value={passingTxNo}
                 />
                 <TextField
                   label="Plate"
                   margin="dense"
                   onChange={(event) => setPassingPlate(event.target.value)}
-                  slotProps={{ htmlInput: { 'aria-label': 'Plate', list: 'manual-record-plate-options' } }}
+                  slotProps={{
+                    htmlInput: {
+                      'aria-label': 'Plate',
+                      list: 'manual-record-plate-options',
+                    },
+                  }}
                   value={passingPlate}
                 />
-                <TextField
-                  label="Timing line"
-                  margin="dense"
-                  onChange={(event) => setPassingLineNumber(event.target.value)}
-                  slotProps={{ htmlInput: { 'aria-label': 'Timing line' } }}
-                  value={passingLineNumber}
-                />
-                <TextField
-                  label="Timing loop"
-                  margin="dense"
-                  onChange={(event) => setPassingLoopNumber(event.target.value)}
-                  slotProps={{ htmlInput: { 'aria-label': 'Timing loop' } }}
-                  value={passingLoopNumber}
-                />
+                <TextField label="Timing line" margin="dense" onChange={(event) => setPassingLineNumber(event.target.value)} slotProps={{ htmlInput: { 'aria-label': 'Timing line' } }} value={passingLineNumber} />
+                <TextField label="Timing loop" margin="dense" onChange={(event) => setPassingLoopNumber(event.target.value)} slotProps={{ htmlInput: { 'aria-label': 'Timing loop' } }} value={passingLoopNumber} />
               </div>
               <datalist id="manual-record-tx-options">
-                {txOptions.map((option) => <option key={option} value={option} />)}
+                {txOptions.map((option) => (
+                  <option key={option} value={option} />
+                ))}
               </datalist>
               <datalist id="manual-record-plate-options">
-                {plateOptions.map((option) => <option key={option} value={option} />)}
+                {plateOptions.map((option) => (
+                  <option key={option} value={option} />
+                ))}
               </datalist>
               <div className="event-details-form-row">
                 <TextField disabled label="Entrant name" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Entrant name' } }} value={resolvedEntrantName} />
@@ -2347,7 +2123,15 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
               </div>
               {dialogMode === 'edit' && editablePassingRecord ? (
                 <div className="event-details-form-row">
-                  <TextField disabled label="Lap control lines" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Lap control lines' } }} value={editableFinishLineNumbers} />
+                  <TextField
+                    disabled
+                    label="Lap control lines"
+                    margin="dense"
+                    slotProps={{
+                      htmlInput: { 'aria-label': 'Lap control lines' },
+                    }}
+                    value={editableFinishLineNumbers}
+                  />
                   <TextField disabled label="Lap crossing" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Lap crossing' } }} value={editablePassingLapControl} />
                   <TextField disabled label="Source" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Source' } }} value={editablePassingSourceName} />
                   <TextField disabled label="Source file" margin="dense" slotProps={{ htmlInput: { 'aria-label': 'Source file' } }} value={editablePassingSourceFile} />
@@ -2363,7 +2147,9 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
               margin="dense"
               minRows={10}
               multiline
-              slotProps={{ htmlInput: { 'aria-label': 'Record JSON', readOnly: true } }}
+              slotProps={{
+                htmlInput: { 'aria-label': 'Record JSON', readOnly: true },
+              }}
               sx={{ gridColumn: '1 / -1' }}
               value={editableRecordJson}
             />
@@ -2372,7 +2158,9 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       </DialogContent>
       <DialogActions>
         <Button onClick={props.onClose}>Cancel</Button>
-        <Button onClick={handleSave} variant="contained">{dialogMode === 'edit' ? 'Save record' : 'Add record'}</Button>
+        <Button onClick={handleSave} variant="contained">
+          {dialogMode === 'edit' ? 'Save record' : 'Add record'}
+        </Button>
       </DialogActions>
     </Dialog>
   );
@@ -2382,16 +2170,18 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
 
 // };
 
-export const RecentRecords = (props: RecordsProps & { 
-  onAssignFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void,
-  onAddRecord?: (record: EventTimeRecord) => void,
-  onEditRecord?: (record: EventTimeRecord) => void,
-  onExclude?: (crossingId: TimeRecordId, exclude: boolean) => void,
-  onChangeCategory?: (participantId: EventParticipantId, categoryId: EventCategoryId) => void,
-  onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void,
-  onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void,
-  onUpdateSourceOffset?: (sourceId: string, previousTime: Date, nextTime: Date) => void
-}) => {
+export const RecentRecords = (
+  props: RecordsProps & {
+    onAssignFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
+    onAddRecord?: (record: EventTimeRecord) => void;
+    onEditRecord?: (record: EventTimeRecord) => void;
+    onExclude?: (crossingId: TimeRecordId, exclude: boolean) => void;
+    onChangeCategory?: (participantId: EventParticipantId, categoryId: EventCategoryId) => void;
+    onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void;
+    onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
+    onUpdateSourceOffset?: (sourceId: string, previousTime: Date, nextTime: Date) => void;
+  }
+) => {
   const [addRecordDialogState, setAddRecordDialogState] = React.useState<AddRecordDialogState | null>(null);
   const [offsetsDialogOpen, setOffsetsDialogOpen] = React.useState<boolean>(false);
   const [recentFirst, setRecentFirst] = React.useState<boolean>(false);
@@ -2424,9 +2214,7 @@ export const RecentRecords = (props: RecordsProps & {
   const emptySelectedParticipants = React.useMemo(() => new Set<EventParticipantId>(), []);
   const propSelectedParticipants = props.selectedParticipants || emptySelectedParticipants;
   const propSelectedParticipantKey = React.useMemo(() => buildSelectionKey(propSelectedParticipants), [propSelectedParticipants]);
-  const [localSelectedParticipants, setLocalSelectedParticipants] = React.useState<Set<EventParticipantId>>(
-    () => new Set<EventParticipantId>(propSelectedParticipants)
-  );
+  const [localSelectedParticipants, setLocalSelectedParticipants] = React.useState<Set<EventParticipantId>>(() => new Set<EventParticipantId>(propSelectedParticipants));
   const [navigationTarget, setNavigationTarget] = React.useState<NavigationTarget | null>(null);
   React.useEffect(() => {
     setLocalSelectedParticipants(new Set<EventParticipantId>(propSelectedParticipants));
@@ -2444,10 +2232,7 @@ export const RecentRecords = (props: RecordsProps & {
   }, [props.raceStateLookup]);
   const isCyclingEvent = props.eventDiscipline === 'cycling';
   const highlightedParticipantIds = React.useMemo(() => {
-    return new Set<EventParticipantId>([
-      ...selectedParticipants,
-      ...teamMemberIds,
-    ]);
+    return new Set<EventParticipantId>([...selectedParticipants, ...teamMemberIds]);
   }, [selectedParticipantKey, teamMemberIds]);
   const highlightedParticipantKey = React.useMemo(() => buildSelectionKey(highlightedParticipantIds), [highlightedParticipantIds]);
   const immediateSelectionState = React.useMemo<RowSelectionState>(() => {
@@ -2459,14 +2244,7 @@ export const RecentRecords = (props: RecordsProps & {
       selectedPlateNumber,
       selectedRecordId,
     };
-  }, [
-    highlightedParticipantIds,
-    highlightedParticipantKey,
-    selectedCategories,
-    selectedCategoryKey,
-    selectedPlateNumber,
-    selectedRecordId,
-  ]);
+  }, [highlightedParticipantIds, highlightedParticipantKey, selectedCategories, selectedCategoryKey, selectedPlateNumber, selectedRecordId]);
   const [deferredSelectionState, setDeferredSelectionState] = React.useState<RowSelectionState>(() => {
     return cloneSelectionState(immediateSelectionState);
   });
@@ -2527,12 +2305,7 @@ export const RecentRecords = (props: RecordsProps & {
       };
 
       setToolbarDock((current) => {
-        return current.height === nextDock.height &&
-          current.isDocked === nextDock.isDocked &&
-          current.left === nextDock.left &&
-          current.width === nextDock.width
-          ? current
-          : nextDock;
+        return current.height === nextDock.height && current.isDocked === nextDock.isDocked && current.left === nextDock.left && current.width === nextDock.width ? current : nextDock;
       });
     };
 
@@ -2573,18 +2346,7 @@ export const RecentRecords = (props: RecordsProps & {
       }
       return recordMatchesSelectedParticipants(record, props.raceStateLookup, teamMemberIds);
     });
-  }, [
-    filterMode,
-    ignoreModes,
-    outsideEventWindowIgnoredRecordIds,
-    props.raceStateLookup,
-    props.records,
-    potentialMissingCrossingIndicators,
-    selectedCategories,
-    selectedParticipants,
-    entrantIds,
-    teamMemberIds,
-  ]);
+  }, [filterMode, ignoreModes, outsideEventWindowIgnoredRecordIds, props.raceStateLookup, props.records, potentialMissingCrossingIndicators, selectedCategories, selectedParticipants, entrantIds, teamMemberIds]);
   const sortedRecords = React.useMemo(() => {
     return [...filteredRecords].sort((a, b) => {
       const leftTime = a.time?.getTime() || 0;
@@ -2608,19 +2370,17 @@ export const RecentRecords = (props: RecordsProps & {
       .sort(compareRecordsByTimeAndInputOrder)
       .map(({ record }) => record);
   }, [sortedRecords]);
-  const displayedLapTime = React.useCallback((passing: ParticipantPassingRecord): number | undefined => {
-    return getDisplayedLapTime(passing, recordsByTime, props.raceStateLookup.getFinishLineNumbers?.());
-  }, [props.raceStateLookup, recordsByTime]);
+  const displayedLapTime = React.useCallback(
+    (passing: ParticipantPassingRecord): number | undefined => {
+      return getDisplayedLapTime(passing, recordsByTime, props.raceStateLookup.getFinishLineNumbers?.());
+    },
+    [props.raceStateLookup, recordsByTime]
+  );
   const cautionRecordIds = React.useMemo(() => {
     return buildCautionRecordIds(filteredRecords);
   }, [filteredRecords]);
   const lapTimeIndicators = React.useMemo(() => {
-    return buildLapTimeIndicatorMap(
-      filteredRecords,
-      props.raceStateLookup,
-      props.sessionKind,
-      potentialMissingCrossingIndicators
-    );
+    return buildLapTimeIndicatorMap(filteredRecords, props.raceStateLookup, props.sessionKind, potentialMissingCrossingIndicators);
   }, [filteredRecords, potentialMissingCrossingIndicators, props.raceStateLookup, props.sessionKind]);
   const leaderLapAtVisibleRange = React.useMemo(() => {
     return getLeaderLapAtVisibleRange(sortedRecords, visibleRowRange);
@@ -2660,17 +2420,9 @@ export const RecentRecords = (props: RecordsProps & {
     const containerOwnsVerticalScroll = scrollContainer === container;
     const containerRect = container.getBoundingClientRect();
     const scrollContainerRect = scrollContainer?.getBoundingClientRect();
-    const viewportHeight = scrollContainer
-      ? scrollContainer.clientHeight || scrollContainerRect?.height || safeRowHeight
-      : window.innerHeight || document.documentElement.clientHeight || safeRowHeight;
-    const visibleTop = containerOwnsVerticalScroll
-      ? container.scrollTop
-      : scrollContainer
-        ? Math.max(0, (scrollContainerRect?.top || 0) - containerRect.top)
-        : Math.max(0, -containerRect.top);
-    const visibleBottom = scrollContainer
-      ? visibleTop + viewportHeight
-      : Math.min(containerRect.height || sortedRecords.length * safeRowHeight, viewportHeight - containerRect.top);
+    const viewportHeight = scrollContainer ? scrollContainer.clientHeight || scrollContainerRect?.height || safeRowHeight : window.innerHeight || document.documentElement.clientHeight || safeRowHeight;
+    const visibleTop = containerOwnsVerticalScroll ? container.scrollTop : scrollContainer ? Math.max(0, (scrollContainerRect?.top || 0) - containerRect.top) : Math.max(0, -containerRect.top);
+    const visibleBottom = scrollContainer ? visibleTop + viewportHeight : Math.min(containerRect.height || sortedRecords.length * safeRowHeight, viewportHeight - containerRect.top);
     const visibleHeight = Math.max(safeRowHeight, visibleBottom - visibleTop);
     const maxRowIndex = Math.max(0, sortedRecords.length - 1);
     const start = Math.min(maxRowIndex, Math.max(0, Math.floor(visibleTop / safeRowHeight)));
@@ -2678,9 +2430,7 @@ export const RecentRecords = (props: RecordsProps & {
     const end = Math.min(Math.max(0, sortedRecords.length - 1), start + visibleCount - 1);
 
     setVisibleRowRange((current) => {
-      return current.start === start && current.end === end
-        ? current
-        : { end, start };
+      return current.start === start && current.end === end ? current : { end, start };
     });
   }, [navigationTarget, sortedRecords.length]);
   React.useLayoutEffect(() => {
@@ -2694,30 +2444,29 @@ export const RecentRecords = (props: RecordsProps & {
         setNavigationTarget(null);
         return;
       }
-      const targetRow = Array.from(container.querySelectorAll('tr[data-record-id]'))
-        .find((row) => row.getAttribute('data-record-id') === targetRecord.id.toString()) as HTMLElement | undefined;
+      const targetRow = Array.from(container.querySelectorAll('tr[data-record-id]')).find((row) => row.getAttribute('data-record-id') === targetRecord.id.toString()) as HTMLElement | undefined;
       if (!targetRow) {
         return;
       }
 
-      targetRow.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+      targetRow.scrollIntoView({
+        behavior: 'auto',
+        block: 'center',
+        inline: 'nearest',
+      });
       window.requestAnimationFrame(() => {
         const scrollContainer = findVerticalScrollContainer(container);
         const rowRect = targetRow.getBoundingClientRect();
         const viewportRect = scrollContainer?.getBoundingClientRect();
         const viewportTop = scrollContainer ? viewportRect?.top || 0 : 0;
-        const viewportBottom = scrollContainer
-          ? viewportRect?.bottom || scrollContainer.clientHeight
-          : window.innerHeight || document.documentElement.clientHeight;
+        const viewportBottom = scrollContainer ? viewportRect?.bottom || scrollContainer.clientHeight : window.innerHeight || document.documentElement.clientHeight;
         const isVisible = rowRect.top >= viewportTop && rowRect.bottom <= viewportBottom;
         if (isVisible || navigationTarget.attempt >= 2) {
           setNavigationTarget(null);
           updateVisibleRowRange();
           return;
         }
-        const targetTop = scrollContainer === container
-          ? targetRow.offsetTop
-          : targetRow.getBoundingClientRect().top + window.scrollY;
+        const targetTop = scrollContainer === container ? targetRow.offsetTop : targetRow.getBoundingClientRect().top + window.scrollY;
         if (scrollContainer === container) {
           scrollContainer.scrollTo({ behavior: 'auto', top: targetTop });
         } else if (scrollContainer) {
@@ -2728,7 +2477,10 @@ export const RecentRecords = (props: RecordsProps & {
         } else {
           window.scrollTo({ behavior: 'auto', top: Math.max(0, targetTop) });
         }
-        setNavigationTarget({ ...navigationTarget, attempt: navigationTarget.attempt + 1 });
+        setNavigationTarget({
+          ...navigationTarget,
+          attempt: navigationTarget.attempt + 1,
+        });
       });
       return;
     }
@@ -2742,15 +2494,18 @@ export const RecentRecords = (props: RecordsProps & {
         return;
       }
 
-      const targetRow = Array.from(container.querySelectorAll('tr[data-record-id]'))
-        .find((row) => row.getAttribute('data-record-id') === targetRecord.id.toString());
+      const targetRow = Array.from(container.querySelectorAll('tr[data-record-id]')).find((row) => row.getAttribute('data-record-id') === targetRecord.id.toString());
       if (!targetRow) {
         return;
       }
       pendingFilterScrollIndexRef.current = undefined;
 
       if (typeof (targetRow as HTMLElement).scrollIntoView === 'function') {
-        (targetRow as HTMLElement).scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+        (targetRow as HTMLElement).scrollIntoView({
+          behavior: 'auto',
+          block: 'center',
+          inline: 'nearest',
+        });
         window.requestAnimationFrame(updateVisibleRowRange);
         return;
       }
@@ -2801,9 +2556,7 @@ export const RecentRecords = (props: RecordsProps & {
     }
 
     const matchingRecordIndex = getRecordIndex(sortedRecords, anchor.recordId);
-    const recordIndex = matchingRecordIndex >= 0
-      ? matchingRecordIndex
-      : Math.min(sortedRecords.length - 1, Math.max(0, anchor.previousIndex));
+    const recordIndex = matchingRecordIndex >= 0 ? matchingRecordIndex : Math.min(sortedRecords.length - 1, Math.max(0, anchor.previousIndex));
     const nextVisibleRowRange = getSelectionVisibleRowRange(recordIndex, visibleRowRange, sortedRecords.length);
     setVisibleRowRange(nextVisibleRowRange);
     pendingFilterScrollIndexRef.current = recordIndex;
@@ -2819,8 +2572,12 @@ export const RecentRecords = (props: RecordsProps & {
       updateVisibleRowRange();
     };
 
-    container.addEventListener('scroll', handleVisibleRowRangeChange, { passive: true });
-    scrollContainer?.addEventListener('scroll', handleVisibleRowRangeChange, { passive: true });
+    container.addEventListener('scroll', handleVisibleRowRangeChange, {
+      passive: true,
+    });
+    scrollContainer?.addEventListener('scroll', handleVisibleRowRangeChange, {
+      passive: true,
+    });
     window.addEventListener('scroll', handleVisibleRowRangeChange, true);
     window.addEventListener('resize', handleVisibleRowRangeChange);
 
@@ -2831,102 +2588,91 @@ export const RecentRecords = (props: RecordsProps & {
       window.removeEventListener('resize', handleVisibleRowRangeChange);
     };
   }, [updateVisibleRowRange]);
-  const goToRecord = React.useCallback((record: EventTimeRecord | undefined): void => {
-    if (!record) {
-      return;
-    }
-    const recordIndex = getRecordIndex(sortedRecords, record.id);
-    if (recordIndex < 0) {
-      return;
-    }
-    setSelectedRecordId(record.id);
-    setNavigationTarget({ attempt: 0, recordId: record.id, recordIndex });
-    setVisibleRowRange(getSelectionVisibleRowRange(recordIndex, visibleRowRange, sortedRecords.length));
-  }, [sortedRecords, visibleRowRange]);
-  const handleGoTo = React.useCallback((option: RecentRecordsGoToOption): void => {
-    const selectedTimeIndex = selectedRecordId === undefined
-      ? -1
-      : recordsByTime.findIndex((record) => record.id === selectedRecordId);
-    const isGreenFlag = (record: EventTimeRecord): boolean => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green';
-    const findNextFlag = (predicate: (record: EventTimeRecord) => boolean): EventTimeRecord | undefined => (
-      recordsByTime.slice(selectedTimeIndex + 1).find(predicate)
-    );
-    const selectedRecord = selectedTimeIndex >= 0 ? recordsByTime[selectedTimeIndex] : undefined;
-    const selectedTransmitter = selectedRecord && isCrossingRecord(selectedRecord)
-      ? getAutomaticIdentifier(selectedRecord)
-      : undefined;
-    const selectedLineKey = selectedRecord && isCrossingRecord(selectedRecord)
-      ? getTimingLineKey(selectedRecord as ParticipantPassingRecord, props.raceStateLookup.getFinishLineNumbers?.())
-      : undefined;
-    const isMatchingTransmitterCrossing = (record: EventTimeRecord, onSelectedLine: boolean): boolean => {
-      if (selectedTransmitter === undefined || !isCrossingRecord(record) || getAutomaticIdentifier(record) !== selectedTransmitter) {
-        return false;
+  const goToRecord = React.useCallback(
+    (record: EventTimeRecord | undefined): void => {
+      if (!record) {
+        return;
       }
-      return !onSelectedLine || getTimingLineKey(record as ParticipantPassingRecord, props.raceStateLookup.getFinishLineNumbers?.()) === selectedLineKey;
-    };
-    const findTransmitterCrossing = (previous: boolean, onSelectedLine: boolean): EventTimeRecord | undefined => {
-      if (selectedTimeIndex < 0 || selectedTransmitter === undefined) {
-        return undefined;
+      const recordIndex = getRecordIndex(sortedRecords, record.id);
+      if (recordIndex < 0) {
+        return;
       }
-      const candidates = previous
-        ? recordsByTime.slice(0, selectedTimeIndex).reverse()
-        : recordsByTime.slice(selectedTimeIndex + 1);
-      return candidates.find((record) => isMatchingTransmitterCrossing(record, onSelectedLine));
-    };
-    const findLeaderLapTransition = (next: boolean): EventTimeRecord | undefined => {
-      if (leaderLapAtVisibleRange === undefined) {
-        return undefined;
-      }
-      const targetLap = next ? leaderLapAtVisibleRange + 1 : leaderLapAtVisibleRange - 1;
-      const candidates = recordsByTime.filter((record) => {
-        const indicators = lapTimeIndicators.get(record.id);
-        return isCrossingRecord(record) && indicators?.lapLeader === true && record.lapNo === targetLap;
-      });
-      return next ? candidates[0] : candidates.at(-1);
-    };
-    const target = option === 'first'
-      ? recordsByTime[0]
-      : option === 'last'
-        ? recordsByTime.at(-1)
-        : option === 'firstGreen'
-          ? recordsByTime.find(isGreenFlag)
-          : option === 'finish'
-            ? recordsByTime.find((record) => isFlagRecord(record) && isFinishFlag(record))
-            : option === 'nextCaution'
-              ? findNextFlag((record) => isFlagRecord(record) && isCautionStartFlag(record))
-              : option === 'nextGreen'
-                ? findNextFlag(isGreenFlag)
-                : option === 'previousTransmitterCrossing'
-                  ? findTransmitterCrossing(true, false)
-                  : option === 'nextTransmitterCrossing'
-                    ? findTransmitterCrossing(false, false)
-                    : option === 'previousTransmitterCrossingOnLine'
-                      ? findTransmitterCrossing(true, true)
-                      : option === 'nextTransmitterCrossingOnLine'
-                        ? findTransmitterCrossing(false, true)
-                        : option === 'leadersNextLap'
-                          ? findLeaderLapTransition(true)
-                          : findLeaderLapTransition(false);
-    setGoToMenuAnchor(null);
-    goToRecord(target);
-  }, [goToRecord, lapTimeIndicators, leaderLapAtVisibleRange, props.raceStateLookup, recordsByTime, selectedRecordId]);
-  const selectedTimeIndex = selectedRecordId === undefined
-    ? -1
-    : recordsByTime.findIndex((record) => record.id === selectedRecordId);
+      setSelectedRecordId(record.id);
+      setNavigationTarget({ attempt: 0, recordId: record.id, recordIndex });
+      setVisibleRowRange(getSelectionVisibleRowRange(recordIndex, visibleRowRange, sortedRecords.length));
+    },
+    [sortedRecords, visibleRowRange]
+  );
+  const handleGoTo = React.useCallback(
+    (option: RecentRecordsGoToOption): void => {
+      const selectedTimeIndex = selectedRecordId === undefined ? -1 : recordsByTime.findIndex((record) => record.id === selectedRecordId);
+      const isGreenFlag = (record: EventTimeRecord): boolean => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green';
+      const findNextFlag = (predicate: (record: EventTimeRecord) => boolean): EventTimeRecord | undefined => recordsByTime.slice(selectedTimeIndex + 1).find(predicate);
+      const selectedRecord = selectedTimeIndex >= 0 ? recordsByTime[selectedTimeIndex] : undefined;
+      const selectedTransmitter = selectedRecord && isCrossingRecord(selectedRecord) ? getAutomaticIdentifier(selectedRecord) : undefined;
+      const selectedLineKey = selectedRecord && isCrossingRecord(selectedRecord) ? getTimingLineKey(selectedRecord as ParticipantPassingRecord, props.raceStateLookup.getFinishLineNumbers?.()) : undefined;
+      const isMatchingTransmitterCrossing = (record: EventTimeRecord, onSelectedLine: boolean): boolean => {
+        if (selectedTransmitter === undefined || !isCrossingRecord(record) || getAutomaticIdentifier(record) !== selectedTransmitter) {
+          return false;
+        }
+        return !onSelectedLine || getTimingLineKey(record as ParticipantPassingRecord, props.raceStateLookup.getFinishLineNumbers?.()) === selectedLineKey;
+      };
+      const findTransmitterCrossing = (previous: boolean, onSelectedLine: boolean): EventTimeRecord | undefined => {
+        if (selectedTimeIndex < 0 || selectedTransmitter === undefined) {
+          return undefined;
+        }
+        const candidates = previous ? recordsByTime.slice(0, selectedTimeIndex).reverse() : recordsByTime.slice(selectedTimeIndex + 1);
+        return candidates.find((record) => isMatchingTransmitterCrossing(record, onSelectedLine));
+      };
+      const findLeaderLapTransition = (next: boolean): EventTimeRecord | undefined => {
+        if (leaderLapAtVisibleRange === undefined) {
+          return undefined;
+        }
+        const targetLap = next ? leaderLapAtVisibleRange + 1 : leaderLapAtVisibleRange - 1;
+        const candidates = recordsByTime.filter((record) => {
+          const indicators = lapTimeIndicators.get(record.id);
+          return isCrossingRecord(record) && indicators?.lapLeader === true && record.lapNo === targetLap;
+        });
+        return next ? candidates[0] : candidates.at(-1);
+      };
+      const target =
+        option === 'first'
+          ? recordsByTime[0]
+          : option === 'last'
+            ? recordsByTime.at(-1)
+            : option === 'firstGreen'
+              ? recordsByTime.find(isGreenFlag)
+              : option === 'finish'
+                ? recordsByTime.find((record) => isFlagRecord(record) && isFinishFlag(record))
+                : option === 'nextCaution'
+                  ? findNextFlag((record) => isFlagRecord(record) && isCautionStartFlag(record))
+                  : option === 'nextGreen'
+                    ? findNextFlag(isGreenFlag)
+                    : option === 'previousTransmitterCrossing'
+                      ? findTransmitterCrossing(true, false)
+                      : option === 'nextTransmitterCrossing'
+                        ? findTransmitterCrossing(false, false)
+                        : option === 'previousTransmitterCrossingOnLine'
+                          ? findTransmitterCrossing(true, true)
+                          : option === 'nextTransmitterCrossingOnLine'
+                            ? findTransmitterCrossing(false, true)
+                            : option === 'leadersNextLap'
+                              ? findLeaderLapTransition(true)
+                              : findLeaderLapTransition(false);
+      setGoToMenuAnchor(null);
+      goToRecord(target);
+    },
+    [goToRecord, lapTimeIndicators, leaderLapAtVisibleRange, props.raceStateLookup, recordsByTime, selectedRecordId]
+  );
+  const selectedTimeIndex = selectedRecordId === undefined ? -1 : recordsByTime.findIndex((record) => record.id === selectedRecordId);
   const selectedRecord = selectedTimeIndex >= 0 ? recordsByTime[selectedTimeIndex] : undefined;
-  const selectedTransmitter = selectedRecord && isCrossingRecord(selectedRecord)
-    ? getAutomaticIdentifier(selectedRecord)
-    : undefined;
-  const selectedLineKey = selectedRecord && isCrossingRecord(selectedRecord)
-    ? getTimingLineKey(selectedRecord as ParticipantPassingRecord, props.raceStateLookup.getFinishLineNumbers?.())
-    : undefined;
+  const selectedTransmitter = selectedRecord && isCrossingRecord(selectedRecord) ? getAutomaticIdentifier(selectedRecord) : undefined;
+  const selectedLineKey = selectedRecord && isCrossingRecord(selectedRecord) ? getTimingLineKey(selectedRecord as ParticipantPassingRecord, props.raceStateLookup.getFinishLineNumbers?.()) : undefined;
   const hasTransmitterCrossing = (previous: boolean, onSelectedLine: boolean): boolean => {
     if (selectedTimeIndex < 0 || selectedTransmitter === undefined) {
       return false;
     }
-    const candidates = previous
-      ? recordsByTime.slice(0, selectedTimeIndex)
-      : recordsByTime.slice(selectedTimeIndex + 1);
+    const candidates = previous ? recordsByTime.slice(0, selectedTimeIndex) : recordsByTime.slice(selectedTimeIndex + 1);
     return candidates.some((record) => {
       if (!isCrossingRecord(record) || getAutomaticIdentifier(record) !== selectedTransmitter) {
         return false;
@@ -2966,269 +2712,304 @@ export const RecentRecords = (props: RecordsProps & {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleGoTo, hasLeaderLapTransition]);
   const openAddRecordDialog = React.useCallback((record: EventTimeRecord, recordType: AddableRecordType): void => {
-    setAddRecordDialogState({ anchorRecord: record, initialRecordType: recordType, mode: 'add' });
+    setAddRecordDialogState({
+      anchorRecord: record,
+      initialRecordType: recordType,
+      mode: 'add',
+    });
   }, []);
   const openEditRecordDialog = React.useCallback((record: EventTimeRecord): void => {
-    setAddRecordDialogState({ anchorRecord: record, existingRecord: record, mode: 'edit' });
+    setAddRecordDialogState({
+      anchorRecord: record,
+      existingRecord: record,
+      mode: 'edit',
+    });
   }, []);
-  const openMissingCrossingDialog = React.useCallback((record: ParticipantPassingRecord): void => {
-    const estimatedTime = estimateMissingCrossingTime(record, props.records, props.raceStateLookup);
-    if (!estimatedTime || !record.participantId) {
-      return;
-    }
-    const participant = props.raceStateLookup.getParticipantById(record.participantId);
-    const plateNumber = participant ? getParticipantNumber(participant) : undefined;
-    const draftRecord: ParticipantPassingRecord & { plateNumber?: string } = {
-      entrantId: record.entrantId || props.raceStateLookup.getEntrantIdForParticipant(record.participantId),
-      eventId: props.currentEventId || record.eventId,
-      generatedReason: 'missing-crossing',
-      id: createTimeRecordId(),
-      isGenerated: true,
-      lineNumber: getPassingLineNumber(record),
-      loopNumber: getPassingLoopNumber(record),
-      participantId: record.participantId,
-      recordType: RECORD_TX_CROSSING,
-      sequence: Math.max(...props.records.map((candidate: EventTimeRecord): number => candidate.sequence), 0) + 1,
-      sessionId: props.currentSessionId || record.sessionId,
-      source: GENERATED_MISSING_CROSSING_SOURCE_ID,
-      time: estimatedTime,
-    };
-    if (plateNumber !== undefined) {
-      draftRecord.plateNumber = plateNumber.toString();
-    }
-    setAddRecordDialogState({ anchorRecord: record, draftRecord, initialRecordType: 'passing', mode: 'add' });
-  }, [props.currentEventId, props.currentSessionId, props.raceStateLookup, props.records]);
-  const handleCategorySelected = React.useCallback((categoryIds: Set<EventCategoryId>): void => {
-    const nextCategoryIds = new Set<EventCategoryId>(categoryIds);
-    React.startTransition(() => {
-      props.categorySelected?.(nextCategoryIds);
-    });
-  }, [props.categorySelected]);
-  const handleParticipantSelected = React.useCallback((participantIds: Set<EventParticipantId>): void => {
-    const nextParticipantIds = new Set<EventParticipantId>(participantIds);
-    setSelectedPlateNumber(undefined);
-    setLocalSelectedParticipants(nextParticipantIds);
-    React.startTransition(() => {
-      props.participantSelected?.(new Set<EventParticipantId>(nextParticipantIds));
-    });
-  }, [props.participantSelected]);
+  const openMissingCrossingDialog = React.useCallback(
+    (record: ParticipantPassingRecord): void => {
+      const estimatedTime = estimateMissingCrossingTime(record, props.records, props.raceStateLookup);
+      if (!estimatedTime || !record.participantId) {
+        return;
+      }
+      const participant = props.raceStateLookup.getParticipantById(record.participantId);
+      const plateNumber = participant ? getParticipantNumber(participant) : undefined;
+      const draftRecord: ParticipantPassingRecord & { plateNumber?: string } = {
+        entrantId: record.entrantId || props.raceStateLookup.getEntrantIdForParticipant(record.participantId),
+        eventId: props.currentEventId || record.eventId,
+        generatedReason: 'missing-crossing',
+        id: createTimeRecordId(),
+        isGenerated: true,
+        lineNumber: getPassingLineNumber(record),
+        loopNumber: getPassingLoopNumber(record),
+        participantId: record.participantId,
+        recordType: RECORD_TX_CROSSING,
+        sequence: Math.max(...props.records.map((candidate: EventTimeRecord): number => candidate.sequence), 0) + 1,
+        sessionId: props.currentSessionId || record.sessionId,
+        source: GENERATED_MISSING_CROSSING_SOURCE_ID,
+        time: estimatedTime,
+      };
+      if (plateNumber !== undefined) {
+        draftRecord.plateNumber = plateNumber.toString();
+      }
+      setAddRecordDialogState({
+        anchorRecord: record,
+        draftRecord,
+        initialRecordType: 'passing',
+        mode: 'add',
+      });
+    },
+    [props.currentEventId, props.currentSessionId, props.raceStateLookup, props.records]
+  );
+  const handleCategorySelected = React.useCallback(
+    (categoryIds: Set<EventCategoryId>): void => {
+      const nextCategoryIds = new Set<EventCategoryId>(categoryIds);
+      React.startTransition(() => {
+        props.categorySelected?.(nextCategoryIds);
+      });
+    },
+    [props.categorySelected]
+  );
+  const handleParticipantSelected = React.useCallback(
+    (participantIds: Set<EventParticipantId>): void => {
+      const nextParticipantIds = new Set<EventParticipantId>(participantIds);
+      setSelectedPlateNumber(undefined);
+      setLocalSelectedParticipants(nextParticipantIds);
+      React.startTransition(() => {
+        props.participantSelected?.(new Set<EventParticipantId>(nextParticipantIds));
+      });
+    },
+    [props.participantSelected]
+  );
   const handleSelectRecord = React.useCallback((recordId: TimeRecordId | undefined): void => {
     setSelectedRecordId(recordId);
   }, []);
   const handleSelectUnrecognisedPlateNumber = React.useCallback((plateNumber: string | undefined): void => {
     setSelectedPlateNumber(plateNumber);
   }, []);
-  const handleFilterModeChange = React.useCallback((nextFilterMode: RecentRecordsFilterMode): void => {
-    if (nextFilterMode !== filterMode && selectedRecordId !== undefined) {
-      pendingFilterScrollAnchorRef.current = {
-        previousIndex: getRecordIndex(sortedRecords, selectedRecordId),
-        recordId: selectedRecordId,
-      };
-    }
-    setFilterMode(nextFilterMode);
-  }, [filterMode, selectedRecordId, sortedRecords]);
+  const handleFilterModeChange = React.useCallback(
+    (nextFilterMode: RecentRecordsFilterMode): void => {
+      if (nextFilterMode !== filterMode && selectedRecordId !== undefined) {
+        pendingFilterScrollAnchorRef.current = {
+          previousIndex: getRecordIndex(sortedRecords, selectedRecordId),
+          recordId: selectedRecordId,
+        };
+      }
+      setFilterMode(nextFilterMode);
+    },
+    [filterMode, selectedRecordId, sortedRecords]
+  );
 
-  return <>
-    <SourceOffsetsDialog
-      offsets={editableSourceOffsets}
-      onClose={() => setOffsetsDialogOpen(false)}
-      onUpdateOffset={props.onUpdateSourceOffset}
-      open={offsetsDialogOpen}
-    />
-    <AddRecordDialog
-      currentEventId={props.currentEventId}
-      currentSessionId={props.currentSessionId}
-      displayTimeZone={displayTimeZone}
-      onClose={() => setAddRecordDialogState(null)}
-      onSave={(record, mode) => {
-        if (mode === 'edit') {
-          props.onEditRecord?.(record);
+  return (
+    <>
+      <SourceOffsetsDialog offsets={editableSourceOffsets} onClose={() => setOffsetsDialogOpen(false)} onUpdateOffset={props.onUpdateSourceOffset} open={offsetsDialogOpen} />
+      <AddRecordDialog
+        currentEventId={props.currentEventId}
+        currentSessionId={props.currentSessionId}
+        displayTimeZone={displayTimeZone}
+        onClose={() => setAddRecordDialogState(null)}
+        onSave={(record, mode) => {
+          if (mode === 'edit') {
+            props.onEditRecord?.(record);
+            setAddRecordDialogState(null);
+            return;
+          }
+          props.onAddRecord?.(record);
           setAddRecordDialogState(null);
-          return;
-        }
-        props.onAddRecord?.(record);
-        setAddRecordDialogState(null);
-      }}
-      openState={addRecordDialogState}
-      raceStateLookup={props.raceStateLookup}
-      records={props.records}
-    />
-    <div
-      className="recent-records-toolbar-anchor"
-      ref={toolbarAnchorRef}
-      style={toolbarDock.isDocked ? { height: toolbarDock.height } : undefined}
-    >
-      <div
-        className={`recent-records-toolbar${toolbarDock.isDocked ? ' docked' : ''}`}
-        ref={toolbarRef}
-        style={toolbarDock.isDocked ? { left: toolbarDock.left, top: 0, width: toolbarDock.width } : undefined}
-      >
-        <h2 className="recent-records">Recent Records</h2>
-        <FormControl
-          fullWidth={false}
-          id="recent-records-category-dropdown"
-          sx={{ display: 'inline-block', minWidth: 220, verticalAlign: 'middle' }}
-        >
-          <InputLabel id="show-recent-categories-label" shrink>Categories</InputLabel>
-          <Select
-            displayEmpty
-            multiple
-            id="show-recent-categories"
-            label="Categories"
-            value={selectedCategoryIds}
-            sx={{ minWidth: 180 }}
-            onChange={(event) => {
-              const value = event.target.value;
-              const categoryIds = typeof value === 'string' ? value.split(',') : value;
-              setLocalSelectedParticipants(new Set<EventParticipantId>());
-              handleCategorySelected(new Set<EventCategoryId>(categoryIds as EventCategoryId[]));
+        }}
+        openState={addRecordDialogState}
+        raceStateLookup={props.raceStateLookup}
+        records={props.records}
+      />
+      <div className="recent-records-toolbar-anchor" ref={toolbarAnchorRef} style={toolbarDock.isDocked ? { height: toolbarDock.height } : undefined}>
+        <div className={`recent-records-toolbar${toolbarDock.isDocked ? ' docked' : ''}`} ref={toolbarRef} style={toolbarDock.isDocked ? { left: toolbarDock.left, top: 0, width: toolbarDock.width } : undefined}>
+          <h2 className="recent-records">Recent Records</h2>
+          <FormControl
+            fullWidth={false}
+            id="recent-records-category-dropdown"
+            sx={{
+              display: 'inline-block',
+              minWidth: 220,
+              verticalAlign: 'middle',
             }}
-            renderValue={() => selectedCategoryNames.length > 0 ? selectedCategoryNames.join(', ') : 'All categories'}>
-            {selectableCategories.map((category) => (
-              <MenuItem key={category.id} value={category.id}>
-                <Checkbox checked={selectedCategories.has(category.id)} />
-                <ListItemText primary={category.name || category.id} />
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl
-          fullWidth={false}
-          id="recent-records-type-dropdown"
-          sx={{ display: 'inline-block', verticalAlign: 'middle' }}
-        >
-          <InputLabel id="show-recent-type-label">Show</InputLabel>
-          <Select
-            id="show-recent-type"
-            value={filterMode}
-            onChange={(event) => handleFilterModeChange(event.target.value as RecentRecordsFilterMode)}
-            label="Record types">
-            <MenuItem value="all">All records</MenuItem>
-            <MenuItem value="flags">Only flags</MenuItem>
-            <MenuItem value="potentialMissingCrossings">Only potential missing crossings</MenuItem>
-            <MenuItem value="category">Only selected category</MenuItem>
-            {canFilterByTeam ? <MenuItem value="team">Only selected team</MenuItem> : null}
-            <MenuItem value="entrant">Only selected entrant</MenuItem>
-            <MenuItem value="participant">Only selected {isCyclingEvent ? 'rider' : 'driver'}</MenuItem>
-          </Select>
-        </FormControl>
-        <FormControl
-          fullWidth={false}
-          id="recent-records-time-zone-dropdown"
-          sx={{ display: 'inline-block', verticalAlign: 'middle' }}
-        >
-          <InputLabel id="show-recent-times-in-label">Show times in</InputLabel>
-          <Select
-            id="show-recent-times-in"
-            value={timeDisplayZoneMode}
-            onChange={(event) => props.onTimeDisplayZoneModeChange?.(event.target.value as TimeDisplayZoneMode)}
-            label="Show times in">
-            <MenuItem value="event">Event time-zone</MenuItem>
-            <MenuItem value="system">System time-zone</MenuItem>
-            <MenuItem value="gmt">GMT</MenuItem>
-          </Select>
-        </FormControl>
-        <FormControl
-          fullWidth={false}
-          id="recent-records-ignore-dropdown"
-          sx={{ display: 'inline-block', minWidth: 180, verticalAlign: 'middle' }}
-        >
-          <InputLabel id="show-recent-ignore-label" shrink>Ignore</InputLabel>
-          <Select
-            displayEmpty
-            multiple
-            id="show-recent-ignore"
-            label="Ignore"
-            value={ignoreModes}
-            sx={{ minWidth: 100 }}
-            onChange={(event) => {
-              const value = event.target.value;
-              setIgnoreModes(typeof value === 'string' ? value.split(',') as RecentRecordsIgnoreMode[] : value as RecentRecordsIgnoreMode[]);
+          >
+            <InputLabel id="show-recent-categories-label" shrink>
+              Categories
+            </InputLabel>
+            <Select
+              displayEmpty
+              multiple
+              id="show-recent-categories"
+              label="Categories"
+              value={selectedCategoryIds}
+              sx={{ minWidth: 180 }}
+              onChange={(event) => {
+                const value = event.target.value;
+                const categoryIds = typeof value === 'string' ? value.split(',') : value;
+                setLocalSelectedParticipants(new Set<EventParticipantId>());
+                handleCategorySelected(new Set<EventCategoryId>(categoryIds as EventCategoryId[]));
+              }}
+              renderValue={() => (selectedCategoryNames.length > 0 ? selectedCategoryNames.join(', ') : 'All categories')}
+            >
+              {selectableCategories.map((category) => (
+                <MenuItem key={category.id} value={category.id}>
+                  <Checkbox checked={selectedCategories.has(category.id)} />
+                  <ListItemText primary={category.name || category.id} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl fullWidth={false} id="recent-records-type-dropdown" sx={{ display: 'inline-block', verticalAlign: 'middle' }}>
+            <InputLabel id="show-recent-type-label">Show</InputLabel>
+            <Select id="show-recent-type" value={filterMode} onChange={(event) => handleFilterModeChange(event.target.value as RecentRecordsFilterMode)} label="Record types">
+              <MenuItem value="all">All records</MenuItem>
+              <MenuItem value="flags">Only flags</MenuItem>
+              <MenuItem value="potentialMissingCrossings">Only potential missing crossings</MenuItem>
+              <MenuItem value="category">Only selected category</MenuItem>
+              {canFilterByTeam ? <MenuItem value="team">Only selected team</MenuItem> : null}
+              <MenuItem value="entrant">Only selected entrant</MenuItem>
+              <MenuItem value="participant">Only selected {isCyclingEvent ? 'rider' : 'driver'}</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl fullWidth={false} id="recent-records-time-zone-dropdown" sx={{ display: 'inline-block', verticalAlign: 'middle' }}>
+            <InputLabel id="show-recent-times-in-label">Show times in</InputLabel>
+            <Select id="show-recent-times-in" value={timeDisplayZoneMode} onChange={(event) => props.onTimeDisplayZoneModeChange?.(event.target.value as TimeDisplayZoneMode)} label="Show times in">
+              <MenuItem value="event">Event time-zone</MenuItem>
+              <MenuItem value="system">System time-zone</MenuItem>
+              <MenuItem value="gmt">GMT</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl
+            fullWidth={false}
+            id="recent-records-ignore-dropdown"
+            sx={{
+              display: 'inline-block',
+              minWidth: 180,
+              verticalAlign: 'middle',
             }}
-            renderValue={(selected) => selected.length > 0
-              ? selected.map((mode) => ignoreModeLabels[mode as RecentRecordsIgnoreMode]).join(', ')
-              : 'None'}>
-            {(Object.keys(ignoreModeLabels) as RecentRecordsIgnoreMode[]).map((mode) => (
-              <MenuItem key={mode} value={mode}>
-                <Checkbox checked={ignoreModes.includes(mode)} />
-                <ListItemText primary={ignoreModeLabels[mode]} />
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl
-          fullWidth={false}
-          id="recent-records-order-dropdown"
-          sx={{ display: 'inline-block', verticalAlign: 'middle' }}
-        >
-          <InputLabel id="show-recent-order-label">Order</InputLabel>
-          <Select
-            id="show-recent-order"
-            defaultValue="oldest"
-            onChange={(e) => {
-              if (e.target.value === 'recent') {
-                setRecentFirst(true);
-              } else {
-                setRecentFirst(false);
-              }
-            }}
-            label="Sort records">
-            <MenuItem value="oldest">Oldest fist</MenuItem>
-            <MenuItem value="recent">Recent first</MenuItem>
-          </Select>
-        </FormControl>
-        <Button onClick={() => setOffsetsDialogOpen(true)} variant="outlined">Edit offsets</Button>
-        <Button
-          aria-controls={goToMenuAnchor ? 'recent-records-go-to-menu' : undefined}
-          aria-expanded={goToMenuAnchor ? 'true' : undefined}
-          aria-haspopup="menu"
-          onClick={(event) => setGoToMenuAnchor(event.currentTarget)}
-          variant="outlined"
-        >
-          Go to
-        </Button>
-        <Menu
-          anchorEl={goToMenuAnchor}
-          id="recent-records-go-to-menu"
-          onClose={() => setGoToMenuAnchor(null)}
-          open={goToMenuAnchor !== null}
-        >
-          <MenuItem disabled={recordsByTime.length === 0} onClick={() => handleGoTo('first')}>First</MenuItem>
-          <MenuItem disabled={recordsByTime.length === 0} onClick={() => handleGoTo('last')}>Last</MenuItem>
-          <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green')} onClick={() => handleGoTo('firstGreen')}>First Green</MenuItem>
-          <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && isFinishFlag(record))} onClick={() => handleGoTo('finish')}>Finish</MenuItem>
-          <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && isCautionStartFlag(record))} onClick={() => handleGoTo('nextCaution')}>Next Caution</MenuItem>
-          <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green')} onClick={() => handleGoTo('nextGreen')}>Next Green</MenuItem>
-          <MenuItem disabled={!hasTransmitterCrossing(true, false)} onClick={() => handleGoTo('previousTransmitterCrossing')}>Previous crossing for this transmitter</MenuItem>
-          <MenuItem disabled={!hasTransmitterCrossing(false, false)} onClick={() => handleGoTo('nextTransmitterCrossing')}>Next crossing for this transmitter</MenuItem>
-          <MenuItem disabled={!hasTransmitterCrossing(true, true)} onClick={() => handleGoTo('previousTransmitterCrossingOnLine')}>Prev Tx crossing on this line</MenuItem>
-          <MenuItem disabled={!hasTransmitterCrossing(false, true)} onClick={() => handleGoTo('nextTransmitterCrossingOnLine')}>Next Tx crossing on this line</MenuItem>
-          <MenuItem disabled={!hasLeaderLapTransition(false)} onClick={() => handleGoTo('leadersPreviousLap')}>Leaders prev lap (B)</MenuItem>
-          <MenuItem disabled={!hasLeaderLapTransition(true)} onClick={() => handleGoTo('leadersNextLap')}>Leaders next lap (N)</MenuItem>
-        </Menu>
+          >
+            <InputLabel id="show-recent-ignore-label" shrink>
+              Ignore
+            </InputLabel>
+            <Select
+              displayEmpty
+              multiple
+              id="show-recent-ignore"
+              label="Ignore"
+              value={ignoreModes}
+              sx={{ minWidth: 100 }}
+              onChange={(event) => {
+                const value = event.target.value;
+                setIgnoreModes(typeof value === 'string' ? (value.split(',') as RecentRecordsIgnoreMode[]) : (value as RecentRecordsIgnoreMode[]));
+              }}
+              renderValue={(selected) => (selected.length > 0 ? selected.map((mode) => ignoreModeLabels[mode as RecentRecordsIgnoreMode]).join(', ') : 'None')}
+            >
+              {(Object.keys(ignoreModeLabels) as RecentRecordsIgnoreMode[]).map((mode) => (
+                <MenuItem key={mode} value={mode}>
+                  <Checkbox checked={ignoreModes.includes(mode)} />
+                  <ListItemText primary={ignoreModeLabels[mode]} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl fullWidth={false} id="recent-records-order-dropdown" sx={{ display: 'inline-block', verticalAlign: 'middle' }}>
+            <InputLabel id="show-recent-order-label">Order</InputLabel>
+            <Select
+              id="show-recent-order"
+              defaultValue="oldest"
+              onChange={(e) => {
+                if (e.target.value === 'recent') {
+                  setRecentFirst(true);
+                } else {
+                  setRecentFirst(false);
+                }
+              }}
+              label="Sort records"
+            >
+              <MenuItem value="oldest">Oldest fist</MenuItem>
+              <MenuItem value="recent">Recent first</MenuItem>
+            </Select>
+          </FormControl>
+          <Button onClick={() => setOffsetsDialogOpen(true)} variant="outlined">
+            Edit offsets
+          </Button>
+          <Button
+            aria-controls={goToMenuAnchor ? 'recent-records-go-to-menu' : undefined}
+            aria-expanded={goToMenuAnchor ? 'true' : undefined}
+            aria-haspopup="menu"
+            onClick={(event) => setGoToMenuAnchor(event.currentTarget)}
+            variant="outlined"
+          >
+            Go to
+          </Button>
+          <Menu anchorEl={goToMenuAnchor} id="recent-records-go-to-menu" onClose={() => setGoToMenuAnchor(null)} open={goToMenuAnchor !== null}>
+            <MenuItem disabled={recordsByTime.length === 0} onClick={() => handleGoTo('first')}>
+              First
+            </MenuItem>
+            <MenuItem disabled={recordsByTime.length === 0} onClick={() => handleGoTo('last')}>
+              Last
+            </MenuItem>
+            <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green')} onClick={() => handleGoTo('firstGreen')}>
+              First Green
+            </MenuItem>
+            <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && isFinishFlag(record))} onClick={() => handleGoTo('finish')}>
+              Finish
+            </MenuItem>
+            <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && isCautionStartFlag(record))} onClick={() => handleGoTo('nextCaution')}>
+              Next Caution
+            </MenuItem>
+            <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green')} onClick={() => handleGoTo('nextGreen')}>
+              Next Green
+            </MenuItem>
+            <MenuItem disabled={!hasTransmitterCrossing(true, false)} onClick={() => handleGoTo('previousTransmitterCrossing')}>
+              Previous crossing for this transmitter
+            </MenuItem>
+            <MenuItem disabled={!hasTransmitterCrossing(false, false)} onClick={() => handleGoTo('nextTransmitterCrossing')}>
+              Next crossing for this transmitter
+            </MenuItem>
+            <MenuItem disabled={!hasTransmitterCrossing(true, true)} onClick={() => handleGoTo('previousTransmitterCrossingOnLine')}>
+              Prev Tx crossing on this line
+            </MenuItem>
+            <MenuItem disabled={!hasTransmitterCrossing(false, true)} onClick={() => handleGoTo('nextTransmitterCrossingOnLine')}>
+              Next Tx crossing on this line
+            </MenuItem>
+            <MenuItem disabled={!hasLeaderLapTransition(false)} onClick={() => handleGoTo('leadersPreviousLap')}>
+              Leaders prev lap (B)
+            </MenuItem>
+            <MenuItem disabled={!hasLeaderLapTransition(true)} onClick={() => handleGoTo('leadersNextLap')}>
+              Leaders next lap (N)
+            </MenuItem>
+          </Menu>
+        </div>
       </div>
-    </div>
-    { warnings?.length > 0 && <Warnings warnings={warnings} />}
-    {
-      !(sortedRecords.length > 0) ? <p>No records available.</p>
-        : <Box sx={{ flexGrow: 1, width: '100%' }}>
+      {warnings?.length > 0 && <Warnings warnings={warnings} />}
+      {!(sortedRecords.length > 0) ? (
+        <p>No records available.</p>
+      ) : (
+        <Box sx={{ flexGrow: 1, width: '100%' }}>
           <TableContainer className="recent-records-table-container" component={Paper} ref={tableContainerRef} style={tableContainerStyle}>
             <Table stickyHeader sx={{ minWidth: 650 }} size="small">
               <TableHead>
                 <TableRow>
-                  {headings.map((heading) => <TableCell key={heading}>{heading}</TableCell>)}
+                  {headings.map((heading) => (
+                    <TableCell key={heading}>{heading}</TableCell>
+                  ))}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {virtualRowWindow.paddingTop > 0 && (
                   <TableRow aria-hidden="true" className="recent-records-virtual-spacer-row">
-                    <TableCell colSpan={headings.length} sx={{ border: 0, height: virtualRowWindow.paddingTop, padding: 0 }} />
+                    <TableCell
+                      colSpan={headings.length}
+                      sx={{
+                        border: 0,
+                        height: virtualRowWindow.paddingTop,
+                        padding: 0,
+                      }}
+                    />
                   </TableRow>
                 )}
                 {virtualRowWindow.rows.map(({ record, index }) => {
-                  const rowSelectionState = isRowIndexWithinRange(index, immediateSelectionWindow)
-                    ? immediateSelectionState
-                    : deferredSelectionState;
+                  const rowSelectionState = isRowIndexWithinRange(index, immediateSelectionWindow) ? immediateSelectionState : deferredSelectionState;
 
                   return (
                     <RecordRow
@@ -3267,13 +3048,21 @@ export const RecentRecords = (props: RecordsProps & {
                 })}
                 {virtualRowWindow.paddingBottom > 0 && (
                   <TableRow aria-hidden="true" className="recent-records-virtual-spacer-row">
-                    <TableCell colSpan={headings.length} sx={{ border: 0, height: virtualRowWindow.paddingBottom, padding: 0 }} />
+                    <TableCell
+                      colSpan={headings.length}
+                      sx={{
+                        border: 0,
+                        height: virtualRowWindow.paddingBottom,
+                        padding: 0,
+                      }}
+                    />
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           </TableContainer>
         </Box>
-    }
-  </>;
+      )}
+    </>
+  );
 };

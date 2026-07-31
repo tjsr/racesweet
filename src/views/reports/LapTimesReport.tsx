@@ -8,6 +8,12 @@ import { type ParticipantPassingRecord, isPassingExcluded } from '../../model/ti
 
 export type ShowAs = 'individual' | 'table';
 
+export interface LapTimesReportState {
+  selectedCategoryId: string;
+  selectedParticipantId: string;
+  showAs: ShowAs;
+}
+
 export interface LapTimesReportEntry {
   categoryIds: string[];
   id: string;
@@ -21,7 +27,9 @@ export interface LapTimesReportEntry {
 export interface LapTimesReportProps {
   participants: LapTimesReportEntry[];
   categories: EventCategory[];
+  onStateChange?: (state: LapTimesReportState) => void;
   passings: Map<string, ParticipantPassingRecord[]>;
+  state?: LapTimesReportState;
   title?: string;
 }
 
@@ -204,12 +212,19 @@ const TableView = ({ participants, passings, lapsPerBlock }: TableViewProps) => 
 export const LapTimesReport = ({
   participants,
   categories,
+  onStateChange,
   passings,
+  state,
   title = 'Lap Times Report',
 }: LapTimesReportProps) => {
-  const [showAs, setShowAs] = useState<ShowAs>('individual');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(ALL_CATEGORIES);
-  const [selectedParticipantId, setSelectedParticipantId] = useState<string>('');
+  const [localState, setLocalState] = useState<LapTimesReportState>({ selectedCategoryId: ALL_CATEGORIES, selectedParticipantId: '', showAs: 'individual' });
+  const reportState = state || localState;
+  const updateState = (changes: Partial<LapTimesReportState>): void => {
+    const nextState: LapTimesReportState = { ...reportState, ...changes };
+    setLocalState(nextState);
+    onStateChange?.(nextState);
+  };
+  const { selectedCategoryId, selectedParticipantId, showAs } = reportState;
   const [lapsPerBlock, setLapsPerBlock] = useState(MAX_LAPS_PER_BLOCK);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -243,7 +258,7 @@ export const LapTimesReport = ({
       filteredParticipants.length > 0 &&
       !filteredParticipants.find((p) => p.id === selectedParticipantId)
     ) {
-      setSelectedParticipantId(filteredParticipants[0].id);
+      updateState({ selectedParticipantId: filteredParticipants[0].id });
     }
   }, [filteredParticipants, selectedParticipantId, showAs]);
 
@@ -259,7 +274,7 @@ export const LapTimesReport = ({
           Show as
           <select
             value={showAs}
-            onChange={(e) => setShowAs(e.target.value as ShowAs)}
+            onChange={(e) => updateState({ showAs: e.target.value as ShowAs })}
           >
             <option value="individual">Individual</option>
             <option value="table">Table</option>
@@ -273,8 +288,7 @@ export const LapTimesReport = ({
             <select
               value={selectedCategoryId}
               onChange={(e) => {
-                setSelectedCategoryId(e.target.value);
-                setSelectedParticipantId('');
+                updateState({ selectedCategoryId: e.target.value, selectedParticipantId: '' });
               }}
             >
               <option value={ALL_CATEGORIES}>All categories</option>
@@ -294,7 +308,7 @@ export const LapTimesReport = ({
             <select
               aria-label="Reports Participant"
               value={selectedParticipantId}
-              onChange={(e) => setSelectedParticipantId(e.target.value)}
+              onChange={(e) => updateState({ selectedParticipantId: e.target.value })}
             >
               <option value="">— select —</option>
               {filteredParticipants.map((p) => (

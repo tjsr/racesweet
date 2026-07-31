@@ -1,4 +1,4 @@
-import { Button, MenuItem, TextField } from '@mui/material';
+import { Button, CircularProgress, MenuItem, TextField } from '@mui/material';
 import React from 'react';
 import { type EventCatalogEvent, type EventDiscipline } from '../../catalog/eventCatalog.js';
 import { type EventId } from '../../model/raceevent.js';
@@ -26,8 +26,28 @@ interface EventDetailsPanelProps {
   warningModal?: React.ReactNode;
 }
 
-export const EventDetailsPanel = (props: EventDetailsPanelProps): React.ReactElement => (
-  <section className="events-panel event-detail-panel">
+export const EventDetailsPanel = (props: EventDetailsPanelProps): React.ReactElement => {
+  const [saveError, setSaveError] = React.useState<string | undefined>(undefined);
+  const [saveStatus, setSaveStatus] = React.useState<'idle' | 'pending' | 'succeeded' | 'failed'>('idle');
+
+  React.useEffect(() => {
+    setSaveError(undefined);
+    setSaveStatus('idle');
+  }, [props.selectedEvent?.id]);
+
+  const saveEventDetails = (): void => {
+    setSaveError(undefined);
+    setSaveStatus('pending');
+    Promise.resolve(props.onSaveEventDetails()).then(
+      () => setSaveStatus('succeeded'),
+      (error: unknown) => {
+        setSaveError(error instanceof Error ? error.message : String(error));
+        setSaveStatus('failed');
+      },
+    );
+  };
+
+  return <section className="events-panel event-detail-panel">
     <h2>Event Details</h2>
     {props.selectedEvent ? (
       <>
@@ -42,7 +62,17 @@ export const EventDetailsPanel = (props: EventDetailsPanelProps): React.ReactEle
         <TextField fullWidth label="Calculate lap 1 from" onChange={(event) => props.onUpdateEventDraft((current) => ({ ...current, lap1Calculation: event.target.value }))} select slotProps={{ select: { 'aria-label': 'Event Calculate Lap 1 From' } }} value={props.eventDraft.lap1Calculation}><MenuItem value="">Inherit default (category start)</MenuItem><MenuItem value="first-start">First start</MenuItem><MenuItem value="category-start">Category start</MenuItem></TextField>
         <TextField fullWidth label="Event Time Zone" onChange={(event) => props.onUpdateEventDraft((current) => ({ ...current, timeZone: event.target.value }))} select slotProps={{ select: { 'aria-label': 'Event Time Zone' } }} value={props.eventDraft.timeZone}>{props.timeZoneOptions.map((timeZone) => <MenuItem key={timeZone} value={timeZone}>{timeZone}</MenuItem>)}</TextField>
         <div className="events-actions">
-          <Button onClick={() => props.onSaveEventDetails()} variant="contained">Save Event Details</Button>
+          <div className="event-save-status">
+            <Button
+              disabled={saveStatus === 'pending'}
+              endIcon={saveStatus === 'pending' ? <CircularProgress aria-label="Saving event details" size={16} /> : saveStatus === 'succeeded' ? <span aria-label="Event details saved" role="img">✓</span> : saveStatus === 'failed' ? <span aria-label="Event details save failed" role="img">!</span> : undefined}
+              onClick={saveEventDetails}
+              variant="contained"
+            >
+              Save Event Details
+            </Button>
+            {saveError ? <span className="error event-save-error" role="alert">{saveError}</span> : null}
+          </div>
           <Button
             onClick={() => props.onActivateEvent?.()}
             disabled={props.selectedEvent.id === props.activeEventId}
@@ -57,5 +87,5 @@ export const EventDetailsPanel = (props: EventDetailsPanelProps): React.ReactEle
     ) : (
       <p>No events are defined.</p>
     )}
-  </section>
-);
+  </section>;
+};
