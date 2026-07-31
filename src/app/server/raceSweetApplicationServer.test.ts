@@ -578,12 +578,14 @@ describe('RaceSweetApplicationServer', () => {
       firstEntrant.catalog.entrants.filter((entrant) => entrant.eventId === eventId).at(-1)!.id,
       secondEntrant.catalog.entrants.filter((entrant) => entrant.eventId === eventId).at(-1)!.id,
     ];
-    const abortController = new AbortController();
-    const streamResponse = await fetch(`${testServer.origin}/api/v1/events`, {
-      headers: { cookie: testServer.adminCookie },
-      signal: abortController.signal,
-    });
-    const reader = streamResponse.body!.getReader();
+    const abortControllers: AbortController[] = [new AbortController(), new AbortController()];
+    const readers = await Promise.all(abortControllers.map(async (abortController) => {
+      const streamResponse = await fetch(`${testServer.origin}/api/v1/events`, {
+        headers: { cookie: testServer.adminCookie },
+        signal: abortController.signal,
+      });
+      return streamResponse.body!.getReader();
+    }));
 
     const deleteResponse = await fetch(`${testServer.origin}/api/v1/catalog/events/${eventId}/entrants`, {
       body: JSON.stringify({ entrantIds }),
@@ -591,13 +593,17 @@ describe('RaceSweetApplicationServer', () => {
       method: 'DELETE',
     });
     const deletion = await deleteResponse.json() as { mutations: EventCatalogMutation[] };
-    const eventText = await readSseEvent(reader, 'catalog.mutations-applied');
-    abortController.abort();
-    await reader.cancel().catch((): void => undefined);
+    const eventTexts = await Promise.all(readers.map((reader) => readSseEvent(reader, 'catalog.mutations-applied')));
+    abortControllers.forEach((abortController) => abortController.abort());
+    await Promise.all(readers.map((reader) => reader.cancel().catch((): void => undefined)));
+    const persistedResponse = await fetch(`${testServer.origin}/api/v1/mutations`, { headers: { cookie: testServer.adminCookie } });
+    const persisted = await persistedResponse.json() as { mutations: EventCatalogMutation[] };
 
     expect(deleteResponse.status).toBe(200);
     expect(deletion.mutations).toEqual([expect.objectContaining({ entrantIds, type: 'entrants-deleted' })]);
-    expect(eventText).toContain('entrants-deleted');
+    expect(eventTexts).toHaveLength(2);
+    eventTexts.forEach((eventText) => expect(eventText).toContain('entrants-deleted'));
+    expect(persisted.mutations.filter((mutation) => mutation.type === 'entrants-deleted')).toHaveLength(1);
   });
 
   it('broadcasts an Electron replica event mutation to every connected client', async () => {
