@@ -19,15 +19,22 @@ import { type MrScatsCatalogImport, type MrScatsCatalogLoadProgress, loadMrScats
 import { listMrScatsDataFiles } from '../parsers/mrScats/fileInventory.ts';
 import { previewCtcRawCrossingBuffer, previewMrScatsDataFile } from '../parsers/mrScats/filePreview.ts';
 import { ElectronJsonEventCatalogPersistence } from '../persistence/eventCatalogPersistence.ts';
+import { JsonReplicaOutboxPersistence } from '../persistence/jsonReplicaOutboxPersistence.ts';
 import { ElectronJsonRaceAdminPersistence } from '../persistence/raceAdminPersistence.ts';
 import type { AdministrativeChanges } from '../persistence/raceAdminPersistence.ts';
 import { ElectronJsonSystemConfigPersistence } from '../persistence/systemConfigPersistence.ts';
 import { EventCatalogService } from '../service/eventCatalogService.ts';
+import { CatalogReplicaOutbox } from '../service/catalogReplicaOutbox.ts';
+import { HttpReplicaTransport } from '../service/httpReplicaTransport.ts';
+import { ReplicaLiveMutationSubscriber } from '../service/replicaLiveMutationSubscriber.ts';
+import { ReplicaSyncController } from '../service/replicaSyncController.ts';
+import { ReplicaSyncService } from '../service/replicaSyncService.ts';
 import { RaceAdminService } from '../service/raceAdminService.ts';
 import { HttpRaceSweetApiClient } from '../service/raceSweetApiClient.ts';
 import { type SessionSourceReloadMode, type SessionSourceReloadSummary, addSessionSourceReloadSummaries, createEmptySessionSourceReloadSummary, isMissingLinkedCategoryPlaceholder, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload } from '../service/sessionSourceReload.ts';
 import { applyPulledRaceStateToSession, getCategoryTimingStartCalculationsForSession, getMinimumLapTimeMillisecondsForSession, getSessionAssignedCategoryIds } from '../service/sourceApplication.ts';
 import { SystemConfigService } from '../service/systemConfigService.ts';
+import { SyncStore } from '../state/syncStore.ts';
 import type { DomainEventEnvelope } from '../model/serverApi.ts';
 import type { EventCatalogMutation } from '../ledger/eventCatalogLedger.ts';
 import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
@@ -431,10 +438,39 @@ export const RaceSweetMainApp = () => {
     raceState: undefined,
     sessionId: undefined,
   });
+  const catalogReplicaOutbox = useRef<CatalogReplicaOutbox | undefined>(undefined);
   remoteRaceAdminTarget.current = {
     raceState: timingRaceState || sessionState,
     sessionId: selectedTimingSessionId as SessionId | undefined,
   };
+
+  useEffect(() => {
+    const remoteServerUrl = systemConfigState.remoteServer?.baseUrl?.trim();
+    if (!eventCatalogService || window.api.persistenceMode !== 'native' || !remoteServerUrl) {
+      catalogReplicaOutbox.current = undefined;
+      return undefined;
+    }
+    const outboxPath = `${systemConfigState.localStorageDirectoryPath.replace(/[\\/]$/u, '')}/replica-outbox.json`;
+    const outboxPersistence = new JsonReplicaOutboxPersistence(outboxPath, {
+      readFile: (filePath) => window.api.requestFileContent<string>(filePath, 'utf8'),
+      writeFile: (filePath, contents) => window.api.writeFileContent(filePath, contents, 'utf8'),
+    });
+    const syncService = new ReplicaSyncService({ applyRemoteMutations: (mutations) => eventCatalogService.applyRemoteMutations(mutations).then((): void => undefined) }, outboxPersistence, new SyncStore(), new HttpReplicaTransport(remoteServerUrl));
+    const controller = new ReplicaSyncController(syncService);
+    const outbox = new CatalogReplicaOutbox(syncService);
+    outbox.initialize({ mutations: eventCatalogService.mutations, schemaVersion: 1 });
+    catalogReplicaOutbox.current = outbox;
+    eventCatalogService.setOnPersistedLedger((ledger) => outbox.enqueueNewPersistedMutations(ledger).then(() => controller.syncNow()));
+    const subscriber = new ReplicaLiveMutationSubscriber(new HttpRaceSweetApiClient(remoteServerUrl), { applyRemoteMutations: (mutations) => eventCatalogService.applyRemoteMutations(mutations).then((): void => undefined) });
+    subscriber.start(() => { void controller.syncNow(); });
+    void controller.start();
+    return () => {
+      subscriber.stop();
+      controller.stop();
+      catalogReplicaOutbox.current = undefined;
+      eventCatalogService.setOnPersistedLedger(undefined);
+    };
+  }, [eventCatalogService, systemConfigState.localStorageDirectoryPath, systemConfigState.remoteServer?.baseUrl]);
 
   useEffect(() => {
     if (!eventCatalogService || !systemConfigService || typeof EventSource === 'undefined') {

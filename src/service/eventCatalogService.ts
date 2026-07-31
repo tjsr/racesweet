@@ -2076,6 +2076,10 @@ export class EventCatalogService {
     return [...this.ledger.mutations];
   }
 
+  public setOnPersistedLedger(callback: EventCatalogServiceOptions['onPersistedLedger']): void {
+    this.options.onPersistedLedger = callback;
+  }
+
   public async applyRemoteMutations(
     mutations: EventCatalogMutation[],
   ): Promise<EventCatalogState> {
