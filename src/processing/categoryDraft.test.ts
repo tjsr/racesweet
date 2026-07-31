@@ -8,9 +8,11 @@ describe('buildCategoryChanges', () => {
       description: 'Premier',
       distanceRuleKind: 'laps',
       distanceRuleValue: '12',
+      elapsedTimeCalculation: 'first-start',
       excludeFromResults: false,
       identityMode: 'multiple',
       isPlaceholder: false,
+      lap1Calculation: 'category-start',
       maxRiderAge: '45',
       maxTeamSize: '4',
       minRiderAge: '18',
@@ -19,6 +21,8 @@ describe('buildCategoryChanges', () => {
     })).toEqual(expect.objectContaining({
       code: 'P',
       distanceRule: { kind: 'laps', value: 12 },
+      elapsedTimeCalculation: 'first-start',
+      lap1Calculation: 'category-start',
       name: 'Premier',
       teamRules: expect.objectContaining({
         maxRiderAge: 45,

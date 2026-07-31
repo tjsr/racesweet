@@ -2185,7 +2185,9 @@ export class EventCatalogService {
     changes: {
       date?: string;
       discipline?: EventCatalogState["events"][number]["discipline"];
+      elapsedTimeCalculation?: EventCatalogState["events"][number]["elapsedTimeCalculation"];
       format?: EventCatalogState["events"][number]["format"];
+      lap1Calculation?: EventCatalogState["events"][number]["lap1Calculation"];
       minimumLapTimeMilliseconds?: number | null;
       name?: string;
       timeZone?: string;
@@ -3193,7 +3195,9 @@ export class EventCatalogService {
       Pick<
         EventCatalogSession,
         | "categoryIds"
+        | "elapsedTimeCalculation"
         | "kind"
+        | "lap1Calculation"
         | "minimumLapTimeMilliseconds"
         | "name"
         | "notes"
@@ -3234,7 +3238,9 @@ export class EventCatalogService {
         Pick<
           EventCatalogSession,
           | "categoryIds"
+          | "elapsedTimeCalculation"
           | "kind"
+          | "lap1Calculation"
           | "minimumLapTimeMilliseconds"
           | "name"
           | "notes"
@@ -3506,9 +3512,11 @@ export class EventCatalogService {
         | "description"
         | "distance"
         | "distanceRule"
+        | "elapsedTimeCalculation"
         | "duration"
         | "excludeFromResults"
         | "isPlaceholder"
+        | "lap1Calculation"
         | "name"
         | "startTime"
         | "teamRules"

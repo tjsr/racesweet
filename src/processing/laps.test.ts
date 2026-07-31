@@ -429,4 +429,48 @@ describe('lap calculation exclusion reasons', () => {
 
     expect(getMissingLapCompletionEvidence(passings, 60_000, [1])).toEqual([]);
   });
+
+  it('uses the first green flag for elapsed time and lap one when configured', () => {
+    const { categoryId, participant, source, startFlag } = createLapCalculationFixture();
+    const firstStart: GreenFlagRecord = {
+      ...startFlag,
+      categoryIds: [createCategoryId('earlier-category')],
+      id: createTimeRecordId('first-green-flag'),
+      time: new Date('2026-05-29T09:59:00.000Z'),
+    };
+    const categoryStart: GreenFlagRecord = {
+      ...startFlag,
+      id: createTimeRecordId('category-green-flag'),
+      time: new Date('2026-05-29T10:00:30.000Z'),
+    };
+    const passing: ParticipantPassingRecord = {
+      id: createTimeRecordId('first-lap-passing'),
+      isLapCompletion: true,
+      lineNumber: 1,
+      participantId: participant.id,
+      recordType: RECORD_TX_CROSSING,
+      sequence: 3,
+      source,
+      time: new Date('2026-05-29T10:00:00.000Z'),
+    };
+
+    const calculated = processAllParticipantLaps(
+      [firstStart, categoryStart, passing],
+      new Map([[participant.id, participant]]),
+      30_000,
+      true,
+      'race',
+      [1],
+      undefined,
+      undefined,
+      new Map([[categoryId, { elapsedTimeCalculation: 'first-start', lap1Calculation: 'first-start' }]]),
+    ).get(participant.id) || [];
+
+    expect(calculated[0]).toEqual(expect.objectContaining({
+      elapsedTime: 60_000,
+      lapNo: 1,
+      lapTime: 60_000,
+      startingLapRecordId: firstStart.id,
+    }));
+  });
 });

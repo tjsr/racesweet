@@ -36,7 +36,7 @@ interface EventsScreenProps {
   onMakeSessionActive: (eventId: EventId, sessionId: SessionId) => void | Promise<void>;
   onReloadEventSources?: (eventId: EventId) => void | Promise<void>;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
-  onUpdateEvent: (eventId: EventId, changes: { date?: string; discipline?: EventDiscipline; format?: EventCatalogEvent['format']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string; trackMap?: EventCatalogEvent['trackMap'] }) => void | Promise<void>;
+  onUpdateEvent: (eventId: EventId, changes: { date?: string; discipline?: EventDiscipline; elapsedTimeCalculation?: EventCatalogEvent['elapsedTimeCalculation']; format?: EventCatalogEvent['format']; lap1Calculation?: EventCatalogEvent['lap1Calculation']; minimumLapTimeMilliseconds?: number | null; name?: string; timeZone?: string; trackMap?: EventCatalogEvent['trackMap'] }) => void | Promise<void>;
   selectedEventId?: EventId;
   selectedSessionId?: SessionId;
 }
@@ -44,14 +44,18 @@ interface EventsScreenProps {
 const getEventDraft = (event: EventCatalogEvent | undefined, systemTimeZone: string): {
   date: string;
   discipline: EventDiscipline;
+  elapsedTimeCalculation: string;
   format: EventCatalogEvent['format'];
+  lap1Calculation: string;
   minimumLapTime: string;
   name: string;
   timeZone: string;
 } => ({
   date: event?.date || '',
   discipline: event?.discipline || 'motorsport',
+  elapsedTimeCalculation: event?.elapsedTimeCalculation || '',
   format: event?.format || 'race-weekend',
+  lap1Calculation: event?.lap1Calculation || '',
   minimumLapTime: formatMinimumLapTimeInput(event?.minimumLapTimeMilliseconds),
   name: event?.name || '',
   timeZone: event?.timeZone || systemTimeZone,
@@ -105,7 +109,9 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
     await props.onUpdateEvent(selectedEvent.id, {
       date: eventDraft.date,
       discipline: eventDraft.discipline,
+      elapsedTimeCalculation: eventDraft.elapsedTimeCalculation === '' ? null : eventDraft.elapsedTimeCalculation as EventCatalogEvent['elapsedTimeCalculation'],
       format: eventDraft.format,
+      lap1Calculation: eventDraft.lap1Calculation === '' ? null : eventDraft.lap1Calculation as EventCatalogEvent['lap1Calculation'],
       minimumLapTimeMilliseconds: parseMinimumLapTimeInputToMilliseconds(eventDraft.minimumLapTime),
       name: eventDraft.name,
       timeZone: eventDraft.timeZone,

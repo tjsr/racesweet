@@ -31,20 +31,24 @@ interface SessionsPageProps {
   onSaveSessionAssignment: (sessionId: SessionId, mode: 'default' | 'specific', sourceIds: string[]) => void | Promise<void>;
   onSelectSession: (sessionId: SessionId) => void;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
-  onUpdateSession: (sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'kind' | 'minimumLapTimeMilliseconds' | 'name' | 'notes' | 'scheduledStart' | 'status'>>) => void | Promise<void>;
+  onUpdateSession: (sessionId: SessionId, changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'elapsedTimeCalculation' | 'kind' | 'lap1Calculation' | 'minimumLapTimeMilliseconds' | 'name' | 'notes' | 'scheduledStart' | 'status'>>) => void | Promise<void>;
   selectedEventId?: EventId;
   selectedSessionId?: SessionId;
 }
 
 const getSessionDraft = (session: EventCatalogSession | undefined): {
   kind: EventCatalogSession['kind'];
+  elapsedTimeCalculation: string;
+  lap1Calculation: string;
   minimumLapTime: string;
   name: string;
   notes: string;
   scheduledStart: string;
   status: EventCatalogSession['status'];
 } => ({
+  elapsedTimeCalculation: session?.elapsedTimeCalculation || '',
   kind: session?.kind || 'practice',
+  lap1Calculation: session?.lap1Calculation || '',
   minimumLapTime: formatMinimumLapTimeInput(session?.minimumLapTimeMilliseconds),
   name: session?.name || '',
   notes: session?.notes || '',
@@ -83,7 +87,9 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
     }
 
     await props.onUpdateSession(selectedSession.id, {
+      elapsedTimeCalculation: sessionDraft.elapsedTimeCalculation === '' ? null : sessionDraft.elapsedTimeCalculation as EventCatalogSession['elapsedTimeCalculation'],
       kind: sessionDraft.kind,
+      lap1Calculation: sessionDraft.lap1Calculation === '' ? null : sessionDraft.lap1Calculation as EventCatalogSession['lap1Calculation'],
       minimumLapTimeMilliseconds: parseMinimumLapTimeInputToMilliseconds(sessionDraft.minimumLapTime),
       name: sessionDraft.name,
       notes: sessionDraft.notes,

@@ -13,6 +13,7 @@ export type EventDiscipline = 'cycling' | 'motorsport';
 export type EventSessionKind = 'practice' | 'qualifying' | 'race' | 'warmup' | 'other';
 export type EventSessionStatus = 'draft' | 'scheduled' | 'live' | 'completed';
 export type EntrantType = 'rider' | 'team';
+export type TimingStartCalculation = 'first-start' | 'category-start';
 
 export interface EventTrackTimingLine {
   label?: string;
@@ -68,7 +69,9 @@ export interface CategorySessionAssignment {
 
 export type EventCatalogCategory = EventCategory & {
   distanceRule?: CategoryDistanceRule;
+  elapsedTimeCalculation?: TimingStartCalculation | null;
   eventId: EventId;
+  lap1Calculation?: TimingStartCalculation | null;
   teamRules?: CategoryTeamRules;
 };
 
@@ -121,6 +124,8 @@ export interface EventCatalogEvent {
   entrantIds: EventEntrantId[];
   format: EventFormat;
   id: EventId;
+  elapsedTimeCalculation?: TimingStartCalculation | null;
+  lap1Calculation?: TimingStartCalculation | null;
   minimumLapTimeMilliseconds?: number | null;
   name: string;
   sessionIds: SessionId[];
@@ -133,6 +138,8 @@ export interface EventCatalogSession {
   eventId: EventId;
   id: SessionId;
   kind: EventSessionKind;
+  elapsedTimeCalculation?: TimingStartCalculation | null;
+  lap1Calculation?: TimingStartCalculation | null;
   minimumLapTimeMilliseconds?: number | null;
   name: string;
   notes?: string;

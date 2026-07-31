@@ -1,4 +1,4 @@
-import { applyPulledRaceStateToSession, getCategoriesToAdd, getMinimumLapTimeMillisecondsForSession, getSessionKindForSession } from '../service/sourceApplication.js';
+import { applyPulledRaceStateToSession, getCategoriesToAdd, getCategoryTimingStartCalculationsForSession, getMinimumLapTimeMillisecondsForSession, getSessionKindForSession } from '../service/sourceApplication.js';
 
 import { createGreenFlagEvent } from '../processing/flag.js';
 import type { EventCategory } from '../model/eventcategory.js';
@@ -48,6 +48,28 @@ const incomingCategoriesWithSeriesDuplicate: EventCategory[] = [
 ];
 
 describe('sourceApplication', () => {
+  it('cascades timing-start calculations from event to session to category', () => {
+    const eventId = createEventId('timing-start-event');
+    const sessionId = createSessionId('timing-start-session');
+    const inheritedCategoryId = createCategoryId('timing-start-inherited');
+    const categoryOverrideId = createCategoryId('timing-start-category-override');
+    const catalog: EventCatalogState = {
+      categories: [
+        { eventId, id: inheritedCategoryId, name: 'Inherited' },
+        { elapsedTimeCalculation: 'category-start', eventId, id: categoryOverrideId, lap1Calculation: 'first-start', name: 'Override' },
+      ],
+      deletedEventIds: [],
+      entrants: [],
+      events: [{ categoryIds: [inheritedCategoryId, categoryOverrideId], date: '2026-07-31', elapsedTimeCalculation: 'first-start', entrantIds: [], format: 'race-weekend', id: eventId, lap1Calculation: 'category-start', name: 'Event', sessionIds: [sessionId] }],
+      sessions: [{ categoryIds: [inheritedCategoryId, categoryOverrideId], elapsedTimeCalculation: 'category-start', eventId, id: sessionId, kind: 'race', lap1Calculation: 'first-start', name: 'Session', scheduledStart: '2026-07-31T10:00:00.000Z', status: 'scheduled' }],
+    };
+
+    expect(getCategoryTimingStartCalculationsForSession(catalog, eventId, sessionId)).toEqual(new Map([
+      [inheritedCategoryId, { elapsedTimeCalculation: 'category-start', lap1Calculation: 'first-start' }],
+      [categoryOverrideId, { elapsedTimeCalculation: 'category-start', lap1Calculation: 'first-start' }],
+    ]));
+  });
+
   it('filters out existing categories and deduplicates incoming category IDs', () => {
     const toAdd = getCategoriesToAdd(existingCategories, incomingCategoriesWithDuplicates);
 

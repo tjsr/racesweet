@@ -261,9 +261,15 @@ describe('SessionsPage integration', () => {
 
     const sessionNameInput = container.querySelector('input[aria-label="Sessions Page Name"]') as HTMLInputElement;
     const sessionMinimumLapTimeInput = container.querySelector('input[aria-label="Sessions Page Minimum Lap Time"]') as HTMLInputElement;
+    const elapsedTimeCalculationSelect = container.querySelector('select[aria-label="Session Calculate Elapsed Time From"]') as HTMLSelectElement;
+    const lap1CalculationSelect = container.querySelector('select[aria-label="Session Calculate Lap 1 From"]') as HTMLSelectElement;
     await act(async () => {
       setInputValue(sessionNameInput, 'Updated Test Session');
       setInputValue(sessionMinimumLapTimeInput, '0:00:45.0000');
+      elapsedTimeCalculationSelect.value = 'first-start';
+      elapsedTimeCalculationSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      lap1CalculationSelect.value = 'category-start';
+      lap1CalculationSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
     const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Session');
@@ -274,6 +280,8 @@ describe('SessionsPage integration', () => {
     });
 
     expect(onUpdateSession).toHaveBeenCalledWith('session-3', expect.objectContaining({
+      elapsedTimeCalculation: 'first-start',
+      lap1Calculation: 'category-start',
       minimumLapTimeMilliseconds: 45000,
       name: 'Updated Test Session',
     }));

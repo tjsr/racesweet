@@ -11,7 +11,7 @@ import { EventCategoryId } from '../../model/eventcategory.js';
 import { EventId } from '../../model/raceevent.js';
 import { type UnsavedChangesGuard } from './unsavedChangesWarning.js';
 
-export type CategoryChanges = Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distanceRule' | 'excludeFromResults' | 'isPlaceholder' | 'name' | 'teamRules'>>;
+export type CategoryChanges = Partial<Pick<EventCatalogCategory, 'code' | 'description' | 'distanceRule' | 'elapsedTimeCalculation' | 'excludeFromResults' | 'isPlaceholder' | 'lap1Calculation' | 'name' | 'teamRules'>>;
 
 export interface CategoriesPageProps {
   catalog: EventCatalogState;
@@ -33,8 +33,10 @@ export interface CategoryDraft {
   description: string;
   distanceRuleKind: CategoryDistanceRule['kind'];
   distanceRuleValue: string;
+  elapsedTimeCalculation: string;
   excludeFromResults: boolean;
   isPlaceholder: boolean;
+  lap1Calculation: string;
   identityMode: 'single' | 'multiple';
   maxRiderAge: string;
   maxTeamSize: string;
@@ -57,9 +59,11 @@ export const getCategoryDraft = (category: EventCatalogCategory | undefined, ses
   description: category?.description || '',
   distanceRuleKind: category?.distanceRule?.kind || 'unspecified',
   distanceRuleValue: category?.distanceRule?.kind === 'unspecified' ? '' : category?.distanceRule?.value?.toString() || '',
+  elapsedTimeCalculation: category?.elapsedTimeCalculation || '',
   excludeFromResults: category?.excludeFromResults || false,
   identityMode: category?.teamRules?.identityMode || 'single',
   isPlaceholder: category?.isPlaceholder === true,
+  lap1Calculation: category?.lap1Calculation || '',
   maxRiderAge: category?.teamRules?.maxRiderAge?.toString() || '',
   maxTeamSize: category?.teamRules?.maxTeamSize?.toString() || '',
   minRiderAge: category?.teamRules?.minRiderAge?.toString() || '',

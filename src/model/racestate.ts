@@ -1,5 +1,5 @@
 import { getOrCacheGreenFlagForCategory, hasCategoryIds, isFlagRecord } from "../processing/flag.js";
-import { getSourceLapCompletion, processAllParticipantLaps } from "../processing/laps.js";
+import { type CategoryTimingStartCalculations, getSourceLapCompletion, processAllParticipantLaps } from "../processing/laps.js";
 import { ParticipantNotFoundError, assignParticpantsToCrossings } from "../processing/participant.js";
 import { addError, compareByTime, isCrossingRecord } from "../processing/timerecord.js";
 import type { EventSessionKind } from "../catalog/eventCatalog.js";
@@ -47,6 +47,7 @@ export interface RaceStateLookup {
   updateParticipantIdentifiers?(participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: ParticipantIdentifierUpdate[]): void;
   setFinishLineNumbers?(finishLineNumbers: number[] | undefined): void;
   setMinimumLapTimeMilliseconds?(minimumLapTimeMilliseconds: number | undefined): void;
+  setCategoryTimingStartCalculations?(calculations: Map<EventCategoryId, CategoryTimingStartCalculations> | undefined): void;
   setSessionValidCategoryIds?(sessionValidCategoryIds: Set<EventCategoryId> | undefined): void;
   setSessionKind?(sessionKind: EventSessionKind | undefined): void;
   ensureCategories?(categories: EventCategory[]): void;
@@ -85,6 +86,7 @@ export class Session implements RaceState, RaceStateLookup {
   private _categoryGreenFlags: Map<EventCategoryId, GreenFlagRecord> | undefined;
   private _finishLineNumbers: number[] | undefined = [1];
   private _minimumLapTimeMilliseconds: number | undefined = 60000;
+  private _categoryTimingStartCalculations: Map<EventCategoryId, CategoryTimingStartCalculations> | undefined;
   private _sessionKind: EventSessionKind | undefined = 'race';
   private _sessionValidCategoryIds: Set<EventCategoryId> | undefined;
   private _cachedTransponderCrossings: Map<ChipCrossingData["chipCode"], ChipCrossingData[]>;
@@ -113,6 +115,14 @@ export class Session implements RaceState, RaceStateLookup {
 
   public setMinimumLapTimeMilliseconds(minimumLapTimeMilliseconds: number | undefined): void {
     this._minimumLapTimeMilliseconds = minimumLapTimeMilliseconds;
+    this._cachedParticipantLaps = undefined;
+    if (!this._bulkProcess) {
+      this.__reprocessAllParticipantLaps();
+    }
+  }
+
+  public setCategoryTimingStartCalculations(calculations: Map<EventCategoryId, CategoryTimingStartCalculations> | undefined): void {
+    this._categoryTimingStartCalculations = calculations ? new Map(calculations) : undefined;
     this._cachedParticipantLaps = undefined;
     if (!this._bulkProcess) {
       this.__reprocessAllParticipantLaps();
@@ -718,7 +728,8 @@ export class Session implements RaceState, RaceStateLookup {
       this._sessionKind,
       this._finishLineNumbers,
       this._sessionValidCategoryIds,
-      (passing) => this.__getSourceLapCompletion(passing)
+      (passing) => this.__getSourceLapCompletion(passing),
+      this._categoryTimingStartCalculations,
     );
 
     this._cachedParticipantLaps = processedLaps;

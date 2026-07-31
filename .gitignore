@@ -15,3 +15,4 @@ out/
 cachedEvents*.json
 
 packages/fmptools-win32-*/bin/fmp2json.exe
+generated/apical-excel-cache/apical-event-73.xlsx

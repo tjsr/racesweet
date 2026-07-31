@@ -1,6 +1,6 @@
 import { validate as validateUuid } from 'uuid';
 import { normalizeCategoryResultExclusion } from '../processing/category.js';
-import type { EventCategory } from '../model/eventcategory.js';
+import type { EventCategory, EventCategoryId } from '../model/eventcategory.js';
 import { getParticipantEntryId, type EventEntry } from '../model/entry.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import type { EventTeam } from '../model/eventteam.js';
@@ -9,7 +9,8 @@ import { getParticipantDisplayName } from '../model/participantDisplay.js';
 import type { RaceState } from '../model/racestate.js';
 import type { TimeRecord, TimeRecordSource } from '../model/timerecord.js';
 import { incrementLoadingMetric } from '../loadingMetrics.js';
-import type { EventCatalogEntrant, EventCatalogEvent, EventCatalogSession, EventCatalogState, EventSessionKind } from '../catalog/eventCatalog.js';
+import type { EventCatalogEntrant, EventCatalogEvent, EventCatalogSession, EventCatalogState, EventSessionKind, TimingStartCalculation } from '../catalog/eventCatalog.js';
+import type { CategoryTimingStartCalculations } from '../processing/laps.js';
 import { addMissingLinkedCategoryPlaceholders } from '../service/sessionSourceReload.js';
 
 interface SessionSourceSink {
@@ -25,6 +26,7 @@ interface SessionSourceSink {
   records: TimeRecord[];
   setFinishLineNumbers?(finishLineNumbers: number[] | undefined): void;
   setMinimumLapTimeMilliseconds?(minimumLapTimeMilliseconds: number | undefined): void;
+  setCategoryTimingStartCalculations?(calculations: Map<EventCategoryId, CategoryTimingStartCalculations> | undefined): void;
   setSessionValidCategoryIds?(sessionValidCategoryIds: Set<string> | undefined): void;
   setSessionKind?(sessionKind: EventSessionKind | undefined): void;
 }
@@ -45,6 +47,28 @@ export const getMinimumLapTimeMillisecondsForSession = (
   const event = catalog?.events.find((item) => item.id === (eventId || session?.eventId));
 
   return session?.minimumLapTimeMilliseconds ?? event?.minimumLapTimeMilliseconds ?? undefined;
+};
+
+export const getCategoryTimingStartCalculationsForSession = (
+  catalog: EventCatalogState | undefined,
+  eventId: string | undefined,
+  sessionId: string | undefined,
+): Map<EventCategoryId, CategoryTimingStartCalculations> | undefined => {
+  if (!catalog) {
+    return undefined;
+  }
+  const session = catalog.sessions.find((item) => item.id === sessionId);
+  const event = catalog.events.find((item) => item.id === (eventId || session?.eventId));
+  if (!event) {
+    return undefined;
+  }
+  const fallback = (categoryValue: TimingStartCalculation | null | undefined, sessionValue: TimingStartCalculation | null | undefined, eventValue: TimingStartCalculation | null | undefined): TimingStartCalculation | undefined => categoryValue ?? sessionValue ?? eventValue ?? undefined;
+  return new Map(catalog.categories
+    .filter((category) => category.eventId === event.id)
+    .map((category) => [category.id, {
+      elapsedTimeCalculation: fallback(category.elapsedTimeCalculation, session?.elapsedTimeCalculation, event.elapsedTimeCalculation),
+      lap1Calculation: fallback(category.lap1Calculation, session?.lap1Calculation, event.lap1Calculation),
+    }]));
 };
 
 export const getSessionKindForSession = (
@@ -476,6 +500,7 @@ export const applyPulledRaceStateToSession = async (
       options.eventId,
       options.sessionId
     ));
+    sessionState.setCategoryTimingStartCalculations?.(getCategoryTimingStartCalculationsForSession(options.catalog, options.eventId, options.sessionId));
     sessionState.setSessionValidCategoryIds?.(getSessionAssignedCategoryIds(
       options.catalog,
       options.eventId,

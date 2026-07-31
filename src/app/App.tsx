@@ -26,7 +26,7 @@ import { EventCatalogService } from '../service/eventCatalogService.ts';
 import { RaceAdminService } from '../service/raceAdminService.ts';
 import { HttpRaceSweetApiClient } from '../service/raceSweetApiClient.ts';
 import { type SessionSourceReloadMode, type SessionSourceReloadSummary, addSessionSourceReloadSummaries, createEmptySessionSourceReloadSummary, isMissingLinkedCategoryPlaceholder, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload } from '../service/sessionSourceReload.ts';
-import { applyPulledRaceStateToSession, getMinimumLapTimeMillisecondsForSession, getSessionAssignedCategoryIds } from '../service/sourceApplication.ts';
+import { applyPulledRaceStateToSession, getCategoryTimingStartCalculationsForSession, getMinimumLapTimeMillisecondsForSession, getSessionAssignedCategoryIds } from '../service/sourceApplication.ts';
 import { SystemConfigService } from '../service/systemConfigService.ts';
 import type { DomainEventEnvelope } from '../model/serverApi.ts';
 import type { EventCatalogMutation } from '../ledger/eventCatalogLedger.ts';
@@ -303,6 +303,7 @@ const applyCatalogSessionScopeToRaceState = (
   const assignedCategoryIds = getSessionAssignedCategoryIds(catalog, eventId, sessionId) || new Set<EventCategoryId>();
   raceState.ensureCategories?.(getCategoriesForEvent(catalog, eventId));
   raceState.setMinimumLapTimeMilliseconds?.(getMinimumLapTimeMillisecondsForSession(catalog, eventId, sessionId));
+  raceState.setCategoryTimingStartCalculations?.(getCategoryTimingStartCalculationsForSession(catalog, eventId, sessionId));
   raceState.setSessionValidCategoryIds?.(assignedCategoryIds);
 };
 
