@@ -107,6 +107,12 @@ export interface EntrantDeletedMutation extends EventCatalogMutationBase {
   type: 'entrant-deleted';
 }
 
+export interface EntrantsDeletedMutation extends EventCatalogMutationBase {
+  entrantIds: EventEntrantId[];
+  eventId: EventId;
+  type: 'entrants-deleted';
+}
+
 export interface EntryCreatedMutation extends EventCatalogMutationBase {
   entry: EventCatalogEntry;
   type: 'entry-created';
@@ -129,6 +135,7 @@ export type EventCatalogMutation =
   | CategoryUpdatedMutation
   | EntrantCreatedMutation
   | EntrantDeletedMutation
+  | EntrantsDeletedMutation
   | EntrantUpdatedMutation
   | EntryCreatedMutation
   | EntryDeletedMutation
@@ -348,6 +355,18 @@ export const applyEventCatalogMutation = (
           ...event,
           entrantIds: removeEntry(event.entrantIds, mutation.entrantId),
         })),
+      };
+    }
+    case 'entrants-deleted': {
+      const deletedEntrantIds = new Set(mutation.entrantIds.map((entrantId) => entrantId.toString()));
+      return {
+        ...currentState,
+        entrants: currentState.entrants.map((entrant) => deletedEntrantIds.has(entrant.id.toString())
+          ? { ...entrant, deleted: true }
+          : entrant),
+        events: currentState.events.map((event) => event.id === mutation.eventId
+          ? { ...event, entrantIds: event.entrantIds.filter((entrantId) => !deletedEntrantIds.has(entrantId.toString())) }
+          : event),
       };
     }
     case 'entry-created': {

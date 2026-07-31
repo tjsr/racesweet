@@ -4290,6 +4290,30 @@ export class EventCatalogService {
     );
   }
 
+  public async deleteEntrants(
+    eventId: EventId,
+    entrantIds: EventEntrantId[],
+    onCompleteStep: (
+      currentTask: string,
+      index: number,
+    ) => Promise<void> = NO_OP_COMPLETE_STEP,
+  ): Promise<EventCatalogState> {
+    const uniqueEntrantIds: EventEntrantId[] = Array.from(new Set(entrantIds));
+    uniqueEntrantIds.forEach((entrantId) => {
+      if (this.importedRaceStateReferencesEntrant(eventId, entrantId)) {
+        throw new Error(`Cannot delete entrant ${entrantId} because imported participants still reference it.`);
+      }
+    });
+
+    return this.appendMutations([{
+      entrantIds: uniqueEntrantIds,
+      eventId,
+      id: createMutationId(),
+      timestamp: createTimestamp(),
+      type: 'entrants-deleted',
+    }], onCompleteStep);
+  }
+
   private async appendMutations(
     mutations: EventCatalogLedger["mutations"],
     onCompleteStep: (
@@ -4510,6 +4534,13 @@ export class EventCatalogService {
 
         if (mutation.type === "entrant-deleted") {
           if (!importedEntrantIds.has(mutation.entrantId.toString())) {
+            replayMutations.push(this.cloneReplayMutation(mutation));
+          }
+          return replayMutations;
+        }
+
+        if (mutation.type === 'entrants-deleted') {
+          if (mutation.entrantIds.some((entrantId) => !importedEntrantIds.has(entrantId.toString()))) {
             replayMutations.push(this.cloneReplayMutation(mutation));
           }
           return replayMutations;

@@ -548,6 +548,164 @@ describe('EntrantsPage integration', () => {
     expect(container.textContent).toContain('Id: ent-empty');
   });
 
+  it('shift-selects entrants, shows bulk summaries, updates categories, and deletes the selection', async () => {
+    let completeDeletion: (() => void) | undefined;
+    let removeSelectedEntrants: (() => void) | undefined;
+    const onUpdateEntrant = vi.fn(() => Promise.resolve());
+    const onDeleteEntrants = vi.fn((_eventId: string, _entrantIds: string[]): Promise<void> => new Promise<void>((resolve): void => {
+      completeDeletion = (): void => {
+        removeSelectedEntrants?.();
+        resolve();
+      };
+    }));
+
+    const Harness = (): React.ReactElement => {
+      const [currentCatalog, setCurrentCatalog] = React.useState<EventCatalogState>(catalog);
+      const [selectedEntrantId, setSelectedEntrantId] = React.useState<string | undefined>('ent-1');
+      removeSelectedEntrants = (): void => {
+        setCurrentCatalog((current) => ({
+          ...current,
+          entrants: current.entrants.map((entrant) => entrant.eventId === 'event-1' ? { ...entrant, deleted: true } : entrant),
+        }));
+      };
+      const deleteEntrant = (_eventId: string, _entrantId: string): Promise<void> => new Promise<void>((resolve): void => {
+        completeDeletion = (): void => {
+          setCurrentCatalog((current) => ({
+            ...current,
+            entrants: current.entrants.map((entrant) => entrant.eventId === 'event-1' ? { ...entrant, deleted: true } : entrant),
+          }));
+          resolve();
+        };
+      });
+
+      return <EntrantsPage
+        catalog={currentCatalog}
+        onCreateEntrant={vi.fn()}
+        onDeleteEntrant={deleteEntrant}
+        onDeleteEntrants={onDeleteEntrants}
+        onSelectEntrant={setSelectedEntrantId}
+        onSelectEvent={vi.fn()}
+        onUpdateEntrant={onUpdateEntrant}
+        raceState={raceState}
+        selectedEntrantId={selectedEntrantId}
+        selectedEventId="event-1"
+      />;
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+    const emptyRiderCard = Array.from(container.querySelectorAll<HTMLButtonElement>('[aria-label="Entrants for selected event"] button'))
+      .find((card) => card.querySelector('.entrant-list-name')?.textContent === 'Empty Rider') as HTMLButtonElement;
+    await act(async () => {
+      emptyRiderCard.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }));
+    });
+
+    expect(container.querySelector('h2')?.textContent).toBe('Entrant List');
+    expect(container.textContent).toContain('Selected Entrants');
+    expect(container.textContent).not.toContain('Driver Details');
+    expect(container.textContent).toContain('Sessions for Entrants');
+    expect(container.querySelector('select[aria-label="Move selected entrants to category"]')).toBeTruthy();
+    expect(Array.from((container.querySelector('select[aria-label="Remove selected entrants from category"]') as HTMLSelectElement).options).map((option) => option.textContent)).toContain('Premier');
+    expect(container.textContent).toContain('Plate Numbers');
+    expect(container.textContent).toContain('Timing devices');
+
+    await act(async () => {
+      setSelectValue(container.querySelector('select[aria-label="Move selected entrants to category"]') as HTMLSelectElement, 'cat-1');
+    });
+    expect(onUpdateEntrant).toHaveBeenCalledWith('ent-1', expect.objectContaining({ categoryId: 'cat-1', categoryIds: ['cat-1'] }));
+    expect(onUpdateEntrant).toHaveBeenCalledWith('ent-empty', expect.objectContaining({ categoryId: 'cat-1', categoryIds: ['cat-1'] }));
+
+    await act(async () => {
+      setSelectValue(container.querySelector('select[aria-label="Remove selected entrants from category"]') as HTMLSelectElement, 'cat-1');
+    });
+    expect(onUpdateEntrant).toHaveBeenCalledWith('ent-1', expect.objectContaining({ categoryId: undefined, categoryIds: [] }));
+    expect(onUpdateEntrant).toHaveBeenCalledWith('ent-empty', expect.objectContaining({ categoryId: undefined, categoryIds: [] }));
+
+    const deleteButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((button) => button.textContent?.includes('Delete all selected')) as HTMLButtonElement;
+    await act(async () => {
+      deleteButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(deleteButton.disabled).toBe(true);
+    expect(container.querySelector('[aria-label="Deleting selected entrants"]')).toBeTruthy();
+    await act(async () => {
+      completeDeletion?.();
+    });
+    expect(onDeleteEntrants).toHaveBeenCalledTimes(1);
+    expect(onDeleteEntrants).toHaveBeenCalledWith('event-1', ['ent-empty', 'ent-1']);
+    expect(container.querySelector('[aria-label="Entrants for selected event"]')?.textContent).not.toContain('Pat Rider');
+    expect(container.querySelector('[aria-label="Entrants for selected event"]')?.textContent).not.toContain('Empty Rider');
+  });
+
+  it('uses a stable shift-selection anchor and lets control-click toggle individual entrant cards', async () => {
+    const multiSelectionCatalog: EventCatalogState = {
+      ...catalog,
+      entrants: [...catalog.entrants, {
+        categoryId: 'cat-1',
+        categoryIds: ['cat-1'],
+        entrantType: 'rider',
+        eventId: 'event-1',
+        firstName: 'Third',
+        id: 'ent-third',
+        lastName: 'Rider',
+        memberParticipantIds: ['ent-third'],
+        name: 'Third Rider',
+      }],
+    };
+
+    const Harness = (): React.ReactElement => {
+      const [selectedEntrantId, setSelectedEntrantId] = React.useState<string | undefined>('ent-1');
+      return <EntrantsPage
+        catalog={multiSelectionCatalog}
+        onCreateEntrant={vi.fn()}
+        onDeleteEntrant={vi.fn()}
+        onSelectEntrant={setSelectedEntrantId}
+        onSelectEvent={vi.fn()}
+        onUpdateEntrant={vi.fn()}
+        selectedEntrantId={selectedEntrantId}
+        selectedEventId="event-1"
+      />;
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+    const entrantCard = (name: string): HTMLButtonElement => Array.from(container.querySelectorAll<HTMLButtonElement>('[aria-label="Entrants for selected event"] button'))
+      .find((card) => card.querySelector('.entrant-list-name')?.textContent === name) as HTMLButtonElement;
+
+    await act(async () => {
+      entrantCard('Empty Rider').dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }));
+    });
+    expect(entrantCard('Empty Rider').getAttribute('aria-selected')).toBe('true');
+    expect(entrantCard('Pat Rider').getAttribute('aria-selected')).toBe('true');
+    expect(entrantCard('Third Rider').getAttribute('aria-selected')).toBe('false');
+
+    await act(async () => {
+      entrantCard('Third Rider').dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }));
+    });
+    expect(entrantCard('Empty Rider').getAttribute('aria-selected')).toBe('false');
+    expect(entrantCard('Pat Rider').getAttribute('aria-selected')).toBe('true');
+    expect(entrantCard('Third Rider').getAttribute('aria-selected')).toBe('true');
+
+    await act(async () => {
+      entrantCard('Empty Rider').dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }));
+    });
+    expect(entrantCard('Empty Rider').getAttribute('aria-selected')).toBe('true');
+
+    await act(async () => {
+      entrantCard('Empty Rider').dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }));
+    });
+    expect(entrantCard('Empty Rider').getAttribute('aria-selected')).toBe('false');
+
+    await act(async () => {
+      entrantCard('Third Rider').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container.textContent).not.toContain('Selected Entrants');
+    expect((container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement).value).toBe('Third Rider');
+    expect(entrantCard('Pat Rider').getAttribute('aria-selected')).toBe('false');
+    expect(entrantCard('Third Rider').getAttribute('aria-selected')).toBe('true');
+  });
+
   it('shows imported Entry owners and their linked Drivers in the Entry category', async () => {
     const importedCatalog: EventCatalogState = {
       ...catalog,

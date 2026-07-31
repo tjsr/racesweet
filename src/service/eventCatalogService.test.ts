@@ -5406,6 +5406,23 @@ describe("EventCatalogService", () => {
       entrants.find((entrant) => entrant.id === createdEntrantId),
     ).toBeUndefined();
   });
+
+  it('deletes multiple entrants with one immutable catalog mutation', async () => {
+    const service = await EventCatalogService.create(createPersistence(createSeedEventCatalogLedger()));
+    await service.createEntrant(SEED_EVENT_ID, 'rider');
+    await service.createEntrant(SEED_EVENT_ID, 'rider');
+    const entrantIds = getEntrantsForEvent(service.catalog, SEED_EVENT_ID)
+      .filter((entrant) => entrant.name === 'New Driver')
+      .map((entrant) => entrant.id);
+    const mutationCount = service.mutations.length;
+
+    await service.deleteEntrants(SEED_EVENT_ID, entrantIds);
+
+    expect(service.mutations.slice(mutationCount)).toEqual([
+      expect.objectContaining({ entrantIds, eventId: SEED_EVENT_ID, type: 'entrants-deleted' }),
+    ]);
+    expect(getEntrantsForEvent(service.catalog, SEED_EVENT_ID).map((entrant) => entrant.id)).not.toEqual(expect.arrayContaining(entrantIds));
+  });
 });
 
 describe("applyEventCatalogLedger", () => {

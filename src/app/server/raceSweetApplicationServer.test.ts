@@ -566,6 +566,40 @@ describe('RaceSweetApplicationServer', () => {
     ]));
   });
 
+  it('deletes multiple entrants through one HTTP command and broadcasts one catalog mutation', async () => {
+    const eventResponse = await jsonRequest(testServer.origin, '/api/v1/catalog/events', {}, testServer.adminCookie);
+    const event = await eventResponse.json() as { catalog: { events: Array<{ id: string }> } };
+    const eventId = event.catalog.events[0]!.id;
+    const firstEntrantResponse = await jsonRequest(testServer.origin, `/api/v1/catalog/events/${eventId}/entrants`, {}, testServer.adminCookie);
+    const secondEntrantResponse = await jsonRequest(testServer.origin, `/api/v1/catalog/events/${eventId}/entrants`, {}, testServer.adminCookie);
+    const firstEntrant = await firstEntrantResponse.json() as { catalog: { entrants: Array<{ eventId: string; id: string }> } };
+    const secondEntrant = await secondEntrantResponse.json() as { catalog: { entrants: Array<{ eventId: string; id: string }> } };
+    const entrantIds = [
+      firstEntrant.catalog.entrants.filter((entrant) => entrant.eventId === eventId).at(-1)!.id,
+      secondEntrant.catalog.entrants.filter((entrant) => entrant.eventId === eventId).at(-1)!.id,
+    ];
+    const abortController = new AbortController();
+    const streamResponse = await fetch(`${testServer.origin}/api/v1/events`, {
+      headers: { cookie: testServer.adminCookie },
+      signal: abortController.signal,
+    });
+    const reader = streamResponse.body!.getReader();
+
+    const deleteResponse = await fetch(`${testServer.origin}/api/v1/catalog/events/${eventId}/entrants`, {
+      body: JSON.stringify({ entrantIds }),
+      headers: { 'content-type': 'application/json', cookie: testServer.adminCookie, origin: testServer.origin },
+      method: 'DELETE',
+    });
+    const deletion = await deleteResponse.json() as { mutations: EventCatalogMutation[] };
+    const eventText = await readSseEvent(reader, 'catalog.mutations-applied');
+    abortController.abort();
+    await reader.cancel().catch((): void => undefined);
+
+    expect(deleteResponse.status).toBe(200);
+    expect(deletion.mutations).toEqual([expect.objectContaining({ entrantIds, type: 'entrants-deleted' })]);
+    expect(eventText).toContain('entrants-deleted');
+  });
+
   it('broadcasts an Electron replica event mutation to every connected client', async () => {
     const abortControllers: AbortController[] = [
       new AbortController(),

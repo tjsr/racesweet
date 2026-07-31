@@ -19,11 +19,12 @@ interface EntrantListPanelProps {
   createKind: EntrantType;
   filteredTeamEntrants: EventCatalogEntrant[];
   onCreateEntrant: (eventId: EventId, entrantType?: EntrantType) => void | Promise<void>;
-  onSelectEntrant: (entrantId: EventEntrantId) => void;
+  onSelectEntrant: (entrantId: EventEntrantId, selectionMode?: 'range' | 'toggle', orderedEntrantIds?: EventEntrantId[]) => void;
   raceStateParticipants: EventParticipant[];
   requestFormExit: (action: () => void | Promise<void>) => void;
   riderEntrants: EventCatalogEntrant[];
   selectedEntrant?: EventCatalogEntrant;
+  selectedEntrantIds?: Set<EventEntrantId>;
   selectedEventId?: EventId;
   isMotorsport?: boolean;
   singularLabel?: string;
@@ -273,6 +274,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
   ));
   const displayedRiderEntrants = props.isMotorsport ? unownedRiderEntrants : sortedRiderEntrants;
   const displayedTeamEntrants = props.isMotorsport ? motorsportEntrants : sortedTeamEntrants;
+  const displayedEntrantIds = [...displayedRiderEntrants, ...displayedTeamEntrants].map((entrant) => entrant.id);
 
   return (
     <section className="events-panel">
@@ -338,9 +340,14 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
                   entrant={entrant}
                   entrantLabel={singularLabel}
                   categoryName={getCategoryName(props.catalog, categoryId)}
-                  isSelected={entrant.id === props.selectedEntrant?.id}
+                  allowSelectedClick={!!props.selectedEntrantIds && props.selectedEntrantIds.size > 1}
+                  isSelected={props.selectedEntrantIds?.has(entrant.id) || entrant.id === props.selectedEntrant?.id}
                   raceNumber={participant ? getParticipantNumber(participant) : undefined}
-                  onSelect={() => props.requestFormExit(() => props.onSelectEntrant(entrant.id))}
+                  onSelect={(event) => props.requestFormExit(() => event.shiftKey
+                    ? props.onSelectEntrant(entrant.id, 'range', displayedEntrantIds)
+                    : event.ctrlKey || event.metaKey
+                      ? props.onSelectEntrant(entrant.id, 'toggle')
+                      : props.onSelectEntrant(entrant.id))}
                   timingDevices={participant ? getParticipantTransponders(participant) : undefined}
                   teamName={teamName}
                   relationshipLabel={relationshipLabel}
@@ -369,8 +376,13 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
                     ))
                     : undefined}
                   categoryName={getCategoryName(props.catalog, getEntrantCategoryId(entrant))}
-                  isSelected={entrant.id === props.selectedEntrant?.id}
-                  onSelect={() => props.requestFormExit(() => props.onSelectEntrant(entrant.id))}
+                  allowSelectedClick={!!props.selectedEntrantIds && props.selectedEntrantIds.size > 1}
+                  isSelected={props.selectedEntrantIds?.has(entrant.id) || entrant.id === props.selectedEntrant?.id}
+                  onSelect={(event) => props.requestFormExit(() => event.shiftKey
+                    ? props.onSelectEntrant(entrant.id, 'range', displayedEntrantIds)
+                    : event.ctrlKey || event.metaKey
+                      ? props.onSelectEntrant(entrant.id, 'toggle')
+                      : props.onSelectEntrant(entrant.id))}
                   raceNumber={!props.isMotorsport && participant ? getParticipantNumber(participant) : undefined}
                   timingDevices={!props.isMotorsport && participant ? getParticipantTransponders(participant) : undefined}
                   showCategory={props.isMotorsport}

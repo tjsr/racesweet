@@ -60,7 +60,7 @@ const openApiOptions: OAS3Options = {
             type: {
               description: 'The immutable ledger operation to apply.',
               enum: [
-                'category-created', 'category-deleted', 'category-updated', 'entrant-created', 'entrant-deleted', 'entrant-updated',
+                'category-created', 'category-deleted', 'category-updated', 'entrant-created', 'entrant-deleted', 'entrants-deleted', 'entrant-updated',
                 'entry-created', 'entry-deleted', 'entry-updated', 'event-activated', 'event-created', 'event-deleted',
                 'event-updated', 'race-state-imported', 'session-activated', 'session-created', 'session-deleted', 'session-updated',
               ],

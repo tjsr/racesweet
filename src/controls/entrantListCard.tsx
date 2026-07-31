@@ -6,9 +6,10 @@ interface EntrantListCartProps {
   entrant: EventCatalogEntrant;
   entrantLabel?: string;
   entrySummaries?: string[];
+  allowSelectedClick?: boolean;
   isSelected: boolean;
   relationshipLabel?: string;
-  onSelect: () => void;
+  onSelect: (event: React.MouseEvent<HTMLButtonElement>) => void;
   raceNumber?: string | number;
   showCategory?: boolean;
   timingDevices?: Array<string | number>;
@@ -31,9 +32,9 @@ export const EntrantListCard = (props: EntrantListCartProps): React.ReactElement
       type="button"
       className={`events-list-item object-card${props.isSelected ? ' selected' : ''}`}
       data-entrant-id={props.entrant.id}
-      onClick={() => {
-        if (!props.isSelected) {
-          props.onSelect();
+      onClick={(event) => {
+        if (!props.isSelected || props.allowSelectedClick || event.ctrlKey || event.metaKey || event.shiftKey) {
+          props.onSelect(event);
         }
       }}
       aria-selected={props.isSelected}

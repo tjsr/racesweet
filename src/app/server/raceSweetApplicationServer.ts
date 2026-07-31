@@ -923,6 +923,8 @@ export class RaceSweetApplicationServer {
           await this.eventCatalogService!.updateEntrant(entrantId, body.changes as never);
         } else if (request.method === 'DELETE' && entrantId) {
           await this.eventCatalogService!.deleteEntrant(eventId, entrantId);
+        } else if (request.method === 'DELETE' && Array.isArray(body.entrantIds) && body.entrantIds.every((id) => typeof id === 'string')) {
+          await this.eventCatalogService!.deleteEntrants(eventId, body.entrantIds as EventEntrantId[]);
         } else {
           throw new Error('Unsupported entrant command.');
         }

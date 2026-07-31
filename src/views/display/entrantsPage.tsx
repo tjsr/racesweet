@@ -24,6 +24,8 @@ import { EntrantDetailsPanel, type EntrantDraft } from '../panels/entrantDetails
 import { EntrantEntriesPanel } from '../panels/entrantEntriesPanel.js';
 import { IdentificationPanel } from '../panels/identificationPanel.js';
 import { FileSelectionField } from '../panels/fileSelectionField.js';
+import { SelectedEntrantIdentificationPanel, SelectedEntrantSessionsPanel } from '../panels/selectedEntrantSummaries.js';
+import { SelectedEntrantsPanel } from '../panels/selectedEntrantsPanel.js';
 import { SessionListPanel } from '../panels/sessionList.js';
 import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
 
@@ -32,6 +34,7 @@ interface EntrantsPageProps {
   enableMultiplePlates?: boolean;
   onCreateEntrant: (eventId: EventId, entrantType?: EntrantType) => void | Promise<void>;
   onDeleteEntrant: (eventId: EventId, entrantId: EventEntrantId) => void | Promise<void>;
+  onDeleteEntrants?: (eventId: EventId, entrantIds: EventEntrantId[]) => void | Promise<void>;
   onImportEntrants?: (eventId: EventId, records: EntrantImportRecord[], fileName: string, defaultCategoryId?: EventCategoryId) => void | Promise<void>;
   onSelectEntrant: (entrantId: EventEntrantId) => void;
   onSelectEvent: (eventId: EventId) => void;
@@ -109,6 +112,10 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   const [deleteEntrantId, setDeleteEntrantId] = React.useState<string | undefined>(undefined);
   const [deleteError, setDeleteError] = React.useState<string | undefined>(undefined);
   const [deleteStatus, setDeleteStatus] = React.useState<'idle' | 'pending' | 'succeeded' | 'failed'>('idle');
+  const [bulkDeleteError, setBulkDeleteError] = React.useState<string | undefined>(undefined);
+  const [bulkDeleteStatus, setBulkDeleteStatus] = React.useState<'idle' | 'pending' | 'succeeded' | 'failed'>('idle');
+  const [multiSelectionAnchorId, setMultiSelectionAnchorId] = React.useState<EventEntrantId | undefined>(undefined);
+  const [multiSelectedEntrantIds, setMultiSelectedEntrantIds] = React.useState<Set<EventEntrantId>>(new Set<EventEntrantId>());
   const teamEntrants = eventEntrants.filter((entrant) => entrant.entrantType === 'team');
   const eventCategoryIds = new Set(eventCategories.map((category) => category.id.toString()));
   const eventCategoryKey = eventCategories.map((category) => category.id.toString()).join('|');
@@ -161,6 +168,10 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   const filteredTeamEntrants = filteredEventEntrants.filter((entrant) => entrant.entrantType === 'team');
   const teamsEnabled = eventSupportsTeams(props.catalog, selectedEvent?.id);
   const selectedEntrant = filteredEventEntrants.find((entrant) => entrant.id === props.selectedEntrantId) ?? filteredEventEntrants[0];
+  const selectedEntrants = multiSelectedEntrantIds.size > 1
+    ? filteredEventEntrants.filter((entrant) => multiSelectedEntrantIds.has(entrant.id))
+    : selectedEntrant ? [selectedEntrant] : [];
+  const hasMultipleSelectedEntrants = selectedEntrants.length > 1;
   const selectedEntrantParticipantIds = new Set(
     (selectedEntrant?.memberParticipantIds || []).map((participantId) => participantId.toString()),
   );
@@ -200,8 +211,17 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
     }
   }, [deleteStatus, props.onSelectEntrant, props.selectedEntrantId, selectedEntrant]);
 
+  React.useEffect(() => {
+    setMultiSelectedEntrantIds(new Set<EventEntrantId>());
+    setMultiSelectionAnchorId(undefined);
+  }, [selectedEvent?.id]);
+
   const selectedEntrantSessionIds = getEntrantAssignedSessionIds(selectedEntrant, eventCategories, eventSessions, eventEntrants);
   const selectedEntrantSessions = eventSessions.filter((session) => selectedEntrantSessionIds.has(session.id));
+  const sessionsBySelectedEntrantId = new Map(selectedEntrants.map((entrant) => [
+    entrant.id.toString(),
+    eventSessions.filter((session) => getEntrantAssignedSessionIds(entrant, eventCategories, eventSessions, eventEntrants).has(session.id)),
+  ]));
   const selectedParentEntrantId = selectedOwningEntrantId || selectedEntrant?.teamEntrantId;
   const selectedTeamName = selectedParentEntrantId
     ? teamEntrants.find((team) => team.id === selectedParentEntrantId)?.name
@@ -283,6 +303,72 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
     }
   };
   const isDeletingSelectedEntrant = deleteEntrantId === selectedEntrant?.id.toString();
+
+  const selectEntrant = (entrantId: EventEntrantId, selectionMode?: 'range' | 'toggle', orderedEntrantIds: EventEntrantId[] = []): void => {
+    if (!selectionMode) {
+      setMultiSelectedEntrantIds(new Set<EventEntrantId>());
+      setMultiSelectionAnchorId(entrantId);
+      props.onSelectEntrant(entrantId);
+      return;
+    }
+
+    const rangeAnchorId = multiSelectionAnchorId || selectedEntrant?.id || entrantId;
+    if (selectionMode === 'range') {
+      setMultiSelectionAnchorId(rangeAnchorId);
+    }
+
+    setMultiSelectedEntrantIds((current) => {
+      const next = new Set<EventEntrantId>(current.size > 0 ? current : selectedEntrant ? [selectedEntrant.id] : []);
+      if (selectionMode === 'toggle') {
+        if (next.has(entrantId)) {
+          next.delete(entrantId);
+        } else {
+          next.add(entrantId);
+        }
+        return next;
+      }
+
+      const anchorIndex = orderedEntrantIds.indexOf(rangeAnchorId);
+      const targetIndex = orderedEntrantIds.indexOf(entrantId);
+      if (anchorIndex === -1 || targetIndex === -1) {
+        return new Set<EventEntrantId>([rangeAnchorId, entrantId]);
+      }
+      return new Set<EventEntrantId>(orderedEntrantIds.slice(Math.min(anchorIndex, targetIndex), Math.max(anchorIndex, targetIndex) + 1));
+    });
+  };
+
+  const updateSelectedEntrantCategories = async (categoryId: string | undefined, removeCategoryId?: string): Promise<void> => {
+    await Promise.all(selectedEntrants.map((entrant) => {
+      const categoryIds = removeCategoryId
+        ? entrant.categoryIds.filter((id) => id.toString() !== removeCategoryId)
+        : categoryId ? [categoryId as EventCategoryId] : entrant.categoryIds;
+      const primaryCategoryId = removeCategoryId
+        ? entrant.categoryId?.toString() === removeCategoryId ? categoryIds[0] : entrant.categoryId
+        : categoryId as EventCategoryId | undefined;
+      return props.onUpdateEntrant(entrant.id, { categoryId: primaryCategoryId, categoryIds });
+    }));
+  };
+
+  const deleteSelectedEntrants = async (): Promise<void> => {
+    if (!selectedEvent || selectedEntrants.length === 0) {
+      return;
+    }
+
+    setBulkDeleteStatus('pending');
+    setBulkDeleteError(undefined);
+    try {
+      if (props.onDeleteEntrants) {
+        await props.onDeleteEntrants(selectedEvent.id, selectedEntrants.map((entrant) => entrant.id));
+      } else {
+        await Promise.all(selectedEntrants.map((entrant) => props.onDeleteEntrant(selectedEvent.id, entrant.id)));
+      }
+      setMultiSelectedEntrantIds(new Set<EventEntrantId>());
+      setBulkDeleteStatus('succeeded');
+    } catch (error: unknown) {
+      setBulkDeleteError(error instanceof Error ? error.message : String(error));
+      setBulkDeleteStatus('failed');
+    }
+  };
 
   const handleImportFile = (file: File): void => {
     if (!selectedEvent || !props.onImportEntrants) {
@@ -373,11 +459,12 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           createKind={createKind}
           filteredTeamEntrants={filteredTeamEntrants}
           onCreateEntrant={props.onCreateEntrant}
-          onSelectEntrant={props.onSelectEntrant}
+          onSelectEntrant={selectEntrant}
           raceStateParticipants={raceStateParticipants}
           requestFormExit={requestFormExit}
           riderEntrants={riderEntrants}
           selectedEntrant={selectedEntrant}
+          selectedEntrantIds={hasMultipleSelectedEntrants ? multiSelectedEntrantIds : undefined}
           selectedEventId={selectedEvent?.id}
           isMotorsport={isMotorsport}
           singularLabel={disciplineLabels.singular}
@@ -387,7 +474,15 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           teamsEnabled={teamsEnabled}
         />
         <div className="event-summary-column">
-          <EntrantDetailsPanel
+          {hasMultipleSelectedEntrants ? <SelectedEntrantsPanel
+            categories={eventCategories}
+            deleteError={bulkDeleteError}
+            deleteStatus={bulkDeleteStatus}
+            onDeleteSelected={() => requestFormExit(deleteSelectedEntrants)}
+            onMoveToCategory={(categoryId) => updateSelectedEntrantCategories(categoryId)}
+            onRemoveFromCategory={(categoryId) => updateSelectedEntrantCategories(undefined, categoryId)}
+            selectedEntrants={selectedEntrants}
+          /> : <EntrantDetailsPanel
             entrantAssignmentIsDerived={isMotorsport && !!selectedEntry}
             entrantLabel={disciplineLabels.singular}
             entrantDraft={entrantDraft}
@@ -408,8 +503,8 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
             teamEntrants={selectableParentEntrants}
             teamMembers={selectedTeamMembers}
             warningModal={warningModal}
-          />
-          {isMotorsport && selectedEntrant?.isEntryOwner && props.onUpdateEntry ? (
+          />}
+          {!hasMultipleSelectedEntrants && isMotorsport && selectedEntrant?.isEntryOwner && props.onUpdateEntry ? (
             <EntrantEntriesPanel
               categories={eventCategories}
               entries={selectedEntrantEntries}
@@ -421,17 +516,17 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           ) : null}
         </div>
         <div className="event-summary-column">
-          <SessionListPanel
+          {hasMultipleSelectedEntrants ? <SelectedEntrantSessionsPanel entrants={selectedEntrants} sessionsByEntrantId={sessionsBySelectedEntrantId} /> : <SessionListPanel
             emptyText="No sessions are currently assigned to this entrant."
             sessions={selectedEntrantSessions}
             title="Sessions for Entrant"
-          />
-          <IdentificationPanel
+          />}
+          {hasMultipleSelectedEntrants ? <SelectedEntrantIdentificationPanel entrants={selectedEntrants} eventEntrants={eventEntrants} participants={raceStateParticipants} /> : <IdentificationPanel
             enableMultiplePlates={props.enableMultiplePlates}
             onUpdateParticipantIdentifiers={props.onUpdateParticipantIdentifiers}
             participants={identificationParticipants}
             selectedParticipant={selectedIdentificationParticipant}
-          />
+          />}
         </div>
       </div>
     </section>

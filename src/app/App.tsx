@@ -2684,6 +2684,35 @@ export const RaceSweetMainApp = () => {
               setSelectedEntrantId(nextEntrantId);
             });
           }}
+          onDeleteEntrants={(eventId, entrantIds): Promise<void> => {
+            if (!eventCatalogService) {
+              return Promise.reject(new Error('The event catalog service is not available.'));
+            }
+            if (window.api.persistenceMode === 'server') {
+              const entrantPath = `/api/v1/catalog/events/${encodeURIComponent(eventId)}/entrants`;
+              return fetch(entrantPath, {
+                body: JSON.stringify({ entrantIds }),
+                credentials: 'include',
+                headers: { 'content-type': 'application/json' },
+                method: 'DELETE',
+              }).then(async (response: Response): Promise<{ mutations: EventCatalogMutation[] }> => {
+                if (!response.ok) {
+                  const problem = await response.json().catch((): { error?: string } => ({})) as { error?: string };
+                  throw new Error(problem.error || `RaceSweet API returned HTTP ${response.status} while deleting entrants.`);
+                }
+                return response.json() as Promise<{ mutations: EventCatalogMutation[] }>;
+              }).then((result) => eventCatalogService.applyRemoteMutations(result.mutations)).then((catalog) => {
+                const nextEntrantId = getEntrantsForEvent(catalog, eventId)[0]?.id;
+                updateEventCatalogState(catalog, eventId, selectedSessionId, selectedCategoryId);
+                setSelectedEntrantId(nextEntrantId);
+              });
+            }
+            return eventCatalogService.deleteEntrants(eventId, entrantIds).then((catalog) => {
+              const nextEntrantId = getEntrantsForEvent(catalog, eventId)[0]?.id;
+              updateEventCatalogState(catalog, eventId, selectedSessionId, selectedCategoryId);
+              setSelectedEntrantId(nextEntrantId);
+            });
+          }}
           onImportEntrants={(eventId, records, _fileName, defaultCategoryId) => {
             if (!eventCatalogService) {
               return;
