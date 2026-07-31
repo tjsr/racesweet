@@ -677,6 +677,12 @@ describe('RaceSweetApplicationServer', () => {
     };
     expect(persisted.mutations).toContainEqual(mutation);
 
+    const reopenedWebResponse: Response = await fetch(`${testServer.origin}/api/v1/mutations`, {
+      headers: { cookie: testServer.adminCookie },
+    });
+    const reopenedWebLedger = await reopenedWebResponse.json() as { mutations: EventCatalogMutation[] };
+    expect(reopenedWebLedger.mutations).toContainEqual(mutation);
+
     abortControllers.forEach((abortController: AbortController): void => {
       abortController.abort();
     });
