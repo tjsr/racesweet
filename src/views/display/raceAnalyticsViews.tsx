@@ -1,6 +1,6 @@
 import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 
-import { MenuItem, TextField } from '@mui/material';
+import { MenuItem } from '@mui/material';
 import React from 'react';
 import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent } from '../../catalog/eventCatalog.js';
 import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
@@ -10,6 +10,7 @@ import { getParticipantNumber } from '../../processing/participant.js';
 import { calculateYellowFlagPeriods } from '../../processing/yellowFlagPeriods.js';
 import { getParticipantEntryId } from '../../model/entry.js';
 import { EventEntrantId } from '../../model/entrant.js';
+import { SelectTextField } from '../../controls/selectTextField.js';
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
 import { EventCategoryId } from '../../model/index.js';
 import { EventId, SessionId } from '../../model/raceevent.js';
@@ -593,10 +594,9 @@ const CategorySelector = (props: {
     : 'overall';
   return (
     <>
-      <TextField
+      <SelectTextField
         className="page-filter-label"
         label="Category"
-        select
         slotProps={{
           select: {
             'aria-label': 'Race View Category',
@@ -609,7 +609,7 @@ const CategorySelector = (props: {
         {props.categories.map((category) => (
           <MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>
         ))}
-      </TextField>
+      </SelectTextField>
       <select
         aria-label="Race View Category"
         hidden
@@ -642,10 +642,9 @@ const EventSessionSelector = (props: {
 
   return (
     <>
-      <TextField
+      <SelectTextField
         className="page-filter-label"
         label="Event/Session"
-        select
         slotProps={{
           select: {
             'aria-label': 'Race View Event Session',
@@ -659,7 +658,7 @@ const EventSessionSelector = (props: {
             {option.sessionId ? `-> ${option.sessionName || option.sessionId}` : option.eventName}
           </MenuItem>
         ))}
-      </TextField>
+      </SelectTextField>
       <select
         aria-label="Race View Event Session"
         hidden
@@ -746,10 +745,9 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
             selectedValue={props.selectedEventSessionValue}
           />
           <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
-          <TextField
+          <SelectTextField
             className="page-filter-label"
             label="View"
-            select
             slotProps={{
               select: {
                 'aria-label': 'Results View Type',
@@ -760,7 +758,7 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
           >
             <MenuItem value="results">Results</MenuItem>
             <MenuItem value="lap-chart">Lap Chart</MenuItem>
-          </TextField>
+          </SelectTextField>
           <select
             aria-label="Results View Type"
             hidden
@@ -1054,10 +1052,9 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             options={props.eventSessionOptions}
             selectedValue={props.selectedEventSessionValue}
           />
-          <TextField
+          <SelectTextField
             className="page-filter-label"
             label="Report"
-            select
             slotProps={{
               select: {
                 'aria-label': 'Reports View Type',
@@ -1073,7 +1070,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <MenuItem value="yellow-flag-periods">Yellow Flag periods</MenuItem>
             <MenuItem value="track-map">Track Map</MenuItem>
             <MenuItem value="handicap-data">Handicap Data</MenuItem>
-          </TextField>
+          </SelectTextField>
           <select
             aria-label="Reports View Type"
             hidden

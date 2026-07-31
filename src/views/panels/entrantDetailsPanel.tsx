@@ -1,6 +1,7 @@
 import { Button, CircularProgress, TextField } from '@mui/material';
 import React from 'react';
 import { type EventCatalogEntrant } from '../../catalog/eventCatalog.js';
+import { SelectTextField } from '../../controls/selectTextField.js';
 import { type CategoryId } from '../../processing/category.js';
 import { type EventEntrantId } from '../../model/entrant.js';
 import { type EventCategory } from '../../model/eventcategory.js';
@@ -87,9 +88,8 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
                 value={props.entrantDraft.lastName}
                 onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, lastName: event.target.value }))}
               />
-              <TextField
+              <SelectTextField
                 label="Gender"
-                select
                 slotProps={{ select: { 'aria-label': 'Entrant Gender', native: true } }}
                 value={props.entrantDraft.gender}
                 onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, gender: event.target.value }))}
@@ -97,7 +97,7 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
                 <option value="male">Male</option>
                 <option value="female">Female</option>
                 <option value={UNSPECIFIED_GENDER}>Unspecified</option>
-              </TextField>
+              </SelectTextField>
               <TextField
                 label="Date of Birth"
                 slotProps={{ htmlInput: { 'aria-label': 'Entrant Date Of Birth' } }}
@@ -112,10 +112,9 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
                 value={props.entrantDraft.startOrder}
                 onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, startOrder: event.target.value }))}
               /> : null}
-              <TextField
+              <SelectTextField
                 disabled={props.entrantAssignmentIsDerived}
                 label={parentLabel}
-                select
                 slotProps={{ select: { 'aria-label': 'Driver Entrant', native: true } }}
                 value={props.entrantDraft.teamEntrantId}
                 onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, teamEntrantId: event.target.value }))}
@@ -124,7 +123,7 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
                 {props.teamEntrants.map((team) => (
                   <option key={team.id} value={team.id}>{`${team.name} (${team.id.toString().slice(0, 6)})`}</option>
                 ))}
-              </TextField>
+              </SelectTextField>
             </>
           ) : props.showTeamMembers !== false ? (
             <>
@@ -135,9 +134,8 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
               />
             </>
           ) : null}
-          {!props.isMotorsport || !isDriver ? <TextField
+          {!props.isMotorsport || !isDriver ? <SelectTextField
             label="Category"
-            select
             slotProps={{ select: { 'aria-label': 'Entrant Category', native: true } }}
             value={props.entrantDraft.categoryId}
             onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, categoryId: event.target.value }))}
@@ -146,7 +144,7 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
             {props.eventCategories.filter(isActiveCategory).map((category) => (
               <option key={category.id.toString()} value={category.id.toString()}>{category.name}</option>
             ))}
-          </TextField> : null}
+          </SelectTextField> : null}
           {isDriver && props.selectedTeamName ? (
             <p className="readonly-summary">{parentLabel}: {props.selectedTeamName}</p>
           ) : null}

@@ -2085,27 +2085,29 @@ export const RaceSweetMainApp = () => {
       );
     });
 
-    const timers = liveSources.map((source) => {
+    const applyLiveSource = (source: DataSourceConfig): void => {
       applySourceToSessionState(selectedSessionsEventId, source, undefined, {
         sessionId: selectedSessionId,
-      }).catch((error: unknown) => {
-        setErrorState(error as Error);
-      });
-      const intervalMs =
-        Math.max(1, source.apiConfig!.pollIntervalSeconds) * 1000;
-      return window.setInterval(() => {
-        applySourceToSessionState(selectedSessionsEventId, source, undefined, {
-          sessionId: selectedSessionId,
-        }).catch((error: unknown) => {
+      })
+        .then(() => adminService?.applyChangesToSessionById(sessionState, selectedSessionId))
+        .then(() => setRenderTick((tick) => tick + 1))
+        .catch((error: unknown) => {
           setErrorState(error as Error);
         });
-      }, intervalMs);
+    };
+
+    const timers = liveSources.map((source) => {
+      applyLiveSource(source);
+      const intervalMs =
+        Math.max(1, source.apiConfig!.pollIntervalSeconds) * 1000;
+      return window.setInterval(() => applyLiveSource(source), intervalMs);
     });
 
     return () => {
       timers.forEach((timer) => clearInterval(timer));
     };
   }, [
+    adminService,
     eventCatalogState,
     selectedSessionId,
     selectedSessionsEventId,

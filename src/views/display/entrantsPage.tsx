@@ -1,4 +1,3 @@
-import { TextField } from '@mui/material';
 import React from 'react';
 import {
   type EntrantType,
@@ -13,6 +12,7 @@ import {
   getSessionsForEvent,
 } from '../../catalog/eventCatalog.js';
 import { type EntrantImportRecord, parseEntrantImportBuffer } from '../../processing/entrantImport.js';
+import { SelectTextField } from '../../controls/selectTextField.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import type { EventEntryId } from '../../model/entry.js';
 import { type EventCategoryId } from '../../model/eventcategory.js';
@@ -414,10 +414,9 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   return (
     <section className="events-screen">
       <h1>Entrants</h1>
-      <TextField
+      <SelectTextField
         className="page-filter-label"
         label="Event"
-        select
         slotProps={{ select: { 'aria-label': 'Entrants Event', native: true } }}
         value={selectedEvent?.id || ''}
         onChange={(event) => {
@@ -428,7 +427,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
         {props.catalog.events.map((event) => (
           <option key={event.id} value={event.id}>{event.name}</option>
         ))}
-      </TextField>
+      </SelectTextField>
       <FileSelectionField
         accept=".csv,.txt,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain"
         ariaLabel="Entrants Import File"
@@ -439,10 +438,9 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
         value={selectedImportFileName}
       />
       {importStatus ? <p aria-live="polite" className="page-filter-status">{importStatus}</p> : null}
-      <TextField
+      <SelectTextField
         className="page-filter-label"
         label="Category"
-        select
         slotProps={{ select: { 'aria-label': 'Entrants Category', native: true } }}
         value={selectedCategoryFilter}
         onChange={(event) => setSelectedCategoryFilter(event.target.value)}
@@ -452,7 +450,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
         {eventCategories.map((category) => (
           <option key={category.id} value={category.id}>{category.name}</option>
         ))}
-      </TextField>
+      </SelectTextField>
       <div className="events-layout">
         <EntrantListPanel
           catalog={props.catalog}

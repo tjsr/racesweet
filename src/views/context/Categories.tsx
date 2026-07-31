@@ -1,6 +1,6 @@
-import { TextField } from '@mui/material';
 import React from 'react';
 import { getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent, } from '../../catalog/eventCatalog.js';
+import { SelectTextField } from '../../controls/selectTextField.js';
 import { buildCategoryChanges } from '../../processing/categoryDraft.js';
 import { CategoriesPageProps, CategoryDraft, dedupeCategoriesForDisplay, getCategoryDraft, } from '../display/categoriesPage.js';
 import { useUnsavedChangesWarning } from '../display/unsavedChangesWarning.js';
@@ -96,10 +96,9 @@ export const CategoriesPage = (props: CategoriesPageProps,): React.ReactElement 
   return (
     <section className="events-screen">
       <h1>Categories</h1>
-      <TextField
+      <SelectTextField
         className="page-filter-label"
         label="Event"
-        select
         slotProps={{ select: { 'aria-label': 'Categories Event', native: true }, }}
         value={selectedEvent?.id || ""}
         onChange={(event) => {
@@ -108,7 +107,7 @@ export const CategoriesPage = (props: CategoriesPageProps,): React.ReactElement 
         } }
       >
         {props.catalog.events.map((event) => ( <option key={event.id} value={event.id}>{event.name}</option>))}
-      </TextField>
+      </SelectTextField>
       <div className="events-layout categories-layout">
         <CategoryListPanel
           allowCreateCategory={!!selectedEvent}

@@ -1,12 +1,14 @@
 // import { ipcMain } from "electron";
 // const { ipcMain } = require("electron");
 
-import type { FileWriteOptions } from './fileWriteDiagnostics.js';
+import type { FileWriteOptions } from "./fileWriteDiagnostics.js";
+import type { LoginRequest } from "../model/serverApi.js";
 
-export type AvailableSendChannels = 'askToRead' | 'askToWrite';
-export type AvailableReceiveChannels = 'sendReadContent' | 'sendReadError' | 'sendWriteSuccess' | 'sendWriteError';
-export type FileReadDataType = 'utf8' | 'buffer' | 'bytearray';
-export type FileWriteDataType = 'utf8' | 'base64';
+export type AvailableSendChannels = "askToRead" | "askToWrite";
+export type AvailableReceiveChannels =
+  "sendReadContent" | "sendReadError" | "sendWriteSuccess" | "sendWriteError";
+export type FileReadDataType = "utf8" | "buffer" | "bytearray";
+export type FileWriteDataType = "utf8" | "base64";
 export interface ExternalHttpProxyRequest {
   bodyBase64?: string;
   credentials?: RequestCredentials;
@@ -25,7 +27,7 @@ export interface ExternalHttpProxyResponse {
 }
 export interface SelectLocalFileOptions {
   filters?: Array<{ extensions: string[]; name: string }>;
-  properties?: Array<'openFile' | 'openDirectory'>;
+  properties?: Array<"openFile" | "openDirectory">;
   title?: string;
 }
 
@@ -35,8 +37,6 @@ export interface SelectLocalFileOptions {
 
 // import remote, { Menu, MenuItem } from '@electron/remote';
 
-
-
 // import remote from '@electron/remote';
 
 // const Menu = remote.require('menu');
@@ -44,21 +44,40 @@ export interface SelectLocalFileOptions {
 declare global {
   interface Window {
     api: {
-      persistenceMode?: 'native' | 'server';
-      receive: (channel: AvailableReceiveChannels | string, func: (...args: unknown[]) => unknown) => void;
-      requestFileContent: <DataType>(filePath: string, dataType: FileReadDataType) => Promise<DataType>;
-      requestExternalHttp: (request: ExternalHttpProxyRequest) => Promise<ExternalHttpProxyResponse>;
+      persistenceMode?: "native" | "server";
+      savedLoginCredentialsMode?: "native";
+      clearSavedLoginCredentials: () => Promise<void>;
+      loadSavedLoginCredentials: () => Promise<LoginRequest | undefined>;
+      receive: (
+        channel: AvailableReceiveChannels | string,
+        func: (...args: unknown[]) => unknown,
+      ) => void;
+      requestFileContent: <DataType>(
+        filePath: string,
+        dataType: FileReadDataType,
+      ) => Promise<DataType>;
+      saveLoginCredentials: (credentials: LoginRequest) => Promise<void>;
+      requestExternalHttp: (
+        request: ExternalHttpProxyRequest,
+      ) => Promise<ExternalHttpProxyResponse>;
       requestBuffer: (filePath: string) => Promise<Buffer>;
       openLocalFile: (filePath: string) => Promise<void>;
       openExternalUrl: (url: string) => Promise<void>;
       selectLocalDirectory: (title?: string) => Promise<string | undefined>;
-      selectLocalFile: (options?: SelectLocalFileOptions) => Promise<string | undefined>;
-      writeFileContent: (filePath: string, contents: string, dataType?: FileWriteDataType, options?: FileWriteOptions) => Promise<void>;
+      selectLocalFile: (
+        options?: SelectLocalFileOptions,
+      ) => Promise<string | undefined>;
+      writeFileContent: (
+        filePath: string,
+        contents: string,
+        dataType?: FileWriteDataType,
+        options?: FileWriteOptions,
+      ) => Promise<void>;
       send: (channel: AvailableSendChannels, ...args: unknown[]) => void;
-    },
+    };
     nodeAPI: {
       createBuffer: (data: string | Uint8Array | ArrayBuffer) => Buffer;
-    }
+    };
     versions: {
       node: () => string;
       chrome: () => string;
@@ -68,9 +87,9 @@ declare global {
 }
 
 // window.api.requestFileContent = <DataType>(path: string): Promise<DataType> => {
-  
+
 //   return new Promise((resolve, reject) => {
-    
+
 //     // window.api.receivePromise('sendReadContent')
 //     // window.api.receive('sendReadContent', (filename: string, data: string): void => {
 //     //   if (filename === path) {
@@ -84,13 +103,10 @@ declare global {
 //     //   }
 //     // });
 
-
 //     // Send the request after we've defined what to do with any rceived response.
 //     // window.api.send('askToRead', path);
 //   });
 // };
-
-
 
 // // window.api.send('askToRead')
 

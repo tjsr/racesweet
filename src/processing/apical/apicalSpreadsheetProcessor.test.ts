@@ -3,6 +3,8 @@ import * as XLSX from 'xlsx';
 import { readApicalExcelBuffer } from './apicalSpreadsheetProcessor.js';
 
 import type { ApicalSpreadsheetLapsRow, ApicalSpreadsheetResultsRow } from '../../app/apicalDataSource.js';
+import { RECORD_TX_CROSSING } from '../../model/timerecord.js';
+import { convertDataToRaceState } from '../../parsers/apical.js';
 import { createApicalTeamNameDisplayWorkbookBuffer } from '../../testing/apicalTeamWorkbook.js';
 
 const createTeamLapsRows = (): ApicalSpreadsheetLapsRow[] => [
@@ -63,6 +65,31 @@ const createWorkbookBuffer = (resultsRows: ApicalSpreadsheetResultsRow[]): Array
 };
 
 describe('apical spreadsheet processor', () => {
+  it('combines the time fraction of a full Excel date-time serial with the event date', async () => {
+    const workbook = XLSX.utils.book_new();
+    const rows: ApicalSpreadsheetLapsRow[] = [{
+      ...createTeamLapsRows()[0]!,
+      CategoryName: 'Solo A',
+      TimeOfDay: 46180.5,
+    }];
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Laps');
+    const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+    const data = await readApicalExcelBuffer(buffer);
+
+    const raceState = convertDataToRaceState(
+      '7b83ad1e-54ba-5f00-9712-1c82d3178640',
+      new Date('2026-06-07T00:00:00.000Z'),
+      data,
+      200000,
+      'UTC',
+    );
+    const crossing = raceState.records?.find((record) => record.recordType === RECORD_TX_CROSSING);
+
+    expect(data[0]!.ParticipantViewModels[0]!.LapByCategoryViewModels[0]!.TimeOfDay).toBe(46180.5);
+    expect(crossing?.time?.toISOString()).toBe('2026-06-07T12:00:00.000Z');
+    expect(raceState.records?.every((record) => record.time?.getUTCFullYear() === 2026)).toBe(true);
+  });
+
   it('uses Results TeamDisplayName rows to create team entrants with all listed race numbers', async () => {
     const data = await readApicalExcelBuffer(createWorkbookBuffer(createTeamResultsRows()));
 

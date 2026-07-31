@@ -1,5 +1,4 @@
 
-import { TextField } from '@mui/material';
 import React from 'react';
 import {
   type EventCatalogSession,
@@ -11,6 +10,7 @@ import { formatMinimumLapTimeInput, parseMinimumLapTimeInputToMilliseconds } fro
 import { type SessionSourceReloadMode } from '../../model/sessionSourceReload.js';
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
 import { type EventCategoryId } from '../../model/eventcategory.js';
+import { SelectTextField } from '../../controls/selectTextField.js';
 import { EventId, SessionId } from '../../model/raceevent.js';
 import { SessionCategoriesPanel } from '../panels/sessionCategories.js';
 import { SessionDetailsPanel } from '../panels/sessionDetails.js';
@@ -111,7 +111,7 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
   return (
     <section className="events-screen">
       <h1>Sessions</h1>
-      <TextField className="page-filter-label" label="Event" select slotProps={{ select: { 'aria-label': 'Sessions Event', native: true } }}
+      <SelectTextField className="page-filter-label" label="Event" slotProps={{ select: { 'aria-label': 'Sessions Event', native: true } }}
         aria-label="Sessions Event"
         value={selectedEvent?.id || ''}
         onChange={(event) => {
@@ -120,7 +120,7 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
         }}
       >
         {props.catalog.events.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
-      </TextField>
+      </SelectTextField>
       <div className="events-layout">
         <SessionListPanel
           activeSessionId={props.catalog.activeSessionId}

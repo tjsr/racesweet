@@ -1,6 +1,7 @@
-import { Button, MenuItem, TextField } from '@mui/material';
+import { Button, MenuItem } from '@mui/material';
 import React from 'react';
 import { type DataSourceType, getDataSourceTypeLabel } from '../../app/systemConfig.js';
+import { SelectTextField } from '../../controls/selectTextField.js';
 
 interface DataSourceTypesPanelProps {
   newSourceType: DataSourceType;
@@ -26,9 +27,8 @@ const sourceTypeOptions: DataSourceType[] = [
 
 export const DataSourceTypesPanel = (props: DataSourceTypesPanelProps): React.ReactElement => (
   <div className="events-actions">
-    <TextField
+    <SelectTextField
       label="Data Source Type"
-      select
       slotProps={{ select: { 'aria-label': 'New Data Source Type' } }}
       value={props.newSourceType}
       onChange={(event) => props.onChangeNewSourceType(event.target.value as DataSourceType)}
@@ -38,7 +38,7 @@ export const DataSourceTypesPanel = (props: DataSourceTypesPanelProps): React.Re
           {getDataSourceTypeLabel(type)}
         </MenuItem>
       ))}
-    </TextField>
+    </SelectTextField>
     <select
       aria-label="New Data Source Type"
       hidden

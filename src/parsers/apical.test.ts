@@ -49,6 +49,10 @@ describe('Apical parser', () => {
     expect(apicalTimeOfDayToDate(new Date('2026-06-07T13:45:00.000Z'), 0.5, 'UTC').toISOString()).toBe('2026-06-07T12:00:00.000Z');
   });
 
+  it('ignores the date portion of a full Excel date-time serial in TimeOfDay', () => {
+    expect(apicalTimeOfDayToDate(new Date('2026-06-07T13:45:00.000Z'), 46180.5, 'UTC').toISOString()).toBe('2026-06-07T12:00:00.000Z');
+  });
+
   it('combines TimeOfDay values with the session date in the event time zone', () => {
     expect(apicalTimeOfDayToDate(new Date('2026-06-07T00:00:00.000Z'), '10:15:30.2500000', 'Australia/Sydney').toISOString()).toBe('2026-06-07T00:15:30.250Z');
   });

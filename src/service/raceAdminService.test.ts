@@ -106,7 +106,10 @@ describe('RaceAdminService', () => {
       expect.objectContaining({ id: 'record-1' }),
     ]);
     expect(sessionDouble.updatedRecords).toEqual([
-      expect.objectContaining({ id: 'record-1' }),
+      expect.objectContaining({
+        id: 'record-1',
+        time: new Date('2026-05-29T10:00:00.000Z'),
+      }),
     ]);
     expect(sessionDouble.excluded.crossing1).toBe(true);
     expect(sessionDouble.entrantCategories.team1).toBe('cat-b');

@@ -1,4 +1,4 @@
-import { Button, TextField } from '@mui/material';
+import { Button } from '@mui/material';
 import React from 'react';
 import {
   type EntrantType,
@@ -10,6 +10,7 @@ import {
 import { type CategoryId } from '../../processing/category.js';
 import { getParticipantNumber, getParticipantTransponders } from '../../processing/participant.js';
 import { EntrantListCard } from '../../controls/entrantListCard.js';
+import { SelectTextField } from '../../controls/selectTextField.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import { type EventParticipant } from '../../model/eventparticipant.js';
 import { EventId } from '../../model/raceevent.js';
@@ -281,17 +282,16 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
       <h2>Entrant List</h2>
       <div className="events-actions">
         {props.teamsEnabled ? (
-          <TextField
+          <SelectTextField
             className="compact-action-label"
             label="Create"
-            select
             slotProps={{ select: { 'aria-label': 'Create Entrant Kind', native: true } }}
             value={props.createKind}
             onChange={(event) => props.setCreateKind(event.target.value as EntrantType)}
           >
             <option value="rider">Create {singularLabel.toLowerCase()}</option>
             <option value="team">Create {groupLabel.toLowerCase().slice(0, -1)}</option>
-          </TextField>
+          </SelectTextField>
         ) : null}
         <Button
           type="button"
@@ -310,10 +310,9 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
         >
           {props.teamsEnabled && props.createKind === 'team' ? `Create ${groupLabel.slice(0, -1)}` : `Create ${singularLabel}`}
         </Button>
-        <TextField
+        <SelectTextField
           className="compact-action-label"
           label="Sort"
-          select
           slotProps={{ select: { 'aria-label': 'Sort Entrants', native: true } }}
           value={sortOrder}
           onChange={(event) => setSortOrder(event.target.value as EntrantListSortOrder)}
@@ -321,7 +320,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
           {entrantListSortOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
-        </TextField>
+        </SelectTextField>
       </div>
       <div className="events-list" role="listbox" aria-label="Entrants for selected event">
         {displayedRiderEntrants.length > 0 ? (

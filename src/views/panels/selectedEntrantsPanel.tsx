@@ -1,6 +1,7 @@
-import { Button, CircularProgress, TextField } from '@mui/material';
+import { Button, CircularProgress } from '@mui/material';
 import React from 'react';
 import { type EventCatalogCategory, type EventCatalogEntrant } from '../../catalog/eventCatalog.js';
+import { SelectTextField } from '../../controls/selectTextField.js';
 
 interface SelectedEntrantsPanelProps {
   categories: EventCatalogCategory[];
@@ -26,10 +27,9 @@ export const SelectedEntrantsPanel = (props: SelectedEntrantsPanelProps): React.
     <ul className="readonly-summary-list">
       {props.selectedEntrants.map((entrant) => <li key={entrant.id}>{entrant.name} ({entrant.entrantType})</li>)}
     </ul>
-    <TextField
+    <SelectTextField
       fullWidth
       label="Move to category"
-      select
       slotProps={{ select: { 'aria-label': 'Move selected entrants to category', native: true } }}
       value=""
       onChange={(event) => {
@@ -40,12 +40,11 @@ export const SelectedEntrantsPanel = (props: SelectedEntrantsPanelProps): React.
     >
       <option value="">Select a category</option>
       {props.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-    </TextField>
-    <TextField
+    </SelectTextField>
+    <SelectTextField
       disabled={removableCategories.length === 0}
       fullWidth
       label="Remove from category"
-      select
       slotProps={{ select: { 'aria-label': 'Remove selected entrants from category', native: true } }}
       value=""
       onChange={(event) => {
@@ -56,7 +55,7 @@ export const SelectedEntrantsPanel = (props: SelectedEntrantsPanelProps): React.
     >
       <option value="">Select a category</option>
       {removableCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-    </TextField>
+    </SelectTextField>
     <div className="entrant-delete-status">
       <Button
         color="error"

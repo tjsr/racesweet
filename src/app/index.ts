@@ -1,30 +1,53 @@
-import './runtimeSourceMaps.ts';
+import "./runtimeSourceMaps.ts";
 
-import { BrowserWindow, app, dialog, ipcMain, session, shell } from 'electron';
-import { readFile } from 'node:fs/promises';
+import { BrowserWindow, app, dialog, ipcMain, session, shell } from "electron";
+import { readFile } from "node:fs/promises";
 import {
   ReadContentErrorIpcReceiveChannel,
   ReadContentIpcReceiveChannel,
   RequestExternalHttpIpcInvokeChannel,
+  RequestClearSavedLoginCredentialsIpcInvokeChannel,
+  RequestLoadSavedLoginCredentialsIpcInvokeChannel,
   RequestOpenLocalFileIpcInvokeChannel,
   RequestOpenExternalUrlIpcInvokeChannel,
+  RequestSaveLoginCredentialsIpcInvokeChannel,
   RequestReadIpcSendChannel,
   RequestSelectLocalDirectoryIpcInvokeChannel,
   RequestSelectLocalFileIpcInvokeChannel,
   RequestWriteIpcSendChannel,
   WriteContentErrorIpcReceiveChannel,
-  WriteContentIpcReceiveChannel
-} from '../model/electronIpc';
-import { buildContentSecurityPolicy, injectContentSecurityPolicyHeader } from './contentSecurityPolicy';
-import { injectCorsHeaders, isAllowedCorsDownloadUrl } from './electron/corsHeaders';
-import { writeApplicationFile } from './fileWrite';
-import type { FileWriteOptions } from './fileWriteDiagnostics';
-import { waitForContentServer, waitForWindowContentLoad } from './startupContentServer';
-import type { ExternalHttpProxyRequest, ExternalHttpProxyResponse, FileWriteDataType, SelectLocalFileOptions } from './window';
-import { RaceSweetApplicationServer } from './server/raceSweetApplicationServer';
+  WriteContentIpcReceiveChannel,
+} from "../model/electronIpc";
+import type { LoginRequest } from "../model/serverApi";
+import {
+  buildContentSecurityPolicy,
+  injectContentSecurityPolicyHeader,
+} from "./contentSecurityPolicy";
+import {
+  injectCorsHeaders,
+  isAllowedCorsDownloadUrl,
+} from "./electron/corsHeaders";
+import { writeApplicationFile } from "./fileWrite";
+import type { FileWriteOptions } from "./fileWriteDiagnostics";
+import {
+  waitForContentServer,
+  waitForWindowContentLoad,
+} from "./startupContentServer";
+import type {
+  ExternalHttpProxyRequest,
+  ExternalHttpProxyResponse,
+  FileWriteDataType,
+  SelectLocalFileOptions,
+} from "./window";
+import { RaceSweetApplicationServer } from "./server/raceSweetApplicationServer";
 
-import path from 'node:path';
-import { fetchExternalHttpProxy } from './externalHttpProxy';
+import path from "node:path";
+import { fetchExternalHttpProxy } from "./externalHttpProxy";
+import {
+  clearNativeSavedLoginCredentials,
+  loadNativeSavedLoginCredentials,
+  saveNativeLoginCredentials,
+} from "./savedLoginCredentialStore";
 
 export type IPCEventId = string;
 
@@ -48,7 +71,7 @@ declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-if (require('electron-squirrel-startup')) {
+if (require("electron-squirrel-startup")) {
   app.quit();
 }
 
@@ -57,13 +80,13 @@ const configureChromiumCacheDirectory = (): void => {
   if (!baseDir) {
     return;
   }
-  const cacheDir = path.join(baseDir, 'RaceSweet', 'chromium-cache');
-  app.commandLine.appendSwitch('disk-cache-dir', cacheDir);
+  const cacheDir = path.join(baseDir, "RaceSweet", "chromium-cache");
+  app.commandLine.appendSwitch("disk-cache-dir", cacheDir);
 };
 
 configureChromiumCacheDirectory();
 
-process.on('warning', (warning) => {
+process.on("warning", (warning) => {
   const trace = warning.stack ?? `${warning.name}: ${warning.message}`;
   console.warn(trace);
 });
@@ -77,8 +100,11 @@ const configureSecurityHeaders = (): void => {
       responseHeaders = injectCorsHeaders(responseHeaders);
     }
 
-    if (details.resourceType === 'mainFrame') {
-      responseHeaders = injectContentSecurityPolicyHeader(responseHeaders, contentSecurityPolicy);
+    if (details.resourceType === "mainFrame") {
+      responseHeaders = injectContentSecurityPolicyHeader(
+        responseHeaders,
+        contentSecurityPolicy,
+      );
     }
 
     callback({ responseHeaders });
@@ -89,7 +115,7 @@ const showStartupError = (error: Error): void => {
   const detail = error.stack ?? error.message;
 
   console.error(`RaceSweet startup failed: ${detail}`);
-  dialog.showErrorBox('RaceSweet startup failed', error.message);
+  dialog.showErrorBox("RaceSweet startup failed", error.message);
 };
 
 const createWindow = async (contentUrl: string): Promise<void> => {
@@ -116,19 +142,22 @@ const createWindow = async (contentUrl: string): Promise<void> => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', () => {
+app.on("ready", () => {
   const startApplication = async (): Promise<void> => {
     await waitForContentServer(MAIN_WINDOW_WEBPACK_ENTRY);
-    const dataDirectory: string = process.env.RACESWEET_DATA_DIRECTORY ||
-      (app.isPackaged ? app.getPath('userData') : path.resolve('src', 'generated'));
+    const dataDirectory: string =
+      process.env.RACESWEET_DATA_DIRECTORY ||
+      (app.isPackaged
+        ? app.getPath("userData")
+        : path.resolve("src", "generated"));
     applicationServer = new RaceSweetApplicationServer({
       assetSource: MAIN_WINDOW_WEBPACK_ENTRY,
       dataDirectory,
       externalAssetSource: app.isPackaged
-        ? path.join(process.resourcesPath, 'web')
-        : path.resolve('dist', 'web'),
+        ? path.join(process.resourcesPath, "web")
+        : path.resolve("dist", "web"),
       swaggerAssetDirectory: app.isPackaged
-        ? path.join(process.resourcesPath, 'swagger-ui-dist')
+        ? path.join(process.resourcesPath, "swagger-ui-dist")
         : undefined,
     });
     await applicationServer.initialize();
@@ -147,18 +176,20 @@ app.on('ready', () => {
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
-app.on('window-all-closed', (): void => {
-  if (process.platform !== 'darwin') {
+app.on("window-all-closed", (): void => {
+  if (process.platform !== "darwin") {
     app.quit();
   }
 });
 
-app.on('activate', (): void => {
+app.on("activate", (): void => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     if (!internalApplicationOrigin) {
-      showStartupError(new Error('The internal RaceSweet server is not available.'));
+      showStartupError(
+        new Error("The internal RaceSweet server is not available."),
+      );
       return;
     }
     createWindow(internalApplicationOrigin).catch((error: Error) => {
@@ -168,123 +199,197 @@ app.on('activate', (): void => {
   }
 });
 
-app.on('will-quit', (): void => {
+app.on("will-quit", (): void => {
   void applicationServer?.close();
 });
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
 
-ipcMain.on(RequestReadIpcSendChannel, (event: Electron.IpcMainEvent, filename: string, eventId: IPCEventId, dataType?: string): void => {
-  // const fs = require('fs');
-  // const path = require('path');
-  const filePath = resolveAppFilePath(filename);
-  
-  readFile(filePath).then((data: Buffer) => {
-    if (dataType === 'utf-8' || dataType === 'utf8') {
-      const utf8Data = new TextDecoder('utf-8').decode(data);
-      event.reply(ReadContentIpcReceiveChannel, eventId, utf8Data, 'utf-8');
-    } else {
-      event.reply(ReadContentIpcReceiveChannel, eventId, data);
+ipcMain.on(
+  RequestReadIpcSendChannel,
+  (
+    event: Electron.IpcMainEvent,
+    filename: string,
+    eventId: IPCEventId,
+    dataType?: string,
+  ): void => {
+    // const fs = require('fs');
+    // const path = require('path');
+    const filePath = resolveAppFilePath(filename);
+
+    readFile(filePath)
+      .then((data: Buffer) => {
+        if (dataType === "utf-8" || dataType === "utf8") {
+          const utf8Data = new TextDecoder("utf-8").decode(data);
+          event.reply(ReadContentIpcReceiveChannel, eventId, utf8Data, "utf-8");
+        } else {
+          event.reply(ReadContentIpcReceiveChannel, eventId, data);
+        }
+      })
+      .catch((error: Error) => {
+        const nodeError = error as NodeJS.ErrnoException;
+        if (nodeError.code === "ENOENT") {
+          console.info(`Optional file not found at ${filePath}.`);
+        } else if (nodeError.code === "EACCES" || nodeError.code === "EPERM") {
+          console.warn(`Permission denied while reading ${filePath}.`);
+        } else {
+          // Handle unexpected file read errors.
+          console.error(
+            `Error reading file ${filename} within dir ${__dirname}`,
+            error,
+          );
+        }
+
+        const errMsg = `Error reading file ${filename} within dir ${__dirname}`;
+        error.message = errMsg + ": " + error.message;
+        event.reply(ReadContentErrorIpcReceiveChannel, eventId, error.message);
+      });
+    // event.reply('sendReadContent', filename, data);
+  },
+);
+
+ipcMain.handle(
+  RequestSelectLocalFileIpcInvokeChannel,
+  async (
+    event: Electron.IpcMainInvokeEvent,
+    options?: SelectLocalFileOptions,
+  ): Promise<string | undefined> => {
+    const browserWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!browserWindow) {
+      return undefined;
     }
-  }).catch((error: Error) => {
-    const nodeError = error as NodeJS.ErrnoException;
-    if (nodeError.code === 'ENOENT') {
-      console.info(`Optional file not found at ${filePath}.`);
-    } else if (nodeError.code === 'EACCES' || nodeError.code === 'EPERM') {
-      console.warn(`Permission denied while reading ${filePath}.`);
-    } else {
-      // Handle unexpected file read errors.
-      console.error(`Error reading file ${filename} within dir ${__dirname}`, error);
+    const result = await dialog.showOpenDialog(browserWindow, {
+      filters: options?.filters,
+      properties: options?.properties || ["openFile"],
+      title: options?.title,
+    });
+
+    if (result.canceled) {
+      return undefined;
     }
 
-    const errMsg = `Error reading file ${filename} within dir ${__dirname}`;
-    error.message = errMsg + ': ' + error.message;
-    event.reply(ReadContentErrorIpcReceiveChannel, eventId, error.message);
-  });
-  // event.reply('sendReadContent', filename, data);
-});
+    return result.filePaths[0];
+  },
+);
 
-ipcMain.handle(RequestSelectLocalFileIpcInvokeChannel, async (event: Electron.IpcMainInvokeEvent, options?: SelectLocalFileOptions): Promise<string | undefined> => {
-  const browserWindow = BrowserWindow.fromWebContents(event.sender);
-  if (!browserWindow) {
-    return undefined;
-  }
-  const result = await dialog.showOpenDialog(browserWindow, {
-    filters: options?.filters,
-    properties: options?.properties || ['openFile'],
-    title: options?.title,
-  });
+ipcMain.handle(
+  RequestSelectLocalDirectoryIpcInvokeChannel,
+  async (
+    event: Electron.IpcMainInvokeEvent,
+    title?: string,
+  ): Promise<string | undefined> => {
+    const browserWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!browserWindow) {
+      return undefined;
+    }
+    const result = await dialog.showOpenDialog(browserWindow, {
+      properties: ["openDirectory"],
+      title,
+    });
 
-  if (result.canceled) {
-    return undefined;
-  }
+    if (result.canceled) {
+      return undefined;
+    }
 
-  return result.filePaths[0];
-});
+    return result.filePaths[0];
+  },
+);
 
-ipcMain.handle(RequestSelectLocalDirectoryIpcInvokeChannel, async (event: Electron.IpcMainInvokeEvent, title?: string): Promise<string | undefined> => {
-  const browserWindow = BrowserWindow.fromWebContents(event.sender);
-  if (!browserWindow) {
-    return undefined;
-  }
-  const result = await dialog.showOpenDialog(browserWindow, {
-    properties: ['openDirectory'],
-    title,
-  });
+ipcMain.handle(
+  RequestExternalHttpIpcInvokeChannel,
+  async (
+    _event: Electron.IpcMainInvokeEvent,
+    request: ExternalHttpProxyRequest,
+  ): Promise<ExternalHttpProxyResponse> => {
+    return fetchExternalHttpProxy(request);
+  },
+);
 
-  if (result.canceled) {
-    return undefined;
-  }
+ipcMain.handle(
+  RequestLoadSavedLoginCredentialsIpcInvokeChannel,
+  (): Promise<LoginRequest | undefined> =>
+    loadNativeSavedLoginCredentials(app.getPath("userData")),
+);
 
-  return result.filePaths[0];
-});
+ipcMain.handle(
+  RequestSaveLoginCredentialsIpcInvokeChannel,
+  (
+    _event: Electron.IpcMainInvokeEvent,
+    credentials: LoginRequest,
+  ): Promise<void> =>
+    saveNativeLoginCredentials(app.getPath("userData"), credentials),
+);
 
-ipcMain.handle(RequestExternalHttpIpcInvokeChannel, async (_event: Electron.IpcMainInvokeEvent, request: ExternalHttpProxyRequest): Promise<ExternalHttpProxyResponse> => {
-  return fetchExternalHttpProxy(request);
-});
+ipcMain.handle(
+  RequestClearSavedLoginCredentialsIpcInvokeChannel,
+  (): Promise<void> =>
+    clearNativeSavedLoginCredentials(app.getPath("userData")),
+);
 
-ipcMain.handle(RequestOpenLocalFileIpcInvokeChannel, async (_event: Electron.IpcMainInvokeEvent, filename: string): Promise<void> => {
-  const fullPath = resolveAppFilePath(filename);
-  const errorMessage = await shell.openPath(fullPath);
-  if (errorMessage) {
-    throw new Error(errorMessage);
-  }
-});
+ipcMain.handle(
+  RequestOpenLocalFileIpcInvokeChannel,
+  async (
+    _event: Electron.IpcMainInvokeEvent,
+    filename: string,
+  ): Promise<void> => {
+    const fullPath = resolveAppFilePath(filename);
+    const errorMessage = await shell.openPath(fullPath);
+    if (errorMessage) {
+      throw new Error(errorMessage);
+    }
+  },
+);
 
-ipcMain.on(RequestWriteIpcSendChannel, (
-  event: Electron.IpcMainEvent,
-  filename: string,
-  eventId: IPCEventId,
-  contents: string,
-  dataType: FileWriteDataType = 'utf8',
-  options?: FileWriteOptions,
-): void => {
-  void writeApplicationFile({ contents, dataType, filename, options }, {
-    getUserDataPath: () => app.getPath('userData'),
-    resolvePath: resolveAppFilePath,
-  }).then(() => {
-    event.reply(WriteContentIpcReceiveChannel, eventId);
-  }).catch((error: unknown) => {
-    event.reply(WriteContentErrorIpcReceiveChannel, eventId, error);
-  });
-});
+ipcMain.on(
+  RequestWriteIpcSendChannel,
+  (
+    event: Electron.IpcMainEvent,
+    filename: string,
+    eventId: IPCEventId,
+    contents: string,
+    dataType: FileWriteDataType = "utf8",
+    options?: FileWriteOptions,
+  ): void => {
+    void writeApplicationFile(
+      { contents, dataType, filename, options },
+      {
+        getUserDataPath: () => app.getPath("userData"),
+        resolvePath: resolveAppFilePath,
+      },
+    )
+      .then(() => {
+        event.reply(WriteContentIpcReceiveChannel, eventId);
+      })
+      .catch((error: unknown) => {
+        event.reply(WriteContentErrorIpcReceiveChannel, eventId, error);
+      });
+  },
+);
 
-ipcMain.handle(RequestOpenExternalUrlIpcInvokeChannel, async (_event: Electron.IpcMainInvokeEvent, urlText: string): Promise<void> => {
-  const url = new URL(urlText);
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw new Error('Only HTTP and HTTPS URLs may be opened externally.');
-  }
-  await shell.openExternal(url.toString());
-});
+ipcMain.handle(
+  RequestOpenExternalUrlIpcInvokeChannel,
+  async (
+    _event: Electron.IpcMainInvokeEvent,
+    urlText: string,
+  ): Promise<void> => {
+    const url = new URL(urlText);
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      throw new Error("Only HTTP and HTTPS URLs may be opened externally.");
+    }
+    await shell.openExternal(url.toString());
+  },
+);
 
-ipcMain.handle('get-cookies', async (event, targetUrl) => {
+ipcMain.handle("get-cookies", async (event, targetUrl) => {
   try {
     // This queries Chromium's inner cookie database directly
-    const cookies = await session.defaultSession.cookies.get({ url: targetUrl });
-    return cookies; 
+    const cookies = await session.defaultSession.cookies.get({
+      url: targetUrl,
+    });
+    return cookies;
   } catch (error) {
-    console.error('Failed to get cookies:', error);
+    console.error("Failed to get cookies:", error);
     return [];
   }
 });

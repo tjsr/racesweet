@@ -1,7 +1,8 @@
-import { Button, MenuItem, TextField } from '@mui/material';
+import { Button, MenuItem } from '@mui/material';
 import React from 'react';
 import { type FileWriteDiagnostics, getFileWriteFailure } from '../../app/fileWriteDiagnostics.js';
 import type { EventCatalogEvent, EventTrackMap, EventTrackTimingLine } from '../../catalog/eventCatalog.js';
+import { SelectTextField } from '../../controls/selectTextField.js';
 import { createTrackMapGeometry, getClosestTrackProgress, getTrackPointAtProgress, toSvgPolylinePoints } from '../reports/trackMapGeometry.js';
 import { FileSelectionField } from './fileSelectionField.js';
 
@@ -148,16 +149,15 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
   return (
     <section className="events-panel" aria-label="Event Track Map Configuration">
       <h2>Track Map</h2>
-      <TextField
+      <SelectTextField
         label="Track data format"
-        select
         slotProps={{ select: { 'aria-label': 'Event Track Data Format' } }}
         onChange={(event) => setDraft((current) => ({ ...current, sourceType: event.target.value as EventTrackMap['sourceType'] }))}
         value={draft.sourceType}
       >
         <MenuItem value="gpx">GPX</MenuItem>
         <MenuItem value="racetrack-csv">Racetrack database CSV</MenuItem>
-      </TextField>
+      </SelectTextField>
       {draft.sourceType === 'gpx' ? (
         <FileSelectionField
           accept=".gpx,application/gpx+xml,application/xml,text/xml"
@@ -246,9 +246,8 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
             {status ? <span aria-label="Track Map Save Status" role="status">{status}</span> : null}
             {saveFailure ? <Button onClick={() => void navigator.clipboard.writeText(formatSaveDiagnostics(props.selectedEvent?.id.toString() || 'unavailable', saveFailure))} type="button">Copy save diagnostics</Button> : null}
           </div>
-          <TextField
+          <SelectTextField
             label="Timing line"
-            select
             slotProps={{ select: { 'aria-label': 'Track Map Timing Line' } }}
             value={selectedLineNumber ?? ''}
             onChange={(event) => setSelectedLineNumber(event.target.value ? Number(event.target.value) : undefined)}
@@ -257,7 +256,7 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
             {availableTimingLines.map((line) => (
               <MenuItem key={line.lineNumber} value={line.lineNumber}>{line.label}</MenuItem>
             ))}
-          </TextField>
+          </SelectTextField>
           <svg
             aria-label="Event Track Map Editor"
             onClick={handleMapClick}

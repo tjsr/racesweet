@@ -1,9 +1,10 @@
-import { MenuItem, TextField } from '@mui/material';
+import { MenuItem } from '@mui/material';
 import React from 'react';
 import { type EventCatalogState } from '../../catalog/eventCatalog.js';
 import { type FastestTimeIndicatorColors } from '../../app/systemConfig.js';
 import { type TimeDisplayZoneMode } from '../../app/utils/timeutils.js';
 import { RecentRecords } from '../../app/views/timing/recentRecords.js';
+import { SelectTextField } from '../../controls/selectTextField.js';
 import { type EventCategory, type EventCategoryId } from '../../model/eventcategory.js';
 import { type EventParticipantId } from '../../model/eventparticipant.js';
 import { EventId, SessionId } from '../../model/raceevent.js';
@@ -107,9 +108,8 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
       <div className="timing-context-row">
         <div className="page-filter-label">
           <span className="timing-selection-select-row">
-            <TextField
+            <SelectTextField
               label="Event"
-              select
               slotProps={{
                 select: {
                   'aria-label': 'Timing Event',
@@ -121,7 +121,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
               {props.events.map((event: EventCatalogEvent) => (
                 <MenuItem key={event.id} value={event.id}>{event.name}</MenuItem>
               ))}
-            </TextField>
+            </SelectTextField>
             <select
               aria-label="Timing Event"
               hidden
@@ -139,9 +139,8 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
         </div>
         <div className="page-filter-label">
           <span className="timing-selection-select-row">
-            <TextField
+            <SelectTextField
               label="Session"
-              select
               slotProps={{
                 select: {
                   'aria-label': 'Timing Session',
@@ -153,7 +152,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
               {sortedSessions.map((session) => (
                 <MenuItem key={session.id} value={session.id}>{formatTimingSessionOption(session)}{props.activeSession?.id === session.id ? ' (active)' : ''}</MenuItem>
               ))}
-            </TextField>
+            </SelectTextField>
             <select
               aria-label="Timing Session"
               hidden

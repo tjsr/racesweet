@@ -2,6 +2,7 @@ import { Button, TextField } from '@mui/material';
 import React from 'react';
 
 import type { EventCatalogCategory, EventCatalogEntrant, EventCatalogEntry } from '../../catalog/eventCatalog.js';
+import { SelectTextField } from '../../controls/selectTextField.js';
 import type { EventEntrantId } from '../../model/entrant.js';
 import type { EventEntryId } from '../../model/entry.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
@@ -125,9 +126,8 @@ const EntryEditor = (props: EntrantEntriesPanelProps & { entry: EventCatalogEntr
         value={draft.name}
         onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
       />
-      <TextField
+      <SelectTextField
         label="Category"
-        select
         slotProps={{ select: { 'aria-label': `Entry Category ${props.entry.id}`, native: true } }}
         value={draft.categoryId}
         onChange={(event) => setDraft((current) => ({ ...current, categoryId: event.target.value }))}
@@ -136,7 +136,7 @@ const EntryEditor = (props: EntrantEntriesPanelProps & { entry: EventCatalogEntr
         {props.categories.filter((category) => category.deleted !== true).map((category) => (
           <option key={category.id} value={category.id}>{category.name}</option>
         ))}
-      </TextField>
+      </SelectTextField>
       <TextField
         label="Race Number"
         slotProps={{ htmlInput: { 'aria-label': `Entry Race Number ${props.entry.id}` } }}

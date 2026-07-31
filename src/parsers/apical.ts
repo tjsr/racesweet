@@ -47,7 +47,12 @@ const getTimeOfDayValue = (lap: ApicalLapByCategoryViewModel): string | number =
 
 export const apicalTimeOfDayToDate = (sessionDate: Date, timeOfDay: string | number, timeZone?: string): Date => {
   const sessionMidnight = dateAtStartOfDayInTimeZone(sessionDate, timeZone);
-  return addToTime(sessionMidnight, apicalTimeToMilliseconds(timeOfDay));
+  // Apical can export a time-formatted cell containing a full Excel date-time serial.
+  // Only its fractional day belongs to TimeOfDay; the session supplies the date.
+  const millisecondsSinceMidnight = typeof timeOfDay === 'number'
+    ? excelTimeToMilliseconds(timeOfDay - Math.floor(timeOfDay))
+    : apicalTimeToMilliseconds(timeOfDay);
+  return addToTime(sessionMidnight, millisecondsSinceMidnight);
 };
 
 const getCumulativeMilliseconds = (lap: ApicalLapByCategoryViewModel): number => {
