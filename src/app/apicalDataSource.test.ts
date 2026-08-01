@@ -101,6 +101,12 @@ const createExcelBuffer = (sheetNames: string[] = ['Laps']): ArrayBuffer => {
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
 };
 
+const createEmptyExcelBuffer = (): ArrayBuffer => {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([]), 'Sheet1');
+  return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+};
+
 const createExcelResponse = (): Response => new Response(createExcelBuffer(), { status: 200 });
 
 const mockExcelFetch = (cookie: string = 'session=abc123'): ReturnType<typeof vi.spyOn> => vi
@@ -647,6 +653,28 @@ describe('apicalDataSource', () => {
 
     expectConvertedLapsPayload(round1EventId);
     expect(result).toBe(converted);
+  });
+
+  it('loads an Apical event with no race data yet as an empty race state', async () => {
+    const emptyRaceState = {
+      categories: [],
+      participants: [],
+      records: [],
+    };
+    convertDataToRaceState.mockReturnValue(emptyRaceState);
+    vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        FileGuid: TEST_FILE_GUID,
+        FileName: 'Round 3.xlsx',
+      }), {
+        headers: { 'set-cookie': 'session=abc123' },
+        status: 200,
+      }))
+      .mockResolvedValueOnce(new Response(createEmptyExcelBuffer(), { status: 200 }));
+
+    await expect(pullApicalRaceState(createApicalSource('apical.example.com'), createEventId())).resolves.toBe(emptyRaceState);
+    expect(convertDataToRaceState).toHaveBeenCalledWith(expect.any(String), expect.any(Date), [], 200000, expect.any(String));
   });
 
   it('fetches Apical event data now with stable catalog ids and ISO retrieval time', async () => {

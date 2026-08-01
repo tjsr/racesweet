@@ -5,6 +5,7 @@ import { createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
 import { type EventId, type SessionId } from '../model/raceevent.js';
 import {
   EVENT_FLAG_DISPLAYED,
+  EVENT_SESSION_END,
   type EventTimeRecord,
   type ParticipantPassingRecord,
   RECORD_TX_CROSSING,
@@ -28,8 +29,8 @@ export const buildManualFlagRecord = (
   const baseRecord = {
     eventId: currentEventId || existingRecord?.eventId || anchorRecord.eventId,
     id: existingRecord?.id || createTimeRecordId(),
-    recordType: EVENT_FLAG_DISPLAYED,
-    sequence: existingRecord?.sequence || Math.max(...records.map((record) => record.sequence), 0) + 1,
+    recordType: existingRecord?.recordType ?? (flagType === 'chequered' ? EVENT_FLAG_DISPLAYED | EVENT_SESSION_END : EVENT_FLAG_DISPLAYED),
+    sequence: existingRecord?.sequence ?? Math.max(...records.map((record) => record.sequence), 0) + 1,
     sessionId: currentSessionId || existingRecord?.sessionId || anchorRecord.sessionId,
     source: existingRecord?.source || MANUAL_RECORD_SOURCE_ID,
     time,

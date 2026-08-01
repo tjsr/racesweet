@@ -170,7 +170,8 @@ export const readApicalExcelBuffer = async (buffer: ArrayBuffer): Promise<Apical
 
   const rows = XLSX.utils.sheet_to_json<ApicalSpreadsheetLapsRow>(worksheet);
   if (rows.length === 0) {
-    throw new ApicalDataException(`Apical Excel workbook did not contain lap rows, but contained sheets ${sheetList}`);
+    console.debug(`Apical Excel workbook did not contain lap rows, but contained sheets ${sheetList}. Treating it as an event with no race data yet.`);
+    return [];
   }
 
   const resultsWorksheet = workbook.Sheets.Results;

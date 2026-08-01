@@ -1,7 +1,8 @@
 import React, { type JSX } from 'react';
 
 import { TZDate } from '@date-fns/tz';
-import { Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip,
+import {
+  Alert, Box, Button, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip,
 } from '@mui/material';
 import { DEFAULT_FASTEST_TIME_INDICATOR_COLORS, type FastestTimeIndicatorColors } from '../../app/systemConfig.ts';
 import type { MillisecondsDuration, TimeDisplayZoneMode } from '../../app/utils/timeutils.ts';
@@ -182,7 +183,7 @@ interface AddRecordDialogState {
 
 const GENERATED_MISSING_CROSSING_SOURCE_ID = createTimeRecordSourceId('generated-missing-crossing');
 const manualFlagLabelByType: Record<AddableFlagType, string> = {
-  chequered: 'Checquered',
+  chequered: 'Chequered',
   green: 'Green',
   red: 'Red',
   white: 'White',
@@ -401,11 +402,17 @@ const getParticipantSessionCategoryIds = (participant: EventParticipant, raceSta
   return Array.from(categoryIds);
 };
 
-const getEditableFlagCategoryIds = (record: EventTimeRecord): EventCategoryId[] => {
+const getEditableFlagCategoryIds = (record: EventTimeRecord, raceStateLookup: RaceStateLookup): EventCategoryId[] => {
   if (!isFlagRecord(record)) {
     return [];
   }
-  return [...(record.categoryIds || [])];
+  return (record.categoryIds || []).filter((categoryId) => {
+    try {
+      return raceStateLookup.getCategoryById(categoryId) !== undefined;
+    } catch (_error: unknown) {
+      return false;
+    }
+  });
 };
 
 const getEditablePassingTxNo = (record: EventTimeRecord): string => {
@@ -1855,7 +1862,7 @@ interface AddRecordDialogProps {
   currentSessionId?: string;
   displayTimeZone: string;
   onClose: () => void;
-  onSave: (record: EventTimeRecord, mode: RecordDialogMode) => void;
+  onSave: (record: EventTimeRecord, mode: RecordDialogMode) => Promise<void>;
   openState: AddRecordDialogState | null;
   raceStateLookup: RaceStateLookup;
   records: EventTimeRecord[];
@@ -1883,6 +1890,8 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
   const [passingLoopNumber, setPassingLoopNumber] = React.useState<string>('');
   const [showRawRecordJson, setShowRawRecordJson] = React.useState<boolean>(false);
   const [dateError, setDateError] = React.useState<string>('');
+  const [saveError, setSaveError] = React.useState<string>('');
+  const [saving, setSaving] = React.useState<boolean>(false);
   const [timeError, setTimeError] = React.useState<string>('');
 
   React.useEffect(() => {
@@ -1894,7 +1903,7 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       setTimeOfDay(timeOfDayInputStringInTimeZone(sourceRecord.time, props.displayTimeZone));
       setRecordType(isFlagRecord(sourceRecord) ? 'flag' : 'passing');
       setFlagType(isFlagRecord(sourceRecord) ? (sourceRecord.flagType as AddableFlagType) : 'yellow');
-      setSelectedFlagCategoryIds(getEditableFlagCategoryIds(sourceRecord));
+      setSelectedFlagCategoryIds(getEditableFlagCategoryIds(sourceRecord, props.raceStateLookup));
       setPassingTxNo(getEditablePassingTxNo(sourceRecord));
       setPassingPlate(getEditablePassingPlate(sourceRecord, props.raceStateLookup));
       setPassingLineNumber(formatOptionalNumber(getPassingLineNumber(sourceRecord as ParticipantPassingRecord)));
@@ -1911,8 +1920,10 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       setPassingLoopNumber('');
     }
     setDateError('');
+    setSaveError('');
+    setSaving(false);
     setTimeError('');
-  }, [anchorRecord, props.displayTimeZone, props.openState?.initialRecordType, props.raceStateLookup, sourceRecord]);
+  }, [anchorRecord, props.displayTimeZone, props.openState?.initialRecordType, sourceRecord]);
   React.useEffect(() => {
     setShowRawRecordJson(false);
   }, [props.openState]);
@@ -1983,14 +1994,22 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
       recordType === 'flag'
         ? buildManualFlagRecord(anchorRecord, props.currentEventId, props.currentSessionId, props.records, parsedTime, flagType, selectedFlagCategoryIds, editingRecord)
         : buildManualPassingRecord(anchorRecord, props.currentEventId, props.currentSessionId, props.records, parsedTime, passingTxNo, passingPlate, passingLineNumber, passingLoopNumber, sourceRecord);
-    props.onSave(record, dialogMode);
-    props.onClose();
+    setSaveError('');
+    setSaving(true);
+    Promise.resolve()
+      .then(() => props.onSave(record, dialogMode))
+      .then(props.onClose)
+      .catch((error: unknown) => {
+        setSaveError(error instanceof Error ? error.message : 'The record could not be saved.');
+      })
+      .finally(() => setSaving(false));
   };
 
   return (
-    <Dialog fullWidth maxWidth="md" onClose={props.onClose} open={props.openState !== null}>
+    <Dialog fullWidth maxWidth="md" onClose={saving ? undefined : props.onClose} open={props.openState !== null}>
       <DialogTitle>{dialogMode === 'edit' ? 'Edit record' : draftRecord ? 'Insert missing crossing' : 'Add record'}</DialogTitle>
       <DialogContent>
+        {saveError ? <Alert severity="error">{saveError}</Alert> : null}
         <div className="event-details-form-grid">
           <TextField
             autoFocus
@@ -2157,9 +2176,9 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
         </div>
       </DialogContent>
       <DialogActions>
-        <Button onClick={props.onClose}>Cancel</Button>
-        <Button onClick={handleSave} variant="contained">
-          {dialogMode === 'edit' ? 'Save record' : 'Add record'}
+        <Button disabled={saving} onClick={props.onClose}>Cancel</Button>
+        <Button disabled={saving} onClick={handleSave} startIcon={saving ? <CircularProgress color="inherit" size={16} /> : undefined} variant="contained">
+          {saving ? 'Saving record…' : dialogMode === 'edit' ? 'Save record' : 'Add record'}
         </Button>
       </DialogActions>
     </Dialog>
@@ -2173,8 +2192,8 @@ const AddRecordDialog = (props: AddRecordDialogProps): JSX.Element => {
 export const RecentRecords = (
   props: RecordsProps & {
     onAssignFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
-    onAddRecord?: (record: EventTimeRecord) => void;
-    onEditRecord?: (record: EventTimeRecord) => void;
+    onAddRecord?: (record: EventTimeRecord) => void | Promise<void>;
+    onEditRecord?: (record: EventTimeRecord) => void | Promise<void>;
     onExclude?: (crossingId: TimeRecordId, exclude: boolean) => void;
     onChangeCategory?: (participantId: EventParticipantId, categoryId: EventCategoryId) => void;
     onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void;
@@ -2807,14 +2826,17 @@ export const RecentRecords = (
         currentSessionId={props.currentSessionId}
         displayTimeZone={displayTimeZone}
         onClose={() => setAddRecordDialogState(null)}
-        onSave={(record, mode) => {
+        onSave={(record, mode): Promise<void> => {
           if (mode === 'edit') {
-            props.onEditRecord?.(record);
-            setAddRecordDialogState(null);
-            return;
+            if (!props.onEditRecord) {
+              return Promise.reject(new Error('Record editing is unavailable.'));
+            }
+            return Promise.resolve(props.onEditRecord(record));
           }
-          props.onAddRecord?.(record);
-          setAddRecordDialogState(null);
+          if (!props.onAddRecord) {
+            return Promise.reject(new Error('Record creation is unavailable.'));
+          }
+          return Promise.resolve(props.onAddRecord(record));
         }}
         openState={addRecordDialogState}
         raceStateLookup={props.raceStateLookup}

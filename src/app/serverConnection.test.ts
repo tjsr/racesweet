@@ -3,6 +3,7 @@
 import type { AdministrativeChanges } from '../persistence/raceAdminPersistence.js';
 import type { SystemConfiguration } from './systemConfig.js';
 import { createServerConnectedRendererApi } from './serverConnection.js';
+import type { FlagRecord } from '../model/flag.js';
 
 describe('server-connected renderer persistence', () => {
   afterEach(() => {
@@ -94,7 +95,7 @@ describe('server-connected renderer persistence', () => {
     );
   });
 
-  it('uploads every race-admin action through the shared API resource', async () => {
+  it('uploads record timestamp edits through the shared race-admin API resource', async () => {
     const fetchImplementation: typeof fetch = vi.fn(
       async (): Promise<Response> => new Response('{}', {
         headers: { 'content-type': 'application/json' },
@@ -113,7 +114,19 @@ describe('server-connected renderer persistence', () => {
       ],
       flagDeleted: { flag: false },
       schemaVersion: 1 as const,
-      updatedRecords: [],
+      updatedRecords: [{
+        record: {
+          flagType: 'yellow',
+          flagValue: 'caution',
+          id: 'record-edited-at-source',
+          recordType: 4,
+          sequence: 1,
+          sessionId: 'session-a',
+          source: 'source-a',
+          time: new Date('2026-05-30T03:30:00.000Z'),
+        } as FlagRecord,
+        sessionId: 'session-a',
+      }],
     } satisfies AdministrativeChanges;
 
     await api.writeFileContent(

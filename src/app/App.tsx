@@ -2347,26 +2347,36 @@ export const RaceSweetMainApp = () => {
       .catch((error: unknown) => setTimingErrorState(error as Error));
   };
 
-  const handleAddTimingRecord = (record: EventTimeRecord) => {
+  const handleAddTimingRecord = (record: EventTimeRecord): Promise<void> => {
     if (!adminService || !record.sessionId) {
-      return;
+      return Promise.reject(new Error('A timing record must belong to a loaded session before it can be saved.'));
     }
     const targetRaceState = timingRaceState || sessionState;
-    adminService
+    return adminService
       .addRecordForSession(targetRaceState, record.sessionId, record)
-      .then(() => setRenderTick((tick) => tick + 1))
-      .catch((error: unknown) => setTimingErrorState(error as Error));
+      .then(() => {
+        setRenderTick((tick) => tick + 1);
+      })
+      .catch((error: unknown) => {
+        setTimingErrorState(error as Error);
+        throw error;
+      });
   };
 
-  const handleEditTimingRecord = (record: EventTimeRecord) => {
+  const handleEditTimingRecord = (record: EventTimeRecord): Promise<void> => {
     if (!adminService || !record.sessionId) {
-      return;
+      return Promise.reject(new Error('A timing record must belong to a loaded session before it can be saved.'));
     }
     const targetRaceState = timingRaceState || sessionState;
-    adminService
+    return adminService
       .updateRecordForSession(targetRaceState, record.sessionId, record)
-      .then(() => setRenderTick((tick) => tick + 1))
-      .catch((error: unknown) => setTimingErrorState(error as Error));
+      .then(() => {
+        setRenderTick((tick) => tick + 1);
+      })
+      .catch((error: unknown) => {
+        setTimingErrorState(error as Error);
+        throw error;
+      });
   };
 
   const handleUpdateSourceOffset = (

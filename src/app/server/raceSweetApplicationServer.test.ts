@@ -725,7 +725,7 @@ describe('RaceSweetApplicationServer', () => {
     }));
   });
 
-  it('broadcasts an Electron flag deletion to every connected client', async () => {
+  it('stores, retrieves, and broadcasts an Electron flag timestamp edit to every connected client', async () => {
     const abortControllers: AbortController[] = [
       new AbortController(),
       new AbortController(),
@@ -750,9 +750,19 @@ describe('RaceSweetApplicationServer', () => {
     );
     const changes = {
       ...createDefaultAdministrativeChanges(),
-      flagDeleted: {
-        'electron-deleted-flag': true,
-      },
+      updatedRecords: [{
+        record: {
+          flagType: 'yellow',
+          flagValue: 'caution',
+          id: 'electron-edited-flag',
+          recordType: 4,
+          sequence: 1,
+          sessionId: 'session-a',
+          source: 'electron-source',
+          time: new Date('2026-05-30T03:30:00.000Z'),
+        },
+        sessionId: 'session-a',
+      }],
     };
 
     const updateResponse: Response = await fetch(
@@ -760,7 +770,7 @@ describe('RaceSweetApplicationServer', () => {
       {
         body: JSON.stringify({
           changes,
-          commandId: 'electron-flag-delete-command',
+          commandId: 'electron-flag-edit-command',
         }),
         headers: {
           cookie: testServer.adminCookie,
@@ -775,8 +785,8 @@ describe('RaceSweetApplicationServer', () => {
 
     deliveredEvents.forEach((eventText: string): void => {
       expect(eventText).toContain('event: race-admin.changed');
-      expect(eventText).toContain('"commandId":"electron-flag-delete-command"');
-      expect(eventText).toContain('"electron-deleted-flag":true');
+      expect(eventText).toContain('"commandId":"electron-flag-edit-command"');
+      expect(eventText).toContain('"time":"2026-05-30T03:30:00.000Z"');
     });
     const persistedResponse: Response = await fetch(
       `${testServer.origin}/api/v1/race-admin`,
@@ -784,7 +794,7 @@ describe('RaceSweetApplicationServer', () => {
         headers: { cookie: testServer.adminCookie },
       },
     );
-    expect(await persistedResponse.json()).toEqual(changes);
+    expect(await persistedResponse.json()).toEqual(JSON.parse(JSON.stringify(changes)));
 
     abortControllers.forEach((abortController: AbortController): void => {
       abortController.abort();

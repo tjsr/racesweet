@@ -12,10 +12,10 @@ import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
 import type { EventTeam } from '../../model/eventteam.js';
 import type { FlagRecord } from '../../model/flag.js';
-import { createCategoryId, createEventEntrantId, createEventParticipantId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
+import { createCategoryId, createEventEntrantId, createEventParticipantId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.js';
 import type { EventTimeRecord } from '../../model/index.js';
 import { type RaceStateLookup, Session } from '../../model/racestate.js';
-import { type ParticipantPassingRecord, RECORD_TX_CROSSING, TimeRecordId } from '../../model/timerecord.js';
+import { EVENT_FLAG_DISPLAYED, EVENT_SESSION_END, type ParticipantPassingRecord, RECORD_TX_CROSSING, TimeRecordId } from '../../model/timerecord.js';
 import { loadMrScatsCatalogFromLocation } from '../../parsers/mrScats/catalogImport.js';
 import { type AdministrativeChanges, type RaceAdminPersistence, createDefaultAdministrativeChanges } from '../../persistence/raceAdminPersistence.js';
 import { createGreenFlagEvent } from '../../processing/flag.js';
@@ -4044,6 +4044,7 @@ describe('RecentRecords integration', () => {
         <RecentRecords
           currentEventId="event-1"
           currentSessionId="session-1"
+          eventTimeZone="UTC"
           onAddRecord={onAddRecord}
           raceStateLookup={raceStateLookup}
           records={[flag as unknown as ParticipantPassingRecord]}
@@ -4091,7 +4092,9 @@ describe('RecentRecords integration', () => {
     expect(flagTypeSelect!.value).toBe('yellow');
 
     await act(async () => {
-      setSelectValue(flagTypeSelect!, 'red');
+      setSelectValue(flagTypeSelect!, 'chequered');
+      setInputValue(document.querySelector('input[aria-label="Record date"]') as HTMLInputElement, '2026-05-30');
+      setInputValue(document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement, '13:30:00.000');
     });
 
     const categorySelect = document.querySelector('#manual-record-categories') as HTMLElement | null;
@@ -4119,10 +4122,12 @@ describe('RecentRecords integration', () => {
       expect.objectContaining({
         categoryIds: [categoryB.id],
         eventId: 'event-1',
-        flagType: 'red',
+        flagType: 'chequered',
         flagValue: 'course',
+        recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_END,
         sessionId: 'session-1',
         source: expect.any(String),
+        time: new Date('2026-05-30T13:30:00.000Z'),
       })
     );
     await waitForNoDialog();
@@ -4215,6 +4220,273 @@ describe('RecentRecords integration', () => {
       })
     );
     expect((onEditRecord.mock.calls[0]?.[0] as FlagRecord).time?.toISOString()).toBe('2026-05-30T03:30:00.000Z');
+  });
+
+  it('retains typed flag date and time when the parent refreshes before Save record', async () => {
+    const category: EventCategory = { id: '1', name: 'Category A' };
+    const flag: FlagRecord = {
+      categoryIds: [category.id],
+      flagType: 'chequered',
+      flagValue: 'course',
+      id: 'refreshable-chequered-flag',
+      recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_END,
+      sequence: 1,
+      sessionId: 'session-1',
+      source: 'test-source',
+      time: new Date('2026-05-29T03:00:00.000Z'),
+    };
+    const onEditRecord = vi.fn();
+    const createRaceStateLookup = (): RaceStateLookup & { categories: EventCategory[] } => ({
+      categories: [category],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === category.id ? category : undefined,
+      getEntrantIdForParticipant: () => undefined,
+      getParticipantById: () => undefined,
+      getParticipantLaps: () => [],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    });
+    const renderRecords = (): void => {
+      root.render(
+        <RecentRecords
+          currentEventId="event-1"
+          currentSessionId="session-1"
+          eventTimeZone="Australia/Sydney"
+          onEditRecord={onEditRecord}
+          raceStateLookup={createRaceStateLookup()}
+          records={[flag]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+          timeDisplayZoneMode="event"
+        />,
+      );
+    };
+
+    await act(async (): Promise<void> => {
+      renderRecords();
+    });
+    await act(async (): Promise<void> => {
+      container.querySelector('tr[data-record-id="refreshable-chequered-flag"]')!.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 90,
+          clientY: 90,
+        }),
+      );
+    });
+    const editRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Edit record');
+    expect(editRecordMenuItem).toBeDefined();
+    await act(async (): Promise<void> => {
+      editRecordMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    const dateInput = document.querySelector('input[aria-label="Record date"]') as HTMLInputElement;
+    const timeInput = document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement;
+    await act(async (): Promise<void> => {
+      setInputValue(dateInput, '2026-05-30');
+      setInputValue(timeInput, '13:30:00.000');
+      renderRecords();
+    });
+
+    expect(dateInput.value).toBe('2026-05-30');
+    expect(timeInput.value).toBe('13:30:00.000');
+    const saveButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Save record');
+    expect(saveButton).toBeDefined();
+    await act(async (): Promise<void> => {
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect((onEditRecord.mock.calls[0]?.[0] as FlagRecord).time?.toISOString()).toBe('2026-05-30T03:30:00.000Z');
+  });
+
+  it('keeps the edit dialog open with a spinner until the record save is confirmed', async () => {
+    const category: EventCategory = { id: '1', name: 'Category A' };
+    const flag: FlagRecord = {
+      categoryIds: [category.id],
+      flagType: 'chequered',
+      flagValue: 'course',
+      id: 'saving-chequered-flag',
+      recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_END,
+      sequence: 1,
+      sessionId: 'session-1',
+      source: 'test-source',
+      time: new Date('2026-05-29T03:00:00.000Z'),
+    };
+    let confirmSave: (() => void) | undefined;
+    const onEditRecord = vi.fn(() => new Promise<void>((resolve: () => void): void => {
+      confirmSave = resolve;
+    }));
+    const raceStateLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [category],
+      countTransponderCrossings: () => 0,
+      excludeCrossing: () => undefined,
+      getCategoryById: (categoryId) => categoryId === category.id ? category : undefined,
+      getEntrantIdForParticipant: () => undefined,
+      getParticipantById: () => undefined,
+      getParticipantLaps: () => [],
+      getTransponderCrossings: () => [],
+      updateCategoryDetails: () => undefined,
+      updateEntrantCategory: () => undefined,
+      updateParticipantCategory: () => undefined,
+    };
+
+    await act(async (): Promise<void> => {
+      root.render(
+        <RecentRecords
+          currentEventId="event-1"
+          currentSessionId="session-1"
+          onEditRecord={onEditRecord}
+          raceStateLookup={raceStateLookup}
+          records={[flag]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+        />,
+      );
+    });
+    await act(async (): Promise<void> => {
+      container.querySelector('tr[data-record-id="saving-chequered-flag"]')!.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 90,
+          clientY: 90,
+        }),
+      );
+    });
+    const editRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Edit record');
+    expect(editRecordMenuItem).toBeDefined();
+    await act(async (): Promise<void> => {
+      editRecordMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    const saveButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Save record');
+    expect(saveButton).toBeDefined();
+    await act(async (): Promise<void> => {
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const savingButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Saving record…');
+    expect(savingButton).toBeDefined();
+    expect(savingButton?.disabled).toBe(true);
+    expect(document.querySelector('div[role="dialog"]')).not.toBeNull();
+    expect(confirmSave).toBeDefined();
+    await act(async (): Promise<void> => {
+      confirmSave!();
+      await Promise.resolve();
+    });
+
+    await waitForNoDialog();
+  });
+
+  it('updates a chequered flag in the state model, persistence ledger, and displayed record after save', async () => {
+    const category: EventCategory = { id: createCategoryId('saved-flag-category'), name: 'Category A' };
+    const sessionId = createSessionId('saved-flag-session');
+    const flag: FlagRecord = {
+      categoryIds: [category.id],
+      flagType: 'chequered',
+      flagValue: 'course',
+      id: createTimeRecordId('saved-flag-record'),
+      recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_END,
+      sequence: 1,
+      sessionId,
+      source: createTimeRecordSourceId('saved-flag-source'),
+      time: new Date('2026-05-29T03:00:00.000Z'),
+    };
+    const stateStore = new Session({
+      categories: [category],
+      entries: [],
+      participants: [],
+      records: [flag],
+      teams: [],
+    });
+    const persistence = new MemoryRaceAdminPersistence();
+    const service = await RaceAdminService.create(async () => stateStore, persistence, sessionId);
+    const stateStoreLookup: RaceStateLookup & { categories: EventCategory[] } = {
+      categories: [category],
+      countTransponderCrossings: (txNo, untilTime) => stateStore.countTransponderCrossings(txNo, untilTime),
+      excludeCrossing: (crossingId, exclude) => stateStore.excludeCrossing(crossingId, exclude),
+      getCategoryById: (categoryId) => categoryId === category.id ? category : undefined,
+      getEntrantIdForParticipant: (participantId) => stateStore.getEntrantIdForParticipant(participantId),
+      getFinishLineNumbers: () => stateStore.getFinishLineNumbers(),
+      getParticipantById: (participantId) => stateStore.getParticipantById(participantId),
+      getParticipantLaps: (participantId) => stateStore.getParticipantLaps(participantId),
+      getTimeRecordSourceById: (sourceId) => stateStore.getTimeRecordSourceById(sourceId),
+      getTransponderCrossings: (txNo, untilTime) => stateStore.getTransponderCrossings(txNo, untilTime),
+      updateCategoryDetails: (categoryId, changes) => stateStore.updateCategoryDetails(categoryId, changes),
+      updateEntrantCategory: (entrantId, categoryId) => stateStore.updateEntrantCategory(entrantId, categoryId),
+      updateParticipantCategory: (participantId, categoryId) => stateStore.updateParticipantCategory(participantId, categoryId),
+    };
+    const renderRecords = (): void => {
+      root.render(
+        <RecentRecords
+          currentEventId="event-1"
+          currentSessionId={sessionId}
+          eventTimeZone="Australia/Sydney"
+          onEditRecord={(record: EventTimeRecord): void => {
+            void service
+              .updateRecordForSession(stateStore, sessionId, record)
+              .then(renderRecords);
+          }}
+          raceStateLookup={stateStoreLookup}
+          records={stateStore.records as EventTimeRecord[]}
+          selectedCategories={new Set()}
+          selectedParticipants={new Set()}
+          timeDisplayZoneMode="event"
+        />,
+      );
+    };
+
+    await act(async (): Promise<void> => {
+      renderRecords();
+    });
+    await act(async (): Promise<void> => {
+      container.querySelector(`tr[data-record-id="${flag.id}"]`)!.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 90,
+          clientY: 90,
+        }),
+      );
+    });
+    const editRecordMenuItem = Array.from(document.querySelectorAll('li[role="menuitem"]')).find((item) => item.textContent?.trim() === 'Edit record');
+    expect(editRecordMenuItem).toBeDefined();
+    await act(async (): Promise<void> => {
+      editRecordMenuItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    await act(async (): Promise<void> => {
+      setInputValue(document.querySelector('input[aria-label="Record date"]') as HTMLInputElement, '2026-05-30');
+      setInputValue(document.querySelector('input[aria-label="Time of day"]') as HTMLInputElement, '13:30:00.000');
+    });
+    const saveButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Save record');
+    expect(saveButton).toBeDefined();
+    await act(async (): Promise<void> => {
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(stateStore.records.find((record) => record.id === flag.id)).toEqual(
+      expect.objectContaining({
+        categoryIds: [category.id],
+        flagType: 'chequered',
+        recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_END,
+        time: new Date('2026-05-30T03:30:00.000Z'),
+      }),
+    );
+    expect(persistence.snapshot.updatedRecords).toEqual([
+      expect.objectContaining({
+        record: expect.objectContaining({
+          categoryIds: [category.id],
+          recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_END,
+          time: new Date('2026-05-30T03:30:00.000Z'),
+        }),
+        sessionId,
+      }),
+    ]);
+    expect(container.querySelector(`tr[data-record-id="${flag.id}"]`)?.textContent).toContain('2026-05-30 13:30:00.000');
   });
 
   it('opens the edit-record dialog with existing values populated and saves through the edit callback', async () => {

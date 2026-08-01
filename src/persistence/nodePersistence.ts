@@ -9,6 +9,7 @@ import {
   type AdministrativeChanges,
   type RaceAdminPersistence,
   createDefaultAdministrativeChanges,
+  reviveAdministrativeChanges,
 } from './raceAdminPersistence.js';
 import {
   type SystemConfigPersistence,
@@ -120,7 +121,8 @@ export class NodeJsonRaceAdminPersistence implements RaceAdminPersistence {
   }
 
   public load = (): Promise<AdministrativeChanges> =>
-    readJson(this.filePath, createDefaultAdministrativeChanges());
+    readJson<Partial<AdministrativeChanges>>(this.filePath, createDefaultAdministrativeChanges())
+      .then(reviveAdministrativeChanges);
 
   public save = (changes: AdministrativeChanges): Promise<void> =>
     writeJsonAtomically(this.filePath, changes);

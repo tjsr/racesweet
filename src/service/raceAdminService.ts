@@ -11,6 +11,7 @@ import {
   type RaceAdminPersistence,
   type UpdatedSessionRecord,
   createDefaultAdministrativeChanges,
+  reviveAdministrativeChanges,
 } from '../persistence/raceAdminPersistence.js';
 
 export class RaceAdminService {
@@ -54,7 +55,7 @@ export class RaceAdminService {
     session: Session & RaceStateLookup = this.session,
     sessionId: SessionId | undefined = this.sessionId,
   ): Promise<void> {
-    this.changes = changes;
+    this.changes = reviveAdministrativeChanges(changes);
     await this.applyChanges(session, sessionId);
   }
 
@@ -134,7 +135,9 @@ export class RaceAdminService {
     this.changes = {
       ...this.changes,
       updatedRecords: [
-        ...this.changes.updatedRecords.filter((entry) => entry.record.id !== record.id),
+        // Keep an immutable edit history so a saved state can be reconstructed
+        // after a source reload or server readback.
+        ...this.changes.updatedRecords,
         { record, sessionId },
       ],
     };

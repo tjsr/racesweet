@@ -90,6 +90,14 @@ describe('apical spreadsheet processor', () => {
     expect(raceState.records?.every((record) => record.time?.getUTCFullYear() === 2026)).toBe(true);
   });
 
+  it('returns an empty payload when a valid Apical worksheet has no lap rows yet', async () => {
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([]), 'Sheet1');
+    const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+
+    await expect(readApicalExcelBuffer(buffer)).resolves.toEqual([]);
+  });
+
   it('uses Results TeamDisplayName rows to create team entrants with all listed race numbers', async () => {
     const data = await readApicalExcelBuffer(createWorkbookBuffer(createTeamResultsRows()));
 

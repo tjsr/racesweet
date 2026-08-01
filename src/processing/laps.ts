@@ -2,13 +2,14 @@ import { elapsedTimeMilliseconds, millisecondsToTime } from "../app/utils/timeut
 import type { EventSessionKind, TimingStartCalculation } from "../catalog/eventCatalog.js";
 import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
 import type { FlagRecord, GreenFlagRecord } from "../model/flag.js";
-import { type CrossingUnrelatedReasonCode, type ParticipantPassingRecord, type TimeRecord, type TimeRecordSource, isPassingExcluded, isPassingValid } from "../model/timerecord.js";
+import { isPassingExcluded, isPassingValid, type CrossingUnrelatedReasonCode, type ParticipantPassingRecord, type TimeRecord, type TimeRecordSource } from "../model/timerecord.js";
 import { EventFlagsError, NoStartFlagError, ParticipantStartFlagError, StartFlagHasNoTimeError } from "../validators/errors.js";
 import { getCategoryFlags, getFlagEvents, getOrCacheGreenFlagForCategory } from "./flag.js";
-import { isStartRecord } from "./session.js";
 import { calculateParticipantElapsedTimes, getParticipantNumber, getParticipantTransponders, getPassingsForParticipant } from "./participant.js";
+import { isStartRecord } from "./session.js";
 import { getTimeRecordIdentifier, isRecordAfterStart } from "./timerecord.js";
 
+import { findCtcTrackLoopBySiteAddress } from '../model/ctcTrackConfig.js';
 import { getParticipantEntryId, type EventEntryId } from '../model/entry.js';
 import type { EventCategoryId } from "../model/eventcategory.js";
 import { createTimeRecordId } from '../model/ids.js';
@@ -27,7 +28,6 @@ import { warn } from "../utils.js";
 import { setCategoryStartForPassings } from "./category.js";
 import { entrantHasAnyTx } from "./participantMatch.js";
 import { compareByTime } from './timerecord.js';
-import { findCtcTrackLoopBySiteAddress } from '../model/ctcTrackConfig.js';
 
 const MINIMUM_LAP_TIME_SECONDS = 300;
 const DEFAULT_FINISH_LINE_NUMBERS = [1];

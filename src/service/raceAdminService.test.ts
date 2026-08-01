@@ -3,10 +3,13 @@ import {
   type RaceAdminPersistence,
   createDefaultAdministrativeChanges,
 } from '../persistence/raceAdminPersistence.js';
-import type { EventCategoryId } from '../model/eventcategory.js';
+import type { EventCategory, EventCategoryId } from '../model/eventcategory.js';
 import type { EventEntrantId } from '../model/entrant.js';
+import type { FlagRecord } from '../model/flag.js';
+import { createCategoryId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
 import type { SessionId } from '../model/raceevent.js';
-import type { EventTimeRecord, TimeRecordId } from '../model/timerecord.js';
+import { Session } from '../model/racestate.js';
+import { EVENT_FLAG_DISPLAYED, type EventTimeRecord, type TimeRecordId } from '../model/timerecord.js';
 import { RaceAdminService } from '../service/raceAdminService.js';
 
 const createSessionDouble = () => {
@@ -232,6 +235,88 @@ describe('RaceAdminService', () => {
     expect(persistence.snapshot.updatedRecords).toEqual([{ record, sessionId: 'session-a' }]);
   });
 
+  it('appends each timestamp edit to the immutable record-edit ledger', async () => {
+    const sessionDouble = createSessionDouble();
+    const persistence = new MemoryPersistence();
+    const service = await RaceAdminService.create(async () => sessionDouble.session as never, persistence, 'session-a');
+    const firstEdit = {
+      id: 'record-3',
+      recordType: 16,
+      sequence: 3,
+      sessionId: 'session-a',
+      source: 'manual-source',
+      time: new Date('2026-05-30T03:30:00.000Z'),
+    } as EventTimeRecord;
+    const secondEdit = {
+      ...firstEdit,
+      time: new Date('2026-05-30T03:31:00.000Z'),
+    } as EventTimeRecord;
+
+    await service.updateRecordForSession(sessionDouble.session as never, 'session-a', firstEdit);
+    await service.updateRecordForSession(sessionDouble.session as never, 'session-a', secondEdit);
+
+    expect(persistence.snapshot.updatedRecords).toEqual([
+      { record: firstEdit, sessionId: 'session-a' },
+      { record: secondEdit, sessionId: 'session-a' },
+    ]);
+  });
+
+  it('replaces an invalid flag in the state store with the valid saved edit and replays it after readback', async () => {
+    const category: EventCategory = {
+      id: createCategoryId('valid-flag-category'),
+      name: 'Valid category',
+    };
+    const sessionId: SessionId = createSessionId('flag-edit-session');
+    const flagId: TimeRecordId = createTimeRecordId('flag-edit-record');
+    const sourceId = createTimeRecordSourceId('flag-edit-source');
+    const invalidFlag: FlagRecord = {
+      categoryIds: [createCategoryId('missing-flag-category')],
+      flagType: 'yellow',
+      flagValue: 'caution',
+      id: flagId,
+      recordType: EVENT_FLAG_DISPLAYED,
+      sequence: 1,
+      sessionId,
+      source: sourceId,
+      time: new Date('2026-05-30T03:00:00.000Z'),
+    };
+    const validFlag: FlagRecord = {
+      ...invalidFlag,
+      categoryIds: [category.id],
+      time: new Date('2026-05-30T03:30:00.000Z'),
+    };
+    const createFlagSession = (): Session => new Session({
+      categories: [category],
+      entries: [],
+      participants: [],
+      records: [invalidFlag],
+      teams: [],
+    });
+    const persistence = new MemoryPersistence();
+    const stateStore = createFlagSession();
+    const service = await RaceAdminService.create(async () => stateStore, persistence, sessionId);
+
+    await service.updateRecordForSession(stateStore, sessionId, validFlag);
+
+    expect(stateStore.records.find((record) => record.id === flagId)).toEqual(
+      expect.objectContaining({
+        categoryIds: [category.id],
+        time: new Date('2026-05-30T03:30:00.000Z'),
+      }),
+    );
+    expect(persistence.snapshot.updatedRecords).toEqual([{ record: validFlag, sessionId }]);
+
+    const reloadedStateStore = createFlagSession();
+    await RaceAdminService.create(async () => reloadedStateStore, persistence, sessionId);
+
+    expect(reloadedStateStore.records.find((record) => record.id === flagId)).toEqual(
+      expect.objectContaining({
+        categoryIds: [category.id],
+        time: new Date('2026-05-30T03:30:00.000Z'),
+      }),
+    );
+  });
+
   it('persists flag deletion updates', async () => {
     const sessionDouble = createSessionDouble();
     const persistence = new MemoryPersistence();
@@ -363,5 +448,44 @@ describe('RaceAdminService', () => {
     );
 
     expect(displayedSessionDouble.flagDeleted['remote-flag-1']).toBe(false);
+  });
+
+  it('revives remote flag timestamps received through JSON before applying them', async () => {
+    const startupSessionDouble = createSessionDouble();
+    const displayedSessionDouble = createSessionDouble();
+    const persistence = new MemoryPersistence();
+    const service = await RaceAdminService.create(
+      async () => startupSessionDouble.session as never,
+      persistence,
+    );
+    const remoteChanges = JSON.parse(JSON.stringify({
+      ...createDefaultAdministrativeChanges(),
+      addedRecords: [{
+        record: {
+          flagType: 'chequered',
+          flagValue: 'course',
+          id: 'remote-chequered-flag',
+          recordType: EVENT_FLAG_DISPLAYED,
+          sequence: 1,
+          sessionId: 'displayed-session',
+          source: 'remote-source',
+          time: new Date('2026-05-30T03:30:00.000Z'),
+        },
+        sessionId: 'displayed-session',
+      }],
+    })) as AdministrativeChanges;
+
+    await service.applyRemoteChanges(
+      remoteChanges,
+      displayedSessionDouble.session as never,
+      'displayed-session' as SessionId,
+    );
+
+    expect(displayedSessionDouble.addedRecords).toEqual([
+      expect.objectContaining({
+        flagType: 'chequered',
+        time: new Date('2026-05-30T03:30:00.000Z'),
+      }),
+    ]);
   });
 });

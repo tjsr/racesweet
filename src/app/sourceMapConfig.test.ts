@@ -11,9 +11,9 @@ describe('source map configuration', () => {
       readFile('src/app/renderer.ts', 'utf-8'),
     ]);
 
-    expect(mainEntry).toContain("import './runtimeSourceMaps.ts';");
-    expect(preloadEntry).toContain("import './runtimeSourceMaps.ts';");
-    expect(rendererEntry).toContain("import './runtimeSourceMaps.ts';");
+    expect(mainEntry).toMatch(/import ["']\.\/runtimeSourceMaps\.ts["'];/);
+    expect(preloadEntry).toMatch(/import ["']\.\/runtimeSourceMaps\.ts["'];/);
+    expect(rendererEntry).toMatch(/import ["']\.\/runtimeSourceMaps\.ts["'];/);
   });
 
   it('emits full source maps for Electron main and renderer bundles', () => {

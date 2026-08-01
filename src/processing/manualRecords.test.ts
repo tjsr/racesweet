@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildManualFlagRecord, buildManualPassingRecord } from './manualRecords.js';
-import { type EventTimeRecord } from '../model/timerecord.js';
+import { EVENT_FLAG_DISPLAYED, EVENT_SESSION_END, type EventTimeRecord } from '../model/timerecord.js';
 
 const anchorRecord = {
   eventId: 'event-1',
@@ -52,6 +52,52 @@ describe('manual record processing', () => {
       loopNumber: 2,
       plateNumber: '18',
       sequence: 5,
+    }));
+  });
+
+  it('preserves the chequered session-end record type when editing its timestamp', () => {
+    const existingRecord = {
+      ...anchorRecord,
+      flagType: 'chequered',
+      flagValue: 'course',
+      recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_END,
+    } as EventTimeRecord;
+
+    const record = buildManualFlagRecord(
+      anchorRecord,
+      undefined,
+      undefined,
+      [existingRecord],
+      new Date('2026-01-01T10:05:00.000Z'),
+      'chequered',
+      [],
+      existingRecord,
+    );
+
+    expect(record).toEqual(expect.objectContaining({
+      id: existingRecord.id,
+      recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_END,
+      time: new Date('2026-01-01T10:05:00.000Z'),
+    }));
+  });
+
+  it('creates a chequered flag as a session-end record at the supplied time', () => {
+    const time = new Date('2026-01-01T10:05:00.000Z');
+
+    const record = buildManualFlagRecord(
+      anchorRecord,
+      undefined,
+      undefined,
+      [anchorRecord],
+      time,
+      'chequered',
+      [],
+    );
+
+    expect(record).toEqual(expect.objectContaining({
+      flagType: 'chequered',
+      recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_END,
+      time,
     }));
   });
 });

@@ -25,8 +25,8 @@ interface TimingContextProps {
   eventTimeZone: string;
   events: EventCatalogEvent[];
   fastestTimeIndicatorColors?: FastestTimeIndicatorColors;
-  onAddRecord: (record: EventTimeRecord) => void;
-  onEditRecord: (record: EventTimeRecord) => void;
+  onAddRecord: (record: EventTimeRecord) => void | Promise<void>;
+  onEditRecord: (record: EventTimeRecord) => void | Promise<void>;
   onAssignFlagCategory: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
   onChangeCategory: (participantId: EventParticipantId, categoryId: EventCategoryId) => void;
   onExclude: (crossingId: TimeRecordId, exclude: boolean) => void;

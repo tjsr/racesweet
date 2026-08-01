@@ -69,6 +69,27 @@ const reviveUpdatedSessionRecord = (entry: UpdatedSessionRecord): UpdatedSession
   };
 };
 
+export const reviveAdministrativeChanges = (changes: Partial<AdministrativeChanges>): AdministrativeChanges => {
+  const addedRecords = changes.addedRecords || [];
+  const entrantCategories = changes.entrantCategories || {};
+  const excludedCrossings = changes.excludedCrossings || {};
+  const flagCategoryChanges = changes.flagCategoryChanges || [];
+  const flagDeleted = changes.flagDeleted || {};
+  const updatedRecords = changes.updatedRecords || [];
+
+  return {
+    ...createDefaultAdministrativeChanges(),
+    ...changes,
+    addedRecords: addedRecords.map(reviveAddedSessionRecord),
+    entrantCategories,
+    excludedCrossings,
+    flagCategoryChanges,
+    flagDeleted,
+    schemaVersion: 1,
+    updatedRecords: updatedRecords.map(reviveUpdatedSessionRecord),
+  };
+};
+
 const isFileNotFoundError = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes('ENOENT') || message.includes('no such file');
@@ -125,31 +146,16 @@ export class ElectronJsonRaceAdminPersistence implements RaceAdminPersistence {
       const api = getRendererApi(['requestFileContent']);
       const content = await api.requestFileContent<string>(this.filePath, 'utf8');
       const parsed = JSON.parse(content) as Partial<AdministrativeChanges>;
-      const addedRecords = parsed.addedRecords || [];
-      const entrantCategories = parsed.entrantCategories || {};
-      const excludedCrossings = parsed.excludedCrossings || {};
-      const flagCategoryChanges = parsed.flagCategoryChanges || [];
-      const flagDeleted = parsed.flagDeleted || {};
-      const updatedRecords = parsed.updatedRecords || [];
+      const changes = reviveAdministrativeChanges(parsed);
 
-      addedRecords.forEach((entry) => incrementLoadingMetric('Read admin added record', entry.record.id.toString()));
-      updatedRecords.forEach((entry) => incrementLoadingMetric('Read admin updated record', entry.record.id.toString()));
-      Object.keys(entrantCategories).forEach((entrantId) => incrementLoadingMetric('Read admin entrant category', entrantId));
-      Object.keys(excludedCrossings).forEach((crossingId) => incrementLoadingMetric('Read admin excluded crossing', crossingId));
-      flagCategoryChanges.forEach((change) => incrementLoadingMetric('Read admin flag category change', change.flagId.toString()));
-      Object.keys(flagDeleted).forEach((flagId) => incrementLoadingMetric('Read admin deleted flag', flagId));
+      changes.addedRecords.forEach((entry) => incrementLoadingMetric('Read admin added record', entry.record.id.toString()));
+      changes.updatedRecords.forEach((entry) => incrementLoadingMetric('Read admin updated record', entry.record.id.toString()));
+      Object.keys(changes.entrantCategories).forEach((entrantId) => incrementLoadingMetric('Read admin entrant category', entrantId));
+      Object.keys(changes.excludedCrossings).forEach((crossingId) => incrementLoadingMetric('Read admin excluded crossing', crossingId));
+      changes.flagCategoryChanges.forEach((change) => incrementLoadingMetric('Read admin flag category change', change.flagId.toString()));
+      Object.keys(changes.flagDeleted).forEach((flagId) => incrementLoadingMetric('Read admin deleted flag', flagId));
 
-      return {
-        ...createDefaultAdministrativeChanges(),
-        ...parsed,
-        addedRecords: addedRecords.map(reviveAddedSessionRecord),
-        entrantCategories,
-        excludedCrossings,
-        flagCategoryChanges,
-        flagDeleted,
-        schemaVersion: 1,
-        updatedRecords: updatedRecords.map(reviveUpdatedSessionRecord),
-      };
+      return changes;
     } catch (error: unknown) {
       if (error instanceof RendererApiUnavailableError) {
         throw error;
