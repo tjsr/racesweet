@@ -27,6 +27,8 @@ interface DataSourcesPanelProps {
   onPreviewDorianCtcSrtFile?: (sourceId: TimeRecordSourceId) => Promise<MrScatsDataFilePreview>;
   onReprocessApicalData: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onSaveSource: (sourceId: TimeRecordSourceId, changes: Partial<DataSourceConfig>) => void | Promise<void>;
+  onStartRfidDecoderListener?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
+  onStopRfidDecoderListener?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onSelectMrScatsDataArchive?: () => Promise<MrScatsDataFileInventory | undefined>;
   onSelectMrScatsDataDirectory?: () => Promise<MrScatsDataFileInventory | undefined>;
   onSelectLocalFile?: () => Promise<string | undefined>;
@@ -34,6 +36,7 @@ interface DataSourcesPanelProps {
   onSelectDorianCtcTrackConfigFile?: () => Promise<string | undefined>;
   onSelectDurtFileMakerDatabase?: () => Promise<string | undefined>;
   onSelectDurtFileMakerExtractor?: () => Promise<string | undefined>;
+  rfidDecoderOutput?: Record<string, string>;
 }
 
 interface SourceFetchError {
@@ -148,6 +151,50 @@ const CtcTrackConfigDetails = ({ onSave, source }: { onSave: (trackConfig: CtcTr
         </tbody>
       </table>
     </details>
+  );
+};
+
+interface RfidDecoderOutputFieldProps {
+  sourceId: string;
+  value: string;
+}
+
+const RfidDecoderOutputField = (props: RfidDecoderOutputFieldProps): React.ReactElement => {
+  const outputRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const shouldFollowOutputRef = React.useRef(true);
+
+  const handleScroll = (event: React.UIEvent<HTMLTextAreaElement>): void => {
+    const output: HTMLTextAreaElement = event.currentTarget;
+    shouldFollowOutputRef.current = output.scrollTop + output.clientHeight >= output.scrollHeight - 1;
+  };
+
+  React.useLayoutEffect((): void => {
+    const output: HTMLTextAreaElement | null = outputRef.current;
+    if (output && shouldFollowOutputRef.current) {
+      output.scrollTop = output.scrollHeight;
+    }
+  }, [props.value]);
+
+  return (
+    <TextField
+      fullWidth
+      inputRef={outputRef}
+      label="Received TCP data"
+      maxRows={20}
+      minRows={8}
+      multiline
+      slotProps={{ htmlInput: { 'aria-label': `RFID Decoder Received Data ${props.sourceId}`, onScroll: handleScroll, readOnly: true } }}
+      sx={{
+        '& .MuiInputBase-root': {
+          maxHeight: 'calc(100dvh - 18rem)',
+          overflowY: 'auto',
+        },
+        '& textarea': {
+          overflowY: 'auto !important',
+        },
+      }}
+      value={props.value}
+    />
   );
 };
 
@@ -364,6 +411,8 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
               const isRfidTimingCsv = source.type === 'file-rfid-timing-csv';
               const isDorianCtcSrt = source.type === 'file-dorian-ctc-srt';
               const isDurtFileMaker = source.type === 'file-durt-filemaker';
+              const isRfidDecoder = source.type === 'timing-rfid-decoder';
+              const isRfidDecoderListening = source.rfidDecoderConfig?.isListening === true;
               const masterProfilesJson = JSON.stringify(source.masterEntrantConfig?.profiles || [], null, 2);
               const sourceFetchError = sourceFetchErrors[source.id];
 
@@ -388,6 +437,64 @@ export const DataSourcesPanel = (props: DataSourcesPanelProps): React.ReactEleme
                       onChange={(event) => props.onSaveSource(source.id, { enabled: event.target.checked })}
                     />
                   </label>
+
+                  {isRfidDecoder ? (
+                    <>
+                      <h4>RFID Decoder Listener</h4>
+                      <div className="events-actions">
+                        <Button
+                          disabled={isRfidDecoderListening || !source.enabled}
+                          onClick={() => {
+                            void props.onStartRfidDecoderListener?.(source.id);
+                          }}
+                          variant="contained"
+                        >
+                          Start
+                        </Button>
+                        <Button
+                          disabled={!isRfidDecoderListening}
+                          onClick={() => {
+                            void props.onStopRfidDecoderListener?.(source.id);
+                          }}
+                          variant="outlined"
+                        >
+                          Stop
+                        </Button>
+                      </div>
+                      <label>
+                        Listen port
+                        <DraftInput
+                          ariaLabel={`RFID Decoder Listen Port ${source.id}`}
+                          type="number"
+                          value={source.rfidDecoderConfig?.listenPort?.toString() || ''}
+                          onCommit={(value) => props.onSaveSource(source.id, {
+                            rfidDecoderConfig: {
+                              ...source.rfidDecoderConfig,
+                              listenPort: Number(value) || undefined,
+                            },
+                          })}
+                        />
+                      </label>
+                      <label>
+                        Raw TCP capture file
+                        <DraftInput
+                          ariaLabel={`RFID Decoder Capture File ${source.id}`}
+                          value={source.rfidDecoderConfig?.captureFilePath || ''}
+                          onCommit={(value) => props.onSaveSource(source.id, {
+                            rfidDecoderConfig: {
+                              ...source.rfidDecoderConfig,
+                              captureFilePath: value || undefined,
+                            },
+                          })}
+                        />
+                      </label>
+                      <RfidDecoderOutputField
+                        sourceId={source.id}
+                        value={props.rfidDecoderOutput?.[source.id] || ''}
+                      />
+                      <p>Every received TCP byte is appended to the capture file. Assign this source to a session, then configure the decoder to connect here and send one RFID Timing crossing per line.</p>
+                    </>
+                  ) : null}
 
                   {isMrScatsData ? (
                     <MrScatsDataSourcePanel

@@ -18,6 +18,19 @@ const createPersistence = (initial = systemConfig.createDefaultSystemConfigurati
 };
 
 describe('SystemConfigService', () => {
+  it('creates an RFID decoder listener source with configurable port settings', async () => {
+    const service = await SystemConfigService.create(createPersistence());
+
+    await service.createSource('timing-rfid-decoder');
+
+    expect(service.state.dataSources[0]).toEqual(expect.objectContaining({
+      finishLineNumbers: [1],
+      name: 'RFID Decoder Listener',
+      rfidDecoderConfig: { isListening: false, listenPort: 11113 },
+      type: 'timing-rfid-decoder',
+    }));
+  });
+
   it('recognizes when an Apical source name should be replaced by the fetched event name', () => {
     expect(systemConfig.shouldRenameApicalSourceForFetchedEvent(undefined)).toBe(true);
     expect(systemConfig.shouldRenameApicalSourceForFetchedEvent(null)).toBe(true);

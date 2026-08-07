@@ -128,13 +128,22 @@ describe.each(['electron', 'web'] as const)('HttpRaceSweetApiClient in %s mode',
       revision: 1,
       type: 'catalog.mutations-applied',
     };
+    const decoderDataEvent: DomainEventEnvelope = {
+      aggregate: 'source',
+      id: 'event-2',
+      occurredAt: '2026-07-28T00:00:01.000Z',
+      payload: { data: '1,123,7B,"09:00:01.250"\n', sourceId: 'rfid-decoder' },
+      revision: 2,
+      type: 'source.rfid-decoder-data',
+    };
     TestEventSource.latest!.emit('catalog.mutations-applied', JSON.stringify(event));
+    TestEventSource.latest!.emit('source.rfid-decoder-data', JSON.stringify(decoderDataEvent));
     TestEventSource.latest!.emit('open');
     TestEventSource.latest!.emit('resync-required');
 
     expect(TestEventSource.latest?.url).toBe('http://localhost:4567/api/v1/events');
     expect(TestEventSource.latest?.withCredentials).toBe(true);
-    expect(received).toEqual([event]);
+    expect(received).toEqual([event, decoderDataEvent]);
     expect(resync).toHaveBeenCalledTimes(2);
     dispose();
     expect(TestEventSource.latest?.close).toHaveBeenCalledOnce();

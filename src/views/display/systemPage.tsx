@@ -35,6 +35,8 @@ interface SystemPageProps {
   onSaveRemoteServer?: (changes: Partial<RemoteServerConfig>) => void | Promise<void>;
   onSelectCertificateFile?: () => Promise<string | undefined>;
   onSaveSource: (sourceId: TimeRecordSourceId, changes: Partial<DataSourceConfig>) => void | Promise<void>;
+  onStartRfidDecoderListener?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
+  onStopRfidDecoderListener?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onSelectMrScatsDataArchive?: () => Promise<MrScatsDataFileInventory | undefined>;
   onSelectMrScatsDataDirectory?: () => Promise<MrScatsDataFileInventory | undefined>;
   onSelectLocalFile?: () => Promise<string | undefined>;
@@ -43,6 +45,7 @@ interface SystemPageProps {
   onSelectDurtFileMakerDatabase?: () => Promise<string | undefined>;
   onSelectDurtFileMakerExtractor?: () => Promise<string | undefined>;
   onSelectPrivateKeyFile?: () => Promise<string | undefined>;
+  rfidDecoderOutput?: Record<string, string>;
 }
 
 export const SystemPage = (props: SystemPageProps): React.ReactElement => {
@@ -101,6 +104,8 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         onPreviewDorianCtcSrtFile={props.onPreviewDorianCtcSrtFile}
         onReprocessApicalData={props.onReprocessApicalData}
         onSaveSource={props.onSaveSource}
+        onStartRfidDecoderListener={props.onStartRfidDecoderListener}
+        onStopRfidDecoderListener={props.onStopRfidDecoderListener}
         onSelectMrScatsDataArchive={props.onSelectMrScatsDataArchive}
         onSelectMrScatsDataDirectory={props.onSelectMrScatsDataDirectory}
         onSelectLocalFile={props.onSelectLocalFile}
@@ -108,6 +113,7 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         onSelectDorianCtcTrackConfigFile={props.onSelectDorianCtcTrackConfigFile}
         onSelectDurtFileMakerDatabase={props.onSelectDurtFileMakerDatabase}
         onSelectDurtFileMakerExtractor={props.onSelectDurtFileMakerExtractor}
+        rfidDecoderOutput={props.rfidDecoderOutput}
       />
       <LogPanel displayedErrorLog={props.displayedErrorLog} />
     </section>

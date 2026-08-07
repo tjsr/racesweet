@@ -3,7 +3,7 @@
  * application process to be restarted. It intentionally remains unchanged
  * during renderer reloads and hot recompilation.
  */
-export const RESTART_REQUIRED_AFTER: string = '2026-07-31T09:35:44.000Z';
+export const RESTART_REQUIRED_AFTER: string = '2026-08-06T14:21:50.784Z';
 
 export const requiresApplicationRestart = (
   launchedVersion: string,

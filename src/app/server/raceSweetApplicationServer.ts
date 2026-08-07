@@ -9,6 +9,10 @@ import type { EventCatalogMutation } from '../../ledger/eventCatalogLedger.js';
 import type { CategoryId } from '../../processing/category.js';
 import type { EventEntrantId } from '../../model/entrant.js';
 import type { EventId, SessionId } from '../../model/raceevent.js';
+import type { EventTimeRecord, TimeRecord, TimeRecordSource } from '../../model/timerecord.js';
+import { RECORD_TX_CROSSING } from '../../model/timerecord.js';
+import { parseUnparsedChipCrossings } from '../../parsers/genericTimeParser.js';
+import { parseRfidLine } from '../../parsers/rfidtiming/rfidtiming.js';
 import type {
   ApiProblem,
   ApplicationBootstrap,
@@ -31,7 +35,9 @@ import { EventCatalogService } from '../../service/eventCatalogService.js';
 import { SystemConfigService } from '../../service/systemConfigService.js';
 import {
   type ListenerServerConfig,
+  type DataSourceConfig,
   type SystemConfiguration,
+  getSessionAssignedSourceIds,
   normalizeSystemConfiguration,
 } from '../systemConfig.js';
 import { getOpenApiSpecification } from '../openapi.js';
@@ -39,6 +45,8 @@ import { RESTART_REQUIRED_AFTER } from '../restartVersion.js';
 import { AuthStore } from './authStore.js';
 import { DomainEventHub } from './domainEventHub.js';
 import { UploadStore } from './uploadStore.js';
+import { formatRfidDecoderBytesForDisplay, RfidDecoderListenerService } from './rfidDecoderListenerService.js';
+import { v5 as uuidv5 } from 'uuid';
 
 type ListenerServer = HttpServer | HttpsServer;
 
@@ -339,6 +347,7 @@ export class RaceSweetApplicationServer {
   private readonly sockets = new Set<Socket>();
   private systemConfigService: SystemConfigService | undefined;
   private readonly raceAdminPersistence: NodeJsonRaceAdminPersistence;
+  private readonly rfidDecoderListeners: RfidDecoderListenerService;
   private readonly swaggerAssetDirectory: string;
   private readonly uploadStore: UploadStore;
 
@@ -354,6 +363,16 @@ export class RaceSweetApplicationServer {
     this.raceAdminPersistence = new NodeJsonRaceAdminPersistence(
       path.join(options.dataDirectory, 'admin-overrides.json'),
     );
+    this.rfidDecoderListeners = new RfidDecoderListenerService({
+      onData: async (source: DataSourceConfig, data: Buffer): Promise<void> => {
+        this.eventHub.publish(
+          'source',
+          'source.rfid-decoder-data',
+          jsonValue({ data: formatRfidDecoderBytesForDisplay(data), sourceId: source.id }),
+        );
+      },
+      onLines: (source, lines) => this.acceptRfidDecoderLines(source, lines),
+    });
     this.swaggerAssetDirectory = options.swaggerAssetDirectory ||
       path.resolve('node_modules', 'swagger-ui-dist');
     this.uploadStore = new UploadStore(path.join(options.dataDirectory, 'uploads'));
@@ -367,6 +386,7 @@ export class RaceSweetApplicationServer {
     this.systemConfigService = await SystemConfigService.create(
       new NodeJsonSystemConfigPersistence(path.join(this.dataDirectory, 'system-config.json')),
     );
+    await this.rfidDecoderListeners.reload(this.systemConfigService.state.dataSources);
   };
 
   public get listenerConfig(): ListenerServerConfig {
@@ -457,6 +477,7 @@ export class RaceSweetApplicationServer {
 
   public close = async (): Promise<void> => {
     this.eventHub.close();
+    await this.rfidDecoderListeners.close();
     await this.uploadStore.close();
     const servers: ListenerServer[] = [
       this.internalServer,
@@ -478,6 +499,98 @@ export class RaceSweetApplicationServer {
     this.externalHttpServer = undefined;
     this.externalHttpsServer = undefined;
     this.activeListenerConfig = undefined;
+  };
+
+  private acceptRfidDecoderLines = async (
+    source: DataSourceConfig,
+    lines: string[],
+  ): Promise<void> => {
+    if (lines.length === 0) {
+      return;
+    }
+    await this.enqueueCommand(async (): Promise<void> => {
+      const catalog = this.eventCatalogService!.catalog;
+      const targets = catalog.sessions.filter((session) =>
+        getSessionAssignedSourceIds(
+          this.systemConfigService!.state,
+          session.eventId,
+          session.id,
+        ).includes(source.id),
+      );
+      const beforeCount: number = this.eventCatalogService!.mutations.length;
+      const sourceNamespace: string = uuidv5(source.id, uuidv5.URL);
+
+      for (const target of targets) {
+        const event = catalog.events.find((candidate) => candidate.id === target.eventId);
+        if (!event) {
+          continue;
+        }
+        const eventDate: Date = new Date(`${event.date}T00:00:00`);
+        if (Number.isNaN(eventDate.getTime())) {
+          throw new Error(`RFID decoder source "${source.name}" cannot use event "${event.name}" because its date is invalid.`);
+        }
+
+        const existingRaceState = this.eventCatalogService!.getImportedRaceState(
+          event.id,
+          target.id,
+        ) || {};
+        const existingRecords: TimeRecord[] = existingRaceState.records || [];
+        const parsedRecords: EventTimeRecord[] = lines.flatMap((line: string, index: number): EventTimeRecord[] => {
+          try {
+            const parsed: TimeRecord | undefined = parseUnparsedChipCrossings(
+              eventDate,
+              [parseRfidLine(line, sourceNamespace)],
+            )[0];
+            return parsed ? [{
+              ...parsed,
+              eventId: event.id,
+              recordType: RECORD_TX_CROSSING,
+              sequence: existingRecords.length + index,
+              sessionId: target.id,
+              source: source.id,
+            }] : [];
+          } catch (error: unknown) {
+            console.warn(`Ignoring invalid RFID decoder line from source "${source.name}": ${error instanceof Error ? error.message : String(error)}`);
+            return [];
+          }
+        });
+        const existingRecordIds = new Set(existingRecords.map((record: TimeRecord): string => record.id));
+        const newRecords: TimeRecord[] = parsedRecords.filter((record: TimeRecord): boolean => {
+          if (existingRecordIds.has(record.id)) {
+            return false;
+          }
+          existingRecordIds.add(record.id);
+          return true;
+        });
+        if (newRecords.length === 0) {
+          continue;
+        }
+        const timeRecordSources: TimeRecordSource[] = [
+          ...(existingRaceState.timeRecordSources || []),
+          ...((existingRaceState.timeRecordSources || []).some(
+            (recordSource: TimeRecordSource): boolean => recordSource.name === source.name,
+          ) ? [] : [{ id: source.id, name: source.name }]),
+        ];
+        await this.eventCatalogService!.updateImportedRaceState(
+          event.id,
+          target.id,
+          {
+            ...existingRaceState,
+            records: [...existingRecords, ...newRecords],
+            timeRecordSources,
+          },
+        );
+      }
+
+      const mutations: EventCatalogMutation[] = this.eventCatalogService!.mutations.slice(beforeCount);
+      if (mutations.length > 0) {
+        this.eventHub.publish(
+          'catalog',
+          'catalog.mutations-applied',
+          jsonValue({ mutations }),
+        );
+      }
+    });
   };
 
   private activeListenerStatus = (): ListenerServerConfig => {
@@ -968,6 +1081,61 @@ export class RaceSweetApplicationServer {
     url: URL,
   ): Promise<void> => {
     this.assertInitialized();
+    const rfidDecoderListenerMatch: RegExpMatchArray | null = url.pathname.match(
+      /^\/api\/v1\/system\/rfid-decoder-listeners\/([^/]+)\/(start|stop)$/u,
+    );
+    if (rfidDecoderListenerMatch) {
+      const user: AuthenticatedUser | undefined = this.requireUser(request, response, 'race:write');
+      if (!user) {
+        return;
+      }
+      if (request.method !== 'POST') {
+        sendProblem(response, 405, 'Only POST is supported.');
+        return;
+      }
+      const sourceId: string = rfidDecoderListenerMatch[1] || '';
+      const shouldListen: boolean = rfidDecoderListenerMatch[2] === 'start';
+      let config: SystemConfiguration | undefined;
+      await this.enqueueCommand(async (): Promise<void> => {
+        const source: DataSourceConfig | undefined = this.systemConfigService!.state.dataSources.find(
+          (candidate: DataSourceConfig): boolean => candidate.id === sourceId,
+        );
+        if (!source || source.type !== 'timing-rfid-decoder') {
+          throw new Error(`RFID decoder source "${sourceId}" was not found.`);
+        }
+        config = await this.systemConfigService!.updateSource(source.id, {
+          rfidDecoderConfig: {
+            ...source.rfidDecoderConfig,
+            isListening: shouldListen,
+          },
+        });
+        try {
+          await this.rfidDecoderListeners.reload(config.dataSources);
+        } catch (error: unknown) {
+          if (shouldListen) {
+            config = await this.systemConfigService!.updateSource(source.id, {
+              rfidDecoderConfig: {
+                ...source.rfidDecoderConfig,
+                isListening: false,
+              },
+            });
+            await this.rfidDecoderListeners.reload(config.dataSources);
+          }
+          throw error;
+        }
+        this.eventHub.publish(
+          'system-config',
+          'system-config.changed',
+          jsonValue(safeConfiguration(config)),
+        );
+      });
+      sendJson(response, 200, {
+        config: sharedConfigurationForClient(config!),
+        running: this.rfidDecoderListeners.isListening(sourceId),
+        revision: this.eventHub.currentRevision,
+      });
+      return;
+    }
     if (url.pathname === '/api/v1/system/configuration') {
       const requiredPermission: string = request.method === 'GET' ? 'race:read' : 'race:write';
       const user: AuthenticatedUser | undefined = this.requireUser(
@@ -993,6 +1161,7 @@ export class RaceSweetApplicationServer {
         await this.enqueueCommand(async (): Promise<void> => {
           const config: SystemConfiguration =
             await this.systemConfigService!.replaceSharedConfiguration(body.config);
+          await this.rfidDecoderListeners.reload(config.dataSources);
           this.eventHub.publish(
             'system-config',
             'system-config.changed',

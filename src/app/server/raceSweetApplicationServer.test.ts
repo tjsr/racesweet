@@ -1,6 +1,6 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { createServer as createNetServer } from 'node:net';
-import type { AddressInfo } from 'node:net';
+import { createConnection, createServer as createNetServer } from 'node:net';
+import type { AddressInfo, Socket } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -63,6 +63,14 @@ const getAvailablePort = async (): Promise<number> => {
   });
   return port;
 };
+
+const sendDecoderLine = (port: number, line: string): Promise<void> => new Promise<void>((resolve, reject): void => {
+  const socket: Socket = createConnection({ host: '127.0.0.1', port }, (): void => {
+    socket.end(line);
+  });
+  socket.once('error', reject);
+  socket.once('close', (): void => resolve());
+});
 
 const startTestServer = async (): Promise<StartedTestServer> => {
   const dataDirectory: string = await mkdtemp(path.join(os.tmpdir(), 'racesweet-server-test-'));
@@ -472,6 +480,116 @@ describe('RaceSweetApplicationServer', () => {
       enabled: true,
       httpPort,
     }));
+  });
+
+  it('accepts assigned RFID decoder crossings through a configured TCP listener', async () => {
+    const eventResponse: Response = await jsonRequest(
+      testServer.origin,
+      '/api/v1/catalog/events',
+      {},
+      testServer.adminCookie,
+    );
+    const eventPayload: { catalog: { events: Array<{ id: string }> } } = await eventResponse.json();
+    const eventId: string = eventPayload.catalog.events[0]!.id;
+    const sessionResponse: Response = await jsonRequest(
+      testServer.origin,
+      `/api/v1/catalog/events/${eventId}/sessions`,
+      {},
+      testServer.adminCookie,
+    );
+    const sessionPayload: { catalog: { sessions: Array<{ id: string }> } } = await sessionResponse.json();
+    const sessionId: string = sessionPayload.catalog.sessions[0]!.id;
+    const port: number = await getAvailablePort();
+    const captureFilePath: string = path.join(testServer.dataDirectory, 'captures', 'rfid-decoder.raw');
+    const configurationResponse: Response = await fetch(
+      `${testServer.origin}/api/v1/system/configuration`,
+      { headers: { cookie: testServer.adminCookie } },
+    );
+    const configuration: {
+      dataSources: object[];
+      eventSourceAssignments: Record<string, string[]>;
+      sessionSourceAssignments: Record<string, { mode: 'default' | 'specific'; sourceIds: string[] }>;
+    } = await configurationResponse.json();
+    const sourceId: string = 'rfid-decoder-listener';
+    const updateResponse: Response = await fetch(
+      `${testServer.origin}/api/v1/system/configuration`,
+      {
+        body: JSON.stringify({
+          config: {
+            ...configuration,
+            dataSources: [{
+              enabled: true,
+              id: sourceId,
+              name: 'RFID TCP decoder',
+              rfidDecoderConfig: { captureFilePath, isListening: false, listenPort: port },
+              type: 'timing-rfid-decoder',
+            }],
+            eventSourceAssignments: { [eventId]: [sourceId] },
+            sessionSourceAssignments: {
+              [sessionId]: { mode: 'specific', sourceIds: [sourceId] },
+            },
+          },
+        }),
+        headers: {
+          'content-type': 'application/json',
+          cookie: testServer.adminCookie,
+          origin: testServer.origin,
+        },
+        method: 'PUT',
+      },
+    );
+
+    expect(updateResponse.status).toBe(200);
+    const startResponse: Response = await fetch(
+      `${testServer.origin}/api/v1/system/rfid-decoder-listeners/${sourceId}/start`,
+      {
+        headers: { cookie: testServer.adminCookie, origin: testServer.origin },
+        method: 'POST',
+      },
+    );
+    expect(startResponse.status).toBe(200);
+    expect(await startResponse.json()).toEqual(expect.objectContaining({ running: true }));
+    await sendDecoderLine(port, '1,123,7B,"09:00:01.250"\n');
+    await sendDecoderLine(port, '1,123,7B,"09:00:01.250"\n');
+
+    await vi.waitFor(async (): Promise<void> => {
+      expect(await readFile(captureFilePath, 'utf8')).toBe(
+        '1,123,7B,"09:00:01.250"\n1,123,7B,"09:00:01.250"\n',
+      );
+    });
+
+    await vi.waitFor(async (): Promise<void> => {
+      const mutationsResponse: Response = await fetch(
+        `${testServer.origin}/api/v1/mutations`,
+        { headers: { cookie: testServer.adminCookie } },
+      );
+      const payload: { mutations: Array<{ raceState?: { records?: Array<{ chipCode?: number; source?: string }>; timeRecordSources?: Array<{ id: string; name: string }> }; sessionId?: string; type: string }> } =
+        await mutationsResponse.json();
+      const crossingMutation = payload.mutations.find((mutation) =>
+        mutation.type === 'race-state-imported' && mutation.sessionId === sessionId,
+      );
+
+      expect(crossingMutation?.raceState?.records).toEqual(expect.arrayContaining([
+        expect.objectContaining({ chipCode: 123 }),
+      ]));
+      expect(crossingMutation?.raceState?.records).toHaveLength(1);
+      const crossingSourceId: string | undefined = crossingMutation?.raceState?.records?.find(
+        (record) => record.chipCode === 123,
+      )?.source;
+      expect(crossingMutation?.raceState?.timeRecordSources).toContainEqual(
+        expect.objectContaining({ id: crossingSourceId, name: 'RFID TCP decoder' }),
+      );
+    });
+
+    const stopResponse: Response = await fetch(
+      `${testServer.origin}/api/v1/system/rfid-decoder-listeners/${sourceId}/stop`,
+      {
+        headers: { cookie: testServer.adminCookie, origin: testServer.origin },
+        method: 'POST',
+      },
+    );
+    expect(stopResponse.status).toBe(200);
+    expect(await stopResponse.json()).toEqual(expect.objectContaining({ running: false }));
   });
 
   it('persists catalog commands and broadcasts the accepted mutations over SSE', async () => {

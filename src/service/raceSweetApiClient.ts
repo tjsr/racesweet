@@ -89,6 +89,7 @@ export class HttpRaceSweetApiClient implements RaceSweetApiClient {
       'catalog.mutations-applied',
       'race-admin.changed',
       'server.listener-updated',
+      'source.rfid-decoder-data',
       'source.file-uploaded',
       'system-config.changed',
       'timing.records-received',

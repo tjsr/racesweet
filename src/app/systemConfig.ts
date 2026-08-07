@@ -56,6 +56,12 @@ export interface DurtFileMakerSourceConfig {
   importMode?: DataImportMode;
 }
 
+export interface RfidDecoderSourceConfig {
+  captureFilePath?: string;
+  isListening?: boolean;
+  listenPort?: number;
+}
+
 export interface ApicalListedEvent {
   companyName?: string;
   eventDate?: string;
@@ -95,6 +101,7 @@ export interface DataSourceConfig {
   masterEntrantConfig?: MasterEntrantSourceConfig;
   mrScatsConfig?: MrScatsSourceConfig;
   name: string;
+  rfidDecoderConfig?: RfidDecoderSourceConfig;
   type: DataSourceType;
 }
 
@@ -321,6 +328,18 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListed
     };
   }
 
+  if (source.type === 'timing-rfid-decoder') {
+    return {
+      ...source,
+      finishLineNumbers: normalizeFinishLineNumbers(source.finishLineNumbers) || [1],
+      rfidDecoderConfig: {
+        captureFilePath: normalizeOptionalSystemFilePath(source.rfidDecoderConfig?.captureFilePath),
+        isListening: source.rfidDecoderConfig?.isListening === true,
+        listenPort: normalizePort(source.rfidDecoderConfig?.listenPort) || 11113,
+      },
+    };
+  }
+
   if (!isApicalDataSource(source) || !source.apiConfig) {
     return {
       ...source,
@@ -446,6 +465,7 @@ export const getFinishLineNumbersForSession = (
   if (!source) {
     return undefined;
   }
+
   const configuredFinishLines = source.finishLineNumbers || [];
   const ctcFinishLines = source.type === 'file-dorian-ctc-srt'
     ? getCtcFinishLineNumbers(source.fileConfig?.ctcTrackConfig) || []

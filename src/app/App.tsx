@@ -467,6 +467,7 @@ export const RaceSweetMainApp = () => {
   const [displayedErrorLogEntries, setDisplayedErrorLogEntries] = useState<
     DisplayedErrorLogEntry[]
   >([]);
+  const [rfidDecoderOutput, setRfidDecoderOutput] = useState<Record<string, string>>({});
   const [loadingMetrics, setLoadingMetrics] = useState<LoadingMetricsState>(
     getLoadingMetricsSnapshot,
   );
@@ -628,6 +629,23 @@ export const RaceSweetMainApp = () => {
       );
     };
     const applyRemoteEvent = (event: DomainEventEnvelope): void => {
+      if (
+        event.type === 'source.rfid-decoder-data' &&
+        typeof event.payload === 'object' &&
+        !Array.isArray(event.payload) &&
+        event.payload !== null
+      ) {
+        const payload = event.payload as { data?: unknown; sourceId?: unknown };
+        if (typeof payload.data === 'string' && typeof payload.sourceId === 'string') {
+          const data: string = payload.data;
+          const sourceId: string = payload.sourceId;
+          setRfidDecoderOutput((current: Record<string, string>): Record<string, string> => ({
+            ...current,
+            [sourceId]: `${current[sourceId] || ''}${data}`.slice(-100_000),
+          }));
+        }
+        return;
+      }
       if (
         event.type !== "catalog.mutations-applied" ||
         typeof event.payload !== "object" ||
@@ -1296,6 +1314,43 @@ export const RaceSweetMainApp = () => {
 
   const updateSystemConfigState = (config: SystemConfiguration) => {
     setSystemConfigState(config);
+  };
+
+  const syncRfidDecoderSources = async (
+    config: SystemConfiguration,
+  ): Promise<void> => {
+    const response: Response = await fetch('/api/v1/system/configuration', {
+      body: JSON.stringify({ config }),
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      method: 'PUT',
+    });
+    if (!response.ok) {
+      const problem: { error?: string } = await response.json() as { error?: string };
+      throw new Error(problem.error || `RaceSweet API returned HTTP ${response.status} while updating RFID decoder listeners.`);
+    }
+  };
+
+  const controlRfidDecoderListener = async (
+    sourceId: string,
+    action: 'start' | 'stop',
+  ): Promise<void> => {
+    if (!systemConfigService) {
+      return;
+    }
+    const response: Response = await fetch(
+      `/api/v1/system/rfid-decoder-listeners/${sourceId}/${action}`,
+      {
+        credentials: 'include',
+        method: 'POST',
+      },
+    );
+    if (!response.ok) {
+      const problem: { error?: string } = await response.json() as { error?: string };
+      throw new Error(problem.error || `RaceSweet API returned HTTP ${response.status} while trying to ${action} the RFID decoder listener.`);
+    }
+    const result: { config: SystemConfiguration } = await response.json() as { config: SystemConfiguration };
+    updateSystemConfigState(systemConfigService.applyRemoteConfiguration(result.config));
   };
 
   const getEventTimeZone = (eventId: EventId | undefined): string => {
@@ -2686,6 +2741,7 @@ export const RaceSweetMainApp = () => {
         <SystemContext
           config={systemConfigState}
           displayedErrorLog={displayedErrorLogText}
+          rfidDecoderOutput={rfidDecoderOutput}
           onDisplayError={logDisplayedError}
           onCreateSource={(type) => {
             if (!systemConfigService) {
@@ -2693,16 +2749,29 @@ export const RaceSweetMainApp = () => {
             }
             systemConfigService
               .createSource(type)
-              .then(updateSystemConfigState)
+              .then((config: SystemConfiguration): Promise<void> => {
+                updateSystemConfigState(config);
+                return type === 'timing-rfid-decoder'
+                  ? syncRfidDecoderSources(config)
+                  : Promise.resolve();
+              })
               .catch((error: unknown) => setErrorState(error as Error));
           }}
           onDeleteSource={(sourceId) => {
             if (!systemConfigService) {
               return;
             }
+            const deletedSource = systemConfigState.dataSources.find(
+              (source) => source.id === sourceId,
+            );
             systemConfigService
               .deleteSource(sourceId)
-              .then(updateSystemConfigState)
+              .then((config: SystemConfiguration): Promise<void> => {
+                updateSystemConfigState(config);
+                return deletedSource?.type === 'timing-rfid-decoder'
+                  ? syncRfidDecoderSources(config)
+                  : Promise.resolve();
+              })
               .catch((error: unknown) => setErrorState(error as Error));
           }}
           onFetchApicalDataNow={(sourceId) => {
@@ -3111,10 +3180,23 @@ export const RaceSweetMainApp = () => {
                 nextChanges,
               );
               updateSystemConfigState(config);
+              if (source?.type === 'timing-rfid-decoder') {
+                await syncRfidDecoderSources(config);
+              }
             };
 
             saveSource().catch((error: unknown) =>
               setErrorState(error as Error),
+            );
+          }}
+          onStartRfidDecoderListener={(sourceId) => {
+            controlRfidDecoderListener(sourceId, 'start').catch(
+              (error: unknown) => setErrorState(error as Error),
+            );
+          }}
+          onStopRfidDecoderListener={(sourceId) => {
+            controlRfidDecoderListener(sourceId, 'stop').catch(
+              (error: unknown) => setErrorState(error as Error),
             );
           }}
           onSaveListenerServer={(changes) => {
@@ -3538,7 +3620,12 @@ export const RaceSweetMainApp = () => {
             }
             systemConfigService
               .assignSourcesToEvent(eventId, sourceIds)
-              .then(updateSystemConfigState)
+              .then((config: SystemConfiguration): Promise<void> => {
+                updateSystemConfigState(config);
+                return config.dataSources.some(
+                  (source) => source.type === 'timing-rfid-decoder',
+                ) ? syncRfidDecoderSources(config) : Promise.resolve();
+              })
               .catch((error: unknown) => setErrorState(error as Error));
           }}
           onReloadEventSources={(eventId) => {
@@ -3717,7 +3804,12 @@ export const RaceSweetMainApp = () => {
             }
             systemConfigService
               .assignSourcesToSession(sessionId, { mode, sourceIds })
-              .then(updateSystemConfigState)
+              .then((config: SystemConfiguration): Promise<void> => {
+                updateSystemConfigState(config);
+                return config.dataSources.some(
+                  (source) => source.type === 'timing-rfid-decoder',
+                ) ? syncRfidDecoderSources(config) : Promise.resolve();
+              })
               .catch((error: unknown) => setErrorState(error as Error));
           }}
           onSaveSessionCategoryAssignment={(

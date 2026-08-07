@@ -187,6 +187,102 @@ describe('SystemPage integration', () => {
     expect(onSaveLocalStorageDirectoryPath).toHaveBeenCalledWith(`${config.localStorageDirectoryPath}-local`);
   });
 
+  it('enables the applicable RFID decoder listener control and shows received TCP output', async () => {
+    const onStartRfidDecoderListener = vi.fn();
+    const onStopRfidDecoderListener = vi.fn();
+    const listenerConfig: SystemConfiguration = {
+      ...config,
+      dataSources: [...config.dataSources, {
+        enabled: true,
+        id: 'source-rfid-listener',
+        name: 'RFID Listener',
+        rfidDecoderConfig: { isListening: false, listenPort: 11113 },
+        type: 'timing-rfid-decoder',
+      }],
+    };
+
+    await act(async () => {
+      root.render(
+        <SystemPage
+          config={listenerConfig}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={vi.fn()}
+          onReprocessApicalData={vi.fn()}
+          onSaveLocalStorageDirectoryPath={vi.fn()}
+          onSaveSource={vi.fn()}
+          onStartRfidDecoderListener={onStartRfidDecoderListener}
+          onStopRfidDecoderListener={onStopRfidDecoderListener}
+          rfidDecoderOutput={{ 'source-rfid-listener': '1,123,7B,"09:00:01.250"\n' }}
+        />,
+      );
+    });
+    const listenerRow = Array.from(container.querySelectorAll('tbody tr')).find(
+      (row) => row.textContent?.includes('RFID Listener'),
+    );
+    expect(listenerRow).toBeDefined();
+    await act(async () => {
+      listenerRow!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const startButton = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Start',
+    );
+    const stopButton = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Stop',
+    );
+    expect(startButton?.disabled).toBe(false);
+    expect(stopButton?.disabled).toBe(true);
+    expect((container.querySelector('[aria-label="RFID Decoder Received Data source-rfid-listener"]') as HTMLTextAreaElement).value).toContain('1,123,7B');
+
+    await act(async () => {
+      startButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(onStartRfidDecoderListener).toHaveBeenCalledWith('source-rfid-listener');
+
+    const runningListenerConfig: SystemConfiguration = {
+      ...listenerConfig,
+      dataSources: listenerConfig.dataSources.map((source) => source.id === 'source-rfid-listener'
+        ? {
+          ...source,
+          rfidDecoderConfig: {
+            ...source.rfidDecoderConfig,
+            isListening: true,
+          },
+        }
+        : source),
+    };
+    await act(async () => {
+      root.render(
+        <SystemPage
+          config={runningListenerConfig}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={vi.fn()}
+          onReprocessApicalData={vi.fn()}
+          onSaveLocalStorageDirectoryPath={vi.fn()}
+          onSaveSource={vi.fn()}
+          onStartRfidDecoderListener={onStartRfidDecoderListener}
+          onStopRfidDecoderListener={onStopRfidDecoderListener}
+        />,
+      );
+    });
+    const runningStartButton = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Start',
+    );
+    const runningStopButton = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Stop',
+    );
+    expect(runningStartButton?.disabled).toBe(true);
+    expect(runningStopButton?.disabled).toBe(false);
+    await act(async () => {
+      runningStopButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(onStopRfidDecoderListener).toHaveBeenCalledWith('source-rfid-listener');
+  });
+
   it('saves fastest time indicator colors from the system panel', async () => {
     const onSaveFastestTimeIndicatorColors = vi.fn();
 
@@ -656,5 +752,56 @@ describe('SystemPage integration', () => {
         sourceKind: 'directory',
       },
     });
+  });
+
+  it('keeps RFID output at the bottom only when it was already being followed', async () => {
+    const listenerConfig: SystemConfiguration = {
+      ...config,
+      dataSources: [{
+        enabled: true,
+        id: 'source-rfid-listener',
+        name: 'RFID Listener',
+        rfidDecoderConfig: { isListening: true, listenPort: 11113 },
+        type: 'timing-rfid-decoder',
+      }],
+    };
+    const renderWithOutput = async (output: string): Promise<void> => {
+      await act(async () => {
+        root.render(
+          <SystemPage
+            config={listenerConfig}
+            onCreateSource={vi.fn()}
+            onDeleteSource={vi.fn()}
+            onFetchApicalDataNow={vi.fn()}
+            onLoadApicalEvents={vi.fn()}
+            onReprocessApicalData={vi.fn()}
+            onSaveLocalStorageDirectoryPath={vi.fn()}
+            onSaveSource={vi.fn()}
+            rfidDecoderOutput={{ 'source-rfid-listener': output }}
+          />,
+        );
+      });
+    };
+
+    await renderWithOutput('initial output');
+    const output: HTMLTextAreaElement = container.querySelector('[aria-label="RFID Decoder Received Data source-rfid-listener"]') as HTMLTextAreaElement;
+    let scrollHeight: number = 300;
+    Object.defineProperties(output, {
+      clientHeight: { configurable: true, value: 100 },
+      scrollHeight: { configurable: true, get: (): number => scrollHeight },
+      scrollTop: { configurable: true, value: 200, writable: true },
+    });
+
+    scrollHeight = 400;
+    await renderWithOutput('initial output\nnext output');
+    expect(output.scrollTop).toBe(400);
+
+    output.scrollTop = 80;
+    await act(async () => {
+      output.dispatchEvent(new Event('scroll', { bubbles: true }));
+    });
+    scrollHeight = 500;
+    await renderWithOutput('initial output\nnext output\nlatest output');
+    expect(output.scrollTop).toBe(80);
   });
 });

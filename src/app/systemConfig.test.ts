@@ -13,6 +13,26 @@ const pitTrackConfig = {
 };
 
 describe('CTC finish line configuration', () => {
+  it('normalizes RFID decoder listener ports and retains default finish line one', () => {
+    const source = normalizeDataSourceConfig({
+      enabled: true,
+      id: 'rfid-listener',
+      name: 'RFID listener',
+      rfidDecoderConfig: {
+        captureFilePath: 'captures/decoder.raw',
+        listenPort: 9_000.5,
+      },
+      type: 'timing-rfid-decoder',
+    });
+
+    expect(source.rfidDecoderConfig).toEqual({
+      captureFilePath: normalizeOptionalSystemFilePath('captures/decoder.raw'),
+      isListening: false,
+      listenPort: 11113,
+    });
+    expect(source.finishLineNumbers).toEqual([1]);
+  });
+
   it('removes repeated Windows drive prefixes from Dorian CTC file paths', () => {
     const source = normalizeDataSourceConfig({
       enabled: true,

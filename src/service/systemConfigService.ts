@@ -107,6 +107,15 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
     };
   }
 
+  if (type === 'timing-rfid-decoder') {
+    return {
+      ...base,
+      finishLineNumbers: [1],
+      name: 'RFID Decoder Listener',
+      rfidDecoderConfig: { isListening: false, listenPort: 11113 },
+    };
+  }
+
   return base;
 };
 
