@@ -1,0 +1,19 @@
+services:
+  rfidlistener:
+    image: busybox:1.37.0-uclibc
+    container_name: rfidlistener
+    ports:
+      - "11113:11113/tcp"
+    volumes:
+      - ./rfidlistener-data:/mnt/rfidlistener
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        mkdir -p /mnt/rfidlistener
+        touch /mnt/rfidlistener/rfid.log
+        while true; do
+          nc -l -p 11113 >> /mnt/rfidlistener/rfid.log
+          sleep 1
+        done
+    restart: unless-stopped
