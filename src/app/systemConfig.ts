@@ -1,9 +1,11 @@
 import path from 'node:path';
+import defaults from '../defaults.json';
 import { EventId, SessionId } from '../model/raceevent';
 import { getCtcFinishLineNumbers, hasCtcLapCompletionSelection, type CtcTrackConfig } from '../model/ctcTrackConfig';
 import type { MrScatsDataFileSummary } from '../parsers/mrScats/fileInventory';
 
 export type DataSourceType =
+  | 'timing-iracing-agent'
   | 'timing-rfid-decoder'
   | 'timing-mylaps-decoder'
   | 'timing-dorian-data1-supernode'
@@ -138,6 +140,8 @@ export interface ListenerServerConfig {
   privateKeyPath?: string;
 }
 
+export const DEFAULT_LISTENER_HTTP_PORT: number = defaults.listenerHttpPort;
+
 export interface RemoteServerConfig {
   baseUrl?: string;
 }
@@ -185,7 +189,7 @@ export const createDefaultSystemConfiguration = (): SystemConfiguration => ({
   eventSourceAssignments: {},
   fastestTimeIndicatorColors: DEFAULT_FASTEST_TIME_INDICATOR_COLORS,
   localStorageDirectoryPath: DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH,
-  listenerServer: { enabled: false },
+  listenerServer: { enabled: false, httpPort: DEFAULT_LISTENER_HTTP_PORT },
   remoteServer: {},
   schemaVersion: 1,
   sessionSourceAssignments: {},
@@ -201,7 +205,7 @@ const normalizePort = (port: number | undefined): number | undefined => (
 const normalizeListenerServerConfig = (config: ListenerServerConfig | undefined): ListenerServerConfig => ({
   certificatePath: normalizeOptionalSystemFilePath(config?.certificatePath),
   enabled: config?.enabled === true,
-  httpPort: normalizePort(config?.httpPort),
+  httpPort: normalizePort(config?.httpPort) || (!normalizePort(config?.httpsPort) ? DEFAULT_LISTENER_HTTP_PORT : undefined),
   httpsPort: normalizePort(config?.httpsPort),
   privateKeyPath: normalizeOptionalSystemFilePath(config?.privateKeyPath),
 });

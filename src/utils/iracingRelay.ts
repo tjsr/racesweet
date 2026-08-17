@@ -23,6 +23,7 @@ export interface IracingRelayRecord {
   kind: 'finish' | 'pit-entry' | 'pit-exit' | 'sector';
   lapNumber: number;
   lineId: string;
+  occurredAt: string;
   sessionId: string;
   sessionTimeSeconds: number;
 }
@@ -53,10 +54,10 @@ export const createIracingRelayRecords = (previous: IracingFrame | undefined, ne
       }
       const sessionTimeSeconds = interpolateTime(previous, next, previousCar.lapDistancePercent, car.lapDistancePercent, line.lapDistancePercent);
       const lapNumber = car.lapDistancePercent < previousCar.lapDistancePercent ? car.lapNumber : previousCar.lapNumber;
-      return [{ customerId: car.customerId, id: `${next.sessionId}:${car.customerId}:${line.id}:${lapNumber}`, kind: line.kind, lapNumber, lineId: line.id, sessionId: next.sessionId, sessionTimeSeconds }];
+      return [{ customerId: car.customerId, id: `${next.sessionId}:${car.customerId}:${line.id}:${lapNumber}`, kind: line.kind, lapNumber, lineId: line.id, occurredAt: new Date().toISOString(), sessionId: next.sessionId, sessionTimeSeconds }];
     });
     if (previousCar.onPitRoad !== car.onPitRoad) {
-      records.push({ customerId: car.customerId, id: `${next.sessionId}:${car.customerId}:${car.onPitRoad ? 'pit-entry' : 'pit-exit'}:${car.lapNumber}:${next.sessionTimeSeconds}`, kind: car.onPitRoad ? 'pit-entry' : 'pit-exit', lapNumber: car.lapNumber, lineId: car.onPitRoad ? 'pit-entry' : 'pit-exit', sessionId: next.sessionId, sessionTimeSeconds: next.sessionTimeSeconds });
+      records.push({ customerId: car.customerId, id: `${next.sessionId}:${car.customerId}:${car.onPitRoad ? 'pit-entry' : 'pit-exit'}:${car.lapNumber}:${next.sessionTimeSeconds}`, kind: car.onPitRoad ? 'pit-entry' : 'pit-exit', lapNumber: car.lapNumber, lineId: car.onPitRoad ? 'pit-entry' : 'pit-exit', occurredAt: new Date().toISOString(), sessionId: next.sessionId, sessionTimeSeconds: next.sessionTimeSeconds });
     }
     return records;
   });

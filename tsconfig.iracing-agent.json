@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./dist-iracing-agent",
+    "rootDir": "."
+  },
+  "include": [
+    "src/agent/**/*.ts",
+    "src/utils/iracingRelay.ts"
+  ]
+}

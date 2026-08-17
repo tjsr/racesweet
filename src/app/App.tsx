@@ -1705,6 +1705,7 @@ export const RaceSweetMainApp = () => {
       case "file-rfid-timing-csv":
       case "master-entrant-profiles":
       case "timing-dorian-data1-supernode":
+      case "timing-iracing-agent":
       case "timing-mylaps-decoder":
       case "timing-rfid-decoder":
         throw new Error(

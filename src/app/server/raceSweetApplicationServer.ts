@@ -47,6 +47,7 @@ import { DomainEventHub } from './domainEventHub.js';
 import { UploadStore } from './uploadStore.js';
 import { formatRfidDecoderBytesForDisplay, RfidDecoderListenerService } from './rfidDecoderListenerService.js';
 import { v5 as uuidv5 } from 'uuid';
+import type { IracingRelayRecord } from '../../utils/iracingRelay.js';
 
 type ListenerServer = HttpServer | HttpsServer;
 
@@ -593,6 +594,64 @@ export class RaceSweetApplicationServer {
     });
   };
 
+  private acceptIracingRecords = async (sourceId: string, sessionId: string, records: IracingRelayRecord[]): Promise<number> => {
+    const source: DataSourceConfig | undefined = this.systemConfigService!.state.dataSources.find(
+      (candidate: DataSourceConfig): boolean => candidate.id === sourceId,
+    );
+    if (!source || source.type !== 'timing-iracing-agent') {
+      throw new Error(`iRacing source "${sourceId}" was not found.`);
+    }
+    const catalog = this.eventCatalogService!.catalog;
+    let acceptedCount: number = 0;
+    await this.enqueueCommand(async (): Promise<void> => {
+      const sourceNamespace: string = uuidv5(source.id, uuidv5.URL);
+      const requestedSessionId: string | undefined = sessionId === 'active' ? catalog.activeSessionId : sessionId;
+      const targets = catalog.sessions.filter((session) => session.id === requestedSessionId && getSessionAssignedSourceIds(
+          this.systemConfigService!.state,
+          session.eventId,
+          session.id,
+        ).includes(source.id));
+      for (const target of targets) {
+        const event = catalog.events.find((candidate) => candidate.id === target.eventId);
+        if (!event) {
+          continue;
+        }
+        const existingRaceState = this.eventCatalogService!.getImportedRaceState(event.id, target.id) || {};
+        const existingRecords: TimeRecord[] = existingRaceState.records || [];
+        const existingRecordIds: Set<string> = new Set(existingRecords.map((record: TimeRecord): string => record.id));
+        const newRecords: EventTimeRecord[] = records
+          .filter((record: IracingRelayRecord): boolean => record.sessionId === `${target.id}` || record.sessionId.length > 0)
+          .filter((record: IracingRelayRecord): boolean => !existingRecordIds.has(uuidv5(record.id, sourceNamespace)))
+          .map((record: IracingRelayRecord, index: number): EventTimeRecord & { chipCode: number } => ({
+            chipCode: record.customerId,
+            dataLine: JSON.stringify(record),
+            eventId: event.id,
+            id: uuidv5(record.id, sourceNamespace),
+            recordType: RECORD_TX_CROSSING,
+            sequence: existingRecords.length + index,
+            sessionId: target.id,
+            source: source.id,
+            time: new Date(record.occurredAt),
+          }));
+        if (newRecords.length === 0) {
+          continue;
+        }
+        acceptedCount += newRecords.length;
+        await this.eventCatalogService!.updateImportedRaceState(event.id, target.id, {
+          ...existingRaceState,
+          records: [...existingRecords, ...newRecords],
+          timeRecordSources: [
+            ...(existingRaceState.timeRecordSources || []),
+            ...((existingRaceState.timeRecordSources || []).some((recordSource): boolean => recordSource.id === source.id)
+              ? []
+              : [{ id: source.id, name: source.name }]),
+          ],
+        });
+      }
+    });
+    return acceptedCount;
+  };
+
   private activeListenerStatus = (): ListenerServerConfig => {
     const configured: ListenerServerConfig = this.listenerConfig;
     const httpPort: number | undefined = listeningPort(this.externalHttpServer);
@@ -776,6 +835,21 @@ export class RaceSweetApplicationServer {
     }
     if (url.pathname === '/api/v1/mutations') {
       await this.handleMutations(request, response, url);
+      return;
+    }
+    if (url.pathname === '/api/v1/timing/iracing') {
+      const user: AuthenticatedUser | undefined = this.requireUser(request, response, 'race:write');
+      if (!user) {
+        return;
+      }
+      if (request.method !== 'POST') {
+        sendProblem(response, 405, 'Only POST is supported.');
+        return;
+      }
+      const body: { records: IracingRelayRecord[]; sessionId: string; sourceId: string } =
+        await readRequestBody<{ records: IracingRelayRecord[]; sessionId: string; sourceId: string }>(request);
+      const accepted: number = await this.acceptIracingRecords(body.sourceId, body.sessionId, body.records);
+      sendJson(response, 200, { accepted });
       return;
     }
     if (url.pathname === '/api/v1/uploads') {
