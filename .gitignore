@@ -18,3 +18,5 @@ packages/fmptools-win32-*/bin/fmp2json.exe
 generated/apical-excel-cache/*
 release/iracing-agent*/*
 dist-iracing-agent/*
+release/*.zip
+release/racesweet-iracing-agent.zip
