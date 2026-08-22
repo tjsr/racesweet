@@ -2187,6 +2187,7 @@ export class EventCatalogService {
   public async updateEvent(
     eventId: EventId,
     changes: {
+      dataSourceLastLoadedAt?: Record<string, string>;
       date?: string;
       discipline?: EventCatalogState["events"][number]["discipline"];
       elapsedTimeCalculation?: EventCatalogState["events"][number]["elapsedTimeCalculation"];

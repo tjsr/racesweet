@@ -34,6 +34,10 @@ const catalog: EventCatalogState = {
   events: [
     {
       categoryIds: ['cat-1'],
+      dataSourceLastLoadedAt: {
+        'source-a': '2026-06-12T08:00:00.000Z',
+        'source-b': '2026-06-12T08:01:00.000Z',
+      },
       date: '2026-06-12',
       entrantIds: ['ent-1'],
       format: 'race-weekend',
@@ -94,6 +98,12 @@ const config: SystemConfiguration = {
       name: 'Apical Source A',
       type: 'api-apical-excel-file',
     },
+    {
+      enabled: true,
+      id: 'source-b',
+      name: 'Apical Source B',
+      type: 'api-apical-excel-file',
+    },
   ],
   eventSourceAssignments: {
     'event-1': [],
@@ -144,7 +154,7 @@ describe('EventsScreen integration', () => {
             ...config,
             eventSourceAssignments: {
               ...config.eventSourceAssignments,
-              'event-1': ['source-a'],
+              'event-1': ['source-a', 'source-b'],
             },
           }}
           onActivateEvent={(eventId) => {
@@ -204,6 +214,9 @@ describe('EventsScreen integration', () => {
       (button) => button.textContent === 'Re-load assigned sources into event sessions',
     );
     expect(reloadEventSourcesButton).toBeDefined();
+    expect(container.querySelector('[aria-label="Event Data Sources Last Loaded At"]')?.textContent).toBe('Last loaded at varies by data source or is not yet available.');
+    expect(container.textContent).toContain('Apical Source A (Last loaded at 2026-06-12T08:00:00.000Z)');
+    expect(container.textContent).toContain('Apical Source B (Last loaded at 2026-06-12T08:01:00.000Z)');
     await act(async () => {
       reloadEventSourcesButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
@@ -262,6 +275,7 @@ describe('EventsScreen integration', () => {
       await Promise.resolve();
     });
     expect(container.textContent).toContain('spring-test.gpx loaded');
+    expect(container.textContent).toMatch(/spring-test\.gpx \(Last loaded at \d{4}-\d{2}-\d{2}T/);
 
     const editTimingLinesButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Edit timing-line positions');
     expect(editTimingLinesButton).toBeDefined();
@@ -293,6 +307,7 @@ describe('EventsScreen integration', () => {
       trackMap: expect.objectContaining({
         gpxContent,
         gpxFileName: 'spring-test.gpx',
+        gpxLastLoadedAt: expect.any(String),
         timingLines: [expect.objectContaining({ lineNumber: 1 })],
       }),
     });

@@ -11,6 +11,15 @@ interface EventDataSourcesPanelProps {
   selectedEvent?: EventCatalogEvent;
 }
 
+const getEventLastLoadedAt = (event: EventCatalogEvent, sourceIds: string[]): string | undefined => {
+  const loadedAtValues: string[] = sourceIds
+    .map((sourceId: string) => event.dataSourceLastLoadedAt?.[sourceId])
+    .filter((loadedAt: string | undefined): loadedAt is string => loadedAt !== undefined);
+  return loadedAtValues.length === sourceIds.length && new Set<string>(loadedAtValues).size === 1
+    ? loadedAtValues[0]
+    : undefined;
+};
+
 const toggleInList = (values: string[], value: string): string[] => {
   return values.includes(value)
     ? values.filter((item) => item !== value)
@@ -27,8 +36,11 @@ export const EventDataSourcesPanel = (props: EventDataSourcesPanelProps): React.
         <ul>
           {(() => {
             const selectedEventId = props.selectedEvent.id;
+            const selectedEvent = props.selectedEvent;
             return props.dataSources.map((source) => {
               const checked = props.assignedSourceIds.includes(source.id);
+              const lastLoadedAt = selectedEvent.dataSourceLastLoadedAt?.[source.id];
+              const eventLastLoadedAt = getEventLastLoadedAt(selectedEvent, props.assignedSourceIds);
               return (
                 <li key={`event-source-${source.id}`}>
                   <FormControlLabel
@@ -37,7 +49,7 @@ export const EventDataSourcesPanel = (props: EventDataSourcesPanelProps): React.
                       onChange={() => props.onSaveEventAssignment(selectedEventId, toggleInList(props.assignedSourceIds, source.id))}
                       slotProps={{ input: { 'aria-label': `Event Source ${selectedEventId} ${source.id}` } }}
                     />}
-                    label={source.name}
+                    label={`${source.name}${lastLoadedAt && lastLoadedAt !== eventLastLoadedAt ? ` (Last loaded at ${lastLoadedAt})` : ''}`}
                   />
                 </li>
               );
@@ -56,6 +68,11 @@ export const EventDataSourcesPanel = (props: EventDataSourcesPanelProps): React.
         >
           Re-load assigned sources into event sessions
         </Button>
+        <p aria-label="Event Data Sources Last Loaded At">
+          {getEventLastLoadedAt(props.selectedEvent, props.assignedSourceIds)
+            ? `Last loaded at ${getEventLastLoadedAt(props.selectedEvent, props.assignedSourceIds)}`
+            : 'Last loaded at varies by data source or is not yet available.'}
+        </p>
       </div>
     ) : null}
   </section>

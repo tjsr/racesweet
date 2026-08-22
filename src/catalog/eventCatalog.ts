@@ -24,6 +24,8 @@ export interface EventTrackTimingLine {
 export interface EventTrackMap {
   gpxContent?: string;
   gpxFileName?: string;
+  /** ISO-8601 time when the GPX file was selected for this event. */
+  gpxLastLoadedAt?: string;
   racingLineCsvContent?: string;
   racingLineCsvFileName?: string;
   sourceType?: 'gpx' | 'racetrack-csv';
@@ -119,6 +121,8 @@ export type EventCatalogEntry = EventEntry & {
 export interface EventCatalogEvent {
   categoryIds: EventCategoryId[];
   date: string;
+  /** Successful data-source loads, keyed by configured data-source ID. */
+  dataSourceLastLoadedAt?: Record<string, string>;
   discipline?: EventDiscipline;
   entryIds?: EventEntryId[];
   entrantIds: EventEntrantId[];

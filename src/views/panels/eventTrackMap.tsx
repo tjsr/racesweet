@@ -20,6 +20,7 @@ interface EventTrackMapPanelProps {
 const normalizeTrackMap = (trackMap: EventTrackMap | undefined): EventTrackMap => ({
   gpxContent: trackMap?.gpxContent,
   gpxFileName: trackMap?.gpxFileName,
+  gpxLastLoadedAt: trackMap?.gpxLastLoadedAt,
   racingLineCsvContent: trackMap?.racingLineCsvContent,
   racingLineCsvFileName: trackMap?.racingLineCsvFileName,
   sourceType: trackMap?.sourceType || (trackMap?.trackCsvContent ? 'racetrack-csv' : 'gpx'),
@@ -87,7 +88,8 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
 
   const handleGpxFile = async (file: File): Promise<void> => {
     const gpxContent = await file.text();
-    setDraft((current) => ({ ...current, gpxContent, gpxFileName: file.name, sourceType: 'gpx' }));
+    const gpxLastLoadedAt: string = new Date().toISOString();
+    setDraft((current) => ({ ...current, gpxContent, gpxFileName: file.name, gpxLastLoadedAt, sourceType: 'gpx' }));
     setStatus(`${file.name} loaded. Save the track map to persist it.`);
   };
 
@@ -192,7 +194,9 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
           <p>{draft.racingLineCsvFileName || 'No racing line configured; entrants will follow the track centreline.'}</p>
         </>
       )}
-      <p>{draft.sourceType === 'gpx' ? draft.gpxFileName || 'No GPX file configured. Reports will use a circular track.' : null}</p>
+      <p>{draft.sourceType === 'gpx' ? draft.gpxFileName
+        ? `${draft.gpxFileName}${draft.gpxLastLoadedAt ? ` (Last loaded at ${draft.gpxLastLoadedAt})` : ''}`
+        : 'No GPX file configured. Reports will use a circular track.' : null}</p>
       <div className="events-actions">
         <Button type="button" onClick={() => setEditing((current) => !current)}>
           {editing ? 'Close timing-line editor' : 'Edit timing-line positions'}
@@ -203,6 +207,7 @@ export const EventTrackMapPanel = (props: EventTrackMapPanelProps): React.ReactE
             ...current,
             gpxContent: undefined,
             gpxFileName: undefined,
+            gpxLastLoadedAt: undefined,
             racingLineCsvContent: undefined,
             racingLineCsvFileName: undefined,
             trackCsvContent: undefined,

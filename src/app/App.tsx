@@ -1556,7 +1556,7 @@ export const RaceSweetMainApp = () => {
   const pullAssignedSessionSourceRaceState = async (
     eventId: EventId,
     sessionId: SessionId,
-  ): Promise<Partial<RaceState>> => {
+  ): Promise<{ loadedSourceIds: string[]; raceState: Partial<RaceState> }> => {
     const sourceIds = getSessionAssignedSourceIds(
       systemConfigState,
       eventId,
@@ -1566,6 +1566,7 @@ export const RaceSweetMainApp = () => {
       (source) => source.enabled && sourceIds.includes(source.id),
     );
     const pulledRaceStates: Partial<RaceState>[] = [];
+    const loadedSourceIds: string[] = [];
 
     for (const source of sources) {
       switch (source.type) {
@@ -1719,15 +1720,36 @@ export const RaceSweetMainApp = () => {
         );
       }
       }
+      loadedSourceIds.push(source.id);
     }
 
-    return mergePulledRaceStates(pulledRaceStates);
+    return { loadedSourceIds, raceState: mergePulledRaceStates(pulledRaceStates) };
+  };
+
+  const markDataSourcesLoaded = async (
+    eventId: EventId,
+    sourceIds: string[],
+    requestedAt: string,
+  ): Promise<EventCatalogState | undefined> => {
+    if (!eventCatalogService || sourceIds.length === 0) {
+      return undefined;
+    }
+    const event = eventCatalogService.catalog.events.find((item) => item.id === eventId);
+    if (!event) {
+      return undefined;
+    }
+    const dataSourceLastLoadedAt: Record<string, string> = {
+      ...event.dataSourceLastLoadedAt,
+      ...Object.fromEntries(sourceIds.map((sourceId: string) => [sourceId, requestedAt])),
+    };
+    return eventCatalogService.updateEvent(eventId, { dataSourceLastLoadedAt });
   };
 
   const reloadSessionSources = async (
     eventId: EventId,
     sessionId: SessionId,
     mode: SessionSourceReloadMode,
+    requestedAt: string = new Date().toISOString(),
   ): Promise<SessionSourceReloadSummary | undefined> => {
     if (!validateUuid(eventId)) {
       throw new Error(`Invalid eventId provided: ${eventId}`);
@@ -1739,10 +1761,11 @@ export const RaceSweetMainApp = () => {
       return undefined;
     }
 
-    const pulledRaceState = await pullAssignedSessionSourceRaceState(
+    const pulledSourceResult = await pullAssignedSessionSourceRaceState(
       eventId,
       sessionId,
     );
+    const pulledRaceState = pulledSourceResult.raceState;
     const existingRaceState = eventCatalogService.getImportedRaceState(
       eventId,
       sessionId,
@@ -1784,7 +1807,7 @@ export const RaceSweetMainApp = () => {
         (category) =>
           category.description || `${category.name} could not be found.`,
       );
-    const catalog = await eventCatalogService.reloadImportedRaceState(
+    let catalog = await eventCatalogService.reloadImportedRaceState(
       eventId,
       sessionId,
       nextRaceState,
@@ -1792,6 +1815,7 @@ export const RaceSweetMainApp = () => {
         ?.apicalDataFilePath,
       getMasterEntrantProfilesForEvent(systemConfigState, eventId),
     );
+    catalog = await markDataSourcesLoaded(eventId, pulledSourceResult.loadedSourceIds, requestedAt) || catalog;
     const targetSessionState = createEmptySessionState();
     await applyPulledRaceStateToSession(targetSessionState, nextRaceState, {
       catalog: eventCatalogService.catalog,
@@ -1849,11 +1873,13 @@ export const RaceSweetMainApp = () => {
     });
     let summary = createEmptySessionSourceReloadSummary();
 
+    const requestedAt: string = new Date().toISOString();
     for (const session of linkedSessions) {
       const sessionSummary = await reloadSessionSources(
         session.eventId,
         session.id,
         "all",
+        requestedAt,
       );
       if (sessionSummary) {
         summary = addSessionSourceReloadSummaries(summary, sessionSummary);
@@ -2785,6 +2811,7 @@ export const RaceSweetMainApp = () => {
             if (!source) {
               return;
             }
+            const requestedAt: string = new Date().toISOString();
 
             const apicalEventId =
               source.apiConfig?.selectedEventIds[0] ||
@@ -2800,8 +2827,13 @@ export const RaceSweetMainApp = () => {
               .then(async (importData: PulledApicalRaceState) => {
                 const catalog =
                   await eventCatalogService.importApicalRaceState(importData);
+                const catalogWithLoadTime = await markDataSourcesLoaded(
+                  importData.eventId,
+                  [sourceId],
+                  requestedAt,
+                ) || catalog;
                 updateEventCatalogState(
-                  catalog,
+                  catalogWithLoadTime,
                   importData.eventId,
                   importData.sessionId,
                 );
@@ -2865,6 +2897,7 @@ export const RaceSweetMainApp = () => {
                 "MR-SCATS data files location must be selected before loading the event.",
               );
             }
+            const requestedAt: string = new Date().toISOString();
 
             const postParseStepCount = 5;
             let latestProgress: MrScatsCatalogLoadProgress | undefined;
@@ -2918,9 +2951,14 @@ export const RaceSweetMainApp = () => {
                   importData,
                   completeImportStep,
                 );
+                const catalogWithLoadTime = await markDataSourcesLoaded(
+                  importData.eventId,
+                  [sourceId],
+                  requestedAt,
+                ) || catalog;
                 await completeImportStep("Updating event display", 3);
                 updateEventCatalogState(
-                  catalog,
+                  catalogWithLoadTime,
                   importData.eventId,
                   importData.sessions[0]?.id,
                 );
@@ -2951,6 +2989,7 @@ export const RaceSweetMainApp = () => {
             if (!eventCatalogService || !systemConfigService) {
               return;
             }
+            const requestedAt: string = new Date().toISOString();
 
             const source = systemConfigState.dataSources.find(
               (item) => item.id === sourceId,
@@ -3094,7 +3133,12 @@ export const RaceSweetMainApp = () => {
                       sessionId,
                       raceStateSnapshot(targetSessionState),
                     );
-                updateEventCatalogState(catalog, eventId, sessionId);
+                const catalogWithLoadTime = await markDataSourcesLoaded(
+                  eventId,
+                  [sourceId],
+                  requestedAt,
+                ) || catalog;
+                updateEventCatalogState(catalogWithLoadTime, eventId, sessionId);
                 if (isActiveSession) {
                   setSessionState(targetSessionState);
                   setRenderTick((tick) => tick + 1);
@@ -3254,6 +3298,7 @@ export const RaceSweetMainApp = () => {
             if (!eventCatalogService || !systemConfigService) {
               return;
             }
+            const requestedAt: string = new Date().toISOString();
             const source = systemConfigState.dataSources.find(
               (item) => item.id === sourceId,
             );
@@ -3368,7 +3413,12 @@ export const RaceSweetMainApp = () => {
                       sessionId,
                       importedSessionRaceState,
                     );
-                updateEventCatalogState(catalog, eventId, sessionId);
+                const catalogWithLoadTime = await markDataSourcesLoaded(
+                  eventId,
+                  [sourceId],
+                  requestedAt,
+                ) || catalog;
+                updateEventCatalogState(catalogWithLoadTime, eventId, sessionId);
                 if (isActiveSession) {
                   setSessionState(targetSessionState);
                   setRenderTick((tick) => tick + 1);
@@ -3634,13 +3684,14 @@ export const RaceSweetMainApp = () => {
               return;
             }
 
+            const requestedAt: string = new Date().toISOString();
             const eventSessions = getSessionsForEvent(
               eventCatalogState,
               eventId,
             );
             Promise.all(
               eventSessions.map((session) =>
-                reloadSessionSources(eventId, session.id, "all"),
+                reloadSessionSources(eventId, session.id, "all", requestedAt),
               ),
             )
               .then((summaries) => {
