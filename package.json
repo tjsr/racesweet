@@ -139,7 +139,6 @@
     "swagger-ui-express": "^5.0.1",
     "util": "^0.12.5",
     "uuid": "^14.0.1",
-    "irsdk-node": "^5.4.0",
     "xlsx": "^0.18.5"
   },
   "engines": {

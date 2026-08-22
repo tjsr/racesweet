@@ -44,7 +44,7 @@ for (const packageName of runtimePackages) {
   );
 }
 await cp(process.execPath, path.join(packageDirectory, 'runtime', 'node.exe'));
-await writeFile(path.join(packageDirectory, 'package.json'), `${JSON.stringify({ dependencies: { 'irsdk-node': '^5.4.0' }, private: true, type: 'commonjs' }, null, 2)}\n`, 'utf8');
+await writeFile(path.join(packageDirectory, 'package.json'), `${JSON.stringify({ dependencies: { 'irsdk-node': '^4.4.0' }, private: true, type: 'commonjs' }, null, 2)}\n`, 'utf8');
 const defaultUrl = configuredValue('RACESWEET_URL', localSystemConfiguration.remoteServer?.baseUrl || localListenerUrl || `http://127.0.0.1:${defaultConfiguration.listenerHttpPort}`);
 const defaultSourceId = configuredValue('RACESWEET_SOURCE_ID', 'iracing-agent');
 const defaultSessionId = configuredValue('RACESWEET_SESSION_ID', 'active');

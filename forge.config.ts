@@ -25,7 +25,9 @@ const config: ForgeConfig = {
       path.resolve('node_modules', 'swagger-ui-dist'),
     ],
   },
-  rebuildConfig: {},
+  rebuildConfig: {
+    ignoreModules: ['@irsdk-node/native'],
+  },
   makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
   plugins: [
     new AutoUnpackNativesPlugin({}),
