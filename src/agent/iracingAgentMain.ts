@@ -3,7 +3,8 @@ import { createIracingAgentApi } from './iracingAgentApiClient.js';
 import { loadIracingAgentConfig } from './iracingAgentConfig.js';
 import { runIracingAgent } from './iracingAgent.js';
 
-const propertiesPath: string = path.resolve(path.dirname(process.argv[1] || ''), '..', '..', 'racesweet.properties');
+const defaultPropertiesPath: string = path.resolve(path.dirname(process.argv[1] || ''), '..', '..', 'racesweet.properties');
+const propertiesPath: string = process.env.RACESWEET_PROPERTIES_PATH || defaultPropertiesPath;
 const config = loadIracingAgentConfig(propertiesPath, process.env);
 
 const controller: AbortController = new AbortController();

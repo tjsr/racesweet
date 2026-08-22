@@ -30,4 +30,33 @@ describe('createIracingAgentConfig', () => {
     expect(config.password).toBe(password);
     expect(config.username).toBe(username);
   });
+
+  it('explains how to recover when a configuration field no longer matches the encrypted password', () => {
+    const properties: Record<string, string> = {
+      passwordEncrypted: createEncryptedPassword('adminadminadmin', 'http://127.0.0.1:3000', 'iracing-agent', 'active', 'admin'),
+      sessionId: 'active',
+      sourceId: 'iracing-agent',
+      url: 'http://127.0.0.1:3001',
+      username: 'admin',
+    };
+
+    expect(() => createIracingAgentConfig(properties, {})).toThrow(
+      'Unable to decrypt passwordEncrypted. Its encryption key is derived from url, sourceId, sessionId, and username. '
+      + 'Set RACESWEET_PASSWORD for this launch, or rebuild the agent package after changing any of those values.',
+    );
+  });
+
+  it('uses a launch password when the configured endpoint has changed', () => {
+    const properties: Record<string, string> = {
+      passwordEncrypted: createEncryptedPassword('adminadminadmin', 'http://127.0.0.1:3000', 'iracing-agent', 'active', 'admin'),
+      sessionId: 'active',
+      sourceId: 'iracing-agent',
+      url: 'http://127.0.0.1:3001',
+      username: 'admin',
+    };
+
+    const config = createIracingAgentConfig(properties, { RACESWEET_PASSWORD: 'debug-password' });
+
+    expect(config.password).toBe('debug-password');
+  });
 });

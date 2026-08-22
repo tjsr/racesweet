@@ -27,6 +27,26 @@
     "preLaunchTask": "debug: clear terminal and runtime caches"
   },
   {
+    "name": "Debug iRacing Agent",
+    "type": "node",
+    "request": "launch",
+    "program": "${workspaceFolder}/dist-iracing-agent/src/agent/iracingAgentMain.js",
+    "cwd": "${workspaceFolder}",
+    "env": {
+      "RACESWEET_PASSWORD": "${input:racesweetAgentPassword}",
+      "RACESWEET_PROPERTIES_PATH": "${workspaceFolder}/release/iracing-agent/racesweet.properties"
+    },
+    "sourceMaps": true,
+    "outFiles": [
+      "${workspaceFolder}/dist-iracing-agent/src/**/*.js"
+    ],
+    "skipFiles": [
+      "<node_internals>/**"
+    ],
+    "console": "integratedTerminal",
+    "preLaunchTask": "iracing-agent: build debug files"
+  },
+  {
     "name": "Electron Main",
     "type": "node",
     "request": "launch",
@@ -125,6 +145,14 @@
     "console": "integratedTerminal",
     "preLaunchTask": "debug: clear terminal and runtime caches"
   }
+  ],
+  "inputs": [
+    {
+      "id": "racesweetAgentPassword",
+      "type": "promptString",
+      "description": "RaceSweet password for the iRacing agent",
+      "password": true
+    }
   ],
   "compounds": [
     {

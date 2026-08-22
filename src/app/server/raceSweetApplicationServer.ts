@@ -47,7 +47,7 @@ import { DomainEventHub } from './domainEventHub.js';
 import { UploadStore } from './uploadStore.js';
 import { formatRfidDecoderBytesForDisplay, RfidDecoderListenerService } from './rfidDecoderListenerService.js';
 import { v5 as uuidv5 } from 'uuid';
-import type { IracingRelayRecord } from '../../utils/iracingRelay.js';
+import type { IracingCrossingRecord } from '../../utils/iracingRelay.js';
 
 type ListenerServer = HttpServer | HttpsServer;
 
@@ -594,7 +594,7 @@ export class RaceSweetApplicationServer {
     });
   };
 
-  private acceptIracingRecords = async (sourceId: string, sessionId: string, records: IracingRelayRecord[]): Promise<number> => {
+  private acceptIracingCrossings = async (sourceId: string, sessionId: string, crossings: IracingCrossingRecord[]): Promise<number> => {
     const source: DataSourceConfig | undefined = this.systemConfigService!.state.dataSources.find(
       (candidate: DataSourceConfig): boolean => candidate.id === sourceId,
     );
@@ -603,6 +603,7 @@ export class RaceSweetApplicationServer {
     }
     const catalog = this.eventCatalogService!.catalog;
     let acceptedCount: number = 0;
+    const beforeCount: number = this.eventCatalogService!.mutations.length;
     await this.enqueueCommand(async (): Promise<void> => {
       const sourceNamespace: string = uuidv5(source.id, uuidv5.URL);
       const requestedSessionId: string | undefined = sessionId === 'active' ? catalog.activeSessionId : sessionId;
@@ -619,19 +620,16 @@ export class RaceSweetApplicationServer {
         const existingRaceState = this.eventCatalogService!.getImportedRaceState(event.id, target.id) || {};
         const existingRecords: TimeRecord[] = existingRaceState.records || [];
         const existingRecordIds: Set<string> = new Set(existingRecords.map((record: TimeRecord): string => record.id));
-        const newRecords: EventTimeRecord[] = records
-          .filter((record: IracingRelayRecord): boolean => record.sessionId === `${target.id}` || record.sessionId.length > 0)
-          .filter((record: IracingRelayRecord): boolean => !existingRecordIds.has(uuidv5(record.id, sourceNamespace)))
-          .map((record: IracingRelayRecord, index: number): EventTimeRecord & { chipCode: number } => ({
-            chipCode: record.customerId,
-            dataLine: JSON.stringify(record),
+        const newRecords: EventTimeRecord[] = crossings
+          .filter((crossing: IracingCrossingRecord): boolean => !existingRecordIds.has(uuidv5(crossing.id, sourceNamespace)))
+          .map((crossing: IracingCrossingRecord, index: number): EventTimeRecord & { chipCode: number } => ({
+            ...crossing,
             eventId: event.id,
-            id: uuidv5(record.id, sourceNamespace),
-            recordType: RECORD_TX_CROSSING,
+            id: uuidv5(crossing.id, sourceNamespace),
             sequence: existingRecords.length + index,
             sessionId: target.id,
             source: source.id,
-            time: new Date(record.occurredAt),
+            time: new Date(crossing.time),
           }));
         if (newRecords.length === 0) {
           continue;
@@ -649,6 +647,14 @@ export class RaceSweetApplicationServer {
         });
       }
     });
+    const mutations: EventCatalogMutation[] = this.eventCatalogService!.mutations.slice(beforeCount);
+    if (mutations.length > 0) {
+      this.eventHub.publish(
+        'catalog',
+        'catalog.mutations-applied',
+        jsonValue({ mutations }),
+      );
+    }
     return acceptedCount;
   };
 
@@ -837,7 +843,7 @@ export class RaceSweetApplicationServer {
       await this.handleMutations(request, response, url);
       return;
     }
-    if (url.pathname === '/api/v1/timing/iracing') {
+    if (url.pathname === '/api/v1/timing/crossing') {
       const user: AuthenticatedUser | undefined = this.requireUser(request, response, 'race:write');
       if (!user) {
         return;
@@ -846,9 +852,9 @@ export class RaceSweetApplicationServer {
         sendProblem(response, 405, 'Only POST is supported.');
         return;
       }
-      const body: { records: IracingRelayRecord[]; sessionId: string; sourceId: string } =
-        await readRequestBody<{ records: IracingRelayRecord[]; sessionId: string; sourceId: string }>(request);
-      const accepted: number = await this.acceptIracingRecords(body.sourceId, body.sessionId, body.records);
+      const body: { crossings: IracingCrossingRecord[]; sessionId: string; sourceId: string } =
+        await readRequestBody<{ crossings: IracingCrossingRecord[]; sessionId: string; sourceId: string }>(request);
+      const accepted: number = await this.acceptIracingCrossings(body.sourceId, body.sessionId, body.crossings);
       sendJson(response, 200, { accepted });
       return;
     }

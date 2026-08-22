@@ -142,8 +142,8 @@
     "xlsx": "^0.18.5"
   },
   "engines": {
-    "node": ">=22.14.0",
-    "npm": ">=11.4.1"
+    "node": ">=24.19.0",
+    "npm": ">=12.0.2"
   },
   "optionalDependencies": {
     "@racesweet/fmptools-win32-arm64": "file:packages/fmptools-win32-arm64",
@@ -154,7 +154,8 @@
     "electron@37.1.0": true,
     "electron-winstaller@5.4.0": true,
     "esbuild@0.28.1": true,
-    "@scarf/scarf@1.4.0": true
+    "@scarf/scarf@1.4.0": true,
+    "@irsdk-node/native@5.4.0": true
   },
   "overrides": {
     "tar": ">7.5.10",

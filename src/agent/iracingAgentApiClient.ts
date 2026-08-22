@@ -1,17 +1,29 @@
 import type { IracingAgentApi } from './iracingAgent.js';
-import type { IracingRelayRecord } from '../utils/iracingRelay.js';
+import { createIracingCrossingRecords, type IracingRelayRecord } from '../utils/iracingRelay.js';
 
 export const createIracingAgentApi = (baseUrl: string): IracingAgentApi => {
   let cookie: string | undefined;
   const request = async (path: string, init: RequestInit): Promise<Response> => {
+    const endpoint: URL = new URL(path, baseUrl);
+    const method: string = init.method || 'GET';
     const headers: Headers = new Headers(init.headers);
     headers.set('content-type', 'application/json');
     if (cookie) {
       headers.set('cookie', cookie);
     }
-    const response: Response = await fetch(new URL(path, baseUrl), { ...init, headers });
+    const response: Response = await fetch(endpoint, { ...init, headers }).catch((error: unknown): never => {
+      const reason: string = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `RaceSweet request ${method} ${endpoint.toString()} could not reach the server: ${reason}. `
+        + 'Confirm RACESWEET_URL points to a running RaceSweet server.',
+      );
+    });
     if (!response.ok) {
-      throw new Error(`RaceSweet request ${path} returned HTTP ${response.status}.`);
+      throw new Error(
+        `RaceSweet request ${method} ${endpoint.toString()} returned HTTP ${response.status} ${response.statusText}. `
+        + 'The server is reachable, but this RaceSweet endpoint was not found or does not accept this request. '
+        + 'Confirm RACESWEET_URL points to the RaceSweet application root and that any reverse proxy forwards this endpoint.',
+      );
     }
     return response;
   };
@@ -28,8 +40,15 @@ export const createIracingAgentApi = (baseUrl: string): IracingAgentApi => {
       }
     },
     sendRecords: async (sourceId: string, sessionId: string, records: IracingRelayRecord[]): Promise<void> => {
-      await request('/api/v1/timing/iracing', {
-        body: JSON.stringify({ records, sessionId, sourceId }),
+      const crossings = createIracingCrossingRecords(sourceId, records);
+      const payload: { crossings: ReturnType<typeof createIracingCrossingRecords>; sessionId: string; sourceId: string } = {
+        crossings,
+        sessionId,
+        sourceId,
+      };
+      console.log('Sending RaceSweet crossing records:', JSON.stringify(payload));
+      await request('/api/v1/timing/crossing', {
+        body: JSON.stringify(payload),
         method: 'POST',
       });
     },

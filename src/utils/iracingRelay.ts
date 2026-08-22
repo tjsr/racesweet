@@ -28,6 +28,27 @@ export interface IracingRelayRecord {
   sessionTimeSeconds: number;
 }
 
+export interface IracingCrossingRecord {
+  chipCode: number;
+  dataLine: string;
+  id: string;
+  recordType: 16;
+  source: string;
+  time: string;
+}
+
+export const createIracingCrossingRecords = (
+  sourceId: string,
+  records: IracingRelayRecord[],
+): IracingCrossingRecord[] => records.map((record: IracingRelayRecord): IracingCrossingRecord => ({
+  chipCode: record.customerId,
+  dataLine: JSON.stringify(record),
+  id: record.id,
+  recordType: 16,
+  source: sourceId,
+  time: record.occurredAt,
+}));
+
 const crossedLine = (previous: number, next: number, line: number): boolean => (
   next >= previous ? line > previous && line <= next : line > previous || line <= next
 );

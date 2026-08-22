@@ -29,9 +29,16 @@ const decryptPassword = (
     return '';
   }
   const key: Buffer = createHash('sha256').update(`${baseUrl}\0${sourceId}\0${sessionId}\0${username}`).digest();
-  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(ivText, 'base64url'));
-  decipher.setAuthTag(Buffer.from(tagText, 'base64url'));
-  return Buffer.concat([decipher.update(Buffer.from(cipherText, 'base64url')), decipher.final()]).toString('utf8');
+  try {
+    const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(ivText, 'base64url'));
+    decipher.setAuthTag(Buffer.from(tagText, 'base64url'));
+    return Buffer.concat([decipher.update(Buffer.from(cipherText, 'base64url')), decipher.final()]).toString('utf8');
+  } catch {
+    throw new Error(
+      'Unable to decrypt passwordEncrypted. Its encryption key is derived from url, sourceId, sessionId, and username. '
+      + 'Set RACESWEET_PASSWORD for this launch, or rebuild the agent package after changing any of those values.',
+    );
+  }
 };
 
 const requiredValue = (name: string, value: string | undefined): string => {
