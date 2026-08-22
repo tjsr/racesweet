@@ -20,7 +20,7 @@ The package command refuses to create a bundle with blank connection defaults. V
 
 If username or password environment variables are omitted, the package defaults to username `admin` and password `adminadminadmin`.
 
-If URL, source ID, or session ID environment variables are omitted, defaults are the shared RaceSweet listener default (`http://127.0.0.1:3000`), `iracing-agent`, and `active`. The `active` session value is resolved by the RaceSweet server when the upload arrives.
+If URL, source ID, or session ID environment variables are omitted, defaults are the shared RaceSweet listener default (`http://127.0.0.11`), `iracing-agent`, and `active`. The `active` session value is resolved by the RaceSweet server when the upload arrives.
 
 The zip is written to `release\\racesweet-iracing-agent.zip`. It includes the compiled agent, production dependencies, the native iRacing binding, a private Node.js runtime, `launch-iracing-agent.cmd`, and `racesweet.properties`.
 

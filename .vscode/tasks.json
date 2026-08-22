@@ -93,6 +93,17 @@
       "detail": "Clears TSX/Vite/Vitest runtime caches and stale compiled sidecars before TypeScript debug runs"
     },
     {
+      "label": "iracing-agent: build debug files",
+      "type": "shell",
+      "command": "npm run build:iracing-agent",
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always"
+      },
+      "detail": "Builds iRacing agent debug files without replacing its configured properties"
+    },
+    {
       "label": "debug: clear terminal and runtime caches",
       "dependsOrder": "sequence",
       "dependsOn": [

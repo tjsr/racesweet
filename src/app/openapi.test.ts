@@ -12,6 +12,7 @@ describe('RaceSweet OpenAPI documentation', () => {
     expect(specification.paths['/api/v1/auth/setup']?.post).toBeDefined();
     expect(specification.paths['/api/v1/bootstrap']?.get).toBeDefined();
     expect(specification.paths['/api/v1/events']?.get).toBeDefined();
+    expect(specification.paths['/api/v1/timing/crossing']?.post).toBeDefined();
     expect(specification.paths['/api/v1/uploads']?.post).toBeDefined();
     expect(mutationPath?.get).toBeDefined();
     expect(mutationPath?.put).toBeDefined();

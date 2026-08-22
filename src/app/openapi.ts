@@ -184,6 +184,15 @@ const openApiOptions: OAS3Options = {
           tags: ['Application'],
         },
       },
+      '/api/v1/timing/crossing': {
+        post: {
+          operationId: 'submitTimingCrossings',
+          responses: { 200: { description: 'Accepted timing crossings.' }, 400: { description: 'Invalid request.' } },
+          security: [{ raceSweetSession: [] }],
+          summary: 'Submit timing crossing records',
+          tags: ['Timing'],
+        },
+      },
       '/api/v1/events': {
         get: {
           description: 'Supports Last-Event-ID replay and emits resync-required when retained history cannot satisfy the cursor.',
