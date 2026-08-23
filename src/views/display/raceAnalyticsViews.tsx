@@ -2,6 +2,7 @@ import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 
 import { MenuItem } from '@mui/material';
 import React from 'react';
+import { getCategoryColor, getCategoryPaletteColor } from '../../categoryColors.js';
 import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent } from '../../catalog/eventCatalog.js';
 import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
 import { shouldExcludeCategoryFromResults } from '../../processing/category.js';
@@ -46,6 +47,7 @@ interface EntrantSummaryRow {
   lapCount: number;
   laps: ParticipantPassingRecord[];
   memberDetails: Array<{
+    categoryId?: string;
     categoryName: string;
     participantDisplayName: string;
     participantId: EventParticipantId;
@@ -70,6 +72,7 @@ const getEntrantRaceNumber = (entrant: EventCatalogEntrant | undefined): string 
 };
 
 interface LapChartEntry {
+  categoryId?: string;
   categoryName: string;
   crossingTime: number;
   entrantId: EventEntrantId;
@@ -163,13 +166,7 @@ interface ReportsPageProps extends BaseRaceAnalyticsProps {
 
 type CategoryFilter = 'overall' | string;
 
-const lapChartLineColors: string[] = ['#0057b8', '#b00020', '#217a34', '#7a4cc2', '#a65f00', '#007a78'];
-
 const normalizeText = (value: string): string => value.trim().toLowerCase();
-
-const getLapChartEntrantLineColor = (_entrantId: EventEntrantId, entrantIndex: number): string => {
-  return lapChartLineColors[entrantIndex % lapChartLineColors.length];
-};
 
 const getCategoryByIdSafely = (
   raceState: RaceState & RaceStateLookup,
@@ -402,6 +399,7 @@ const buildLapChart = (rows: EntrantSummaryRow[]): LapChartColumn[] => {
       }
 
       const chartEntry: LapChartEntry = {
+        categoryId: detail.categoryId,
         categoryName: detail.categoryName,
         crossingTime: lap.time?.getTime() || Number.MAX_SAFE_INTEGER,
         entrantId: row.entrantId,
@@ -951,7 +949,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     const wrapperRect = wrapper.getBoundingClientRect();
     const buttons = Array.from(wrapper.querySelectorAll<HTMLButtonElement>('button[data-lap-chart-entrant-id]'));
     const pointsByEntrant = new Map<EventEntrantId, LapChartLinePoint[]>();
-    const entrantOrder = new Map<EventEntrantId, number>();
+    const entrantColorOrder = new Map<EventEntrantId, number>(allRows.map((row, index) => [row.entrantId, index]));
 
     buttons.forEach((button, domOrder: number) => {
       const entrantId = button.dataset.lapChartEntrantId as EventEntrantId | undefined;
@@ -959,10 +957,6 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
       const position = Number(button.dataset.lapChartPosition);
       if (!entrantId || Number.isNaN(lapNo) || Number.isNaN(position)) {
         return;
-      }
-
-      if (!entrantOrder.has(entrantId)) {
-        entrantOrder.set(entrantId, entrantOrder.size);
       }
 
       const buttonRect = button.getBoundingClientRect();
@@ -990,8 +984,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
         }
         return left.domOrder - right.domOrder;
       });
-      const entrantIndex = entrantOrder.get(entrantId) || 0;
-      const color = getLapChartEntrantLineColor(entrantId, entrantIndex);
+      const color = getCategoryPaletteColor(entrantColorOrder.get(entrantId) || 0);
       sortedPoints.slice(1).forEach((point, index) => {
         const previousPoint = sortedPoints[index];
         segments.push({
@@ -1007,7 +1000,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     });
 
     setLapChartLineSegments(segments);
-  }, [drawLineChart, reportType]);
+  }, [allRows, drawLineChart, reportType]);
 
   React.useLayoutEffect(() => {
     updateLapChartLineSegments();
@@ -1239,10 +1232,12 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
                     {lapChart.map((column) => {
                       const entry = column.entries[rowIndex];
                       const isSelectedEntrant = !!entry && selectedLapEntry?.entrantId === entry.entrantId;
+                      const categoryColor = entry ? getCategoryColor(entry.categoryId) : undefined;
                       return (
                         <td
                           key={`reports-lap-cell-${column.lapNo}-${rowIndex + 1}`}
                           className={isSelectedEntrant ? 'lap-chart-table__entrant-cell--selected' : undefined}
+                          style={categoryColor ? { border: `2px solid ${categoryColor}` } : undefined}
                         >
                           {entry ? (
                             <button

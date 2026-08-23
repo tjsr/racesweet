@@ -309,6 +309,9 @@ export const IdentifierListControl = (
                           htmlInput: {
                             "aria-label": `Assignment time ${participantLabel} ${rowIndex + 1}`,
                           },
+                          inputLabel: {
+                            shrink: true,
+                          },
                         }}
                         type="datetime-local"
                         value={rowValue.assignmentTime}

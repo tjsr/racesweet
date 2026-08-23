@@ -81,6 +81,11 @@ describe("IdentificationPanel", () => {
     expect(timingDeviceInput).toBeTruthy();
     expect(timingAssignmentInput).toBeTruthy();
     expect(
+      container.querySelector(
+        `label[for="${timingAssignmentInput.id}"]`,
+      )?.classList.contains("MuiInputLabel-shrink"),
+    ).toBe(true);
+    expect(
       (
         Array.from(container.querySelectorAll("button")).find(
           (button) => button.textContent === "Add plate",

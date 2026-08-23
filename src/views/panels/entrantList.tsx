@@ -1,5 +1,6 @@
 import { Button } from '@mui/material';
 import React from 'react';
+import { getCategoryColor } from '../../categoryColors.js';
 import {
   type EntrantType,
   type EventCatalogEntrant,
@@ -338,6 +339,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
                   key={entrant.id}
                   entrant={entrant}
                   entrantLabel={singularLabel}
+                  categoryColor={getCategoryColor(categoryId)}
                   categoryName={getCategoryName(props.catalog, categoryId)}
                   allowSelectedClick={!!props.selectedEntrantIds && props.selectedEntrantIds.size > 1}
                   isSelected={props.selectedEntrantIds?.has(entrant.id) || entrant.id === props.selectedEntrant?.id}
@@ -367,6 +369,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
                   key={entrant.id}
                   entrant={entrant}
                   entrantLabel={singularLabel}
+                  categoryColor={getCategoryColor(getEntrantCategoryId(entrant))}
                   entrySummaries={props.isMotorsport
                     ? (entriesByEntrantId.get(entrant.id) || []).map((entry) => getEntrySummary(
                       entry,
