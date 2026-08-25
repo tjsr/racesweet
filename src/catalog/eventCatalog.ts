@@ -1,19 +1,20 @@
-import { CategoryId } from '../processing/category.js';
-import { EventEntrantId } from '../model/entrant.js';
-import type { EventEntry, EventEntryId } from '../model/entry.js';
-import type { EventCategory, EventCategoryId } from '../model/eventcategory.js';
-import type { EventParticipant } from '../model/eventparticipant.js';
-import { EventParticipantId } from '../model/eventparticipant.js';
-import { EventId, SessionId } from '../model/raceevent.js';
-import { IdType } from '../model/types.js';
-import { isValidId } from '../validators/isValidId.js';
+import { CategoryId } from "../processing/category.js";
+import { EventEntrantId } from "../model/entrant.js";
+import type { EventEntry, EventEntryId } from "../model/entry.js";
+import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
+import type { EventParticipant } from "../model/eventparticipant.js";
+import { EventParticipantId } from "../model/eventparticipant.js";
+import { EventId, SessionId } from "../model/raceevent.js";
+import { IdType } from "../model/types.js";
+import { isValidId } from "../validators/isValidId.js";
 
-export type EventFormat = 'race-weekend' | 'test-day' | 'track-day' | 'other';
-export type EventDiscipline = 'cycling' | 'motorsport';
-export type EventSessionKind = 'practice' | 'qualifying' | 'race' | 'warmup' | 'other';
-export type EventSessionStatus = 'draft' | 'scheduled' | 'live' | 'completed';
-export type EntrantType = 'rider' | 'team';
-export type TimingStartCalculation = 'first-start' | 'category-start';
+export type EventFormat = "race-weekend" | "test-day" | "track-day" | "other";
+export type EventDiscipline = "cycling" | "motorsport";
+export type EventSessionKind =
+  "practice" | "qualifying" | "race" | "warmup" | "other";
+export type EventSessionStatus = "draft" | "scheduled" | "live" | "completed";
+export type EntrantType = "rider" | "team";
+export type TimingStartCalculation = "first-start" | "category-start";
 
 export interface EventTrackTimingLine {
   label?: string;
@@ -28,27 +29,28 @@ export interface EventTrackMap {
   gpxLastLoadedAt?: string;
   racingLineCsvContent?: string;
   racingLineCsvFileName?: string;
-  sourceType?: 'gpx' | 'racetrack-csv';
+  sourceType?: "gpx" | "racetrack-csv";
   timingLines: EventTrackTimingLine[];
   trackCsvContent?: string;
   trackCsvFileName?: string;
 }
 
 export interface CategoryDistanceTime {
-  kind: 'time';
+  kind: "time";
   value: string;
 }
 
 export interface CategoryDistanceLaps {
-  kind: 'laps';
+  kind: "laps";
   value: number;
 }
 
 export interface CategoryDistanceUnspecified {
-  kind: 'unspecified';
+  kind: "unspecified";
 }
 
-export type CategoryDistanceRule = CategoryDistanceUnspecified | CategoryDistanceTime | CategoryDistanceLaps;
+export type CategoryDistanceRule =
+  CategoryDistanceUnspecified | CategoryDistanceTime | CategoryDistanceLaps;
 
 export interface CategoryTeamCompositionRule {
   gender: string;
@@ -57,7 +59,7 @@ export interface CategoryTeamCompositionRule {
 }
 
 export interface CategoryTeamRules {
-  identityMode?: 'single' | 'multiple';
+  identityMode?: "single" | "multiple";
   maxTeamSize?: number;
   maxRiderAge?: number;
   minRiderAge?: number;
@@ -88,7 +90,7 @@ export interface EventCatalogEntrant {
   firstName?: string;
   gender?: string;
   id: EventEntrantId;
-  identifiers?: EventParticipant['identifiers'];
+  identifiers?: EventParticipant["identifiers"];
   /** True while this entrant was created only to represent unidentified timing data. */
   isPlaceholder?: boolean;
   /** True when this is the person or organisation responsible for Entries. */
@@ -139,6 +141,8 @@ export interface EventCatalogEvent {
 
 export interface EventCatalogSession {
   categoryIds: EventCategoryId[];
+  /** Ordered category/start-wave display and timing configuration for this session. */
+  startSequence?: SessionStartSequenceItem[];
   eventId: EventId;
   id: SessionId;
   kind: EventSessionKind;
@@ -150,6 +154,58 @@ export interface EventCatalogSession {
   scheduledStart: string;
   status: EventSessionStatus;
 }
+
+export interface SessionStartSequenceCategoryItem {
+  categoryId: EventCategoryId;
+  type: "category";
+}
+
+export interface SessionStartSequenceWaveItem {
+  id: string;
+  offset: string;
+  type: "start-wave";
+}
+
+export type SessionStartSequenceItem =
+  SessionStartSequenceCategoryItem | SessionStartSequenceWaveItem;
+
+export const getSessionStartSequence = (
+  session: EventCatalogSession | undefined,
+): SessionStartSequenceItem[] => {
+  if (!session) {
+    return [];
+  }
+
+  const assignedCategoryIds = new Set<EventCategoryId>(session.categoryIds);
+  const sequence: SessionStartSequenceItem[] = [];
+  const includedCategoryIds = new Set<EventCategoryId>();
+  (session.startSequence || []).forEach((item) => {
+    if (item.type === "category") {
+      if (
+        assignedCategoryIds.has(item.categoryId) &&
+        !includedCategoryIds.has(item.categoryId)
+      ) {
+        sequence.push(item);
+        includedCategoryIds.add(item.categoryId);
+      }
+      return;
+    }
+
+    sequence.push(item);
+  });
+  session.categoryIds.forEach((categoryId) => {
+    if (!includedCategoryIds.has(categoryId)) {
+      sequence.push({ categoryId, type: "category" });
+    }
+  });
+  return sequence.filter(
+    (item, index) =>
+      item.type === "category" ||
+      sequence
+        .slice(index + 1)
+        .some((nextItem) => nextItem.type === "category"),
+  );
+};
 
 export interface EventCatalogState {
   activeEventId?: EventId;
@@ -190,28 +246,43 @@ export interface EventDisciplineLabels {
   singular: string;
 }
 
-export const getEventDisciplineLabels = (discipline: EventDiscipline | undefined): EventDisciplineLabels => {
-  return discipline === 'cycling'
+export const getEventDisciplineLabels = (
+  discipline: EventDiscipline | undefined,
+): EventDisciplineLabels => {
+  return discipline === "cycling"
     ? {
-      plural: 'Riders',
-      singular: 'Rider',
-    }
+        plural: "Riders",
+        singular: "Rider",
+      }
     : {
-      plural: 'Drivers',
-      singular: 'Driver',
-    };
+        plural: "Drivers",
+        singular: "Driver",
+      };
 };
 
-const isActiveCategory = (category: EventCatalogCategory): boolean => category.deleted !== true;
-const getLegacyCategorySessionAssignments = (category: EventCatalogCategory | undefined): CategorySessionAssignment[] => {
-  return ((category as EventCatalogCategory & { sessionAssignments?: CategorySessionAssignment[] } | undefined)?.sessionAssignments || []);
+const isActiveCategory = (category: EventCatalogCategory): boolean =>
+  category.deleted !== true;
+const getLegacyCategorySessionAssignments = (
+  category: EventCatalogCategory | undefined,
+): CategorySessionAssignment[] => {
+  return (
+    (
+      category as
+        | (EventCatalogCategory & {
+            sessionAssignments?: CategorySessionAssignment[];
+          })
+        | undefined
+    )?.sessionAssignments || []
+  );
 };
 
-const getCategoryIdsForSession = (session: EventCatalogSession | undefined): EventCategoryId[] => session?.categoryIds || [];
+const getCategoryIdsForSession = (
+  session: EventCatalogSession | undefined,
+): EventCategoryId[] => session?.categoryIds || [];
 
 export const getSessionsForEvent = (
   state: EventCatalogState,
-  eventId: EventId | undefined
+  eventId: EventId | undefined,
 ): EventCatalogSession[] => {
   if (!eventId || !state.events.some((event) => event.id === eventId)) {
     return [];
@@ -222,7 +293,7 @@ export const getSessionsForEvent = (
 
 export const getCategoriesForEvent = (
   state: EventCatalogState,
-  eventId: EventId | undefined
+  eventId: EventId | undefined,
 ): EventCatalogCategory[] => {
   const event = state.events.find((item) => item.id === eventId);
   if (!event) {
@@ -230,18 +301,25 @@ export const getCategoriesForEvent = (
   }
 
   const eventCategoryIds = new Set(event.categoryIds);
-  return state.categories.filter((category) => category.eventId === eventId && isActiveCategory(category) && eventCategoryIds.has(category.id));
+  return state.categories.filter(
+    (category) =>
+      category.eventId === eventId &&
+      isActiveCategory(category) &&
+      eventCategoryIds.has(category.id),
+  );
 };
 
 export const getCategoryAssignedSessionIds = (
   category: EventCatalogCategory | undefined,
-  eventSessions: EventCatalogSession[] = []
+  eventSessions: EventCatalogSession[] = [],
 ): Set<SessionId> => {
   const assignedSessionIds = new Set<SessionId>();
 
   if (category) {
     eventSessions
-      .filter((session) => getCategoryIdsForSession(session).includes(category.id))
+      .filter((session) =>
+        getCategoryIdsForSession(session).includes(category.id),
+      )
       .forEach((session) => assignedSessionIds.add(session.id));
   }
 
@@ -251,7 +329,9 @@ export const getCategoryAssignedSessionIds = (
       return;
     }
 
-    const matchingSession = eventSessions.find((session) => session.scheduledStart === assignment.startTime);
+    const matchingSession = eventSessions.find(
+      (session) => session.scheduledStart === assignment.startTime,
+    );
     if (matchingSession) {
       assignedSessionIds.add(matchingSession.id.toString());
       return;
@@ -268,17 +348,22 @@ export const getCategoryAssignedSessionIds = (
 export const getSessionAssignedCategoryIds = (
   categories: EventCatalogCategory[],
   sessionId: SessionId | undefined,
-  eventSessions: EventCatalogSession[] = []
+  eventSessions: EventCatalogSession[] = [],
 ): Set<EventCategoryId> => {
   if (!sessionId) {
     return new Set<EventCategoryId>();
   }
 
-  const activeCategoryIds = new Set(categories.filter(isActiveCategory).map((category) => category.id));
-  const sessionCategoryIds = getCategoryIdsForSession(eventSessions.find((session) => session.id === sessionId))
-    .filter((categoryId) => activeCategoryIds.has(categoryId));
+  const activeCategoryIds = new Set(
+    categories.filter(isActiveCategory).map((category) => category.id),
+  );
+  const sessionCategoryIds = getCategoryIdsForSession(
+    eventSessions.find((session) => session.id === sessionId),
+  ).filter((categoryId) => activeCategoryIds.has(categoryId));
   const legacyCategoryIds = categories
-    .filter((category) => getCategoryAssignedSessionIds(category, eventSessions).has(sessionId))
+    .filter((category) =>
+      getCategoryAssignedSessionIds(category, eventSessions).has(sessionId),
+    )
     .map((category) => category.id);
 
   return new Set([...sessionCategoryIds, ...legacyCategoryIds]);
@@ -286,7 +371,7 @@ export const getSessionAssignedCategoryIds = (
 
 export const getEntrantCategoryIds = (
   entrant: EventCatalogEntrant | undefined,
-  eventEntrants: EventCatalogEntrant[] = []
+  eventEntrants: EventCatalogEntrant[] = [],
 ): Set<EventCategoryId> => {
   const categoryIds = new Set<EventCategoryId>();
   if (!entrant) {
@@ -299,7 +384,9 @@ export const getEntrantCategoryIds = (
   entrant.categoryIds.forEach((categoryId) => categoryIds.add(categoryId));
 
   if (entrant.teamEntrantId) {
-    const team = eventEntrants.find((candidate) => candidate.id === entrant.teamEntrantId);
+    const team = eventEntrants.find(
+      (candidate) => candidate.id === entrant.teamEntrantId,
+    );
     if (team?.categoryId) {
       categoryIds.add(team.categoryId);
     }
@@ -313,41 +400,54 @@ export const getEntrantAssignedSessionIds = (
   entrant: EventCatalogEntrant | undefined,
   eventCategories: EventCatalogCategory[] = [],
   eventSessions: EventCatalogSession[] = [],
-  eventEntrants: EventCatalogEntrant[] = []
+  eventEntrants: EventCatalogEntrant[] = [],
 ): Set<SessionId> => {
   const entrantCategoryIds = getEntrantCategoryIds(entrant, eventEntrants);
   const assignedSessionIds = new Set<SessionId>();
 
   eventSessions
-    .filter((session) => getCategoryIdsForSession(session).some((categoryId) => entrantCategoryIds.has(categoryId)))
+    .filter((session) =>
+      getCategoryIdsForSession(session).some((categoryId) =>
+        entrantCategoryIds.has(categoryId),
+      ),
+    )
     .forEach((session) => assignedSessionIds.add(session.id));
 
   eventCategories
     .filter((category) => entrantCategoryIds.has(category.id))
-    .forEach((category) => getLegacyCategorySessionAssignments(category)
-      .forEach(() => getCategoryAssignedSessionIds(category, eventSessions).forEach((sessionId) => assignedSessionIds.add(sessionId))));
+    .forEach((category) =>
+      getLegacyCategorySessionAssignments(category).forEach(() =>
+        getCategoryAssignedSessionIds(category, eventSessions).forEach(
+          (sessionId) => assignedSessionIds.add(sessionId),
+        ),
+      ),
+    );
 
   return assignedSessionIds;
 };
 
 export const getParticipantAssignedSessionIds = (
-  participant: Pick<EventParticipant, 'categoryId'> | undefined,
+  participant: Pick<EventParticipant, "categoryId"> | undefined,
   eventCategories: EventCatalogCategory[] = [],
-  eventSessions: EventCatalogSession[] = []
+  eventSessions: EventCatalogSession[] = [],
 ): Set<SessionId> => {
-  const category = eventCategories.find((candidate) => candidate.id === participant?.categoryId);
+  const category = eventCategories.find(
+    (candidate) => candidate.id === participant?.categoryId,
+  );
   return getCategoryAssignedSessionIds(category, eventSessions);
 };
 
 export const getEntrantsForEvent = (
   state: EventCatalogState,
-  eventId: EventId | undefined
+  eventId: EventId | undefined,
 ): EventCatalogEntrant[] => {
   if (!eventId || !state.events.some((event) => event.id === eventId)) {
     return [];
   }
 
-  return state.entrants.filter((entrant) => entrant.eventId === eventId && entrant.deleted !== true);
+  return state.entrants.filter(
+    (entrant) => entrant.eventId === eventId && entrant.deleted !== true,
+  );
 };
 
 export const getEntriesForEvent = (
@@ -364,50 +464,61 @@ export const getEntriesForEvent = (
 export const getEntrantsForCategory = (
   state: EventCatalogState,
   eventId: EventId | undefined,
-  categoryId: CategoryId | undefined
+  categoryId: CategoryId | undefined,
 ): EventCatalogEntrant[] => {
   if (!eventId || !categoryId) {
     return [];
   }
 
-  const categoryIsListedForEvent = getCategoriesForEvent(state, eventId).some((category) => category.id === categoryId);
+  const categoryIsListedForEvent = getCategoriesForEvent(state, eventId).some(
+    (category) => category.id === categoryId,
+  );
   if (!categoryIsListedForEvent) {
     return [];
   }
 
   const eventEntrants = getEntrantsForEvent(state, eventId);
-  const categoryTeamIds = new Set(eventEntrants
-    .filter((entrant) => entrant.entrantType === 'team')
-    .filter((entrant) => entrant.categoryId === categoryId || entrant.categoryIds.includes(categoryId))
-    .map((entrant) => entrant.id));
+  const categoryTeamIds = new Set(
+    eventEntrants
+      .filter((entrant) => entrant.entrantType === "team")
+      .filter(
+        (entrant) =>
+          entrant.categoryId === categoryId ||
+          entrant.categoryIds.includes(categoryId),
+      )
+      .map((entrant) => entrant.id),
+  );
 
   return eventEntrants.filter((entrant) => {
     if (entrant.teamEntrantId && categoryTeamIds.has(entrant.teamEntrantId)) {
       return true;
     }
 
-    return entrant.categoryId === categoryId || entrant.categoryIds.includes(categoryId);
+    return (
+      entrant.categoryId === categoryId ||
+      entrant.categoryIds.includes(categoryId)
+    );
   });
 };
 
 export const getTeamsForParticipant = (
   state: EventCatalogState,
   eventId: EventId | undefined,
-  participantId: IdType | undefined
+  participantId: IdType | undefined,
 ): EventCatalogEntrant[] => {
   if (!participantId) {
     return [];
   }
 
   return getEntrantsForEvent(state, eventId)
-    .filter((entrant) => entrant.entrantType === 'team')
+    .filter((entrant) => entrant.entrantType === "team")
     .filter((entrant) => entrant.memberParticipantIds.includes(participantId));
 };
 
 export const getParticipantEntrantMemberships = (
   state: EventCatalogState,
   participantId: IdType | undefined,
-  options: ParticipantEntrantMembershipOptions = {}
+  options: ParticipantEntrantMembershipOptions = {},
 ): ParticipantEntrantMembership[] => {
   if (!participantId) {
     return [];
@@ -416,8 +527,8 @@ export const getParticipantEntrantMemberships = (
   const eventIds = options.eventId
     ? [options.eventId]
     : state.events
-      .filter((event) => !state.deletedEventIds.includes(event.id))
-      .map((event) => event.id);
+        .filter((event) => !state.deletedEventIds.includes(event.id))
+        .map((event) => event.id);
   const memberships: ParticipantEntrantMembership[] = [];
   const includedMembershipIds = new Set<string>();
 
@@ -426,7 +537,7 @@ export const getParticipantEntrantMemberships = (
     entrant: EventCatalogEntrant,
     eventEntrants: EventCatalogEntrant[],
     eventCategories: EventCatalogCategory[],
-    eventSessions: EventCatalogSession[]
+    eventSessions: EventCatalogSession[],
   ): void => {
     const membershipId = `${event.id}:${entrant.id}`;
     if (includedMembershipIds.has(membershipId)) {
@@ -434,18 +545,31 @@ export const getParticipantEntrantMemberships = (
     }
 
     const entrantCategoryIds = getEntrantCategoryIds(entrant, eventEntrants);
-    const assignedSessionIds = getEntrantAssignedSessionIds(entrant, eventCategories, eventSessions, eventEntrants);
+    const assignedSessionIds = getEntrantAssignedSessionIds(
+      entrant,
+      eventCategories,
+      eventSessions,
+      eventEntrants,
+    );
     memberships.push({
-      categories: eventCategories.filter((category) => entrantCategoryIds.has(category.id)),
+      categories: eventCategories.filter((category) =>
+        entrantCategoryIds.has(category.id),
+      ),
       entrant,
       event,
-      sessions: eventSessions.filter((session) => assignedSessionIds.has(session.id)),
+      sessions: eventSessions.filter((session) =>
+        assignedSessionIds.has(session.id),
+      ),
     });
     includedMembershipIds.add(membershipId);
   };
 
   eventIds.forEach((eventId) => {
-    const event = state.events.find((candidate) => candidate.id === eventId && !state.deletedEventIds.includes(candidate.id));
+    const event = state.events.find(
+      (candidate) =>
+        candidate.id === eventId &&
+        !state.deletedEventIds.includes(candidate.id),
+    );
     if (!event) {
       return;
     }
@@ -454,19 +578,36 @@ export const getParticipantEntrantMemberships = (
     const eventCategories = getCategoriesForEvent(state, event.id);
     const eventSessions = getSessionsForEvent(state, event.id);
     const matchingEntrants = eventEntrants.filter((entrant) => {
-      return entrant.id === participantId || entrant.memberParticipantIds.includes(participantId);
+      return (
+        entrant.id === participantId ||
+        entrant.memberParticipantIds.includes(participantId)
+      );
     });
 
     matchingEntrants.forEach((entrant) => {
-      addMembership(event, entrant, eventEntrants, eventCategories, eventSessions);
+      addMembership(
+        event,
+        entrant,
+        eventEntrants,
+        eventCategories,
+        eventSessions,
+      );
 
       if (!options.includeTeamParents || !entrant.teamEntrantId) {
         return;
       }
 
-      const teamEntrant = eventEntrants.find((candidate) => candidate.id === entrant.teamEntrantId);
+      const teamEntrant = eventEntrants.find(
+        (candidate) => candidate.id === entrant.teamEntrantId,
+      );
       if (teamEntrant) {
-        addMembership(event, teamEntrant, eventEntrants, eventCategories, eventSessions);
+        addMembership(
+          event,
+          teamEntrant,
+          eventEntrants,
+          eventCategories,
+          eventSessions,
+        );
       }
     });
   });

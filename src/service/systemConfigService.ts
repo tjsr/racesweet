@@ -1,31 +1,32 @@
-import { EventId, SessionId } from '../model/raceevent.js';
-import { TimeRecordSourceId } from '../model/types.js';
+import { EventId, SessionId } from "../model/raceevent.js";
+import { TimeRecordSourceId } from "../model/types.js";
 import {
-    APICAL_DEFAULT_SOURCE_NAME,
-    type DataSourceConfig,
-    type DataSourceType,
-    type ListenerServerConfig,
-    type RemoteServerConfig,
-    type SessionSourceAssignment,
-    type SystemConfiguration,
-    type TimingContextSelectionConfig,
-    createDefaultSystemConfiguration,
-    getDataSourceTypeLabel,
-    normalizeOptionalSystemFilePath,
-    normalizeSystemConfiguration,
-    normalizeSystemDirectoryPath,
-    shouldRenameApicalSourceForFetchedEvent,
-} from '../app/systemConfig.js';
-import { incrementLoadingMetric } from '../loadingMetrics.js';
-import type { LoadingProgressCallback } from '../loadingProgress.js';
-import type { SystemConfigPersistence } from '../persistence/systemConfigPersistence.js';
+  APICAL_DEFAULT_SOURCE_NAME,
+  type DataSourceConfig,
+  type DataSourceType,
+  type ListenerServerConfig,
+  type RemoteServerConfig,
+  type SessionSourceAssignment,
+  type SystemConfiguration,
+  type TimingContextSelectionConfig,
+  createDefaultSystemConfiguration,
+  getDataSourceTypeLabel,
+  normalizeOptionalSystemFilePath,
+  normalizeSystemConfiguration,
+  normalizeSystemDirectoryPath,
+  shouldRenameApicalSourceForFetchedEvent,
+} from "../app/systemConfig.js";
+import { incrementLoadingMetric } from "../loadingMetrics.js";
+import type { LoadingProgressCallback } from "../loadingProgress.js";
+import type { SystemConfigPersistence } from "../persistence/systemConfigPersistence.js";
 
 export interface SystemConfigServiceOptions {
   onPersistedConfig?: (config: SystemConfiguration) => Promise<void>;
   onProgress?: LoadingProgressCallback;
 }
 
-const createSourceId = (): string => `source-${Date.now()}-${Math.round(Math.random() * 100000)}`;
+const createSourceId = (): string =>
+  `source-${Date.now()}-${Math.round(Math.random() * 100000)}`;
 
 const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
   const base: DataSourceConfig = {
@@ -35,13 +36,17 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
     type,
   };
 
-  if (type === 'api-apical-data-file' || type === 'api-apical-excel-file') {
+  if (
+    type === "api-apical-data-file" ||
+    type === "api-apical-excel-file" ||
+    type === "api-apical-recent-laps"
+  ) {
     return {
       ...base,
       apiConfig: {
-        authHeaderName: 'Authorization',
-        authHeaderValue: '',
-        baseUrl: 'https://apicalracetiming.com.au',
+        authHeaderName: "Authorization",
+        authHeaderValue: "",
+        baseUrl: "https://apicalracetiming.com.au",
         companyId: 2,
         httpTimeoutSeconds: 30,
         live: false,
@@ -49,46 +54,49 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
         selectedEventIds: [],
       },
       listedEvents: [],
-      name: APICAL_DEFAULT_SOURCE_NAME,
+      name:
+        type === "api-apical-recent-laps"
+          ? getDataSourceTypeLabel(type)
+          : APICAL_DEFAULT_SOURCE_NAME,
     };
   }
 
-  if (type === 'master-entrant-profiles') {
+  if (type === "master-entrant-profiles") {
     return {
       ...base,
       masterEntrantConfig: {
         profiles: [],
       },
-      name: 'Master Entrant Profiles',
+      name: "Master Entrant Profiles",
     };
   }
 
-  if (type === 'file-rfid-timing-csv') {
+  if (type === "file-rfid-timing-csv") {
     return {
       ...base,
       fileConfig: {},
-      name: 'RFID Timing CSV',
+      name: "RFID Timing CSV",
     };
   }
 
-  if (type === 'file-dorian-ctc-srt') {
+  if (type === "file-dorian-ctc-srt") {
     return {
       ...base,
-      fileConfig: { importMode: 'import' },
+      fileConfig: { importMode: "import" },
       finishLineNumbers: [1],
-      name: 'Dorian CTC SRT / ERF File',
+      name: "Dorian CTC SRT / ERF File",
     };
   }
 
-  if (type === 'file-durt-filemaker') {
+  if (type === "file-durt-filemaker") {
     return {
       ...base,
-      durtFileMakerConfig: { importMode: 'import' },
-      name: 'DURT FileMaker Database',
+      durtFileMakerConfig: { importMode: "import" },
+      name: "DURT FileMaker Database",
     };
   }
 
-  if (type === 'file-mr-scats-data') {
+  if (type === "file-mr-scats-data") {
     return {
       ...base,
       finishLineNumbers: [1],
@@ -96,22 +104,22 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
         files: [],
         ignoreLineOneNo1CrossingsWhenDbfPresent: true,
       },
-      name: 'MR-SCATS Data',
+      name: "MR-SCATS Data",
     };
   }
 
-  if (type === 'timing-dorian-data1-supernode') {
+  if (type === "timing-dorian-data1-supernode") {
     return {
       ...base,
       finishLineNumbers: [1],
     };
   }
 
-  if (type === 'timing-rfid-decoder') {
+  if (type === "timing-rfid-decoder") {
     return {
       ...base,
       finishLineNumbers: [1],
-      name: 'RFID Decoder Listener',
+      name: "RFID Decoder Listener",
       rfidDecoderConfig: { isListening: false, listenPort: 11113 },
     };
   }
@@ -119,8 +127,14 @@ const createDefaultSource = (type: DataSourceType): DataSourceConfig => {
   return base;
 };
 
-const isApicalDataSource = (source: Pick<DataSourceConfig, 'type'>): boolean => {
-  return source.type === 'api-apical-data-file' || source.type === 'api-apical-excel-file';
+const isApicalDataSource = (
+  source: Pick<DataSourceConfig, "type">,
+): boolean => {
+  return (
+    source.type === "api-apical-data-file" ||
+    source.type === "api-apical-excel-file" ||
+    source.type === "api-apical-recent-laps"
+  );
 };
 
 export class SystemConfigService {
@@ -128,57 +142,102 @@ export class SystemConfigService {
   private readonly options: SystemConfigServiceOptions;
   private readonly persistence: SystemConfigPersistence;
 
-  private constructor(persistence: SystemConfigPersistence, config: SystemConfiguration, options: SystemConfigServiceOptions = {}) {
+  private constructor(
+    persistence: SystemConfigPersistence,
+    config: SystemConfiguration,
+    options: SystemConfigServiceOptions = {},
+  ) {
     this.config = config;
     this.options = options;
     this.persistence = persistence;
   }
 
-  public static async create(persistence: SystemConfigPersistence, options: SystemConfigServiceOptions = {}): Promise<SystemConfigService> {
-    incrementLoadingMetric('Load system config service');
+  public static async create(
+    persistence: SystemConfigPersistence,
+    options: SystemConfigServiceOptions = {},
+  ): Promise<SystemConfigService> {
+    incrementLoadingMetric("Load system config service");
     const config = await persistence.load();
     const eventAssignmentIds = Object.keys(config.eventSourceAssignments);
     const sessionAssignmentIds = Object.keys(config.sessionSourceAssignments);
-    const total = Math.max(1, config.dataSources.length + eventAssignmentIds.length + sessionAssignmentIds.length);
+    const total = Math.max(
+      1,
+      config.dataSources.length +
+        eventAssignmentIds.length +
+        sessionAssignmentIds.length,
+    );
     let completed = 0;
-    await options.onProgress?.({ completed, currentTask: 'Preparing system configuration', total });
+    await options.onProgress?.({
+      completed,
+      currentTask: "Preparing system configuration",
+      total,
+    });
     for (const source of config.dataSources) {
-      incrementLoadingMetric('Normalize system data source', source.name || source.id);
+      incrementLoadingMetric(
+        "Normalize system data source",
+        source.name || source.id,
+      );
       completed += 1;
-      await options.onProgress?.({ completed, currentTask: `Normalize source ${source.name || source.id}`, total });
+      await options.onProgress?.({
+        completed,
+        currentTask: `Normalize source ${source.name || source.id}`,
+        total,
+      });
     }
     for (const eventId of eventAssignmentIds) {
-      incrementLoadingMetric('Normalize event source assignment', eventId);
+      incrementLoadingMetric("Normalize event source assignment", eventId);
       completed += 1;
-      await options.onProgress?.({ completed, currentTask: `Normalize event source assignment ${eventId}`, total });
+      await options.onProgress?.({
+        completed,
+        currentTask: `Normalize event source assignment ${eventId}`,
+        total,
+      });
     }
     for (const sessionId of sessionAssignmentIds) {
-      incrementLoadingMetric('Normalize session source assignment', sessionId);
+      incrementLoadingMetric("Normalize session source assignment", sessionId);
       completed += 1;
-      await options.onProgress?.({ completed, currentTask: `Normalize session source assignment ${sessionId}`, total });
+      await options.onProgress?.({
+        completed,
+        currentTask: `Normalize session source assignment ${sessionId}`,
+        total,
+      });
     }
-    return new SystemConfigService(persistence, normalizeSystemConfiguration(config), options);
+    return new SystemConfigService(
+      persistence,
+      normalizeSystemConfiguration(config),
+      options,
+    );
   }
 
   public get state(): SystemConfiguration {
     return this.config;
   }
 
-  public applyRemoteConfiguration(config: SystemConfiguration): SystemConfiguration {
+  public applyRemoteConfiguration(
+    config: SystemConfiguration,
+  ): SystemConfiguration {
     this.config = normalizeSystemConfiguration(config);
     return this.config;
   }
 
-  public async updateListenerServer(changes: Partial<ListenerServerConfig>): Promise<SystemConfiguration> {
+  public async updateListenerServer(
+    changes: Partial<ListenerServerConfig>,
+  ): Promise<SystemConfiguration> {
     this.config = normalizeSystemConfiguration({
       ...this.config,
-      listenerServer: { enabled: false, ...this.config.listenerServer, ...changes },
+      listenerServer: {
+        enabled: false,
+        ...this.config.listenerServer,
+        ...changes,
+      },
     });
     await this.persist();
     return this.config;
   }
 
-  public async updateRemoteServer(changes: Partial<RemoteServerConfig>): Promise<SystemConfiguration> {
+  public async updateRemoteServer(
+    changes: Partial<RemoteServerConfig>,
+  ): Promise<SystemConfiguration> {
     this.config = normalizeSystemConfiguration({
       ...this.config,
       remoteServer: { ...this.config.remoteServer, ...changes },
@@ -187,16 +246,21 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async createSource(type: DataSourceType): Promise<SystemConfiguration> {
+  public async createSource(
+    type: DataSourceType,
+  ): Promise<SystemConfiguration> {
     const source = createDefaultSource(type);
     this.config = {
       ...this.config,
       dataSources: [
         ...this.config.dataSources,
-        isApicalDataSource(source) && (this.config.apicalListedEvents || []).length > 0
+        isApicalDataSource(source) &&
+        (this.config.apicalListedEvents || []).length > 0
           ? {
               ...source,
-              listedEvents: (this.config.apicalListedEvents || []).map((event) => ({ ...event })),
+              listedEvents: (this.config.apicalListedEvents || []).map(
+                (event) => ({ ...event }),
+              ),
             }
           : source,
       ],
@@ -205,7 +269,54 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async updateSource(sourceId: TimeRecordSourceId, changes: Partial<DataSourceConfig>): Promise<SystemConfiguration> {
+  public async cloneApicalSourceForEvent(
+    sourceId: TimeRecordSourceId,
+    apicalEventId: number,
+  ): Promise<SystemConfiguration> {
+    const source: DataSourceConfig | undefined = this.config.dataSources.find(
+      (candidate: DataSourceConfig): boolean => candidate.id === sourceId,
+    );
+    const eventName: string | undefined = source?.listedEvents?.find(
+      (eventItem): boolean => eventItem.id === apicalEventId,
+    )?.name;
+
+    if (
+      !source ||
+      source.type !== "api-apical-excel-file" ||
+      !source.apiConfig ||
+      !eventName
+    ) {
+      throw new Error(
+        "The selected Apical event is not available for this source.",
+      );
+    }
+
+    const clonedSource: DataSourceConfig = {
+      ...source,
+      apiConfig: {
+        ...source.apiConfig,
+        apicalEventId,
+        selectedEventIds: [apicalEventId],
+      },
+      id: createSourceId(),
+      listedEvents: (source.listedEvents || []).map((eventItem) => ({
+        ...eventItem,
+      })),
+      name: eventName,
+    };
+
+    this.config = {
+      ...this.config,
+      dataSources: [...this.config.dataSources, clonedSource],
+    };
+    await this.persist();
+    return this.config;
+  }
+
+  public async updateSource(
+    sourceId: TimeRecordSourceId,
+    changes: Partial<DataSourceConfig>,
+  ): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
       dataSources: this.config.dataSources.map((source) => {
@@ -223,31 +334,42 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async deleteSource(sourceId: TimeRecordSourceId): Promise<SystemConfiguration> {
+  public async deleteSource(
+    sourceId: TimeRecordSourceId,
+  ): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
-      dataSources: this.config.dataSources.filter((source) => source.id !== sourceId),
+      dataSources: this.config.dataSources.filter(
+        (source) => source.id !== sourceId,
+      ),
       eventSourceAssignments: Object.fromEntries(
-        Object.entries(this.config.eventSourceAssignments).map(([eventId, sourceIds]) => [
-          eventId,
-          sourceIds.filter((id) => id !== sourceId),
-        ])
+        Object.entries(this.config.eventSourceAssignments).map(
+          ([eventId, sourceIds]) => [
+            eventId,
+            sourceIds.filter((id) => id !== sourceId),
+          ],
+        ),
       ),
       sessionSourceAssignments: Object.fromEntries(
-        Object.entries(this.config.sessionSourceAssignments).map(([sessionId, assignment]) => [
-          sessionId,
-          {
-            ...assignment,
-            sourceIds: assignment.sourceIds.filter((id) => id !== sourceId),
-          },
-        ])
+        Object.entries(this.config.sessionSourceAssignments).map(
+          ([sessionId, assignment]) => [
+            sessionId,
+            {
+              ...assignment,
+              sourceIds: assignment.sourceIds.filter((id) => id !== sourceId),
+            },
+          ],
+        ),
       ),
     };
     await this.persist();
     return this.config;
   }
 
-  public async assignSourcesToEvent(eventId: EventId, sourceIds: TimeRecordSourceId[]): Promise<SystemConfiguration> {
+  public async assignSourcesToEvent(
+    eventId: EventId,
+    sourceIds: TimeRecordSourceId[],
+  ): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
       eventSourceAssignments: {
@@ -259,7 +381,10 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async assignSourcesToSession(sessionId: SessionId, assignment: SessionSourceAssignment): Promise<SystemConfiguration> {
+  public async assignSourcesToSession(
+    sessionId: SessionId,
+    assignment: SessionSourceAssignment,
+  ): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
       sessionSourceAssignments: {
@@ -271,7 +396,10 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async updateEventOptions(eventId: EventId, changes: SystemConfiguration['eventOptions'][string]): Promise<SystemConfiguration> {
+  public async updateEventOptions(
+    eventId: EventId,
+    changes: SystemConfiguration["eventOptions"][string],
+  ): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
       eventOptions: {
@@ -287,7 +415,7 @@ export class SystemConfigService {
   }
 
   public async updateFastestTimeIndicatorColors(
-    changes: Partial<SystemConfiguration['fastestTimeIndicatorColors']>
+    changes: Partial<SystemConfiguration["fastestTimeIndicatorColors"]>,
   ): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
@@ -300,7 +428,9 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async updateLocalStorageDirectoryPath(directoryPath: string): Promise<SystemConfiguration> {
+  public async updateLocalStorageDirectoryPath(
+    directoryPath: string,
+  ): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
       localStorageDirectoryPath: normalizeSystemDirectoryPath(directoryPath),
@@ -309,7 +439,9 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async updateTimingContextSelection(selection: TimingContextSelectionConfig): Promise<SystemConfiguration> {
+  public async updateTimingContextSelection(
+    selection: TimingContextSelectionConfig,
+  ): Promise<SystemConfiguration> {
     this.config = {
       ...this.config,
       timingContextSelection: {
@@ -323,18 +455,24 @@ export class SystemConfigService {
   public async replaceSharedConfiguration(
     sharedConfig: Pick<
       SystemConfiguration,
-      'dataSources' | 'eventOptions' | 'eventSourceAssignments' | 'sessionSourceAssignments'
+      | "dataSources"
+      | "eventOptions"
+      | "eventSourceAssignments"
+      | "sessionSourceAssignments"
     >,
   ): Promise<SystemConfiguration> {
     const existingSources = new Map(
-      this.config.dataSources.map((source: DataSourceConfig): [string, DataSourceConfig] => [
-        source.id,
-        source,
-      ]),
+      this.config.dataSources.map(
+        (source: DataSourceConfig): [string, DataSourceConfig] => [
+          source.id,
+          source,
+        ],
+      ),
     );
     const dataSources: DataSourceConfig[] = sharedConfig.dataSources.map(
       (source: DataSourceConfig): DataSourceConfig => {
-        const existingSource: DataSourceConfig | undefined = existingSources.get(source.id);
+        const existingSource: DataSourceConfig | undefined =
+          existingSources.get(source.id);
         if (!source.apiConfig || !existingSource?.apiConfig) {
           return source;
         }
@@ -342,7 +480,8 @@ export class SystemConfigService {
           ...source,
           apiConfig: {
             ...source.apiConfig,
-            authHeaderValue: source.apiConfig.authHeaderValue ||
+            authHeaderValue:
+              source.apiConfig.authHeaderValue ||
               existingSource.apiConfig.authHeaderValue,
           },
         };
@@ -359,34 +498,46 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async persistListedApicalEvents(sourceId: TimeRecordSourceId, listedEvents: DataSourceConfig['listedEvents']): Promise<SystemConfiguration> {
+  public async persistListedApicalEvents(
+    sourceId: TimeRecordSourceId,
+    listedEvents: DataSourceConfig["listedEvents"],
+  ): Promise<SystemConfiguration> {
     const source = this.config.dataSources.find((item) => item.id === sourceId);
     if (!source || !isApicalDataSource(source) || !source.apiConfig) {
       return this.updateSource(sourceId, { listedEvents });
     }
 
-    const listedEventIds = new Set((listedEvents || []).map((eventItem) => eventItem.id));
-    const selectedEventIds = (source.apiConfig.selectedEventIds || []).filter((eventId) => listedEventIds.has(eventId));
+    const listedEventIds = new Set(
+      (listedEvents || []).map((eventItem) => eventItem.id),
+    );
+    const selectedEventIds = (source.apiConfig.selectedEventIds || []).filter(
+      (eventId) => listedEventIds.has(eventId),
+    );
     this.config = {
       ...this.config,
-      apicalListedEvents: (listedEvents || []).map((eventItem) => ({ ...eventItem })),
+      apicalListedEvents: (listedEvents || []).map((eventItem) => ({
+        ...eventItem,
+      })),
       dataSources: this.config.dataSources.map((item) => {
         if (!isApicalDataSource(item)) {
           return item;
         }
 
-        const nextApiConfig = item.id === sourceId && item.apiConfig
-          ? {
-              ...item.apiConfig,
-              apicalEventId: selectedEventIds[0],
-              selectedEventIds,
-            }
-          : item.apiConfig;
+        const nextApiConfig =
+          item.id === sourceId && item.apiConfig
+            ? {
+                ...item.apiConfig,
+                apicalEventId: selectedEventIds[0],
+                selectedEventIds,
+              }
+            : item.apiConfig;
 
         return {
           ...item,
           apiConfig: nextApiConfig,
-          listedEvents: (listedEvents || []).map((eventItem) => ({ ...eventItem })),
+          listedEvents: (listedEvents || []).map((eventItem) => ({
+            ...eventItem,
+          })),
         };
       }),
     };
@@ -401,10 +552,12 @@ export class SystemConfigService {
     sessionId: SessionId,
     retrievedAt: string,
     apicalDataFilePath?: string,
-    eventName?: string
+    eventName?: string,
   ): Promise<SystemConfiguration> {
-    const assignedEventSources = this.config.eventSourceAssignments[eventId] || [];
-    const normalizedApicalDataFilePath = normalizeOptionalSystemFilePath(apicalDataFilePath);
+    const assignedEventSources =
+      this.config.eventSourceAssignments[eventId] || [];
+    const normalizedApicalDataFilePath =
+      normalizeOptionalSystemFilePath(apicalDataFilePath);
     this.config = {
       ...this.config,
       dataSources: this.config.dataSources.map((source) => {
@@ -416,7 +569,10 @@ export class SystemConfigService {
           ...source,
           apicalDataFilePath: normalizedApicalDataFilePath,
           dataLastRetrieved: retrievedAt,
-          name: eventName && shouldRenameApicalSourceForFetchedEvent(source.name) ? eventName : source.name,
+          name:
+            eventName && shouldRenameApicalSourceForFetchedEvent(source.name)
+              ? eventName
+              : source.name,
         };
       }),
       eventSourceAssignments: {
@@ -426,7 +582,7 @@ export class SystemConfigService {
       sessionSourceAssignments: {
         ...this.config.sessionSourceAssignments,
         [sessionId]: {
-          mode: 'specific',
+          mode: "specific",
           sourceIds: [sourceId],
         },
       },
@@ -435,13 +591,20 @@ export class SystemConfigService {
     return this.config;
   }
 
-  public async persistApicalDataFilePaths(sourceFilePaths: Record<string, string | undefined>): Promise<SystemConfiguration> {
+  public async persistApicalDataFilePaths(
+    sourceFilePaths: Record<string, string | undefined>,
+  ): Promise<SystemConfiguration> {
     let changed = false;
     this.config = {
       ...this.config,
       dataSources: this.config.dataSources.map((source) => {
-        const apicalDataFilePath = normalizeOptionalSystemFilePath(sourceFilePaths[source.id]);
-        if (!apicalDataFilePath || source.apicalDataFilePath === apicalDataFilePath) {
+        const apicalDataFilePath = normalizeOptionalSystemFilePath(
+          sourceFilePaths[source.id],
+        );
+        if (
+          !apicalDataFilePath ||
+          source.apicalDataFilePath === apicalDataFilePath
+        ) {
           return source;
         }
 

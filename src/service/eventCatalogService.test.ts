@@ -82,7 +82,8 @@ const TEST_CATEGORY_ID = createCategoryId("event-2026-test-day-category");
 const TEST_ENTRANT_ID = createEventEntrantId("event-2026-test-day-entrant");
 const TEST_EVENT_ID = createEventId("event-2026-test-day");
 const TEST_SESSION_ID = createSessionId("event-2026-test-day-session");
-const indyEntrantsPath = "C:/Users/tim/OneDrive/RaceTime/timing/DORIAN/INDY/entrants.xlsx";
+const indyEntrantsPath =
+  "C:/Users/tim/OneDrive/RaceTime/timing/DORIAN/INDY/entrants.xlsx";
 const maybeIndyIt = existsSync(indyEntrantsPath) ? it : it.skip;
 
 const getParticipantRacePlate = (
@@ -206,58 +207,90 @@ const expectLedgerPhaseIdsToBeValid = (
 };
 
 describe("EventCatalogService", () => {
-  maybeIndyIt("imports the INDY workbook as 33 Entries without merging shared Entrants", async () => {
-    const service = await EventCatalogService.create(
-      createPersistence(createSeedEventCatalogLedger()),
-    );
-    await service.updateEvent(SEED_EVENT_ID, { discipline: "motorsport" });
-    await service.updateImportedRaceState(SEED_EVENT_ID, SEED_RACE_SESSION_ID, {
-      categories: getCategoriesForEvent(service.catalog, SEED_EVENT_ID),
-      entries: [],
-      participants: [],
-      records: [],
-      teams: [],
-      timeRecordSources: [],
-    });
+  maybeIndyIt(
+    "imports the INDY workbook as 33 Entries without merging shared Entrants",
+    async () => {
+      const service = await EventCatalogService.create(
+        createPersistence(createSeedEventCatalogLedger()),
+      );
+      await service.updateEvent(SEED_EVENT_ID, { discipline: "motorsport" });
+      await service.updateImportedRaceState(
+        SEED_EVENT_ID,
+        SEED_RACE_SESSION_ID,
+        {
+          categories: getCategoriesForEvent(service.catalog, SEED_EVENT_ID),
+          entries: [],
+          participants: [],
+          records: [],
+          teams: [],
+          timeRecordSources: [],
+        },
+      );
 
-    const records = parseEntrantImportBuffer(readFileSync(indyEntrantsPath));
-    const catalog = await service.importEntrants(
-      SEED_EVENT_ID,
-      records,
-      SEED_PREMIER_CATEGORY_ID,
-    );
-    const entries = getEntriesForEvent(catalog, SEED_EVENT_ID);
-    const entrants = getEntrantsForEvent(catalog, SEED_EVENT_ID);
-    const mears = entries.find((entry) => entry.name === "Rick Mears");
-    const andretti = entries.find((entry) => entry.name === "Michael Andretti");
-    const fittipaldi = entries.find((entry) => entry.name === "Emerson Fittipaldi");
-    const penske = entrants.find(
-      (entrant) => entrant.isEntryOwner === true && entrant.name === "Penske Racing",
-    );
-    const mearsVerification = records.find((record) => record.fullName === "Rick Mears");
-    const andrettiVerification = records.find((record) => record.fullName === "Michael Andretti");
-    const fittipaldiVerification = records.find((record) => record.fullName === "Emerson Fittipaldi");
+      const records = parseEntrantImportBuffer(readFileSync(indyEntrantsPath));
+      const catalog = await service.importEntrants(
+        SEED_EVENT_ID,
+        records,
+        SEED_PREMIER_CATEGORY_ID,
+      );
+      const entries = getEntriesForEvent(catalog, SEED_EVENT_ID);
+      const entrants = getEntrantsForEvent(catalog, SEED_EVENT_ID);
+      const mears = entries.find((entry) => entry.name === "Rick Mears");
+      const andretti = entries.find(
+        (entry) => entry.name === "Michael Andretti",
+      );
+      const fittipaldi = entries.find(
+        (entry) => entry.name === "Emerson Fittipaldi",
+      );
+      const penske = entrants.find(
+        (entrant) =>
+          entrant.isEntryOwner === true && entrant.name === "Penske Racing",
+      );
+      const mearsVerification = records.find(
+        (record) => record.fullName === "Rick Mears",
+      );
+      const andrettiVerification = records.find(
+        (record) => record.fullName === "Michael Andretti",
+      );
+      const fittipaldiVerification = records.find(
+        (record) => record.fullName === "Emerson Fittipaldi",
+      );
 
-    expect(entries).toHaveLength(33);
-    expect(mearsVerification).toEqual(expect.objectContaining({ classifiedLaps: 200, finishPosition: 1 }));
-    expect(andrettiVerification).toEqual(expect.objectContaining({ classifiedLaps: 200, finishPosition: 2 }));
-    expect(fittipaldiVerification).toEqual(expect.objectContaining({ classifiedLaps: 171, finishPosition: 11 }));
-    expect(mears).toEqual(expect.objectContaining({
-      entrantId: penske?.id,
-      raceNumber: "3",
-    }));
-    expect(andretti).toEqual(expect.objectContaining({
-      raceNumber: "10",
-    }));
-    expect(fittipaldi).toEqual(expect.objectContaining({
-      entrantId: penske?.id,
-      raceNumber: "5",
-    }));
-    expect(Object.hasOwn(mears || {}, "classifiedLaps")).toBe(false);
-    expect(Object.hasOwn(mears || {}, "finishPosition")).toBe(false);
-    expect(mears?.id).not.toBe(fittipaldi?.id);
-    expect(penske?.entryIds).toEqual(expect.arrayContaining([mears?.id, fittipaldi?.id]));
-  });
+      expect(entries).toHaveLength(33);
+      expect(mearsVerification).toEqual(
+        expect.objectContaining({ classifiedLaps: 200, finishPosition: 1 }),
+      );
+      expect(andrettiVerification).toEqual(
+        expect.objectContaining({ classifiedLaps: 200, finishPosition: 2 }),
+      );
+      expect(fittipaldiVerification).toEqual(
+        expect.objectContaining({ classifiedLaps: 171, finishPosition: 11 }),
+      );
+      expect(mears).toEqual(
+        expect.objectContaining({
+          entrantId: penske?.id,
+          raceNumber: "3",
+        }),
+      );
+      expect(andretti).toEqual(
+        expect.objectContaining({
+          raceNumber: "10",
+        }),
+      );
+      expect(fittipaldi).toEqual(
+        expect.objectContaining({
+          entrantId: penske?.id,
+          raceNumber: "5",
+        }),
+      );
+      expect(Object.hasOwn(mears || {}, "classifiedLaps")).toBe(false);
+      expect(Object.hasOwn(mears || {}, "finishPosition")).toBe(false);
+      expect(mears?.id).not.toBe(fittipaldi?.id);
+      expect(penske?.entryIds).toEqual(
+        expect.arrayContaining([mears?.id, fittipaldi?.id]),
+      );
+    },
+  );
 
   it("rejects malformed persistence objects before loading the event catalog", async () => {
     await expect(
@@ -835,7 +868,9 @@ describe("EventCatalogService", () => {
     await service.updateEvent(SEED_EVENT_ID, { discipline: "motorsport" });
     await service.updateCategory(SEED_PREMIER_CATEGORY_ID, {
       teamRules: {
-        ...getCategoriesForEvent(service.catalog, SEED_EVENT_ID).find((category) => category.id === SEED_PREMIER_CATEGORY_ID)?.teamRules,
+        ...getCategoriesForEvent(service.catalog, SEED_EVENT_ID).find(
+          (category) => category.id === SEED_PREMIER_CATEGORY_ID,
+        )?.teamRules,
         identityMode: "multiple",
         teamCompositionRules: [],
       },
@@ -879,13 +914,16 @@ describe("EventCatalogService", () => {
     const matchedPlaceholder = importedRiders.find(
       (entrant) => entrant.name === "Rick Mears",
     );
-    const matchedPlaceholderEntry = getEntriesForEvent(catalog, SEED_EVENT_ID)
-      .find((entry) => entry.id === matchedPlaceholder?.id);
+    const matchedPlaceholderEntry = getEntriesForEvent(
+      catalog,
+      SEED_EVENT_ID,
+    ).find((entry) => entry.id === matchedPlaceholder?.id);
     const secondDriver = importedRiders.find(
       (entrant) => entrant.name === "Second Driver",
     );
-    const secondDriverEntry = getEntriesForEvent(catalog, SEED_EVENT_ID)
-      .find((entry) => entry.id === secondDriver?.id);
+    const secondDriverEntry = getEntriesForEvent(catalog, SEED_EVENT_ID).find(
+      (entry) => entry.id === secondDriver?.id,
+    );
     const penskeEntrant = getEntrantsForEvent(catalog, SEED_EVENT_ID).find(
       (entrant) =>
         entrant.isEntryOwner === true && entrant.name === "Penske Racing",
@@ -954,18 +992,30 @@ describe("EventCatalogService", () => {
     expect(importedRaceState?.teams).toHaveLength(0);
     expect(onPersistedLedger).toHaveBeenCalledTimes(1);
     const persistedLedger = onPersistedLedger.mock.calls[0]?.[0];
-    const ownerCreationIndex = persistedLedger?.mutations.findIndex(
-      (mutation) => mutation.type === "entrant-created" && mutation.entrant.id === penskeEntrant?.id,
-    ) ?? -1;
-    const entryCreationIndex = persistedLedger?.mutations.findIndex(
-      (mutation) => mutation.type === "entry-created" && mutation.entry.id === matchedPlaceholderEntry?.id,
-    ) ?? -1;
-    const eventLinkIndex = persistedLedger?.mutations.findLastIndex(
-      (mutation) => mutation.type === "event-updated" && mutation.changes.entryIds?.includes(matchedPlaceholderEntry!.id),
-    ) ?? -1;
-    const raceStateImportIndex = persistedLedger?.mutations.findLastIndex(
-      (mutation) => mutation.type === "race-state-imported" && mutation.sessionId === SEED_RACE_SESSION_ID,
-    ) ?? -1;
+    const ownerCreationIndex =
+      persistedLedger?.mutations.findIndex(
+        (mutation) =>
+          mutation.type === "entrant-created" &&
+          mutation.entrant.id === penskeEntrant?.id,
+      ) ?? -1;
+    const entryCreationIndex =
+      persistedLedger?.mutations.findIndex(
+        (mutation) =>
+          mutation.type === "entry-created" &&
+          mutation.entry.id === matchedPlaceholderEntry?.id,
+      ) ?? -1;
+    const eventLinkIndex =
+      persistedLedger?.mutations.findLastIndex(
+        (mutation) =>
+          mutation.type === "event-updated" &&
+          mutation.changes.entryIds?.includes(matchedPlaceholderEntry!.id),
+      ) ?? -1;
+    const raceStateImportIndex =
+      persistedLedger?.mutations.findLastIndex(
+        (mutation) =>
+          mutation.type === "race-state-imported" &&
+          mutation.sessionId === SEED_RACE_SESSION_ID,
+      ) ?? -1;
     expect(ownerCreationIndex).toBeGreaterThanOrEqual(0);
     expect(entryCreationIndex).toBeGreaterThan(ownerCreationIndex);
     expect(eventLinkIndex).toBeGreaterThan(entryCreationIndex);
@@ -1009,7 +1059,10 @@ describe("EventCatalogService", () => {
     const updatedEntrant = getEntrantsForEvent(
       service.catalog,
       SEED_EVENT_ID,
-    ).find((entrant) => entrant.id !== createdEntrant!.id && entrant.name.includes("Casey"));
+    ).find(
+      (entrant) =>
+        entrant.id !== createdEntrant!.id && entrant.name.includes("Casey"),
+    );
     expect(updatedEntrant).toEqual(
       expect.objectContaining({
         firstName: "Casey",
@@ -1059,29 +1112,37 @@ describe("EventCatalogService", () => {
     ]);
 
     const driver = getEntrantsForEvent(catalog, SEED_EVENT_ID).find(
-      (entrant) => entrant.name === "Default Driver" && entrant.entrantType === "rider",
+      (entrant) =>
+        entrant.name === "Default Driver" && entrant.entrantType === "rider",
     );
-    const entry = getEntriesForEvent(catalog, SEED_EVENT_ID).find(
-      (candidate) => candidate.participantIds.some((participantId) => (
-        driver?.memberParticipantIds.includes(participantId)
-      )),
+    const entry = getEntriesForEvent(catalog, SEED_EVENT_ID).find((candidate) =>
+      candidate.participantIds.some((participantId) =>
+        driver?.memberParticipantIds.includes(participantId),
+      ),
     );
     const owningEntrant = getEntrantsForEvent(catalog, SEED_EVENT_ID).find(
       (entrant) => entrant.id === entry?.entrantId,
     );
 
-    expect(entry).toEqual(expect.objectContaining({
-      name: "Default Driver",
-      raceNumber: "123",
-    }));
-    expect(owningEntrant).toEqual(expect.objectContaining({
-      entryIds: [entry?.id],
-      isEntryOwner: true,
-      name: "Default Driver",
-    }));
-    expect(getEntrantsForEvent(catalog, SEED_EVENT_ID).filter((entrant) => (
-      entrant.entrantType === "team" && entrant.isEntryOwner !== true
-    ))).toHaveLength(0);
+    expect(entry).toEqual(
+      expect.objectContaining({
+        name: "Default Driver",
+        raceNumber: "123",
+      }),
+    );
+    expect(owningEntrant).toEqual(
+      expect.objectContaining({
+        entryIds: [entry?.id],
+        isEntryOwner: true,
+        name: "Default Driver",
+      }),
+    );
+    expect(
+      getEntrantsForEvent(catalog, SEED_EVENT_ID).filter(
+        (entrant) =>
+          entrant.entrantType === "team" && entrant.isEntryOwner !== true,
+      ),
+    ).toHaveLength(0);
 
     await service.updateEntry(entry!.id, {
       startOrder: 9,
@@ -1093,7 +1154,11 @@ describe("EventCatalogService", () => {
       name: "Updated Driver",
     });
 
-    expect(getEntriesForEvent(service.catalog, SEED_EVENT_ID).find((candidate) => candidate.id === entry?.id)).toEqual(
+    expect(
+      getEntriesForEvent(service.catalog, SEED_EVENT_ID).find(
+        (candidate) => candidate.id === entry?.id,
+      ),
+    ).toEqual(
       expect.objectContaining({ startOrder: 9, vehicle: "Updated race car" }),
     );
   });
@@ -1122,20 +1187,33 @@ describe("EventCatalogService", () => {
     ]);
 
     const importedRiders = getEntrantsForEvent(catalog, SEED_EVENT_ID).filter(
-      (entrant) => entrant.firstName === "Alex" && entrant.lastName === "Driver",
+      (entrant) =>
+        entrant.firstName === "Alex" && entrant.lastName === "Driver",
     );
     expect(importedRiders).toHaveLength(2);
-    expect(importedRiders.every((entrant) => !entrant.teamEntrantId)).toBe(true);
-    const owner = getEntrantsForEvent(catalog, SEED_EVENT_ID).find((entrant) => entrant.isEntryOwner === true);
-    expect(owner).toEqual(expect.objectContaining({
-      entryIds: importedRiders.map((entrant) => entrant.id),
-      name: "Indy Racing",
-    }));
-    expect(getEntriesForEvent(catalog, SEED_EVENT_ID)).toEqual(expect.arrayContaining(importedRiders.map((entrant) => expect.objectContaining({
-      entrantId: owner?.id,
-      id: entrant.id,
-      participantIds: entrant.memberParticipantIds,
-    }))));
+    expect(importedRiders.every((entrant) => !entrant.teamEntrantId)).toBe(
+      true,
+    );
+    const owner = getEntrantsForEvent(catalog, SEED_EVENT_ID).find(
+      (entrant) => entrant.isEntryOwner === true,
+    );
+    expect(owner).toEqual(
+      expect.objectContaining({
+        entryIds: importedRiders.map((entrant) => entrant.id),
+        name: "Indy Racing",
+      }),
+    );
+    expect(getEntriesForEvent(catalog, SEED_EVENT_ID)).toEqual(
+      expect.arrayContaining(
+        importedRiders.map((entrant) =>
+          expect.objectContaining({
+            entrantId: owner?.id,
+            id: entrant.id,
+            participantIds: entrant.memberParticipantIds,
+          }),
+        ),
+      ),
+    );
   });
 
   it("rejects an entrant import when a transmitter is already assigned to multiple entrants", async () => {
@@ -1171,7 +1249,9 @@ describe("EventCatalogService", () => {
     );
     await service.updateCategory(SEED_PREMIER_CATEGORY_ID, {
       teamRules: {
-        ...getCategoriesForEvent(service.catalog, SEED_EVENT_ID).find((category) => category.id === SEED_PREMIER_CATEGORY_ID)?.teamRules,
+        ...getCategoriesForEvent(service.catalog, SEED_EVENT_ID).find(
+          (category) => category.id === SEED_PREMIER_CATEGORY_ID,
+        )?.teamRules,
         identityMode: "multiple",
         teamCompositionRules: [],
       },
@@ -1242,8 +1322,9 @@ describe("EventCatalogService", () => {
         }),
       );
       expect(getParticipantRacePlate(participant!)).toBe(`${index + 101}`);
-      const entry = getEntriesForEvent(service.catalog, SEED_EVENT_ID)
-        .find((candidate) => candidate.id === entrant?.id);
+      const entry = getEntriesForEvent(service.catalog, SEED_EVENT_ID).find(
+        (candidate) => candidate.id === entrant?.id,
+      );
       const owningEntrant = getEntrantsForEvent(
         service.catalog,
         SEED_EVENT_ID,
@@ -2070,23 +2151,19 @@ describe("EventCatalogService", () => {
     );
 
     await expect(
-      service.updateImportedRaceState(
-        SEED_EVENT_ID,
-        SEED_PRACTICE_SESSION_ID,
-        {
-          records: [
-            {
-              id: createTimeRecordId("failed-persistence-record"),
-              recordType: RECORD_TX_CROSSING,
-              sequence: 1,
-              source: createTimeRecordSourceId(
-                "failed-persistence-record-source",
-              ),
-              time: new Date("2026-01-01T00:00:01.000Z"),
-            } as EventTimeRecord,
-          ],
-        },
-      ),
+      service.updateImportedRaceState(SEED_EVENT_ID, SEED_PRACTICE_SESSION_ID, {
+        records: [
+          {
+            id: createTimeRecordId("failed-persistence-record"),
+            recordType: RECORD_TX_CROSSING,
+            sequence: 1,
+            source: createTimeRecordSourceId(
+              "failed-persistence-record-source",
+            ),
+            time: new Date("2026-01-01T00:00:01.000Z"),
+          } as EventTimeRecord,
+        ],
+      }),
     ).rejects.toThrow("The imported race state could not be persisted.");
 
     expect(service.catalog).toEqual(originalCatalog);
@@ -2206,6 +2283,9 @@ describe("EventCatalogService", () => {
     });
     await service.updateSession(SEED_RACE_SESSION_ID, {
       categoryIds: [SEED_PREMIER_CATEGORY_ID],
+      startSequence: [
+        { categoryId: SEED_PREMIER_CATEGORY_ID, type: "category" },
+      ],
     });
 
     const event = service.catalog.events.find(
@@ -2237,6 +2317,9 @@ describe("EventCatalogService", () => {
     expect(session?.minimumLapTimeMilliseconds).toBe(45000);
     expect(session?.status).toBe("live");
     expect(raceSession?.categoryIds).toEqual([SEED_PREMIER_CATEGORY_ID]);
+    expect(raceSession?.startSequence).toEqual([
+      { categoryId: SEED_PREMIER_CATEGORY_ID, type: "category" },
+    ]);
     expect(category?.distanceRule).toEqual({ kind: "time", value: "1:45" });
     expect(category?.teamRules?.maxTeamSize).toBe(3);
     expect(seededPersistence.save).toHaveBeenCalledTimes(4);
@@ -2391,7 +2474,9 @@ describe("EventCatalogService", () => {
       [secondSessionId!],
     );
     expect(
-      repairedService.catalog.sessions.find((session) => session.id === secondSessionId)?.categoryIds,
+      repairedService.catalog.sessions.find(
+        (session) => session.id === secondSessionId,
+      )?.categoryIds,
     ).toEqual([secondEventCategory!.id]);
     await expect(
       repairedService.updateCategorySessionAssignments(
@@ -5009,8 +5094,11 @@ describe("EventCatalogService", () => {
       (item) => item.id === SEED_ENTRANT_ID,
     );
     expect(deletedCategory?.deleted).toBe(true);
-    expect(getCategoriesForEvent(service.catalog, SEED_EVENT_ID)
-      .some((item) => item.id === SEED_CLUBMAN_CATEGORY_ID)).toBe(false);
+    expect(
+      getCategoriesForEvent(service.catalog, SEED_EVENT_ID).some(
+        (item) => item.id === SEED_CLUBMAN_CATEGORY_ID,
+      ),
+    ).toBe(false);
     expect(entrant?.categoryId).toBeUndefined();
     expect(entrant?.categoryIds).toEqual([]);
   });
@@ -5207,11 +5295,13 @@ describe("EventCatalogService", () => {
       }),
     );
     expect(importedParticipant?.categoryId).toBeUndefined();
-    expect(importedParticipant).toEqual(expect.objectContaining({
-      firstname: "Seed",
-      isPlaceholder: false,
-      surname: "Entrant",
-    }));
+    expect(importedParticipant).toEqual(
+      expect.objectContaining({
+        firstname: "Seed",
+        isPlaceholder: false,
+        surname: "Entrant",
+      }),
+    );
     expect(importedUnscaffoldedParticipant?.categoryId).toBeUndefined();
     expect(
       service.getImportedRaceState(SEED_EVENT_ID, SEED_RACE_SESSION_ID)
@@ -5391,7 +5481,11 @@ describe("EventCatalogService", () => {
       createdEntrantId!,
       onCompleteStep,
     );
-    expect(service.catalog.entrants.find((entrant) => entrant.id === createdEntrantId)?.deleted).toBe(true);
+    expect(
+      service.catalog.entrants.find(
+        (entrant) => entrant.id === createdEntrantId,
+      )?.deleted,
+    ).toBe(true);
 
     sessions = getSessionsForEvent(service.catalog, SEED_EVENT_ID);
     categories = getCategoriesForEvent(service.catalog, SEED_EVENT_ID);
@@ -5407,35 +5501,62 @@ describe("EventCatalogService", () => {
     ).toBeUndefined();
   });
 
-  it('deletes multiple entrants with one immutable catalog mutation', async () => {
-    const service = await EventCatalogService.create(createPersistence(createSeedEventCatalogLedger()));
-    await service.createEntrant(SEED_EVENT_ID, 'rider');
-    await service.createEntrant(SEED_EVENT_ID, 'rider');
+  it("deletes multiple entrants with one immutable catalog mutation", async () => {
+    const service = await EventCatalogService.create(
+      createPersistence(createSeedEventCatalogLedger()),
+    );
+    await service.createEntrant(SEED_EVENT_ID, "rider");
+    await service.createEntrant(SEED_EVENT_ID, "rider");
     const entrantIds = getEntrantsForEvent(service.catalog, SEED_EVENT_ID)
-      .filter((entrant) => entrant.name === 'New Driver')
+      .filter((entrant) => entrant.name === "New Driver")
       .map((entrant) => entrant.id);
     const mutationCount = service.mutations.length;
 
     await service.deleteEntrants(SEED_EVENT_ID, entrantIds);
 
     expect(service.mutations.slice(mutationCount)).toEqual([
-      expect.objectContaining({ entrantIds, eventId: SEED_EVENT_ID, type: 'entrants-deleted' }),
+      expect.objectContaining({
+        entrantIds,
+        eventId: SEED_EVENT_ID,
+        type: "entrants-deleted",
+      }),
     ]);
-    expect(getEntrantsForEvent(service.catalog, SEED_EVENT_ID).map((entrant) => entrant.id)).not.toEqual(expect.arrayContaining(entrantIds));
+    expect(
+      getEntrantsForEvent(service.catalog, SEED_EVENT_ID).map(
+        (entrant) => entrant.id,
+      ),
+    ).not.toEqual(expect.arrayContaining(entrantIds));
   });
 });
 
 describe("applyEventCatalogLedger", () => {
   it("reports and awaits one progress callback per mutation", async () => {
     const ledger = createSeedEventCatalogLedger();
-    const progressEvents: Array<{ completed: number; currentTask: string; total: number }> = [];
+    const progressEvents: Array<{
+      completed: number;
+      currentTask: string;
+      total: number;
+    }> = [];
 
-    const state = await applyEventCatalogLedgerWithProgress(ledger, async (progress) => {
-      progressEvents.push({ completed: progress.completed, currentTask: progress.currentTask, total: progress.total });
+    const state = await applyEventCatalogLedgerWithProgress(
+      ledger,
+      async (progress) => {
+        progressEvents.push({
+          completed: progress.completed,
+          currentTask: progress.currentTask,
+          total: progress.total,
+        });
+      },
+    );
+
+    expect(progressEvents[0]).toEqual({
+      completed: 0,
+      currentTask: "Preparing event catalog replay",
+      total: ledger.mutations.length,
     });
-
-    expect(progressEvents[0]).toEqual({ completed: 0, currentTask: 'Preparing event catalog replay', total: ledger.mutations.length });
-    expect(progressEvents.slice(1).map((progress) => progress.completed)).toEqual(
+    expect(
+      progressEvents.slice(1).map((progress) => progress.completed),
+    ).toEqual(
       Array.from({ length: ledger.mutations.length }, (_, index) => index + 1),
     );
     expect(state).toEqual(applyEventCatalogLedger(ledger));

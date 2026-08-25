@@ -1,18 +1,18 @@
 // @vitest-environment jsdom
 
-import { flushSync } from 'react-dom';
-import { type Root, createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { type DataSourceConfig } from '../../app/systemConfig.js';
-import { DataSourcesPanel } from './dataSources.js';
+import { flushSync } from "react-dom";
+import { type Root, createRoot } from "react-dom/client";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { type DataSourceConfig } from "../../app/systemConfig.js";
+import { DataSourcesPanel } from "./dataSources.js";
 
 const dataSources: DataSourceConfig[] = [
   {
     apiConfig: {
       apicalEventId: 1001,
-      authHeaderName: 'Authorization',
-      authHeaderValue: 'Bearer token',
-      baseUrl: 'https://apicalracetiming.com.au',
+      authHeaderName: "Authorization",
+      authHeaderValue: "Bearer token",
+      baseUrl: "https://apicalracetiming.com.au",
       companyId: 2,
       httpTimeoutSeconds: 10,
       live: true,
@@ -20,26 +20,26 @@ const dataSources: DataSourceConfig[] = [
       selectedEventIds: [1001],
     },
     enabled: true,
-    id: 'source-apical',
+    id: "source-apical",
     listedEvents: [
-      { id: 1001, name: 'Round 1' },
-      { id: 1002, name: 'Round 2' },
+      { id: 1001, name: "Round 1" },
+      { id: 1002, name: "Round 2" },
     ],
-    name: 'Apical Source',
-    type: 'api-apical-excel-file',
+    name: "Apical Source",
+    type: "api-apical-excel-file",
   },
   {
     enabled: true,
-    id: 'source-mr-scats',
+    id: "source-mr-scats",
     mrScatsConfig: {
       files: [],
     },
-    name: 'MR-SCATS Source',
-    type: 'file-mr-scats-data',
+    name: "MR-SCATS Source",
+    type: "file-mr-scats-data",
   },
 ];
 
-describe('DataSourcesPanel', () => {
+describe("DataSourcesPanel", () => {
   let container: HTMLDivElement | undefined;
   let root: Root | undefined;
 
@@ -50,8 +50,8 @@ describe('DataSourcesPanel', () => {
     container = undefined;
   });
 
-  it('renders the configured data sources section and source type chooser', () => {
-    container = document.createElement('div');
+  it("renders the configured data sources section and source type chooser", () => {
+    container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
 
@@ -69,28 +69,38 @@ describe('DataSourcesPanel', () => {
       );
     });
 
-    const headings = Array.from(container.querySelectorAll('h2, h3')).map((heading) => heading.textContent);
-    expect(headings).toContain('Configured Data Sources');
-    expect(headings).toContain('Apical Source');
-    expect(container.querySelector('select[aria-label="New Data Source Type"]')).toBeTruthy();
-    expect(container.querySelector('table[aria-label="Configured data sources table"]')).toBeTruthy();
-    expect(container.textContent).toContain('Add Data Source');
+    const headings = Array.from(container.querySelectorAll("h2, h3")).map(
+      (heading) => heading.textContent,
+    );
+    expect(headings).toContain("Configured Data Sources");
+    expect(headings).toContain("Apical Source");
+    expect(
+      container.querySelector('select[aria-label="New Data Source Type"]'),
+    ).toBeTruthy();
+    expect(
+      container.querySelector(
+        'table[aria-label="Configured data sources table"]',
+      ),
+    ).toBeTruthy();
+    expect(container.textContent).toContain("Add Data Source");
   });
 
-  it('imports the selected Apical event and re-loads its linked sessions', () => {
+  it("imports the selected Apical event and re-loads its linked sessions", () => {
     const onFetchApicalDataNow = vi.fn();
     const onReprocessApicalData = vi.fn();
-    container = document.createElement('div');
+    container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
 
     flushSync(() => {
       root?.render(
         <DataSourcesPanel
-          dataSources={[{
-            ...dataSources[0]!,
-            apicalDataFilePath: 'C:/RaceSweet/apical-1001.xlsx',
-          }]}
+          dataSources={[
+            {
+              ...dataSources[0]!,
+              apicalDataFilePath: "C:/RaceSweet/apical-1001.xlsx",
+            },
+          ]}
           onCreateSource={vi.fn()}
           onDeleteSource={vi.fn()}
           onFetchApicalDataNow={onFetchApicalDataNow}
@@ -101,39 +111,128 @@ describe('DataSourcesPanel', () => {
       );
     });
 
-    const importButton = Array.from(container.querySelectorAll('button')).find(
-      (button: HTMLButtonElement): boolean => button.textContent === 'Import selected event',
+    const importButton = Array.from(container.querySelectorAll("button")).find(
+      (button: HTMLButtonElement): boolean =>
+        button.textContent === "Import selected event",
     );
-    const reloadButton = Array.from(container.querySelectorAll('button')).find(
-      (button: HTMLButtonElement): boolean => button.textContent === 'Re-load linked sessions',
+    const reloadButton = Array.from(container.querySelectorAll("button")).find(
+      (button: HTMLButtonElement): boolean =>
+        button.textContent === "Re-load linked sessions",
     );
     expect(importButton).toBeDefined();
     expect(reloadButton).toBeDefined();
 
     flushSync(() => {
-      importButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      reloadButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      importButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      reloadButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(onFetchApicalDataNow).toHaveBeenCalledWith('source-apical');
-    expect(onReprocessApicalData).toHaveBeenCalledWith('source-apical');
+    expect(onFetchApicalDataNow).toHaveBeenCalledWith("source-apical");
+    expect(onReprocessApicalData).toHaveBeenCalledWith("source-apical");
   });
 
-  it('persists the selected Dorian CTC Import or Update mode', async () => {
+  it("uses MUI controls to reload and resume an Apical Recent Laps source", (): void => {
+    const onFetchApicalDataNow = vi.fn();
+    const recentSource: DataSourceConfig = {
+      ...dataSources[0]!,
+      apiConfig: {
+        ...dataSources[0]!.apiConfig!,
+        live: false,
+        pollingStopReason:
+          "No new laps arrived within 175% of the competitors' previous average lap time.",
+        pollingStoppedAt: "2026-08-25T01:00:00.000Z",
+      },
+      id: "source-recent",
+      name: "Recent laps",
+      type: "api-apical-recent-laps",
+    };
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync((): void => {
+      root?.render(
+        <DataSourcesPanel
+          dataSources={[recentSource]}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={onFetchApicalDataNow}
+          onLoadApicalEvents={vi.fn()}
+          onReprocessApicalData={vi.fn()}
+          onSaveSource={vi.fn()}
+        />,
+      );
+    });
+
+    expect(
+      container.querySelector('input[aria-label="Apical Live source-recent"]'),
+    ).toBeTruthy();
+    expect(container.textContent).toContain("Polling stopped at");
+    expect(container.textContent).not.toContain("Re-load linked sessions");
+    const reloadButton: HTMLButtonElement | undefined = Array.from(
+      container.querySelectorAll("button"),
+    ).find(
+      (button: HTMLButtonElement): boolean =>
+        button.textContent === "Reload now and resume polling",
+    );
+    reloadButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(onFetchApicalDataNow).toHaveBeenCalledWith("source-recent");
+  });
+
+  it("creates an Apical source cloned for the selected event", () => {
+    const onCreateApicalSourceFrom = vi.fn();
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <DataSourcesPanel
+          dataSources={dataSources}
+          onCreateApicalSourceFrom={onCreateApicalSourceFrom}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={vi.fn()}
+          onReprocessApicalData={vi.fn()}
+          onSaveSource={vi.fn()}
+        />,
+      );
+    });
+
+    const createButton = Array.from(container.querySelectorAll("button")).find(
+      (button: HTMLButtonElement): boolean =>
+        button.textContent === "Create new from",
+    );
+    expect(createButton).toBeDefined();
+
+    flushSync(() => {
+      createButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(onCreateApicalSourceFrom).toHaveBeenCalledWith(
+      "source-apical",
+      1001,
+    );
+  });
+
+  it("persists the selected Dorian CTC Import or Update mode", async () => {
     const onSaveSource = vi.fn();
     const onLoadDorianCtcSrtFile = vi.fn();
-    const onSelectDorianCtcTrackConfigFile = vi.fn(async () => 'C:/RaceTime/timing/TRACK.CFG');
+    const onSelectDorianCtcTrackConfigFile = vi.fn(
+      async () => "C:/RaceTime/timing/TRACK.CFG",
+    );
     const ctcSource: DataSourceConfig = {
       enabled: true,
       fileConfig: {
-        filePath: 'C:/RaceTime/timing/INDY500.ERF',
-        importMode: 'import',
+        filePath: "C:/RaceTime/timing/INDY500.ERF",
+        importMode: "import",
       },
-      id: 'source-dorian-ctc',
-      name: 'CTC Source',
-      type: 'file-dorian-ctc-srt',
+      id: "source-dorian-ctc",
+      name: "CTC Source",
+      type: "file-dorian-ctc-srt",
     };
-    container = document.createElement('div');
+    container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
 
@@ -153,131 +252,190 @@ describe('DataSourcesPanel', () => {
       );
     });
 
-    const ctcRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('CTC Source'));
+    const ctcRow = Array.from(container.querySelectorAll("tbody tr")).find(
+      (row) => row.textContent?.includes("CTC Source"),
+    );
     flushSync(() => {
-      ctcRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      ctcRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    const updateRadio = Array.from(container.querySelectorAll('input[type="radio"]')).find((input) => input.parentElement?.textContent?.includes('Update'));
+    const updateRadio = Array.from(
+      container.querySelectorAll('input[type="radio"]'),
+    ).find((input) => input.parentElement?.textContent?.includes("Update"));
 
     expect(updateRadio).toBeTruthy();
     flushSync(() => {
-      updateRadio?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      updateRadio?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(onSaveSource).toHaveBeenCalledWith('source-dorian-ctc', {
+    expect(onSaveSource).toHaveBeenCalledWith("source-dorian-ctc", {
       fileConfig: {
-        filePath: 'C:/RaceTime/timing/INDY500.ERF',
-        importMode: 'update',
+        filePath: "C:/RaceTime/timing/INDY500.ERF",
+        importMode: "update",
       },
     });
 
-    const placeholderCheckbox = Array.from(container.querySelectorAll('label'))
-      .find((label) => label.textContent?.includes('Import placeholder entrant for unknown transmitters'))
+    const placeholderCheckbox = Array.from(container.querySelectorAll("label"))
+      .find((label) =>
+        label.textContent?.includes(
+          "Import placeholder entrant for unknown transmitters",
+        ),
+      )
       ?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
     expect(placeholderCheckbox).toBeTruthy();
     flushSync(() => {
-      placeholderCheckbox?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      placeholderCheckbox?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
     });
-    expect(onSaveSource).toHaveBeenCalledWith('source-dorian-ctc', {
+    expect(onSaveSource).toHaveBeenCalledWith("source-dorian-ctc", {
       fileConfig: {
-        filePath: 'C:/RaceTime/timing/INDY500.ERF',
-        importMode: 'import',
+        filePath: "C:/RaceTime/timing/INDY500.ERF",
+        importMode: "import",
         importPlaceholderEntrantsForUnknownTransmitters: true,
       },
     });
 
-    const importButton = Array.from(container.querySelectorAll('button')).find(
-      (button: HTMLButtonElement): boolean => button.textContent === 'Import into selected session',
+    const importButton = Array.from(container.querySelectorAll("button")).find(
+      (button: HTMLButtonElement): boolean =>
+        button.textContent === "Import into selected session",
     );
     expect(importButton).toBeDefined();
     flushSync(() => {
-      importButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      importButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    expect(onLoadDorianCtcSrtFile).toHaveBeenCalledWith('source-dorian-ctc');
+    expect(onLoadDorianCtcSrtFile).toHaveBeenCalledWith("source-dorian-ctc");
 
-    const trackConfigInput = container.querySelector('input[aria-label="Dorian CTC TRACK.CFG File Path source-dorian-ctc"]') as HTMLInputElement;
+    const trackConfigInput = container.querySelector(
+      'input[aria-label="Dorian CTC TRACK.CFG File Path source-dorian-ctc"]',
+    ) as HTMLInputElement;
     expect(trackConfigInput).toBeTruthy();
-    expect(trackConfigInput.placeholder).toBe('No TRACK.CFG selected');
-    const trackConfigButton = container.querySelector('button[aria-label="Dorian CTC TRACK.CFG File Path source-dorian-ctc Select File"]');
+    expect(trackConfigInput.placeholder).toBe("No TRACK.CFG selected");
+    const trackConfigButton = container.querySelector(
+      'button[aria-label="Dorian CTC TRACK.CFG File Path source-dorian-ctc Select File"]',
+    );
     expect(trackConfigButton).toBeDefined();
-    trackConfigButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    trackConfigButton?.dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
     await Promise.resolve();
     expect(onSelectDorianCtcTrackConfigFile).toHaveBeenCalled();
-    expect(onSaveSource).toHaveBeenCalledWith('source-dorian-ctc', {
+    expect(onSaveSource).toHaveBeenCalledWith("source-dorian-ctc", {
       fileConfig: {
-        filePath: 'C:/RaceTime/timing/INDY500.ERF',
-        importMode: 'import',
-        trackConfigFilePath: 'C:/RaceTime/timing/TRACK.CFG',
+        filePath: "C:/RaceTime/timing/INDY500.ERF",
+        importMode: "import",
+        trackConfigFilePath: "C:/RaceTime/timing/TRACK.CFG",
       },
     });
   });
 
-  it('selects DURT database and extractor paths without importing from System', async () => {
+  it("selects DURT database and extractor paths without importing from System", async () => {
     const onLoadDurtFileMakerDatabase = vi.fn();
     const onOpenExternalUrl = vi.fn();
     const onSaveSource = vi.fn();
     const durtSource: DataSourceConfig = {
-      durtFileMakerConfig: { importMode: 'import' },
+      durtFileMakerConfig: { importMode: "import" },
       enabled: true,
-      id: 'source-durt',
-      name: 'DURT Source',
-      type: 'file-durt-filemaker',
+      id: "source-durt",
+      name: "DURT Source",
+      type: "file-durt-filemaker",
     };
-    container = document.createElement('div');
+    container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
     flushSync(() => {
-      root?.render(<DataSourcesPanel dataSources={[durtSource]} onCreateSource={vi.fn()} onDeleteSource={vi.fn()} onFetchApicalDataNow={vi.fn()} onLoadApicalEvents={vi.fn()} onLoadDurtFileMakerDatabase={onLoadDurtFileMakerDatabase} onOpenExternalUrl={onOpenExternalUrl} onReprocessApicalData={vi.fn()} onSaveSource={onSaveSource} onSelectDurtFileMakerDatabase={async () => 'C:/DURT/event.fp7'} onSelectDurtFileMakerExtractor={async () => 'C:/tools/fmp2json.exe'} />);
+      root?.render(
+        <DataSourcesPanel
+          dataSources={[durtSource]}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={vi.fn()}
+          onLoadDurtFileMakerDatabase={onLoadDurtFileMakerDatabase}
+          onOpenExternalUrl={onOpenExternalUrl}
+          onReprocessApicalData={vi.fn()}
+          onSaveSource={onSaveSource}
+          onSelectDurtFileMakerDatabase={async () => "C:/DURT/event.fp7"}
+          onSelectDurtFileMakerExtractor={async () => "C:/tools/fmp2json.exe"}
+        />,
+      );
     });
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const databaseButton = buttons.find((button) => button.textContent === 'Select Database');
-    const extractorButton = buttons.find((button) => button.textContent === 'Select Extractor');
-    const extractorInfo = container.querySelector('summary[aria-label="About fmp2json"]');
-    expect(buttons.find((button) => button.textContent === 'Import DURT Database')).toBeUndefined();
-    expect(extractorInfo?.textContent).toBe('ⓘ');
-    const releaseLink = container.querySelector('a[href="https://github.com/evanmiller/fmptools/releases"]');
-    expect(releaseLink?.textContent).toBe('fmptools releases');
-    releaseLink?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(onOpenExternalUrl).toHaveBeenCalledWith('https://github.com/evanmiller/fmptools/releases');
-    databaseButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    extractorButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const buttons = Array.from(container.querySelectorAll("button"));
+    const databaseButton = buttons.find(
+      (button) => button.textContent === "Select Database",
+    );
+    const extractorButton = buttons.find(
+      (button) => button.textContent === "Select Extractor",
+    );
+    const extractorInfo = container.querySelector(
+      'summary[aria-label="About fmp2json"]',
+    );
+    expect(
+      buttons.find((button) => button.textContent === "Import DURT Database"),
+    ).toBeUndefined();
+    expect(extractorInfo?.textContent).toBe("ⓘ");
+    const releaseLink = container.querySelector(
+      'a[href="https://github.com/evanmiller/fmptools/releases"]',
+    );
+    expect(releaseLink?.textContent).toBe("fmptools releases");
+    releaseLink?.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true }),
+    );
+    expect(onOpenExternalUrl).toHaveBeenCalledWith(
+      "https://github.com/evanmiller/fmptools/releases",
+    );
+    databaseButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    extractorButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await Promise.resolve();
-    expect(onSaveSource).toHaveBeenCalledWith('source-durt', { durtFileMakerConfig: { databaseFilePath: 'C:/DURT/event.fp7', importMode: 'import' } });
-    expect(onSaveSource).toHaveBeenCalledWith('source-durt', { durtFileMakerConfig: { extractorPath: 'C:/tools/fmp2json.exe', importMode: 'import' } });
+    expect(onSaveSource).toHaveBeenCalledWith("source-durt", {
+      durtFileMakerConfig: {
+        databaseFilePath: "C:/DURT/event.fp7",
+        importMode: "import",
+      },
+    });
+    expect(onSaveSource).toHaveBeenCalledWith("source-durt", {
+      durtFileMakerConfig: {
+        extractorPath: "C:/tools/fmp2json.exe",
+        importMode: "import",
+      },
+    });
 
     expect(onLoadDurtFileMakerDatabase).not.toHaveBeenCalled();
   });
 
-  it('displays parsed Dorian CTC TRACK.CFG networks, lines, and loop mappings', () => {
+  it("displays parsed Dorian CTC TRACK.CFG networks, lines, and loop mappings", () => {
     const onSaveSource = vi.fn();
     const ctcSource: DataSourceConfig = {
       enabled: true,
       fileConfig: {
         ctcTrackConfig: {
           eventDescriptions: {},
-          filePath: 'C:/RaceTime/timing/TRACK.CFG',
-          networks: [{
-            lines: [{
-              line: 5,
-              loops: [
-                { card: 1, comPort: 2, loopNumber: 1, siteAddress: 35 },
-                { card: 1, comPort: 2, loopNumber: 2, siteAddress: 35 },
-                { card: 2, comPort: 2, loopNumber: 5, siteAddress: 35 },
+          filePath: "C:/RaceTime/timing/TRACK.CFG",
+          networks: [
+            {
+              lines: [
+                {
+                  line: 5,
+                  loops: [
+                    { card: 1, comPort: 2, loopNumber: 1, siteAddress: 35 },
+                    { card: 1, comPort: 2, loopNumber: 2, siteAddress: 35 },
+                    { card: 2, comPort: 2, loopNumber: 5, siteAddress: 35 },
+                  ],
+                  name: "Pit Exit : Pits",
+                },
               ],
-              name: 'Pit Exit : Pits',
-            }],
-            name: 'South Network',
-          }],
+              name: "South Network",
+            },
+          ],
         },
-        filePath: 'C:/RaceTime/timing/INDY500.ERF',
-        importMode: 'import',
-        trackConfigFilePath: 'C:/RaceTime/timing/TRACK.CFG',
+        filePath: "C:/RaceTime/timing/INDY500.ERF",
+        importMode: "import",
+        trackConfigFilePath: "C:/RaceTime/timing/TRACK.CFG",
       },
-      id: 'source-dorian-ctc',
-      name: 'CTC Source',
-      type: 'file-dorian-ctc-srt',
+      id: "source-dorian-ctc",
+      name: "CTC Source",
+      type: "file-dorian-ctc-srt",
     };
-    container = document.createElement('div');
+    container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
 
@@ -295,69 +453,88 @@ describe('DataSourcesPanel', () => {
       );
     });
 
-    const ctcRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('CTC Source'));
+    const ctcRow = Array.from(container.querySelectorAll("tbody tr")).find(
+      (row) => row.textContent?.includes("CTC Source"),
+    );
     flushSync(() => {
-      ctcRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      ctcRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain('TRACK.CFG metadata: 1 network, 1 line, 3 loops');
-    const metadataTable = container.querySelector('table[aria-label="Dorian CTC TRACK.CFG Metadata source-dorian-ctc"]');
+    expect(container.textContent).toContain(
+      "TRACK.CFG metadata: 1 network, 1 line, 3 loops",
+    );
+    const metadataTable = container.querySelector(
+      'table[aria-label="Dorian CTC TRACK.CFG Metadata source-dorian-ctc"]',
+    );
     expect(metadataTable).toBeTruthy();
-    const rows = Array.from(metadataTable!.querySelectorAll('tbody tr')).map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent));
+    const rows = Array.from(metadataTable!.querySelectorAll("tbody tr")).map(
+      (row) =>
+        Array.from(row.querySelectorAll("td")).map((cell) => cell.textContent),
+    );
     expect(rows).toEqual([
-      ['South Network', '5', 'Pit Exit : Pits', '1', '35', '1', '2', ''],
-      ['South Network', '5', 'Pit Exit : Pits', '2', '35', '1', '2', ''],
-      ['South Network', '5', 'Pit Exit : Pits', '5', '35', '2', '2', ''],
+      ["South Network", "5", "Pit Exit : Pits", "1", "35", "1", "2", ""],
+      ["South Network", "5", "Pit Exit : Pits", "2", "35", "1", "2", ""],
+      ["South Network", "5", "Pit Exit : Pits", "5", "35", "2", "2", ""],
     ]);
 
-    const lapFinishCheckbox = container.querySelector('input[aria-label="CTC South Network line 5 loop 1 lap finish"]') as HTMLInputElement;
+    const lapFinishCheckbox = container.querySelector(
+      'input[aria-label="CTC South Network line 5 loop 1 lap finish"]',
+    ) as HTMLInputElement;
     expect(lapFinishCheckbox.checked).toBe(false);
     flushSync(() => {
-      lapFinishCheckbox.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      lapFinishCheckbox.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
     });
-    expect(onSaveSource).toHaveBeenCalledWith('source-dorian-ctc', {
+    expect(onSaveSource).toHaveBeenCalledWith("source-dorian-ctc", {
       fileConfig: {
         ctcTrackConfig: expect.objectContaining({
-          networks: [expect.objectContaining({
-            lines: [expect.objectContaining({
-              loops: expect.arrayContaining([expect.objectContaining({ isLapCompletion: true })]),
-            })],
-          })],
+          networks: [
+            expect.objectContaining({
+              lines: [
+                expect.objectContaining({
+                  loops: expect.arrayContaining([
+                    expect.objectContaining({ isLapCompletion: true }),
+                  ]),
+                }),
+              ],
+            }),
+          ],
         }),
-        filePath: 'C:/RaceTime/timing/INDY500.ERF',
-        importMode: 'import',
-        trackConfigFilePath: 'C:/RaceTime/timing/TRACK.CFG',
+        filePath: "C:/RaceTime/timing/INDY500.ERF",
+        importMode: "import",
+        trackConfigFilePath: "C:/RaceTime/timing/TRACK.CFG",
       },
       finishLineNumbers: [5],
     });
   });
 
-  it('selects an MR-SCATS data directory and persists the discovered file list', async () => {
+  it("selects an MR-SCATS data directory and persists the discovered file list", async () => {
     const onSaveSource = vi.fn();
     const onSelectMrScatsDataDirectory = vi.fn(async () => ({
       files: [
         {
           dbf: {
-            fields: [{ decimals: 0, length: 4, name: 'CARNUMBER', type: 'N' }],
+            fields: [{ decimals: 0, length: 4, name: "CARNUMBER", type: "N" }],
             headerLength: 226,
             recordCount: 228,
             recordLength: 30,
             version: 3,
           },
-          extension: '.dbf',
-          kind: 'dbf-table' as const,
-          meetingCode: 'W9721',
-          name: 'W9721Q01.DBF',
-          relativePath: 'W9721Q01.DBF',
-          sessionCode: 'Q',
+          extension: ".dbf",
+          kind: "dbf-table" as const,
+          meetingCode: "W9721",
+          name: "W9721Q01.DBF",
+          relativePath: "W9721Q01.DBF",
+          sessionCode: "Q",
           sessionNumber: 1,
           size: 7067,
         },
       ],
-      locationPath: 'C:/RaceTime/timing-data/W9721',
-      sourceKind: 'directory' as const,
+      locationPath: "C:/RaceTime/timing-data/W9721",
+      sourceKind: "directory" as const,
     }));
-    container = document.createElement('div');
+    container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
 
@@ -376,85 +553,112 @@ describe('DataSourcesPanel', () => {
       );
     });
 
-    const mrScatsRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('MR-SCATS Source'));
+    const mrScatsRow = Array.from(container.querySelectorAll("tbody tr")).find(
+      (row) => row.textContent?.includes("MR-SCATS Source"),
+    );
     expect(mrScatsRow).toBeDefined();
     flushSync(() => {
-      mrScatsRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      mrScatsRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain('MR-SCATS Data');
-    const locationInput = container.querySelector('input[aria-label="MR-SCATS Data Files Location source-mr-scats"]') as HTMLInputElement;
+    expect(container.textContent).toContain("MR-SCATS Data");
+    const locationInput = container.querySelector(
+      'input[aria-label="MR-SCATS Data Files Location source-mr-scats"]',
+    ) as HTMLInputElement;
     expect(locationInput).toBeTruthy();
-    expect(locationInput.placeholder).toBe('No file or directory selected');
-    const ignoreLineOneCheckbox = container.querySelector('input[aria-label="MR-SCATS Ignore Line 1 NO1 Crossings source-mr-scats"]') as HTMLInputElement;
+    expect(locationInput.placeholder).toBe("No file or directory selected");
+    const ignoreLineOneCheckbox = container.querySelector(
+      'input[aria-label="MR-SCATS Ignore Line 1 NO1 Crossings source-mr-scats"]',
+    ) as HTMLInputElement;
     expect(ignoreLineOneCheckbox?.checked).toBe(true);
-    ignoreLineOneCheckbox.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    ignoreLineOneCheckbox.dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
     await Promise.resolve();
-    expect(onSaveSource).toHaveBeenCalledWith('source-mr-scats', {
+    expect(onSaveSource).toHaveBeenCalledWith("source-mr-scats", {
       mrScatsConfig: {
         files: [],
         ignoreLineOneNo1CrossingsWhenDbfPresent: false,
       },
     });
-    expect(Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Load event')).toBeUndefined();
+    expect(
+      Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Load event",
+      ),
+    ).toBeUndefined();
 
-    const selectDirectoryButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Select Directory');
-    const selectArchiveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Select Archive');
+    const selectDirectoryButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent === "Select Directory");
+    const selectArchiveButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent === "Select Archive");
     expect(selectDirectoryButton).toBeDefined();
     expect(selectArchiveButton).toBeDefined();
-    selectDirectoryButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    selectDirectoryButton?.dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
     await Promise.resolve();
 
     expect(onSelectMrScatsDataDirectory).toHaveBeenCalled();
-    expect(onSaveSource).toHaveBeenCalledWith('source-mr-scats', {
+    expect(onSaveSource).toHaveBeenCalledWith("source-mr-scats", {
       mrScatsConfig: {
-        dataLocationPath: 'C:/RaceTime/timing-data/W9721',
+        dataLocationPath: "C:/RaceTime/timing-data/W9721",
         files: [
           expect.objectContaining({
             dbf: expect.objectContaining({ recordCount: 228 }),
-            relativePath: 'W9721Q01.DBF',
+            relativePath: "W9721Q01.DBF",
           }),
         ],
         ignoreLineOneNo1CrossingsWhenDbfPresent: true,
-        sourceKind: 'directory',
+        sourceKind: "directory",
       },
     });
   });
 
-  it('does not load an MR-SCATS event from the System source configuration', async () => {
+  it("does not load an MR-SCATS event from the System source configuration", async () => {
     const onLoadMrScatsEvent = vi.fn();
-    container = document.createElement('div');
+    container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
 
     flushSync(() => {
       root?.render(
         <DataSourcesPanel
-          dataSources={dataSources.map((source) => source.id === 'source-mr-scats'
-            ? {
-              ...source,
-              mrScatsConfig: {
-                dataLocationPath: 'C:/RaceTime/timing-data/W9721',
-                files: [
-                  {
-                    dbf: {
-                      fields: [{ decimals: 0, length: 4, name: 'CARNUMBER', type: 'N' }],
-                      headerLength: 65,
-                      recordCount: 4,
-                      recordLength: 5,
-                      version: 3,
+          dataSources={dataSources.map((source) =>
+            source.id === "source-mr-scats"
+              ? {
+                ...source,
+                mrScatsConfig: {
+                  dataLocationPath: "C:/RaceTime/timing-data/W9721",
+                  files: [
+                    {
+                      dbf: {
+                        fields: [
+                          {
+                            decimals: 0,
+                            length: 4,
+                            name: "CARNUMBER",
+                            type: "N",
+                          },
+                        ],
+                        headerLength: 65,
+                        recordCount: 4,
+                        recordLength: 5,
+                        version: 3,
+                      },
+                      extension: ".dbf",
+                      kind: "dbf-table" as const,
+                      name: "W9721R01.DBF",
+                      relativePath: "W9721R01.DBF",
+                      size: 85,
                     },
-                    extension: '.dbf',
-                    kind: 'dbf-table' as const,
-                    name: 'W9721R01.DBF',
-                    relativePath: 'W9721R01.DBF',
-                    size: 85,
-                  },
-                ],
-                sourceKind: 'directory',
-              },
-            }
-            : source)}
+                  ],
+                  sourceKind: "directory",
+                },
+              }
+              : source,
+          )}
           onCreateSource={vi.fn()}
           onDeleteSource={vi.fn()}
           onFetchApicalDataNow={vi.fn()}
@@ -466,95 +670,115 @@ describe('DataSourcesPanel', () => {
       );
     });
 
-    const mrScatsRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('MR-SCATS Source'));
+    const mrScatsRow = Array.from(container.querySelectorAll("tbody tr")).find(
+      (row) => row.textContent?.includes("MR-SCATS Source"),
+    );
     expect(mrScatsRow).toBeDefined();
     flushSync(() => {
-      mrScatsRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      mrScatsRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    const loadEventButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Load event') as HTMLButtonElement | undefined;
+    const loadEventButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent === "Load event") as
+      HTMLButtonElement | undefined;
     expect(loadEventButton).toBeUndefined();
     expect(onLoadMrScatsEvent).not.toHaveBeenCalled();
-
   });
 
-  it('groups MR-SCATS data files into an open General section and collapsed per-session sections', () => {
-    container = document.createElement('div');
+  it("groups MR-SCATS data files into an open General section and collapsed per-session sections", () => {
+    container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
 
     flushSync(() => {
       root?.render(
         <DataSourcesPanel
-          dataSources={dataSources.map((source) => source.id === 'source-mr-scats'
-            ? {
-              ...source,
-              mrScatsConfig: {
-                dataLocationPath: 'C:/RaceTime/timing-data/T9743',
-                files: [
-                  {
-                    dbf: {
-                      fields: [{ decimals: 0, length: 4, name: 'CARNUMBER', type: 'N' }],
-                      headerLength: 65,
-                      recordCount: 1,
-                      recordLength: 5,
-                      version: 3,
+          dataSources={dataSources.map((source) =>
+            source.id === "source-mr-scats"
+              ? {
+                ...source,
+                mrScatsConfig: {
+                  dataLocationPath: "C:/RaceTime/timing-data/T9743",
+                  files: [
+                    {
+                      dbf: {
+                        fields: [
+                          {
+                            decimals: 0,
+                            length: 4,
+                            name: "CARNUMBER",
+                            type: "N",
+                          },
+                        ],
+                        headerLength: 65,
+                        recordCount: 1,
+                        recordLength: 5,
+                        version: 3,
+                      },
+                      extension: ".dbf",
+                      kind: "dbf-table" as const,
+                      name: "DRIVERS.DBF",
+                      relativePath: "DRIVERS.DBF",
+                      size: 120,
                     },
-                    extension: '.dbf',
-                    kind: 'dbf-table' as const,
-                    name: 'DRIVERS.DBF',
-                    relativePath: 'DRIVERS.DBF',
-                    size: 120,
-                  },
-                  {
-                    extension: '.dbt',
-                    kind: 'dbt-memo' as const,
-                    name: 'PRGMME.DBT',
-                    relativePath: 'PRGMME.DBT',
-                    size: 240,
-                  },
-                  {
-                    dbf: {
-                      fields: [{ decimals: 0, length: 4, name: 'CARNUMBER', type: 'N' }],
-                      headerLength: 65,
-                      recordCount: 3,
-                      recordLength: 5,
-                      version: 3,
+                    {
+                      extension: ".dbt",
+                      kind: "dbt-memo" as const,
+                      name: "PRGMME.DBT",
+                      relativePath: "PRGMME.DBT",
+                      size: 240,
                     },
-                    extension: '.dbf',
-                    kind: 'dbf-table' as const,
-                    meetingCode: 'T9743',
-                    name: 'T9743S01.DBF',
-                    relativePath: 'T9743S01.DBF',
-                    sessionCode: 'S',
-                    sessionNumber: 1,
-                    size: 360,
-                  },
-                  {
-                    extension: '.pit',
-                    kind: 'pit' as const,
-                    meetingCode: 'T9743',
-                    name: 'T9743S01.PIT',
-                    relativePath: 'T9743S01.PIT',
-                    sessionCode: 'S',
-                    sessionNumber: 1,
-                    size: 36,
-                  },
-                  {
-                    extension: '.no1',
-                    kind: 'no1-report' as const,
-                    meetingCode: 'T9743',
-                    name: 'T9743R03.NO1',
-                    relativePath: 'T9743R03.NO1',
-                    sessionCode: 'R',
-                    sessionNumber: 3,
-                    size: 420,
-                  },
-                ],
-                sourceKind: 'directory',
-              },
-            }
-            : source)}
+                    {
+                      dbf: {
+                        fields: [
+                          {
+                            decimals: 0,
+                            length: 4,
+                            name: "CARNUMBER",
+                            type: "N",
+                          },
+                        ],
+                        headerLength: 65,
+                        recordCount: 3,
+                        recordLength: 5,
+                        version: 3,
+                      },
+                      extension: ".dbf",
+                      kind: "dbf-table" as const,
+                      meetingCode: "T9743",
+                      name: "T9743S01.DBF",
+                      relativePath: "T9743S01.DBF",
+                      sessionCode: "S",
+                      sessionNumber: 1,
+                      size: 360,
+                    },
+                    {
+                      extension: ".pit",
+                      kind: "pit" as const,
+                      meetingCode: "T9743",
+                      name: "T9743S01.PIT",
+                      relativePath: "T9743S01.PIT",
+                      sessionCode: "S",
+                      sessionNumber: 1,
+                      size: 36,
+                    },
+                    {
+                      extension: ".no1",
+                      kind: "no1-report" as const,
+                      meetingCode: "T9743",
+                      name: "T9743R03.NO1",
+                      relativePath: "T9743R03.NO1",
+                      sessionCode: "R",
+                      sessionNumber: 3,
+                      size: 420,
+                    },
+                  ],
+                  sourceKind: "directory",
+                },
+              }
+              : source,
+          )}
           onCreateSource={vi.fn()}
           onDeleteSource={vi.fn()}
           onFetchApicalDataNow={vi.fn()}
@@ -565,79 +789,105 @@ describe('DataSourcesPanel', () => {
       );
     });
 
-    const mrScatsRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('MR-SCATS Source'));
+    const mrScatsRow = Array.from(container.querySelectorAll("tbody tr")).find(
+      (row) => row.textContent?.includes("MR-SCATS Source"),
+    );
     expect(mrScatsRow).toBeDefined();
     flushSync(() => {
-      mrScatsRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      mrScatsRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    const details = Array.from(container.querySelectorAll('details'));
-    const generalDetails = details.find((item) => item.querySelector('summary')?.textContent?.includes('General')) as HTMLDetailsElement | undefined;
-    const sessionOneDetails = details.find((item) => item.querySelector('summary')?.textContent?.includes('T9743 S01')) as HTMLDetailsElement | undefined;
-    const sessionTwoDetails = details.find((item) => item.querySelector('summary')?.textContent?.includes('T9743 R03')) as HTMLDetailsElement | undefined;
+    const details = Array.from(container.querySelectorAll("details"));
+    const generalDetails = details.find((item) =>
+      item.querySelector("summary")?.textContent?.includes("General"),
+    ) as HTMLDetailsElement | undefined;
+    const sessionOneDetails = details.find((item) =>
+      item.querySelector("summary")?.textContent?.includes("T9743 S01"),
+    ) as HTMLDetailsElement | undefined;
+    const sessionTwoDetails = details.find((item) =>
+      item.querySelector("summary")?.textContent?.includes("T9743 R03"),
+    ) as HTMLDetailsElement | undefined;
 
     expect(generalDetails).toBeDefined();
     expect(generalDetails?.open).toBe(true);
-    expect(generalDetails?.textContent).toContain('DRIVERS.DBF');
-    expect(generalDetails?.textContent).toContain('PRGMME.DBT');
+    expect(generalDetails?.textContent).toContain("DRIVERS.DBF");
+    expect(generalDetails?.textContent).toContain("PRGMME.DBT");
 
     expect(sessionOneDetails).toBeDefined();
     expect(sessionOneDetails?.open).toBe(false);
-    expect(sessionOneDetails?.textContent).toContain('T9743S01.DBF');
-    expect(sessionOneDetails?.textContent).toContain('T9743S01.PIT');
+    expect(sessionOneDetails?.textContent).toContain("T9743S01.DBF");
+    expect(sessionOneDetails?.textContent).toContain("T9743S01.PIT");
 
     expect(sessionTwoDetails).toBeDefined();
     expect(sessionTwoDetails?.open).toBe(false);
-    expect(sessionTwoDetails?.textContent).toContain('T9743R03.NO1');
+    expect(sessionTwoDetails?.textContent).toContain("T9743R03.NO1");
   });
 
-  it('opens an MR-SCATS file preview dialog from the file inventory table', async () => {
+  it("opens an MR-SCATS file preview dialog from the file inventory table", async () => {
     const onPreviewMrScatsDataFile = vi.fn(async () => ({
-      calculatedCells: [{ column: 'Time of day', rowIndex: 0 }],
-      columns: ['CARNUMBER', 'Time of day', 'DRIVER'],
+      calculatedCells: [{ column: "Time of day", rowIndex: 0 }],
+      columns: ["CARNUMBER", "Time of day", "DRIVER"],
       displayedRowCount: 1,
-      fileKind: 'dbf-table' as const,
-      fileName: 'DRIVERS.DBF',
-      parser: 'dbf' as const,
+      fileKind: "dbf-table" as const,
+      fileName: "DRIVERS.DBF",
+      parser: "dbf" as const,
       recordCount: 1,
-      rows: [{ CARNUMBER: 42, DRIVER: 'Alice Rider', 'Time of day': '01:20.3311 (12:52:00.3311)' }],
+      rows: [
+        {
+          CARNUMBER: 42,
+          DRIVER: "Alice Rider",
+          "Time of day": "01:20.3311 (12:52:00.3311)",
+        },
+      ],
       warnings: [],
     }));
-    container = document.createElement('div');
+    container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
 
     flushSync(() => {
       root?.render(
         <DataSourcesPanel
-          dataSources={dataSources.map((source) => source.id === 'source-mr-scats'
-            ? {
-              ...source,
-              mrScatsConfig: {
-                dataLocationPath: 'C:/RaceTime/timing-data/W9721',
-                files: [
-                  {
-                    dbf: {
-                      fields: [
-                        { decimals: 0, length: 4, name: 'CARNUMBER', type: 'N' },
-                        { decimals: 0, length: 20, name: 'DRIVER', type: 'C' },
-                      ],
-                      headerLength: 97,
-                      recordCount: 1,
-                      recordLength: 25,
-                      version: 3,
+          dataSources={dataSources.map((source) =>
+            source.id === "source-mr-scats"
+              ? {
+                ...source,
+                mrScatsConfig: {
+                  dataLocationPath: "C:/RaceTime/timing-data/W9721",
+                  files: [
+                    {
+                      dbf: {
+                        fields: [
+                          {
+                            decimals: 0,
+                            length: 4,
+                            name: "CARNUMBER",
+                            type: "N",
+                          },
+                          {
+                            decimals: 0,
+                            length: 20,
+                            name: "DRIVER",
+                            type: "C",
+                          },
+                        ],
+                        headerLength: 97,
+                        recordCount: 1,
+                        recordLength: 25,
+                        version: 3,
+                      },
+                      extension: ".dbf",
+                      kind: "dbf-table" as const,
+                      name: "DRIVERS.DBF",
+                      relativePath: "DRIVERS.DBF",
+                      size: 122,
                     },
-                    extension: '.dbf',
-                    kind: 'dbf-table' as const,
-                    name: 'DRIVERS.DBF',
-                    relativePath: 'DRIVERS.DBF',
-                    size: 122,
-                  },
-                ],
-                sourceKind: 'directory',
-              },
-            }
-            : source)}
+                  ],
+                  sourceKind: "directory",
+                },
+              }
+              : source,
+          )}
           onCreateSource={vi.fn()}
           onDeleteSource={vi.fn()}
           onFetchApicalDataNow={vi.fn()}
@@ -649,17 +899,27 @@ describe('DataSourcesPanel', () => {
       );
     });
 
-    const mrScatsRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('MR-SCATS Source'));
+    const mrScatsRow = Array.from(container.querySelectorAll("tbody tr")).find(
+      (row) => row.textContent?.includes("MR-SCATS Source"),
+    );
     expect(mrScatsRow).toBeDefined();
     flushSync(() => {
-      mrScatsRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      mrScatsRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    const previewFileButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'DRIVERS.DBF');
+    const previewFileButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent === "DRIVERS.DBF");
     expect(previewFileButton).toBeDefined();
-    previewFileButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    previewFileButton?.dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
     for (let attempt: number = 0; attempt < 120; attempt += 1) {
-      if (container.querySelector('[role="dialog"]')?.textContent?.includes('Alice Rider')) {
+      if (
+        container
+          .querySelector('[role="dialog"]')
+          ?.textContent?.includes("Alice Rider")
+      ) {
         break;
       }
       await new Promise<void>((resolve): void => {
@@ -667,14 +927,24 @@ describe('DataSourcesPanel', () => {
       });
     }
 
-    expect(onPreviewMrScatsDataFile).toHaveBeenCalledWith('source-mr-scats', expect.objectContaining({
-      relativePath: 'DRIVERS.DBF',
-    }));
+    expect(onPreviewMrScatsDataFile).toHaveBeenCalledWith(
+      "source-mr-scats",
+      expect.objectContaining({
+        relativePath: "DRIVERS.DBF",
+      }),
+    );
     const previewDialog = container.querySelector('[role="dialog"]');
-    expect(previewDialog?.classList.contains('mr-scats-preview-dialog')).toBe(true);
-    expect(previewDialog?.querySelector('.mr-scats-preview-content')).toBeTruthy();
-    expect(previewDialog?.textContent).toContain('DRIVERS.DBF');
-    expect(previewDialog?.textContent).toContain('Alice Rider');
-    expect(previewDialog?.querySelector('.mr-scats-preview-calculated-cell')?.textContent).toBe('01:20.3311 (12:52:00.3311)');
+    expect(previewDialog?.classList.contains("mr-scats-preview-dialog")).toBe(
+      true,
+    );
+    expect(
+      previewDialog?.querySelector(".mr-scats-preview-content"),
+    ).toBeTruthy();
+    expect(previewDialog?.textContent).toContain("DRIVERS.DBF");
+    expect(previewDialog?.textContent).toContain("Alice Rider");
+    expect(
+      previewDialog?.querySelector(".mr-scats-preview-calculated-cell")
+        ?.textContent,
+    ).toBe("01:20.3311 (12:52:00.3311)");
   });
 });

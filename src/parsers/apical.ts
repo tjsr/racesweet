@@ -3,59 +3,91 @@ import {
   type ApicalCategoryResult,
   type ApicalLapByCategory,
   type ApicalLapByCategoryViewModel,
-  type ApicalParticipantViewModel
+  type ApicalParticipantViewModel,
 } from "../model/apical.ts";
 import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
 import type { uuid } from "../model/types.js";
-import type { EventParticipant, EventParticipantId } from "../model/eventparticipant.js";
+import type {
+  EventParticipant,
+  EventParticipantId,
+} from "../model/eventparticipant.js";
 import { RECORD_TX_CROSSING, type TimeRecord } from "../model/timerecord.js";
-import { assignParticipantNumber, assignTransponder, createParticipantIdFromEventAndCategory } from "../processing/participant.js";
+import {
+  assignParticipantNumber,
+  assignTransponder,
+  createParticipantIdFromEventAndCategory,
+} from "../processing/participant.js";
 import { generateTeamId, isEntrantTeam } from "../processing/eventteam.js";
 import type { ChipCrossingData } from "../model/chipcrossing.js";
 import type { EventTeam } from "../model/eventteam.js";
 import type { GreenFlagRecord } from "../model/flag.js";
 import type { RaceState } from "../model/racestate.js";
-import { addToTime, dateAtStartOfDayInTimeZone } from "../app/utils/timeutils.js";
+import {
+  addToTime,
+  dateAtStartOfDayInTimeZone,
+} from "../app/utils/timeutils.js";
 import { createEventCategoryIdFromCategoryCode } from "../processing/category.js";
 import { createGreenFlagEvent } from "../processing/flag.js";
 import { createTimeRecordId } from "../model/ids.js";
 import { normalizeCategoryResultExclusion } from "../processing/category.js";
-import { durationStringToMilliseconds, excelTimeToMilliseconds } from "./genericTimeParser.js";
+import {
+  durationStringToMilliseconds,
+  excelTimeToMilliseconds,
+} from "./genericTimeParser.js";
 import { inferTransponderFromRaceNumber } from "../processing/transponder.js";
 import { split } from "../utils.js";
-import { v5 as uuidv5, validate as validateUuid } from 'uuid';
+import { v5 as uuidv5, validate as validateUuid } from "uuid";
 import { EventId } from "../model/raceevent.ts";
 import { TimeParseError } from "./date/errors.ts";
 
-const hasLapTimeValue = (value: string | number | null | undefined): value is string | number => {
-  return typeof value === 'number' || (typeof value === 'string' && value.trim().length > 0);
+const hasLapTimeValue = (
+  value: string | number | null | undefined,
+): value is string | number => {
+  return (
+    typeof value === "number" ||
+    (typeof value === "string" && value.trim().length > 0)
+  );
 };
 
-export const apicalTimeToMilliseconds = (timeValue: string | number): number => {
-  return typeof timeValue === 'number'
+export const apicalTimeToMilliseconds = (
+  timeValue: string | number,
+): number => {
+  return typeof timeValue === "number"
     ? excelTimeToMilliseconds(timeValue)
     : durationStringToMilliseconds(timeValue);
 };
 
-const getTimeOfDayValue = (lap: ApicalLapByCategoryViewModel): string | number => {
+const getTimeOfDayValue = (
+  lap: ApicalLapByCategoryViewModel,
+): string | number => {
   if (hasLapTimeValue(lap.TimeOfDay)) {
     return lap.TimeOfDay;
   }
 
-  throw new TimeParseError(`Missing Apical TimeOfDay for lap ${lap.Id}`, String(lap.TimeOfDay));
+  throw new TimeParseError(
+    `Missing Apical TimeOfDay for lap ${lap.Id}`,
+    String(lap.TimeOfDay),
+  );
 };
 
-export const apicalTimeOfDayToDate = (sessionDate: Date, timeOfDay: string | number, timeZone?: string): Date => {
+export const apicalTimeOfDayToDate = (
+  sessionDate: Date,
+  timeOfDay: string | number,
+  timeZone?: string,
+): Date => {
   const sessionMidnight = dateAtStartOfDayInTimeZone(sessionDate, timeZone);
   // Apical can export a time-formatted cell containing a full Excel date-time serial.
   // Only its fractional day belongs to TimeOfDay; the session supplies the date.
-  const millisecondsSinceMidnight = typeof timeOfDay === 'number'
-    ? excelTimeToMilliseconds(timeOfDay - Math.floor(timeOfDay))
-    : apicalTimeToMilliseconds(timeOfDay);
+  const millisecondsSinceMidnight =
+    typeof timeOfDay === "number"
+      ? excelTimeToMilliseconds(timeOfDay - Math.floor(timeOfDay))
+      : apicalTimeToMilliseconds(timeOfDay);
   return addToTime(sessionMidnight, millisecondsSinceMidnight);
 };
 
-const getCumulativeMilliseconds = (lap: ApicalLapByCategoryViewModel): number => {
+const getCumulativeMilliseconds = (
+  lap: ApicalLapByCategoryViewModel,
+): number => {
   if (hasLapTimeValue(lap.CumulativeSeconds)) {
     return Number(lap.CumulativeSeconds) * 1000;
   }
@@ -66,9 +98,13 @@ const getCumulativeMilliseconds = (lap: ApicalLapByCategoryViewModel): number =>
 const getCategoryStartTimeForLap = (
   lap: ApicalLapByCategoryViewModel,
   eventStartTime: Date,
-  timeZone?: string
+  timeZone?: string,
 ): Date => {
-  const crossingTime = apicalTimeOfDayToDate(eventStartTime, getTimeOfDayValue(lap), timeZone);
+  const crossingTime = apicalTimeOfDayToDate(
+    eventStartTime,
+    getTimeOfDayValue(lap),
+    timeZone,
+  );
   return addToTime(crossingTime, -getCumulativeMilliseconds(lap));
 };
 
@@ -76,47 +112,70 @@ export const getCategoryStartTimeMap = (
   data: ApicalLapByCategory,
   eventId: EventId,
   eventStartTime: Date | undefined,
-  timeZone?: string
+  timeZone?: string,
 ): Map<EventCategoryId, Date> => {
   if (!validateUuid(eventId)) {
     throw new Error(`Invalid eventId provided: ${eventId}`);
   }
 
-  const startTimeTotals = new Map<EventCategoryId, { count: number; totalMilliseconds: number }>();
+  const startTimeTotals = new Map<
+    EventCategoryId,
+    { count: number; totalMilliseconds: number }
+  >();
   data.forEach((apiCategory: ApicalCategoryResult) => {
-    const categoryId = createEventCategoryIdFromCategoryCode(eventId, apiCategory.CategoryName);
-    apiCategory.ParticipantViewModels.forEach((entrant: ApicalParticipantViewModel) => {
-      entrant.LapByCategoryViewModels.forEach((lap: ApicalLapByCategoryViewModel) => {
-        if (!hasLapTimeValue(lap.TimeOfDay)) {
-          return;
-        }
+    const categoryId = createEventCategoryIdFromCategoryCode(
+      eventId,
+      apiCategory.CategoryName,
+    );
+    apiCategory.ParticipantViewModels.forEach(
+      (entrant: ApicalParticipantViewModel) => {
+        entrant.LapByCategoryViewModels.forEach(
+          (lap: ApicalLapByCategoryViewModel) => {
+            if (!hasLapTimeValue(lap.TimeOfDay)) {
+              return;
+            }
 
-        const startTime = getCategoryStartTimeForLap(lap, eventStartTime || new Date(), timeZone);
-        const current = startTimeTotals.get(categoryId) || { count: 0, totalMilliseconds: 0 };
-        startTimeTotals.set(categoryId, {
-          count: current.count + 1,
-          totalMilliseconds: current.totalMilliseconds + startTime.getTime(),
-        });
-      });
-    });
+            const startTime = getCategoryStartTimeForLap(
+              lap,
+              eventStartTime || new Date(),
+              timeZone,
+            );
+            const current = startTimeTotals.get(categoryId) || {
+              count: 0,
+              totalMilliseconds: 0,
+            };
+            startTimeTotals.set(categoryId, {
+              count: current.count + 1,
+              totalMilliseconds:
+                current.totalMilliseconds + startTime.getTime(),
+            });
+          },
+        );
+      },
+    );
   });
 
-  return new Map(Array.from(startTimeTotals.entries()).map(([categoryId, start]) => [
-    categoryId,
-    new Date(start.totalMilliseconds / start.count),
-  ]));
+  return new Map(
+    Array.from(startTimeTotals.entries()).map(([categoryId, start]) => [
+      categoryId,
+      new Date(start.totalMilliseconds / start.count),
+    ]),
+  );
 };
 
 const createCategoryStartFlags = (
   categoryStartTimes: Map<EventCategoryId, Date>,
   eventId: EventId,
-  source: uuid
+  source: uuid,
 ): GreenFlagRecord[] => {
-  const groupedStartFlags: { categoryIds: EventCategoryId[]; time: Date }[] = [];
+  const groupedStartFlags: { categoryIds: EventCategoryId[]; time: Date }[] =
+    [];
   Array.from(categoryStartTimes.entries())
     .sort((left, right) => left[1].getTime() - right[1].getTime())
     .forEach(([categoryId, startTime]) => {
-      const matchingStartFlag = groupedStartFlags.find((flag) => Math.abs(startTime.getTime() - flag.time.getTime()) <= 1000);
+      const matchingStartFlag = groupedStartFlags.find(
+        (flag) => Math.abs(startTime.getTime() - flag.time.getTime()) <= 1000,
+      );
       if (matchingStartFlag) {
         matchingStartFlag.categoryIds.push(categoryId);
         return;
@@ -133,8 +192,10 @@ const createCategoryStartFlags = (
     return createGreenFlagEvent({
       categoryIds,
       eventId,
-      flagValue: 'course',
-      id: createTimeRecordId(`apical-green-flag:${eventId}:${flag.time.toISOString()}:${categoryIds.join(',')}`),
+      flagValue: "course",
+      id: createTimeRecordId(
+        `apical-green-flag:${eventId}:${flag.time.toISOString()}:${categoryIds.join(",")}`,
+      ),
       indicatesRaceStart: true,
       source,
       time: flag.time,
@@ -142,7 +203,10 @@ const createCategoryStartFlags = (
   });
 };
 
-const compareImportedRecords = (left: TimeRecord, right: TimeRecord): number => {
+const compareImportedRecords = (
+  left: TimeRecord,
+  right: TimeRecord,
+): number => {
   const leftTime = left.time?.getTime() ?? Number.MAX_SAFE_INTEGER;
   const rightTime = right.time?.getTime() ?? Number.MAX_SAFE_INTEGER;
   if (leftTime !== rightTime) {
@@ -163,32 +227,45 @@ export const createChipCrossingRecord = (
   eventStartTime: Date,
   txNo: number,
   eventId: EventId,
-  timeZone?: string
-): Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time' | 'eventId'> => {
+  timeZone?: string,
+): Pick<
+  ChipCrossingData,
+  "id" | "recordType" | "chipCode" | "time" | "eventId"
+> => {
   if (!validateUuid(eventId)) {
     throw new Error(`Invalid eventId provided: ${eventId}`);
   }
   if (!txNo) {
-    throw new Error('Cannot create chip crossing record without transponder number');
+    throw new Error(
+      "Cannot create chip crossing record without transponder number",
+    );
   }
   if (!eventStartTime) {
-    throw new Error(`Event start time is undefined, cannot create crossing record for lap ${lap.Id}`);
+    throw new Error(
+      `Event start time is undefined, cannot create crossing record for lap ${lap.Id}`,
+    );
   }
   try {
     const calculatedRecordTime = hasLapTimeValue(lap.TimeOfDay)
       ? apicalTimeOfDayToDate(eventStartTime, getTimeOfDayValue(lap), timeZone)
-      : addToTime(eventStartTime, apicalTimeToMilliseconds(lap.CumulativeLapTimeSpan));
+      : addToTime(
+          eventStartTime,
+          apicalTimeToMilliseconds(lap.CumulativeLapTimeSpan),
+        );
 
     const timeRecordSeed = [
-      'apical-crossing',
+      "apical-crossing",
       eventId,
       lap.Id,
       lap.RaceNumber,
       lap.LapNumber,
       txNo,
       calculatedRecordTime.toISOString(),
-    ].join(':');
-    const timeRecord: Pick<ChipCrossingData, 'id' | 'recordType' | 'chipCode' | 'time' | 'eventId'> = {
+    ].join(":");
+    const timeRecord: Pick<
+      ChipCrossingData,
+      "id" | "recordType" | "chipCode" | "time" | "eventId"
+    > = {
       chipCode: txNo,
       eventId: eventId,
       id: createTimeRecordId(timeRecordSeed),
@@ -198,7 +275,10 @@ export const createChipCrossingRecord = (
     return timeRecord;
   } catch (error: unknown) {
     if (error instanceof TimeParseError) {
-      console.error(`Error parsing TimeOfDay for lap ${lap.Id} with value "${lap.TimeOfDay}":`, error);
+      console.error(
+        `Error parsing TimeOfDay for lap ${lap.Id} with value "${lap.TimeOfDay}":`,
+        error,
+      );
     }
     throw error;
   }
@@ -208,7 +288,7 @@ export const participantToLap = (
   eventId: EventId,
   categoryId: EventCategoryId,
   lap: ApicalLapByCategoryViewModel,
-  inferTransponderNumberRange: number | undefined
+  inferTransponderNumberRange: number | undefined,
 ): EventParticipant => {
   if (!validateUuid(eventId)) {
     throw new Error(`Invalid eventId provided: ${eventId}`);
@@ -216,10 +296,17 @@ export const participantToLap = (
   if (!validateUuid(categoryId)) {
     throw new Error(`Invalid categoryId provided: ${categoryId}`);
   }
-  const epId: EventParticipantId = createParticipantIdFromEventAndCategory(eventId, categoryId, lap.RaceNumber);
+  const epId: EventParticipantId = createParticipantIdFromEventAndCategory(
+    eventId,
+    categoryId,
+    lap.RaceNumber,
+  );
 
   const txNo = inferTransponderNumberRange
-    ? inferTransponderFromRaceNumber(lap.RaceNumber, inferTransponderNumberRange!)
+    ? inferTransponderFromRaceNumber(
+        lap.RaceNumber,
+        inferTransponderNumberRange!,
+      )
     : undefined;
 
   return createEntrantFromLap(lap, categoryId, epId, txNo);
@@ -229,7 +316,7 @@ export const createEntrantFromLap = (
   lap: ApicalLapByCategoryViewModel,
   categoryId: EventCategoryId,
   participantId: EventParticipantId,
-  txNo: number | undefined
+  txNo: number | undefined,
 ): EventParticipant => {
   if (!validateUuid(participantId)) {
     throw new Error(`Invalid participantId provided: ${participantId}`);
@@ -237,9 +324,11 @@ export const createEntrantFromLap = (
   if (!validateUuid(categoryId)) {
     throw new Error(`Invalid categoryId provided: ${categoryId}`);
   }
-  const nameParts = split(lap.FullName, ' ', 1);
+  const nameParts = split(lap.FullName, " ", 1);
   if (nameParts.length < 2) {
-    throw new Error(`Participant name "${lap.FullName}" does not contain both first and last name.`);
+    throw new Error(
+      `Participant name "${lap.FullName}" does not contain both first and last name.`,
+    );
   }
   const ep: Partial<EventParticipant> = {
     categoryId: categoryId,
@@ -259,7 +348,7 @@ export const getUniqueParticipantsFromLapCategoryViewModels = (
   lapCategoryViewModels: ApicalLapByCategoryViewModel[],
   eventId: EventId,
   categoryId: EventCategoryId,
-  inferTransponderNumberRange?: number
+  inferTransponderNumberRange?: number,
 ): EventParticipant[] => {
   if (!validateUuid(eventId)) {
     throw new Error(`Invalid eventId provided: ${eventId}`);
@@ -273,14 +362,18 @@ export const getUniqueParticipantsFromLapCategoryViewModels = (
 
   const unique: EventParticipantId[] = [];
   const returnedParticipants: EventParticipant[] = [];
-  lapCategoryViewModels.forEach(
-    (lap: ApicalLapByCategoryViewModel) => {
-      const participant = participantToLap(eventId, categoryId, lap, inferTransponderNumberRange);
-      if (!unique.includes(participant.id)) {
-        unique.push(participant.id);
-        returnedParticipants.push(participant);
-      }
-    });
+  lapCategoryViewModels.forEach((lap: ApicalLapByCategoryViewModel) => {
+    const participant = participantToLap(
+      eventId,
+      categoryId,
+      lap,
+      inferTransponderNumberRange,
+    );
+    if (!unique.includes(participant.id)) {
+      unique.push(participant.id);
+      returnedParticipants.push(participant);
+    }
+  });
 
   return returnedParticipants;
 };
@@ -291,17 +384,32 @@ export const convertLapCategoryViewModelToChipCrossing = (
   categoryId: EventCategoryId,
   eventStartTime: Date,
   inferTransponderNumberRange: number,
-  timeZone?: string
-): Pick<ChipCrossingData, 'participantId' | 'eventId'> & ReturnType<typeof createChipCrossingRecord> => {
+  timeZone?: string,
+): Pick<ChipCrossingData, "participantId" | "eventId"> &
+  ReturnType<typeof createChipCrossingRecord> => {
   if (!validateUuid(eventId)) {
     throw new Error(`Invalid eventId provided: ${eventId}`);
   }
   if (!validateUuid(categoryId)) {
     throw new Error(`Invalid categoryId provided: ${categoryId}`);
   }
-  const epId: EventParticipantId = createParticipantIdFromEventAndCategory(eventId, categoryId, lap.RaceNumber);
-  const txNo = inferTransponderFromRaceNumber(lap.RaceNumber, inferTransponderNumberRange);
-  const crossing: Pick<ChipCrossingData, 'participantId' | 'eventId'> & ReturnType<typeof createChipCrossingRecord> = createChipCrossingRecord(lap, eventStartTime, txNo, eventId, timeZone);
+  const epId: EventParticipantId = createParticipantIdFromEventAndCategory(
+    eventId,
+    categoryId,
+    lap.RaceNumber,
+  );
+  const txNo = inferTransponderFromRaceNumber(
+    lap.RaceNumber,
+    inferTransponderNumberRange,
+  );
+  const crossing: Pick<ChipCrossingData, "participantId" | "eventId"> &
+    ReturnType<typeof createChipCrossingRecord> = createChipCrossingRecord(
+    lap,
+    eventStartTime,
+    txNo,
+    eventId,
+    timeZone,
+  );
   crossing.participantId = epId;
 
   return crossing;
@@ -313,23 +421,24 @@ export const getChipCrossingsFromLapCategoryViewModels = (
   categoryId: EventCategoryId,
   eventStartTime: Date,
   inferTransponderNumberRange: number,
-  timeZone?: string
+  timeZone?: string,
 ): ReturnType<typeof convertLapCategoryViewModelToChipCrossing>[] => {
-    if (!validateUuid(eventId)) {
+  if (!validateUuid(eventId)) {
     throw new Error(`Invalid eventId provided: ${eventId}`);
   }
   if (!validateUuid(categoryId)) {
     throw new Error(`Invalid categoryId provided: ${categoryId}`);
   }
-  return lapCategoryViewModels.map(
-  (lap: ApicalLapByCategoryViewModel) => convertLapCategoryViewModelToChipCrossing(
-    lap,
-    eventId,
-    categoryId,
-    eventStartTime,
-    inferTransponderNumberRange,
-    timeZone
-  ));
+  return lapCategoryViewModels.map((lap: ApicalLapByCategoryViewModel) =>
+    convertLapCategoryViewModelToChipCrossing(
+      lap,
+      eventId,
+      categoryId,
+      eventStartTime,
+      inferTransponderNumberRange,
+      timeZone,
+    ),
+  );
 };
 
 export const convertLapCategoryViewModelsForEntrant = (
@@ -338,20 +447,24 @@ export const convertLapCategoryViewModelsForEntrant = (
   eventId: EventId,
   eventStartTime: Date,
   inferTransponderNumberRange?: number,
-  timeZone?: string
-): { participants: EventParticipant[]; records?: Partial<ChipCrossingData>[]; } => {
+  timeZone?: string,
+): {
+  participants: EventParticipant[];
+  records?: Partial<ChipCrossingData>[];
+} => {
   if (!validateUuid(eventId)) {
     throw new Error(`Invalid eventId provided: ${eventId}`);
   }
   if (!validateUuid(categoryId)) {
     throw new Error(`Invalid categoryId provided: ${categoryId}`);
   }
-  const participants: EventParticipant[] = getUniqueParticipantsFromLapCategoryViewModels(
-    lapCategoryViewModels,
-    eventId,
-    categoryId,
-    inferTransponderNumberRange
-  );
+  const participants: EventParticipant[] =
+    getUniqueParticipantsFromLapCategoryViewModels(
+      lapCategoryViewModels,
+      eventId,
+      categoryId,
+      inferTransponderNumberRange,
+    );
 
   let records: Partial<ChipCrossingData>[] | undefined = undefined;
 
@@ -362,7 +475,7 @@ export const convertLapCategoryViewModelsForEntrant = (
       categoryId,
       eventStartTime,
       inferTransponderNumberRange,
-      timeZone
+      timeZone,
     );
   }
 
@@ -378,21 +491,25 @@ export const apiParticipantEntrantToEntrantData = (
   categoryId: EventCategoryId,
   eventStartTime: Date | undefined,
   inferTransponderNumberRange?: number,
-  timeZone?: string
-): { team?: EventTeam; participants: EventParticipant[]; records?: Partial<ChipCrossingData>[]; } => {
+  timeZone?: string,
+): {
+  team?: EventTeam;
+  participants: EventParticipant[];
+  records?: Partial<ChipCrossingData>[];
+} => {
   if (!validateUuid(eventId)) {
     throw new Error(`Invalid eventId provided: ${eventId}`);
   }
   if (!validateUuid(categoryId)) {
     throw new Error(`Invalid categoryId provided: ${categoryId}`);
   }
-  const teamName = entrant.TeamDisplayName || entrant.TeamNameDisplay || '';
+  const teamName = entrant.TeamDisplayName || entrant.TeamNameDisplay || "";
 
   let team: EventTeam | undefined;
   if (isEntrantTeam(entrant)) {
     team = {
       categoryId: categoryId,
-      description: '',
+      description: "",
       id: generateTeamId(eventId, teamName),
       members: [],
       name: teamName,
@@ -405,7 +522,7 @@ export const apiParticipantEntrantToEntrantData = (
     eventId,
     eventStartTime || new Date(), // Default to now if no start time is provided
     inferTransponderNumberRange,
-    timeZone
+    timeZone,
   );
 
   results.participants.forEach((participant: EventParticipant) => {
@@ -427,13 +544,16 @@ export const convertDataToRaceState = (
   eventStartTime: Date | undefined,
   data: ApicalLapByCategory,
   inferTransponderNumberRange?: number,
-  timeZone?: string
+  timeZone?: string,
 ): Partial<RaceState> => {
   if (!validateUuid(eventId)) {
-    console.error('Invalid eventId provided:', eventId);
+    console.error("Invalid eventId provided:", eventId);
     throw new Error(`Invalid eventId provided: ${eventId}`);
   }
-  const categoriesMap: Map<EventCategoryId, EventCategory> = new Map<EventCategoryId, EventCategory>();
+  const categoriesMap: Map<EventCategoryId, EventCategory> = new Map<
+    EventCategoryId,
+    EventCategory
+  >();
 
   const records: TimeRecord[] = [];
   const participants: EventParticipant[] = [];
@@ -441,13 +561,23 @@ export const convertDataToRaceState = (
   assert(data != null);
   assert(eventId);
   const source: uuid = uuidv5(data.toString(), eventId);
-  const categoryStartTimes = getCategoryStartTimeMap(data, eventId, eventStartTime, timeZone);
-  records.push(...createCategoryStartFlags(categoryStartTimes, eventId, source));
+  const categoryStartTimes = getCategoryStartTimeMap(
+    data,
+    eventId,
+    eventStartTime,
+    timeZone,
+  );
+  records.push(
+    ...createCategoryStartFlags(categoryStartTimes, eventId, source),
+  );
 
   data.forEach((apiCategory: ApicalCategoryResult) => {
     let categoryId;
     try {
-      categoryId = createEventCategoryIdFromCategoryCode(eventId, apiCategory.CategoryName);
+      categoryId = createEventCategoryIdFromCategoryCode(
+        eventId,
+        apiCategory.CategoryName,
+      );
     } catch (error) {
       console.error(`Error creating category:`, error, apiCategory);
       return; // Skip this category if there's an error
@@ -458,7 +588,7 @@ export const convertDataToRaceState = (
     if (!category) {
       categoriesMap.set(categoryId, {
         code: apiCategory.CategoryName,
-        description: '',
+        description: "",
         excludeFromResults: normalizeCategoryResultExclusion({
           id: categoryId,
           name: apiCategory.CategoryName,
@@ -468,9 +598,17 @@ export const convertDataToRaceState = (
       } as EventCategory);
     }
 
-    const entrantData = apiCategory.ParticipantViewModels.map((entrant: ApicalParticipantViewModel) => apiParticipantEntrantToEntrantData(
-      entrant, eventId, categoryId, eventStartTime, inferTransponderNumberRange, timeZone
-    ));
+    const entrantData = apiCategory.ParticipantViewModels.map(
+      (entrant: ApicalParticipantViewModel) =>
+        apiParticipantEntrantToEntrantData(
+          entrant,
+          eventId,
+          categoryId,
+          eventStartTime,
+          inferTransponderNumberRange,
+          timeZone,
+        ),
+    );
 
     entrantData.forEach((entrant) => {
       entrant.records?.forEach((record: Partial<ChipCrossingData>) => {
@@ -500,4 +638,3 @@ export const convertDataToRaceState = (
     teams,
   } as RaceState;
 };
-

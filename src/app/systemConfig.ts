@@ -1,25 +1,30 @@
-import path from 'node:path';
-import defaults from '../defaults.json';
-import { EventId, SessionId } from '../model/raceevent';
-import { getCtcFinishLineNumbers, hasCtcLapCompletionSelection, type CtcTrackConfig } from '../model/ctcTrackConfig';
-import type { MrScatsDataFileSummary } from '../parsers/mrScats/fileInventory';
+import path from "node:path";
+import defaults from "../defaults.json";
+import { EventId, SessionId } from "../model/raceevent";
+import {
+  getCtcFinishLineNumbers,
+  hasCtcLapCompletionSelection,
+  type CtcTrackConfig,
+} from "../model/ctcTrackConfig";
+import type { MrScatsDataFileSummary } from "../parsers/mrScats/fileInventory";
 
 export type DataSourceType =
-  | 'timing-iracing-agent'
-  | 'timing-rfid-decoder'
-  | 'timing-mylaps-decoder'
-  | 'timing-dorian-data1-supernode'
-  | 'file-rfid-timing-csv'
-  | 'file-dorian-ctc-srt'
-  | 'file-durt-filemaker'
-  | 'file-mr-scats-data'
-  | 'file-apical-data-file'
-  | 'file-racesweet-ledger'
-  | 'api-aws-sqs'
-  | 'api-http-request'
-  | 'api-apical-excel-file'
-  | 'api-apical-data-file'
-  | 'master-entrant-profiles';
+  | "timing-iracing-agent"
+  | "timing-rfid-decoder"
+  | "timing-mylaps-decoder"
+  | "timing-dorian-data1-supernode"
+  | "file-rfid-timing-csv"
+  | "file-dorian-ctc-srt"
+  | "file-durt-filemaker"
+  | "file-mr-scats-data"
+  | "file-apical-data-file"
+  | "file-racesweet-ledger"
+  | "api-aws-sqs"
+  | "api-http-request"
+  | "api-apical-recent-laps"
+  | "api-apical-excel-file"
+  | "api-apical-data-file"
+  | "master-entrant-profiles";
 
 export interface MasterEntrantProfile {
   categoryId?: string;
@@ -35,7 +40,7 @@ export interface MasterEntrantSourceConfig {
   profiles: MasterEntrantProfile[];
 }
 
-export type DataImportMode = 'import' | 'update';
+export type DataImportMode = "import" | "update";
 
 export interface LocalFileSourceConfig {
   ctcTrackConfig?: CtcTrackConfig;
@@ -49,7 +54,7 @@ export interface MrScatsSourceConfig {
   dataLocationPath?: string;
   files: MrScatsDataFileSummary[];
   ignoreLineOneNo1CrossingsWhenDbfPresent?: boolean;
-  sourceKind?: 'archive' | 'directory';
+  sourceKind?: "archive" | "directory";
 }
 
 export interface DurtFileMakerSourceConfig {
@@ -71,9 +76,11 @@ export interface ApicalListedEvent {
   name: string;
 }
 
-export const APICAL_DEFAULT_SOURCE_NAME = 'Apical Data file endpoint';
+export const APICAL_DEFAULT_SOURCE_NAME = "Apical Data file endpoint";
 
-export const shouldRenameApicalSourceForFetchedEvent = (sourceName: string | null | undefined): boolean => {
+export const shouldRenameApicalSourceForFetchedEvent = (
+  sourceName: string | null | undefined,
+): boolean => {
   const trimmedSourceName = sourceName?.trim();
   return !trimmedSourceName || trimmedSourceName === APICAL_DEFAULT_SOURCE_NAME;
 };
@@ -86,6 +93,9 @@ export interface ApicalApiSourceConfig {
   companyId: number;
   httpTimeoutSeconds: number;
   live: boolean;
+  pollingResumedAt?: string;
+  pollingStoppedAt?: string;
+  pollingStopReason?: string;
   pollIntervalSeconds: number;
   selectedEventIds: number[];
 }
@@ -108,11 +118,11 @@ export interface DataSourceConfig {
 }
 
 export interface SessionSourceAssignment {
-  mode: 'default' | 'specific';
+  mode: "default" | "specific";
   sourceIds: string[];
 }
 
-export type EventTimeDisplayZoneMode = 'event' | 'system' | 'gmt';
+export type EventTimeDisplayZoneMode = "event" | "system" | "gmt";
 
 export interface EventOptionsConfig {
   timeDisplayZoneMode?: EventTimeDisplayZoneMode;
@@ -124,7 +134,7 @@ export interface FastestTimeIndicatorColors {
   sessionFastestTime: string;
 }
 
-export type TimingContextSelectionMode = 'active' | 'session';
+export type TimingContextSelectionMode = "active" | "session";
 
 export interface TimingContextSelectionConfig {
   eventId?: EventId;
@@ -160,26 +170,38 @@ export interface SystemConfiguration {
   timingContextSelection: TimingContextSelectionConfig;
 }
 
-export const DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH = path.resolve('src/generated');
-export const DEFAULT_FASTEST_TIME_INDICATOR_COLORS: FastestTimeIndicatorColors = {
-  entrantFasterTime: '#f2c94c',
-  entrantFastestTime: '#21a366',
-  sessionFastestTime: '#8a2be2',
-};
-const APICAL_EXCEL_CACHE_DIRECTORY_NAME = 'apical-excel-cache';
+export const DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH =
+  path.resolve("src/generated");
+export const DEFAULT_FASTEST_TIME_INDICATOR_COLORS: FastestTimeIndicatorColors =
+  {
+    entrantFasterTime: "#f2c94c",
+    entrantFastestTime: "#21a366",
+    sessionFastestTime: "#8a2be2",
+  };
+const APICAL_EXCEL_CACHE_DIRECTORY_NAME = "apical-excel-cache";
 
-export const normalizeSystemDirectoryPath = (directoryPath: string | undefined): string => {
+export const normalizeSystemDirectoryPath = (
+  directoryPath: string | undefined,
+): string => {
   const trimmedPath = directoryPath?.trim();
-  return path.resolve(trimmedPath && trimmedPath.length > 0 ? trimmedPath : DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH);
+  return path.resolve(
+    trimmedPath && trimmedPath.length > 0
+      ? trimmedPath
+      : DEFAULT_LOCAL_STORAGE_DIRECTORY_PATH,
+  );
 };
 
 const removeDuplicateWindowsDrivePrefixes = (filePath: string): string => {
-  return filePath.replace(/^([a-z]:)(?:[\\/][a-z]:)+(?=[\\/]|$)/iu, '$1');
+  return filePath.replace(/^([a-z]:)(?:[\\/][a-z]:)+(?=[\\/]|$)/iu, "$1");
 };
 
-export const normalizeOptionalSystemFilePath = (filePath: string | undefined): string | undefined => {
+export const normalizeOptionalSystemFilePath = (
+  filePath: string | undefined,
+): string | undefined => {
   const trimmedPath = filePath?.trim();
-  return trimmedPath && trimmedPath.length > 0 ? path.resolve(removeDuplicateWindowsDrivePrefixes(trimmedPath)) : undefined;
+  return trimmedPath && trimmedPath.length > 0
+    ? path.resolve(removeDuplicateWindowsDrivePrefixes(trimmedPath))
+    : undefined;
 };
 
 export const createDefaultSystemConfiguration = (): SystemConfiguration => ({
@@ -194,29 +216,36 @@ export const createDefaultSystemConfiguration = (): SystemConfiguration => ({
   schemaVersion: 1,
   sessionSourceAssignments: {},
   timingContextSelection: {
-    selectionMode: 'active',
+    selectionMode: "active",
   },
 });
 
-const normalizePort = (port: number | undefined): number | undefined => (
-  Number.isInteger(port) && port! > 0 && port! <= 65535 ? port : undefined
-);
+const normalizePort = (port: number | undefined): number | undefined =>
+  Number.isInteger(port) && port! > 0 && port! <= 65535 ? port : undefined;
 
-const normalizeListenerServerConfig = (config: ListenerServerConfig | undefined): ListenerServerConfig => ({
+const normalizeListenerServerConfig = (
+  config: ListenerServerConfig | undefined,
+): ListenerServerConfig => ({
   certificatePath: normalizeOptionalSystemFilePath(config?.certificatePath),
   enabled: config?.enabled === true,
-  httpPort: normalizePort(config?.httpPort) || (!normalizePort(config?.httpsPort) ? DEFAULT_LISTENER_HTTP_PORT : undefined),
+  httpPort:
+    normalizePort(config?.httpPort) ||
+    (!normalizePort(config?.httpsPort)
+      ? DEFAULT_LISTENER_HTTP_PORT
+      : undefined),
   httpsPort: normalizePort(config?.httpsPort),
   privateKeyPath: normalizeOptionalSystemFilePath(config?.privateKeyPath),
 });
 
-const normalizeRemoteServerConfig = (config: RemoteServerConfig | undefined): RemoteServerConfig => {
+const normalizeRemoteServerConfig = (
+  config: RemoteServerConfig | undefined,
+): RemoteServerConfig => {
   const baseUrl = config?.baseUrl?.trim();
   if (!baseUrl) {
     return {};
   }
   try {
-    return { baseUrl: new URL(baseUrl).toString().replace(/\/$/, '') };
+    return { baseUrl: new URL(baseUrl).toString().replace(/\/$/, "") };
   } catch {
     return {};
   }
@@ -224,36 +253,51 @@ const normalizeRemoteServerConfig = (config: RemoteServerConfig | undefined): Re
 
 const normalizeLocalStorageDirectoryPath = (
   directoryPath: string | undefined,
-  legacyApicalExcelCacheDirectoryPath: string | undefined
+  legacyApicalExcelCacheDirectoryPath: string | undefined,
 ): string => {
   if (directoryPath !== undefined) {
     return normalizeSystemDirectoryPath(directoryPath);
   }
 
-  const normalizedLegacyPath = normalizeSystemDirectoryPath(legacyApicalExcelCacheDirectoryPath);
-  return path.basename(normalizedLegacyPath) === APICAL_EXCEL_CACHE_DIRECTORY_NAME
+  const normalizedLegacyPath = normalizeSystemDirectoryPath(
+    legacyApicalExcelCacheDirectoryPath,
+  );
+  return path.basename(normalizedLegacyPath) ===
+    APICAL_EXCEL_CACHE_DIRECTORY_NAME
     ? path.dirname(normalizedLegacyPath)
     : normalizedLegacyPath;
 };
 
-const isApicalDataSource = (source: Pick<DataSourceConfig, 'type'>): boolean => {
-  return source.type === 'api-apical-data-file' || source.type === 'api-apical-excel-file';
+const isApicalDataSource = (
+  source: Pick<DataSourceConfig, "type">,
+): boolean => {
+  return (
+    source.type === "api-apical-data-file" ||
+    source.type === "api-apical-excel-file" ||
+    source.type === "api-apical-recent-laps"
+  );
 };
 
-const normalizeFinishLineNumbers = (finishLineNumbers: number[] | undefined): number[] | undefined => {
+const normalizeFinishLineNumbers = (
+  finishLineNumbers: number[] | undefined,
+): number[] | undefined => {
   if (!finishLineNumbers) {
     return undefined;
   }
 
-  const uniqueNumbers = Array.from(new Set(
-    finishLineNumbers
-      .map((value) => Number(value))
-      .filter((value) => Number.isInteger(value) && value > 0)
-  ));
+  const uniqueNumbers = Array.from(
+    new Set(
+      finishLineNumbers
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value > 0),
+    ),
+  );
   return uniqueNumbers.length > 0 ? uniqueNumbers : undefined;
 };
 
-const normalizeMrScatsSourceConfig = (config: MrScatsSourceConfig | undefined): MrScatsSourceConfig | undefined => {
+const normalizeMrScatsSourceConfig = (
+  config: MrScatsSourceConfig | undefined,
+): MrScatsSourceConfig | undefined => {
   if (!config) {
     return undefined;
   }
@@ -262,84 +306,119 @@ const normalizeMrScatsSourceConfig = (config: MrScatsSourceConfig | undefined): 
     ...config,
     dataLocationPath: normalizeOptionalSystemFilePath(config.dataLocationPath),
     files: config.files || [],
-    ignoreLineOneNo1CrossingsWhenDbfPresent: config.ignoreLineOneNo1CrossingsWhenDbfPresent !== false,
+    ignoreLineOneNo1CrossingsWhenDbfPresent:
+      config.ignoreLineOneNo1CrossingsWhenDbfPresent !== false,
   };
 };
 
-const normalizeApicalListedEvents = (listedEvents: ApicalListedEvent[] | undefined): ApicalListedEvent[] => {
+const normalizeApicalListedEvents = (
+  listedEvents: ApicalListedEvent[] | undefined,
+): ApicalListedEvent[] => {
   return (listedEvents || []).map((event) => ({ ...event }));
 };
 
 const normalizeTimingContextSelection = (
-  selection: Partial<TimingContextSelectionConfig> | undefined
+  selection: Partial<TimingContextSelectionConfig> | undefined,
 ): TimingContextSelectionConfig => {
-  if (selection?.selectionMode === 'session') {
+  if (selection?.selectionMode === "session") {
     return {
       eventId: selection.eventId,
-      selectionMode: 'session',
+      selectionMode: "session",
       sessionId: selection.sessionId,
     };
   }
 
   return {
-    selectionMode: 'active',
+    selectionMode: "active",
   };
 };
 
-export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListedEvents: ApicalListedEvent[] = []): DataSourceConfig => {
-  if (source.type === 'file-mr-scats-data') {
+export const normalizeDataSourceConfig = (
+  source: DataSourceConfig,
+  apicalListedEvents: ApicalListedEvent[] = [],
+): DataSourceConfig => {
+  if (source.type === "file-mr-scats-data") {
     return {
       ...source,
-      finishLineNumbers: normalizeFinishLineNumbers(source.finishLineNumbers) || [1],
-      mrScatsConfig: normalizeMrScatsSourceConfig(source.mrScatsConfig) || { files: [] },
+      finishLineNumbers: normalizeFinishLineNumbers(
+        source.finishLineNumbers,
+      ) || [1],
+      mrScatsConfig: normalizeMrScatsSourceConfig(source.mrScatsConfig) || {
+        files: [],
+      },
     };
   }
 
-  if (source.type === 'file-dorian-ctc-srt') {
-    const configuredFinishLines = normalizeFinishLineNumbers(source.finishLineNumbers) || [];
-    const ctcFinishLines = getCtcFinishLineNumbers(source.fileConfig?.ctcTrackConfig) || [];
-    const finishLineNumbers = hasCtcLapCompletionSelection(source.fileConfig?.ctcTrackConfig)
+  if (source.type === "file-dorian-ctc-srt") {
+    const configuredFinishLines =
+      normalizeFinishLineNumbers(source.finishLineNumbers) || [];
+    const ctcFinishLines =
+      getCtcFinishLineNumbers(source.fileConfig?.ctcTrackConfig) || [];
+    const finishLineNumbers = hasCtcLapCompletionSelection(
+      source.fileConfig?.ctcTrackConfig,
+    )
       ? ctcFinishLines
-      : Array.from(new Set([...configuredFinishLines, ...ctcFinishLines])).sort((left, right) => left - right);
+      : Array.from(new Set([...configuredFinishLines, ...ctcFinishLines])).sort(
+          (left, right) => left - right,
+        );
     return {
       ...source,
       fileConfig: {
         ctcTrackConfig: source.fileConfig?.ctcTrackConfig,
         filePath: normalizeOptionalSystemFilePath(source.fileConfig?.filePath),
-        importPlaceholderEntrantsForUnknownTransmitters: source.fileConfig?.importPlaceholderEntrantsForUnknownTransmitters === true,
-        importMode: source.fileConfig?.importMode === 'update' ? 'update' : 'import',
-        trackConfigFilePath: normalizeOptionalSystemFilePath(source.fileConfig?.trackConfigFilePath),
+        importPlaceholderEntrantsForUnknownTransmitters:
+          source.fileConfig?.importPlaceholderEntrantsForUnknownTransmitters ===
+          true,
+        importMode:
+          source.fileConfig?.importMode === "update" ? "update" : "import",
+        trackConfigFilePath: normalizeOptionalSystemFilePath(
+          source.fileConfig?.trackConfigFilePath,
+        ),
       },
       finishLineNumbers,
     };
   }
 
-  if (source.type === 'file-durt-filemaker') {
+  if (source.type === "file-durt-filemaker") {
     return {
       ...source,
       durtFileMakerConfig: {
-        databaseFilePath: normalizeOptionalSystemFilePath(source.durtFileMakerConfig?.databaseFilePath),
-        extractorPath: normalizeOptionalSystemFilePath(source.durtFileMakerConfig?.extractorPath),
-        importMode: source.durtFileMakerConfig?.importMode === 'update' ? 'update' : 'import',
+        databaseFilePath: normalizeOptionalSystemFilePath(
+          source.durtFileMakerConfig?.databaseFilePath,
+        ),
+        extractorPath: normalizeOptionalSystemFilePath(
+          source.durtFileMakerConfig?.extractorPath,
+        ),
+        importMode:
+          source.durtFileMakerConfig?.importMode === "update"
+            ? "update"
+            : "import",
       },
     };
   }
 
-  if (source.type === 'timing-dorian-data1-supernode') {
+  if (source.type === "timing-dorian-data1-supernode") {
     return {
       ...source,
-      finishLineNumbers: normalizeFinishLineNumbers(source.finishLineNumbers) || [1],
+      finishLineNumbers: normalizeFinishLineNumbers(
+        source.finishLineNumbers,
+      ) || [1],
     };
   }
 
-  if (source.type === 'timing-rfid-decoder') {
+  if (source.type === "timing-rfid-decoder") {
     return {
       ...source,
-      finishLineNumbers: normalizeFinishLineNumbers(source.finishLineNumbers) || [1],
+      finishLineNumbers: normalizeFinishLineNumbers(
+        source.finishLineNumbers,
+      ) || [1],
       rfidDecoderConfig: {
-        captureFilePath: normalizeOptionalSystemFilePath(source.rfidDecoderConfig?.captureFilePath),
+        captureFilePath: normalizeOptionalSystemFilePath(
+          source.rfidDecoderConfig?.captureFilePath,
+        ),
         isListening: source.rfidDecoderConfig?.isListening === true,
-        listenPort: normalizePort(source.rfidDecoderConfig?.listenPort) || 11113,
+        listenPort:
+          normalizePort(source.rfidDecoderConfig?.listenPort) || 11113,
       },
     };
   }
@@ -351,15 +430,18 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListed
     };
   }
 
-  const selectedEventIds = source.apiConfig.selectedEventIds?.length > 0
-    ? source.apiConfig.selectedEventIds
-    : source.apiConfig.apicalEventId
-      ? [source.apiConfig.apicalEventId]
-      : [];
+  const selectedEventIds =
+    source.apiConfig.selectedEventIds?.length > 0
+      ? source.apiConfig.selectedEventIds
+      : source.apiConfig.apicalEventId
+        ? [source.apiConfig.apicalEventId]
+        : [];
 
   return {
     ...source,
-    apicalDataFilePath: normalizeOptionalSystemFilePath(source.apicalDataFilePath),
+    apicalDataFilePath: normalizeOptionalSystemFilePath(
+      source.apicalDataFilePath,
+    ),
     finishLineNumbers: normalizeFinishLineNumbers(source.finishLineNumbers),
     ...(source.listedEvents && source.listedEvents.length > 0
       ? { listedEvents: normalizeApicalListedEvents(source.listedEvents) }
@@ -375,82 +457,109 @@ export const normalizeDataSourceConfig = (source: DataSourceConfig, apicalListed
 };
 
 export const normalizeSystemConfiguration = (
-  config: Partial<SystemConfiguration> & { apicalExcelCacheDirectoryPath?: string }
+  config: Partial<SystemConfiguration> & {
+    apicalExcelCacheDirectoryPath?: string;
+  },
 ): SystemConfiguration => {
   const {
     apicalExcelCacheDirectoryPath: _legacyApicalExcelCacheDirectoryPath,
     ...currentConfig
   } = config;
-  const normalizedApicalListedEvents = normalizeApicalListedEvents(config.apicalListedEvents);
-  const normalizedDataSources = (config.dataSources || []).map((source) => normalizeDataSourceConfig(source, normalizedApicalListedEvents));
-  const derivedApicalListedEvents = normalizedApicalListedEvents.length > 0
-    ? normalizedApicalListedEvents
-    : normalizedDataSources.find((source) => isApicalDataSource(source) && (source.listedEvents || []).length > 0)?.listedEvents || [];
+  const normalizedApicalListedEvents = normalizeApicalListedEvents(
+    config.apicalListedEvents,
+  );
+  const normalizedDataSources = (config.dataSources || []).map((source) =>
+    normalizeDataSourceConfig(source, normalizedApicalListedEvents),
+  );
+  const derivedApicalListedEvents =
+    normalizedApicalListedEvents.length > 0
+      ? normalizedApicalListedEvents
+      : normalizedDataSources.find(
+          (source) =>
+            isApicalDataSource(source) &&
+            (source.listedEvents || []).length > 0,
+        )?.listedEvents || [];
 
   return {
     ...createDefaultSystemConfiguration(),
     ...currentConfig,
     apicalListedEvents: derivedApicalListedEvents,
-    dataSources: normalizedDataSources.map((source) => (
-      isApicalDataSource(source) && derivedApicalListedEvents.length > 0 && (!source.listedEvents || source.listedEvents.length === 0)
+    dataSources: normalizedDataSources.map((source) =>
+      isApicalDataSource(source) &&
+      derivedApicalListedEvents.length > 0 &&
+      (!source.listedEvents || source.listedEvents.length === 0)
         ? { ...source, listedEvents: derivedApicalListedEvents }
-        : source
-    )),
+        : source,
+    ),
     eventOptions: config.eventOptions || {},
     eventSourceAssignments: config.eventSourceAssignments || {},
     fastestTimeIndicatorColors: {
       ...DEFAULT_FASTEST_TIME_INDICATOR_COLORS,
       ...(config.fastestTimeIndicatorColors || {}),
     },
-    localStorageDirectoryPath: normalizeLocalStorageDirectoryPath(config.localStorageDirectoryPath, config.apicalExcelCacheDirectoryPath),
+    localStorageDirectoryPath: normalizeLocalStorageDirectoryPath(
+      config.localStorageDirectoryPath,
+      config.apicalExcelCacheDirectoryPath,
+    ),
     listenerServer: normalizeListenerServerConfig(config.listenerServer),
     remoteServer: normalizeRemoteServerConfig(config.remoteServer),
     schemaVersion: 1,
     sessionSourceAssignments: config.sessionSourceAssignments || {},
-    timingContextSelection: normalizeTimingContextSelection(config.timingContextSelection),
+    timingContextSelection: normalizeTimingContextSelection(
+      config.timingContextSelection,
+    ),
   };
 };
 
 export const getDataSourceTypeLabel = (type: DataSourceType): string => {
   switch (type) {
-  case 'timing-rfid-decoder':
-    return 'RFID Timing Decoder';
-  case 'timing-mylaps-decoder':
-    return 'MyLaps Decoder';
-  case 'timing-dorian-data1-supernode':
-    return 'Dorian DATA-1 Supernode';
-  case 'file-rfid-timing-csv':
-    return 'RFID Timing CSV';
-  case 'file-dorian-ctc-srt':
-    return 'Dorian CTC SRT / ERF File';
-  case 'file-durt-filemaker':
-    return 'DURT FileMaker Database';
-  case 'file-mr-scats-data':
-    return 'MR-SCATS Data';
-  case 'file-apical-data-file':
-    return 'Apical data file';
-  case 'file-racesweet-ledger':
-    return 'RaceSweet Ledger';
-  case 'api-aws-sqs':
-    return 'AWS SQS';
-  case 'api-http-request':
-    return 'HTTP Request';
-  case 'api-apical-excel-file':
-    return 'Apical Excel data';
-  case 'master-entrant-profiles':
-    return 'Master Entrant Profiles';
-  default:
-    return type;
+    case "timing-rfid-decoder":
+      return "RFID Timing Decoder";
+    case "timing-mylaps-decoder":
+      return "MyLaps Decoder";
+    case "timing-dorian-data1-supernode":
+      return "Dorian DATA-1 Supernode";
+    case "file-rfid-timing-csv":
+      return "RFID Timing CSV";
+    case "file-dorian-ctc-srt":
+      return "Dorian CTC SRT / ERF File";
+    case "file-durt-filemaker":
+      return "DURT FileMaker Database";
+    case "file-mr-scats-data":
+      return "MR-SCATS Data";
+    case "file-apical-data-file":
+      return "Apical data file";
+    case "file-racesweet-ledger":
+      return "RaceSweet Ledger";
+    case "api-aws-sqs":
+      return "AWS SQS";
+    case "api-http-request":
+      return "HTTP Request";
+    case "api-apical-excel-file":
+      return "Apical Excel data";
+    case "api-apical-recent-laps":
+      return "Apical Recent Laps";
+    case "master-entrant-profiles":
+      return "Master Entrant Profiles";
+    default:
+      return type;
   }
 };
 
-export const getEventAssignedSourceIds = (config: SystemConfiguration, eventId: EventId): string[] => {
+export const getEventAssignedSourceIds = (
+  config: SystemConfiguration,
+  eventId: EventId,
+): string[] => {
   return config.eventSourceAssignments[eventId] || [];
 };
 
-export const getSessionAssignedSourceIds = (config: SystemConfiguration, eventId: EventId, sessionId: SessionId): string[] => {
+export const getSessionAssignedSourceIds = (
+  config: SystemConfiguration,
+  eventId: EventId,
+  sessionId: SessionId,
+): string[] => {
   const sessionAssignment = config.sessionSourceAssignments[sessionId];
-  if (!sessionAssignment || sessionAssignment.mode === 'default') {
+  if (!sessionAssignment || sessionAssignment.mode === "default") {
     return getEventAssignedSourceIds(config, eventId);
   }
 
@@ -460,30 +569,45 @@ export const getSessionAssignedSourceIds = (config: SystemConfiguration, eventId
 export const getFinishLineNumbersForSession = (
   config: SystemConfiguration,
   eventId: EventId,
-  sessionId: SessionId
+  sessionId: SessionId,
 ): number[] | undefined => {
   const sourceIds = getSessionAssignedSourceIds(config, eventId, sessionId);
-  const source = config.dataSources.find((candidate) => candidate.enabled && sourceIds.includes(candidate.id) && (
-    (candidate.finishLineNumbers || []).length > 0 || candidate.type === 'file-dorian-ctc-srt'
-  ));
+  const source = config.dataSources.find(
+    (candidate) =>
+      candidate.enabled &&
+      sourceIds.includes(candidate.id) &&
+      ((candidate.finishLineNumbers || []).length > 0 ||
+        candidate.type === "file-dorian-ctc-srt"),
+  );
   if (!source) {
     return undefined;
   }
 
   const configuredFinishLines = source.finishLineNumbers || [];
-  const ctcFinishLines = source.type === 'file-dorian-ctc-srt'
-    ? getCtcFinishLineNumbers(source.fileConfig?.ctcTrackConfig) || []
-    : [];
-  const finishLineNumbers = source.type === 'file-dorian-ctc-srt' && hasCtcLapCompletionSelection(source.fileConfig?.ctcTrackConfig)
-    ? ctcFinishLines
-    : Array.from(new Set([...configuredFinishLines, ...ctcFinishLines]));
+  const ctcFinishLines =
+    source.type === "file-dorian-ctc-srt"
+      ? getCtcFinishLineNumbers(source.fileConfig?.ctcTrackConfig) || []
+      : [];
+  const finishLineNumbers =
+    source.type === "file-dorian-ctc-srt" &&
+    hasCtcLapCompletionSelection(source.fileConfig?.ctcTrackConfig)
+      ? ctcFinishLines
+      : Array.from(new Set([...configuredFinishLines, ...ctcFinishLines]));
   return finishLineNumbers.length > 0 ? finishLineNumbers : undefined;
 };
 
-export const getMasterEntrantProfilesForEvent = (config: SystemConfiguration, eventId: EventId): MasterEntrantProfile[] => {
+export const getMasterEntrantProfilesForEvent = (
+  config: SystemConfiguration,
+  eventId: EventId,
+): MasterEntrantProfile[] => {
   const sourceIds = getEventAssignedSourceIds(config, eventId);
 
   return config.dataSources
-    .filter((source) => source.enabled && sourceIds.includes(source.id) && source.type === 'master-entrant-profiles')
+    .filter(
+      (source) =>
+        source.enabled &&
+        sourceIds.includes(source.id) &&
+        source.type === "master-entrant-profiles",
+    )
     .flatMap((source) => source.masterEntrantConfig?.profiles || []);
 };
