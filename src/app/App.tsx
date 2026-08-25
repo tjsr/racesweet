@@ -145,6 +145,12 @@ import {
   loadDurtFileMakerRaceState,
 } from "./durtFileMakerDataSource.ts";
 import "./index.css";
+import {
+  type LivePollingContext,
+  LivePollingScheduler,
+  type LivePollingSource,
+  type ScheduledLivePoll,
+} from "./livePollingScheduler.ts";
 import { formatErrorForDisplay } from "./stackTrace.ts";
 import {
   type DataSourceConfig,
@@ -171,6 +177,16 @@ type AppSection =
   | "Results"
   | "Reports";
 type TimingSessionSelection = "active" | "session";
+
+const isLivePollableSource = (source: DataSourceConfig): boolean => {
+  return (
+    source.enabled &&
+    source.apiConfig?.live === true &&
+    (source.type === "api-apical-data-file" ||
+      source.type === "api-apical-excel-file" ||
+      source.type === "api-apical-recent-laps")
+  );
+};
 
 const SEED_FIXTURE_EVENT_ID: EventId = createEventId(
   "event-2026-racesweet-round-1",
@@ -686,10 +702,27 @@ export const RaceSweetMainApp = () => {
   const [timingSelectionLoading, setTimingSelectionLoading] =
     useState<boolean>(false);
   const [timingErrorState, setTimingErrorState] = useState<unknown>(undefined);
+  const [scheduledLivePolls, setScheduledLivePolls] = useState<
+    ScheduledLivePoll[]
+  >([]);
   const [reloadSummary, setReloadSummary] = useState<
     SessionSourceReloadSummary | undefined
   >(undefined);
   const initialTimingSelectionHydrated = useRef<boolean>(false);
+  const livePollingScheduler = useRef<LivePollingScheduler | undefined>(
+    undefined,
+  );
+  const reloadLivePollingSource = useRef<
+    (sourceId: string, target: { eventId: EventId; sessionId: SessionId }) => Promise<void>
+      >(() => Promise.resolve());
+  if (!livePollingScheduler.current) {
+    livePollingScheduler.current = new LivePollingScheduler({
+      onScheduleChanged: (scheduledPolls: ScheduledLivePoll[]): void => {
+        setScheduledLivePolls(scheduledPolls);
+      },
+      onSourceError: (error: Error): void => setErrorState(error),
+    });
+  }
   const unsavedChangesGuards = useRef<
     Partial<Record<AppSection, UnsavedChangesGuard>>
   >({});
@@ -1685,6 +1718,46 @@ export const RaceSweetMainApp = () => {
     }
   };
 
+  reloadLivePollingSource.current = (
+    sourceId: string,
+    target: { eventId: EventId; sessionId: SessionId },
+  ): Promise<void> => {
+    const source: DataSourceConfig | undefined = systemConfigState.dataSources.find(
+      (candidate: DataSourceConfig): boolean => candidate.id === sourceId,
+    );
+    const activeSourceIds: string[] = getSessionAssignedSourceIds(
+      systemConfigState,
+      target.eventId,
+      target.sessionId,
+    );
+    if (
+      !source ||
+      !sessionState ||
+      eventCatalogState?.activeEventId !== target.eventId ||
+      eventCatalogState.activeSessionId !== target.sessionId ||
+      !activeSourceIds.includes(source.id) ||
+      !isLivePollableSource(source)
+    ) {
+      return Promise.resolve();
+    }
+
+    if (source.type === "api-apical-recent-laps") {
+      return pollApicalRecentLapsSource(
+        source,
+        target.eventId,
+        target.sessionId,
+      );
+    }
+
+    return applySourceToSessionState(target.eventId, source, undefined, {
+      sessionId: target.sessionId,
+    })
+      .then(() =>
+        adminService?.applyChangesToSessionById(sessionState, target.sessionId),
+      )
+      .then((): void => setRenderTick((tick: number): number => tick + 1));
+  };
+
   const applyPersistedRaceStateToSession = async (
     eventId: EventId,
     sessionId: SessionId,
@@ -2463,114 +2536,86 @@ export const RaceSweetMainApp = () => {
     timingSessionSelection,
   ]);
 
-  useEffect(() => {
-    if (
-      !eventCatalogState ||
-      !sessionState ||
-      !selectedSessionsEventId ||
-      !selectedSessionId
-    ) {
-      return;
+  const livePollingConfigurationKey = useMemo((): string => {
+    const activeEventId: EventId | undefined = eventCatalogState?.activeEventId;
+    const activeSessionId: SessionId | undefined =
+      eventCatalogState?.activeSessionId;
+    if (!activeEventId || !activeSessionId) {
+      return "";
     }
-
-    const sourceIds = getSessionAssignedSourceIds(
+    const assignedSourceIds: string[] = getSessionAssignedSourceIds(
       systemConfigState,
-      selectedSessionsEventId,
-      selectedSessionId,
+      activeEventId,
+      activeSessionId,
     );
-    const liveSources = systemConfigState.dataSources.filter((source) => {
-      return (
-        sourceIds.includes(source.id) &&
-        source.enabled &&
-        (source.type === "api-apical-data-file" ||
-          source.type === "api-apical-excel-file") &&
-        !!source.apiConfig?.live
-      );
-    });
-
-    const applyLiveSource = (source: DataSourceConfig): void => {
-      applySourceToSessionState(selectedSessionsEventId, source, undefined, {
-        sessionId: selectedSessionId,
-      })
-        .then(() =>
-          adminService?.applyChangesToSessionById(
-            sessionState,
-            selectedSessionId,
-          ),
+    return JSON.stringify({
+      assignedSourceIds: [...assignedSourceIds].sort(),
+      sources: systemConfigState.dataSources
+        .filter((source: DataSourceConfig): boolean =>
+          assignedSourceIds.includes(source.id),
         )
-        .then(() => setRenderTick((tick) => tick + 1))
-        .catch((error: unknown) => {
-          setErrorState(error as Error);
-        });
-    };
-
-    const timers = liveSources.map((source) => {
-      applyLiveSource(source);
-      const intervalMs =
-        Math.max(1, source.apiConfig!.pollIntervalSeconds) * 1000;
-      return window.setInterval(() => applyLiveSource(source), intervalMs);
+        .map((source: DataSourceConfig) => ({
+          enabled: source.enabled,
+          id: source.id,
+          live: source.apiConfig?.live,
+          name: source.name,
+          pollIntervalSeconds: source.apiConfig?.pollIntervalSeconds,
+          type: source.type,
+        })),
     });
-
-    return () => {
-      timers.forEach((timer) => clearInterval(timer));
-    };
   }, [
-    adminService,
-    eventCatalogState,
-    selectedSessionId,
-    selectedSessionsEventId,
-    systemConfigState,
+    eventCatalogState?.activeEventId,
+    eventCatalogState?.activeSessionId,
+    systemConfigState.dataSources,
+    systemConfigState.eventSourceAssignments,
+    systemConfigState.sessionSourceAssignments,
   ]);
 
   useEffect(() => {
     const activeEventId: EventId | undefined = eventCatalogState?.activeEventId;
     const activeSessionId: SessionId | undefined =
       eventCatalogState?.activeSessionId;
-    if (!activeEventId || !activeSessionId) {
-      return;
-    }
-
-    const assignedSourceIds: string[] = getSessionAssignedSourceIds(
-      systemConfigState,
-      activeEventId,
-      activeSessionId,
-    );
-    const liveSources: DataSourceConfig[] =
-      systemConfigState.dataSources.filter(
+    const assignedSourceIds: string[] = activeEventId && activeSessionId
+      ? getSessionAssignedSourceIds(
+        systemConfigState,
+        activeEventId,
+        activeSessionId,
+      )
+      : [];
+    const liveSources: LivePollingSource[] = systemConfigState.dataSources
+      .filter(
         (source: DataSourceConfig): boolean =>
-          source.type === "api-apical-recent-laps" &&
-          source.enabled &&
-          assignedSourceIds.includes(source.id) &&
-          source.apiConfig?.live === true,
-      );
-    const timers: number[] = liveSources.map(
-      (source: DataSourceConfig): number => {
-        void pollApicalRecentLapsSource(
-          source,
-          activeEventId,
-          activeSessionId,
-        ).catch((error: unknown): void => setErrorState(error as Error));
-        const intervalMilliseconds: number =
-          Math.max(1, source.apiConfig!.pollIntervalSeconds) * 1000;
-        return window.setInterval((): void => {
-          void pollApicalRecentLapsSource(
-            source,
-            activeEventId,
-            activeSessionId,
-          ).catch((error: unknown): void => setErrorState(error as Error));
-        }, intervalMilliseconds);
-      },
-    );
-
-    return (): void => {
-      timers.forEach((timer: number): void => window.clearInterval(timer));
-    };
+          assignedSourceIds.includes(source.id) && isLivePollableSource(source),
+      )
+      .map((source: DataSourceConfig): LivePollingSource => ({
+        id: source.id,
+        name: source.name,
+        pollIntervalSeconds: source.apiConfig!.pollIntervalSeconds,
+      }));
+    const context: LivePollingContext | undefined = activeEventId && activeSessionId
+      ? {
+        eventId: activeEventId,
+        getLiveSource: (sourceId: string): LivePollingSource | undefined =>
+          liveSources.find(
+            (source: LivePollingSource): boolean => source.id === sourceId,
+          ),
+        loadSource: (source: LivePollingSource): Promise<void> =>
+          reloadLivePollingSource.current(source.id, {
+            eventId: activeEventId,
+            sessionId: activeSessionId,
+          }),
+        sessionId: activeSessionId,
+        sources: liveSources,
+      }
+      : undefined;
+    livePollingScheduler.current!.synchronize(context);
   }, [
-    eventCatalogState?.activeEventId,
-    eventCatalogState?.activeSessionId,
-    pollApicalRecentLapsSource,
-    systemConfigState,
+    livePollingConfigurationKey,
   ]);
+
+  useEffect((): (() => void) => {
+    return (): void => livePollingScheduler.current?.dispose();
+  }, []);
 
   const renderShell = (content: ReactElement): ReactElement => (
     <div className="app-shell">
@@ -3039,6 +3084,7 @@ export const RaceSweetMainApp = () => {
           }
           timeDisplayZoneMode={timingTimeDisplayZoneMode}
           timingEvent={timingEvent}
+          scheduledLivePolls={scheduledLivePolls}
           timingSelectionLoading={timingSelectionLoading}
           timingSessionValidCategoryIds={timingSessionValidCategoryIds}
           timingSessionValue={timingSessionValue}
