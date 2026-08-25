@@ -4,6 +4,7 @@ import { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import { tableTimeString } from '../../app/utils/timeutils.js';
 import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent } from '../../catalog/eventCatalog.js';
+import { getCategoryColor, getCategoryPaletteColor } from '../../categoryColors.js';
 import { CategoryId } from '../../processing/category.js';
 import { createGreenFlagEvent } from '../../processing/flag.js';
 import { EventEntrantId } from '../../model/entrant.js';
@@ -281,6 +282,15 @@ describe('race analytics views integration', () => {
     await selectMuiOption(getMuiSelect(container, 'Results View Type'), 'Lap Chart');
 
     expect(container.querySelector('table[aria-label="Results Lap Chart Table"]')).toBeTruthy();
+    const lineChartCheckbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    expect(lineChartCheckbox).toBeTruthy();
+    expect(lineChartCheckbox.checked).toBe(false);
+
+    await act(async () => {
+      lineChartCheckbox.click();
+    });
+
+    expect(container.querySelector('svg.lap-chart-line-overlay')).toBeTruthy();
     const lapEntryButton = container.querySelector('button.lap-entry-button') as HTMLButtonElement;
     expect(lapEntryButton).toBeTruthy();
 
@@ -1099,6 +1109,10 @@ describe('race analytics views integration', () => {
     expect(lapEntryButton(createEventParticipantId('p-team-1')).getAttribute('aria-pressed')).toBe('true');
     expect(lapEntryButton(createEventParticipantId('p-team-2')).getAttribute('aria-pressed')).toBe('true');
     expect(lapEntryButton(createEventParticipantId('p-rider-1')).getAttribute('aria-pressed')).toBe('false');
+    const categoryBorder: HTMLButtonElement = document.createElement('button');
+    categoryBorder.style.border = `2px solid ${getCategoryColor(createCategoryId('cat-a'))!}`;
+    expect(lapEntryButton(createEventParticipantId('p-team-1')).style.border).toBe(categoryBorder.style.border);
+    expect(lapEntryButton(createEventParticipantId('p-team-1')).closest('td')?.style.border).toBe('');
 
     await act(async () => {
       lapEntryButton(createEventParticipantId('p-team-2')).dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -1124,13 +1138,24 @@ describe('race analytics views integration', () => {
     expect(container.textContent).toContain(`Entrant: Solo Rider (${createEventEntrantId('rider-1')})`);
   });
 
-  it('draws entrant line chart segments behind reports lap chart plates when enabled', async () => {
+  it('draws uniquely-coloured entrant line chart segments behind reports lap chart plates when enabled', async () => {
+    const sameCategoryParticipants: EventParticipant[] = participants.map((participant): EventParticipant => {
+      return participant.id === createEventParticipantId('p-rider-1')
+        ? { ...participant, categoryId: createCategoryId('cat-a') }
+        : participant;
+    });
+    const sameCategoryRaceState = {
+      ...raceState,
+      getParticipantById: (participantId: EventParticipantId) => sameCategoryParticipants.find((participant) => participant.id === participantId),
+      participants: sameCategoryParticipants,
+    } as unknown as Session & RaceStateLookup;
+
     await act(async () => {
       root.render(
         <ReportsPage
           categories={categories}
           catalogEntrants={catalogEntrants}
-          raceState={raceState}
+          raceState={sameCategoryRaceState}
           selectedCategoryId={undefined}
         />,
       );
@@ -1156,8 +1181,8 @@ describe('race analytics views integration', () => {
     const riderLines = lines.filter((line) => line.getAttribute('data-lap-chart-entrant-id') === createEventEntrantId('rider-1'));
     expect(teamLines).toHaveLength(3);
     expect(riderLines).toHaveLength(1);
-    expect(teamLines[0].getAttribute('stroke')).toBeTruthy();
-    expect(riderLines[0].getAttribute('stroke')).toBeTruthy();
+    expect(teamLines[0].getAttribute('stroke')).toBe(getCategoryPaletteColor(0));
+    expect(riderLines[0].getAttribute('stroke')).toBe(getCategoryPaletteColor(1));
     expect(teamLines[0].getAttribute('stroke')).not.toBe(riderLines[0].getAttribute('stroke'));
 
     await act(async () => {
