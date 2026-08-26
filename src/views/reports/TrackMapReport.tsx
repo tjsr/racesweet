@@ -10,7 +10,9 @@ import type {
   EventCatalogEvent,
 } from "../../catalog/eventCatalog.js";
 import type { EventEntrantId } from "../../model/entrant.js";
+import { getParticipantEntryId } from "../../model/entry.js";
 import type { RaceState, RaceStateLookup } from "../../model/racestate.js";
+import { getEffectiveParticipantCategoryId } from "../../model/racestate.js";
 import { getParticipantNumber } from "../../processing/participant.js";
 import { checkTrackTimingLineOrder } from "./trackLineOrder.js";
 import {
@@ -25,6 +27,7 @@ import {
 import { createTrackStatusSegments } from "./trackStatus.js";
 
 interface TrackMapReportProps {
+  categoryColors?: ReadonlyMap<string, string>;
   catalogEntries?: EventCatalogEntry[];
   catalogEntrants: EventCatalogEntrant[];
   event?: EventCatalogEvent;
@@ -173,6 +176,20 @@ export const TrackMapReport = (
   const entrantNames = new Map(
     props.catalogEntrants.map((entrant) => [entrant.id, entrant.name]),
   );
+  const categoryIdByEntrant = React.useMemo(() => {
+    const categoryIdByEntrant = new Map<EventEntrantId, string>();
+    const categoryIdByEntry = new Map((props.catalogEntries || [])
+      .filter((entry) => entry.categoryId)
+      .map((entry) => [entry.id, entry.categoryId!.toString()]));
+    props.raceState.participants.forEach((participant) => {
+      const entrantId = props.raceState.getEntryIdForParticipant?.(participant.id) || getParticipantEntryId(participant);
+      const categoryId = categoryIdByEntry.get(entrantId) || getEffectiveParticipantCategoryId(props.raceState, participant)?.toString();
+      if (categoryId) {
+        categoryIdByEntrant.set(entrantId, categoryId);
+      }
+    });
+    return categoryIdByEntrant;
+  }, [props.catalogEntries, props.raceState]);
 
   const updateElapsed = (nextElapsed: number): void => {
     elapsedRef.current = nextElapsed;
@@ -192,6 +209,7 @@ export const TrackMapReport = (
       props.catalogEntries,
     );
     const selected = entrant.entrantId === selectedEntrantId;
+    const categoryColor = props.categoryColors?.get(categoryIdByEntrant.get(entrant.entrantId) || '') || "#1565c0";
     return (
       <g
         aria-label={`Track entrant ${label}`}
@@ -209,7 +227,7 @@ export const TrackMapReport = (
         <circle
           cx={point.x}
           cy={point.y}
-          fill={selected ? "#ffb300" : "#1565c0"}
+          fill={selected ? "#ffb300" : categoryColor}
           r={selected ? 3.8 : 3.2}
           stroke="#fff"
           strokeWidth="0.8"

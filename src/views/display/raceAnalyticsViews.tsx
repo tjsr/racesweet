@@ -3,6 +3,7 @@ import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 import { MenuItem } from '@mui/material';
 import React from 'react';
 import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent } from '../../catalog/eventCatalog.js';
+import { DEFAULT_CATEGORY_COLORS, packedRgbToCssColor } from '../../defaultCategoryColors.js';
 import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
 import { shouldExcludeCategoryFromResults } from '../../processing/category.js';
 import { getSourceLapCompletion, isCountedLapPassing } from '../../processing/laps.js';
@@ -46,6 +47,7 @@ interface EntrantSummaryRow {
   lapCount: number;
   laps: ParticipantPassingRecord[];
   memberDetails: Array<{
+    categoryId?: string;
     categoryName: string;
     participantDisplayName: string;
     participantId: EventParticipantId;
@@ -70,6 +72,7 @@ const getEntrantRaceNumber = (entrant: EventCatalogEntrant | undefined): string 
 };
 
 interface LapChartEntry {
+  categoryId?: string;
   categoryName: string;
   crossingTime: number;
   entrantId: EventEntrantId;
@@ -163,13 +166,18 @@ interface ReportsPageProps extends BaseRaceAnalyticsProps {
 
 type CategoryFilter = 'overall' | string;
 
-const lapChartLineColors: string[] = ['#0057b8', '#b00020', '#217a34', '#7a4cc2', '#a65f00', '#007a78'];
-
 const normalizeText = (value: string): string => value.trim().toLowerCase();
 
-const getLapChartEntrantLineColor = (_entrantId: EventEntrantId, entrantIndex: number): string => {
-  return lapChartLineColors[entrantIndex % lapChartLineColors.length];
-};
+const getCategoryColors = (
+  categories: CategoryOption[],
+  excludedCategoryKeys: Set<string>,
+): ReadonlyMap<string, string> => new Map(categories
+  .filter((category) => category.deleted !== true && category.excludeFromResults !== true)
+  .filter((category) => !excludedCategoryKeys.has(categoryKeyFromName(category.name)))
+  .map((category, index) => [
+    category.id,
+    packedRgbToCssColor(DEFAULT_CATEGORY_COLORS[index % DEFAULT_CATEGORY_COLORS.length]!),
+  ]));
 
 const getCategoryByIdSafely = (
   raceState: RaceState & RaceStateLookup,
@@ -402,6 +410,7 @@ const buildLapChart = (rows: EntrantSummaryRow[]): LapChartColumn[] => {
       }
 
       const chartEntry: LapChartEntry = {
+        categoryId: detail.categoryId,
         categoryName: detail.categoryName,
         crossingTime: lap.time?.getTime() || Number.MAX_SAFE_INTEGER,
         entrantId: row.entrantId,
@@ -686,6 +695,7 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
   const categories = React.useMemo(() => {
     return dedupeCategoryOptions(props.categories);
   }, [props.categories]);
+  const categoryColors = React.useMemo(() => getCategoryColors(categories, excludedCategoryKeys), [categories, excludedCategoryKeys]);
   const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(
     props.selectedCategoryId && categories.some(
       (category: CategoryOption): boolean => category.id === props.selectedCategoryId,
@@ -827,6 +837,7 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
                             type="button"
                             className="lap-entry-button"
                             onClick={() => setSelectedLapEntry(entry)}
+                            style={{ borderColor: entry.categoryId ? categoryColors.get(entry.categoryId) : undefined }}
                           >
                             {entry.raceNumber}
                           </button>
@@ -866,6 +877,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   const categories = React.useMemo(() => {
     return dedupeCategoryOptions(props.categories);
   }, [props.categories]);
+  const categoryColors = React.useMemo(() => getCategoryColors(categories, excludedCategoryKeys), [categories, excludedCategoryKeys]);
   const [localViewState, setLocalViewState] = React.useState<ReportsViewState>({
     ...createDefaultReportsViewState(),
     selectedCategory: props.selectedCategoryId && categories.some(
@@ -951,7 +963,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     const wrapperRect = wrapper.getBoundingClientRect();
     const buttons = Array.from(wrapper.querySelectorAll<HTMLButtonElement>('button[data-lap-chart-entrant-id]'));
     const pointsByEntrant = new Map<EventEntrantId, LapChartLinePoint[]>();
-    const entrantOrder = new Map<EventEntrantId, number>();
+    const categoryIdByEntrant = new Map<EventEntrantId, string | undefined>();
 
     buttons.forEach((button, domOrder: number) => {
       const entrantId = button.dataset.lapChartEntrantId as EventEntrantId | undefined;
@@ -961,9 +973,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
         return;
       }
 
-      if (!entrantOrder.has(entrantId)) {
-        entrantOrder.set(entrantId, entrantOrder.size);
-      }
+      categoryIdByEntrant.set(entrantId, button.dataset.lapChartCategoryId);
 
       const buttonRect = button.getBoundingClientRect();
       const point: LapChartLinePoint = {
@@ -990,8 +1000,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
         }
         return left.domOrder - right.domOrder;
       });
-      const entrantIndex = entrantOrder.get(entrantId) || 0;
-      const color = getLapChartEntrantLineColor(entrantId, entrantIndex);
+      const color = categoryColors.get(categoryIdByEntrant.get(entrantId) || '') || '#1565c0';
       sortedPoints.slice(1).forEach((point, index) => {
         const previousPoint = sortedPoints[index];
         segments.push({
@@ -1007,7 +1016,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     });
 
     setLapChartLineSegments(segments);
-  }, [drawLineChart, reportType]);
+  }, [categoryColors, drawLineChart, reportType]);
 
   React.useLayoutEffect(() => {
     updateLapChartLineSegments();
@@ -1249,10 +1258,12 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
                               type="button"
                               className="lap-entry-button"
                               aria-pressed={isSelectedEntrant}
+                              data-lap-chart-category-id={entry.categoryId}
                               data-lap-chart-entrant-id={entry.entrantId}
                               data-lap-chart-lap-no={entry.lapNo}
                               data-lap-chart-position={entry.position}
                               onClick={() => handleReportLapEntryClick(entry)}
+                              style={{ borderColor: entry.categoryId ? categoryColors.get(entry.categoryId) : undefined }}
                             >
                               {entry.raceNumber}
                             </button>
@@ -1319,7 +1330,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
       {reportType === 'track-map' ? (
         <section className="events-panel">
           <h2>Track Map</h2>
-          <TrackMapReport catalogEntries={props.catalogEntries} catalogEntrants={props.catalogEntrants} event={props.event} raceState={props.raceState} />
+          <TrackMapReport categoryColors={categoryColors} catalogEntries={props.catalogEntries} catalogEntrants={props.catalogEntrants} event={props.event} raceState={props.raceState} />
         </section>
       ) : null}
     </section>
