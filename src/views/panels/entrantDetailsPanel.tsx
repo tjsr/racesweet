@@ -100,7 +100,7 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
               </SelectTextField>
               <TextField
                 label="Date of Birth"
-                slotProps={{ htmlInput: { 'aria-label': 'Entrant Date Of Birth' } }}
+                slotProps={{ htmlInput: { 'aria-label': 'Entrant Date Of Birth' }, inputLabel: { shrink: true } }}
                 type="date"
                 value={props.entrantDraft.dateOfBirth}
                 onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, dateOfBirth: event.target.value }))}

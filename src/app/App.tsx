@@ -1,90 +1,223 @@
-import { Component, type ReactElement, type ReactNode, useCallback, useEffect, useMemo, useRef, useState, } from 'react';
-import { validate as validateUuid } from 'uuid';
-import { type EventCatalogEntrant, type EventCatalogState, getCategoriesForEvent, getEntrantsForCategory, getEntrantsForEvent, getEntriesForEvent, getEventDisciplineLabels, getSessionsForEvent, } from '../catalog/eventCatalog.ts';
-import { fetchApicalEvents } from '../processing/apical/getResultListJson.ts';
-import { CategoryId } from '../processing/category.ts';
-import { type LoadingMetricsState, getLoadingMetricsSnapshot, incrementLoadingMetric, resetLoadingMetrics, subscribeLoadingMetrics, } from '../loadingMetrics.ts';
-import { type LoadingProgressCallback, type LoadingProgressState, completeLoadingProgressStage, createLoadingProgressState, updateLoadingProgressStage, waitForLoadingProgressPaint, } from '../loadingProgress.ts';
-import { type EventCategory, EventCategoryId } from '../model/eventcategory.ts';
-import { getParticipantEntryId } from '../model/entry.ts';
-import { type EventParticipant, type EventParticipantId, type ParticipantTransponder, } from '../model/eventparticipant.ts';
-import type { EventTeam } from '../model/eventteam.ts';
-import { createEventId } from '../model/ids.ts';
-import { EventId, SessionId } from '../model/raceevent.ts';
-import { type RaceState, RaceStateLookup, Session, getEffectiveParticipantCategoryId, } from '../model/racestate.ts';
-import { type EventTimeRecord, type TimeRecordId, } from '../model/timerecord.ts';
-import { loadDorianCtcSrtCatalogForSession } from '../parsers/ctc/srtCatalogImport.ts';
-import { parseCtcTrackConfig } from '../parsers/ctc/trackConfig.ts';
-import { type MrScatsCatalogImport, type MrScatsCatalogLoadProgress, loadMrScatsCatalogFromLocation, } from '../parsers/mrScats/catalogImport.ts';
-import { listMrScatsDataFiles } from '../parsers/mrScats/fileInventory.ts';
-import { previewCtcRawCrossingBuffer, previewMrScatsDataFile, } from '../parsers/mrScats/filePreview.ts';
-import { ElectronJsonEventCatalogPersistence } from '../persistence/eventCatalogPersistence.ts';
-import { JsonReplicaOutboxPersistence } from '../persistence/jsonReplicaOutboxPersistence.ts';
-import { ElectronJsonRaceAdminPersistence } from '../persistence/raceAdminPersistence.ts';
-import type { AdministrativeChanges } from '../persistence/raceAdminPersistence.ts';
-import { ElectronJsonSystemConfigPersistence } from '../persistence/systemConfigPersistence.ts';
-import { EventCatalogService } from '../service/eventCatalogService.ts';
-import { CatalogReplicaOutbox } from '../service/catalogReplicaOutbox.ts';
-import { HttpReplicaTransport } from '../service/httpReplicaTransport.ts';
-import { ReplicaLiveMutationSubscriber } from '../service/replicaLiveMutationSubscriber.ts';
-import { ReplicaSyncController } from '../service/replicaSyncController.ts';
-import { ReplicaSyncService } from '../service/replicaSyncService.ts';
-import { RaceAdminService } from '../service/raceAdminService.ts';
-import { HttpRaceSweetApiClient } from '../service/raceSweetApiClient.ts';
-import { type SessionSourceReloadMode, type SessionSourceReloadSummary, addSessionSourceReloadSummaries, createEmptySessionSourceReloadSummary, isMissingLinkedCategoryPlaceholder, mergePulledRaceStates, mergeRaceStateForReload, summarizeSessionSourceReload, } from '../service/sessionSourceReload.ts';
-import { applyPulledRaceStateToSession, getCategoryTimingStartCalculationsForSession, getMinimumLapTimeMillisecondsForSession, getSessionAssignedCategoryIds, } from '../service/sourceApplication.ts';
-import { SystemConfigService } from '../service/systemConfigService.ts';
-import { SyncStore } from '../state/syncStore.ts';
-import type { DomainEventEnvelope } from '../model/serverApi.ts';
-import type { EventCatalogMutation } from '../ledger/eventCatalogLedger.ts';
-import { ApicalElectronFile } from '../testdata/apicalElectronFile.ts';
-import { type TestSession, type TestSessionLoadProgressCallback, } from '../testdata/testsession.ts';
-import { CategoriesContext } from '../views/context/Categories.tsx';
-import { EntrantsContext } from '../views/context/Entrants.tsx';
-import { EventsContext } from '../views/context/Events.tsx';
-import { ReportsContext } from '../views/context/Reports.tsx';
-import { ResultsContext } from '../views/context/Results.tsx';
-import { SessionsContext } from '../views/context/Sessions.tsx';
-import { SystemContext } from '../views/context/System.tsx';
-import { TimingContext } from '../views/context/Timing.tsx';
-import { ReloadSummaryDialog } from '../views/display/reloadSummaryDialog.tsx';
-import { type ReportsViewState,
+import {
+  Component,
+  type ReactElement,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { validate as validateUuid } from "uuid";
+import {
+  type EventCatalogEntrant,
+  type EventCatalogState,
+  getCategoriesForEvent,
+  getEntrantsForCategory,
+  getEntrantsForEvent,
+  getEntriesForEvent,
+  getEventDisciplineLabels,
+  getSessionsForEvent,
+} from "../catalog/eventCatalog.ts";
+import { fetchApicalEvents } from "../processing/apical/getResultListJson.ts";
+import { CategoryId } from "../processing/category.ts";
+import {
+  type LoadingMetricsState,
+  getLoadingMetricsSnapshot,
+  incrementLoadingMetric,
+  resetLoadingMetrics,
+  subscribeLoadingMetrics,
+} from "../loadingMetrics.ts";
+import {
+  type LoadingProgressCallback,
+  type LoadingProgressState,
+  completeLoadingProgressStage,
+  createLoadingProgressState,
+  updateLoadingProgressStage,
+  waitForLoadingProgressPaint,
+} from "../loadingProgress.ts";
+import { type EventCategory, EventCategoryId } from "../model/eventcategory.ts";
+import { getParticipantEntryId } from "../model/entry.ts";
+import {
+  type EventParticipant,
+  type EventParticipantId,
+  type ParticipantTransponder,
+} from "../model/eventparticipant.ts";
+import type { EventTeam } from "../model/eventteam.ts";
+import { createEventId } from "../model/ids.ts";
+import { EventId, SessionId } from "../model/raceevent.ts";
+import {
+  type RaceState,
+  RaceStateLookup,
+  Session,
+  getEffectiveParticipantCategoryId,
+} from "../model/racestate.ts";
+import {
+  type EventTimeRecord,
+  type TimeRecordId,
+} from "../model/timerecord.ts";
+import { loadDorianCtcSrtCatalogForSession } from "../parsers/ctc/srtCatalogImport.ts";
+import { parseCtcTrackConfig } from "../parsers/ctc/trackConfig.ts";
+import {
+  type MrScatsCatalogImport,
+  type MrScatsCatalogLoadProgress,
+  loadMrScatsCatalogFromLocation,
+} from "../parsers/mrScats/catalogImport.ts";
+import { listMrScatsDataFiles } from "../parsers/mrScats/fileInventory.ts";
+import {
+  previewCtcRawCrossingBuffer,
+  previewMrScatsDataFile,
+} from "../parsers/mrScats/filePreview.ts";
+import { ElectronJsonEventCatalogPersistence } from "../persistence/eventCatalogPersistence.ts";
+import { JsonReplicaOutboxPersistence } from "../persistence/jsonReplicaOutboxPersistence.ts";
+import { ElectronJsonRaceAdminPersistence } from "../persistence/raceAdminPersistence.ts";
+import type { AdministrativeChanges } from "../persistence/raceAdminPersistence.ts";
+import { ElectronJsonSystemConfigPersistence } from "../persistence/systemConfigPersistence.ts";
+import { EventCatalogService } from "../service/eventCatalogService.ts";
+import { CatalogReplicaOutbox } from "../service/catalogReplicaOutbox.ts";
+import { HttpReplicaTransport } from "../service/httpReplicaTransport.ts";
+import { ReplicaLiveMutationSubscriber } from "../service/replicaLiveMutationSubscriber.ts";
+import { ReplicaSyncController } from "../service/replicaSyncController.ts";
+import { ReplicaSyncService } from "../service/replicaSyncService.ts";
+import { RaceAdminService } from "../service/raceAdminService.ts";
+import { HttpRaceSweetApiClient } from "../service/raceSweetApiClient.ts";
+import {
+  type SessionSourceReloadMode,
+  type SessionSourceReloadSummary,
+  addSessionSourceReloadSummaries,
+  createEmptySessionSourceReloadSummary,
+  isMissingLinkedCategoryPlaceholder,
+  mergePulledRaceStates,
+  mergeRaceStateForReload,
+  summarizeSessionSourceReload,
+} from "../service/sessionSourceReload.ts";
+import {
+  applyPulledRaceStateToSession,
+  getCategoryTimingStartCalculationsForSession,
+  getMinimumLapTimeMillisecondsForSession,
+  getSessionAssignedCategoryIds,
+} from "../service/sourceApplication.ts";
+import { SystemConfigService } from "../service/systemConfigService.ts";
+import { SyncStore } from "../state/syncStore.ts";
+import type { DomainEventEnvelope } from "../model/serverApi.ts";
+import type { EventCatalogMutation } from "../ledger/eventCatalogLedger.ts";
+import { ApicalElectronFile } from "../testdata/apicalElectronFile.ts";
+import {
+  type TestSession,
+  type TestSessionLoadProgressCallback,
+} from "../testdata/testsession.ts";
+import { CategoriesContext } from "../views/context/Categories.tsx";
+import { EntrantsContext } from "../views/context/Entrants.tsx";
+import { EventsContext } from "../views/context/Events.tsx";
+import { ReportsContext } from "../views/context/Reports.tsx";
+import { ResultsContext } from "../views/context/Results.tsx";
+import { SessionsContext } from "../views/context/Sessions.tsx";
+import { SystemContext } from "../views/context/System.tsx";
+import { TimingContext } from "../views/context/Timing.tsx";
+import { ReloadSummaryDialog } from "../views/display/reloadSummaryDialog.tsx";
+import {
+  type ReportsViewState,
   createDefaultReportsViewState,
 } from "../views/display/raceAnalyticsViews.tsx";
-import { type UnsavedChangesGuard } from '../views/display/unsavedChangesWarning.tsx';
-import { LoadingProgress } from '../views/panels/LoadingProgress.tsx';
-import { PulledApicalRaceState, createApicalCatalogEventId, createApicalCatalogSessionId, fetchApicalRaceStateNow, getConfiguredApicalEventId, pullApicalRaceState, } from './apicalDataSource.ts';
-import { updateCategorySelectionsForChangedParticipant } from './categoryChangeState.ts';
-import { type DurtFileMakerLoadProgress, getBundledDurtFileMakerExtractorPath, loadDurtFileMakerRaceState, } from './durtFileMakerDataSource.ts';
-import './index.css';
-import { formatErrorForDisplay } from './stackTrace.ts';
-import { type DataSourceConfig, type EventTimeDisplayZoneMode, type ListenerServerConfig, type SystemConfiguration, type TimingContextSelectionConfig, createDefaultSystemConfiguration, getFinishLineNumbersForSession, getMasterEntrantProfilesForEvent, getSessionAssignedSourceIds, normalizeOptionalSystemFilePath, } from './systemConfig.ts';
-import { getSystemTimeZone } from './utils/timeutils.ts';
-import { type EventSessionOption } from './views/results/resultsPage.tsx';
+import { type UnsavedChangesGuard } from "../views/display/unsavedChangesWarning.tsx";
+import { LoadingProgress } from "../views/panels/LoadingProgress.tsx";
+import {
+  PulledApicalRaceState,
+  createApicalCatalogEventId,
+  createApicalCatalogSessionId,
+  fetchApicalRaceStateNow,
+  getConfiguredApicalEventId,
+  pullApicalRaceState,
+} from "./apicalDataSource.ts";
+import {
+  type ApicalRecentLapsMergeResult,
+  type ApicalRecentLapsPollingDecision,
+  type ApicalRecentLapsTarget,
+  ensureApicalRecentLapsTarget,
+  fetchApicalRecentLapsRaceState,
+  getApicalRecentLapsPollingDecision,
+  mergeApicalRecentLapsRaceState,
+} from "./apicalRecentLapsDataSource.ts";
+import { updateCategorySelectionsForChangedParticipant } from "./categoryChangeState.ts";
+import {
+  type DurtFileMakerLoadProgress,
+  getBundledDurtFileMakerExtractorPath,
+  loadDurtFileMakerRaceState,
+} from "./durtFileMakerDataSource.ts";
+import "./index.css";
+import {
+  type LivePollingContext,
+  LivePollingScheduler,
+  type LivePollingSource,
+  type ScheduledLivePoll,
+} from "./livePollingScheduler.ts";
+import { formatErrorForDisplay } from "./stackTrace.ts";
+import {
+  type DataSourceConfig,
+  type EventTimeDisplayZoneMode,
+  type ListenerServerConfig,
+  type SystemConfiguration,
+  type TimingContextSelectionConfig,
+  createDefaultSystemConfiguration,
+  getFinishLineNumbersForSession,
+  getMasterEntrantProfilesForEvent,
+  getSessionAssignedSourceIds,
+  normalizeOptionalSystemFilePath,
+} from "./systemConfig.ts";
+import { getSystemTimeZone } from "./utils/timeutils.ts";
+import { type EventSessionOption } from "./views/results/resultsPage.tsx";
 
 type AppSection =
-  | 'System' | 'Events' | 'Entrants' | 'Categories' | 'Sessions' | 'Timing' | 'Results' | 'Reports';
-type TimingSessionSelection = 'active' | 'session';
+  | "System"
+  | "Events"
+  | "Entrants"
+  | "Categories"
+  | "Sessions"
+  | "Timing"
+  | "Results"
+  | "Reports";
+type TimingSessionSelection = "active" | "session";
 
-const SEED_FIXTURE_EVENT_ID: EventId = createEventId('event-2026-racesweet-round-1',);
+const isLivePollableSource = (source: DataSourceConfig): boolean => {
+  return (
+    source.enabled &&
+    source.apiConfig?.live === true &&
+    (source.type === "api-apical-data-file" ||
+      source.type === "api-apical-excel-file" ||
+      source.type === "api-apical-recent-laps")
+  );
+};
+
+const SEED_FIXTURE_EVENT_ID: EventId = createEventId(
+  "event-2026-racesweet-round-1",
+);
 
 interface RemoteRaceAdminTarget {
   raceState: (Session & RaceStateLookup) | undefined;
   sessionId: SessionId | undefined;
 }
 
-const createStartupLoadingProgress = (): LoadingProgressState => createLoadingProgressState('Loading RaceSweet', [
-  { id: 'services', label: 'Loading generated data files', total: 3 },
-  { id: 'test-session', label: 'Loading startup race data', total: 1 },
-  { id: 'admin-changes', label: 'Applying administrative changes', total: 1 },
-  { id: 'catalog-load', label: 'Rebuilding event catalog', total: 1 },
-  { id: 'system-config', label: 'Normalising system configuration', total: 1, },
-  { id: 'source-metadata', label: 'Restoring source metadata', total: 1 },
-  { id: 'catalog-validation', label: 'Checking event catalog links', total: 1, },
-  { id: 'session-state', label: 'Preparing active session state', total: 1 },
-  { id: 'scaffold', label: 'Synchronising event scaffold', total: 1 },
-  { id: 'publish', label: 'Displaying application', total: 1 },
-]);
+const createStartupLoadingProgress = (): LoadingProgressState =>
+  createLoadingProgressState("Loading RaceSweet", [
+    { id: "services", label: "Loading generated data files", total: 3 },
+    { id: "test-session", label: "Loading startup race data", total: 1 },
+    { id: "admin-changes", label: "Applying administrative changes", total: 1 },
+    { id: "catalog-load", label: "Rebuilding event catalog", total: 1 },
+    {
+      id: "system-config",
+      label: "Normalising system configuration",
+      total: 1,
+    },
+    { id: "source-metadata", label: "Restoring source metadata", total: 1 },
+    {
+      id: "catalog-validation",
+      label: "Checking event catalog links",
+      total: 1,
+    },
+    { id: "session-state", label: "Preparing active session state", total: 1 },
+    { id: "scaffold", label: "Synchronising event scaffold", total: 1 },
+    { id: "publish", label: "Displaying application", total: 1 },
+  ]);
 
 interface PageErrorFallbackProps {
   error: unknown;
@@ -104,14 +237,14 @@ interface PageErrorBoundaryState {
 }
 
 const appSections: Array<{ icon: string; id: AppSection; label: string }> = [
-  { icon: 'SYS', id: 'System', label: 'System' },
-  { icon: 'EVT', id: 'Events', label: 'Events' },
-  { icon: 'ENT', id: 'Entrants', label: 'Entrants' },
-  { icon: 'CAT', id: 'Categories', label: 'Categories' },
-  { icon: 'SES', id: 'Sessions', label: 'Sessions' },
-  { icon: 'TIM', id: 'Timing', label: 'Timing' },
-  { icon: 'RES', id: 'Results', label: 'Results' },
-  { icon: 'RPT', id: 'Reports', label: 'Reports' },
+  { icon: "SYS", id: "System", label: "System" },
+  { icon: "EVT", id: "Events", label: "Events" },
+  { icon: "ENT", id: "Entrants", label: "Entrants" },
+  { icon: "CAT", id: "Categories", label: "Categories" },
+  { icon: "SES", id: "Sessions", label: "Sessions" },
+  { icon: "TIM", id: "Timing", label: "Timing" },
+  { icon: "RES", id: "Results", label: "Results" },
+  { icon: "RPT", id: "Reports", label: "Reports" },
 ];
 
 interface DisplayedErrorLogEntry {
@@ -121,7 +254,11 @@ interface DisplayedErrorLogEntry {
   timestamp: string;
 }
 
-const PageErrorFallback = ({ error, onDismiss, title = 'Error loading content', }: PageErrorFallbackProps): ReactElement => (
+const PageErrorFallback = ({
+  error,
+  onDismiss,
+  title = "Error loading content",
+}: PageErrorFallbackProps): ReactElement => (
   <>
     <h1>{title}</h1>
     <div className="error" role="alert">
@@ -145,7 +282,10 @@ const createEmptySessionState = (): Session & RaceStateLookup => {
   }) as Session & RaceStateLookup;
 };
 
-class PageErrorBoundary extends Component<PageErrorBoundaryProps, PageErrorBoundaryState> {
+class PageErrorBoundary extends Component<
+  PageErrorBoundaryProps,
+  PageErrorBoundaryState
+> {
   public state: PageErrorBoundaryState = {};
 
   public static getDerivedStateFromError(error: Error): PageErrorBoundaryState {
@@ -164,7 +304,11 @@ class PageErrorBoundary extends Component<PageErrorBoundaryProps, PageErrorBound
 
   public render(): ReactNode {
     if (this.state.error) {
-      return ( <PageErrorFallback error={this.state.error} title={this.props.fallbackTitle} />
+      return (
+        <PageErrorFallback
+          error={this.state.error}
+          title={this.props.fallbackTitle}
+        />
       );
     }
 
@@ -177,28 +321,39 @@ const loadAdminService = async (
   onSessionProgress?: TestSessionLoadProgressCallback,
   onAdminProgress?: LoadingProgressCallback,
 ): Promise<RaceAdminService> => {
-  incrementLoadingMetric('Create admin service');
-  const persistence = new ElectronJsonRaceAdminPersistence('../../src/generated/admin-overrides.json', onError,);
+  incrementLoadingMetric("Create admin service");
+  const persistence = new ElectronJsonRaceAdminPersistence(
+    "../../src/generated/admin-overrides.json",
+    onError,
+  );
 
-  return RaceAdminService.create(async () => {
-    if (window.api.persistenceMode === 'server') {
-      incrementLoadingMetric('Create empty server-backed startup race state');
-      return createEmptySessionState();
-    }
-    const eventSession: TestSession = new ApicalElectronFile();
-    incrementLoadingMetric('Load startup test data');
-    await eventSession.loadTestData(false, onSessionProgress);
-    console.log("Test data loaded successfully.");
-    return eventSession as Session & RaceStateLookup;
-  }, persistence, undefined, { onProgress: onAdminProgress },);
+  return RaceAdminService.create(
+    async () => {
+      if (window.api.persistenceMode === "server") {
+        incrementLoadingMetric("Create empty server-backed startup race state");
+        return createEmptySessionState();
+      }
+      const eventSession: TestSession = new ApicalElectronFile();
+      incrementLoadingMetric("Load startup test data");
+      await eventSession.loadTestData(false, onSessionProgress);
+      console.log("Test data loaded successfully.");
+      return eventSession as Session & RaceStateLookup;
+    },
+    persistence,
+    undefined,
+    { onProgress: onAdminProgress },
+  );
 };
 
 const loadEventCatalogService = async (
   onError?: (error: unknown) => void,
   onProgress?: LoadingProgressCallback,
 ): Promise<EventCatalogService> => {
-  incrementLoadingMetric('Create event catalog service');
-  const persistence = new ElectronJsonEventCatalogPersistence('../../src/generated/event-catalog.json', onError,);
+  incrementLoadingMetric("Create event catalog service");
+  const persistence = new ElectronJsonEventCatalogPersistence(
+    "../../src/generated/event-catalog.json",
+    onError,
+  );
   return EventCatalogService.create(persistence, {
     onProgress,
     persistAppliedRemoteMutations: false,
@@ -209,8 +364,11 @@ const loadSystemConfigService = async (
   onError?: (error: unknown) => void,
   onProgress?: LoadingProgressCallback,
 ): Promise<SystemConfigService> => {
-  incrementLoadingMetric('Create system config service');
-  const persistence = new ElectronJsonSystemConfigPersistence('../../src/generated/system-config.json', onError,);
+  incrementLoadingMetric("Create system config service");
+  const persistence = new ElectronJsonSystemConfigPersistence(
+    "../../src/generated/system-config.json",
+    onError,
+  );
   return SystemConfigService.create(persistence, { onProgress });
 };
 
@@ -221,19 +379,24 @@ const getImportedApicalDataFilePath = (
 ): string | undefined => {
   const candidateEventIds = new Set<string>();
   const candidateSessionIds = new Set<string>();
-  const apicalEventId = source.apiConfig?.selectedEventIds[0] || source.apiConfig?.apicalEventId;
+  const apicalEventId =
+    source.apiConfig?.selectedEventIds[0] || source.apiConfig?.apicalEventId;
 
-  Object.entries(config.eventSourceAssignments).forEach(([eventId, sourceIds]) => {
-    if (sourceIds.includes(source.id)) {
-      candidateEventIds.add(eventId);
-    }
-  },);
+  Object.entries(config.eventSourceAssignments).forEach(
+    ([eventId, sourceIds]) => {
+      if (sourceIds.includes(source.id)) {
+        candidateEventIds.add(eventId);
+      }
+    },
+  );
 
-  Object.entries(config.sessionSourceAssignments).forEach(([sessionId, assignment]) => {
-    if (assignment.sourceIds.includes(source.id)) {
-      candidateSessionIds.add(sessionId);
-    }
-  },);
+  Object.entries(config.sessionSourceAssignments).forEach(
+    ([sessionId, assignment]) => {
+      if (assignment.sourceIds.includes(source.id)) {
+        candidateSessionIds.add(sessionId);
+      }
+    },
+  );
 
   if (apicalEventId) {
     candidateEventIds.add(createApicalCatalogEventId(apicalEventId));
@@ -242,7 +405,11 @@ const getImportedApicalDataFilePath = (
 
   for (const eventId of candidateEventIds) {
     for (const sessionId of candidateSessionIds) {
-      const apicalDataFilePath = eventCatalogService.getImportedRaceStateMetadata(eventId, sessionId,)?.apicalDataFilePath;
+      const apicalDataFilePath =
+        eventCatalogService.getImportedRaceStateMetadata(
+          eventId,
+          sessionId,
+        )?.apicalDataFilePath;
       if (apicalDataFilePath) {
         return apicalDataFilePath;
       }
@@ -262,11 +429,22 @@ const loadSystemConfigWithImportedApicalPaths = async (
   const total = Math.max(1, sources.length);
   let completed = 0;
 
-  await onProgress?.({ completed, currentTask: 'Preparing source metadata', total, });
+  await onProgress?.({
+    completed,
+    currentTask: "Preparing source metadata",
+    total,
+  });
   for (const source of sources) {
-    if ((source.type !== 'api-apical-data-file' && source.type !== 'api-apical-excel-file') || source.apicalDataFilePath || !source.dataLastRetrieved) {
+    if (
+      (source.type !== "api-apical-data-file" &&
+        source.type !== "api-apical-excel-file") ||
+      source.apicalDataFilePath ||
+      !source.dataLastRetrieved
+    ) {
       completed += 1;
-      await onProgress?.({ completed, currentTask: `Check source metadata ${source.name || source.id}`,
+      await onProgress?.({
+        completed,
+        currentTask: `Check source metadata ${source.name || source.id}`,
         total,
       });
       continue;
@@ -467,7 +645,9 @@ export const RaceSweetMainApp = () => {
   const [displayedErrorLogEntries, setDisplayedErrorLogEntries] = useState<
     DisplayedErrorLogEntry[]
   >([]);
-  const [rfidDecoderOutput, setRfidDecoderOutput] = useState<Record<string, string>>({});
+  const [rfidDecoderOutput, setRfidDecoderOutput] = useState<
+    Record<string, string>
+  >({});
   const [loadingMetrics, setLoadingMetrics] = useState<LoadingMetricsState>(
     getLoadingMetricsSnapshot,
   );
@@ -522,10 +702,27 @@ export const RaceSweetMainApp = () => {
   const [timingSelectionLoading, setTimingSelectionLoading] =
     useState<boolean>(false);
   const [timingErrorState, setTimingErrorState] = useState<unknown>(undefined);
+  const [scheduledLivePolls, setScheduledLivePolls] = useState<
+    ScheduledLivePoll[]
+  >([]);
   const [reloadSummary, setReloadSummary] = useState<
     SessionSourceReloadSummary | undefined
   >(undefined);
   const initialTimingSelectionHydrated = useRef<boolean>(false);
+  const livePollingScheduler = useRef<LivePollingScheduler | undefined>(
+    undefined,
+  );
+  const reloadLivePollingSource = useRef<
+    (sourceId: string, target: { eventId: EventId; sessionId: SessionId }) => Promise<void>
+      >(() => Promise.resolve());
+  if (!livePollingScheduler.current) {
+    livePollingScheduler.current = new LivePollingScheduler({
+      onScheduleChanged: (scheduledPolls: ScheduledLivePoll[]): void => {
+        setScheduledLivePolls(scheduledPolls);
+      },
+      onSourceError: (error: Error): void => setErrorState(error),
+    });
+  }
   const unsavedChangesGuards = useRef<
     Partial<Record<AppSection, UnsavedChangesGuard>>
   >({});
@@ -630,19 +827,24 @@ export const RaceSweetMainApp = () => {
     };
     const applyRemoteEvent = (event: DomainEventEnvelope): void => {
       if (
-        event.type === 'source.rfid-decoder-data' &&
-        typeof event.payload === 'object' &&
+        event.type === "source.rfid-decoder-data" &&
+        typeof event.payload === "object" &&
         !Array.isArray(event.payload) &&
         event.payload !== null
       ) {
         const payload = event.payload as { data?: unknown; sourceId?: unknown };
-        if (typeof payload.data === 'string' && typeof payload.sourceId === 'string') {
+        if (
+          typeof payload.data === "string" &&
+          typeof payload.sourceId === "string"
+        ) {
           const data: string = payload.data;
           const sourceId: string = payload.sourceId;
-          setRfidDecoderOutput((current: Record<string, string>): Record<string, string> => ({
-            ...current,
-            [sourceId]: `${current[sourceId] || ''}${data}`.slice(-100_000),
-          }));
+          setRfidDecoderOutput(
+            (current: Record<string, string>): Record<string, string> => ({
+              ...current,
+              [sourceId]: `${current[sourceId] || ""}${data}`.slice(-100_000),
+            }),
+          );
         }
         return;
       }
@@ -1319,21 +1521,26 @@ export const RaceSweetMainApp = () => {
   const syncRfidDecoderSources = async (
     config: SystemConfiguration,
   ): Promise<void> => {
-    const response: Response = await fetch('/api/v1/system/configuration', {
+    const response: Response = await fetch("/api/v1/system/configuration", {
       body: JSON.stringify({ config }),
-      credentials: 'include',
-      headers: { 'content-type': 'application/json' },
-      method: 'PUT',
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      method: "PUT",
     });
     if (!response.ok) {
-      const problem: { error?: string } = await response.json() as { error?: string };
-      throw new Error(problem.error || `RaceSweet API returned HTTP ${response.status} while updating RFID decoder listeners.`);
+      const problem: { error?: string } = (await response.json()) as {
+        error?: string;
+      };
+      throw new Error(
+        problem.error ||
+          `RaceSweet API returned HTTP ${response.status} while updating RFID decoder listeners.`,
+      );
     }
   };
 
   const controlRfidDecoderListener = async (
     sourceId: string,
-    action: 'start' | 'stop',
+    action: "start" | "stop",
   ): Promise<void> => {
     if (!systemConfigService) {
       return;
@@ -1341,22 +1548,129 @@ export const RaceSweetMainApp = () => {
     const response: Response = await fetch(
       `/api/v1/system/rfid-decoder-listeners/${sourceId}/${action}`,
       {
-        credentials: 'include',
-        method: 'POST',
+        credentials: "include",
+        method: "POST",
       },
     );
     if (!response.ok) {
-      const problem: { error?: string } = await response.json() as { error?: string };
-      throw new Error(problem.error || `RaceSweet API returned HTTP ${response.status} while trying to ${action} the RFID decoder listener.`);
+      const problem: { error?: string } = (await response.json()) as {
+        error?: string;
+      };
+      throw new Error(
+        problem.error ||
+          `RaceSweet API returned HTTP ${response.status} while trying to ${action} the RFID decoder listener.`,
+      );
     }
-    const result: { config: SystemConfiguration } = await response.json() as { config: SystemConfiguration };
-    updateSystemConfigState(systemConfigService.applyRemoteConfiguration(result.config));
+    const result: { config: SystemConfiguration } = (await response.json()) as {
+      config: SystemConfiguration;
+    };
+    updateSystemConfigState(
+      systemConfigService.applyRemoteConfiguration(result.config),
+    );
   };
 
   const getEventTimeZone = (eventId: EventId | undefined): string => {
     const event = eventCatalogState?.events.find((item) => item.id === eventId);
     return event?.timeZone || getSystemTimeZone();
   };
+
+  const apicalRecentLapsPollsInFlight = useRef<Set<string>>(new Set<string>());
+
+  const pollApicalRecentLapsSource = useCallback(
+    async (
+      source: DataSourceConfig,
+      eventId: EventId,
+      sessionId: SessionId,
+    ): Promise<void> => {
+      if (
+        !eventCatalogService ||
+        !systemConfigService ||
+        apicalRecentLapsPollsInFlight.current.has(source.id)
+      ) {
+        return;
+      }
+
+      const event = eventCatalogService.catalog.events.find(
+        (candidate): boolean => candidate.id === eventId,
+      );
+      const session = eventCatalogService.catalog.sessions.find(
+        (candidate): boolean => candidate.id === sessionId,
+      );
+      if (!event || !session || session.eventId !== eventId) {
+        return;
+      }
+
+      apicalRecentLapsPollsInFlight.current.add(source.id);
+      try {
+        const incomingRaceState: Partial<RaceState> =
+          await fetchApicalRecentLapsRaceState(
+            source,
+            eventId,
+            event.date,
+            event.timeZone || getSystemTimeZone(),
+          );
+        const existingRaceState: Partial<RaceState> | undefined =
+          eventCatalogService.getImportedRaceState(eventId, sessionId);
+        const mergeResult: ApicalRecentLapsMergeResult =
+          mergeApicalRecentLapsRaceState(existingRaceState, incomingRaceState);
+        let catalog: EventCatalogState = eventCatalogService.catalog;
+
+        if (mergeResult.summary.changed) {
+          catalog = await eventCatalogService.updateImportedRaceState(
+            eventId,
+            sessionId,
+            mergeResult.raceState,
+          );
+          updateEventCatalogState(catalog, eventId, sessionId);
+          if (
+            catalog.activeEventId === eventId &&
+            catalog.activeSessionId === sessionId
+          ) {
+            const importedSessionState = sessionFromPartialRaceState(
+              mergeResult.raceState,
+            );
+            applyCatalogSessionScopeToRaceState(
+              importedSessionState,
+              catalog,
+              eventId,
+              sessionId,
+            );
+            setSessionState(importedSessionState);
+            setRenderTick((tick: number): number => tick + 1);
+          }
+        }
+
+        const decision: ApicalRecentLapsPollingDecision =
+          getApicalRecentLapsPollingDecision(
+            mergeResult.raceState,
+            session.status,
+            new Date(),
+            source.apiConfig?.pollingResumedAt,
+          );
+        if (mergeResult.summary.changed || decision.shouldStop) {
+          const retrievedAt: string = new Date().toISOString();
+          const config: SystemConfiguration =
+            await systemConfigService.updateSource(source.id, {
+              apiConfig: source.apiConfig
+                ? {
+                  ...source.apiConfig,
+                  live: decision.shouldStop ? false : source.apiConfig.live,
+                  pollingStopReason: decision.reason,
+                  pollingStoppedAt: decision.shouldStop
+                    ? retrievedAt
+                    : undefined,
+                }
+                : undefined,
+              dataLastRetrieved: retrievedAt,
+            });
+          updateSystemConfigState(config);
+        }
+      } finally {
+        apicalRecentLapsPollsInFlight.current.delete(source.id);
+      }
+    },
+    [eventCatalogService, systemConfigService],
+  );
 
   const applySourceToSessionState = async (
     eventId: EventId,
@@ -1402,6 +1716,46 @@ export const RaceSweetMainApp = () => {
     if (!targetSessionState) {
       setRenderTick((tick) => tick + 1);
     }
+  };
+
+  reloadLivePollingSource.current = (
+    sourceId: string,
+    target: { eventId: EventId; sessionId: SessionId },
+  ): Promise<void> => {
+    const source: DataSourceConfig | undefined = systemConfigState.dataSources.find(
+      (candidate: DataSourceConfig): boolean => candidate.id === sourceId,
+    );
+    const activeSourceIds: string[] = getSessionAssignedSourceIds(
+      systemConfigState,
+      target.eventId,
+      target.sessionId,
+    );
+    if (
+      !source ||
+      !sessionState ||
+      eventCatalogState?.activeEventId !== target.eventId ||
+      eventCatalogState.activeSessionId !== target.sessionId ||
+      !activeSourceIds.includes(source.id) ||
+      !isLivePollableSource(source)
+    ) {
+      return Promise.resolve();
+    }
+
+    if (source.type === "api-apical-recent-laps") {
+      return pollApicalRecentLapsSource(
+        source,
+        target.eventId,
+        target.sessionId,
+      );
+    }
+
+    return applySourceToSessionState(target.eventId, source, undefined, {
+      sessionId: target.sessionId,
+    })
+      .then(() =>
+        adminService?.applyChangesToSessionById(sessionState, target.sessionId),
+      )
+      .then((): void => setRenderTick((tick: number): number => tick + 1));
   };
 
   const applyPersistedRaceStateToSession = async (
@@ -1633,6 +1987,26 @@ export const RaceSweetMainApp = () => {
         );
         break;
 
+      case "api-apical-recent-laps": {
+        const event = eventCatalogService?.catalog.events.find(
+          (candidate): boolean => candidate.id === eventId,
+        );
+        if (!event) {
+          throw new Error(
+            `Assigned Apical Recent Laps source "${source.name}" requires an existing event.`,
+          );
+        }
+        pulledRaceStates.push(
+          await fetchApicalRecentLapsRaceState(
+            source,
+            eventId,
+            event.date,
+            event.timeZone || getSystemTimeZone(),
+          ),
+        );
+        break;
+      }
+
       case "file-dorian-ctc-srt": {
         const filePath = source.fileConfig?.filePath;
         const catalog = eventCatalogService?.catalog;
@@ -1723,7 +2097,10 @@ export const RaceSweetMainApp = () => {
       loadedSourceIds.push(source.id);
     }
 
-    return { loadedSourceIds, raceState: mergePulledRaceStates(pulledRaceStates) };
+    return {
+      loadedSourceIds,
+      raceState: mergePulledRaceStates(pulledRaceStates),
+    };
   };
 
   const markDataSourcesLoaded = async (
@@ -1734,13 +2111,17 @@ export const RaceSweetMainApp = () => {
     if (!eventCatalogService || sourceIds.length === 0) {
       return undefined;
     }
-    const event = eventCatalogService.catalog.events.find((item) => item.id === eventId);
+    const event = eventCatalogService.catalog.events.find(
+      (item) => item.id === eventId,
+    );
     if (!event) {
       return undefined;
     }
     const dataSourceLastLoadedAt: Record<string, string> = {
       ...event.dataSourceLastLoadedAt,
-      ...Object.fromEntries(sourceIds.map((sourceId: string) => [sourceId, requestedAt])),
+      ...Object.fromEntries(
+        sourceIds.map((sourceId: string) => [sourceId, requestedAt]),
+      ),
     };
     return eventCatalogService.updateEvent(eventId, { dataSourceLastLoadedAt });
   };
@@ -1807,15 +2188,28 @@ export const RaceSweetMainApp = () => {
         (category) =>
           category.description || `${category.name} could not be found.`,
       );
-    let catalog = await eventCatalogService.reloadImportedRaceState(
+    const event = eventCatalogService.catalog.events.find(
+      (item): boolean => item.id === eventId,
+    );
+    const dataSourceLastLoadedAt: Record<string, string> = {
+      ...event?.dataSourceLastLoadedAt,
+      ...Object.fromEntries(
+        pulledSourceResult.loadedSourceIds.map((sourceId: string) => [
+          sourceId,
+          requestedAt,
+        ]),
+      ),
+    };
+    const catalog = await eventCatalogService.reloadImportedRaceState(
       eventId,
       sessionId,
       nextRaceState,
       eventCatalogService.getImportedRaceStateMetadata(eventId, sessionId)
         ?.apicalDataFilePath,
       getMasterEntrantProfilesForEvent(systemConfigState, eventId),
+      undefined,
+      dataSourceLastLoadedAt,
     );
-    catalog = await markDataSourcesLoaded(eventId, pulledSourceResult.loadedSourceIds, requestedAt) || catalog;
     const targetSessionState = createEmptySessionState();
     await applyPulledRaceStateToSession(targetSessionState, nextRaceState, {
       catalog: eventCatalogService.catalog,
@@ -2142,59 +2536,86 @@ export const RaceSweetMainApp = () => {
     timingSessionSelection,
   ]);
 
-  useEffect(() => {
-    if (
-      !eventCatalogState ||
-      !sessionState ||
-      !selectedSessionsEventId ||
-      !selectedSessionId
-    ) {
-      return;
+  const livePollingConfigurationKey = useMemo((): string => {
+    const activeEventId: EventId | undefined = eventCatalogState?.activeEventId;
+    const activeSessionId: SessionId | undefined =
+      eventCatalogState?.activeSessionId;
+    if (!activeEventId || !activeSessionId) {
+      return "";
     }
-
-    const sourceIds = getSessionAssignedSourceIds(
+    const assignedSourceIds: string[] = getSessionAssignedSourceIds(
       systemConfigState,
-      selectedSessionsEventId,
-      selectedSessionId,
+      activeEventId,
+      activeSessionId,
     );
-    const liveSources = systemConfigState.dataSources.filter((source) => {
-      return (
-        sourceIds.includes(source.id) &&
-        source.enabled &&
-        (source.type === "api-apical-data-file" ||
-          source.type === "api-apical-excel-file") &&
-        !!source.apiConfig?.live
-      );
+    return JSON.stringify({
+      assignedSourceIds: [...assignedSourceIds].sort(),
+      sources: systemConfigState.dataSources
+        .filter((source: DataSourceConfig): boolean =>
+          assignedSourceIds.includes(source.id),
+        )
+        .map((source: DataSourceConfig) => ({
+          enabled: source.enabled,
+          id: source.id,
+          live: source.apiConfig?.live,
+          name: source.name,
+          pollIntervalSeconds: source.apiConfig?.pollIntervalSeconds,
+          type: source.type,
+        })),
     });
-
-    const applyLiveSource = (source: DataSourceConfig): void => {
-      applySourceToSessionState(selectedSessionsEventId, source, undefined, {
-        sessionId: selectedSessionId,
-      })
-        .then(() => adminService?.applyChangesToSessionById(sessionState, selectedSessionId))
-        .then(() => setRenderTick((tick) => tick + 1))
-        .catch((error: unknown) => {
-          setErrorState(error as Error);
-        });
-    };
-
-    const timers = liveSources.map((source) => {
-      applyLiveSource(source);
-      const intervalMs =
-        Math.max(1, source.apiConfig!.pollIntervalSeconds) * 1000;
-      return window.setInterval(() => applyLiveSource(source), intervalMs);
-    });
-
-    return () => {
-      timers.forEach((timer) => clearInterval(timer));
-    };
   }, [
-    adminService,
-    eventCatalogState,
-    selectedSessionId,
-    selectedSessionsEventId,
-    systemConfigState,
+    eventCatalogState?.activeEventId,
+    eventCatalogState?.activeSessionId,
+    systemConfigState.dataSources,
+    systemConfigState.eventSourceAssignments,
+    systemConfigState.sessionSourceAssignments,
   ]);
+
+  useEffect(() => {
+    const activeEventId: EventId | undefined = eventCatalogState?.activeEventId;
+    const activeSessionId: SessionId | undefined =
+      eventCatalogState?.activeSessionId;
+    const assignedSourceIds: string[] = activeEventId && activeSessionId
+      ? getSessionAssignedSourceIds(
+        systemConfigState,
+        activeEventId,
+        activeSessionId,
+      )
+      : [];
+    const liveSources: LivePollingSource[] = systemConfigState.dataSources
+      .filter(
+        (source: DataSourceConfig): boolean =>
+          assignedSourceIds.includes(source.id) && isLivePollableSource(source),
+      )
+      .map((source: DataSourceConfig): LivePollingSource => ({
+        id: source.id,
+        name: source.name,
+        pollIntervalSeconds: source.apiConfig!.pollIntervalSeconds,
+      }));
+    const context: LivePollingContext | undefined = activeEventId && activeSessionId
+      ? {
+        eventId: activeEventId,
+        getLiveSource: (sourceId: string): LivePollingSource | undefined =>
+          liveSources.find(
+            (source: LivePollingSource): boolean => source.id === sourceId,
+          ),
+        loadSource: (source: LivePollingSource): Promise<void> =>
+          reloadLivePollingSource.current(source.id, {
+            eventId: activeEventId,
+            sessionId: activeSessionId,
+          }),
+        sessionId: activeSessionId,
+        sources: liveSources,
+      }
+      : undefined;
+    livePollingScheduler.current!.synchronize(context);
+  }, [
+    livePollingConfigurationKey,
+  ]);
+
+  useEffect((): (() => void) => {
+    return (): void => livePollingScheduler.current?.dispose();
+  }, []);
 
   const renderShell = (content: ReactElement): ReactElement => (
     <div className="app-shell">
@@ -2205,7 +2626,7 @@ export const RaceSweetMainApp = () => {
             <button
               key={section.id}
               type="button"
-              className={`section-tile${isActive ? ' active' : ""}`}
+              className={`section-tile${isActive ? " active" : ""}`}
               onClick={() => changeActiveSection(section.id)}
               aria-current={isActive ? "page" : undefined}
               aria-label={section.label}
@@ -2431,7 +2852,11 @@ export const RaceSweetMainApp = () => {
 
   const handleAddTimingRecord = (record: EventTimeRecord): Promise<void> => {
     if (!adminService || !record.sessionId) {
-      return Promise.reject(new Error('A timing record must belong to a loaded session before it can be saved.'));
+      return Promise.reject(
+        new Error(
+          "A timing record must belong to a loaded session before it can be saved.",
+        ),
+      );
     }
     const targetRaceState = timingRaceState || sessionState;
     return adminService
@@ -2447,7 +2872,11 @@ export const RaceSweetMainApp = () => {
 
   const handleEditTimingRecord = (record: EventTimeRecord): Promise<void> => {
     if (!adminService || !record.sessionId) {
-      return Promise.reject(new Error('A timing record must belong to a loaded session before it can be saved.'));
+      return Promise.reject(
+        new Error(
+          "A timing record must belong to a loaded session before it can be saved.",
+        ),
+      );
     }
     const targetRaceState = timingRaceState || sessionState;
     return adminService
@@ -2655,6 +3084,7 @@ export const RaceSweetMainApp = () => {
           }
           timeDisplayZoneMode={timingTimeDisplayZoneMode}
           timingEvent={timingEvent}
+          scheduledLivePolls={scheduledLivePolls}
           timingSelectionLoading={timingSelectionLoading}
           timingSessionValidCategoryIds={timingSessionValidCategoryIds}
           timingSessionValue={timingSessionValue}
@@ -2728,6 +3158,11 @@ export const RaceSweetMainApp = () => {
     timingSessionId ||
     eventCatalogState.activeSessionId ||
     getSessionsForEvent(eventCatalogState, selectedResultsEventId)[0]?.id;
+  const selectedResultsSession = eventCatalogState.sessions.find(
+    (session) =>
+      session.id === selectedResultsSessionId &&
+      session.eventId === selectedResultsEventId,
+  );
   const displayedAnalyticsRaceState = timingRaceStateLookup;
   const selectedEventSessionValue = selectedResultsEventId
     ? encodeEventSessionValue(selectedResultsEventId, selectedResultsSessionId)
@@ -2778,10 +3213,21 @@ export const RaceSweetMainApp = () => {
               .createSource(type)
               .then((config: SystemConfiguration): Promise<void> => {
                 updateSystemConfigState(config);
-                return type === 'timing-rfid-decoder'
+                return type === "timing-rfid-decoder"
                   ? syncRfidDecoderSources(config)
                   : Promise.resolve();
               })
+              .catch((error: unknown) => setErrorState(error as Error));
+          }}
+          onCreateApicalSourceFrom={(sourceId, apicalEventId) => {
+            if (!systemConfigService) {
+              return;
+            }
+            systemConfigService
+              .cloneApicalSourceForEvent(sourceId, apicalEventId)
+              .then((config: SystemConfiguration): void =>
+                updateSystemConfigState(config),
+              )
               .catch((error: unknown) => setErrorState(error as Error));
           }}
           onDeleteSource={(sourceId) => {
@@ -2795,7 +3241,7 @@ export const RaceSweetMainApp = () => {
               .deleteSource(sourceId)
               .then((config: SystemConfiguration): Promise<void> => {
                 updateSystemConfigState(config);
-                return deletedSource?.type === 'timing-rfid-decoder'
+                return deletedSource?.type === "timing-rfid-decoder"
                   ? syncRfidDecoderSources(config)
                   : Promise.resolve();
               })
@@ -2813,6 +3259,49 @@ export const RaceSweetMainApp = () => {
             }
             const requestedAt: string = new Date().toISOString();
 
+            if (source.type === "api-apical-recent-laps") {
+              if (!source.apiConfig) {
+                throw new Error(
+                  "Configure an Apical event id before loading it.",
+                );
+              }
+              const resumedSource: DataSourceConfig = {
+                ...source,
+                apiConfig: {
+                  ...source.apiConfig,
+                  live: true,
+                  pollingResumedAt: requestedAt,
+                  pollingStopReason: undefined,
+                  pollingStoppedAt: undefined,
+                },
+              };
+              return ensureApicalRecentLapsTarget(
+                eventCatalogService,
+                systemConfigService,
+                systemConfigState,
+                resumedSource,
+              ).then(async (target: ApicalRecentLapsTarget): Promise<void> => {
+                if (target.sessionCreated) {
+                  updateEventCatalogState(
+                    target.catalog,
+                    target.eventId,
+                    target.session.id,
+                  );
+                }
+                const config: SystemConfiguration =
+                  await systemConfigService.updateSource(
+                    source.id,
+                    resumedSource,
+                  );
+                updateSystemConfigState(config);
+                return pollApicalRecentLapsSource(
+                  resumedSource,
+                  target.eventId,
+                  target.session.id,
+                );
+              });
+            }
+
             const apicalEventId =
               source.apiConfig?.selectedEventIds[0] ||
               source.apiConfig?.apicalEventId;
@@ -2827,11 +3316,12 @@ export const RaceSweetMainApp = () => {
               .then(async (importData: PulledApicalRaceState) => {
                 const catalog =
                   await eventCatalogService.importApicalRaceState(importData);
-                const catalogWithLoadTime = await markDataSourcesLoaded(
-                  importData.eventId,
-                  [sourceId],
-                  requestedAt,
-                ) || catalog;
+                const catalogWithLoadTime =
+                  (await markDataSourcesLoaded(
+                    importData.eventId,
+                    [sourceId],
+                    requestedAt,
+                  )) || catalog;
                 updateEventCatalogState(
                   catalogWithLoadTime,
                   importData.eventId,
@@ -2951,11 +3441,12 @@ export const RaceSweetMainApp = () => {
                   importData,
                   completeImportStep,
                 );
-                const catalogWithLoadTime = await markDataSourcesLoaded(
-                  importData.eventId,
-                  [sourceId],
-                  requestedAt,
-                ) || catalog;
+                const catalogWithLoadTime =
+                  (await markDataSourcesLoaded(
+                    importData.eventId,
+                    [sourceId],
+                    requestedAt,
+                  )) || catalog;
                 await completeImportStep("Updating event display", 3);
                 updateEventCatalogState(
                   catalogWithLoadTime,
@@ -3133,12 +3624,17 @@ export const RaceSweetMainApp = () => {
                       sessionId,
                       raceStateSnapshot(targetSessionState),
                     );
-                const catalogWithLoadTime = await markDataSourcesLoaded(
+                const catalogWithLoadTime =
+                  (await markDataSourcesLoaded(
+                    eventId,
+                    [sourceId],
+                    requestedAt,
+                  )) || catalog;
+                updateEventCatalogState(
+                  catalogWithLoadTime,
                   eventId,
-                  [sourceId],
-                  requestedAt,
-                ) || catalog;
-                updateEventCatalogState(catalogWithLoadTime, eventId, sessionId);
+                  sessionId,
+                );
                 if (isActiveSession) {
                   setSessionState(targetSessionState);
                   setRenderTick((tick) => tick + 1);
@@ -3225,7 +3721,7 @@ export const RaceSweetMainApp = () => {
                 nextChanges,
               );
               updateSystemConfigState(config);
-              if (source?.type === 'timing-rfid-decoder') {
+              if (source?.type === "timing-rfid-decoder") {
                 await syncRfidDecoderSources(config);
               }
             };
@@ -3235,12 +3731,12 @@ export const RaceSweetMainApp = () => {
             );
           }}
           onStartRfidDecoderListener={(sourceId) => {
-            controlRfidDecoderListener(sourceId, 'start').catch(
+            controlRfidDecoderListener(sourceId, "start").catch(
               (error: unknown) => setErrorState(error as Error),
             );
           }}
           onStopRfidDecoderListener={(sourceId) => {
-            controlRfidDecoderListener(sourceId, 'stop').catch(
+            controlRfidDecoderListener(sourceId, "stop").catch(
               (error: unknown) => setErrorState(error as Error),
             );
           }}
@@ -3413,12 +3909,17 @@ export const RaceSweetMainApp = () => {
                       sessionId,
                       importedSessionRaceState,
                     );
-                const catalogWithLoadTime = await markDataSourcesLoaded(
+                const catalogWithLoadTime =
+                  (await markDataSourcesLoaded(
+                    eventId,
+                    [sourceId],
+                    requestedAt,
+                  )) || catalog;
+                updateEventCatalogState(
+                  catalogWithLoadTime,
                   eventId,
-                  [sourceId],
-                  requestedAt,
-                ) || catalog;
-                updateEventCatalogState(catalogWithLoadTime, eventId, sessionId);
+                  sessionId,
+                );
                 if (isActiveSession) {
                   setSessionState(targetSessionState);
                   setRenderTick((tick) => tick + 1);
@@ -3674,8 +4175,10 @@ export const RaceSweetMainApp = () => {
               .then((config: SystemConfiguration): Promise<void> => {
                 updateSystemConfigState(config);
                 return config.dataSources.some(
-                  (source) => source.type === 'timing-rfid-decoder',
-                ) ? syncRfidDecoderSources(config) : Promise.resolve();
+                  (source) => source.type === "timing-rfid-decoder",
+                )
+                  ? syncRfidDecoderSources(config)
+                  : Promise.resolve();
               })
               .catch((error: unknown) => setErrorState(error as Error));
           }}
@@ -3859,8 +4362,10 @@ export const RaceSweetMainApp = () => {
               .then((config: SystemConfiguration): Promise<void> => {
                 updateSystemConfigState(config);
                 return config.dataSources.some(
-                  (source) => source.type === 'timing-rfid-decoder',
-                ) ? syncRfidDecoderSources(config) : Promise.resolve();
+                  (source) => source.type === "timing-rfid-decoder",
+                )
+                  ? syncRfidDecoderSources(config)
+                  : Promise.resolve();
               })
               .catch((error: unknown) => setErrorState(error as Error));
           }}
@@ -4447,6 +4952,7 @@ export const RaceSweetMainApp = () => {
             selectedResultsEventId,
           )}
           event={timingEvent}
+          session={selectedResultsSession}
           onSelectEventSession={selectAnalyticsEventSession}
           raceState={displayedAnalyticsRaceState}
           selectedCategoryId={selectedCategoryId}
@@ -4469,6 +4975,7 @@ export const RaceSweetMainApp = () => {
             selectedResultsEventId,
           )}
           event={timingEvent}
+          session={selectedResultsSession}
           onSelectEventSession={selectAnalyticsEventSession}
           raceState={displayedAnalyticsRaceState}
           selectedCategoryId={selectedCategoryId}

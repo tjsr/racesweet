@@ -27,6 +27,7 @@ import { isCrossingRecord } from "../../processing/timerecord.js";
 
 export interface TrackPlaybackEntrantState {
   didNotFinish: boolean;
+  estimatedFinalLap: boolean;
   entrantId: EventEntrantId;
   fastestLap?: number;
   lastLapTime?: number;
@@ -38,12 +39,12 @@ export interface TrackPlaybackEntrantState {
 
 const DNF_INACTIVITY_MILLISECONDS = 3 * 60 * 1000;
 
-const isChequeredFlag = (record: {
+const isFinishFlag = (record: {
   flagType?: string;
   recordType: number;
 }): boolean =>
   (record.recordType & EVENT_SESSION_END) !== 0 ||
-  ["chequered", "finish"].includes(record.flagType?.toLowerCase() || "");
+  ["chequered", "finish", "red"].includes(record.flagType?.toLowerCase() || "");
 
 export interface TrackPlaybackSnapshot {
   entrants: TrackPlaybackEntrantState[];
@@ -57,6 +58,7 @@ export interface TrackPlaybackIndex {
 }
 
 interface PreparedPassing {
+  categoryId?: EventCategoryId;
   entrantId: EventEntrantId;
   entrantIndex: number;
   passing: ParticipantPassingRecord;
@@ -175,22 +177,22 @@ export const createTrackPlaybackIndex = (
     }
     return categoryStartTimeById.get(categoryId);
   };
-  const chequeredFlags = eventFlags.filter(
+  const finishFlags = eventFlags.filter(
     (flag) =>
       flag.deleted !== true &&
       (flag.recordType & EVENT_FLAG_RETRACTED) === 0 &&
       flag.time !== undefined &&
-      isChequeredFlag(flag),
+      isFinishFlag(flag),
   );
-  const getChequeredTime = (
+  const getFinishTime = (
     categoryId: EventCategoryId | undefined,
   ): number | undefined =>
-    chequeredFlags
+    finishFlags
       .filter((flag) => flagAppliesToCategory(flag, categoryId))
       .map((flag) => flag.time!.getTime())
       .sort((left, right) => left - right)[0];
   const passingsByEntrant = new Map<EventEntrantId, PreparedPassing[]>();
-  const completedAfterChequeredByEntrant = new Set<EventEntrantId>();
+  const completedAfterFinishByEntrant = new Set<EventEntrantId>();
   const startTimeByEntrant = new Map<EventEntrantId, number>();
 
   recordsWithTimes
@@ -215,7 +217,7 @@ export const createTrackPlaybackIndex = (
       const categoryStartTime =
         categoryId === undefined ? undefined : getCategoryStartTime(categoryId);
       const passingTime = passing.time?.getTime();
-      const chequeredTime = getChequeredTime(categoryId);
+      const finishTime = getFinishTime(categoryId);
       if (
         categoryStartTime !== undefined &&
         passingTime !== undefined &&
@@ -230,15 +232,16 @@ export const createTrackPlaybackIndex = (
         );
       }
       if (
-        chequeredTime !== undefined &&
+        finishTime !== undefined &&
         passingTime !== undefined &&
-        passingTime > chequeredTime &&
+        passingTime > finishTime &&
         isFinishLinePassing(passing, raceState.getFinishLineNumbers?.())
       ) {
-        completedAfterChequeredByEntrant.add(entrantId);
+        completedAfterFinishByEntrant.add(entrantId);
       }
       const lineNumber = getPassingLineNumber(passing);
       entrantPassings.push({
+        categoryId,
         entrantId,
         entrantIndex: entrantPassings.length,
         passing,
@@ -255,6 +258,24 @@ export const createTrackPlaybackIndex = (
   const preparedPassings = Array.from(passingsByEntrant.values())
     .flat()
     .sort((left, right) => comparePassingTime(left.passing, right.passing));
+  const averageLapTimeByEntrant = new Map<EventEntrantId, number>();
+  passingsByEntrant.forEach((passings, entrantId) => {
+    const validLapTimes = passings
+      .filter((prepared) => isCountedLapPassing(
+        prepared.passing,
+        raceState.getFinishLineNumbers?.(),
+        (candidate) => getSourceLapCompletion(candidate, raceState.getTimeRecordSourceById?.(candidate.source)),
+      ))
+      .map((prepared) => prepared.passing.lapTime)
+      .filter((lapTime): lapTime is number => typeof lapTime === "number" && lapTime > 0)
+      .slice(-3);
+    if (validLapTimes.length > 0) {
+      averageLapTimeByEntrant.set(
+        entrantId,
+        validLapTimes.reduce((total, lapTime) => total + lapTime, 0) / validLapTimes.length,
+      );
+    }
+  });
   const mutableStateByEntrant = new Map<EventEntrantId, MutableEntrantState>();
   let appliedRecordCursor = -1;
   let currentTime = startTime;
@@ -330,24 +351,33 @@ export const createTrackPlaybackIndex = (
           state.passingIndex >= 0 ? passings[state.passingIndex] : undefined;
         const next = passings[state.passingIndex + 1];
         const lastPassingTime = previous?.passing.time?.getTime();
+        const finishTime = getFinishTime(previous?.categoryId);
+        const estimatedFinalLap =
+          finishTime !== undefined &&
+          time >= finishTime &&
+          !completedAfterFinishByEntrant.has(entrantId) &&
+          lastPassingTime !== undefined &&
+          next === undefined &&
+          averageLapTimeByEntrant.has(entrantId);
+        const estimatedLapTime = averageLapTimeByEntrant.get(entrantId);
+        const estimatedProgress = estimatedFinalLap && previous && estimatedLapTime
+          ? (previous.progress + Math.max(0, Math.min(1, (time - lastPassingTime!) / estimatedLapTime))) % 1
+          : undefined;
         return [
           {
             didNotFinish:
-              !completedAfterChequeredByEntrant.has(entrantId) &&
+              !estimatedFinalLap &&
+              !completedAfterFinishByEntrant.has(entrantId) &&
               lastPassingTime !== undefined &&
               next === undefined &&
               time - lastPassingTime > DNF_INACTIVITY_MILLISECONDS,
             entrantId,
+            estimatedFinalLap,
             fastestLap: state.fastestLap,
             lastLapTime: state.lastLapTime,
             lapCount: state.lapCount,
             position: 0,
-            progress: interpolateProgress(
-              previous,
-              next,
-              time,
-              entrantStartTime,
-            ),
+            progress: estimatedProgress ?? interpolateProgress(previous, next, time, entrantStartTime),
             raceElapsedTime: state.raceElapsedTime,
           },
         ];

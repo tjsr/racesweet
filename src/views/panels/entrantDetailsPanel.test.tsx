@@ -99,7 +99,7 @@ describe('EntrantDetailsPanel', () => {
     const onSaveEntrant = vi.fn();
     const entrantDraft: EntrantDraft = {
       categoryId: 'category-1',
-      dateOfBirth: '2000-01-01',
+      dateOfBirth: '',
       firstName: 'Rider',
       gender: 'male',
       lastName: 'One',
@@ -132,7 +132,14 @@ describe('EntrantDetailsPanel', () => {
     expect(await getMuiOptionLabels(getMuiSelect(container, 'Driver Entrant'))).toContain('Fast Friends (team-1)');
 
     const nameInput = container.querySelector<HTMLInputElement>('input[aria-label="Entrant Name"]');
+    const dateOfBirthInput = container.querySelector<HTMLInputElement>('input[aria-label="Entrant Date Of Birth"]');
     expect(nameInput?.value).toBe('Rider One');
+    expect(dateOfBirthInput?.value).toBe('');
+    expect(
+      container.querySelector(
+        `label[for="${dateOfBirthInput?.id}"]`,
+      )?.classList.contains('MuiInputLabel-shrink'),
+    ).toBe(true);
 
     const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Entrant');
     const deleteButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Delete Entrant');

@@ -1,13 +1,15 @@
 ﻿body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
-    Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
   margin: 0;
   /* max-width: 38rem; */
   min-height: 100vh;
   padding: 0;
   background: var(--color-bg);
   color: var(--color-fg);
-  background: #ddd; color: black;
+  background: #ddd;
+  color: black;
 }
 
 :root {
@@ -265,7 +267,10 @@
 .events-layout {
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(15rem, 18rem) minmax(20rem, 1fr) minmax(18rem, 24rem);
+  grid-template-columns: minmax(15rem, 18rem) minmax(20rem, 1fr) minmax(
+      18rem,
+      24rem
+    );
 }
 
 .events-layout.two-panel {
@@ -273,7 +278,10 @@
 }
 
 .events-layout.categories-layout {
-  grid-template-columns: minmax(15rem, 18rem) minmax(20rem, 1fr) minmax(18rem, 22rem);
+  grid-template-columns: minmax(15rem, 18rem) minmax(20rem, 1fr) minmax(
+      18rem,
+      22rem
+    );
 }
 
 .events-panel {
@@ -310,8 +318,8 @@
   gap: 0.25rem;
 }
 
-.events-panel label:has(> input[type='checkbox']),
-.events-panel label:has(> input[type='radio']) {
+.events-panel label:has(> input[type="checkbox"]),
+.events-panel label:has(> input[type="radio"]) {
   align-items: center;
   flex-direction: row;
   gap: 0.5rem;
@@ -388,14 +396,14 @@
   }
 }
 
-.events-panel input:not([class*='Mui']),
-.events-panel select:not([class*='Mui']),
-.events-panel textarea:not([class*='Mui']) {
+.events-panel input:not([class*="Mui"]),
+.events-panel select:not([class*="Mui"]),
+.events-panel textarea:not([class*="Mui"]) {
   font: inherit;
   padding: 0.45rem 0.55rem;
 }
 
-.events-panel textarea:not([class*='Mui']) {
+.events-panel textarea:not([class*="Mui"]) {
   min-height: 7rem;
   resize: vertical;
 }
@@ -498,6 +506,90 @@
   box-shadow: inset 0 0 0 2px rgba(127, 127, 127, 0.2);
 }
 
+.session-start-wave {
+  align-items: center;
+  background: rgba(46, 125, 50, 0.12);
+  border: 1px solid rgba(46, 125, 50, 0.45);
+  border-radius: 0.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+}
+
+.scratch-start-wave {
+  background: rgba(25, 118, 210, 0.12);
+  border-color: rgba(25, 118, 210, 0.5);
+}
+
+.session-sequence-drop-zone {
+  display: flex;
+  height: 2px;
+  justify-content: center;
+  min-height: 2px;
+  position: relative;
+  width: 100%;
+}
+
+.session-sequence-drop-zone > button {
+  left: 50%;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transition: opacity 120ms ease;
+  z-index: 1;
+}
+
+.session-sequence-drop-zone:hover > button,
+.session-sequence-drop-zone.show-add-wave > button,
+.session-sequence-drop-zone:focus-within > button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.session-sequence-drag-handle {
+  cursor: grab;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.session-category-sequence-item {
+  cursor: grab;
+  position: relative;
+  will-change: transform;
+}
+
+.session-category-sequence-item:active,
+.session-start-wave:active {
+  cursor: grabbing;
+}
+
+.session-category-sequence-item .events-list-item {
+  cursor: grab;
+  padding-left: 2.4rem;
+}
+
+.session-category-sequence-item:active .events-list-item {
+  cursor: grabbing;
+}
+
+.session-category-drag-handle {
+  align-items: center;
+  color: rgba(0, 0, 0, 0.65);
+  display: inline-flex;
+  left: 0.65rem;
+  pointer-events: none;
+  position: absolute;
+  top: 0.65rem;
+  z-index: 1;
+}
+
+.session-start-wave {
+  will-change: transform;
+}
+
 .category-card-heading {
   align-items: center;
   display: flex;
@@ -517,7 +609,10 @@
   gap: 0.15rem;
   padding: 0.65rem;
   text-align: left;
-  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .session-list-card:hover {
@@ -750,7 +845,7 @@
   text-align: left;
 }
 
-.events-panel tbody tr[aria-selected='true'] {
+.events-panel tbody tr[aria-selected="true"] {
   background: rgba(127, 127, 127, 0.2);
 }
 
@@ -816,6 +911,26 @@
 
 .lap-entry-info {
   margin-top: 0.8rem;
+}
+
+.countdown-clock-report {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: calc(100vh - 12rem);
+  padding: 1rem;
+}
+
+.countdown-clock-report__flag-select {
+  min-width: 18rem;
+}
+
+.countdown-clock-report__time {
+  font-size: clamp(5rem, 22vw, 22rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .warning-modal-backdrop {
@@ -944,7 +1059,6 @@
   .events-layout {
     grid-template-columns: 1fr;
   }
-
 }
 
 @media (max-width: 640px) {
@@ -973,7 +1087,10 @@
     --color-tab-active: #4da3ff;
     --color-error: #ef5350;
   }
-  body { background: var(--color-bg); color: var(--color-fg); }
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
   .loading-progress__stages li {
     color: rgba(240, 240, 240, 0.72);
   }
@@ -983,5 +1100,8 @@
 }
 
 @media (prefers-color-scheme: light) {
-  body { background: #ddd; color: black; }
+  body {
+    background: #ddd;
+    color: black;
+  }
 }

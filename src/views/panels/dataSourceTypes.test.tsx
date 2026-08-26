@@ -50,6 +50,7 @@ describe('DataSourceTypesPanel', () => {
       select.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     });
     const options = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'));
+    expect(options.map((option) => option.textContent)).toContain('Apical Recent Laps');
     expect(options.map((option) => option.textContent)).toContain('MR-SCATS Data');
     expect(options.map((option) => option.textContent)).toContain('Dorian CTC SRT / ERF File');
     expect(options.map((option) => option.textContent)).toContain('DURT FileMaker Database');

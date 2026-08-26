@@ -1,13 +1,13 @@
-import { normalizeCategoryResultExclusion } from '../processing/category.js';
-import type { EventEntrantId } from '../model/entrant.js';
-import type { EventEntryId } from '../model/entry.js';
-import type { EventCategoryId } from '../model/eventcategory.js';
-import type { EventId, SessionId } from '../model/raceevent.js';
-import type { RaceState } from '../model/racestate.js';
-import type { IdType } from '../model/types.js';
-import { incrementLoadingMetric } from '../loadingMetrics.js';
-import type { LoadingProgressCallback } from '../loadingProgress.js';
-import { isValidId } from '../validators/isValidId.js';
+import { normalizeCategoryResultExclusion } from "../processing/category.js";
+import type { EventEntrantId } from "../model/entrant.js";
+import type { EventEntryId } from "../model/entry.js";
+import type { EventCategoryId } from "../model/eventcategory.js";
+import type { EventId, SessionId } from "../model/raceevent.js";
+import type { RaceState } from "../model/racestate.js";
+import type { IdType } from "../model/types.js";
+import { incrementLoadingMetric } from "../loadingMetrics.js";
+import type { LoadingProgressCallback } from "../loadingProgress.js";
+import { isValidId } from "../validators/isValidId.js";
 import {
   type CategorySessionAssignment,
   createDefaultEventCatalogState,
@@ -17,7 +17,7 @@ import {
   type EventCatalogEvent,
   type EventCatalogSession,
   type EventCatalogState,
-} from '../catalog/eventCatalog.js';
+} from "../catalog/eventCatalog.js";
 
 interface EventCatalogMutationBase {
   id: string;
@@ -26,45 +26,74 @@ interface EventCatalogMutationBase {
 
 export interface EventCreatedMutation extends EventCatalogMutationBase {
   event: EventCatalogEvent;
-  type: 'event-created';
+  type: "event-created";
 }
 
 export interface EventUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogEvent, 'categoryIds' | 'date' | 'discipline' | 'entryIds' | 'entrantIds' | 'format' | 'minimumLapTimeMilliseconds' | 'name' | 'sessionIds' | 'timeZone' | 'trackMap'>>;
+  changes: Partial<
+    Pick<
+      EventCatalogEvent,
+      | "categoryIds"
+      | "date"
+      | "discipline"
+      | "entryIds"
+      | "entrantIds"
+      | "format"
+      | "minimumLapTimeMilliseconds"
+      | "name"
+      | "sessionIds"
+      | "timeZone"
+      | "trackMap"
+    >
+  >;
   eventId: EventId;
-  type: 'event-updated';
+  type: "event-updated";
 }
 
 export interface EventDeletedMutation extends EventCatalogMutationBase {
   eventId: EventId;
-  type: 'event-deleted';
+  type: "event-deleted";
 }
 
 export interface EventActivatedMutation extends EventCatalogMutationBase {
   eventId: EventId;
-  type: 'event-activated';
+  type: "event-activated";
 }
 
 export interface SessionCreatedMutation extends EventCatalogMutationBase {
   session: EventCatalogSession;
-  type: 'session-created';
+  type: "session-created";
 }
 
 export interface SessionUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogSession, 'categoryIds' | 'eventId' | 'kind' | 'minimumLapTimeMilliseconds' | 'name' | 'notes' | 'scheduledStart' | 'status'>>;
+  changes: Partial<
+    Pick<
+      EventCatalogSession,
+      | "categoryIds"
+      | "duration"
+      | "eventId"
+      | "kind"
+      | "minimumLapTimeMilliseconds"
+      | "name"
+      | "notes"
+      | "scheduledStart"
+      | "startSequence"
+      | "status"
+    >
+  >;
   sessionId: SessionId;
-  type: 'session-updated';
+  type: "session-updated";
 }
 
 export interface SessionActivatedMutation extends EventCatalogMutationBase {
   eventId: EventId;
   sessionId: SessionId;
-  type: 'session-activated';
+  type: "session-activated";
 }
 
 export interface SessionDeletedMutation extends EventCatalogMutationBase {
   sessionId: SessionId;
-  type: 'session-deleted';
+  type: "session-deleted";
 }
 
 export interface RaceStateImportedMutation extends EventCatalogMutationBase {
@@ -72,61 +101,111 @@ export interface RaceStateImportedMutation extends EventCatalogMutationBase {
   eventId: EventId;
   raceState: Partial<RaceState>;
   sessionId: SessionId;
-  type: 'race-state-imported';
+  type: "race-state-imported";
 }
 
 export interface CategoryCreatedMutation extends EventCatalogMutationBase {
   category: EventCatalogCategory;
-  type: 'category-created';
+  type: "category-created";
 }
 
 export interface CategoryUpdatedMutation extends EventCatalogMutationBase {
   categoryId: EventCategoryId;
-  changes: Partial<Pick<EventCatalogCategory, 'code' | 'deleted' | 'description' | 'distance' | 'distanceRule' | 'duration' | 'excludeFromResults' | 'isPlaceholder' | 'name' | 'startTime' | 'teamRules'>>;
-  type: 'category-updated';
+  changes: Partial<
+    Pick<
+      EventCatalogCategory,
+      | "code"
+      | "deleted"
+      | "description"
+      | "distance"
+      | "distanceRule"
+      | "duration"
+      | "excludeFromResults"
+      | "isPlaceholder"
+      | "name"
+      | "startTime"
+      | "teamRules"
+    >
+  >;
+  type: "category-updated";
 }
 
 export interface CategoryDeletedMutation extends EventCatalogMutationBase {
   categoryId: EventCategoryId;
-  type: 'category-deleted';
+  type: "category-deleted";
 }
 
 export interface EntrantCreatedMutation extends EventCatalogMutationBase {
   entrant: EventCatalogEntrant;
-  type: 'entrant-created';
+  type: "entrant-created";
 }
 
 export interface EntrantUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'entryIds' | 'firstName' | 'gender' | 'identifiers' | 'isEntryOwner' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'startOrder' | 'teamEntrantId' | 'teamMembers' | 'vehicle'>>;
+  changes: Partial<
+    Pick<
+      EventCatalogEntrant,
+      | "categoryId"
+      | "categoryIds"
+      | "dateOfBirth"
+      | "entrantType"
+      | "entryIds"
+      | "firstName"
+      | "gender"
+      | "identifiers"
+      | "isEntryOwner"
+      | "lastName"
+      | "memberParticipantIds"
+      | "name"
+      | "notes"
+      | "startOrder"
+      | "teamEntrantId"
+      | "teamMembers"
+      | "vehicle"
+    >
+  >;
   entrantId: EventEntrantId;
-  type: 'entrant-updated';
+  type: "entrant-updated";
 }
 
 export interface EntrantDeletedMutation extends EventCatalogMutationBase {
   entrantId: EventEntrantId;
-  type: 'entrant-deleted';
+  type: "entrant-deleted";
 }
 
 export interface EntrantsDeletedMutation extends EventCatalogMutationBase {
   entrantIds: EventEntrantId[];
   eventId: EventId;
-  type: 'entrants-deleted';
+  type: "entrants-deleted";
 }
 
 export interface EntryCreatedMutation extends EventCatalogMutationBase {
   entry: EventCatalogEntry;
-  type: 'entry-created';
+  type: "entry-created";
 }
 
 export interface EntryUpdatedMutation extends EventCatalogMutationBase {
-  changes: Partial<Pick<EventCatalogEntry, 'categoryId' | 'entrantId' | 'identifiers' | 'isPlaceholder' | 'name' | 'participantIds' | 'raceNumber' | 'sessionIds' | 'startOrder' | 'vehicle'>>;
+  changes: Partial<
+    Pick<
+      EventCatalogEntry,
+      | "categoryId"
+      | "entrantId"
+      | "identifiers"
+      | "isPlaceholder"
+      | "name"
+      | "participantIds"
+      | "raceNumber"
+      | "sessionIds"
+      | "startOrder"
+      | "vehicle"
+    >
+  >;
   entryId: EventEntryId;
-  type: 'entry-updated';
+  type: "entry-updated";
 }
 
 export interface EntryDeletedMutation extends EventCatalogMutationBase {
   entryId: EventEntryId;
-  type: 'entry-deleted';
+  type: "entry-deleted";
 }
 
 export type EventCatalogMutation =
@@ -160,39 +239,69 @@ export const createDefaultEventCatalogLedger = (): EventCatalogLedger => ({
   schemaVersion: 1,
 });
 
-const removeEntry = (ids: IdType[], id: IdType): IdType[] => ids.filter((entryId) => entryId !== id);
-const addUniqueEntry = <TValue extends IdType>(ids: TValue[], id: TValue): TValue[] => ids.includes(id) ? ids : [...ids, id];
-const isActiveCategory = (category: EventCatalogCategory): boolean => category.deleted !== true;
-const getLegacyCategorySessionAssignments = (category: EventCatalogCategory | undefined): CategorySessionAssignment[] => {
-  return ((category as EventCatalogCategory & { sessionAssignments?: CategorySessionAssignment[] } | undefined)?.sessionAssignments || []);
+const removeEntry = (ids: IdType[], id: IdType): IdType[] =>
+  ids.filter((entryId) => entryId !== id);
+const addUniqueEntry = <TValue extends IdType>(
+  ids: TValue[],
+  id: TValue,
+): TValue[] => (ids.includes(id) ? ids : [...ids, id]);
+const isActiveCategory = (category: EventCatalogCategory): boolean =>
+  category.deleted !== true;
+const getLegacyCategorySessionAssignments = (
+  category: EventCatalogCategory | undefined,
+): CategorySessionAssignment[] => {
+  return (
+    (
+      category as
+        | (EventCatalogCategory & {
+            sessionAssignments?: CategorySessionAssignment[];
+          })
+        | undefined
+    )?.sessionAssignments || []
+  );
 };
 
-const getCategoryIdsForSession = (session: EventCatalogSession | undefined): EventCategoryId[] => session?.categoryIds || [];
+const getCategoryIdsForSession = (
+  session: EventCatalogSession | undefined,
+): EventCategoryId[] => session?.categoryIds || [];
 
-const migrateLegacyCategoryAssignments = (state: EventCatalogState): EventCatalogState => {
+const migrateLegacyCategoryAssignments = (
+  state: EventCatalogState,
+): EventCatalogState => {
   const activeCategories = state.categories.filter(isActiveCategory);
-  if (!activeCategories.some((category) => getLegacyCategorySessionAssignments(category).length > 0)) {
+  if (
+    !activeCategories.some(
+      (category) => getLegacyCategorySessionAssignments(category).length > 0,
+    )
+  ) {
     return state;
   }
 
   return {
     ...state,
     sessions: state.sessions.map((session) => {
-      const categoryIds = activeCategories.reduce<EventCategoryId[]>((assignedCategoryIds, category) => {
-        const isAssigned = getLegacyCategorySessionAssignments(category).some((assignment) => {
-          if (category.eventId !== session.eventId) {
-            return false;
-          }
+      const categoryIds = activeCategories.reduce<EventCategoryId[]>(
+        (assignedCategoryIds, category) => {
+          const isAssigned = getLegacyCategorySessionAssignments(category).some(
+            (assignment) => {
+              if (category.eventId !== session.eventId) {
+                return false;
+              }
 
-          if (isValidId(assignment.sessionId)) {
-            return assignment.sessionId === session.id;
-          }
+              if (isValidId(assignment.sessionId)) {
+                return assignment.sessionId === session.id;
+              }
 
-          return assignment.startTime === session.scheduledStart;
-        });
+              return assignment.startTime === session.scheduledStart;
+            },
+          );
 
-        return isAssigned ? addUniqueEntry(assignedCategoryIds, category.id) : assignedCategoryIds;
-      }, getCategoryIdsForSession(session));
+          return isAssigned
+            ? addUniqueEntry(assignedCategoryIds, category.id)
+            : assignedCategoryIds;
+        },
+        getCategoryIdsForSession(session),
+      );
 
       return {
         ...session,
@@ -204,10 +313,10 @@ const migrateLegacyCategoryAssignments = (state: EventCatalogState): EventCatalo
 
 export const applyEventCatalogMutation = (
   currentState: EventCatalogState,
-  mutation: EventCatalogMutation
+  mutation: EventCatalogMutation,
 ): EventCatalogState => {
   switch (mutation.type) {
-    case 'event-created': {
+    case "event-created": {
       if (currentState.deletedEventIds.includes(mutation.event.id)) {
         return currentState;
       }
@@ -218,7 +327,7 @@ export const applyEventCatalogMutation = (
         events: [...currentState.events, mutation.event],
       };
     }
-    case 'event-updated': {
+    case "event-updated": {
       if (currentState.deletedEventIds.includes(mutation.eventId)) {
         return currentState;
       }
@@ -237,14 +346,20 @@ export const applyEventCatalogMutation = (
         }),
       };
     }
-    case 'event-deleted': {
-      const remainingEvents = currentState.events.filter((event) => event.id !== mutation.eventId);
-      const nextActiveEventId = currentState.activeEventId === mutation.eventId
-        ? remainingEvents[0]?.id
-        : currentState.activeEventId;
-      const nextActiveSessionId = currentState.activeEventId === mutation.eventId
-        ? currentState.sessions.find((session) => session.eventId === nextActiveEventId)?.id
-        : currentState.activeSessionId;
+    case "event-deleted": {
+      const remainingEvents = currentState.events.filter(
+        (event) => event.id !== mutation.eventId,
+      );
+      const nextActiveEventId =
+        currentState.activeEventId === mutation.eventId
+          ? remainingEvents[0]?.id
+          : currentState.activeEventId;
+      const nextActiveSessionId =
+        currentState.activeEventId === mutation.eventId
+          ? currentState.sessions.find(
+              (session) => session.eventId === nextActiveEventId,
+            )?.id
+          : currentState.activeSessionId;
 
       return {
         ...currentState,
@@ -254,13 +369,22 @@ export const applyEventCatalogMutation = (
         events: remainingEvents,
       };
     }
-    case 'event-activated': {
-      if (currentState.deletedEventIds.includes(mutation.eventId) || !currentState.events.some((event) => event.id === mutation.eventId)) {
+    case "event-activated": {
+      if (
+        currentState.deletedEventIds.includes(mutation.eventId) ||
+        !currentState.events.some((event) => event.id === mutation.eventId)
+      ) {
         return currentState;
       }
 
-      const existingActiveSession = currentState.sessions.find((session) => session.id === currentState.activeSessionId && session.eventId === mutation.eventId);
-      const firstEventSession = currentState.sessions.find((session) => session.eventId === mutation.eventId);
+      const existingActiveSession = currentState.sessions.find(
+        (session) =>
+          session.id === currentState.activeSessionId &&
+          session.eventId === mutation.eventId,
+      );
+      const firstEventSession = currentState.sessions.find(
+        (session) => session.eventId === mutation.eventId,
+      );
 
       return {
         ...currentState,
@@ -268,25 +392,32 @@ export const applyEventCatalogMutation = (
         activeSessionId: existingActiveSession?.id || firstEventSession?.id,
       };
     }
-    case 'category-created': {
-      const category = normalizeCategoryResultExclusion({ ...mutation.category, deleted: false });
+    case "category-created": {
+      const category = normalizeCategoryResultExclusion({
+        ...mutation.category,
+        deleted: false,
+      });
       return {
         ...currentState,
         categories: [
-          ...currentState.categories.map((existingCategory) => (
-            existingCategory.id === category.id && isActiveCategory(existingCategory)
+          ...currentState.categories.map((existingCategory) =>
+            existingCategory.id === category.id &&
+            isActiveCategory(existingCategory)
               ? { ...existingCategory, deleted: true }
-              : existingCategory
-          )),
+              : existingCategory,
+          ),
           category,
         ],
       };
     }
-    case 'category-updated': {
+    case "category-updated": {
       return {
         ...currentState,
         categories: currentState.categories.map((category) => {
-          if (category.id !== mutation.categoryId || !isActiveCategory(category)) {
+          if (
+            category.id !== mutation.categoryId ||
+            !isActiveCategory(category)
+          ) {
             return category;
           }
 
@@ -297,40 +428,55 @@ export const applyEventCatalogMutation = (
         }),
       };
     }
-    case 'category-deleted': {
+    case "category-deleted": {
       return {
         ...currentState,
-        categories: currentState.categories.map((category) => (
+        categories: currentState.categories.map((category) =>
           category.id === mutation.categoryId && isActiveCategory(category)
             ? { ...category, deleted: true }
-            : category
-        )),
+            : category,
+        ),
         entrants: currentState.entrants.map((entrant) => ({
           ...entrant,
-          categoryId: entrant.categoryId === mutation.categoryId.toString() ? undefined : entrant.categoryId,
-          categoryIds: removeEntry(entrant.categoryIds, mutation.categoryId.toString()),
+          categoryId:
+            entrant.categoryId === mutation.categoryId.toString()
+              ? undefined
+              : entrant.categoryId,
+          categoryIds: removeEntry(
+            entrant.categoryIds,
+            mutation.categoryId.toString(),
+          ),
         })),
         entries: (currentState.entries || []).map((entry) => ({
           ...entry,
-          categoryId: entry.categoryId === mutation.categoryId.toString() ? undefined : entry.categoryId,
+          categoryId:
+            entry.categoryId === mutation.categoryId.toString()
+              ? undefined
+              : entry.categoryId,
         })),
         events: currentState.events.map((event) => ({
           ...event,
-          categoryIds: removeEntry(event.categoryIds, mutation.categoryId.toString()),
+          categoryIds: removeEntry(
+            event.categoryIds,
+            mutation.categoryId.toString(),
+          ),
         })),
         sessions: currentState.sessions.map((session) => ({
           ...session,
-          categoryIds: removeEntry(getCategoryIdsForSession(session), mutation.categoryId.toString()),
+          categoryIds: removeEntry(
+            getCategoryIdsForSession(session),
+            mutation.categoryId.toString(),
+          ),
         })),
       };
     }
-    case 'entrant-created': {
+    case "entrant-created": {
       return {
         ...currentState,
         entrants: [...currentState.entrants, mutation.entrant],
       };
     }
-    case 'entrant-updated': {
+    case "entrant-updated": {
       return {
         ...currentState,
         entrants: currentState.entrants.map((entrant) => {
@@ -345,61 +491,84 @@ export const applyEventCatalogMutation = (
         }),
       };
     }
-    case 'entrant-deleted': {
+    case "entrant-deleted": {
       return {
         ...currentState,
-        entrants: currentState.entrants.map((entrant) => entrant.id === mutation.entrantId
-          ? { ...entrant, deleted: true }
-          : entrant),
+        entrants: currentState.entrants.map((entrant) =>
+          entrant.id === mutation.entrantId
+            ? { ...entrant, deleted: true }
+            : entrant,
+        ),
         events: currentState.events.map((event) => ({
           ...event,
           entrantIds: removeEntry(event.entrantIds, mutation.entrantId),
         })),
       };
     }
-    case 'entrants-deleted': {
-      const deletedEntrantIds = new Set(mutation.entrantIds.map((entrantId) => entrantId.toString()));
+    case "entrants-deleted": {
+      const deletedEntrantIds = new Set(
+        mutation.entrantIds.map((entrantId) => entrantId.toString()),
+      );
       return {
         ...currentState,
-        entrants: currentState.entrants.map((entrant) => deletedEntrantIds.has(entrant.id.toString())
-          ? { ...entrant, deleted: true }
-          : entrant),
-        events: currentState.events.map((event) => event.id === mutation.eventId
-          ? { ...event, entrantIds: event.entrantIds.filter((entrantId) => !deletedEntrantIds.has(entrantId.toString())) }
-          : event),
+        entrants: currentState.entrants.map((entrant) =>
+          deletedEntrantIds.has(entrant.id.toString())
+            ? { ...entrant, deleted: true }
+            : entrant,
+        ),
+        events: currentState.events.map((event) =>
+          event.id === mutation.eventId
+            ? {
+                ...event,
+                entrantIds: event.entrantIds.filter(
+                  (entrantId) => !deletedEntrantIds.has(entrantId.toString()),
+                ),
+              }
+            : event,
+        ),
       };
     }
-    case 'entry-created': {
+    case "entry-created": {
       return {
         ...currentState,
         entries: [...(currentState.entries || []), mutation.entry],
       };
     }
-    case 'entry-updated': {
+    case "entry-updated": {
       return {
         ...currentState,
-        entries: (currentState.entries || []).map((entry) => entry.id === mutation.entryId
-          ? { ...entry, ...mutation.changes }
-          : entry),
+        entries: (currentState.entries || []).map((entry) =>
+          entry.id === mutation.entryId
+            ? { ...entry, ...mutation.changes }
+            : entry,
+        ),
       };
     }
-    case 'entry-deleted': {
+    case "entry-deleted": {
       return {
         ...currentState,
-        entries: (currentState.entries || []).filter((entry) => entry.id !== mutation.entryId),
+        entries: (currentState.entries || []).filter(
+          (entry) => entry.id !== mutation.entryId,
+        ),
         events: currentState.events.map((event) => ({
           ...event,
           entryIds: removeEntry(event.entryIds || [], mutation.entryId),
         })),
       };
     }
-    case 'session-created': {
+    case "session-created": {
       return {
         ...currentState,
-        sessions: [...currentState.sessions, { ...mutation.session, categoryIds: getCategoryIdsForSession(mutation.session) }],
+        sessions: [
+          ...currentState.sessions,
+          {
+            ...mutation.session,
+            categoryIds: getCategoryIdsForSession(mutation.session),
+          },
+        ],
       };
     }
-    case 'session-updated': {
+    case "session-updated": {
       return {
         ...currentState,
         sessions: currentState.sessions.map((session) => {
@@ -414,18 +583,23 @@ export const applyEventCatalogMutation = (
         }),
       };
     }
-    case 'session-activated': {
+    case "session-activated": {
       return {
         ...currentState,
         activeEventId: mutation.eventId,
         activeSessionId: mutation.sessionId,
       };
     }
-    case 'session-deleted': {
-      const remainingSessions = currentState.sessions.filter((session) => session.id !== mutation.sessionId);
-      const nextActiveSession = currentState.activeSessionId === mutation.sessionId
-        ? remainingSessions.find((session) => session.eventId === currentState.activeEventId)?.id
-        : currentState.activeSessionId;
+    case "session-deleted": {
+      const remainingSessions = currentState.sessions.filter(
+        (session) => session.id !== mutation.sessionId,
+      );
+      const nextActiveSession =
+        currentState.activeSessionId === mutation.sessionId
+          ? remainingSessions.find(
+              (session) => session.eventId === currentState.activeEventId,
+            )?.id
+          : currentState.activeSessionId;
 
       return {
         ...currentState,
@@ -437,7 +611,7 @@ export const applyEventCatalogMutation = (
         sessions: remainingSessions,
       };
     }
-    case 'race-state-imported': {
+    case "race-state-imported": {
       return currentState;
     }
     default: {
@@ -446,11 +620,19 @@ export const applyEventCatalogMutation = (
   }
 };
 
-export const applyEventCatalogLedger = (ledger: EventCatalogLedger): EventCatalogState => {
-  const state = ledger.mutations.reduce<EventCatalogState>((currentState, mutation) => {
-    incrementLoadingMetric('Apply event catalog ledger mutation', mutation.type);
-    return applyEventCatalogMutation(currentState, mutation);
-  }, createDefaultEventCatalogState());
+export const applyEventCatalogLedger = (
+  ledger: EventCatalogLedger,
+): EventCatalogState => {
+  const state = ledger.mutations.reduce<EventCatalogState>(
+    (currentState, mutation) => {
+      incrementLoadingMetric(
+        "Apply event catalog ledger mutation",
+        mutation.type,
+      );
+      return applyEventCatalogMutation(currentState, mutation);
+    },
+    createDefaultEventCatalogState(),
+  );
 
   return migrateLegacyCategoryAssignments(state);
 };
@@ -461,14 +643,26 @@ export const applyEventCatalogLedgerWithProgress = async (
 ): Promise<EventCatalogState> => {
   const total = Math.max(1, ledger.mutations.length);
   let completed = 0;
-  await onProgress?.({ completed, currentTask: 'Preparing event catalog replay', total });
+  await onProgress?.({
+    completed,
+    currentTask: "Preparing event catalog replay",
+    total,
+  });
 
   let state = createDefaultEventCatalogState();
   for (const mutation of ledger.mutations) {
-    incrementLoadingMetric('Apply event catalog ledger mutation', mutation.type);
+    incrementLoadingMetric(
+      "Apply event catalog ledger mutation",
+      mutation.type,
+    );
     state = applyEventCatalogMutation(state, mutation);
     completed += 1;
-    await onProgress?.({ completed, currentTask: `Apply catalog mutation ${mutation.type}`, detail: mutation.id, total });
+    await onProgress?.({
+      completed,
+      currentTask: `Apply catalog mutation ${mutation.type}`,
+      detail: mutation.id,
+      total,
+    });
   }
 
   return migrateLegacyCategoryAssignments(state);

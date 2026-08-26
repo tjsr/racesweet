@@ -346,6 +346,9 @@ describe("CategoriesPage integration", () => {
     const distanceRuleTypeInput = container.querySelector(
       'select[aria-label="Category Distance Rule Type"]',
     ) as HTMLSelectElement;
+    const entrantIdentityInput = container.querySelector(
+      'select[aria-label="Category Entrant Identity"]',
+    ) as HTMLSelectElement;
     const maxTeamSizeInput = container.querySelector(
       'input[aria-label="Category Max Team Size"]',
     ) as HTMLInputElement;
@@ -365,6 +368,7 @@ describe("CategoriesPage integration", () => {
       'select[aria-label="Category Session Assignments"]',
     ) as HTMLSelectElement;
     expect(maxTeamSizeInput.inputMode).toBe("numeric");
+    expect(maxTeamSizeInput.disabled).toBe(true);
     expect(minRiderAgeInput.inputMode).toBe("numeric");
     expect(maxRiderAgeInput.inputMode).toBe("numeric");
     expect(
@@ -381,7 +385,13 @@ describe("CategoriesPage integration", () => {
       distanceRuleTypeInput.dispatchEvent(
         new Event("change", { bubbles: true }),
       );
+      entrantIdentityInput.value = "multiple";
+      entrantIdentityInput.dispatchEvent(
+        new Event("change", { bubbles: true }),
+      );
     });
+
+    expect(maxTeamSizeInput.disabled).toBe(false);
 
     const distanceRuleValueInput = container.querySelector(
       'input[aria-label="Category Distance Rule Value"]',
@@ -414,7 +424,7 @@ describe("CategoriesPage integration", () => {
         excludeFromResults: true,
         name: "Development Cup",
         teamRules: {
-          identityMode: "single",
+          identityMode: "multiple",
           maxRiderAge: 55,
           maxTeamSize: 3,
           minRiderAge: 15,

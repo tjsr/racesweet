@@ -2,6 +2,7 @@ import React from 'react';
 import { type EventCatalogEntrant } from '../catalog/eventCatalog.js';
 
 interface EntrantListCartProps {
+  categoryColor?: string;
   categoryName?: string;
   entrant: EventCatalogEntrant;
   entrantLabel?: string;
@@ -49,7 +50,7 @@ export const EntrantListCard = (props: EntrantListCartProps): React.ReactElement
         ) : null}
       </div>
       {props.showCategory !== false && props.categoryName ? (
-        <span className="entrant-category-chip">
+        <span className="entrant-category-chip" style={{ backgroundColor: props.categoryColor }}>
           {props.categoryName || 'No category'}
         </span>
       ) : null}

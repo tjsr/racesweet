@@ -1,44 +1,93 @@
-import React from 'react';
-import { type DataSourceConfig, type DataSourceType, type ListenerServerConfig, type RemoteServerConfig, type SystemConfiguration } from '../../app/systemConfig.js';
-import { getBuildTimestamp, getRuntimeVersions } from '../../app/versionInfo.js';
-import { TimeRecordSourceId } from '../../model/types.js';
-import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
-import type { MrScatsDataFilePreview } from '../../parsers/mrScats/filePreview.js';
-import { DataSourcesPanel } from '../panels/dataSources.js';
-import { FastestTimeIndicatorsPanel } from '../panels/fastestTimeIndicators.js';
-import type { InlineLoadingProgress } from '../panels/InlineLoadingIndicator.js';
-import { LocalStorageLocationPanel } from '../panels/localStorageLocation.js';
-import { LogPanel } from '../panels/log.js';
-import { RaceSweetLogo } from '../panels/RaceSweetLogo.js';
-import { RuntimeInformationPanel } from '../panels/runtimeInformation.js';
-import { ServerConfigurationPanel } from '../panels/serverConfigurationPanel.js';
+import React from "react";
+import {
+  type DataSourceConfig,
+  type DataSourceType,
+  type ListenerServerConfig,
+  type RemoteServerConfig,
+  type SystemConfiguration,
+} from "../../app/systemConfig.js";
+import {
+  getBuildTimestamp,
+  getRuntimeVersions,
+} from "../../app/versionInfo.js";
+import { TimeRecordSourceId } from "../../model/types.js";
+import type {
+  MrScatsDataFileInventory,
+  MrScatsDataFileSummary,
+} from "../../parsers/mrScats/fileInventory.js";
+import type { MrScatsDataFilePreview } from "../../parsers/mrScats/filePreview.js";
+import { DataSourcesPanel } from "../panels/dataSources.js";
+import { FastestTimeIndicatorsPanel } from "../panels/fastestTimeIndicators.js";
+import type { InlineLoadingProgress } from "../panels/InlineLoadingIndicator.js";
+import { LocalStorageLocationPanel } from "../panels/localStorageLocation.js";
+import { LogPanel } from "../panels/log.js";
+import { RaceSweetLogo } from "../panels/RaceSweetLogo.js";
+import { RuntimeInformationPanel } from "../panels/runtimeInformation.js";
+import { ServerConfigurationPanel } from "../panels/serverConfigurationPanel.js";
 
 interface SystemPageProps {
   config: SystemConfiguration;
   displayedErrorLog?: string;
   onCreateSource: (type: DataSourceType) => void | Promise<void>;
+  onCreateApicalSourceFrom?: (
+    sourceId: TimeRecordSourceId,
+    apicalEventId: number,
+  ) => void | Promise<void>;
   onDeleteSource: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onDisplayError?: (source: string, error: unknown) => void;
   onFetchApicalDataNow: (sourceId: TimeRecordSourceId) => void | Promise<void>;
   onOpenLocalFile?: (filePath: string) => void | Promise<void>;
   onOpenExternalUrl?: (url: string) => void | Promise<void>;
   onLoadApicalEvents: (sourceId: TimeRecordSourceId) => void | Promise<void>;
-  onLoadMrScatsEvent?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
-  onLoadDorianCtcSrtFile?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
-  onLoadDurtFileMakerDatabase?: (sourceId: TimeRecordSourceId, onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>) => void | Promise<void>;
+  onLoadMrScatsEvent?: (
+    sourceId: TimeRecordSourceId,
+    onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>,
+  ) => void | Promise<void>;
+  onLoadDorianCtcSrtFile?: (
+    sourceId: TimeRecordSourceId,
+    onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>,
+  ) => void | Promise<void>;
+  onLoadDurtFileMakerDatabase?: (
+    sourceId: TimeRecordSourceId,
+    onProgress?: (progress: InlineLoadingProgress) => void | Promise<void>,
+  ) => void | Promise<void>;
   onReprocessApicalData: (sourceId: TimeRecordSourceId) => void | Promise<void>;
-  onPreviewMrScatsDataFile?: (sourceId: TimeRecordSourceId, file: MrScatsDataFileSummary) => Promise<MrScatsDataFilePreview>;
-  onPreviewDorianCtcSrtFile?: (sourceId: TimeRecordSourceId) => Promise<MrScatsDataFilePreview>;
-  onSaveFastestTimeIndicatorColors?: (changes: Partial<SystemConfiguration['fastestTimeIndicatorColors']>) => void | Promise<void>;
-  onSaveLocalStorageDirectoryPath: (directoryPath: string) => void | Promise<void>;
-  onSaveListenerServer?: (changes: Partial<ListenerServerConfig>) => void | Promise<void>;
-  onSaveRemoteServer?: (changes: Partial<RemoteServerConfig>) => void | Promise<void>;
+  onPreviewMrScatsDataFile?: (
+    sourceId: TimeRecordSourceId,
+    file: MrScatsDataFileSummary,
+  ) => Promise<MrScatsDataFilePreview>;
+  onPreviewDorianCtcSrtFile?: (
+    sourceId: TimeRecordSourceId,
+  ) => Promise<MrScatsDataFilePreview>;
+  onSaveFastestTimeIndicatorColors?: (
+    changes: Partial<SystemConfiguration["fastestTimeIndicatorColors"]>,
+  ) => void | Promise<void>;
+  onSaveLocalStorageDirectoryPath: (
+    directoryPath: string,
+  ) => void | Promise<void>;
+  onSaveListenerServer?: (
+    changes: Partial<ListenerServerConfig>,
+  ) => void | Promise<void>;
+  onSaveRemoteServer?: (
+    changes: Partial<RemoteServerConfig>,
+  ) => void | Promise<void>;
   onSelectCertificateFile?: () => Promise<string | undefined>;
-  onSaveSource: (sourceId: TimeRecordSourceId, changes: Partial<DataSourceConfig>) => void | Promise<void>;
-  onStartRfidDecoderListener?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
-  onStopRfidDecoderListener?: (sourceId: TimeRecordSourceId) => void | Promise<void>;
-  onSelectMrScatsDataArchive?: () => Promise<MrScatsDataFileInventory | undefined>;
-  onSelectMrScatsDataDirectory?: () => Promise<MrScatsDataFileInventory | undefined>;
+  onSaveSource: (
+    sourceId: TimeRecordSourceId,
+    changes: Partial<DataSourceConfig>,
+  ) => void | Promise<void>;
+  onStartRfidDecoderListener?: (
+    sourceId: TimeRecordSourceId,
+  ) => void | Promise<void>;
+  onStopRfidDecoderListener?: (
+    sourceId: TimeRecordSourceId,
+  ) => void | Promise<void>;
+  onSelectMrScatsDataArchive?: () => Promise<
+    MrScatsDataFileInventory | undefined
+  >;
+  onSelectMrScatsDataDirectory?: () => Promise<
+    MrScatsDataFileInventory | undefined
+  >;
   onSelectLocalFile?: () => Promise<string | undefined>;
   onSelectDorianCtcSrtFile?: () => Promise<string | undefined>;
   onSelectDorianCtcTrackConfigFile?: () => Promise<string | undefined>;
@@ -55,10 +104,15 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
   return (
     <section className="events-screen">
       <h1>System</h1>
-      <p>Configure global data-source definitions and source connection settings.</p>
+      <p>
+        Configure global data-source definitions and source connection settings.
+      </p>
 
       <div className="system-runtime-summary">
-        <RuntimeInformationPanel buildTimestamp={buildTimestamp} runtimeVersions={runtimeVersions} />
+        <RuntimeInformationPanel
+          buildTimestamp={buildTimestamp}
+          runtimeVersions={runtimeVersions}
+        />
         <RaceSweetLogo className="system-runtime-summary__logo" />
       </div>
 
@@ -66,7 +120,9 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         <div className="system-configuration-grid__server">
           <ServerConfigurationPanel
             listenerServer={props.config.listenerServer}
-            onSaveListenerServer={props.onSaveListenerServer || (() => undefined)}
+            onSaveListenerServer={
+              props.onSaveListenerServer || (() => undefined)
+            }
             onSaveRemoteServer={props.onSaveRemoteServer || (() => undefined)}
             onOpenExternalUrl={props.onOpenExternalUrl}
             onSelectCertificateFile={props.onSelectCertificateFile}
@@ -77,19 +133,24 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         <div className="system-configuration-grid__storage">
           <LocalStorageLocationPanel
             localStorageDirectoryPath={props.config.localStorageDirectoryPath}
-            onSaveLocalStorageDirectoryPath={props.onSaveLocalStorageDirectoryPath}
+            onSaveLocalStorageDirectoryPath={
+              props.onSaveLocalStorageDirectoryPath
+            }
           />
         </div>
         <div className="system-configuration-grid__fastest-time-indicators">
           <FastestTimeIndicatorsPanel
             colors={props.config.fastestTimeIndicatorColors}
-            onSaveFastestTimeIndicatorColors={props.onSaveFastestTimeIndicatorColors || (() => undefined)}
+            onSaveFastestTimeIndicatorColors={
+              props.onSaveFastestTimeIndicatorColors || (() => undefined)
+            }
           />
         </div>
       </div>
 
       <DataSourcesPanel
         dataSources={props.config.dataSources}
+        onCreateApicalSourceFrom={props.onCreateApicalSourceFrom}
         onCreateSource={props.onCreateSource}
         onDeleteSource={props.onDeleteSource}
         onDisplayError={props.onDisplayError}
@@ -110,7 +171,9 @@ export const SystemPage = (props: SystemPageProps): React.ReactElement => {
         onSelectMrScatsDataDirectory={props.onSelectMrScatsDataDirectory}
         onSelectLocalFile={props.onSelectLocalFile}
         onSelectDorianCtcSrtFile={props.onSelectDorianCtcSrtFile}
-        onSelectDorianCtcTrackConfigFile={props.onSelectDorianCtcTrackConfigFile}
+        onSelectDorianCtcTrackConfigFile={
+          props.onSelectDorianCtcTrackConfigFile
+        }
         onSelectDurtFileMakerDatabase={props.onSelectDurtFileMakerDatabase}
         onSelectDurtFileMakerExtractor={props.onSelectDurtFileMakerExtractor}
         rfidDecoderOutput={props.rfidDecoderOutput}

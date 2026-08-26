@@ -35,6 +35,7 @@ describe('EntrantListCard', () => {
     flushSync(() => {
       root?.render(
         <EntrantListCard
+          categoryColor="#0057b8"
           categoryName="Premier"
           entrant={baseEntrant}
           isSelected={false}
@@ -54,6 +55,7 @@ describe('EntrantListCard', () => {
     const teamRow = container.querySelector('.entrant-list-team-row');
     const teamName = container.querySelector('.entrant-team-chip');
     const entrantType = container.querySelector('.entrant-list-type');
+    const categoryChip = container.querySelector('.entrant-category-chip') as HTMLSpanElement;
 
     expect(header?.firstElementChild?.classList.contains('entrant-list-name')).toBe(true);
     expect(card.classList.contains('object-card')).toBe(true);
@@ -66,5 +68,6 @@ describe('EntrantListCard', () => {
     expect(teamRow?.children[1]).toBe(entrantType);
     expect(teamName?.textContent).toBe('Team: Fast Friends');
     expect(entrantType?.textContent).toBe('driver');
+    expect(categoryChip.style.backgroundColor).toBe('rgb(0, 87, 184)');
   });
 });

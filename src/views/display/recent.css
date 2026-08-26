@@ -76,11 +76,20 @@
   font-style: italic;
 }
 
+.selected-category > .MuiTableCell-root {
+  background-color: #ebffd0;
+}
+
 .selected-participant {
   background-color: #dfc0f1;
   font-style: unset;
   font-weight: unset;
   font-weight: bold;
+}
+
+.selected-participant > .MuiTableCell-root,
+.MuiTableCell-root.selected-participant {
+  background-color: #dfc0f1;
 }
 
 .selected-row {

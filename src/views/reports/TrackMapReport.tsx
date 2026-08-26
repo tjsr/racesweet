@@ -1,4 +1,5 @@
 import React from "react";
+import { getCategoryColor } from "../../categoryColors.js";
 
 import {
   millisecondsToTime,
@@ -209,7 +210,9 @@ export const TrackMapReport = (
       props.catalogEntries,
     );
     const selected = entrant.entrantId === selectedEntrantId;
-    const categoryColor = props.categoryColors?.get(categoryIdByEntrant.get(entrant.entrantId) || '') || "#1565c0";
+    const categoryId = props.raceState.participants.find(
+      (participant) => participant.entrantId === entrant.entrantId,
+    )?.categoryId;
     return (
       <g
         aria-label={`Track entrant ${label}`}
@@ -227,9 +230,10 @@ export const TrackMapReport = (
         <circle
           cx={point.x}
           cy={point.y}
-          fill={selected ? "#ffb300" : categoryColor}
+          fill={entrant.estimatedFinalLap ? "#757575" : selected ? "#ffb300" : getCategoryColor(categoryId) || "#1565c0"}
           r={selected ? 3.8 : 3.2}
           stroke="#fff"
+          strokeDasharray={entrant.estimatedFinalLap ? "1.2 0.8" : undefined}
           strokeWidth="0.8"
         />
         <text

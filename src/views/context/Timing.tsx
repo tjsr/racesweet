@@ -1,5 +1,6 @@
 import { MenuItem } from '@mui/material';
 import React from 'react';
+import { type ScheduledLivePoll } from '../../app/livePollingScheduler.js';
 import { type EventCatalogState } from '../../catalog/eventCatalog.js';
 import { type FastestTimeIndicatorColors } from '../../app/systemConfig.js';
 import { type TimeDisplayZoneMode } from '../../app/utils/timeutils.js';
@@ -38,6 +39,7 @@ interface TimingContextProps {
   onUpdateSourceOffset?: (sourceId: string, previousTime: Date, nextTime: Date) => void;
   participantSelected: (participantId: Set<EventParticipantId>) => void;
   raceState: TimingRaceState;
+  scheduledLivePolls?: ScheduledLivePoll[];
   selectedCategories: Set<EventCategoryId>;
   selectedParticipants: Set<EventParticipantId>;
   sessions: EventCatalogSession[];
@@ -101,6 +103,13 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
     return `[${prefix}] ${session.name}`;
   };
   const selectedTimingSession = sortedSessions.find((session) => session.id === props.timingSessionValue) || props.activeSession;
+  const pollTimeFormatter = new Intl.DateTimeFormat('en-AU', {
+    hour: '2-digit',
+    hour12: false,
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: props.eventTimeZone,
+  });
 
   return (
     <>
@@ -166,6 +175,11 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
             {props.timingSelectionLoading ? (
               <InlineLoadingIndicator ariaLabel="Loading Timing session" />
             ) : null}
+            {props.scheduledLivePolls?.map((poll: ScheduledLivePoll) => (
+              <span key={poll.id} className="timing-live-poll-status">
+                Data Source {poll.name} next poll at {pollTimeFormatter.format(poll.nextPollAt)}
+              </span>
+            ))}
           </span>
         </div>
       </div>

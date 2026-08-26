@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { type EventCatalogState } from '../../catalog/eventCatalog.js';
+import type { ScheduledLivePoll } from '../../app/livePollingScheduler.js';
 import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
@@ -417,6 +418,14 @@ describe('TimingContext integration', () => {
     };
     const onSelectEvent = vi.fn();
     const onSelectSession = vi.fn();
+    const scheduledLivePolls: ScheduledLivePoll[] = [{
+      eventId: event.id,
+      id: 'source-1',
+      name: 'Apical live results',
+      nextPollAt: new Date('2026-05-29T10:06:07.000Z'),
+      pollIntervalSeconds: 30,
+      sessionId: session.id,
+    }];
 
     await act(async () => {
       root.render(
@@ -437,6 +446,7 @@ describe('TimingContext integration', () => {
           onTimeDisplayZoneModeChange={() => undefined}
           participantSelected={() => undefined}
           raceState={raceState}
+          scheduledLivePolls={scheduledLivePolls}
           selectedCategories={new Set()}
           selectedParticipants={new Set()}
           sessions={[session, secondarySession]}
@@ -450,6 +460,7 @@ describe('TimingContext integration', () => {
 
     expect(container.querySelector('[role="status"][aria-label="Loading Timing event"]')).not.toBeNull();
     expect(container.querySelector('[role="status"][aria-label="Loading Timing session"]')).not.toBeNull();
+    expect(container.textContent).toContain('Data Source Apical live results next poll at 20:06:07');
 
     const timingEventSelect = getMuiSelect(container, 'Timing Event');
     expect(timingEventSelect.getAttribute('role')).toBe('combobox');

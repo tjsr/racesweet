@@ -2,20 +2,22 @@ import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 
 import { MenuItem } from '@mui/material';
 import React from 'react';
-import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent } from '../../catalog/eventCatalog.js';
-import { DEFAULT_CATEGORY_COLORS, packedRgbToCssColor } from '../../defaultCategoryColors.js';
 import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
+import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent, EventCatalogSession } from '../../catalog/eventCatalog.js';
+import { getCategoryColor, getCategoryPaletteColor } from '../../categoryColors.js';
+import { SelectTextField } from '../../controls/selectTextField.js';
+import { EventEntrantId } from '../../model/entrant.js';
+import { getParticipantEntryId } from '../../model/entry.js';
+import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
+import type { FlagRecord } from '../../model/flag.js';
+import { EventCategoryId } from '../../model/index.js';
+import { EventId, SessionId } from '../../model/raceevent.js';
+import type { ParticipantPassingRecord, TimeRecord } from '../../model/timerecord.js';
 import { shouldExcludeCategoryFromResults } from '../../processing/category.js';
+import { getFlagEvents } from '../../processing/flag.js';
 import { getSourceLapCompletion, isCountedLapPassing } from '../../processing/laps.js';
 import { getParticipantNumber } from '../../processing/participant.js';
 import { calculateYellowFlagPeriods } from '../../processing/yellowFlagPeriods.js';
-import { getParticipantEntryId } from '../../model/entry.js';
-import { EventEntrantId } from '../../model/entrant.js';
-import { SelectTextField } from '../../controls/selectTextField.js';
-import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
-import { EventCategoryId } from '../../model/index.js';
-import { EventId, SessionId } from '../../model/raceevent.js';
-import type { ParticipantPassingRecord } from '../../model/timerecord.js';
 import { LapTimesReport, type LapTimesReportState } from '../reports/LapTimesReport.js';
 import { TrackMapReport } from '../reports/TrackMapReport.js';
 import { HandicapView } from './handicap.js';
@@ -127,6 +129,7 @@ interface BaseRaceAnalyticsProps {
   catalogEntrants: EventCatalogEntrant[];
   eventSessionOptions?: EventSessionOption[];
   event?: EventCatalogEvent;
+  session?: EventCatalogSession;
   onSelectEventSession?: (value: string) => void;
   raceState: RaceState & RaceStateLookup;
   selectedEventSessionValue?: string;
@@ -136,9 +139,10 @@ interface ResultsPageProps extends BaseRaceAnalyticsProps {
   selectedCategoryId?: EventCategoryId;
 }
 
-export type ReportType = 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'yellow-flag-periods' | 'handicap-data' | 'track-map';
+export type ReportType = 'countdown-clock' | 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'yellow-flag-periods' | 'handicap-data' | 'track-map';
 
 export interface ReportsViewState {
+  countdownStartFlagId?: string;
   drawLineChart: boolean;
   handicapShowFilter: 'all' | 'event-participants-only';
   ignoreFirstLapForFastestLaps: boolean;
@@ -456,6 +460,30 @@ const buildLapChart = (rows: EntrantSummaryRow[]): LapChartColumn[] => {
     });
 };
 
+const parseIsoDurationMilliseconds = (duration: string | undefined): number | undefined => {
+  const match = duration?.trim().match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/u);
+  if (!match) {
+    return undefined;
+  }
+  const [, days = '0', hours = '0', minutes = '0', seconds = '0'] = match;
+  const milliseconds = (((Number(days) * 24 + Number(hours)) * 60 + Number(minutes)) * 60 + Number(seconds)) * 1000;
+  return Number.isFinite(milliseconds) && milliseconds > 0 ? milliseconds : undefined;
+};
+
+const formatCountdown = (remainingMilliseconds: number): string => {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMilliseconds / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+};
+
+const getCountdownFlags = (records: TimeRecord[]): FlagRecord[] => {
+  return getFlagEvents(records)
+    .filter((flag) => flag.time !== undefined)
+    .sort((left, right) => left.time!.getTime() - right.time!.getTime());
+};
+
 const getRaceStateContentSignature = (raceState: RaceState & RaceStateLookup): string => {
   const entrySignature = (raceState.entries || [])
     .map((entry) => [
@@ -685,6 +713,195 @@ const EventSessionSelector = (props: {
   );
 };
 
+interface LapChartPanelProps {
+  allRows: EntrantSummaryRow[];
+  drawLineChart: boolean;
+  onDrawLineChartChange: (drawLineChart: boolean) => void;
+  rows: EntrantSummaryRow[];
+  tableAriaLabel: string;
+}
+
+const LapChartPanel = (props: LapChartPanelProps): React.ReactElement => {
+  const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
+  const [lapChartLineSegments, setLapChartLineSegments] = React.useState<LapChartLineSegment[]>([]);
+  const lapChartWrapperRef = React.useRef<HTMLDivElement | null>(null);
+  const lapChart = React.useMemo(() => {
+    return buildLapChart(props.rows);
+  }, [props.rows]);
+  const maxLapPosition = React.useMemo(() => {
+    return lapChart.reduce((maxValue, lap) => Math.max(maxValue, lap.entries.length), 0);
+  }, [lapChart]);
+
+  const handleLapEntryClick = (entry: LapChartEntry): void => {
+    setSelectedLapEntry((currentEntry) => currentEntry?.entrantId === entry.entrantId ? undefined : entry);
+  };
+
+  const updateLapChartLineSegments = React.useCallback((): void => {
+    const wrapper = lapChartWrapperRef.current;
+    if (!props.drawLineChart || !wrapper) {
+      setLapChartLineSegments([]);
+      return;
+    }
+
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const buttons = Array.from(wrapper.querySelectorAll<HTMLButtonElement>('button[data-lap-chart-entrant-id]'));
+    const pointsByEntrant = new Map<EventEntrantId, LapChartLinePoint[]>();
+    const entrantIds: EventEntrantId[] = Array.from(new Set(props.allRows.map((row) => row.entrantId)));
+    const entrantColorOrder: Map<EventEntrantId, number> = new Map(entrantIds.map((entrantId, index) => [entrantId, index]));
+
+    buttons.forEach((button, domOrder: number) => {
+      const entrantId = button.dataset.lapChartEntrantId as EventEntrantId | undefined;
+      const lapNo = Number(button.dataset.lapChartLapNo);
+      const position = Number(button.dataset.lapChartPosition);
+      if (!entrantId || Number.isNaN(lapNo) || Number.isNaN(position)) {
+        return;
+      }
+
+      const buttonRect = button.getBoundingClientRect();
+      const point: LapChartLinePoint = {
+        domOrder,
+        entrantId,
+        lapNo,
+        position,
+        x: buttonRect.left - wrapperRect.left + buttonRect.width / 2,
+        y: buttonRect.top - wrapperRect.top + buttonRect.height / 2,
+      };
+      const points = pointsByEntrant.get(entrantId) || [];
+      points.push(point);
+      pointsByEntrant.set(entrantId, points);
+    });
+
+    const segments: LapChartLineSegment[] = [];
+    pointsByEntrant.forEach((points, entrantId) => {
+      const sortedPoints = [...points].sort((left, right) => {
+        if (left.lapNo !== right.lapNo) {
+          return left.lapNo - right.lapNo;
+        }
+        if (left.position !== right.position) {
+          return left.position - right.position;
+        }
+        return left.domOrder - right.domOrder;
+      });
+      const color = getCategoryPaletteColor(entrantColorOrder.get(entrantId) || 0);
+      sortedPoints.slice(1).forEach((point, index) => {
+        const previousPoint = sortedPoints[index];
+        segments.push({
+          color,
+          entrantId,
+          key: `${entrantId}-${previousPoint.lapNo}-${previousPoint.position}-${point.lapNo}-${point.position}-${index}`,
+          x1: previousPoint.x,
+          x2: point.x,
+          y1: previousPoint.y,
+          y2: point.y,
+        });
+      });
+    });
+
+    setLapChartLineSegments(segments);
+  }, [props.allRows, props.drawLineChart]);
+
+  React.useLayoutEffect(() => {
+    updateLapChartLineSegments();
+  }, [lapChart, maxLapPosition, updateLapChartLineSegments]);
+
+  React.useEffect(() => {
+    if (!props.drawLineChart) {
+      return undefined;
+    }
+
+    window.addEventListener('resize', updateLapChartLineSegments);
+    return () => {
+      window.removeEventListener('resize', updateLapChartLineSegments);
+    };
+  }, [props.drawLineChart, updateLapChartLineSegments]);
+
+  return (
+    <section className="events-panel">
+      <h2>Lap Chart</h2>
+      <label className="lap-chart-line-toggle">
+        <input
+          type="checkbox"
+          checked={props.drawLineChart}
+          onChange={(event) => props.onDrawLineChartChange(event.target.checked)}
+        />
+        Draw line chart
+      </label>
+      <div className="lap-chart-table-wrapper" ref={lapChartWrapperRef}>
+        {props.drawLineChart ? (
+          <svg className="lap-chart-line-overlay" aria-hidden="true">
+            {lapChartLineSegments.map((segment) => (
+              <line
+                key={segment.key}
+                className="lap-chart-line-overlay__line"
+                data-lap-chart-entrant-id={segment.entrantId}
+                stroke={segment.color}
+                x1={segment.x1}
+                x2={segment.x2}
+                y1={segment.y1}
+                y2={segment.y2}
+              />
+            ))}
+          </svg>
+        ) : null}
+        <table aria-label={props.tableAriaLabel} className="lap-chart-table">
+          <thead>
+            <tr>
+              <th>Position</th>
+              {lapChart.map((column) => (
+                <th key={`lap-column-${column.lapNo}`}>Lap {column.lapNo}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: maxLapPosition }, (_, rowIndex) => (
+              <tr key={`lap-row-${rowIndex + 1}`}>
+                <td>{rowIndex + 1}</td>
+                {lapChart.map((column) => {
+                  const entry = column.entries[rowIndex];
+                  const isSelectedEntrant = !!entry && selectedLapEntry?.entrantId === entry.entrantId;
+                  const categoryColor = entry ? getCategoryColor(entry.categoryId) : undefined;
+                  return (
+                    <td
+                      key={`lap-cell-${column.lapNo}-${rowIndex + 1}`}
+                      className={isSelectedEntrant ? 'lap-chart-table__entrant-cell--selected' : undefined}
+                    >
+                      {entry ? (
+                        <button
+                          type="button"
+                          className="lap-entry-button"
+                          aria-pressed={isSelectedEntrant}
+                          data-lap-chart-entrant-id={entry.entrantId}
+                          data-lap-chart-lap-no={entry.lapNo}
+                          data-lap-chart-position={entry.position}
+                          onClick={() => handleLapEntryClick(entry)}
+                          style={categoryColor ? { border: `2px solid ${categoryColor}` } : undefined}
+                        >
+                          {entry.raceNumber}
+                        </button>
+                      ) : null}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {selectedLapEntry ? (
+        <aside className="events-panel lap-entry-info" aria-label="Lap Entry Details">
+          <h3>Lap Entry Details</h3>
+          <p>Rider: {selectedLapEntry.raceNumber} · {selectedLapEntry.participantName}</p>
+          <p>Entrant: {selectedLapEntry.entrantName} ({selectedLapEntry.entrantId})</p>
+          <p>Category: {selectedLapEntry.categoryName}</p>
+          <p>Lap: {selectedLapEntry.lapNo}</p>
+          <p>Position: {selectedLapEntry.position}</p>
+          <p>Lap Time: {formatDuration(selectedLapEntry.lapTime)}</p>
+        </aside>
+      ) : null}
+    </section>
+  );
+};
+
 export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
   const isMotorsport = props.event?.discipline === 'motorsport';
   const isCycling = props.event?.discipline === 'cycling';
@@ -703,7 +920,7 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
       ? props.selectedCategoryId
       : 'overall',
   );
-  const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
+  const [drawLineChart, setDrawLineChart] = React.useState<boolean>(false);
   const [viewType, setViewType] = React.useState<'results' | 'lap-chart'>('results');
 
   React.useEffect(() => {
@@ -734,14 +951,6 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
     const categoryKey = categoryKeyFromName(categoryName);
     return allRows.filter((row) => row.categoryKeys.includes(categoryKey));
   }, [allRows, categories, selectedCategory]);
-
-  const lapChart = React.useMemo(() => {
-    return buildLapChart(rows);
-  }, [rows]);
-
-  const maxLapPosition = React.useMemo(() => {
-    return lapChart.reduce((maxValue, lap) => Math.max(maxValue, lap.entries.length), 0);
-  }, [lapChart]);
 
   return (
     <section className="events-screen">
@@ -813,56 +1022,69 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
           </table>
         </section>
       ) : (
-        <section className="events-panel">
-          <h2>Lap Chart</h2>
-          <table aria-label="Results Lap Chart Table" className="lap-chart-table">
-            <thead>
-              <tr>
-                <th>Position</th>
-                {lapChart.map((column) => (
-                  <th key={`results-lap-column-${column.lapNo}`}>Lap {column.lapNo}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: maxLapPosition }, (_, rowIndex) => (
-                <tr key={`results-lap-row-${rowIndex + 1}`}>
-                  <td>{rowIndex + 1}</td>
-                  {lapChart.map((column) => {
-                    const entry = column.entries[rowIndex];
-                    return (
-                      <td key={`results-lap-cell-${column.lapNo}-${rowIndex + 1}`}>
-                        {entry ? (
-                          <button
-                            type="button"
-                            className="lap-entry-button"
-                            onClick={() => setSelectedLapEntry(entry)}
-                            style={{ borderColor: entry.categoryId ? categoryColors.get(entry.categoryId) : undefined }}
-                          >
-                            {entry.raceNumber}
-                          </button>
-                        ) : null}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {selectedLapEntry ? (
-            <aside className="events-panel lap-entry-info" aria-label="Lap Entry Details">
-              <h3>Lap Entry Details</h3>
-              <p>Rider: {selectedLapEntry.raceNumber} · {selectedLapEntry.participantName}</p>
-              <p>Entrant: {selectedLapEntry.entrantName} ({selectedLapEntry.entrantId})</p>
-              <p>Category: {selectedLapEntry.categoryName}</p>
-              <p>Lap: {selectedLapEntry.lapNo}</p>
-              <p>Position: {selectedLapEntry.position}</p>
-              <p>Lap Time: {formatDuration(selectedLapEntry.lapTime)}</p>
-            </aside>
-          ) : null}
-        </section>
+        <LapChartPanel
+          allRows={allRows}
+          drawLineChart={drawLineChart}
+          onDrawLineChartChange={setDrawLineChart}
+          rows={rows}
+          tableAriaLabel="Results Lap Chart Table"
+        />
       )}
     </section>
+  );
+};
+
+const CountdownClockReport = (props: {
+  raceRecords: TimeRecord[];
+  selectedStartFlagId?: string;
+  sessionDuration?: string;
+}): React.ReactElement => {
+  const [now, setNow] = React.useState<number>(() => Date.now());
+  const flags: FlagRecord[] = React.useMemo(() => {
+    return getCountdownFlags(props.raceRecords);
+  }, [props.raceRecords]);
+  const selectedFlag = flags.find((flag) => flag.id.toString() === props.selectedStartFlagId) || flags[0];
+  const durationMilliseconds = parseIsoDurationMilliseconds(props.sessionDuration);
+  const remainingMilliseconds = selectedFlag?.time && durationMilliseconds !== undefined
+    ? Math.max(0, selectedFlag.time.getTime() + durationMilliseconds - now)
+    : 0;
+
+  React.useEffect(() => {
+    const intervalId = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  return (
+    <section className="countdown-clock-report" aria-label="Countdown Clock Report">
+      {!durationMilliseconds ? <p>This session is not configured for a time countdown because no event duration is set.</p> : null}
+      {durationMilliseconds && flags.length === 0 ? <p>No flag events are available for this session.</p> : null}
+      {durationMilliseconds && selectedFlag ? <output className="countdown-clock-report__time" aria-live="polite">{formatCountdown(remainingMilliseconds)}</output> : null}
+    </section>
+  );
+};
+
+const CountdownStartFlagSelector = (props: {
+  eventTimeZone?: string;
+  onStartFlagChange: (flagId: string) => void;
+  raceRecords: TimeRecord[];
+  selectedStartFlagId?: string;
+}): React.ReactElement => {
+  const flags: FlagRecord[] = React.useMemo(() => getCountdownFlags(props.raceRecords), [props.raceRecords]);
+  const selectedFlag = flags.find((flag) => flag.id.toString() === props.selectedStartFlagId) || flags[0];
+  return (
+    <SelectTextField
+      className="countdown-clock-report__flag-select"
+      label="Countdown start flag"
+      slotProps={{ select: { 'aria-label': 'Countdown Clock Start Flag', native: true } }}
+      value={selectedFlag?.id.toString() || ''}
+      onChange={(event) => props.onStartFlagChange(event.target.value)}
+    >
+      {flags.map((flag) => (
+        <option key={flag.id} value={flag.id}>
+          {`${flag.flagType} ${flag.flagValue} — ${tableTimeString(flag.time, props.eventTimeZone)}`}
+        </option>
+      ))}
+    </SelectTextField>
   );
 };
 
@@ -890,14 +1112,10 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     props.onViewStateChange?.(changes);
   };
   const selectedCategory = viewState.selectedCategory;
-  const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
-  const drawLineChart = viewState.drawLineChart;
-  const [lapChartLineSegments, setLapChartLineSegments] = React.useState<LapChartLineSegment[]>([]);
   const reportType = viewState.reportType;
   const ignoreFirstLapForFastestLaps = viewState.ignoreFirstLapForFastestLaps;
   const ignoreFirstLapForTimeline = viewState.ignoreFirstLapForTimeline;
   const handicapShowFilter = viewState.handicapShowFilter;
-  const lapChartWrapperRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     if (selectedCategory !== 'overall' && !categories.some((category) => category.id === selectedCategory)) {
@@ -937,101 +1155,9 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     teamName: row.entrantName,
   })), [rows]);
 
-  const lapChart = React.useMemo(() => {
-    return buildLapChart(rows);
-  }, [rows]);
-
   const fastestLapTimelineRows = React.useMemo(() => {
     return buildFastestLapTimeline(rows, ignoreFirstLapForTimeline);
   }, [ignoreFirstLapForTimeline, rows]);
-
-  const maxLapPosition = React.useMemo(() => {
-    return lapChart.reduce((maxValue, lap) => Math.max(maxValue, lap.entries.length), 0);
-  }, [lapChart]);
-
-  const handleReportLapEntryClick = (entry: LapChartEntry): void => {
-    setSelectedLapEntry((currentEntry) => currentEntry?.entrantId === entry.entrantId ? undefined : entry);
-  };
-
-  const updateLapChartLineSegments = React.useCallback((): void => {
-    const wrapper = lapChartWrapperRef.current;
-    if (!drawLineChart || reportType !== 'lap-chart' || !wrapper) {
-      setLapChartLineSegments([]);
-      return;
-    }
-
-    const wrapperRect = wrapper.getBoundingClientRect();
-    const buttons = Array.from(wrapper.querySelectorAll<HTMLButtonElement>('button[data-lap-chart-entrant-id]'));
-    const pointsByEntrant = new Map<EventEntrantId, LapChartLinePoint[]>();
-    const categoryIdByEntrant = new Map<EventEntrantId, string | undefined>();
-
-    buttons.forEach((button, domOrder: number) => {
-      const entrantId = button.dataset.lapChartEntrantId as EventEntrantId | undefined;
-      const lapNo = Number(button.dataset.lapChartLapNo);
-      const position = Number(button.dataset.lapChartPosition);
-      if (!entrantId || Number.isNaN(lapNo) || Number.isNaN(position)) {
-        return;
-      }
-
-      categoryIdByEntrant.set(entrantId, button.dataset.lapChartCategoryId);
-
-      const buttonRect = button.getBoundingClientRect();
-      const point: LapChartLinePoint = {
-        domOrder,
-        entrantId,
-        lapNo,
-        position,
-        x: buttonRect.left - wrapperRect.left + buttonRect.width / 2,
-        y: buttonRect.top - wrapperRect.top + buttonRect.height / 2,
-      };
-      const points = pointsByEntrant.get(entrantId) || [];
-      points.push(point);
-      pointsByEntrant.set(entrantId, points);
-    });
-
-    const segments: LapChartLineSegment[] = [];
-    pointsByEntrant.forEach((points, entrantId) => {
-      const sortedPoints = [...points].sort((left, right) => {
-        if (left.lapNo !== right.lapNo) {
-          return left.lapNo - right.lapNo;
-        }
-        if (left.position !== right.position) {
-          return left.position - right.position;
-        }
-        return left.domOrder - right.domOrder;
-      });
-      const color = categoryColors.get(categoryIdByEntrant.get(entrantId) || '') || '#1565c0';
-      sortedPoints.slice(1).forEach((point, index) => {
-        const previousPoint = sortedPoints[index];
-        segments.push({
-          color,
-          entrantId,
-          key: `${entrantId}-${previousPoint.lapNo}-${previousPoint.position}-${point.lapNo}-${point.position}-${index}`,
-          x1: previousPoint.x,
-          x2: point.x,
-          y1: previousPoint.y,
-          y2: point.y,
-        });
-      });
-    });
-
-    setLapChartLineSegments(segments);
-  }, [categoryColors, drawLineChart, reportType]);
-
-  React.useLayoutEffect(() => {
-    updateLapChartLineSegments();
-  }, [lapChart, maxLapPosition, updateLapChartLineSegments]);
-
-  React.useEffect(() => {
-    if (!drawLineChart || reportType !== 'lap-chart') {
-      return undefined;
-    }
-
-    window.addEventListener('resize', updateLapChartLineSegments);
-    return () => {
-      window.removeEventListener('resize', updateLapChartLineSegments);
-    };
-  }, [drawLineChart, reportType, updateLapChartLineSegments]);
 
   const fastestLapRows = React.useMemo(() => {
     return buildFastestLapReportRows(rows, ignoreFirstLapForFastestLaps);
@@ -1072,6 +1198,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             value={reportType}
             onChange={(event) => updateViewState({ reportType: event.target.value as ReportType })}
           >
+            <MenuItem value="countdown-clock">Countdown Clock</MenuItem>
             <MenuItem value="fastest-laps">Fastest Laps</MenuItem>
             <MenuItem value="fastest-lap-timeline">Fastest Lap Timeline</MenuItem>
             <MenuItem value="lap-times">Lap Times</MenuItem>
@@ -1080,6 +1207,14 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <MenuItem value="track-map">Track Map</MenuItem>
             <MenuItem value="handicap-data">Handicap Data</MenuItem>
           </SelectTextField>
+          {reportType === 'countdown-clock' ? (
+            <CountdownStartFlagSelector
+              eventTimeZone={props.event?.timeZone}
+              onStartFlagChange={(countdownStartFlagId: string) => updateViewState({ countdownStartFlagId })}
+              raceRecords={props.raceState.records}
+              selectedStartFlagId={viewState.countdownStartFlagId}
+            />
+          ) : null}
           <select
             aria-label="Reports View Type"
             hidden
@@ -1087,6 +1222,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             onChange={(event: React.ChangeEvent<HTMLSelectElement>): void =>
               updateViewState({ reportType: event.target.value as ReportType })}
           >
+            <option value="countdown-clock">Countdown Clock</option>
             <option value="fastest-laps">Fastest Laps</option>
             <option value="fastest-lap-timeline">Fastest Lap Timeline</option>
             <option value="lap-times">Lap Times</option>
@@ -1095,7 +1231,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <option value="track-map">Track Map</option>
             <option value="handicap-data">Handicap Data</option>
           </select>
-          {reportType !== 'handicap-data' ? (
+          {reportType !== 'countdown-clock' && reportType !== 'handicap-data' ? (
             <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={(category: CategoryFilter) => updateViewState({ selectedCategory: category })} />
           ) : null}
           {reportType === 'handicap-data' ? (
@@ -1113,6 +1249,14 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
           ) : null}
         </div>
       </section>
+
+      {reportType === 'countdown-clock' ? (
+        <CountdownClockReport
+          raceRecords={props.raceState.records}
+          selectedStartFlagId={viewState.countdownStartFlagId}
+          sessionDuration={props.session?.duration}
+        />
+      ) : null}
 
       {reportType === 'fastest-laps' ? (
         <section className="events-panel">
@@ -1205,89 +1349,13 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
       ) : null}
 
       {reportType === 'lap-chart' ? (
-        <section className="events-panel">
-          <h2>Lap Chart</h2>
-          <label className="lap-chart-line-toggle">
-            <input
-              type="checkbox"
-              checked={drawLineChart}
-              onChange={(event) => updateViewState({ drawLineChart: event.target.checked })}
-            />
-            Draw line chart
-          </label>
-          <div className="lap-chart-table-wrapper" ref={lapChartWrapperRef}>
-            {drawLineChart ? (
-              <svg className="lap-chart-line-overlay" aria-hidden="true">
-                {lapChartLineSegments.map((segment) => (
-                  <line
-                    key={segment.key}
-                    className="lap-chart-line-overlay__line"
-                    data-lap-chart-entrant-id={segment.entrantId}
-                    stroke={segment.color}
-                    x1={segment.x1}
-                    x2={segment.x2}
-                    y1={segment.y1}
-                    y2={segment.y2}
-                  />
-                ))}
-              </svg>
-            ) : null}
-            <table aria-label="Reports Lap Chart Table" className="lap-chart-table">
-              <thead>
-                <tr>
-                  <th>Position</th>
-                  {lapChart.map((column) => (
-                    <th key={`reports-lap-column-${column.lapNo}`}>Lap {column.lapNo}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: maxLapPosition }, (_, rowIndex) => (
-                  <tr key={`reports-lap-row-${rowIndex + 1}`}>
-                    <td>{rowIndex + 1}</td>
-                    {lapChart.map((column) => {
-                      const entry = column.entries[rowIndex];
-                      const isSelectedEntrant = !!entry && selectedLapEntry?.entrantId === entry.entrantId;
-                      return (
-                        <td
-                          key={`reports-lap-cell-${column.lapNo}-${rowIndex + 1}`}
-                          className={isSelectedEntrant ? 'lap-chart-table__entrant-cell--selected' : undefined}
-                        >
-                          {entry ? (
-                            <button
-                              type="button"
-                              className="lap-entry-button"
-                              aria-pressed={isSelectedEntrant}
-                              data-lap-chart-category-id={entry.categoryId}
-                              data-lap-chart-entrant-id={entry.entrantId}
-                              data-lap-chart-lap-no={entry.lapNo}
-                              data-lap-chart-position={entry.position}
-                              onClick={() => handleReportLapEntryClick(entry)}
-                              style={{ borderColor: entry.categoryId ? categoryColors.get(entry.categoryId) : undefined }}
-                            >
-                              {entry.raceNumber}
-                            </button>
-                          ) : null}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {selectedLapEntry ? (
-            <aside className="events-panel lap-entry-info" aria-label="Lap Entry Details">
-              <h3>Lap Entry Details</h3>
-              <p>Rider: {selectedLapEntry.raceNumber} · {selectedLapEntry.participantName}</p>
-              <p>Entrant: {selectedLapEntry.entrantName} ({selectedLapEntry.entrantId})</p>
-              <p>Category: {selectedLapEntry.categoryName}</p>
-              <p>Lap: {selectedLapEntry.lapNo}</p>
-              <p>Position: {selectedLapEntry.position}</p>
-              <p>Lap Time: {formatDuration(selectedLapEntry.lapTime)}</p>
-            </aside>
-          ) : null}
-        </section>
+        <LapChartPanel
+          allRows={allRows}
+          drawLineChart={viewState.drawLineChart}
+          onDrawLineChartChange={(drawLineChart: boolean) => updateViewState({ drawLineChart })}
+          rows={rows}
+          tableAriaLabel="Reports Lap Chart Table"
+        />
       ) : null}
 
       {reportType === 'handicap-data' ? (
