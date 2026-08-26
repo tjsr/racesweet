@@ -3158,6 +3158,11 @@ export const RaceSweetMainApp = () => {
     timingSessionId ||
     eventCatalogState.activeSessionId ||
     getSessionsForEvent(eventCatalogState, selectedResultsEventId)[0]?.id;
+  const selectedResultsSession = eventCatalogState.sessions.find(
+    (session) =>
+      session.id === selectedResultsSessionId &&
+      session.eventId === selectedResultsEventId,
+  );
   const displayedAnalyticsRaceState = timingRaceStateLookup;
   const selectedEventSessionValue = selectedResultsEventId
     ? encodeEventSessionValue(selectedResultsEventId, selectedResultsSessionId)
@@ -4947,6 +4952,7 @@ export const RaceSweetMainApp = () => {
             selectedResultsEventId,
           )}
           event={timingEvent}
+          session={selectedResultsSession}
           onSelectEventSession={selectAnalyticsEventSession}
           raceState={displayedAnalyticsRaceState}
           selectedCategoryId={selectedCategoryId}
@@ -4969,6 +4975,7 @@ export const RaceSweetMainApp = () => {
             selectedResultsEventId,
           )}
           event={timingEvent}
+          session={selectedResultsSession}
           onSelectEventSession={selectAnalyticsEventSession}
           raceState={displayedAnalyticsRaceState}
           selectedCategoryId={selectedCategoryId}

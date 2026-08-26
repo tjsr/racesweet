@@ -3222,6 +3222,7 @@ export class EventCatalogService {
       Pick<
         EventCatalogSession,
         | "categoryIds"
+        | "duration"
         | "elapsedTimeCalculation"
         | "kind"
         | "lap1Calculation"
@@ -3266,6 +3267,7 @@ export class EventCatalogService {
         Pick<
           EventCatalogSession,
           | "categoryIds"
+          | "duration"
           | "elapsedTimeCalculation"
           | "kind"
           | "lap1Calculation"

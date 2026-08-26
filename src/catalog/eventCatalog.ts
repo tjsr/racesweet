@@ -5,7 +5,7 @@ import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
 import type { EventParticipant } from "../model/eventparticipant.js";
 import { EventParticipantId } from "../model/eventparticipant.js";
 import { EventId, SessionId } from "../model/raceevent.js";
-import { IdType } from "../model/types.js";
+import { type ISO8601Duration, IdType } from "../model/types.js";
 import { isValidId } from "../validators/isValidId.js";
 
 export type EventFormat = "race-weekend" | "test-day" | "track-day" | "other";
@@ -146,6 +146,7 @@ export interface EventCatalogSession {
   eventId: EventId;
   id: SessionId;
   kind: EventSessionKind;
+  duration?: ISO8601Duration;
   elapsedTimeCalculation?: TimingStartCalculation | null;
   lap1Calculation?: TimingStartCalculation | null;
   minimumLapTimeMilliseconds?: number | null;

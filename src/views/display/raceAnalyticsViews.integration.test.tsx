@@ -3,7 +3,7 @@
 import { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import { tableTimeString } from '../../app/utils/timeutils.js';
-import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent } from '../../catalog/eventCatalog.js';
+import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent, EventCatalogSession } from '../../catalog/eventCatalog.js';
 import { getCategoryColor, getCategoryPaletteColor } from '../../categoryColors.js';
 import { CategoryId } from '../../processing/category.js';
 import { createGreenFlagEvent } from '../../processing/flag.js';
@@ -21,7 +21,7 @@ import {
   RECORD_TX_CROSSING,
 } from '../../model/timerecord.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
-import { ReportsPage, ResultsPage } from './raceAnalyticsViews.js';
+import { ReportsPage, type ReportsViewState, ResultsPage, createDefaultReportsViewState } from './raceAnalyticsViews.js';
 import { RecentRecords } from './recent.js';
 
 const setSelectValue = (select: HTMLSelectElement, value: string): void => {
@@ -1190,6 +1190,60 @@ describe('race analytics views integration', () => {
     });
 
     expect(container.querySelector('svg.lap-chart-line-overlay')).toBeFalsy();
+  });
+
+  it('counts down from the selected flag event without showing a negative duration', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-12T10:00:00.000Z'));
+    const session: EventCatalogSession = {
+      categoryIds: [createCategoryId('cat-a')],
+      duration: 'PT1M',
+      eventId: createEventId('event-1'),
+      id: createSessionId('session-1'),
+      kind: 'race',
+      name: 'Feature Race',
+      scheduledStart: '2026-06-12T09:59:00.000Z',
+      status: 'live',
+    };
+    const earlyFlag = createGreenFlagEvent({
+      id: createTimeRecordId('countdown-early'),
+      sequence: 1,
+      source: createTimeRecordSourceId('countdown'),
+      time: new Date('2026-06-12T09:59:30.000Z'),
+    });
+    const laterFlag = createGreenFlagEvent({
+      id: createTimeRecordId('countdown-later'),
+      sequence: 2,
+      source: createTimeRecordSourceId('countdown'),
+      time: new Date('2026-06-12T09:59:50.000Z'),
+    });
+    let countdownViewState: ReportsViewState = { ...createDefaultReportsViewState(), reportType: 'countdown-clock' };
+    const onCountdownViewStateChange = (changes: Partial<ReportsViewState>): void => {
+      countdownViewState = { ...countdownViewState, ...changes };
+    };
+    const onSelectEventSession = vi.fn();
+    const countdownRaceState = { ...raceState, records: [earlyFlag, laterFlag] } as unknown as Session & RaceStateLookup;
+
+    await act(async () => {
+      root.render(<ReportsPage categories={categories} catalogEntrants={catalogEntrants} eventSessionOptions={[{ eventId: createEventId('event-1'), eventName: 'Winter Round', sessionId: createSessionId('session-1'), sessionName: 'Feature Race', value: 'session:event-1:session-1' }]} onSelectEventSession={onSelectEventSession} onViewStateChange={onCountdownViewStateChange} raceState={countdownRaceState} selectedEventSessionValue="session:event-1:session-1" session={session} viewState={countdownViewState} />);
+    });
+
+    const clock = container.querySelector('output[aria-live="polite"]') as HTMLOutputElement;
+    expect(clock.textContent).toBe('0:00:30');
+    const sessionSelect = container.querySelector('select[aria-label="Race View Event Session"]') as HTMLSelectElement;
+    expect(sessionSelect).toBeTruthy();
+    const flagSelect = container.querySelector('select[aria-label="Countdown Clock Start Flag"]') as HTMLSelectElement;
+    await act(async () => {
+      setSelectValue(flagSelect, laterFlag.id.toString());
+      root.render(<ReportsPage categories={categories} catalogEntrants={catalogEntrants} eventSessionOptions={[{ eventId: createEventId('event-1'), eventName: 'Winter Round', sessionId: createSessionId('session-1'), sessionName: 'Feature Race', value: 'session:event-1:session-1' }]} onSelectEventSession={onSelectEventSession} onViewStateChange={onCountdownViewStateChange} raceState={countdownRaceState} selectedEventSessionValue="session:event-1:session-1" session={session} viewState={countdownViewState} />);
+    });
+    expect(clock.textContent).toBe('0:00:50');
+
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(clock.textContent).toBe('0:00:00');
+    vi.useRealTimers();
   });
 
   it('renders Yellow Flag periods with leader and revocation details', async () => {

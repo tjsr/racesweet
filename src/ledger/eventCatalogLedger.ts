@@ -70,6 +70,7 @@ export interface SessionUpdatedMutation extends EventCatalogMutationBase {
     Pick<
       EventCatalogSession,
       | "categoryIds"
+      | "duration"
       | "eventId"
       | "kind"
       | "minimumLapTimeMilliseconds"

@@ -72,6 +72,7 @@ interface SessionsPageProps {
       Pick<
         EventCatalogSession,
         | "categoryIds"
+        | "duration"
         | "elapsedTimeCalculation"
         | "kind"
         | "lap1Calculation"
@@ -93,6 +94,7 @@ const getSessionDraft = (
 ): {
   kind: EventCatalogSession["kind"];
   elapsedTimeCalculation: string;
+  duration: string;
   lap1Calculation: string;
   minimumLapTime: string;
   name: string;
@@ -100,6 +102,7 @@ const getSessionDraft = (
   scheduledStart: string;
   status: EventCatalogSession["status"];
 } => ({
+  duration: session?.duration || "",
   elapsedTimeCalculation: session?.elapsedTimeCalculation || "",
   kind: session?.kind || "practice",
   lap1Calculation: session?.lap1Calculation || "",
@@ -164,6 +167,7 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
     }
 
     await props.onUpdateSession(selectedSession.id, {
+      duration: sessionDraft.duration.trim() || undefined,
       elapsedTimeCalculation:
         sessionDraft.elapsedTimeCalculation === ""
           ? null

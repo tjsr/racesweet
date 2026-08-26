@@ -3,19 +3,21 @@ import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
 import { MenuItem } from '@mui/material';
 import React from 'react';
 import { getCategoryColor, getCategoryPaletteColor } from '../../categoryColors.js';
-import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent } from '../../catalog/eventCatalog.js';
+import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent, EventCatalogSession } from '../../catalog/eventCatalog.js';
 import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
 import { shouldExcludeCategoryFromResults } from '../../processing/category.js';
 import { getSourceLapCompletion, isCountedLapPassing } from '../../processing/laps.js';
 import { getParticipantNumber } from '../../processing/participant.js';
 import { calculateYellowFlagPeriods } from '../../processing/yellowFlagPeriods.js';
+import { getFlagEvents } from '../../processing/flag.js';
+import type { FlagRecord } from '../../model/flag.js';
 import { getParticipantEntryId } from '../../model/entry.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import { SelectTextField } from '../../controls/selectTextField.js';
 import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
 import { EventCategoryId } from '../../model/index.js';
 import { EventId, SessionId } from '../../model/raceevent.js';
-import type { ParticipantPassingRecord } from '../../model/timerecord.js';
+import type { ParticipantPassingRecord, TimeRecord } from '../../model/timerecord.js';
 import { LapTimesReport, type LapTimesReportState } from '../reports/LapTimesReport.js';
 import { TrackMapReport } from '../reports/TrackMapReport.js';
 import { HandicapView } from './handicap.js';
@@ -127,6 +129,7 @@ interface BaseRaceAnalyticsProps {
   catalogEntrants: EventCatalogEntrant[];
   eventSessionOptions?: EventSessionOption[];
   event?: EventCatalogEvent;
+  session?: EventCatalogSession;
   onSelectEventSession?: (value: string) => void;
   raceState: RaceState & RaceStateLookup;
   selectedEventSessionValue?: string;
@@ -136,9 +139,10 @@ interface ResultsPageProps extends BaseRaceAnalyticsProps {
   selectedCategoryId?: EventCategoryId;
 }
 
-export type ReportType = 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'yellow-flag-periods' | 'handicap-data' | 'track-map';
+export type ReportType = 'countdown-clock' | 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'yellow-flag-periods' | 'handicap-data' | 'track-map';
 
 export interface ReportsViewState {
+  countdownStartFlagId?: string;
   drawLineChart: boolean;
   handicapShowFilter: 'all' | 'event-participants-only';
   ignoreFirstLapForFastestLaps: boolean;
@@ -443,6 +447,30 @@ const buildLapChart = (rows: EntrantSummaryRow[]): LapChartColumn[] => {
         lapNo,
       };
     });
+};
+
+const parseIsoDurationMilliseconds = (duration: string | undefined): number | undefined => {
+  const match = duration?.trim().match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/u);
+  if (!match) {
+    return undefined;
+  }
+  const [, days = '0', hours = '0', minutes = '0', seconds = '0'] = match;
+  const milliseconds = (((Number(days) * 24 + Number(hours)) * 60 + Number(minutes)) * 60 + Number(seconds)) * 1000;
+  return Number.isFinite(milliseconds) && milliseconds > 0 ? milliseconds : undefined;
+};
+
+const formatCountdown = (remainingMilliseconds: number): string => {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMilliseconds / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+};
+
+const getCountdownFlags = (records: TimeRecord[]): FlagRecord[] => {
+  return getFlagEvents(records)
+    .filter((flag) => flag.time !== undefined)
+    .sort((left, right) => left.time!.getTime() - right.time!.getTime());
 };
 
 const getRaceStateContentSignature = (raceState: RaceState & RaceStateLookup): string => {
@@ -994,6 +1022,60 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
   );
 };
 
+const CountdownClockReport = (props: {
+  raceRecords: TimeRecord[];
+  selectedStartFlagId?: string;
+  sessionDuration?: string;
+}): React.ReactElement => {
+  const [now, setNow] = React.useState<number>(() => Date.now());
+  const flags: FlagRecord[] = React.useMemo(() => {
+    return getCountdownFlags(props.raceRecords);
+  }, [props.raceRecords]);
+  const selectedFlag = flags.find((flag) => flag.id.toString() === props.selectedStartFlagId) || flags[0];
+  const durationMilliseconds = parseIsoDurationMilliseconds(props.sessionDuration);
+  const remainingMilliseconds = selectedFlag?.time && durationMilliseconds !== undefined
+    ? Math.max(0, selectedFlag.time.getTime() + durationMilliseconds - now)
+    : 0;
+
+  React.useEffect(() => {
+    const intervalId = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  return (
+    <section className="countdown-clock-report" aria-label="Countdown Clock Report">
+      {!durationMilliseconds ? <p>This session is not configured for a time countdown because no event duration is set.</p> : null}
+      {durationMilliseconds && flags.length === 0 ? <p>No flag events are available for this session.</p> : null}
+      {durationMilliseconds && selectedFlag ? <output className="countdown-clock-report__time" aria-live="polite">{formatCountdown(remainingMilliseconds)}</output> : null}
+    </section>
+  );
+};
+
+const CountdownStartFlagSelector = (props: {
+  eventTimeZone?: string;
+  onStartFlagChange: (flagId: string) => void;
+  raceRecords: TimeRecord[];
+  selectedStartFlagId?: string;
+}): React.ReactElement => {
+  const flags: FlagRecord[] = React.useMemo(() => getCountdownFlags(props.raceRecords), [props.raceRecords]);
+  const selectedFlag = flags.find((flag) => flag.id.toString() === props.selectedStartFlagId) || flags[0];
+  return (
+    <SelectTextField
+      className="countdown-clock-report__flag-select"
+      label="Countdown start flag"
+      slotProps={{ select: { 'aria-label': 'Countdown Clock Start Flag', native: true } }}
+      value={selectedFlag?.id.toString() || ''}
+      onChange={(event) => props.onStartFlagChange(event.target.value)}
+    >
+      {flags.map((flag) => (
+        <option key={flag.id} value={flag.id}>
+          {`${flag.flagType} ${flag.flagValue} — ${tableTimeString(flag.time, props.eventTimeZone)}`}
+        </option>
+      ))}
+    </SelectTextField>
+  );
+};
+
 export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   const isMotorsport = props.event?.discipline === 'motorsport';
   const isCycling = props.event?.discipline === 'cycling';
@@ -1103,6 +1185,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             value={reportType}
             onChange={(event) => updateViewState({ reportType: event.target.value as ReportType })}
           >
+            <MenuItem value="countdown-clock">Countdown Clock</MenuItem>
             <MenuItem value="fastest-laps">Fastest Laps</MenuItem>
             <MenuItem value="fastest-lap-timeline">Fastest Lap Timeline</MenuItem>
             <MenuItem value="lap-times">Lap Times</MenuItem>
@@ -1111,6 +1194,14 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <MenuItem value="track-map">Track Map</MenuItem>
             <MenuItem value="handicap-data">Handicap Data</MenuItem>
           </SelectTextField>
+          {reportType === 'countdown-clock' ? (
+            <CountdownStartFlagSelector
+              eventTimeZone={props.event?.timeZone}
+              onStartFlagChange={(countdownStartFlagId: string) => updateViewState({ countdownStartFlagId })}
+              raceRecords={props.raceState.records}
+              selectedStartFlagId={viewState.countdownStartFlagId}
+            />
+          ) : null}
           <select
             aria-label="Reports View Type"
             hidden
@@ -1118,6 +1209,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             onChange={(event: React.ChangeEvent<HTMLSelectElement>): void =>
               updateViewState({ reportType: event.target.value as ReportType })}
           >
+            <option value="countdown-clock">Countdown Clock</option>
             <option value="fastest-laps">Fastest Laps</option>
             <option value="fastest-lap-timeline">Fastest Lap Timeline</option>
             <option value="lap-times">Lap Times</option>
@@ -1126,7 +1218,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <option value="track-map">Track Map</option>
             <option value="handicap-data">Handicap Data</option>
           </select>
-          {reportType !== 'handicap-data' ? (
+          {reportType !== 'countdown-clock' && reportType !== 'handicap-data' ? (
             <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={(category: CategoryFilter) => updateViewState({ selectedCategory: category })} />
           ) : null}
           {reportType === 'handicap-data' ? (
@@ -1144,6 +1236,14 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
           ) : null}
         </div>
       </section>
+
+      {reportType === 'countdown-clock' ? (
+        <CountdownClockReport
+          raceRecords={props.raceState.records}
+          selectedStartFlagId={viewState.countdownStartFlagId}
+          sessionDuration={props.session?.duration}
+        />
+      ) : null}
 
       {reportType === 'fastest-laps' ? (
         <section className="events-panel">

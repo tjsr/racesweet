@@ -260,6 +260,7 @@ describe('SessionsPage integration', () => {
     expect(onMoveSessionToEvent).toHaveBeenCalledWith('session-3', 'event-1');
 
     const sessionNameInput = container.querySelector('input[aria-label="Sessions Page Name"]') as HTMLInputElement;
+    const sessionDurationInput = container.querySelector('input[aria-label="Sessions Page Duration"]') as HTMLInputElement;
     const sessionMinimumLapTimeInput = container.querySelector('input[aria-label="Sessions Page Minimum Lap Time"]') as HTMLInputElement;
     const sessionScheduledStartInput = container.querySelector('input[aria-label="Sessions Page Start"]') as HTMLInputElement;
     const elapsedTimeCalculationSelect = container.querySelector('select[aria-label="Session Calculate Elapsed Time From"]') as HTMLSelectElement;
@@ -271,6 +272,7 @@ describe('SessionsPage integration', () => {
     ).toBe('Scheduled Start');
     await act(async () => {
       setInputValue(sessionNameInput, 'Updated Test Session');
+      setInputValue(sessionDurationInput, 'PT45M');
       setInputValue(sessionMinimumLapTimeInput, '0:00:45.0000');
       elapsedTimeCalculationSelect.value = 'first-start';
       elapsedTimeCalculationSelect.dispatchEvent(new Event('change', { bubbles: true }));
@@ -286,6 +288,7 @@ describe('SessionsPage integration', () => {
     });
 
     expect(onUpdateSession).toHaveBeenCalledWith('session-3', expect.objectContaining({
+      duration: 'PT45M',
       elapsedTimeCalculation: 'first-start',
       lap1Calculation: 'category-start',
       minimumLapTimeMilliseconds: 45000,
