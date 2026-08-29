@@ -1,5 +1,5 @@
-import swaggerJsdoc, { type OAS3Options } from 'swagger-jsdoc';
-import YAML from 'yaml';
+import swaggerJsdoc, { type OAS3Options } from "swagger-jsdoc";
+import YAML from "yaml";
 
 const openApiOptions: OAS3Options = {
   apis: [],
@@ -7,367 +7,635 @@ const openApiOptions: OAS3Options = {
     components: {
       securitySchemes: {
         raceSweetSession: {
-          in: 'cookie',
-          name: 'racesweet_session',
-          type: 'apiKey',
+          in: "cookie",
+          name: "racesweet_session",
+          type: "apiKey",
         },
       },
       schemas: {
         AuthenticatedUser: {
           properties: {
-            id: { type: 'string' },
-            role: { enum: ['admin', 'operator', 'viewer'], type: 'string' },
-            username: { type: 'string' },
+            id: { type: "string" },
+            role: { enum: ["admin", "operator", "viewer"], type: "string" },
+            username: { type: "string" },
           },
-          required: ['id', 'role', 'username'],
-          type: 'object',
+          required: ["id", "role", "username"],
+          type: "object",
         },
         AuthenticationRequest: {
           properties: {
-            password: { format: 'password', minLength: 12, type: 'string' },
-            username: { type: 'string' },
+            password: { format: "password", minLength: 12, type: "string" },
+            username: { type: "string" },
           },
-          required: ['password', 'username'],
-          type: 'object',
+          required: ["password", "username"],
+          type: "object",
         },
         AuthenticationStatus: {
           properties: {
-            setupRequired: { type: 'boolean' },
-            user: { $ref: '#/components/schemas/AuthenticatedUser' },
+            setupRequired: { type: "boolean" },
+            user: { $ref: "#/components/schemas/AuthenticatedUser" },
           },
-          required: ['setupRequired'],
-          type: 'object',
+          required: ["setupRequired"],
+          type: "object",
         },
         DomainEventEnvelope: {
           properties: {
-            aggregate: { enum: ['catalog', 'race-admin', 'server', 'source', 'system-config', 'timing'], type: 'string' },
-            commandId: { type: 'string' },
-            id: { type: 'string' },
-            occurredAt: { format: 'date-time', type: 'string' },
-            payload: { type: 'object' },
-            revision: { minimum: 0, type: 'integer' },
-            type: { type: 'string' },
+            aggregate: {
+              enum: [
+                "catalog",
+                "race-admin",
+                "server",
+                "source",
+                "system-config",
+                "timing",
+              ],
+              type: "string",
+            },
+            commandId: { type: "string" },
+            id: { type: "string" },
+            occurredAt: { format: "date-time", type: "string" },
+            payload: { type: "object" },
+            revision: { minimum: 0, type: "integer" },
+            type: { type: "string" },
           },
-          required: ['aggregate', 'id', 'occurredAt', 'payload', 'revision', 'type'],
-          type: 'object',
+          required: [
+            "aggregate",
+            "id",
+            "occurredAt",
+            "payload",
+            "revision",
+            "type",
+          ],
+          type: "object",
         },
         EventCatalogMutation: {
           additionalProperties: true,
-          description: 'An immutable event-catalog ledger mutation. The `type` field identifies the mutation operation and the remaining fields depend on that operation.',
+          description:
+            "An immutable event-catalog ledger mutation. The `type` field identifies the mutation operation and the remaining fields depend on that operation.",
           properties: {
-            id: { description: 'Immutable mutation identifier.', type: 'string' },
-            timestamp: { description: 'ISO 8601 mutation timestamp.', format: 'date-time', type: 'string' },
+            id: {
+              description: "Immutable mutation identifier.",
+              type: "string",
+            },
+            timestamp: {
+              description: "ISO 8601 mutation timestamp.",
+              format: "date-time",
+              type: "string",
+            },
             type: {
-              description: 'The immutable ledger operation to apply.',
+              description: "The immutable ledger operation to apply.",
               enum: [
-                'category-created', 'category-deleted', 'category-updated', 'entrant-created', 'entrant-deleted', 'entrants-deleted', 'entrant-updated',
-                'entry-created', 'entry-deleted', 'entry-updated', 'event-activated', 'event-created', 'event-deleted',
-                'event-updated', 'race-state-imported', 'session-activated', 'session-created', 'session-deleted', 'session-updated',
+                "category-created",
+                "category-deleted",
+                "category-updated",
+                "entrant-created",
+                "entrant-deleted",
+                "entrants-deleted",
+                "entrant-updated",
+                "entry-created",
+                "entry-deleted",
+                "entry-updated",
+                "event-activated",
+                "event-created",
+                "event-deleted",
+                "event-updated",
+                "race-state-imported",
+                "session-activated",
+                "session-created",
+                "session-deleted",
+                "session-updated",
               ],
-              type: 'string',
+              type: "string",
             },
           },
-          required: ['id', 'timestamp', 'type'],
-          type: 'object',
+          required: ["id", "timestamp", "type"],
+          type: "object",
         },
         MutationPullResponse: {
           properties: {
-            cursor: { description: 'Cursor to send with the next pull request.', type: 'string' },
-            mutations: { items: { $ref: '#/components/schemas/EventCatalogMutation' }, type: 'array' },
+            cursor: {
+              description: "Cursor to send with the next pull request.",
+              type: "string",
+            },
+            mutations: {
+              items: { $ref: "#/components/schemas/EventCatalogMutation" },
+              type: "array",
+            },
           },
-          required: ['cursor', 'mutations'],
-          type: 'object',
+          required: ["cursor", "mutations"],
+          type: "object",
         },
         MutationPushRequest: {
           properties: {
-            mutations: { items: { $ref: '#/components/schemas/EventCatalogMutation' }, type: 'array' },
+            mutations: {
+              items: { $ref: "#/components/schemas/EventCatalogMutation" },
+              type: "array",
+            },
           },
-          required: ['mutations'],
-          type: 'object',
+          required: ["mutations"],
+          type: "object",
         },
         MutationPushResponse: {
           properties: {
-            acknowledgedMutationIds: { items: { type: 'string' }, type: 'array' },
-            cursor: { description: 'Cursor for subsequent pull requests.', type: 'string' },
+            acknowledgedMutationIds: {
+              items: { type: "string" },
+              type: "array",
+            },
+            cursor: {
+              description: "Cursor for subsequent pull requests.",
+              type: "string",
+            },
           },
-          required: ['acknowledgedMutationIds', 'cursor'],
-          type: 'object',
+          required: ["acknowledgedMutationIds", "cursor"],
+          type: "object",
         },
         UploadedApplicationFile: {
           properties: {
-            id: { type: 'string' },
-            mediaType: { type: 'string' },
-            name: { type: 'string' },
-            relativePath: { type: 'string' },
-            size: { minimum: 0, type: 'integer' },
+            id: { type: "string" },
+            mediaType: { type: "string" },
+            name: { type: "string" },
+            relativePath: { type: "string" },
+            size: { minimum: 0, type: "integer" },
           },
-          required: ['id', 'mediaType', 'name', 'relativePath', 'size'],
-          type: 'object',
+          required: ["id", "mediaType", "name", "relativePath", "size"],
+          type: "object",
         },
         Problem: {
-          properties: { error: { type: 'string' } },
-          required: ['error'],
-          type: 'object',
+          properties: { error: { type: "string" } },
+          required: ["error"],
+          type: "object",
         },
       },
     },
     info: {
-      description: 'Authenticated RaceSweet application, command, upload, and live-event API.',
-      title: 'RaceSweet API',
-      version: '1.0.0',
+      description:
+        "Authenticated RaceSweet application, command, upload, and live-event API.",
+      title: "RaceSweet API",
+      version: "1.0.0",
     },
-    openapi: '3.0.3',
+    openapi: "3.0.3",
     paths: {
-      '/api/v1/auth/status': {
+      "/api/v1/auth/status": {
         get: {
-          operationId: 'getAuthenticationStatus',
-          responses: { 200: { description: 'Setup and current-session status.' } },
-          summary: 'Get setup and authentication status',
-          tags: ['Authentication'],
+          operationId: "getAuthenticationStatus",
+          responses: {
+            200: { description: "Setup and current-session status." },
+          },
+          summary: "Get setup and authentication status",
+          tags: ["Authentication"],
         },
       },
-      '/api/v1/auth/setup': {
+      "/api/v1/auth/setup": {
         post: {
-          operationId: 'createInitialAdministrator',
+          operationId: "createInitialAdministrator",
           requestBody: {
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/AuthenticationRequest' } } },
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/AuthenticationRequest" },
+              },
+            },
             required: true,
           },
-          responses: { 200: { description: 'The initial administrator session.' }, 400: { description: 'Setup is closed or the request is not from loopback.' } },
-          summary: 'Create the first administrator from loopback',
-          tags: ['Authentication'],
+          responses: {
+            200: { description: "The initial administrator session." },
+            400: {
+              description:
+                "Setup is closed or the request is not from loopback.",
+            },
+          },
+          summary: "Create the first administrator from loopback",
+          tags: ["Authentication"],
         },
       },
-      '/api/v1/auth/login': {
+      "/api/v1/auth/login": {
         post: {
-          operationId: 'login',
+          operationId: "login",
           requestBody: {
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/AuthenticationRequest' } } },
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/AuthenticationRequest" },
+              },
+            },
             required: true,
           },
-          responses: { 200: { description: 'Authenticated user and session cookie.' }, 400: { description: 'Invalid credentials.' } },
-          summary: 'Sign in',
-          tags: ['Authentication'],
+          responses: {
+            200: { description: "Authenticated user and session cookie." },
+            400: { description: "Invalid credentials." },
+          },
+          summary: "Sign in",
+          tags: ["Authentication"],
         },
       },
-      '/api/v1/auth/logout': {
+      "/api/v1/auth/logout": {
         post: {
-          operationId: 'logout',
-          responses: { 200: { description: 'Session removed.' } },
+          operationId: "logout",
+          responses: { 200: { description: "Session removed." } },
           security: [{ raceSweetSession: [] }],
-          summary: 'Sign out',
-          tags: ['Authentication'],
+          summary: "Sign out",
+          tags: ["Authentication"],
         },
       },
-      '/api/v1/auth/users': {
+      "/api/v1/auth/users": {
         get: {
-          operationId: 'listUsers',
-          responses: { 200: { description: 'Users.' }, 403: { description: 'Administrator role required.' } },
+          operationId: "listUsers",
+          responses: {
+            200: { description: "Users." },
+            403: { description: "Administrator role required." },
+          },
           security: [{ raceSweetSession: [] }],
-          summary: 'List users',
-          tags: ['Authentication'],
+          summary: "List users",
+          tags: ["Authentication"],
         },
         post: {
-          operationId: 'createUser',
-          responses: { 201: { description: 'User created.' }, 403: { description: 'Administrator role required.' } },
+          operationId: "createUser",
+          responses: {
+            201: { description: "User created." },
+            403: { description: "Administrator role required." },
+          },
           security: [{ raceSweetSession: [] }],
-          summary: 'Create a user',
-          tags: ['Authentication'],
+          summary: "Create a user",
+          tags: ["Authentication"],
         },
       },
-      '/api/v1/bootstrap': {
+      "/api/v1/bootstrap": {
         get: {
-          operationId: 'getApplicationBootstrap',
-          responses: { 200: { description: 'Current safe application projection and revision.' }, 401: { description: 'Authentication required.' } },
-          security: [{ raceSweetSession: [] }],
-          summary: 'Load the application state',
-          tags: ['Application'],
-        },
-      },
-      '/api/v1/timing/crossing': {
-        post: {
-          operationId: 'submitTimingCrossings',
-          responses: { 200: { description: 'Accepted timing crossings.' }, 400: { description: 'Invalid request.' } },
-          security: [{ raceSweetSession: [] }],
-          summary: 'Submit timing crossing records',
-          tags: ['Timing'],
-        },
-      },
-      '/api/v1/events': {
-        get: {
-          description: 'Supports Last-Event-ID replay and emits resync-required when retained history cannot satisfy the cursor.',
-          operationId: 'streamDomainEvents',
+          operationId: "getApplicationBootstrap",
           responses: {
             200: {
-              content: { 'text/event-stream': { schema: { $ref: '#/components/schemas/DomainEventEnvelope' } } },
-              description: 'Ordered domain event stream.',
+              description: "Current safe application projection and revision.",
+            },
+            401: { description: "Authentication required." },
+          },
+          security: [{ raceSweetSession: [] }],
+          summary: "Load the application state",
+          tags: ["Application"],
+        },
+      },
+      "/api/v1/timing/crossing": {
+        post: {
+          operationId: "submitTimingCrossings",
+          responses: {
+            200: { description: "Accepted timing crossings." },
+            400: { description: "Invalid request." },
+          },
+          security: [{ raceSweetSession: [] }],
+          summary: "Submit timing crossing records",
+          tags: ["Timing"],
+        },
+      },
+      "/api/v1/events": {
+        get: {
+          description:
+            "Supports Last-Event-ID replay and emits resync-required when retained history cannot satisfy the cursor.",
+          operationId: "streamDomainEvents",
+          responses: {
+            200: {
+              content: {
+                "text/event-stream": {
+                  schema: { $ref: "#/components/schemas/DomainEventEnvelope" },
+                },
+              },
+              description: "Ordered domain event stream.",
             },
           },
           security: [{ raceSweetSession: [] }],
-          summary: 'Stream live domain events',
-          tags: ['Application'],
+          summary: "Stream live domain events",
+          tags: ["Application"],
         },
       },
-      '/api/v1/mutations': {
+      "/api/v1/reports/replay": {
         get: {
-          operationId: 'pullMutations',
-          parameters: [{
-            description: 'The cursor returned by the preceding pull or push response.',
-            in: 'query',
-            name: 'cursor',
-            schema: { type: 'string' },
-          }],
+          description:
+            "Streams selected event crossing records as Server-Sent Events. Replay records retain their recorded intervals scaled by the speed query parameter; live streams emit newly accepted crossings.",
+          operationId: "streamEventReplay",
+          parameters: [
+            {
+              description: "Event to stream.",
+              in: "query",
+              name: "eventId",
+              required: true,
+              schema: { type: "string" },
+            },
+            {
+              description: "Optional session within the selected event.",
+              in: "query",
+              name: "sessionId",
+              schema: { type: "string" },
+            },
+            {
+              description:
+                "Replay recorded data or stream newly accepted live crossings.",
+              in: "query",
+              name: "mode",
+              schema: {
+                default: "replay",
+                enum: ["live", "replay"],
+                type: "string",
+              },
+            },
+            {
+              description: "Relative playback speed, from 0.01 to 1000.",
+              in: "query",
+              name: "speed",
+              schema: {
+                default: 1,
+                maximum: 1000,
+                minimum: 0.01,
+                type: "number",
+              },
+            },
+            {
+              description: "Stable replay identifier. Reconnecting with this identifier receives a snapshot and the current replay state.",
+              in: "query",
+              name: "streamId",
+              schema: { type: "string" },
+            },
+          ],
           responses: {
             200: {
-              content: { 'application/json': { schema: { $ref: '#/components/schemas/MutationPullResponse' } } },
-              description: 'Mutations and the cursor for the next pull.',
+              content: { "text/event-stream": { schema: { type: "string" } } },
+              description: "Replay lifecycle and race-record events.",
             },
-            405: { description: 'Only GET and PUT are supported.' },
+            400: { description: "Invalid replay parameters." },
+            401: { description: "Authentication required." },
+            404: { description: "Selected event or session was not found." },
           },
-          summary: 'Pull ledger mutations after a cursor',
-          tags: ['Mutations'],
+          security: [{ raceSweetSession: [] }],
+          summary: "Stream live or replayed event crossings",
+          tags: ["Reports"],
+        },
+      },
+      "/api/v1/reports/replay/control": {
+        post: {
+          description: "Controls a named replay stream. The stream must first be created by a replay subscription.",
+          operationId: "controlEventReplay",
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  properties: {
+                    command: { enum: ["pause", "reset", "resume", "set-speed", "start"], type: "string" },
+                    speed: { maximum: 1000, minimum: 0.01, type: "number" },
+                    streamId: { type: "string" },
+                  },
+                  required: ["command", "streamId"],
+                  type: "object",
+                },
+              },
+            },
+            required: true,
+          },
+          responses: {
+            200: { description: "Current replay state after the command." },
+            400: { description: "Invalid replay control request." },
+            401: { description: "Authentication required." },
+            404: { description: "Replay stream was not found." },
+          },
+          security: [{ raceSweetSession: [] }],
+          summary: "Control a replay stream",
+          tags: ["Reports"],
+        },
+      },
+      "/api/v1/mutations": {
+        get: {
+          operationId: "pullMutations",
+          parameters: [
+            {
+              description:
+                "The cursor returned by the preceding pull or push response.",
+              in: "query",
+              name: "cursor",
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            200: {
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/MutationPullResponse" },
+                },
+              },
+              description: "Mutations and the cursor for the next pull.",
+            },
+            405: { description: "Only GET and PUT are supported." },
+          },
+          summary: "Pull ledger mutations after a cursor",
+          tags: ["Mutations"],
         },
         put: {
-          operationId: 'pushMutations',
+          operationId: "pushMutations",
           requestBody: {
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/MutationPushRequest' } } },
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/MutationPushRequest" },
+              },
+            },
             required: true,
           },
           responses: {
             200: {
-              content: { 'application/json': { schema: { $ref: '#/components/schemas/MutationPushResponse' } } },
-              description: 'Mutation identifiers acknowledged by the receiving store.',
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/MutationPushResponse" },
+                },
+              },
+              description:
+                "Mutation identifiers acknowledged by the receiving store.",
             },
             400: {
-              content: { 'application/json': { schema: { $ref: '#/components/schemas/Problem' } } },
-              description: 'The request body is not valid JSON or cannot be applied.',
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Problem" },
+                },
+              },
+              description:
+                "The request body is not valid JSON or cannot be applied.",
             },
-            405: { description: 'Only GET and PUT are supported.' },
+            405: { description: "Only GET and PUT are supported." },
           },
-          summary: 'Append remote ledger mutations',
-          tags: ['Mutations'],
+          summary: "Append remote ledger mutations",
+          tags: ["Mutations"],
         },
       },
-      '/api/v1/uploads': {
+      "/api/v1/uploads": {
         post: {
-          operationId: 'uploadApplicationFile',
+          operationId: "uploadApplicationFile",
           parameters: [
-            { in: 'query', name: 'name', required: true, schema: { type: 'string' } },
-            { in: 'query', name: 'relativePath', schema: { type: 'string' } },
-            { in: 'query', name: 'mediaType', schema: { type: 'string' } },
+            {
+              in: "query",
+              name: "name",
+              required: true,
+              schema: { type: "string" },
+            },
+            { in: "query", name: "relativePath", schema: { type: "string" } },
+            { in: "query", name: "mediaType", schema: { type: "string" } },
           ],
           requestBody: {
-            content: { 'application/octet-stream': { schema: { format: 'binary', type: 'string' } } },
+            content: {
+              "application/octet-stream": {
+                schema: { format: "binary", type: "string" },
+              },
+            },
             required: true,
           },
-          responses: { 201: { description: 'Server-managed upload.' } },
+          responses: { 201: { description: "Server-managed upload." } },
           security: [{ raceSweetSession: [] }],
-          summary: 'Upload a file for an import',
-          tags: ['Files'],
+          summary: "Upload a file for an import",
+          tags: ["Files"],
         },
       },
-      '/api/v1/uploads/{uploadId}': {
+      "/api/v1/uploads/{uploadId}": {
         get: {
-          operationId: 'downloadApplicationFile',
-          parameters: [{ in: 'path', name: 'uploadId', required: true, schema: { type: 'string' } }],
-          responses: { 200: { description: 'Uploaded or generated file.' }, 404: { description: 'File not found.' } },
+          operationId: "downloadApplicationFile",
+          parameters: [
+            {
+              in: "path",
+              name: "uploadId",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            200: { description: "Uploaded or generated file." },
+            404: { description: "File not found." },
+          },
           security: [{ raceSweetSession: [] }],
-          summary: 'Download a managed file',
-          tags: ['Files'],
+          summary: "Download a managed file",
+          tags: ["Files"],
         },
       },
-      '/api/v1/race-admin': {
+      "/api/v1/race-admin": {
         get: {
-          operationId: 'getRaceAdminChanges',
-          responses: { 200: { description: 'Persisted administrative changes.' } },
+          operationId: "getRaceAdminChanges",
+          responses: {
+            200: { description: "Persisted administrative changes." },
+          },
           security: [{ raceSweetSession: [] }],
-          summary: 'Read race administration changes',
-          tags: ['Race administration'],
+          summary: "Read race administration changes",
+          tags: ["Race administration"],
         },
         put: {
-          operationId: 'replaceRaceAdminChanges',
-          responses: { 200: { description: 'Changes persisted and broadcast.' } },
+          operationId: "replaceRaceAdminChanges",
+          responses: {
+            200: { description: "Changes persisted and broadcast." },
+          },
           security: [{ raceSweetSession: [] }],
-          summary: 'Persist race administration changes',
-          tags: ['Race administration'],
+          summary: "Persist race administration changes",
+          tags: ["Race administration"],
         },
       },
-      '/api/v1/system/configuration': {
+      "/api/v1/system/configuration": {
         get: {
-          operationId: 'getSharedSystemConfiguration',
-          responses: { 200: { description: 'Shared configuration with secrets redacted.' } },
+          operationId: "getSharedSystemConfiguration",
+          responses: {
+            200: { description: "Shared configuration with secrets redacted." },
+          },
           security: [{ raceSweetSession: [] }],
-          summary: 'Read shared source configuration',
-          tags: ['System'],
+          summary: "Read shared source configuration",
+          tags: ["System"],
         },
         put: {
-          operationId: 'replaceSharedSystemConfiguration',
-          responses: { 200: { description: 'Configuration persisted and broadcast.' } },
+          operationId: "replaceSharedSystemConfiguration",
+          responses: {
+            200: { description: "Configuration persisted and broadcast." },
+          },
           security: [{ raceSweetSession: [] }],
-          summary: 'Persist shared source configuration',
-          tags: ['System'],
+          summary: "Persist shared source configuration",
+          tags: ["System"],
         },
       },
-      '/api/v1/system/listener': {
+      "/api/v1/system/listener": {
         get: {
-          responses: { 200: { description: 'Active external listener status.' }, 403: { description: 'Administrator role required.' } },
+          responses: {
+            200: { description: "Active external listener status." },
+            403: { description: "Administrator role required." },
+          },
           security: [{ cookieAuth: [] }],
-          summary: 'Read active external HTTP and HTTPS listener status',
+          summary: "Read active external HTTP and HTTPS listener status",
         },
         put: {
-          operationId: 'updateListenerServer',
-          responses: { 200: { description: 'External listeners safely replaced.' }, 403: { description: 'Administrator role required.' } },
+          operationId: "updateListenerServer",
+          responses: {
+            200: { description: "External listeners safely replaced." },
+            403: { description: "Administrator role required." },
+          },
           security: [{ raceSweetSession: [] }],
-          summary: 'Configure external HTTP and HTTPS listeners',
-          tags: ['System'],
+          summary: "Configure external HTTP and HTTPS listeners",
+          tags: ["System"],
         },
       },
-      '/api/v1/catalog/events': {
+      "/api/v1/catalog/events": {
         post: {
-          operationId: 'createEvent',
-          responses: { 200: { description: 'Event created, persisted, and broadcast.' } },
+          operationId: "createEvent",
+          responses: {
+            200: { description: "Event created, persisted, and broadcast." },
+          },
           security: [{ raceSweetSession: [] }],
-          summary: 'Create an event',
-          tags: ['Catalog'],
+          summary: "Create an event",
+          tags: ["Catalog"],
         },
       },
-      '/api/v1/catalog/events/{eventId}': {
+      "/api/v1/catalog/events/{eventId}": {
         delete: {
-          operationId: 'deleteEvent',
-          parameters: [{ in: 'path', name: 'eventId', required: true, schema: { type: 'string' } }],
-          responses: { 200: { description: 'Event deleted.' } },
+          operationId: "deleteEvent",
+          parameters: [
+            {
+              in: "path",
+              name: "eventId",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: { 200: { description: "Event deleted." } },
           security: [{ raceSweetSession: [] }],
-          summary: 'Delete an event',
-          tags: ['Catalog'],
+          summary: "Delete an event",
+          tags: ["Catalog"],
         },
         patch: {
-          operationId: 'updateEvent',
-          parameters: [{ in: 'path', name: 'eventId', required: true, schema: { type: 'string' } }],
-          responses: { 200: { description: 'Event updated.' } },
+          operationId: "updateEvent",
+          parameters: [
+            {
+              in: "path",
+              name: "eventId",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: { 200: { description: "Event updated." } },
           security: [{ raceSweetSession: [] }],
-          summary: 'Update an event',
-          tags: ['Catalog'],
+          summary: "Update an event",
+          tags: ["Catalog"],
         },
       },
-      '/api/v1/catalog/events/{eventId}/activate': {
+      "/api/v1/catalog/events/{eventId}/activate": {
         post: {
-          operationId: 'activateEvent',
-          parameters: [{ in: 'path', name: 'eventId', required: true, schema: { type: 'string' } }],
-          responses: { 200: { description: 'Event activated.' } },
+          operationId: "activateEvent",
+          parameters: [
+            {
+              in: "path",
+              name: "eventId",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: { 200: { description: "Event activated." } },
           security: [{ raceSweetSession: [] }],
-          summary: 'Activate an event',
-          tags: ['Catalog'],
+          summary: "Activate an event",
+          tags: ["Catalog"],
         },
       },
     },
     tags: [
-      { name: 'Application' },
-      { name: 'Authentication' },
-      { name: 'Catalog' },
-      { name: 'Files' },
-      { description: 'Immutable event-catalog ledger replication.', name: 'Mutations' },
-      { name: 'Race administration' },
-      { name: 'System' },
+      { name: "Application" },
+      { name: "Authentication" },
+      { name: "Catalog" },
+      { name: "Files" },
+      {
+        description: "Immutable event-catalog ledger replication.",
+        name: "Mutations",
+      },
+      { name: "Race administration" },
+      { name: "System" },
     ],
   },
 };

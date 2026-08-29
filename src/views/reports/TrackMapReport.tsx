@@ -179,12 +179,21 @@ export const TrackMapReport = (
   );
   const categoryIdByEntrant = React.useMemo(() => {
     const categoryIdByEntrant = new Map<EventEntrantId, string>();
-    const categoryIdByEntry = new Map((props.catalogEntries || [])
-      .filter((entry) => entry.categoryId)
-      .map((entry) => [entry.id, entry.categoryId!.toString()]));
+    const categoryIdByEntry = new Map(
+      (props.catalogEntries || [])
+        .filter((entry) => entry.categoryId)
+        .map((entry) => [entry.id, entry.categoryId!.toString()]),
+    );
     props.raceState.participants.forEach((participant) => {
-      const entrantId = props.raceState.getEntryIdForParticipant?.(participant.id) || getParticipantEntryId(participant);
-      const categoryId = categoryIdByEntry.get(entrantId) || getEffectiveParticipantCategoryId(props.raceState, participant)?.toString();
+      const entrantId =
+        props.raceState.getEntryIdForParticipant?.(participant.id) ||
+        getParticipantEntryId(participant);
+      const categoryId =
+        categoryIdByEntry.get(entrantId) ||
+        getEffectiveParticipantCategoryId(
+          props.raceState,
+          participant,
+        )?.toString();
       if (categoryId) {
         categoryIdByEntrant.set(entrantId, categoryId);
       }
@@ -210,9 +219,12 @@ export const TrackMapReport = (
       props.catalogEntries,
     );
     const selected = entrant.entrantId === selectedEntrantId;
-    const categoryId = props.raceState.participants.find(
-      (participant) => participant.entrantId === entrant.entrantId,
-    )?.categoryId;
+    const categoryColor =
+      props.categoryColors?.get(
+        categoryIdByEntrant.get(entrant.entrantId) || "",
+      ) ||
+      getCategoryColor(categoryIdByEntrant.get(entrant.entrantId)) ||
+      "#1565c0";
     return (
       <g
         aria-label={`Track entrant ${label}`}
@@ -230,7 +242,13 @@ export const TrackMapReport = (
         <circle
           cx={point.x}
           cy={point.y}
-          fill={entrant.estimatedFinalLap ? "#757575" : selected ? "#ffb300" : getCategoryColor(categoryId) || "#1565c0"}
+          fill={
+            entrant.estimatedFinalLap
+              ? "#757575"
+              : selected
+                ? "#ffb300"
+                : categoryColor
+          }
           r={selected ? 3.8 : 3.2}
           stroke="#fff"
           strokeDasharray={entrant.estimatedFinalLap ? "1.2 0.8" : undefined}

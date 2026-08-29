@@ -1,18 +1,29 @@
-import { createServer as createHttpServer, type Server as HttpServer } from 'node:http';
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
-import { createServer as createHttpsServer, type Server as HttpsServer } from 'node:https';
-import type { AddressInfo, Socket } from 'node:net';
-import path from 'node:path';
-import type { EventCatalogState } from '../../catalog/eventCatalog.js';
-import type { EventCatalogMutation } from '../../ledger/eventCatalogLedger.js';
-import type { CategoryId } from '../../processing/category.js';
-import type { EventEntrantId } from '../../model/entrant.js';
-import type { EventId, SessionId } from '../../model/raceevent.js';
-import type { EventTimeRecord, TimeRecord, TimeRecordSource } from '../../model/timerecord.js';
-import { RECORD_TX_CROSSING } from '../../model/timerecord.js';
-import { parseUnparsedChipCrossings } from '../../parsers/genericTimeParser.js';
-import { parseRfidLine } from '../../parsers/rfidtiming/rfidtiming.js';
+import {
+  createServer as createHttpServer,
+  type Server as HttpServer,
+} from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { readFile, stat } from "node:fs/promises";
+import {
+  createServer as createHttpsServer,
+  type Server as HttpsServer,
+} from "node:https";
+import type { AddressInfo, Socket } from "node:net";
+import { randomUUID } from "node:crypto";
+import path from "node:path";
+import type { EventCatalogState } from "../../catalog/eventCatalog.js";
+import type { EventCatalogMutation } from "../../ledger/eventCatalogLedger.js";
+import type { CategoryId } from "../../processing/category.js";
+import type { EventEntrantId } from "../../model/entrant.js";
+import type { EventId, SessionId } from "../../model/raceevent.js";
+import type {
+  EventTimeRecord,
+  TimeRecord,
+  TimeRecordSource,
+} from "../../model/timerecord.js";
+import { RECORD_TX_CROSSING } from "../../model/timerecord.js";
+import { parseUnparsedChipCrossings } from "../../parsers/genericTimeParser.js";
+import { parseRfidLine } from "../../parsers/rfidtiming/rfidtiming.js";
 import type {
   ApiProblem,
   ApplicationBootstrap,
@@ -22,64 +33,71 @@ import type {
   RuntimeCapabilities,
   SetupRequest,
   UserRole,
-} from '../../model/serverApi.js';
+} from "../../model/serverApi.js";
 import {
   NodeJsonEventCatalogPersistence,
   NodeJsonRaceAdminPersistence,
   NodeJsonSystemConfigPersistence,
-} from '../../persistence/nodePersistence.js';
-import type {
-  AdministrativeChanges,
-} from '../../persistence/raceAdminPersistence.js';
-import { EventCatalogService } from '../../service/eventCatalogService.js';
-import { SystemConfigService } from '../../service/systemConfigService.js';
+} from "../../persistence/nodePersistence.js";
+import type { AdministrativeChanges } from "../../persistence/raceAdminPersistence.js";
+import { EventCatalogService } from "../../service/eventCatalogService.js";
+import { SystemConfigService } from "../../service/systemConfigService.js";
 import {
   type ListenerServerConfig,
   type DataSourceConfig,
   type SystemConfiguration,
   getSessionAssignedSourceIds,
   normalizeSystemConfiguration,
-} from '../systemConfig.js';
-import { getOpenApiSpecification } from '../openapi.js';
-import { RESTART_REQUIRED_AFTER } from '../restartVersion.js';
-import { AuthStore } from './authStore.js';
-import { DomainEventHub } from './domainEventHub.js';
-import { UploadStore } from './uploadStore.js';
-import { formatRfidDecoderBytesForDisplay, RfidDecoderListenerService } from './rfidDecoderListenerService.js';
-import { v5 as uuidv5 } from 'uuid';
-import type { IracingCrossingRecord } from '../../utils/iracingRelay.js';
+} from "../systemConfig.js";
+import { getOpenApiSpecification } from "../openapi.js";
+import { RESTART_REQUIRED_AFTER } from "../restartVersion.js";
+import { AuthStore } from "./authStore.js";
+import { DomainEventHub } from "./domainEventHub.js";
+import {
+  type EventReplayCommand,
+  type EventReplayMode,
+  type EventReplayRecord,
+  EventReplayHub,
+} from "./eventReplayHub.js";
+import { UploadStore } from "./uploadStore.js";
+import {
+  formatRfidDecoderBytesForDisplay,
+  RfidDecoderListenerService,
+} from "./rfidDecoderListenerService.js";
+import { v5 as uuidv5 } from "uuid";
+import type { IracingCrossingRecord } from "../../utils/iracingRelay.js";
 
 type ListenerServer = HttpServer | HttpsServer;
 
-const SESSION_COOKIE_NAME: string = 'racesweet_session';
+const SESSION_COOKIE_NAME: string = "racesweet_session";
 const LOGIN_ATTEMPT_WINDOW_MS: number = 60_000;
 const LOGIN_BLOCK_DURATION_MS: number = 5 * 60_000;
 const MAXIMUM_LOGIN_ATTEMPTS: number = 5;
 const requiredSwaggerAssets: string[] = [
-  'swagger-ui.css',
-  'swagger-ui-bundle.js',
-  'swagger-ui-standalone-preset.js',
+  "swagger-ui.css",
+  "swagger-ui-bundle.js",
+  "swagger-ui-standalone-preset.js",
 ];
 const staticContentTypes: Record<string, string> = {
-  '.css': 'text/css; charset=utf-8',
-  '.gif': 'image/gif',
-  '.html': 'text/html; charset=utf-8',
-  '.ico': 'image/x-icon',
-  '.jpeg': 'image/jpeg',
-  '.jpg': 'image/jpeg',
-  '.js': 'application/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.map': 'application/json; charset=utf-8',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
+  ".css": "text/css; charset=utf-8",
+  ".gif": "image/gif",
+  ".html": "text/html; charset=utf-8",
+  ".ico": "image/x-icon",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".js": "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
 };
 
 const rolePermissions: Record<UserRole, string[]> = {
-  admin: ['race:read', 'race:write', 'server:admin', 'users:admin'],
-  operator: ['race:read', 'race:write'],
-  viewer: ['race:read'],
+  admin: ["race:read", "race:write", "server:admin", "users:admin"],
+  operator: ["race:read", "race:write"],
+  viewer: ["race:read"],
 };
 
 export interface RaceSweetApplicationServerOptions {
@@ -109,36 +127,38 @@ const MAXIMUM_JSON_REQUEST_BODY_BYTES: number = 100 * 1024 * 1024;
 const jsonValue = (value: object): JsonValue =>
   JSON.parse(JSON.stringify(value)) as JsonValue;
 
-const readRequestBody = async <TValue>(request: IncomingMessage): Promise<TValue> =>
+const readRequestBody = async <TValue>(
+  request: IncomingMessage,
+): Promise<TValue> =>
   new Promise<TValue>((resolve, reject): void => {
-    let body: string = '';
-    request.setEncoding('utf8');
-    request.on('data', (chunk: string): void => {
+    let body: string = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk: string): void => {
       body += chunk;
-      if (Buffer.byteLength(body, 'utf8') > MAXIMUM_JSON_REQUEST_BODY_BYTES) {
-        reject(new Error('Request body exceeds the 100 MiB JSON limit.'));
+      if (Buffer.byteLength(body, "utf8") > MAXIMUM_JSON_REQUEST_BODY_BYTES) {
+        reject(new Error("Request body exceeds the 100 MiB JSON limit."));
         request.destroy();
       }
     });
-    request.on('end', (): void => {
+    request.on("end", (): void => {
       try {
-        resolve(JSON.parse(body || '{}') as TValue);
+        resolve(JSON.parse(body || "{}") as TValue);
       } catch (error: unknown) {
         reject(error);
       }
     });
-    request.on('error', reject);
+    request.on("error", reject);
   });
 
 const parseCookies = (header: string | undefined): Record<string, string> =>
   Object.fromEntries(
-    (header || '')
-      .split(';')
-      .map((item: string): string[] => item.trim().split('='))
+    (header || "")
+      .split(";")
+      .map((item: string): string[] => item.trim().split("="))
       .filter((item: string[]): boolean => item.length >= 2)
       .map((item: string[]): [string, string] => [
-        item[0] || '',
-        decodeURIComponent(item.slice(1).join('=')),
+        item[0] || "",
+        decodeURIComponent(item.slice(1).join("=")),
       ]),
   );
 
@@ -148,14 +168,20 @@ const sendJson = (
   value: object,
   headers: Record<string, string> = {},
 ): void => {
-  response.writeHead(status, {
-    'cache-control': 'no-store',
-    'content-type': 'application/json; charset=utf-8',
-    ...headers,
-  }).end(JSON.stringify(value));
+  response
+    .writeHead(status, {
+      "cache-control": "no-store",
+      "content-type": "application/json; charset=utf-8",
+      ...headers,
+    })
+    .end(JSON.stringify(value));
 };
 
-const sendProblem = (response: ServerResponse, status: number, error: string): void => {
+const sendProblem = (
+  response: ServerResponse,
+  status: number,
+  error: string,
+): void => {
   sendJson(response, status, { error, status } satisfies ApiProblem);
 };
 
@@ -164,10 +190,12 @@ const sendHtml = (
   status: number,
   html: string | Buffer,
 ): void => {
-  response.writeHead(status, {
-    'cache-control': 'no-store',
-    'content-type': 'text/html; charset=utf-8',
-  }).end(html);
+  response
+    .writeHead(status, {
+      "cache-control": "no-store",
+      "content-type": "text/html; charset=utf-8",
+    })
+    .end(html);
 };
 
 const getUnavailablePage = (
@@ -197,33 +225,38 @@ const getUnavailablePage = (
 
 const getLocalScriptPaths = (html: string): string[] =>
   Array.from(html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/giu))
-    .map((match: RegExpMatchArray): string => match[1] || '')
-    .filter((source: string): boolean =>
-      source.length > 0 &&
-      !/^(?:data:|https?:|\/\/)/iu.test(source),
+    .map((match: RegExpMatchArray): string => match[1] || "")
+    .filter(
+      (source: string): boolean =>
+        source.length > 0 && !/^(?:data:|https?:|\/\/)/iu.test(source),
     )
-    .map((source: string): string => new URL(source, 'http://localhost/').pathname);
+    .map(
+      (source: string): string => new URL(source, "http://localhost/").pathname,
+    );
 
 const isStaticAssetRequest = (requestPath: string): boolean =>
-  path.posix.extname(requestPath) !== '';
+  path.posix.extname(requestPath) !== "";
 
 const applicationAssetCacheControl = (requestPath: string): string =>
   /(?:^|[.-])[a-f0-9]{8,}(?:[.-]|$)/iu.test(path.posix.basename(requestPath))
-    ? 'public, max-age=31536000, immutable'
-    : 'no-cache';
+    ? "public, max-age=31536000, immutable"
+    : "no-cache";
 
 const setSecurityHeaders = (response: ServerResponse): void => {
-  response.setHeader('content-security-policy', [
-    "default-src 'self'",
-    "connect-src 'self'",
-    "font-src 'self' data:",
-    "img-src 'self' data:",
-    "script-src 'self' 'unsafe-inline'",
-    "style-src 'self' 'unsafe-inline'",
-  ].join('; '));
-  response.setHeader('referrer-policy', 'same-origin');
-  response.setHeader('x-content-type-options', 'nosniff');
-  response.setHeader('x-frame-options', 'DENY');
+  response.setHeader(
+    "content-security-policy",
+    [
+      "default-src 'self'",
+      "connect-src 'self'",
+      "font-src 'self' data:",
+      "img-src 'self' data:",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+    ].join("; "),
+  );
+  response.setHeader("referrer-policy", "same-origin");
+  response.setHeader("x-content-type-options", "nosniff");
+  response.setHeader("x-frame-options", "DENY");
 };
 
 const getSwaggerUiHtml = (): string => `<!doctype html>
@@ -254,20 +287,21 @@ const getSwaggerUiInit = (): string => `window.onload = function () {
 
 const closeServer = async (server: ListenerServer): Promise<void> =>
   new Promise<void>((resolve, reject): void => {
-    server.close((error?: Error): void => error ? reject(error) : resolve());
+    server.close((error?: Error): void => (error ? reject(error) : resolve()));
   });
 
 const listen = async (
   server: ListenerServer,
   port: number,
   host?: string,
-): Promise<number> => new Promise<number>((resolve, reject): void => {
-  server.once('error', reject);
-  server.listen(port, host, (): void => {
-    server.off('error', reject);
-    resolve((server.address() as AddressInfo).port);
+): Promise<number> =>
+  new Promise<number>((resolve, reject): void => {
+    server.once("error", reject);
+    server.listen(port, host, (): void => {
+      server.off("error", reject);
+      resolve((server.address() as AddressInfo).port);
+    });
   });
-});
 
 const listenerConfigsEqual = (
   left: ListenerServerConfig,
@@ -279,17 +313,21 @@ const listenerConfigsEqual = (
   left.httpsPort === right.httpsPort &&
   left.privateKeyPath === right.privateKeyPath;
 
-const listeningPort = (server: ListenerServer | undefined): number | undefined => {
+const listeningPort = (
+  server: ListenerServer | undefined,
+): number | undefined => {
   if (!server?.listening) {
     return undefined;
   }
   const address: AddressInfo | string | null = server.address();
-  return typeof address === 'object' && address !== null ? address.port : undefined;
+  return typeof address === "object" && address !== null
+    ? address.port
+    : undefined;
 };
 
 const safeConfiguration = (
   config: SystemConfiguration,
-): ApplicationBootstrap['systemConfiguration'] => ({
+): ApplicationBootstrap["systemConfiguration"] => ({
   dataSources: config.dataSources.map((source) => ({
     enabled: source.enabled,
     id: source.id,
@@ -300,14 +338,16 @@ const safeConfiguration = (
   sessionSourceAssignments: config.sessionSourceAssignments,
 });
 
-const sharedConfigurationForClient = (config: SystemConfiguration): SystemConfiguration => ({
+const sharedConfigurationForClient = (
+  config: SystemConfiguration,
+): SystemConfiguration => ({
   ...config,
   dataSources: config.dataSources.map((source) => ({
     ...source,
     apiConfig: source.apiConfig
       ? {
           ...source.apiConfig,
-          authHeaderValue: '',
+          authHeaderValue: "",
         }
       : undefined,
   })),
@@ -315,20 +355,39 @@ const sharedConfigurationForClient = (config: SystemConfiguration): SystemConfig
   remoteServer: undefined,
 });
 
-const requestProtocol = (request: IncomingMessage): 'http' | 'https' =>
-  request.socket && 'encrypted' in request.socket ? 'https' : 'http';
+const requestProtocol = (request: IncomingMessage): "http" | "https" =>
+  request.socket && "encrypted" in request.socket ? "https" : "http";
 
 const isMutationMethod = (method: string | undefined): boolean =>
-  method !== undefined && !['GET', 'HEAD', 'OPTIONS'].includes(method);
+  method !== undefined && !["GET", "HEAD", "OPTIONS"].includes(method);
+
+const getReplayMode = (value: string | null): EventReplayMode => {
+  if (value === null || value === "replay") {
+    return "replay";
+  }
+  if (value === "live") {
+    return value;
+  }
+  throw new Error('Replay mode must be "live" or "replay".');
+};
+
+const getReplaySpeed = (value: string | null): number => {
+  if (value === null || value === "") {
+    return 1;
+  }
+  const speed: number = Number(value);
+  if (!Number.isFinite(speed) || speed < 0.01 || speed > 1_000) {
+    throw new Error("Replay speed must be a number between 0.01 and 1000.");
+  }
+  return speed;
+};
 
 const resolveDevelopmentAssetUrl = (
   assetSource: string,
   requestPath: string,
 ): URL => {
   const baseUrl: URL = new URL(assetSource);
-  return requestPath === '/'
-    ? baseUrl
-    : new URL(requestPath, baseUrl.origin);
+  return requestPath === "/" ? baseUrl : new URL(requestPath, baseUrl.origin);
 };
 
 export class RaceSweetApplicationServer {
@@ -337,6 +396,7 @@ export class RaceSweetApplicationServer {
   private commandQueue: Promise<void> = Promise.resolve();
   private readonly dataDirectory: string;
   private readonly eventHub: DomainEventHub;
+  private readonly eventReplayHub = new EventReplayHub();
   private readonly externalAssetSource: string | undefined;
   private activeListenerConfig: ListenerServerConfig | undefined;
   private eventCatalogService: EventCatalogService | undefined;
@@ -355,39 +415,54 @@ export class RaceSweetApplicationServer {
   public constructor(options: RaceSweetApplicationServerOptions) {
     this.assetSource = options.assetSource;
     this.dataDirectory = options.dataDirectory;
-    this.externalAssetSource = options.externalAssetSource === null
-      ? undefined
-      : options.externalAssetSource || options.assetSource;
-    this.authStore = new AuthStore(path.join(options.dataDirectory, 'users.json'));
+    this.externalAssetSource =
+      options.externalAssetSource === null
+        ? undefined
+        : options.externalAssetSource || options.assetSource;
+    this.authStore = new AuthStore(
+      path.join(options.dataDirectory, "users.json"),
+    );
     this.eventHub = new DomainEventHub(options.eventRetention);
     this.launchedVersion = RESTART_REQUIRED_AFTER;
     this.raceAdminPersistence = new NodeJsonRaceAdminPersistence(
-      path.join(options.dataDirectory, 'admin-overrides.json'),
+      path.join(options.dataDirectory, "admin-overrides.json"),
     );
     this.rfidDecoderListeners = new RfidDecoderListenerService({
       onData: async (source: DataSourceConfig, data: Buffer): Promise<void> => {
         this.eventHub.publish(
-          'source',
-          'source.rfid-decoder-data',
-          jsonValue({ data: formatRfidDecoderBytesForDisplay(data), sourceId: source.id }),
+          "source",
+          "source.rfid-decoder-data",
+          jsonValue({
+            data: formatRfidDecoderBytesForDisplay(data),
+            sourceId: source.id,
+          }),
         );
       },
       onLines: (source, lines) => this.acceptRfidDecoderLines(source, lines),
     });
-    this.swaggerAssetDirectory = options.swaggerAssetDirectory ||
-      path.resolve('node_modules', 'swagger-ui-dist');
-    this.uploadStore = new UploadStore(path.join(options.dataDirectory, 'uploads'));
+    this.swaggerAssetDirectory =
+      options.swaggerAssetDirectory ||
+      path.resolve("node_modules", "swagger-ui-dist");
+    this.uploadStore = new UploadStore(
+      path.join(options.dataDirectory, "uploads"),
+    );
   }
 
   public initialize = async (): Promise<void> => {
     await this.authStore.initialize();
     this.eventCatalogService = await EventCatalogService.create(
-      new NodeJsonEventCatalogPersistence(path.join(this.dataDirectory, 'event-catalog.json')),
+      new NodeJsonEventCatalogPersistence(
+        path.join(this.dataDirectory, "event-catalog.json"),
+      ),
     );
     this.systemConfigService = await SystemConfigService.create(
-      new NodeJsonSystemConfigPersistence(path.join(this.dataDirectory, 'system-config.json')),
+      new NodeJsonSystemConfigPersistence(
+        path.join(this.dataDirectory, "system-config.json"),
+      ),
     );
-    await this.rfidDecoderListeners.reload(this.systemConfigService.state.dataSources);
+    await this.rfidDecoderListeners.reload(
+      this.systemConfigService.state.dataSources,
+    );
   };
 
   public get listenerConfig(): ListenerServerConfig {
@@ -404,21 +479,22 @@ export class RaceSweetApplicationServer {
         port: address.port,
       };
     }
-    this.internalServer = createHttpServer((
-      request: IncomingMessage,
-      response: ServerResponse,
-    ): void => {
-      void this.handleRequest(request, response, this.assetSource);
-    });
+    this.internalServer = createHttpServer(
+      (request: IncomingMessage, response: ServerResponse): void => {
+        void this.handleRequest(request, response, this.assetSource);
+      },
+    );
     this.trackSockets(this.internalServer);
-    const port: number = await listen(this.internalServer, 0, '127.0.0.1');
+    const port: number = await listen(this.internalServer, 0, "127.0.0.1");
     return {
       origin: `http://127.0.0.1:${port}`,
       port,
     };
   };
 
-  public reloadExternal = async (config: ListenerServerConfig): Promise<void> => {
+  public reloadExternal = async (
+    config: ListenerServerConfig,
+  ): Promise<void> => {
     if (
       this.activeListenerConfig &&
       listenerConfigsEqual(this.activeListenerConfig, config)
@@ -431,16 +507,24 @@ export class RaceSweetApplicationServer {
       if (listeningPort(this.externalHttpServer) === config.httpPort) {
         nextHttpServer = this.externalHttpServer;
       } else {
-        nextHttpServer = createHttpServer((
-          request: IncomingMessage,
-          response: ServerResponse,
-        ): void => {
-          void this.handleRequest(request, response, this.externalAssetSource);
-        });
+        nextHttpServer = createHttpServer(
+          (request: IncomingMessage, response: ServerResponse): void => {
+            void this.handleRequest(
+              request,
+              response,
+              this.externalAssetSource,
+            );
+          },
+        );
         this.trackSockets(nextHttpServer);
       }
     }
-    if (config.enabled && config.httpsPort && config.certificatePath && config.privateKeyPath) {
+    if (
+      config.enabled &&
+      config.httpsPort &&
+      config.certificatePath &&
+      config.privateKeyPath
+    ) {
       const secureContext: { cert: Buffer; key: Buffer } = {
         cert: await readFile(config.certificatePath),
         key: await readFile(config.privateKeyPath),
@@ -449,12 +533,16 @@ export class RaceSweetApplicationServer {
         this.externalHttpsServer!.setSecureContext(secureContext);
         nextHttpsServer = this.externalHttpsServer;
       } else {
-        nextHttpsServer = createHttpsServer(secureContext, (
-          request: IncomingMessage,
-          response: ServerResponse,
-        ): void => {
-          void this.handleRequest(request, response, this.externalAssetSource);
-        });
+        nextHttpsServer = createHttpsServer(
+          secureContext,
+          (request: IncomingMessage, response: ServerResponse): void => {
+            void this.handleRequest(
+              request,
+              response,
+              this.externalAssetSource,
+            );
+          },
+        );
         this.trackSockets(nextHttpsServer);
       }
     }
@@ -466,10 +554,15 @@ export class RaceSweetApplicationServer {
         ? listen(nextHttpsServer, config.httpsPort)
         : undefined,
     ]);
-    const previous: ListenerServer[] = [this.externalHttpServer, this.externalHttpsServer]
-      .filter((server: ListenerServer | undefined): server is ListenerServer =>
-        server !== undefined && server !== nextHttpServer && server !== nextHttpsServer,
-      );
+    const previous: ListenerServer[] = [
+      this.externalHttpServer,
+      this.externalHttpsServer,
+    ].filter(
+      (server: ListenerServer | undefined): server is ListenerServer =>
+        server !== undefined &&
+        server !== nextHttpServer &&
+        server !== nextHttpsServer,
+    );
     this.externalHttpServer = nextHttpServer;
     this.externalHttpsServer = nextHttpsServer;
     this.activeListenerConfig = { ...config };
@@ -478,24 +571,30 @@ export class RaceSweetApplicationServer {
 
   public close = async (): Promise<void> => {
     this.eventHub.close();
+    this.eventReplayHub.close();
     await this.rfidDecoderListeners.close();
     await this.uploadStore.close();
     const servers: ListenerServer[] = [
       this.internalServer,
       this.externalHttpServer,
       this.externalHttpsServer,
-    ].filter((server: ListenerServer | undefined): server is ListenerServer => server !== undefined);
+    ].filter(
+      (server: ListenerServer | undefined): server is ListenerServer =>
+        server !== undefined,
+    );
     this.sockets.forEach((socket: Socket): void => {
       socket.destroy();
     });
     this.sockets.clear();
-    await Promise.all(servers.map(closeServer).map((closing: Promise<void>): Promise<void> =>
-      closing.catch((error: Error): void => {
-        if (!error.message.includes('Server is not running')) {
-          throw error;
-        }
-      }),
-    ));
+    await Promise.all(
+      servers.map(closeServer).map((closing: Promise<void>): Promise<void> =>
+        closing.catch((error: Error): void => {
+          if (!error.message.includes("Server is not running")) {
+            throw error;
+          }
+        }),
+      ),
+    );
     this.internalServer = undefined;
     this.externalHttpServer = undefined;
     this.externalHttpsServer = undefined;
@@ -522,55 +621,73 @@ export class RaceSweetApplicationServer {
       const sourceNamespace: string = uuidv5(source.id, uuidv5.URL);
 
       for (const target of targets) {
-        const event = catalog.events.find((candidate) => candidate.id === target.eventId);
+        const event = catalog.events.find(
+          (candidate) => candidate.id === target.eventId,
+        );
         if (!event) {
           continue;
         }
         const eventDate: Date = new Date(`${event.date}T00:00:00`);
         if (Number.isNaN(eventDate.getTime())) {
-          throw new Error(`RFID decoder source "${source.name}" cannot use event "${event.name}" because its date is invalid.`);
+          throw new Error(
+            `RFID decoder source "${source.name}" cannot use event "${event.name}" because its date is invalid.`,
+          );
         }
 
-        const existingRaceState = this.eventCatalogService!.getImportedRaceState(
-          event.id,
-          target.id,
-        ) || {};
+        const existingRaceState =
+          this.eventCatalogService!.getImportedRaceState(event.id, target.id) ||
+          {};
         const existingRecords: TimeRecord[] = existingRaceState.records || [];
-        const parsedRecords: EventTimeRecord[] = lines.flatMap((line: string, index: number): EventTimeRecord[] => {
-          try {
-            const parsed: TimeRecord | undefined = parseUnparsedChipCrossings(
-              eventDate,
-              [parseRfidLine(line, sourceNamespace)],
-            )[0];
-            return parsed ? [{
-              ...parsed,
-              eventId: event.id,
-              recordType: RECORD_TX_CROSSING,
-              sequence: existingRecords.length + index,
-              sessionId: target.id,
-              source: source.id,
-            }] : [];
-          } catch (error: unknown) {
-            console.warn(`Ignoring invalid RFID decoder line from source "${source.name}": ${error instanceof Error ? error.message : String(error)}`);
-            return [];
-          }
-        });
-        const existingRecordIds = new Set(existingRecords.map((record: TimeRecord): string => record.id));
-        const newRecords: TimeRecord[] = parsedRecords.filter((record: TimeRecord): boolean => {
-          if (existingRecordIds.has(record.id)) {
-            return false;
-          }
-          existingRecordIds.add(record.id);
-          return true;
-        });
+        const parsedRecords: EventTimeRecord[] = lines.flatMap(
+          (line: string, index: number): EventTimeRecord[] => {
+            try {
+              const parsed: TimeRecord | undefined = parseUnparsedChipCrossings(
+                eventDate,
+                [parseRfidLine(line, sourceNamespace)],
+              )[0];
+              return parsed
+                ? [
+                    {
+                      ...parsed,
+                      eventId: event.id,
+                      recordType: RECORD_TX_CROSSING,
+                      sequence: existingRecords.length + index,
+                      sessionId: target.id,
+                      source: source.id,
+                    },
+                  ]
+                : [];
+            } catch (error: unknown) {
+              console.warn(
+                `Ignoring invalid RFID decoder line from source "${source.name}": ${error instanceof Error ? error.message : String(error)}`,
+              );
+              return [];
+            }
+          },
+        );
+        const existingRecordIds = new Set(
+          existingRecords.map((record: TimeRecord): string => record.id),
+        );
+        const newRecords: TimeRecord[] = parsedRecords.filter(
+          (record: TimeRecord): boolean => {
+            if (existingRecordIds.has(record.id)) {
+              return false;
+            }
+            existingRecordIds.add(record.id);
+            return true;
+          },
+        );
         if (newRecords.length === 0) {
           continue;
         }
         const timeRecordSources: TimeRecordSource[] = [
           ...(existingRaceState.timeRecordSources || []),
           ...((existingRaceState.timeRecordSources || []).some(
-            (recordSource: TimeRecordSource): boolean => recordSource.name === source.name,
-          ) ? [] : [{ id: source.id, name: source.name }]),
+            (recordSource: TimeRecordSource): boolean =>
+              recordSource.name === source.name,
+          )
+            ? []
+            : [{ id: source.id, name: source.name }]),
         ];
         await this.eventCatalogService!.updateImportedRaceState(
           event.id,
@@ -581,24 +698,37 @@ export class RaceSweetApplicationServer {
             timeRecordSources,
           },
         );
+        newRecords.forEach((record: TimeRecord): void => {
+          this.eventReplayHub.publish({
+            eventId: event.id,
+            record,
+            sessionId: target.id,
+          });
+        });
       }
 
-      const mutations: EventCatalogMutation[] = this.eventCatalogService!.mutations.slice(beforeCount);
+      const mutations: EventCatalogMutation[] =
+        this.eventCatalogService!.mutations.slice(beforeCount);
       if (mutations.length > 0) {
         this.eventHub.publish(
-          'catalog',
-          'catalog.mutations-applied',
+          "catalog",
+          "catalog.mutations-applied",
           jsonValue({ mutations }),
         );
       }
     });
   };
 
-  private acceptIracingCrossings = async (sourceId: string, sessionId: string, crossings: IracingCrossingRecord[]): Promise<number> => {
-    const source: DataSourceConfig | undefined = this.systemConfigService!.state.dataSources.find(
-      (candidate: DataSourceConfig): boolean => candidate.id === sourceId,
-    );
-    if (!source || source.type !== 'timing-iracing-agent') {
+  private acceptIracingCrossings = async (
+    sourceId: string,
+    sessionId: string,
+    crossings: IracingCrossingRecord[],
+  ): Promise<number> => {
+    const source: DataSourceConfig | undefined =
+      this.systemConfigService!.state.dataSources.find(
+        (candidate: DataSourceConfig): boolean => candidate.id === sourceId,
+      );
+    if (!source || source.type !== "timing-iracing-agent") {
       throw new Error(`iRacing source "${sourceId}" was not found.`);
     }
     const catalog = this.eventCatalogService!.catalog;
@@ -606,52 +736,85 @@ export class RaceSweetApplicationServer {
     const beforeCount: number = this.eventCatalogService!.mutations.length;
     await this.enqueueCommand(async (): Promise<void> => {
       const sourceNamespace: string = uuidv5(source.id, uuidv5.URL);
-      const requestedSessionId: string | undefined = sessionId === 'active' ? catalog.activeSessionId : sessionId;
-      const targets = catalog.sessions.filter((session) => session.id === requestedSessionId && getSessionAssignedSourceIds(
-          this.systemConfigService!.state,
-          session.eventId,
-          session.id,
-        ).includes(source.id));
+      const requestedSessionId: string | undefined =
+        sessionId === "active" ? catalog.activeSessionId : sessionId;
+      const targets = catalog.sessions.filter(
+        (session) =>
+          session.id === requestedSessionId &&
+          getSessionAssignedSourceIds(
+            this.systemConfigService!.state,
+            session.eventId,
+            session.id,
+          ).includes(source.id),
+      );
       for (const target of targets) {
-        const event = catalog.events.find((candidate) => candidate.id === target.eventId);
+        const event = catalog.events.find(
+          (candidate) => candidate.id === target.eventId,
+        );
         if (!event) {
           continue;
         }
-        const existingRaceState = this.eventCatalogService!.getImportedRaceState(event.id, target.id) || {};
+        const existingRaceState =
+          this.eventCatalogService!.getImportedRaceState(event.id, target.id) ||
+          {};
         const existingRecords: TimeRecord[] = existingRaceState.records || [];
-        const existingRecordIds: Set<string> = new Set(existingRecords.map((record: TimeRecord): string => record.id));
+        const existingRecordIds: Set<string> = new Set(
+          existingRecords.map((record: TimeRecord): string => record.id),
+        );
         const newRecords: EventTimeRecord[] = crossings
-          .filter((crossing: IracingCrossingRecord): boolean => !existingRecordIds.has(uuidv5(crossing.id, sourceNamespace)))
-          .map((crossing: IracingCrossingRecord, index: number): EventTimeRecord & { chipCode: number } => ({
-            ...crossing,
-            eventId: event.id,
-            id: uuidv5(crossing.id, sourceNamespace),
-            sequence: existingRecords.length + index,
-            sessionId: target.id,
-            source: source.id,
-            time: new Date(crossing.time),
-          }));
+          .filter(
+            (crossing: IracingCrossingRecord): boolean =>
+              !existingRecordIds.has(uuidv5(crossing.id, sourceNamespace)),
+          )
+          .map(
+            (
+              crossing: IracingCrossingRecord,
+              index: number,
+            ): EventTimeRecord & { chipCode: number } => ({
+              ...crossing,
+              eventId: event.id,
+              id: uuidv5(crossing.id, sourceNamespace),
+              sequence: existingRecords.length + index,
+              sessionId: target.id,
+              source: source.id,
+              time: new Date(crossing.time),
+            }),
+          );
         if (newRecords.length === 0) {
           continue;
         }
         acceptedCount += newRecords.length;
-        await this.eventCatalogService!.updateImportedRaceState(event.id, target.id, {
-          ...existingRaceState,
-          records: [...existingRecords, ...newRecords],
-          timeRecordSources: [
-            ...(existingRaceState.timeRecordSources || []),
-            ...((existingRaceState.timeRecordSources || []).some((recordSource): boolean => recordSource.id === source.id)
-              ? []
-              : [{ id: source.id, name: source.name }]),
-          ],
+        await this.eventCatalogService!.updateImportedRaceState(
+          event.id,
+          target.id,
+          {
+            ...existingRaceState,
+            records: [...existingRecords, ...newRecords],
+            timeRecordSources: [
+              ...(existingRaceState.timeRecordSources || []),
+              ...((existingRaceState.timeRecordSources || []).some(
+                (recordSource): boolean => recordSource.id === source.id,
+              )
+                ? []
+                : [{ id: source.id, name: source.name }]),
+            ],
+          },
+        );
+        newRecords.forEach((record: EventTimeRecord): void => {
+          this.eventReplayHub.publish({
+            eventId: event.id,
+            record,
+            sessionId: target.id,
+          });
         });
       }
     });
-    const mutations: EventCatalogMutation[] = this.eventCatalogService!.mutations.slice(beforeCount);
+    const mutations: EventCatalogMutation[] =
+      this.eventCatalogService!.mutations.slice(beforeCount);
     if (mutations.length > 0) {
       this.eventHub.publish(
-        'catalog',
-        'catalog.mutations-applied',
+        "catalog",
+        "catalog.mutations-applied",
         jsonValue({ mutations }),
       );
     }
@@ -661,7 +824,9 @@ export class RaceSweetApplicationServer {
   private activeListenerStatus = (): ListenerServerConfig => {
     const configured: ListenerServerConfig = this.listenerConfig;
     const httpPort: number | undefined = listeningPort(this.externalHttpServer);
-    const httpsPort: number | undefined = listeningPort(this.externalHttpsServer);
+    const httpsPort: number | undefined = listeningPort(
+      this.externalHttpsServer,
+    );
     return {
       enabled: httpPort !== undefined || httpsPort !== undefined,
       httpPort: httpPort ?? configured.httpPort,
@@ -671,21 +836,27 @@ export class RaceSweetApplicationServer {
 
   private assertInitialized = (): void => {
     if (!this.eventCatalogService || !this.systemConfigService) {
-      throw new Error('RaceSweetApplicationServer.initialize() must complete before the server starts.');
+      throw new Error(
+        "RaceSweetApplicationServer.initialize() must complete before the server starts.",
+      );
     }
   };
 
   private trackSockets = (server: ListenerServer): void => {
-    server.on('connection', (socket: Socket): void => {
+    server.on("connection", (socket: Socket): void => {
       this.sockets.add(socket);
-      socket.once('close', (): void => {
+      socket.once("close", (): void => {
         this.sockets.delete(socket);
       });
     });
   };
 
-  private authenticatedUser = (request: IncomingMessage): AuthenticatedUser | undefined => {
-    const token: string | undefined = parseCookies(request.headers.cookie)[SESSION_COOKIE_NAME];
+  private authenticatedUser = (
+    request: IncomingMessage,
+  ): AuthenticatedUser | undefined => {
+    const token: string | undefined = parseCookies(request.headers.cookie)[
+      SESSION_COOKIE_NAME
+    ];
     return this.authStore.getUserForSession(token);
   };
 
@@ -696,11 +867,15 @@ export class RaceSweetApplicationServer {
   ): AuthenticatedUser | undefined => {
     const user: AuthenticatedUser | undefined = this.authenticatedUser(request);
     if (!user) {
-      sendProblem(response, 401, 'Authentication is required.');
+      sendProblem(response, 401, "Authentication is required.");
       return undefined;
     }
     if (!rolePermissions[user.role].includes(permission)) {
-      sendProblem(response, 403, 'Your RaceSweet role does not permit this operation.');
+      sendProblem(
+        response,
+        403,
+        "Your RaceSweet role does not permit this operation.",
+      );
       return undefined;
     }
     return user;
@@ -712,13 +887,17 @@ export class RaceSweetApplicationServer {
       return true;
     }
     const host: string | undefined = request.headers.host;
-    return host !== undefined && origin === `${requestProtocol(request)}://${host}`;
+    return (
+      host !== undefined && origin === `${requestProtocol(request)}://${host}`
+    );
   };
 
   private getLoginAttemptKey = (request: IncomingMessage): string =>
-    request.socket.remoteAddress || 'unknown';
+    request.socket.remoteAddress || "unknown";
 
-  private getLoginRetrySeconds = (request: IncomingMessage): number | undefined => {
+  private getLoginRetrySeconds = (
+    request: IncomingMessage,
+  ): number | undefined => {
     const now: number = Date.now();
     const key: string = this.getLoginAttemptKey(request);
     const state: LoginAttemptState | undefined = this.loginAttempts.get(key);
@@ -739,13 +918,18 @@ export class RaceSweetApplicationServer {
     return undefined;
   };
 
-  private recordLoginFailure = (request: IncomingMessage): number | undefined => {
+  private recordLoginFailure = (
+    request: IncomingMessage,
+  ): number | undefined => {
     const now: number = Date.now();
     const key: string = this.getLoginAttemptKey(request);
-    const current: LoginAttemptState = this.loginAttempts.get(key) || { failures: [] };
+    const current: LoginAttemptState = this.loginAttempts.get(key) || {
+      failures: [],
+    };
     const failures: number[] = [
       ...current.failures.filter(
-        (timestamp: number): boolean => now - timestamp < LOGIN_ATTEMPT_WINDOW_MS,
+        (timestamp: number): boolean =>
+          now - timestamp < LOGIN_ATTEMPT_WINDOW_MS,
       ),
       now,
     ];
@@ -768,24 +952,35 @@ export class RaceSweetApplicationServer {
     assetSource: string | undefined,
   ): Promise<void> => {
     setSecurityHeaders(response);
-    const url: URL = new URL(request.url || '/', 'http://localhost');
+    const url: URL = new URL(request.url || "/", "http://localhost");
     try {
-      if (url.pathname.startsWith('/api/')) {
-        if (isMutationMethod(request.method) && !this.validRequestOrigin(request)) {
-          sendProblem(response, 403, 'The request origin does not match this RaceSweet server.');
+      if (url.pathname.startsWith("/api/")) {
+        if (
+          isMutationMethod(request.method) &&
+          !this.validRequestOrigin(request)
+        ) {
+          sendProblem(
+            response,
+            403,
+            "The request origin does not match this RaceSweet server.",
+          );
           return;
         }
         await this.handleApiRequest(request, response, url);
         return;
       }
-      if (url.pathname === '/api') {
+      if (url.pathname === "/api") {
         await this.serveSwaggerDocumentation(response);
         return;
       }
       await this.serveApplication(url.pathname, response, assetSource);
     } catch (error: unknown) {
       if (!response.headersSent) {
-        sendProblem(response, 400, error instanceof Error ? error.message : String(error));
+        sendProblem(
+          response,
+          400,
+          error instanceof Error ? error.message : String(error),
+        );
       } else if (!response.writableEnded) {
         response.end();
       }
@@ -797,95 +992,261 @@ export class RaceSweetApplicationServer {
     response: ServerResponse,
     url: URL,
   ): Promise<void> => {
-    if (request.method === 'GET' && url.pathname === '/api/v1/runtime-version') {
+    if (
+      request.method === "GET" &&
+      url.pathname === "/api/v1/runtime-version"
+    ) {
       sendJson(response, 200, { launchedVersion: this.launchedVersion });
       return;
     }
-    if (request.method === 'GET' && url.pathname === '/api/openapi.json') {
+    if (request.method === "GET" && url.pathname === "/api/openapi.json") {
       sendJson(response, 200, getOpenApiSpecification());
       return;
     }
-    if (request.method === 'GET' && url.pathname.startsWith('/api/swagger-ui/')) {
+    if (
+      request.method === "GET" &&
+      url.pathname.startsWith("/api/swagger-ui/")
+    ) {
       await this.serveSwaggerAsset(url.pathname, response);
       return;
     }
-    if (url.pathname.startsWith('/api/v1/auth/')) {
+    if (url.pathname.startsWith("/api/v1/auth/")) {
       await this.handleAuthentication(request, response, url);
       return;
     }
 
-    if (request.method === 'GET' && url.pathname === '/api/v1/bootstrap') {
-      const user: AuthenticatedUser | undefined = this.requireUser(request, response, 'race:read');
+    if (request.method === "GET" && url.pathname === "/api/v1/bootstrap") {
+      const user: AuthenticatedUser | undefined = this.requireUser(
+        request,
+        response,
+        "race:read",
+      );
       if (!user) {
         return;
       }
-      const runtime: RuntimeCapabilities['runtime'] = url.searchParams.get('runtime') === 'electron'
-        ? 'electron'
-        : 'web';
+      const runtime: RuntimeCapabilities["runtime"] =
+        url.searchParams.get("runtime") === "electron" ? "electron" : "web";
       sendJson(response, 200, this.createBootstrap(user, runtime));
       return;
     }
-    if (request.method === 'GET' && url.pathname === '/api/v1/events') {
-      const user: AuthenticatedUser | undefined = this.requireUser(request, response, 'race:read');
+    if (request.method === "GET" && url.pathname === "/api/v1/events") {
+      const user: AuthenticatedUser | undefined = this.requireUser(
+        request,
+        response,
+        "race:read",
+      );
       if (!user) {
         return;
       }
       const dispose: () => void = this.eventHub.subscribe(
         response,
-        Array.isArray(request.headers['last-event-id'])
-          ? request.headers['last-event-id'][0]
-          : request.headers['last-event-id'] || url.searchParams.get('cursor') || undefined,
+        Array.isArray(request.headers["last-event-id"])
+          ? request.headers["last-event-id"][0]
+          : request.headers["last-event-id"] ||
+              url.searchParams.get("cursor") ||
+              undefined,
       );
-      response.once('close', dispose);
+      response.once("close", dispose);
       return;
     }
-    if (url.pathname === '/api/v1/mutations') {
+    if (request.method === "GET" && url.pathname === "/api/v1/reports/replay") {
+      await this.handleEventReplay(request, response, url);
+      return;
+    }
+    if (
+      request.method === "POST" &&
+      url.pathname === "/api/v1/reports/replay/control"
+    ) {
+      await this.handleEventReplayControl(request, response);
+      return;
+    }
+    if (url.pathname === "/api/v1/mutations") {
       await this.handleMutations(request, response, url);
       return;
     }
-    if (url.pathname === '/api/v1/timing/crossing') {
-      const user: AuthenticatedUser | undefined = this.requireUser(request, response, 'race:write');
+    if (url.pathname === "/api/v1/timing/crossing") {
+      const user: AuthenticatedUser | undefined = this.requireUser(
+        request,
+        response,
+        "race:write",
+      );
       if (!user) {
         return;
       }
-      if (request.method !== 'POST') {
-        sendProblem(response, 405, 'Only POST is supported.');
+      if (request.method !== "POST") {
+        sendProblem(response, 405, "Only POST is supported.");
         return;
       }
-      const body: { crossings: IracingCrossingRecord[]; sessionId: string; sourceId: string } =
-        await readRequestBody<{ crossings: IracingCrossingRecord[]; sessionId: string; sourceId: string }>(request);
-      const accepted: number = await this.acceptIracingCrossings(body.sourceId, body.sessionId, body.crossings);
+      const body: {
+        crossings: IracingCrossingRecord[];
+        sessionId: string;
+        sourceId: string;
+      } = await readRequestBody<{
+        crossings: IracingCrossingRecord[];
+        sessionId: string;
+        sourceId: string;
+      }>(request);
+      const accepted: number = await this.acceptIracingCrossings(
+        body.sourceId,
+        body.sessionId,
+        body.crossings,
+      );
       sendJson(response, 200, { accepted });
       return;
     }
-    if (url.pathname === '/api/v1/uploads') {
+    if (url.pathname === "/api/v1/uploads") {
       await this.handleUpload(request, response, url);
       return;
     }
-    if (url.pathname.startsWith('/api/v1/uploads/')) {
-      const user: AuthenticatedUser | undefined = this.requireUser(request, response, 'race:read');
-      if (!user || request.method !== 'GET') {
+    if (url.pathname.startsWith("/api/v1/uploads/")) {
+      const user: AuthenticatedUser | undefined = this.requireUser(
+        request,
+        response,
+        "race:read",
+      );
+      if (!user || request.method !== "GET") {
         return;
       }
-      const uploadId: string = url.pathname.slice('/api/v1/uploads/'.length);
+      const uploadId: string = url.pathname.slice("/api/v1/uploads/".length);
       if (!this.uploadStore.download(uploadId, response)) {
         sendProblem(response, 404, `Upload ${uploadId} was not found.`);
       }
       return;
     }
-    if (url.pathname.startsWith('/api/v1/catalog/')) {
+    if (url.pathname.startsWith("/api/v1/catalog/")) {
       await this.handleCatalogCommand(request, response, url);
       return;
     }
-    if (url.pathname.startsWith('/api/v1/system/')) {
+    if (url.pathname.startsWith("/api/v1/system/")) {
       await this.handleSystemCommand(request, response, url);
       return;
     }
-    if (url.pathname === '/api/v1/race-admin') {
+    if (url.pathname === "/api/v1/race-admin") {
       await this.handleRaceAdmin(request, response);
       return;
     }
-    sendProblem(response, 404, 'API resource not found.');
+    sendProblem(response, 404, "API resource not found.");
+  };
+
+  private handleEventReplay = async (
+    request: IncomingMessage,
+    response: ServerResponse,
+    url: URL,
+  ): Promise<void> => {
+    const user: AuthenticatedUser | undefined = this.requireUser(
+      request,
+      response,
+      "race:read",
+    );
+    if (!user) {
+      return;
+    }
+    this.assertInitialized();
+    const eventIdValue: string | null = url.searchParams.get("eventId");
+    if (!eventIdValue) {
+      sendProblem(response, 400, "An eventId query parameter is required.");
+      return;
+    }
+    const eventId: EventId = eventIdValue as EventId;
+    const sessionIdValue: string | null = url.searchParams.get("sessionId");
+    const sessionId: SessionId | undefined = sessionIdValue
+      ? (sessionIdValue as SessionId)
+      : undefined;
+    const catalog: EventCatalogState = this.eventCatalogService!.catalog;
+    if (!catalog.events.some((event) => event.id === eventId)) {
+      sendProblem(response, 404, `Event ${eventIdValue} was not found.`);
+      return;
+    }
+    const sessions = catalog.sessions.filter(
+      (session) =>
+        session.eventId === eventId &&
+        (sessionId === undefined || session.id === sessionId),
+    );
+    if (sessionId !== undefined && sessions.length === 0) {
+      sendProblem(
+        response,
+        404,
+        `Session ${sessionIdValue} was not found in event ${eventIdValue}.`,
+      );
+      return;
+    }
+    const records: EventReplayRecord[] = sessions.flatMap(
+      (session): EventReplayRecord[] => {
+        const raceState = this.eventCatalogService!.getImportedRaceState(
+          eventId,
+          session.id,
+        );
+        return (raceState?.records || []).map(
+          (record: TimeRecord): EventReplayRecord => ({
+            eventId,
+            record,
+            sessionId: session.id,
+          }),
+        );
+      },
+    );
+    const dispose: () => void = this.eventReplayHub.subscribe(
+      response,
+      { eventId, sessionId },
+      getReplayMode(url.searchParams.get("mode")),
+      getReplaySpeed(url.searchParams.get("speed")),
+      records,
+      url.searchParams.get("streamId") || randomUUID(),
+    );
+    response.once("close", dispose);
+  };
+
+  private handleEventReplayControl = async (
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): Promise<void> => {
+    const user: AuthenticatedUser | undefined = this.requireUser(
+      request,
+      response,
+      "race:write",
+    );
+    if (!user) {
+      return;
+    }
+    const body: {
+      command?: EventReplayCommand;
+      speed?: number;
+      streamId?: string;
+    } = await readRequestBody<{
+      command?: EventReplayCommand;
+      speed?: number;
+      streamId?: string;
+    }>(request);
+    const commands: EventReplayCommand[] = [
+      "pause",
+      "reset",
+      "resume",
+      "set-speed",
+      "start",
+    ];
+    if (
+      !body.streamId ||
+      !body.command ||
+      !commands.includes(body.command)
+    ) {
+      sendProblem(
+        response,
+        400,
+        "A replay streamId and valid replay command are required.",
+      );
+      return;
+    }
+    try {
+      const state = this.eventReplayHub.control(
+        body.streamId,
+        body.command,
+        body.speed,
+      );
+      sendJson(response, 200, { state });
+    } catch (error: unknown) {
+      const message: string = error instanceof Error ? error.message : String(error);
+      sendProblem(response, message.includes('was not found') ? 404 : 400, message);
+    }
   };
 
   private handleAuthentication = async (
@@ -893,14 +1254,14 @@ export class RaceSweetApplicationServer {
     response: ServerResponse,
     url: URL,
   ): Promise<void> => {
-    if (request.method === 'GET' && url.pathname === '/api/v1/auth/status') {
+    if (request.method === "GET" && url.pathname === "/api/v1/auth/status") {
       sendJson(response, 200, {
         setupRequired: this.authStore.setupRequired,
         user: this.authenticatedUser(request),
       });
       return;
     }
-    if (request.method === 'POST' && url.pathname === '/api/v1/auth/setup') {
+    if (request.method === "POST" && url.pathname === "/api/v1/auth/setup") {
       const result: { token: string; user: AuthenticatedUser } =
         await this.authStore.createInitialAdmin(
           await readRequestBody<SetupRequest>(request),
@@ -909,59 +1270,85 @@ export class RaceSweetApplicationServer {
       this.sendAuthenticated(request, response, result);
       return;
     }
-    if (request.method === 'POST' && url.pathname === '/api/v1/auth/login') {
-      const retrySeconds: number | undefined = this.getLoginRetrySeconds(request);
+    if (request.method === "POST" && url.pathname === "/api/v1/auth/login") {
+      const retrySeconds: number | undefined =
+        this.getLoginRetrySeconds(request);
       if (retrySeconds) {
-        sendJson(response, 429, {
-          error: 'Too many failed login attempts. Try again later.',
-          status: 429,
-        } satisfies ApiProblem, {
-          'retry-after': retrySeconds.toString(),
-        });
+        sendJson(
+          response,
+          429,
+          {
+            error: "Too many failed login attempts. Try again later.",
+            status: 429,
+          } satisfies ApiProblem,
+          {
+            "retry-after": retrySeconds.toString(),
+          },
+        );
         return;
       }
       try {
         const result: { token: string; user: AuthenticatedUser } =
-          await this.authStore.authenticate(await readRequestBody<LoginRequest>(request));
+          await this.authStore.authenticate(
+            await readRequestBody<LoginRequest>(request),
+          );
         this.clearLoginFailures(request);
         this.sendAuthenticated(request, response, result);
       } catch {
-        const nextRetrySeconds: number | undefined = this.recordLoginFailure(request);
-        sendJson(response, nextRetrySeconds ? 429 : 401, {
-          error: nextRetrySeconds
-            ? 'Too many failed login attempts. Try again later.'
-            : 'Invalid username or password.',
-          status: nextRetrySeconds ? 429 : 401,
-        } satisfies ApiProblem, nextRetrySeconds
-          ? { 'retry-after': nextRetrySeconds.toString() }
-          : {});
+        const nextRetrySeconds: number | undefined =
+          this.recordLoginFailure(request);
+        sendJson(
+          response,
+          nextRetrySeconds ? 429 : 401,
+          {
+            error: nextRetrySeconds
+              ? "Too many failed login attempts. Try again later."
+              : "Invalid username or password.",
+            status: nextRetrySeconds ? 429 : 401,
+          } satisfies ApiProblem,
+          nextRetrySeconds
+            ? { "retry-after": nextRetrySeconds.toString() }
+            : {},
+        );
       }
       return;
     }
-    if (request.method === 'POST' && url.pathname === '/api/v1/auth/logout') {
-      this.authStore.logout(parseCookies(request.headers.cookie)[SESSION_COOKIE_NAME]);
-      sendJson(response, 200, {}, {
-        'set-cookie': `${SESSION_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`,
-      });
+    if (request.method === "POST" && url.pathname === "/api/v1/auth/logout") {
+      this.authStore.logout(
+        parseCookies(request.headers.cookie)[SESSION_COOKIE_NAME],
+      );
+      sendJson(
+        response,
+        200,
+        {},
+        {
+          "set-cookie": `${SESSION_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`,
+        },
+      );
       return;
     }
-    if (url.pathname === '/api/v1/auth/users') {
-      const user: AuthenticatedUser | undefined = this.requireUser(request, response, 'users:admin');
+    if (url.pathname === "/api/v1/auth/users") {
+      const user: AuthenticatedUser | undefined = this.requireUser(
+        request,
+        response,
+        "users:admin",
+      );
       if (!user) {
         return;
       }
-      if (request.method === 'GET') {
+      if (request.method === "GET") {
         sendJson(response, 200, { users: this.authStore.listUsers() });
         return;
       }
-      if (request.method === 'POST') {
-        const body: LoginRequest & { role: UserRole } =
-          await readRequestBody<LoginRequest & { role: UserRole }>(request);
+      if (request.method === "POST") {
+        const body: LoginRequest & { role: UserRole } = await readRequestBody<
+          LoginRequest & { role: UserRole }
+        >(request);
         sendJson(response, 201, await this.authStore.createUser(body));
         return;
       }
     }
-    sendProblem(response, 404, 'Authentication resource not found.');
+    sendProblem(response, 404, "Authentication resource not found.");
   };
 
   private sendAuthenticated = (
@@ -969,15 +1356,16 @@ export class RaceSweetApplicationServer {
     response: ServerResponse,
     result: { token: string; user: AuthenticatedUser },
   ): void => {
-    const secureAttribute: string = requestProtocol(request) === 'https' ? '; Secure' : '';
+    const secureAttribute: string =
+      requestProtocol(request) === "https" ? "; Secure" : "";
     sendJson(response, 200, result.user, {
-      'set-cookie': `${SESSION_COOKIE_NAME}=${encodeURIComponent(result.token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200${secureAttribute}`,
+      "set-cookie": `${SESSION_COOKIE_NAME}=${encodeURIComponent(result.token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200${secureAttribute}`,
     });
   };
 
   private createBootstrap = (
     user: AuthenticatedUser,
-    runtime: RuntimeCapabilities['runtime'],
+    runtime: RuntimeCapabilities["runtime"],
   ): ApplicationBootstrap => {
     this.assertInitialized();
     const catalog: EventCatalogState = this.eventCatalogService!.catalog;
@@ -986,7 +1374,7 @@ export class RaceSweetApplicationServer {
       permissions: rolePermissions[user.role],
       revision: this.eventHub.currentRevision,
       runtimeCapabilities: {
-        canOpenLocalFiles: runtime === 'electron',
+        canOpenLocalFiles: runtime === "electron",
         canSelectDirectories: true,
         canSelectFiles: true,
         runtime,
@@ -1006,51 +1394,65 @@ export class RaceSweetApplicationServer {
     response: ServerResponse,
     url: URL,
   ): Promise<void> => {
-    const requiredPermission: string = request.method === 'GET' ? 'race:read' : 'race:write';
-    const user: AuthenticatedUser | undefined = this.requireUser(request, response, requiredPermission);
+    const requiredPermission: string =
+      request.method === "GET" ? "race:read" : "race:write";
+    const user: AuthenticatedUser | undefined = this.requireUser(
+      request,
+      response,
+      requiredPermission,
+    );
     if (!user) {
       return;
     }
     this.assertInitialized();
-    if (request.method === 'GET') {
-      const mutations: EventCatalogMutation[] = this.eventCatalogService!.mutations;
-      const offsetValue: number = Number.parseInt(url.searchParams.get('cursor') || '0', 10);
-      const offset: number = Number.isSafeInteger(offsetValue) && offsetValue >= 0 ? offsetValue : 0;
+    if (request.method === "GET") {
+      const mutations: EventCatalogMutation[] =
+        this.eventCatalogService!.mutations;
+      const offsetValue: number = Number.parseInt(
+        url.searchParams.get("cursor") || "0",
+        10,
+      );
+      const offset: number =
+        Number.isSafeInteger(offsetValue) && offsetValue >= 0 ? offsetValue : 0;
       sendJson(response, 200, {
         cursor: mutations.length.toString(),
         mutations: mutations.slice(offset),
       });
       return;
     }
-    if (request.method !== 'PUT') {
-      sendProblem(response, 405, 'Only GET and PUT are supported.');
+    if (request.method !== "PUT") {
+      sendProblem(response, 405, "Only GET and PUT are supported.");
       return;
     }
     const body: { commandId?: string; mutations?: EventCatalogMutation[] } =
-      await readRequestBody<{ commandId?: string; mutations?: EventCatalogMutation[] }>(request);
+      await readRequestBody<{
+        commandId?: string;
+        mutations?: EventCatalogMutation[];
+      }>(request);
     const mutations: EventCatalogMutation[] = body.mutations || [];
     await this.enqueueCommand(async (): Promise<void> => {
       const knownIds: Set<string> = new Set(
-        this.eventCatalogService!.mutations.map((mutation: EventCatalogMutation): string =>
-          mutation.id.toString(),
+        this.eventCatalogService!.mutations.map(
+          (mutation: EventCatalogMutation): string => mutation.id.toString(),
         ),
       );
       await this.eventCatalogService!.applyRemoteMutations(mutations);
       const accepted: EventCatalogMutation[] = mutations.filter(
-        (mutation: EventCatalogMutation): boolean => !knownIds.has(mutation.id.toString()),
+        (mutation: EventCatalogMutation): boolean =>
+          !knownIds.has(mutation.id.toString()),
       );
       if (accepted.length > 0) {
         this.eventHub.publish(
-          'catalog',
-          'catalog.mutations-applied',
+          "catalog",
+          "catalog.mutations-applied",
           jsonValue({ mutations: accepted }),
           body.commandId,
         );
       }
     });
     sendJson(response, 200, {
-      acknowledgedMutationIds: mutations.map((mutation: EventCatalogMutation): string =>
-        mutation.id.toString(),
+      acknowledgedMutationIds: mutations.map(
+        (mutation: EventCatalogMutation): string => mutation.id.toString(),
       ),
       cursor: this.eventCatalogService!.mutations.length.toString(),
     });
@@ -1061,7 +1463,11 @@ export class RaceSweetApplicationServer {
     response: ServerResponse,
     url: URL,
   ): Promise<void> => {
-    const user: AuthenticatedUser | undefined = this.requireUser(request, response, 'race:write');
+    const user: AuthenticatedUser | undefined = this.requireUser(
+      request,
+      response,
+      "race:write",
+    );
     if (!user) {
       return;
     }
@@ -1070,79 +1476,119 @@ export class RaceSweetApplicationServer {
       ? await readRequestBody<JsonObject>(request)
       : {};
     const commandId: string | undefined =
-      typeof body.commandId === 'string' ? body.commandId : undefined;
+      typeof body.commandId === "string" ? body.commandId : undefined;
     const beforeCount: number = this.eventCatalogService!.mutations.length;
     let accepted: EventCatalogMutation[] = [];
 
     await this.enqueueCommand(async (): Promise<void> => {
-      const eventMatch: RegExpMatchArray | null = url.pathname.match(/^\/api\/v1\/catalog\/events(?:\/([^/]+))?(?:\/(activate))?$/u);
-      const sessionMatch: RegExpMatchArray | null = url.pathname.match(/^\/api\/v1\/catalog\/events\/([^/]+)\/sessions(?:\/([^/]+))?(?:\/(activate))?$/u);
-      const categoryMatch: RegExpMatchArray | null = url.pathname.match(/^\/api\/v1\/catalog\/events\/([^/]+)\/categories(?:\/([^/]+))?$/u);
-      const entrantMatch: RegExpMatchArray | null = url.pathname.match(/^\/api\/v1\/catalog\/events\/([^/]+)\/entrants(?:\/([^/]+))?$/u);
+      const eventMatch: RegExpMatchArray | null = url.pathname.match(
+        /^\/api\/v1\/catalog\/events(?:\/([^/]+))?(?:\/(activate))?$/u,
+      );
+      const sessionMatch: RegExpMatchArray | null = url.pathname.match(
+        /^\/api\/v1\/catalog\/events\/([^/]+)\/sessions(?:\/([^/]+))?(?:\/(activate))?$/u,
+      );
+      const categoryMatch: RegExpMatchArray | null = url.pathname.match(
+        /^\/api\/v1\/catalog\/events\/([^/]+)\/categories(?:\/([^/]+))?$/u,
+      );
+      const entrantMatch: RegExpMatchArray | null = url.pathname.match(
+        /^\/api\/v1\/catalog\/events\/([^/]+)\/entrants(?:\/([^/]+))?$/u,
+      );
 
       if (sessionMatch) {
         const eventId: EventId = sessionMatch[1] as EventId;
-        const sessionId: SessionId | undefined = sessionMatch[2] as SessionId | undefined;
-        if (request.method === 'POST' && !sessionId) {
+        const sessionId: SessionId | undefined = sessionMatch[2] as
+          SessionId | undefined;
+        if (request.method === "POST" && !sessionId) {
           await this.eventCatalogService!.createSession(eventId);
-        } else if (request.method === 'POST' && sessionId && sessionMatch[3] === 'activate') {
+        } else if (
+          request.method === "POST" &&
+          sessionId &&
+          sessionMatch[3] === "activate"
+        ) {
           await this.eventCatalogService!.activateSession(eventId, sessionId);
-        } else if (request.method === 'PATCH' && sessionId) {
-          await this.eventCatalogService!.updateSession(sessionId, body.changes as never);
-        } else if (request.method === 'DELETE' && sessionId) {
+        } else if (request.method === "PATCH" && sessionId) {
+          await this.eventCatalogService!.updateSession(
+            sessionId,
+            body.changes as never,
+          );
+        } else if (request.method === "DELETE" && sessionId) {
           await this.eventCatalogService!.deleteSession(eventId, sessionId);
         } else {
-          throw new Error('Unsupported session command.');
+          throw new Error("Unsupported session command.");
         }
       } else if (categoryMatch) {
         const eventId: EventId = categoryMatch[1] as EventId;
-        const categoryId: CategoryId | undefined = categoryMatch[2] as CategoryId | undefined;
-        if (request.method === 'POST' && !categoryId) {
+        const categoryId: CategoryId | undefined = categoryMatch[2] as
+          CategoryId | undefined;
+        if (request.method === "POST" && !categoryId) {
           await this.eventCatalogService!.createCategory(eventId);
-        } else if (request.method === 'PATCH' && categoryId) {
-          await this.eventCatalogService!.updateCategory(categoryId, body.changes as never);
-        } else if (request.method === 'DELETE' && categoryId) {
+        } else if (request.method === "PATCH" && categoryId) {
+          await this.eventCatalogService!.updateCategory(
+            categoryId,
+            body.changes as never,
+          );
+        } else if (request.method === "DELETE" && categoryId) {
           await this.eventCatalogService!.deleteCategory(eventId, categoryId);
         } else {
-          throw new Error('Unsupported category command.');
+          throw new Error("Unsupported category command.");
         }
       } else if (entrantMatch) {
         const eventId: EventId = entrantMatch[1] as EventId;
-        const entrantId: EventEntrantId | undefined = entrantMatch[2] as EventEntrantId | undefined;
-        if (request.method === 'POST' && !entrantId) {
-          const entrantType: 'rider' | 'team' = body.entrantType === 'team' ? 'team' : 'rider';
+        const entrantId: EventEntrantId | undefined = entrantMatch[2] as
+          EventEntrantId | undefined;
+        if (request.method === "POST" && !entrantId) {
+          const entrantType: "rider" | "team" =
+            body.entrantType === "team" ? "team" : "rider";
           await this.eventCatalogService!.createEntrant(eventId, entrantType);
-        } else if (request.method === 'PATCH' && entrantId) {
-          await this.eventCatalogService!.updateEntrant(entrantId, body.changes as never);
-        } else if (request.method === 'DELETE' && entrantId) {
+        } else if (request.method === "PATCH" && entrantId) {
+          await this.eventCatalogService!.updateEntrant(
+            entrantId,
+            body.changes as never,
+          );
+        } else if (request.method === "DELETE" && entrantId) {
           await this.eventCatalogService!.deleteEntrant(eventId, entrantId);
-        } else if (request.method === 'DELETE' && Array.isArray(body.entrantIds) && body.entrantIds.every((id) => typeof id === 'string')) {
-          await this.eventCatalogService!.deleteEntrants(eventId, body.entrantIds as EventEntrantId[]);
+        } else if (
+          request.method === "DELETE" &&
+          Array.isArray(body.entrantIds) &&
+          body.entrantIds.every((id) => typeof id === "string")
+        ) {
+          await this.eventCatalogService!.deleteEntrants(
+            eventId,
+            body.entrantIds as EventEntrantId[],
+          );
         } else {
-          throw new Error('Unsupported entrant command.');
+          throw new Error("Unsupported entrant command.");
         }
       } else if (eventMatch) {
-        const eventId: EventId | undefined = eventMatch[1] as EventId | undefined;
-        if (request.method === 'POST' && !eventId) {
+        const eventId: EventId | undefined = eventMatch[1] as
+          EventId | undefined;
+        if (request.method === "POST" && !eventId) {
           await this.eventCatalogService!.createEvent();
-        } else if (request.method === 'POST' && eventId && eventMatch[2] === 'activate') {
+        } else if (
+          request.method === "POST" &&
+          eventId &&
+          eventMatch[2] === "activate"
+        ) {
           await this.eventCatalogService!.activateEvent(eventId);
-        } else if (request.method === 'PATCH' && eventId) {
-          await this.eventCatalogService!.updateEvent(eventId, body.changes as never);
-        } else if (request.method === 'DELETE' && eventId) {
+        } else if (request.method === "PATCH" && eventId) {
+          await this.eventCatalogService!.updateEvent(
+            eventId,
+            body.changes as never,
+          );
+        } else if (request.method === "DELETE" && eventId) {
           await this.eventCatalogService!.deleteEvent(eventId);
         } else {
-          throw new Error('Unsupported event command.');
+          throw new Error("Unsupported event command.");
         }
       } else {
-        throw new Error('Catalog command resource not found.');
+        throw new Error("Catalog command resource not found.");
       }
 
       accepted = this.eventCatalogService!.mutations.slice(beforeCount);
       if (accepted.length > 0) {
         this.eventHub.publish(
-          'catalog',
-          'catalog.mutations-applied',
+          "catalog",
+          "catalog.mutations-applied",
           jsonValue({ mutations: accepted }),
           commandId,
         );
@@ -1161,26 +1607,32 @@ export class RaceSweetApplicationServer {
     url: URL,
   ): Promise<void> => {
     this.assertInitialized();
-    const rfidDecoderListenerMatch: RegExpMatchArray | null = url.pathname.match(
-      /^\/api\/v1\/system\/rfid-decoder-listeners\/([^/]+)\/(start|stop)$/u,
-    );
+    const rfidDecoderListenerMatch: RegExpMatchArray | null =
+      url.pathname.match(
+        /^\/api\/v1\/system\/rfid-decoder-listeners\/([^/]+)\/(start|stop)$/u,
+      );
     if (rfidDecoderListenerMatch) {
-      const user: AuthenticatedUser | undefined = this.requireUser(request, response, 'race:write');
+      const user: AuthenticatedUser | undefined = this.requireUser(
+        request,
+        response,
+        "race:write",
+      );
       if (!user) {
         return;
       }
-      if (request.method !== 'POST') {
-        sendProblem(response, 405, 'Only POST is supported.');
+      if (request.method !== "POST") {
+        sendProblem(response, 405, "Only POST is supported.");
         return;
       }
-      const sourceId: string = rfidDecoderListenerMatch[1] || '';
-      const shouldListen: boolean = rfidDecoderListenerMatch[2] === 'start';
+      const sourceId: string = rfidDecoderListenerMatch[1] || "";
+      const shouldListen: boolean = rfidDecoderListenerMatch[2] === "start";
       let config: SystemConfiguration | undefined;
       await this.enqueueCommand(async (): Promise<void> => {
-        const source: DataSourceConfig | undefined = this.systemConfigService!.state.dataSources.find(
-          (candidate: DataSourceConfig): boolean => candidate.id === sourceId,
-        );
-        if (!source || source.type !== 'timing-rfid-decoder') {
+        const source: DataSourceConfig | undefined =
+          this.systemConfigService!.state.dataSources.find(
+            (candidate: DataSourceConfig): boolean => candidate.id === sourceId,
+          );
+        if (!source || source.type !== "timing-rfid-decoder") {
           throw new Error(`RFID decoder source "${sourceId}" was not found.`);
         }
         config = await this.systemConfigService!.updateSource(source.id, {
@@ -1204,8 +1656,8 @@ export class RaceSweetApplicationServer {
           throw error;
         }
         this.eventHub.publish(
-          'system-config',
-          'system-config.changed',
+          "system-config",
+          "system-config.changed",
           jsonValue(safeConfiguration(config)),
         );
       });
@@ -1216,8 +1668,9 @@ export class RaceSweetApplicationServer {
       });
       return;
     }
-    if (url.pathname === '/api/v1/system/configuration') {
-      const requiredPermission: string = request.method === 'GET' ? 'race:read' : 'race:write';
+    if (url.pathname === "/api/v1/system/configuration") {
+      const requiredPermission: string =
+        request.method === "GET" ? "race:read" : "race:write";
       const user: AuthenticatedUser | undefined = this.requireUser(
         request,
         response,
@@ -1226,25 +1679,30 @@ export class RaceSweetApplicationServer {
       if (!user) {
         return;
       }
-      if (request.method === 'GET') {
+      if (request.method === "GET") {
         sendJson(response, 200, {
           ...sharedConfigurationForClient(this.systemConfigService!.state),
-          listenerServer: rolePermissions[user.role].includes('server:admin')
+          listenerServer: rolePermissions[user.role].includes("server:admin")
             ? this.activeListenerStatus()
             : undefined,
         });
         return;
       }
-      if (request.method === 'PUT') {
+      if (request.method === "PUT") {
         const body: { commandId?: string; config: SystemConfiguration } =
-          await readRequestBody<{ commandId?: string; config: SystemConfiguration }>(request);
+          await readRequestBody<{
+            commandId?: string;
+            config: SystemConfiguration;
+          }>(request);
         await this.enqueueCommand(async (): Promise<void> => {
           const config: SystemConfiguration =
-            await this.systemConfigService!.replaceSharedConfiguration(body.config);
+            await this.systemConfigService!.replaceSharedConfiguration(
+              body.config,
+            );
           await this.rfidDecoderListeners.reload(config.dataSources);
           this.eventHub.publish(
-            'system-config',
-            'system-config.changed',
+            "system-config",
+            "system-config.changed",
             jsonValue(safeConfiguration(config)),
             body.commandId,
           );
@@ -1255,49 +1713,61 @@ export class RaceSweetApplicationServer {
         });
         return;
       }
-      sendProblem(response, 405, 'Only GET and PUT are supported.');
+      sendProblem(response, 405, "Only GET and PUT are supported.");
       return;
     }
-    if (url.pathname === '/api/v1/system/listener') {
-      const user: AuthenticatedUser | undefined = this.requireUser(request, response, 'server:admin');
+    if (url.pathname === "/api/v1/system/listener") {
+      const user: AuthenticatedUser | undefined = this.requireUser(
+        request,
+        response,
+        "server:admin",
+      );
       if (!user) {
         return;
       }
-      if (request.method === 'GET') {
+      if (request.method === "GET") {
         sendJson(response, 200, {
           listenerServer: this.activeListenerStatus(),
         });
         return;
       }
-      if (request.method !== 'PUT') {
-        sendProblem(response, 405, 'Only GET and PUT are supported.');
+      if (request.method !== "PUT") {
+        sendProblem(response, 405, "Only GET and PUT are supported.");
         return;
       }
-      const body: { changes: Partial<ListenerServerConfig>; commandId?: string } =
-        await readRequestBody<{ changes: Partial<ListenerServerConfig>; commandId?: string }>(request);
+      const body: {
+        changes: Partial<ListenerServerConfig>;
+        commandId?: string;
+      } = await readRequestBody<{
+        changes: Partial<ListenerServerConfig>;
+        commandId?: string;
+      }>(request);
       await this.enqueueCommand(async (): Promise<void> => {
-        const currentConfig: SystemConfiguration = this.systemConfigService!.state;
-        const nextListenerConfig: ListenerServerConfig = normalizeSystemConfiguration({
-          ...currentConfig,
-          listenerServer: {
-            enabled: false,
-            ...currentConfig.listenerServer,
-            ...body.changes,
-          },
-        }).listenerServer!;
+        const currentConfig: SystemConfiguration =
+          this.systemConfigService!.state;
+        const nextListenerConfig: ListenerServerConfig =
+          normalizeSystemConfiguration({
+            ...currentConfig,
+            listenerServer: {
+              enabled: false,
+              ...currentConfig.listenerServer,
+              ...body.changes,
+            },
+          }).listenerServer!;
         await this.reloadExternal(nextListenerConfig);
         const config: SystemConfiguration =
           await this.systemConfigService!.updateListenerServer(body.changes);
-        const listenerStatus: ListenerServerConfig = this.activeListenerStatus();
+        const listenerStatus: ListenerServerConfig =
+          this.activeListenerStatus();
         this.eventHub.publish(
-          'server',
-          'server.listener-updated',
+          "server",
+          "server.listener-updated",
           jsonValue({
             enabled: listenerStatus.enabled,
             httpPort: listenerStatus.httpPort || null,
             httpsPort: listenerStatus.httpsPort || null,
-            insecureHttpWarning: listenerStatus.enabled &&
-              listenerStatus.httpPort !== undefined,
+            insecureHttpWarning:
+              listenerStatus.enabled && listenerStatus.httpPort !== undefined,
           }),
           body.commandId,
         );
@@ -1308,14 +1778,15 @@ export class RaceSweetApplicationServer {
       });
       return;
     }
-    sendProblem(response, 404, 'System command resource not found.');
+    sendProblem(response, 404, "System command resource not found.");
   };
 
   private handleRaceAdmin = async (
     request: IncomingMessage,
     response: ServerResponse,
   ): Promise<void> => {
-    const requiredPermission: string = request.method === 'GET' ? 'race:read' : 'race:write';
+    const requiredPermission: string =
+      request.method === "GET" ? "race:read" : "race:write";
     const user: AuthenticatedUser | undefined = this.requireUser(
       request,
       response,
@@ -1324,18 +1795,21 @@ export class RaceSweetApplicationServer {
     if (!user) {
       return;
     }
-    if (request.method === 'GET') {
+    if (request.method === "GET") {
       sendJson(response, 200, await this.raceAdminPersistence.load());
       return;
     }
-    if (request.method === 'PUT') {
+    if (request.method === "PUT") {
       const body: { changes: AdministrativeChanges; commandId?: string } =
-        await readRequestBody<{ changes: AdministrativeChanges; commandId?: string }>(request);
+        await readRequestBody<{
+          changes: AdministrativeChanges;
+          commandId?: string;
+        }>(request);
       await this.enqueueCommand(async (): Promise<void> => {
         await this.raceAdminPersistence.save(body.changes);
         this.eventHub.publish(
-          'race-admin',
-          'race-admin.changed',
+          "race-admin",
+          "race-admin.changed",
           jsonValue(body.changes),
           body.commandId,
         );
@@ -1345,7 +1819,7 @@ export class RaceSweetApplicationServer {
       });
       return;
     }
-    sendProblem(response, 405, 'Only GET and PUT are supported.');
+    sendProblem(response, 405, "Only GET and PUT are supported.");
   };
 
   private handleUpload = async (
@@ -1353,25 +1827,34 @@ export class RaceSweetApplicationServer {
     response: ServerResponse,
     url: URL,
   ): Promise<void> => {
-    const user: AuthenticatedUser | undefined = this.requireUser(request, response, 'race:write');
+    const user: AuthenticatedUser | undefined = this.requireUser(
+      request,
+      response,
+      "race:write",
+    );
     if (!user) {
       return;
     }
-    if (request.method !== 'POST') {
-      sendProblem(response, 405, 'Only POST is supported for uploads.');
+    if (request.method !== "POST") {
+      sendProblem(response, 405, "Only POST is supported for uploads.");
       return;
     }
-    const name: string = url.searchParams.get('name') || '';
+    const name: string = url.searchParams.get("name") || "";
     const upload = await this.uploadStore.accept(request, {
-      mediaType: url.searchParams.get('mediaType') || request.headers['content-type'] || 'application/octet-stream',
+      mediaType:
+        url.searchParams.get("mediaType") ||
+        request.headers["content-type"] ||
+        "application/octet-stream",
       name,
-      relativePath: url.searchParams.get('relativePath') || name,
+      relativePath: url.searchParams.get("relativePath") || name,
     });
-    this.eventHub.publish('source', 'source.file-uploaded', jsonValue(upload));
+    this.eventHub.publish("source", "source.file-uploaded", jsonValue(upload));
     sendJson(response, 201, upload);
   };
 
-  private enqueueCommand = async (command: () => Promise<void>): Promise<void> => {
+  private enqueueCommand = async (
+    command: () => Promise<void>,
+  ): Promise<void> => {
     const result: Promise<void> = this.commandQueue.then(command);
     this.commandQueue = result.catch((): void => undefined);
     return result;
@@ -1381,25 +1864,30 @@ export class RaceSweetApplicationServer {
     requestPath: string,
     response: ServerResponse,
   ): Promise<void> => {
-    if (requestPath === '/api/swagger-ui/swagger-ui-init.js') {
-      response.writeHead(200, {
-        'content-type': 'application/javascript; charset=utf-8',
-      }).end(getSwaggerUiInit());
+    if (requestPath === "/api/swagger-ui/swagger-ui-init.js") {
+      response
+        .writeHead(200, {
+          "content-type": "application/javascript; charset=utf-8",
+        })
+        .end(getSwaggerUiInit());
       return;
     }
     const assetName: string = path.basename(requestPath);
     if (!requiredSwaggerAssets.includes(assetName)) {
-      sendProblem(response, 404, 'Swagger UI asset not found.');
+      sendProblem(response, 404, "Swagger UI asset not found.");
       return;
     }
     const assetPath: string = path.join(this.swaggerAssetDirectory, assetName);
     try {
       const asset: Buffer = await readFile(assetPath);
-      response.writeHead(200, {
-        'cache-control': 'public, max-age=31536000, immutable',
-        'content-type': staticContentTypes[path.extname(assetName).toLowerCase()] ||
-          'application/octet-stream',
-      }).end(asset);
+      response
+        .writeHead(200, {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type":
+            staticContentTypes[path.extname(assetName).toLowerCase()] ||
+            "application/octet-stream",
+        })
+        .end(asset);
     } catch {
       sendProblem(
         response,
@@ -1413,19 +1901,20 @@ export class RaceSweetApplicationServer {
     response: ServerResponse,
   ): Promise<void> => {
     try {
-      await Promise.all(requiredSwaggerAssets.map(
-        (assetName: string): Promise<Buffer> =>
+      await Promise.all(
+        requiredSwaggerAssets.map((assetName: string): Promise<Buffer> =>
           readFile(path.join(this.swaggerAssetDirectory, assetName)),
-      ));
+        ),
+      );
       sendHtml(response, 200, getSwaggerUiHtml());
     } catch {
       sendHtml(
         response,
         503,
         getUnavailablePage(
-          'RaceSweet API documentation is unavailable',
-          'The OpenAPI document is available, but the Swagger UI files required to display it were not found.',
-          'Reinstall dependencies or rebuild RaceSweet, then reload this page. The raw specification remains available at <code>/api/openapi.json</code>.',
+          "RaceSweet API documentation is unavailable",
+          "The OpenAPI document is available, but the Swagger UI files required to display it were not found.",
+          "Reinstall dependencies or rebuild RaceSweet, then reload this page. The raw specification remains available at <code>/api/openapi.json</code>.",
         ),
       );
     }
@@ -1436,9 +1925,9 @@ export class RaceSweetApplicationServer {
       response,
       503,
       getUnavailablePage(
-        'RaceSweet web application is not built',
-        'The server is running, but the compiled HTML or JavaScript required by the browser application was not found.',
-        'Run <code>npm run build:web</code>, restart the RaceSweet server, and reload this page. API documentation remains available at <code>/api</code>.',
+        "RaceSweet web application is not built",
+        "The server is running, but the compiled HTML or JavaScript required by the browser application was not found.",
+        "Run <code>npm run build:web</code>, restart the RaceSweet server, and reload this page. API documentation remains available at <code>/api</code>.",
       ),
     );
   };
@@ -1447,13 +1936,16 @@ export class RaceSweetApplicationServer {
     rootPath: string,
     requestPath: string,
   ): string | undefined => {
-    const requestedRelativePath: string = requestPath.replace(/^\/+/u, '');
+    const requestedRelativePath: string = requestPath.replace(/^\/+/u, "");
     const rootDirectoryPrefix: string = `${path.basename(rootPath)}/`;
-    const assetRelativePath: string = requestedRelativePath.startsWith(rootDirectoryPrefix)
+    const assetRelativePath: string = requestedRelativePath.startsWith(
+      rootDirectoryPrefix,
+    )
       ? requestedRelativePath.slice(rootDirectoryPrefix.length)
       : requestedRelativePath;
     const requestedPath: string = path.resolve(rootPath, assetRelativePath);
-    return requestedPath === rootPath || requestedPath.startsWith(`${rootPath}${path.sep}`)
+    return requestedPath === rootPath ||
+      requestedPath.startsWith(`${rootPath}${path.sep}`)
       ? requestedPath
       : undefined;
   };
@@ -1464,16 +1956,19 @@ export class RaceSweetApplicationServer {
   ): Promise<Buffer | undefined> => {
     try {
       const html: Buffer = await readFile(indexPath);
-      const scriptPaths: string[] = getLocalScriptPaths(html.toString('utf8'));
+      const scriptPaths: string[] = getLocalScriptPaths(html.toString("utf8"));
       if (scriptPaths.length === 0) {
         return undefined;
       }
       const scripts: Array<Promise<Buffer>> = scriptPaths.map(
         (scriptPath: string): Promise<Buffer> => {
-          const assetPath: string | undefined = this.fileAssetPath(rootPath, scriptPath);
+          const assetPath: string | undefined = this.fileAssetPath(
+            rootPath,
+            scriptPath,
+          );
           return assetPath
             ? readFile(assetPath)
-            : Promise.reject(new Error('Invalid application script path.'));
+            : Promise.reject(new Error("Invalid application script path."));
         },
       );
       await Promise.all(scripts);
@@ -1491,14 +1986,18 @@ export class RaceSweetApplicationServer {
       return undefined;
     }
     const html: Buffer = Buffer.from(await response.arrayBuffer());
-    const scriptPaths: string[] = getLocalScriptPaths(html.toString('utf8'));
+    const scriptPaths: string[] = getLocalScriptPaths(html.toString("utf8"));
     if (scriptPaths.length === 0) {
       return undefined;
     }
-    const scriptResponses: Response[] = await Promise.all(scriptPaths.map(
-      (scriptPath: string): Promise<Response> => fetch(new URL(scriptPath, baseUrl.origin)),
-    ));
-    return scriptResponses.every((scriptResponse: Response): boolean => scriptResponse.ok)
+    const scriptResponses: Response[] = await Promise.all(
+      scriptPaths.map((scriptPath: string): Promise<Response> =>
+        fetch(new URL(scriptPath, baseUrl.origin)),
+      ),
+    );
+    return scriptResponses.every(
+      (scriptResponse: Response): boolean => scriptResponse.ok,
+    )
       ? html
       : undefined;
   };
@@ -1514,7 +2013,10 @@ export class RaceSweetApplicationServer {
     }
     if (/^https?:/u.test(assetSource)) {
       const baseUrl: URL = new URL(assetSource);
-      const assetUrl: URL = resolveDevelopmentAssetUrl(assetSource, requestPath);
+      const assetUrl: URL = resolveDevelopmentAssetUrl(
+        assetSource,
+        requestPath,
+      );
       let upstream: Response;
       try {
         upstream = await fetch(assetUrl);
@@ -1524,28 +2026,36 @@ export class RaceSweetApplicationServer {
       }
       if (upstream.ok) {
         if (!isStaticAssetRequest(requestPath)) {
-          const html: Buffer | undefined = await this.developmentApplicationHtml(
-            upstream,
-            baseUrl,
-          );
+          const html: Buffer | undefined =
+            await this.developmentApplicationHtml(upstream, baseUrl);
           if (!html) {
             this.sendApplicationUnavailable(response);
             return;
           }
-          response.writeHead(200, {
-            'cache-control': 'no-cache',
-            'content-type': 'text/html; charset=utf-8',
-          }).end(html);
+          response
+            .writeHead(200, {
+              "cache-control": "no-cache",
+              "content-type": "text/html; charset=utf-8",
+            })
+            .end(html);
           return;
         }
-        response.writeHead(200, {
-          'cache-control': applicationAssetCacheControl(requestPath),
-          'content-type': upstream.headers.get('content-type') || 'application/octet-stream',
-        }).end(Buffer.from(await upstream.arrayBuffer()));
+        response
+          .writeHead(200, {
+            "cache-control": applicationAssetCacheControl(requestPath),
+            "content-type":
+              upstream.headers.get("content-type") ||
+              "application/octet-stream",
+          })
+          .end(Buffer.from(await upstream.arrayBuffer()));
         return;
       }
       if (isStaticAssetRequest(requestPath)) {
-        sendProblem(response, 404, `Application asset "${requestPath}" was not found.`);
+        sendProblem(
+          response,
+          404,
+          `Application asset "${requestPath}" was not found.`,
+        );
         return;
       }
       let fallback: Response;
@@ -1555,23 +2065,28 @@ export class RaceSweetApplicationServer {
         this.sendApplicationUnavailable(response);
         return;
       }
-      const html: Buffer | undefined = await this.developmentApplicationHtml(fallback, baseUrl);
+      const html: Buffer | undefined = await this.developmentApplicationHtml(
+        fallback,
+        baseUrl,
+      );
       if (!html) {
         this.sendApplicationUnavailable(response);
         return;
       }
-      response.writeHead(200, {
-        'cache-control': 'no-cache',
-        'content-type': 'text/html; charset=utf-8',
-      }).end(html);
+      response
+        .writeHead(200, {
+          "cache-control": "no-cache",
+          "content-type": "text/html; charset=utf-8",
+        })
+        .end(html);
       return;
     }
 
-    const sourceUrl: URL | undefined = assetSource.startsWith('file:')
+    const sourceUrl: URL | undefined = assetSource.startsWith("file:")
       ? new URL(assetSource)
       : undefined;
     const sourcePath: string = sourceUrl
-      ? decodeURIComponent(sourceUrl.pathname.replace(/^\/([A-Za-z]:)/u, '$1'))
+      ? decodeURIComponent(sourceUrl.pathname.replace(/^\/([A-Za-z]:)/u, "$1"))
       : path.resolve(assetSource);
     let sourceIsDirectory: boolean;
     try {
@@ -1580,13 +2095,21 @@ export class RaceSweetApplicationServer {
       this.sendApplicationUnavailable(response);
       return;
     }
-    const rootPath: string = path.resolve(sourceIsDirectory ? sourcePath : path.dirname(sourcePath));
-    const requestedRelativePath: string = requestPath === '/'
-      ? path.basename(sourcePath).endsWith('.html') ? path.basename(sourcePath) : 'index.html'
-      : requestPath.replace(/^\/+/u, '');
-    const requestedPath: string | undefined = this.fileAssetPath(rootPath, requestedRelativePath);
+    const rootPath: string = path.resolve(
+      sourceIsDirectory ? sourcePath : path.dirname(sourcePath),
+    );
+    const requestedRelativePath: string =
+      requestPath === "/"
+        ? path.basename(sourcePath).endsWith(".html")
+          ? path.basename(sourcePath)
+          : "index.html"
+        : requestPath.replace(/^\/+/u, "");
+    const requestedPath: string | undefined = this.fileAssetPath(
+      rootPath,
+      requestedRelativePath,
+    );
     if (!requestedPath) {
-      sendProblem(response, 400, 'Invalid static asset path.');
+      sendProblem(response, 400, "Invalid static asset path.");
       return;
     }
     try {
@@ -1601,28 +2124,40 @@ export class RaceSweetApplicationServer {
           return;
         }
       }
-      response.writeHead(200, {
-        'cache-control': requestedRelativePath.endsWith('.html')
-          ? 'no-cache'
-          : applicationAssetCacheControl(requestedRelativePath),
-        'content-type': staticContentTypes[path.extname(requestedPath).toLowerCase()] ||
-          'application/octet-stream',
-      }).end(asset);
+      response
+        .writeHead(200, {
+          "cache-control": requestedRelativePath.endsWith(".html")
+            ? "no-cache"
+            : applicationAssetCacheControl(requestedRelativePath),
+          "content-type":
+            staticContentTypes[path.extname(requestedPath).toLowerCase()] ||
+            "application/octet-stream",
+        })
+        .end(asset);
     } catch {
       if (isStaticAssetRequest(requestPath)) {
-        sendProblem(response, 404, `Application asset "${requestPath}" was not found.`);
+        sendProblem(
+          response,
+          404,
+          `Application asset "${requestPath}" was not found.`,
+        );
         return;
       }
-      const fallbackPath: string = path.join(rootPath, 'index.html');
-      const html: Buffer | undefined = await this.fileApplicationHtml(rootPath, fallbackPath);
+      const fallbackPath: string = path.join(rootPath, "index.html");
+      const html: Buffer | undefined = await this.fileApplicationHtml(
+        rootPath,
+        fallbackPath,
+      );
       if (!html) {
         this.sendApplicationUnavailable(response);
         return;
       }
-      response.writeHead(200, {
-        'cache-control': 'no-cache',
-        'content-type': 'text/html; charset=utf-8',
-      }).end(html);
+      response
+        .writeHead(200, {
+          "cache-control": "no-cache",
+          "content-type": "text/html; charset=utf-8",
+        })
+        .end(html);
     }
   };
 }

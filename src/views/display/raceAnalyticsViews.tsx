@@ -1,26 +1,49 @@
-import type { RaceState, RaceStateLookup } from '../../model/racestate.js';
+import type { RaceState, RaceStateLookup } from "../../model/racestate.js";
 
-import { MenuItem } from '@mui/material';
-import React from 'react';
-import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.js';
-import type { EventCatalogEntrant, EventCatalogEntry, EventCatalogEvent, EventCatalogSession } from '../../catalog/eventCatalog.js';
-import { getCategoryColor, getCategoryPaletteColor } from '../../categoryColors.js';
-import { SelectTextField } from '../../controls/selectTextField.js';
-import { EventEntrantId } from '../../model/entrant.js';
-import { getParticipantEntryId } from '../../model/entry.js';
-import type { EventParticipant, EventParticipantId } from '../../model/eventparticipant.js';
-import type { FlagRecord } from '../../model/flag.js';
-import { EventCategoryId } from '../../model/index.js';
-import { EventId, SessionId } from '../../model/raceevent.js';
-import type { ParticipantPassingRecord, TimeRecord } from '../../model/timerecord.js';
-import { shouldExcludeCategoryFromResults } from '../../processing/category.js';
-import { getFlagEvents } from '../../processing/flag.js';
-import { getSourceLapCompletion, isCountedLapPassing } from '../../processing/laps.js';
-import { getParticipantNumber } from '../../processing/participant.js';
-import { calculateYellowFlagPeriods } from '../../processing/yellowFlagPeriods.js';
-import { LapTimesReport, type LapTimesReportState } from '../reports/LapTimesReport.js';
-import { TrackMapReport } from '../reports/TrackMapReport.js';
-import { HandicapView } from './handicap.js';
+import { Button, MenuItem } from "@mui/material";
+import React from "react";
+import {
+  millisecondsToTime,
+  tableTimeString,
+} from "../../app/utils/timeutils.js";
+import type {
+  EventCatalogEntrant,
+  EventCatalogEntry,
+  EventCatalogEvent,
+  EventCatalogSession,
+} from "../../catalog/eventCatalog.js";
+import {
+  getCategoryColor,
+  getCategoryPaletteColor,
+} from "../../categoryColors.js";
+import { SelectTextField } from "../../controls/selectTextField.js";
+import { EventEntrantId } from "../../model/entrant.js";
+import { getParticipantEntryId } from "../../model/entry.js";
+import type {
+  EventParticipant,
+  EventParticipantId,
+} from "../../model/eventparticipant.js";
+import type { FlagRecord } from "../../model/flag.js";
+import { EventCategoryId } from "../../model/index.js";
+import { EventId, SessionId } from "../../model/raceevent.js";
+import type {
+  ParticipantPassingRecord,
+  TimeRecord,
+} from "../../model/timerecord.js";
+import { shouldExcludeCategoryFromResults } from "../../processing/category.js";
+import { getFlagEvents } from "../../processing/flag.js";
+import {
+  getSourceLapCompletion,
+  isCountedLapPassing,
+} from "../../processing/laps.js";
+import { getParticipantNumber } from "../../processing/participant.js";
+import { calculateYellowFlagPeriods } from "../../processing/yellowFlagPeriods.js";
+import {
+  LapTimesReport,
+  type LapTimesReportState,
+} from "../reports/LapTimesReport.js";
+import { TrackMapReport } from "../reports/TrackMapReport.js";
+import { HandicapView } from "./handicap.js";
 
 interface CategoryOption {
   deleted?: boolean;
@@ -60,17 +83,34 @@ interface EntrantSummaryRow {
   totalTime?: number;
 }
 
-const getRowDriverName = (row: EntrantSummaryRow): string => Array.from(new Set(
-  row.memberDetails.map((member) => member.participantDisplayName).filter((name) => name.length > 0),
-)).join(' / ');
+const getRowDriverName = (row: EntrantSummaryRow): string =>
+  Array.from(
+    new Set(
+      row.memberDetails
+        .map((member) => member.participantDisplayName)
+        .filter((name) => name.length > 0),
+    ),
+  ).join(" / ");
 
-const getRowRaceNumber = (row: EntrantSummaryRow): string => Array.from(new Set(
-  row.memberDetails.map((member) => member.racePlate).filter((number): number is string => !!number),
-)).join(' / ');
+const getRowRaceNumber = (row: EntrantSummaryRow): string =>
+  Array.from(
+    new Set(
+      row.memberDetails
+        .map((member) => member.racePlate)
+        .filter((number): number is string => !!number),
+    ),
+  ).join(" / ");
 
-const getEntrantRaceNumber = (entrant: EventCatalogEntrant | undefined): string | undefined => {
-  const identifier = entrant?.identifiers?.find((candidate) => 'racePlate' in candidate) as { racePlate?: unknown } | undefined;
-  return typeof identifier?.racePlate === 'string' && identifier.racePlate.length > 0 ? identifier.racePlate : undefined;
+const getEntrantRaceNumber = (
+  entrant: EventCatalogEntrant | undefined,
+): string | undefined => {
+  const identifier = entrant?.identifiers?.find(
+    (candidate) => "racePlate" in candidate,
+  ) as { racePlate?: unknown } | undefined;
+  return typeof identifier?.racePlate === "string" &&
+    identifier.racePlate.length > 0
+    ? identifier.racePlate
+    : undefined;
 };
 
 interface LapChartEntry {
@@ -139,27 +179,44 @@ interface ResultsPageProps extends BaseRaceAnalyticsProps {
   selectedCategoryId?: EventCategoryId;
 }
 
-export type ReportType = 'countdown-clock' | 'fastest-laps' | 'fastest-lap-timeline' | 'lap-times' | 'lap-chart' | 'yellow-flag-periods' | 'handicap-data' | 'track-map';
+export type ReportType =
+  | "countdown-clock"
+  | "event-replay"
+  | "fastest-laps"
+  | "fastest-lap-timeline"
+  | "lap-times"
+  | "lap-chart"
+  | "yellow-flag-periods"
+  | "handicap-data"
+  | "track-map";
 
 export interface ReportsViewState {
   countdownStartFlagId?: string;
   drawLineChart: boolean;
-  handicapShowFilter: 'all' | 'event-participants-only';
+  handicapShowFilter: "all" | "event-participants-only";
   ignoreFirstLapForFastestLaps: boolean;
   ignoreFirstLapForTimeline: boolean;
   lapTimes: LapTimesReportState;
+  replayMode: ReplayReportMode;
+  replaySpeed: number;
   reportType: ReportType;
   selectedCategory: CategoryFilter;
 }
 
 export const createDefaultReportsViewState = (): ReportsViewState => ({
   drawLineChart: false,
-  handicapShowFilter: 'all',
+  handicapShowFilter: "all",
   ignoreFirstLapForFastestLaps: true,
   ignoreFirstLapForTimeline: true,
-  lapTimes: { selectedCategoryId: '__all__', selectedParticipantId: '', showAs: 'individual' },
-  reportType: 'fastest-laps',
-  selectedCategory: 'overall',
+  lapTimes: {
+    selectedCategoryId: "__all__",
+    selectedParticipantId: "",
+    showAs: "individual",
+  },
+  replayMode: "replay",
+  replaySpeed: 1,
+  reportType: "fastest-laps",
+  selectedCategory: "overall",
 });
 
 interface ReportsPageProps extends BaseRaceAnalyticsProps {
@@ -168,24 +225,167 @@ interface ReportsPageProps extends BaseRaceAnalyticsProps {
   viewState?: ReportsViewState;
 }
 
-type CategoryFilter = 'overall' | string;
+type CategoryFilter = "overall" | string;
+type ReplayReportMode = "live" | "replay";
+type ReplayControlCommand = "pause" | "reset" | "resume" | "set-speed" | "start";
+
+interface EventReplayReportProps {
+  eventId?: EventId;
+  mode: ReplayReportMode;
+  onModeChange: (mode: ReplayReportMode) => void;
+  onSpeedChange: (speed: number) => void;
+  sessionId?: SessionId;
+  speed: number;
+}
+
+const getReplayStreamPath = (
+  eventId: EventId,
+  sessionId: SessionId | undefined,
+  mode: ReplayReportMode,
+  speed: number,
+  streamId: string,
+): string => {
+  const parameters: URLSearchParams = new URLSearchParams({
+    eventId: eventId.toString(),
+    mode,
+    speed: speed.toString(),
+    streamId,
+  });
+  if (sessionId) {
+    parameters.set("sessionId", sessionId.toString());
+  }
+  return `/api/v1/reports/replay?${parameters.toString()}`;
+};
+
+const createReplayStreamId = (): string => globalThis.crypto?.randomUUID?.() ||
+  `replay-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+const sendReplayControl = (
+  streamId: string,
+  command: ReplayControlCommand,
+  speed?: number,
+): Promise<string> => fetch("/api/v1/reports/replay/control", {
+  body: JSON.stringify({ command, speed, streamId }),
+  headers: { "content-type": "application/json" },
+  method: "POST",
+}).then((response: Response): Promise<{ state?: { status?: string } | undefined; error?: string | undefined }> =>
+  response.json() as Promise<{ state?: { status?: string } | undefined; error?: string | undefined }>,
+).then((payload: { state?: { status?: string } | undefined; error?: string | undefined }): string => {
+  if (payload.error) {
+    throw new Error(payload.error);
+  }
+  return `Replay is ${payload.state?.status || "updated"}.`;
+});
+
+const EventReplayReport = (
+  props: EventReplayReportProps,
+): React.ReactElement => {
+  const [streamId, setStreamId] = React.useState<string>(createReplayStreamId);
+  const [controlMessage, setControlMessage] = React.useState<string>("");
+  if (!props.eventId) {
+    return (
+      <section className="events-panel">
+        <h2>Event Replay</h2>
+        <p>Select an event or session above to create a replay stream.</p>
+      </section>
+    );
+  }
+  const controlReplay = (command: ReplayControlCommand): void => {
+    void sendReplayControl(streamId, command, command === "set-speed" ? props.speed : undefined)
+      .then((message: string): void => setControlMessage(message))
+      .catch((error: Error): void => setControlMessage(error.message));
+  };
+  const streamPath: string = getReplayStreamPath(
+    props.eventId,
+    props.sessionId,
+    props.mode,
+    props.speed,
+    streamId,
+  );
+  return (
+    <section className="events-panel">
+      <h2>Event Replay</h2>
+      <p>
+        Remote clients can subscribe to this authenticated Server-Sent Event
+        stream. Replay preserves recorded intervals; live mode sends newly
+        accepted crossing records as they arrive.
+      </p>
+      <div className="events-actions">
+        <SelectTextField
+          className="page-filter-label"
+          label="Replay mode"
+          slotProps={{ select: { "aria-label": "Event Replay Mode" } }}
+          value={props.mode}
+          onChange={(event) =>
+            props.onModeChange(event.target.value as ReplayReportMode)
+          }
+        >
+          <MenuItem value="replay">Replay recorded data</MenuItem>
+          <MenuItem value="live">Live crossing stream</MenuItem>
+        </SelectTextField>
+        <SelectTextField
+          className="page-filter-label"
+          label="Replay speed"
+          slotProps={{ select: { "aria-label": "Event Replay Speed" } }}
+          value={props.speed.toString()}
+          onChange={(event) => props.onSpeedChange(Number(event.target.value))}
+        >
+          <MenuItem value="0.5">0.5×</MenuItem>
+          <MenuItem value="1">Real time (1×)</MenuItem>
+          <MenuItem value="2">2×</MenuItem>
+          <MenuItem value="4">4×</MenuItem>
+          <MenuItem value="8">8×</MenuItem>
+        </SelectTextField>
+        {props.mode === "replay" ? (
+          <>
+            <Button onClick={(): void => controlReplay("start")} variant="contained">
+              Start
+            </Button>
+            <Button onClick={(): void => controlReplay("pause")} variant="outlined">
+              Pause
+            </Button>
+            <Button onClick={(): void => controlReplay("resume")} variant="outlined">
+              Resume
+            </Button>
+            <Button onClick={(): void => controlReplay("reset")} variant="outlined">
+              Reset
+            </Button>
+            <Button onClick={(): void => setStreamId(createReplayStreamId())} variant="text">
+              New stream
+            </Button>
+          </>
+        ) : null}
+      </div>
+      {controlMessage ? <p aria-live="polite">{controlMessage}</p> : null}
+      <p>
+        <code aria-label="Event Replay Stream URL">{streamPath}</code>
+      </p>
+    </section>
+  );
+};
 
 const normalizeText = (value: string): string => value.trim().toLowerCase();
 
 const getCategoryColors = (
   categories: CategoryOption[],
   excludedCategoryKeys: Set<string>,
-): ReadonlyMap<string, string> => new Map(categories
-  .filter((category) => category.deleted !== true && category.excludeFromResults !== true)
-  .filter((category) => !excludedCategoryKeys.has(categoryKeyFromName(category.name)))
-  .map((category, index) => [
-    category.id,
-    packedRgbToCssColor(DEFAULT_CATEGORY_COLORS[index % DEFAULT_CATEGORY_COLORS.length]!),
-  ]));
+): ReadonlyMap<string, string> =>
+  new Map(
+    categories
+      .filter(
+        (category) =>
+          category.deleted !== true && category.excludeFromResults !== true,
+      )
+      .filter(
+        (category) =>
+          !excludedCategoryKeys.has(categoryKeyFromName(category.name)),
+      )
+      .map((category, index) => [category.id, getCategoryPaletteColor(index)]),
+  );
 
 const getCategoryByIdSafely = (
   raceState: RaceState & RaceStateLookup,
-  categoryId?: EventCategoryId
+  categoryId?: EventCategoryId,
 ): CategoryOption | undefined => {
   if (!categoryId) {
     return undefined;
@@ -198,9 +398,12 @@ const getCategoryByIdSafely = (
   }
 };
 
-const categoryNameFromId = (raceState: RaceState & RaceStateLookup, categoryId?: EventCategoryId): string => {
+const categoryNameFromId = (
+  raceState: RaceState & RaceStateLookup,
+  categoryId?: EventCategoryId,
+): string => {
   if (!categoryId) {
-    return 'Unknown';
+    return "Unknown";
   }
 
   return getCategoryByIdSafely(raceState, categoryId)?.name || categoryId;
@@ -208,27 +411,37 @@ const categoryNameFromId = (raceState: RaceState & RaceStateLookup, categoryId?:
 
 const categoryKeyFromName = (name: string): string => normalizeText(name);
 
-const _categoryKeyFromId = (raceState: RaceState & RaceStateLookup, categoryId?: EventCategoryId): string => {
+const _categoryKeyFromId = (
+  raceState: RaceState & RaceStateLookup,
+  categoryId?: EventCategoryId,
+): string => {
   return categoryKeyFromName(categoryNameFromId(raceState, categoryId));
 };
 
-const dedupeCategoryOptions = (categories: CategoryOption[]): CategoryOption[] => {
+const dedupeCategoryOptions = (
+  categories: CategoryOption[],
+): CategoryOption[] => {
   const byId = new Map<string, CategoryOption>();
-  categories.filter((category) => category.deleted !== true).forEach((category) => {
-    byId.set(category.id, category);
-  });
+  categories
+    .filter((category) => category.deleted !== true)
+    .forEach((category) => {
+      byId.set(category.id, category);
+    });
   return Array.from(byId.values());
 };
 
 const getExcludedCategoryKeys = (
   raceState: RaceState & RaceStateLookup,
-  categories: CategoryOption[]
+  categories: CategoryOption[],
 ): Set<string> => {
   const excludedKeys = new Set<string>();
 
   categories.forEach((category) => {
     const stateCategory = getCategoryByIdSafely(raceState, category.id);
-    if (category.excludeFromResults || shouldExcludeCategoryFromResults(stateCategory)) {
+    if (
+      category.excludeFromResults ||
+      shouldExcludeCategoryFromResults(stateCategory)
+    ) {
       excludedKeys.add(categoryKeyFromName(category.name));
       excludedKeys.add(_categoryKeyFromId(raceState, category.id));
     }
@@ -246,36 +459,51 @@ const getExcludedCategoryKeys = (
 const isParticipantExcludedFromResults = (
   raceState: RaceState & RaceStateLookup,
   participant: EventParticipant,
-  excludedCategoryKeys: Set<string>
+  excludedCategoryKeys: Set<string>,
 ): boolean => {
   const category = getCategoryByIdSafely(raceState, participant.categoryId);
-  return shouldExcludeCategoryFromResults(category) || excludedCategoryKeys.has(_categoryKeyFromId(raceState, participant.categoryId));
+  return (
+    shouldExcludeCategoryFromResults(category) ||
+    excludedCategoryKeys.has(
+      _categoryKeyFromId(raceState, participant.categoryId),
+    )
+  );
 };
 
 const formatDuration = (duration?: number): string => {
   if (!duration || duration <= 0) {
-    return '--:--:--.---';
+    return "--:--:--.---";
   }
   return millisecondsToTime(duration);
 };
 
 const isValidLap = (
   lap: ParticipantPassingRecord,
-  raceState: RaceStateLookup
+  raceState: RaceStateLookup,
 ): boolean => {
-  return isCountedLapPassing(lap, raceState.getFinishLineNumbers?.(), (passing) => (
-    getSourceLapCompletion(passing, raceState.getTimeRecordSourceById?.(passing.source))
-  ));
+  return isCountedLapPassing(
+    lap,
+    raceState.getFinishLineNumbers?.(),
+    (passing) =>
+      getSourceLapCompletion(
+        passing,
+        raceState.getTimeRecordSourceById?.(passing.source),
+      ),
+  );
 };
 
-const findEntrantName = (entrantId: EventEntrantId, members: EventParticipant[], catalogEntrantsById: Map<EventEntrantId, EventCatalogEntrant>): string => {
+const findEntrantName = (
+  entrantId: EventEntrantId,
+  members: EventParticipant[],
+  catalogEntrantsById: Map<EventEntrantId, EventCatalogEntrant>,
+): string => {
   const catalogName = catalogEntrantsById.get(entrantId)?.name?.trim();
   if (catalogName && catalogName.length > 0) {
     return catalogName;
   }
 
   const names = members
-    .map((member) => `${member.firstname || ''} ${member.surname || ''}`.trim())
+    .map((member) => `${member.firstname || ""} ${member.surname || ""}`.trim())
     .filter((name) => name.length > 0);
 
   if (names.length === 0) {
@@ -285,12 +513,20 @@ const findEntrantName = (entrantId: EventEntrantId, members: EventParticipant[],
     return names[0];
   }
 
-  return names.join(' / ');
+  return names.join(" / ");
 };
 
-const findFastestLapRecord = (laps: ParticipantPassingRecord[], ignoreFirstLap: boolean): ParticipantPassingRecord | undefined => {
+const findFastestLapRecord = (
+  laps: ParticipantPassingRecord[],
+  ignoreFirstLap: boolean,
+): ParticipantPassingRecord | undefined => {
   return laps
-    .filter((lap) => typeof lap.lapTime === 'number' && lap.lapTime > 0 && (!ignoreFirstLap || lap.lapNo !== 1))
+    .filter(
+      (lap) =>
+        typeof lap.lapTime === "number" &&
+        lap.lapTime > 0 &&
+        (!ignoreFirstLap || lap.lapNo !== 1),
+    )
     .sort((left, right) => {
       if (left.lapTime !== right.lapTime) {
         return (left.lapTime || 0) - (right.lapTime || 0);
@@ -299,11 +535,17 @@ const findFastestLapRecord = (laps: ParticipantPassingRecord[], ignoreFirstLap: 
     })[0];
 };
 
-const findFastestLapPlate = (row: EntrantSummaryRow, fastestLapRecord: ParticipantPassingRecord | undefined): string | undefined => {
+const findFastestLapPlate = (
+  row: EntrantSummaryRow,
+  fastestLapRecord: ParticipantPassingRecord | undefined,
+): string | undefined => {
   if (!fastestLapRecord?.participantId) {
     return undefined;
   }
-  return row.memberDetails.find((member) => member.participantId === fastestLapRecord.participantId?.toString())?.raceNumber;
+  return row.memberDetails.find(
+    (member) =>
+      member.participantId === fastestLapRecord.participantId?.toString(),
+  )?.raceNumber;
 };
 
 const buildEntrantRows = (
@@ -312,8 +554,12 @@ const buildEntrantRows = (
   catalogEntries: EventCatalogEntry[],
   excludedCategoryKeys: Set<string>,
 ): EntrantSummaryRow[] => {
-  const catalogEntrantsById = new Map(catalogEntrants.map((entrant) => [entrant.id, entrant]));
-  const catalogEntriesById = new Map(catalogEntries.map((entry) => [entry.id, entry]));
+  const catalogEntrantsById = new Map(
+    catalogEntrants.map((entrant) => [entrant.id, entrant]),
+  );
+  const catalogEntriesById = new Map(
+    catalogEntries.map((entry) => [entry.id, entry]),
+  );
   const participantGroups = new Map<EventEntrantId, EventParticipant[]>();
 
   raceState.participants.forEach((participant) => {
@@ -329,11 +575,18 @@ const buildEntrantRows = (
     const catalogEntry = catalogEntriesById.get(entrantId);
     const entryCategoryId = catalogEntry?.categoryId;
     const entryCategory = getCategoryByIdSafely(raceState, entryCategoryId);
-    const isEntryExcluded = shouldExcludeCategoryFromResults(entryCategory) ||
+    const isEntryExcluded =
+      shouldExcludeCategoryFromResults(entryCategory) ||
       excludedCategoryKeys.has(_categoryKeyFromId(raceState, entryCategoryId));
-    const includedMembers = members.filter((member) => entryCategoryId
-      ? !isEntryExcluded
-      : !isParticipantExcludedFromResults(raceState, member, excludedCategoryKeys));
+    const includedMembers = members.filter((member) =>
+      entryCategoryId
+        ? !isEntryExcluded
+        : !isParticipantExcludedFromResults(
+          raceState,
+          member,
+          excludedCategoryKeys,
+        ),
+    );
     if (includedMembers.length === 0) {
       return;
     }
@@ -352,29 +605,57 @@ const buildEntrantRows = (
 
     const fastestLapRecord = findFastestLapRecord(laps, false);
 
-    const totalTime = laps.length > 0 ? laps[laps.length - 1].elapsedTime || undefined : undefined;
+    const totalTime =
+      laps.length > 0
+        ? laps[laps.length - 1].elapsedTime || undefined
+        : undefined;
     const memberDetails = includedMembers.map((member) => {
-      const raceNumber = catalogEntry?.raceNumber || getParticipantNumber(member) || getEntrantRaceNumber(catalogEntrantsById.get(entrantId));
+      const raceNumber =
+        catalogEntry?.raceNumber ||
+        getParticipantNumber(member) ||
+        getEntrantRaceNumber(catalogEntrantsById.get(entrantId));
       return {
         categoryId: (entryCategoryId || member.categoryId)?.toString(),
-        categoryName: categoryNameFromId(raceState, entryCategoryId || member.categoryId),
-        participantDisplayName: `${member.firstname || ''} ${member.surname ? member.surname.toUpperCase() : ''}`.trim() || member.id.toString(),
+        categoryName: categoryNameFromId(
+          raceState,
+          entryCategoryId || member.categoryId,
+        ),
+        participantDisplayName:
+          `${member.firstname || ""} ${member.surname ? member.surname.toUpperCase() : ""}`.trim() ||
+          member.id.toString(),
         participantId: member.id.toString(),
-        participantName: `${member.firstname || ''} ${member.surname || ''}`.trim() || member.id.toString(),
+        participantName:
+          `${member.firstname || ""} ${member.surname || ""}`.trim() ||
+          member.id.toString(),
         raceNumber: raceNumber ? raceNumber.toString() : member.id.toString(),
         racePlate: raceNumber ? raceNumber.toString() : undefined,
       };
     });
-    const categoryIds = Array.from(new Set(memberDetails.map((member) => member.categoryId).filter((categoryId): categoryId is string => !!categoryId)));
-    const categoryKeys = Array.from(new Set(memberDetails.map((member) => categoryKeyFromName(member.categoryName))));
-    const categoryName = memberDetails.map((member) => member.categoryName).filter((value, index, values) => values.indexOf(value) === index).join(', ');
+    const categoryIds = Array.from(
+      new Set(
+        memberDetails
+          .map((member) => member.categoryId)
+          .filter((categoryId): categoryId is string => !!categoryId),
+      ),
+    );
+    const categoryKeys = Array.from(
+      new Set(
+        memberDetails.map((member) => categoryKeyFromName(member.categoryName)),
+      ),
+    );
+    const categoryName = memberDetails
+      .map((member) => member.categoryName)
+      .filter((value, index, values) => values.indexOf(value) === index)
+      .join(", ");
 
     rows.push({
       categoryIds,
       categoryKeys,
       categoryName,
       entrantId,
-      entrantName: catalogEntry?.name?.trim() || findEntrantName(entrantId, members, catalogEntrantsById),
+      entrantName:
+        catalogEntry?.name?.trim() ||
+        findEntrantName(entrantId, members, catalogEntrantsById),
       fastestLap: fastestLapRecord?.lapTime || undefined,
       fastestLapNo: fastestLapRecord?.lapNo || undefined,
       fastestLapPlate: undefined,
@@ -389,10 +670,10 @@ const buildEntrantRows = (
     if (left.lapCount !== right.lapCount) {
       return right.lapCount - left.lapCount;
     }
-    if (typeof left.totalTime !== 'number') {
+    if (typeof left.totalTime !== "number") {
       return 1;
     }
-    if (typeof right.totalTime !== 'number') {
+    if (typeof right.totalTime !== "number") {
       return -1;
     }
     return left.totalTime - right.totalTime;
@@ -403,7 +684,9 @@ const buildLapChart = (rows: EntrantSummaryRow[]): LapChartColumn[] => {
   const byLap = new Map<number, Map<string, LapChartEntry>>();
 
   rows.forEach((row) => {
-    const memberById = new Map(row.memberDetails.map((detail) => [detail.participantId, detail]));
+    const memberById = new Map(
+      row.memberDetails.map((detail) => [detail.participantId, detail]),
+    );
     row.laps.forEach((lap) => {
       if (!lap.lapNo || !lap.participantId) {
         return;
@@ -460,14 +743,23 @@ const buildLapChart = (rows: EntrantSummaryRow[]): LapChartColumn[] => {
     });
 };
 
-const parseIsoDurationMilliseconds = (duration: string | undefined): number | undefined => {
-  const match = duration?.trim().match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/u);
+const parseIsoDurationMilliseconds = (
+  duration: string | undefined,
+): number | undefined => {
+  const match = duration
+    ?.trim()
+    .match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/u);
   if (!match) {
     return undefined;
   }
-  const [, days = '0', hours = '0', minutes = '0', seconds = '0'] = match;
-  const milliseconds = (((Number(days) * 24 + Number(hours)) * 60 + Number(minutes)) * 60 + Number(seconds)) * 1000;
-  return Number.isFinite(milliseconds) && milliseconds > 0 ? milliseconds : undefined;
+  const [, days = "0", hours = "0", minutes = "0", seconds = "0"] = match;
+  const milliseconds =
+    (((Number(days) * 24 + Number(hours)) * 60 + Number(minutes)) * 60 +
+      Number(seconds)) *
+    1000;
+  return Number.isFinite(milliseconds) && milliseconds > 0
+    ? milliseconds
+    : undefined;
 };
 
 const formatCountdown = (remainingMilliseconds: number): string => {
@@ -475,7 +767,7 @@ const formatCountdown = (remainingMilliseconds: number): string => {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 };
 
 const getCountdownFlags = (records: TimeRecord[]): FlagRecord[] => {
@@ -484,30 +776,39 @@ const getCountdownFlags = (records: TimeRecord[]): FlagRecord[] => {
     .sort((left, right) => left.time!.getTime() - right.time!.getTime());
 };
 
-const getRaceStateContentSignature = (raceState: RaceState & RaceStateLookup): string => {
+const getRaceStateContentSignature = (
+  raceState: RaceState & RaceStateLookup,
+): string => {
   const entrySignature = (raceState.entries || [])
-    .map((entry) => [
-      entry.id,
-      entry.entrantId,
-      entry.categoryId,
-      entry.raceNumber,
-      JSON.stringify(entry.identifiers),
-      entry.participantIds.join(','),
-    ].join(':'))
-    .join('|');
+    .map((entry) =>
+      [
+        entry.id,
+        entry.entrantId,
+        entry.categoryId,
+        entry.raceNumber,
+        JSON.stringify(entry.identifiers),
+        entry.participantIds.join(","),
+      ].join(":"),
+    )
+    .join("|");
   const participantSignature = raceState.participants
-    .map((participant) => [
-      participant.id,
-      participant.entrantId,
-      participant.categoryId,
-      participant.firstname,
-      participant.surname,
-      JSON.stringify(participant.identifiers || []),
-    ].join(':'))
-    .join('|');
+    .map((participant) =>
+      [
+        participant.id,
+        participant.entrantId,
+        participant.categoryId,
+        participant.firstname,
+        participant.surname,
+        JSON.stringify(participant.identifiers || []),
+      ].join(":"),
+    )
+    .join("|");
   const categorySignature = raceState.categories
-    .map((category) => `${category.id}:${category.name}:${category.excludeFromResults === true}`)
-    .join('|');
+    .map(
+      (category) =>
+        `${category.id}:${category.name}:${category.excludeFromResults === true}`,
+    )
+    .join("|");
   const recordSignature = raceState.records
     .map((record) => {
       const passing = record as ParticipantPassingRecord;
@@ -534,63 +835,72 @@ const getRaceStateContentSignature = (raceState: RaceState & RaceStateLookup): s
         passing.elapsedTime,
         record.time?.getTime(),
         record.timeTenthOfMillisecond,
-      ].join(':');
+      ].join(":");
     })
-    .join('|');
+    .join("|");
 
   return `${entrySignature}::${participantSignature}::${categorySignature}::${recordSignature}`;
 };
 
-const buildFastestLapTimeline = (rows: EntrantSummaryRow[], ignoreFirstLap: boolean): FastestLapTimelineRow[] => {
-  const candidates = rows.flatMap((row) => {
-    const memberById = new Map(row.memberDetails.map((detail) => [detail.participantId, detail]));
-    const isTeamEntrant = row.memberDetails.length > 1;
+const buildFastestLapTimeline = (
+  rows: EntrantSummaryRow[],
+  ignoreFirstLap: boolean,
+): FastestLapTimelineRow[] => {
+  const candidates = rows
+    .flatMap((row) => {
+      const memberById = new Map(
+        row.memberDetails.map((detail) => [detail.participantId, detail]),
+      );
+      const isTeamEntrant = row.memberDetails.length > 1;
 
-    return row.laps
-      .filter((lap) => {
-        return typeof lap.lapTime === 'number' &&
-          lap.lapTime > 0 &&
-          !!lap.participantId &&
-          !!lap.lapNo &&
-          (!ignoreFirstLap || lap.lapNo !== 1);
-      })
-      .map((lap) => {
-        const participantId = lap.participantId!.toString();
-        const detail = memberById.get(participantId);
-        if (!detail) {
-          return undefined;
-        }
+      return row.laps
+        .filter((lap) => {
+          return (
+            typeof lap.lapTime === "number" &&
+            lap.lapTime > 0 &&
+            !!lap.participantId &&
+            !!lap.lapNo &&
+            (!ignoreFirstLap || lap.lapNo !== 1)
+          );
+        })
+        .map((lap) => {
+          const participantId = lap.participantId!.toString();
+          const detail = memberById.get(participantId);
+          if (!detail) {
+            return undefined;
+          }
 
-        const timelineRow: FastestLapTimelineRow = {
-          elapsedTime: lap.elapsedTime!,
-          entrantId: row.entrantId,
-          lapNo: lap.lapNo!,
-          lapTime: lap.lapTime!,
-          participantId: detail.participantId,
-          participantName: detail.participantName,
-          raceNumber: detail.raceNumber,
-          teamName: isTeamEntrant ? row.entrantName : '',
-          time: lap.time,
-        };
-        return timelineRow;
-      })
-      .filter((lap): lap is FastestLapTimelineRow => !!lap);
-  }).sort((left, right) => {
-    const leftTime = left.time?.getTime() || Number.MAX_SAFE_INTEGER;
-    const rightTime = right.time?.getTime() || Number.MAX_SAFE_INTEGER;
-    if (leftTime !== rightTime) {
-      return leftTime - rightTime;
-    }
-    if (left.elapsedTime !== right.elapsedTime) {
-      return left.elapsedTime - right.elapsedTime;
-    }
-    return left.lapTime - right.lapTime;
-  });
+          const timelineRow: FastestLapTimelineRow = {
+            elapsedTime: lap.elapsedTime!,
+            entrantId: row.entrantId,
+            lapNo: lap.lapNo!,
+            lapTime: lap.lapTime!,
+            participantId: detail.participantId,
+            participantName: detail.participantName,
+            raceNumber: detail.raceNumber,
+            teamName: isTeamEntrant ? row.entrantName : "",
+            time: lap.time,
+          };
+          return timelineRow;
+        })
+        .filter((lap): lap is FastestLapTimelineRow => !!lap);
+    })
+    .sort((left, right) => {
+      const leftTime = left.time?.getTime() || Number.MAX_SAFE_INTEGER;
+      const rightTime = right.time?.getTime() || Number.MAX_SAFE_INTEGER;
+      if (leftTime !== rightTime) {
+        return leftTime - rightTime;
+      }
+      if (left.elapsedTime !== right.elapsedTime) {
+        return left.elapsedTime - right.elapsedTime;
+      }
+      return left.lapTime - right.lapTime;
+    });
 
   const timeline: FastestLapTimelineRow[] = [];
   candidates.forEach((lap) => {
     const currentFastest = timeline[timeline.length - 1]?.lapTime;
-    if (typeof currentFastest !== 'number' || lap.lapTime < currentFastest) {
+    if (typeof currentFastest !== "number" || lap.lapTime < currentFastest) {
       timeline.push(lap);
     }
   });
@@ -598,7 +908,10 @@ const buildFastestLapTimeline = (rows: EntrantSummaryRow[], ignoreFirstLap: bool
   return timeline;
 };
 
-const buildFastestLapReportRows = (rows: EntrantSummaryRow[], ignoreFirstLap: boolean): EntrantSummaryRow[] => {
+const buildFastestLapReportRows = (
+  rows: EntrantSummaryRow[],
+  ignoreFirstLap: boolean,
+): EntrantSummaryRow[] => {
   return rows
     .map((row) => {
       const fastestLapRecord = findFastestLapRecord(row.laps, ignoreFirstLap);
@@ -610,10 +923,10 @@ const buildFastestLapReportRows = (rows: EntrantSummaryRow[], ignoreFirstLap: bo
       };
     })
     .sort((left, right) => {
-      if (typeof left.fastestLap !== 'number') {
+      if (typeof left.fastestLap !== "number") {
         return 1;
       }
-      if (typeof right.fastestLap !== 'number') {
+      if (typeof right.fastestLap !== "number") {
         return -1;
       }
       return left.fastestLap - right.fastestLap;
@@ -625,10 +938,14 @@ const CategorySelector = (props: {
   selectedCategory: CategoryFilter;
   onSelectCategory: (next: CategoryFilter) => void;
 }): React.ReactElement => {
-  const selectedCategory: CategoryFilter = props.selectedCategory === 'overall' ||
-    props.categories.some((category: CategoryOption): boolean => category.id === props.selectedCategory)
-    ? props.selectedCategory
-    : 'overall';
+  const selectedCategory: CategoryFilter =
+    props.selectedCategory === "overall" ||
+    props.categories.some(
+      (category: CategoryOption): boolean =>
+        category.id === props.selectedCategory,
+    )
+      ? props.selectedCategory
+      : "overall";
   return (
     <>
       <SelectTextField
@@ -636,15 +953,19 @@ const CategorySelector = (props: {
         label="Category"
         slotProps={{
           select: {
-            'aria-label': 'Race View Category',
+            "aria-label": "Race View Category",
           },
         }}
         value={selectedCategory}
-        onChange={(event) => props.onSelectCategory(event.target.value as CategoryFilter)}
+        onChange={(event) =>
+          props.onSelectCategory(event.target.value as CategoryFilter)
+        }
       >
         <MenuItem value="overall">Overall</MenuItem>
         {props.categories.map((category) => (
-          <MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>
+          <MenuItem key={category.id} value={category.id}>
+            {category.name}
+          </MenuItem>
         ))}
       </SelectTextField>
       <select
@@ -652,11 +973,14 @@ const CategorySelector = (props: {
         hidden
         value={selectedCategory}
         onChange={(event: React.ChangeEvent<HTMLSelectElement>): void =>
-          props.onSelectCategory(event.target.value as CategoryFilter)}
+          props.onSelectCategory(event.target.value as CategoryFilter)
+        }
       >
         <option value="overall">Overall</option>
         {props.categories.map((category: CategoryOption) => (
-          <option key={category.id} value={category.id}>{category.name}</option>
+          <option key={category.id} value={category.id}>
+            {category.name}
+          </option>
         ))}
       </select>
     </>
@@ -668,14 +992,20 @@ const EventSessionSelector = (props: {
   options?: EventSessionOption[];
   selectedValue?: string;
 }): React.ReactElement | null => {
-  if (!props.options || props.options.length === 0 || !props.onSelectEventSession) {
+  if (
+    !props.options ||
+    props.options.length === 0 ||
+    !props.onSelectEventSession
+  ) {
     return null;
   }
 
   const selectableOptions = props.options.filter((option) => option.sessionId);
-  const selectedValue = selectableOptions.some((option) => option.value === props.selectedValue)
+  const selectedValue = selectableOptions.some(
+    (option) => option.value === props.selectedValue,
+  )
     ? props.selectedValue
-    : selectableOptions[0]?.value || '';
+    : selectableOptions[0]?.value || "";
 
   return (
     <>
@@ -684,15 +1014,21 @@ const EventSessionSelector = (props: {
         label="Event/Session"
         slotProps={{
           select: {
-            'aria-label': 'Race View Event Session',
+            "aria-label": "Race View Event Session",
           },
         }}
         value={selectedValue}
         onChange={(event) => props.onSelectEventSession?.(event.target.value)}
       >
         {props.options.map((option) => (
-          <MenuItem key={option.value} disabled={!option.sessionId} value={option.value}>
-            {option.sessionId ? `-> ${option.sessionName || option.sessionId}` : option.eventName}
+          <MenuItem
+            key={option.value}
+            disabled={!option.sessionId}
+            value={option.value}
+          >
+            {option.sessionId
+              ? `-> ${option.sessionName || option.sessionId}`
+              : option.eventName}
           </MenuItem>
         ))}
       </SelectTextField>
@@ -701,11 +1037,18 @@ const EventSessionSelector = (props: {
         hidden
         value={selectedValue}
         onChange={(event: React.ChangeEvent<HTMLSelectElement>): void =>
-          props.onSelectEventSession?.(event.target.value)}
+          props.onSelectEventSession?.(event.target.value)
+        }
       >
         {props.options.map((option: EventSessionOption) => (
-          <option key={option.value} disabled={!option.sessionId} value={option.value}>
-            {option.sessionId ? `-> ${option.sessionName || option.sessionId}` : option.eventName}
+          <option
+            key={option.value}
+            disabled={!option.sessionId}
+            value={option.value}
+          >
+            {option.sessionId
+              ? `-> ${option.sessionName || option.sessionId}`
+              : option.eventName}
           </option>
         ))}
       </select>
@@ -722,18 +1065,27 @@ interface LapChartPanelProps {
 }
 
 const LapChartPanel = (props: LapChartPanelProps): React.ReactElement => {
-  const [selectedLapEntry, setSelectedLapEntry] = React.useState<LapChartEntry | undefined>(undefined);
-  const [lapChartLineSegments, setLapChartLineSegments] = React.useState<LapChartLineSegment[]>([]);
+  const [selectedLapEntry, setSelectedLapEntry] = React.useState<
+    LapChartEntry | undefined
+  >(undefined);
+  const [lapChartLineSegments, setLapChartLineSegments] = React.useState<
+    LapChartLineSegment[]
+  >([]);
   const lapChartWrapperRef = React.useRef<HTMLDivElement | null>(null);
   const lapChart = React.useMemo(() => {
     return buildLapChart(props.rows);
   }, [props.rows]);
   const maxLapPosition = React.useMemo(() => {
-    return lapChart.reduce((maxValue, lap) => Math.max(maxValue, lap.entries.length), 0);
+    return lapChart.reduce(
+      (maxValue, lap) => Math.max(maxValue, lap.entries.length),
+      0,
+    );
   }, [lapChart]);
 
   const handleLapEntryClick = (entry: LapChartEntry): void => {
-    setSelectedLapEntry((currentEntry) => currentEntry?.entrantId === entry.entrantId ? undefined : entry);
+    setSelectedLapEntry((currentEntry) =>
+      currentEntry?.entrantId === entry.entrantId ? undefined : entry,
+    );
   };
 
   const updateLapChartLineSegments = React.useCallback((): void => {
@@ -744,13 +1096,22 @@ const LapChartPanel = (props: LapChartPanelProps): React.ReactElement => {
     }
 
     const wrapperRect = wrapper.getBoundingClientRect();
-    const buttons = Array.from(wrapper.querySelectorAll<HTMLButtonElement>('button[data-lap-chart-entrant-id]'));
+    const buttons = Array.from(
+      wrapper.querySelectorAll<HTMLButtonElement>(
+        "button[data-lap-chart-entrant-id]",
+      ),
+    );
     const pointsByEntrant = new Map<EventEntrantId, LapChartLinePoint[]>();
-    const entrantIds: EventEntrantId[] = Array.from(new Set(props.allRows.map((row) => row.entrantId)));
-    const entrantColorOrder: Map<EventEntrantId, number> = new Map(entrantIds.map((entrantId, index) => [entrantId, index]));
+    const entrantIds: EventEntrantId[] = Array.from(
+      new Set(props.allRows.map((row) => row.entrantId)),
+    );
+    const entrantColorOrder: Map<EventEntrantId, number> = new Map(
+      entrantIds.map((entrantId, index) => [entrantId, index]),
+    );
 
     buttons.forEach((button, domOrder: number) => {
-      const entrantId = button.dataset.lapChartEntrantId as EventEntrantId | undefined;
+      const entrantId = button.dataset.lapChartEntrantId as
+        EventEntrantId | undefined;
       const lapNo = Number(button.dataset.lapChartLapNo);
       const position = Number(button.dataset.lapChartPosition);
       if (!entrantId || Number.isNaN(lapNo) || Number.isNaN(position)) {
@@ -782,7 +1143,9 @@ const LapChartPanel = (props: LapChartPanelProps): React.ReactElement => {
         }
         return left.domOrder - right.domOrder;
       });
-      const color = getCategoryPaletteColor(entrantColorOrder.get(entrantId) || 0);
+      const color = getCategoryPaletteColor(
+        entrantColorOrder.get(entrantId) || 0,
+      );
       sortedPoints.slice(1).forEach((point, index) => {
         const previousPoint = sortedPoints[index];
         segments.push({
@@ -809,9 +1172,9 @@ const LapChartPanel = (props: LapChartPanelProps): React.ReactElement => {
       return undefined;
     }
 
-    window.addEventListener('resize', updateLapChartLineSegments);
+    window.addEventListener("resize", updateLapChartLineSegments);
     return () => {
-      window.removeEventListener('resize', updateLapChartLineSegments);
+      window.removeEventListener("resize", updateLapChartLineSegments);
     };
   }, [props.drawLineChart, updateLapChartLineSegments]);
 
@@ -822,7 +1185,9 @@ const LapChartPanel = (props: LapChartPanelProps): React.ReactElement => {
         <input
           type="checkbox"
           checked={props.drawLineChart}
-          onChange={(event) => props.onDrawLineChartChange(event.target.checked)}
+          onChange={(event) =>
+            props.onDrawLineChartChange(event.target.checked)
+          }
         />
         Draw line chart
       </label>
@@ -858,12 +1223,19 @@ const LapChartPanel = (props: LapChartPanelProps): React.ReactElement => {
                 <td>{rowIndex + 1}</td>
                 {lapChart.map((column) => {
                   const entry = column.entries[rowIndex];
-                  const isSelectedEntrant = !!entry && selectedLapEntry?.entrantId === entry.entrantId;
-                  const categoryColor = entry ? getCategoryColor(entry.categoryId) : undefined;
+                  const isSelectedEntrant =
+                    !!entry && selectedLapEntry?.entrantId === entry.entrantId;
+                  const categoryColor = entry
+                    ? getCategoryColor(entry.categoryId)
+                    : undefined;
                   return (
                     <td
                       key={`lap-cell-${column.lapNo}-${rowIndex + 1}`}
-                      className={isSelectedEntrant ? 'lap-chart-table__entrant-cell--selected' : undefined}
+                      className={
+                        isSelectedEntrant
+                          ? "lap-chart-table__entrant-cell--selected"
+                          : undefined
+                      }
                     >
                       {entry ? (
                         <button
@@ -874,7 +1246,11 @@ const LapChartPanel = (props: LapChartPanelProps): React.ReactElement => {
                           data-lap-chart-lap-no={entry.lapNo}
                           data-lap-chart-position={entry.position}
                           onClick={() => handleLapEntryClick(entry)}
-                          style={categoryColor ? { border: `2px solid ${categoryColor}` } : undefined}
+                          style={
+                            categoryColor
+                              ? { border: `2px solid ${categoryColor}` }
+                              : undefined
+                          }
                         >
                           {entry.raceNumber}
                         </button>
@@ -888,10 +1264,19 @@ const LapChartPanel = (props: LapChartPanelProps): React.ReactElement => {
         </table>
       </div>
       {selectedLapEntry ? (
-        <aside className="events-panel lap-entry-info" aria-label="Lap Entry Details">
+        <aside
+          className="events-panel lap-entry-info"
+          aria-label="Lap Entry Details"
+        >
           <h3>Lap Entry Details</h3>
-          <p>Rider: {selectedLapEntry.raceNumber} · {selectedLapEntry.participantName}</p>
-          <p>Entrant: {selectedLapEntry.entrantName} ({selectedLapEntry.entrantId})</p>
+          <p>
+            Rider: {selectedLapEntry.raceNumber} ·{" "}
+            {selectedLapEntry.participantName}
+          </p>
+          <p>
+            Entrant: {selectedLapEntry.entrantName} (
+            {selectedLapEntry.entrantId})
+          </p>
           <p>Category: {selectedLapEntry.categoryName}</p>
           <p>Lap: {selectedLapEntry.lapNo}</p>
           <p>Position: {selectedLapEntry.position}</p>
@@ -903,51 +1288,82 @@ const LapChartPanel = (props: LapChartPanelProps): React.ReactElement => {
 };
 
 export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
-  const isMotorsport = props.event?.discipline === 'motorsport';
-  const isCycling = props.event?.discipline === 'cycling';
+  const isMotorsport = props.event?.discipline === "motorsport";
+  const isCycling = props.event?.discipline === "cycling";
   const useParticipantIdentity = isMotorsport || isCycling;
-  const participantLabel = isMotorsport ? 'Driver' : isCycling ? 'Participant' : 'Entrant';
-  const numberLabel = 'No.';
-  const excludedCategoryKeys = React.useMemo(() => getExcludedCategoryKeys(props.raceState, props.categories), [props.categories, props.raceState]);
+  const participantLabel = isMotorsport
+    ? "Driver"
+    : isCycling
+      ? "Participant"
+      : "Entrant";
+  const numberLabel = "No.";
+  const excludedCategoryKeys = React.useMemo(
+    () => getExcludedCategoryKeys(props.raceState, props.categories),
+    [props.categories, props.raceState],
+  );
   const categories = React.useMemo(() => {
     return dedupeCategoryOptions(props.categories);
   }, [props.categories]);
-  const categoryColors = React.useMemo(() => getCategoryColors(categories, excludedCategoryKeys), [categories, excludedCategoryKeys]);
-  const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>(
-    props.selectedCategoryId && categories.some(
-      (category: CategoryOption): boolean => category.id === props.selectedCategoryId,
-    )
-      ? props.selectedCategoryId
-      : 'overall',
-  );
+  const [selectedCategory, setSelectedCategory] =
+    React.useState<CategoryFilter>(
+      props.selectedCategoryId &&
+        categories.some(
+          (category: CategoryOption): boolean =>
+            category.id === props.selectedCategoryId,
+        )
+        ? props.selectedCategoryId
+        : "overall",
+    );
   const [drawLineChart, setDrawLineChart] = React.useState<boolean>(false);
-  const [viewType, setViewType] = React.useState<'results' | 'lap-chart'>('results');
+  const [viewType, setViewType] = React.useState<"results" | "lap-chart">(
+    "results",
+  );
 
   React.useEffect(() => {
     if (!props.selectedCategoryId) {
       return;
     }
-    if (categories.some((category) => category.id === props.selectedCategoryId)) {
+    if (
+      categories.some((category) => category.id === props.selectedCategoryId)
+    ) {
       setSelectedCategory(props.selectedCategoryId);
     }
   }, [categories, props.selectedCategoryId]);
 
   React.useEffect(() => {
-    if (selectedCategory !== 'overall' && !categories.some((category) => category.id === selectedCategory)) {
-      setSelectedCategory('overall');
+    if (
+      selectedCategory !== "overall" &&
+      !categories.some((category) => category.id === selectedCategory)
+    ) {
+      setSelectedCategory("overall");
     }
   }, [categories, selectedCategory]);
 
-  const raceStateContentSignature = getRaceStateContentSignature(props.raceState);
+  const raceStateContentSignature = getRaceStateContentSignature(
+    props.raceState,
+  );
   const allRows = React.useMemo(() => {
-    return buildEntrantRows(props.raceState, props.catalogEntrants, props.catalogEntries || [], excludedCategoryKeys);
-  }, [excludedCategoryKeys, props.catalogEntries, props.catalogEntrants, props.raceState, raceStateContentSignature]);
+    return buildEntrantRows(
+      props.raceState,
+      props.catalogEntrants,
+      props.catalogEntries || [],
+      excludedCategoryKeys,
+    );
+  }, [
+    excludedCategoryKeys,
+    props.catalogEntries,
+    props.catalogEntrants,
+    props.raceState,
+    raceStateContentSignature,
+  ]);
 
   const rows = React.useMemo(() => {
-    if (selectedCategory === 'overall') {
+    if (selectedCategory === "overall") {
       return allRows;
     }
-    const categoryName = categories.find((category) => category.id === selectedCategory)?.name || selectedCategory;
+    const categoryName =
+      categories.find((category) => category.id === selectedCategory)?.name ||
+      selectedCategory;
     const categoryKey = categoryKeyFromName(categoryName);
     return allRows.filter((row) => row.categoryKeys.includes(categoryKey));
   }, [allRows, categories, selectedCategory]);
@@ -955,7 +1371,10 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
   return (
     <section className="events-screen">
       <h1>Results</h1>
-      <p>Session race standings and lap-chart view for the selected category scope.</p>
+      <p>
+        Session race standings and lap-chart view for the selected category
+        scope.
+      </p>
       <section className="events-panel">
         <div className="events-actions">
           <EventSessionSelector
@@ -963,17 +1382,23 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
             options={props.eventSessionOptions}
             selectedValue={props.selectedEventSessionValue}
           />
-          <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
+          <CategorySelector
+            categories={categories}
+            selectedCategory={selectedCategory}
+            onSelectCategory={setSelectedCategory}
+          />
           <SelectTextField
             className="page-filter-label"
             label="View"
             slotProps={{
               select: {
-                'aria-label': 'Results View Type',
+                "aria-label": "Results View Type",
               },
             }}
             value={viewType}
-            onChange={(event) => setViewType(event.target.value as 'results' | 'lap-chart')}
+            onChange={(event) =>
+              setViewType(event.target.value as "results" | "lap-chart")
+            }
           >
             <MenuItem value="results">Results</MenuItem>
             <MenuItem value="lap-chart">Lap Chart</MenuItem>
@@ -983,7 +1408,8 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
             hidden
             value={viewType}
             onChange={(event: React.ChangeEvent<HTMLSelectElement>): void =>
-              setViewType(event.target.value as 'results' | 'lap-chart')}
+              setViewType(event.target.value as "results" | "lap-chart")
+            }
           >
             <option value="results">Results</option>
             <option value="lap-chart">Lap Chart</option>
@@ -991,7 +1417,7 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
         </div>
       </section>
 
-      {viewType === 'results' ? (
+      {viewType === "results" ? (
         <section className="events-panel">
           <h2>Results</h2>
           <table aria-label="Results Table">
@@ -1010,8 +1436,12 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
               {rows.map((row, index) => (
                 <tr key={row.entrantId}>
                   <td>{index + 1}</td>
-                  <td>{getRowRaceNumber(row) || '-'}</td>
-                  <td>{useParticipantIdentity ? getRowDriverName(row) || '-' : row.entrantName}</td>
+                  <td>{getRowRaceNumber(row) || "-"}</td>
+                  <td>
+                    {useParticipantIdentity
+                      ? getRowDriverName(row) || "-"
+                      : row.entrantName}
+                  </td>
                   <td>{row.categoryName}</td>
                   <td>{row.lapCount}</td>
                   <td>{formatDuration(row.totalTime)}</td>
@@ -1043,11 +1473,16 @@ const CountdownClockReport = (props: {
   const flags: FlagRecord[] = React.useMemo(() => {
     return getCountdownFlags(props.raceRecords);
   }, [props.raceRecords]);
-  const selectedFlag = flags.find((flag) => flag.id.toString() === props.selectedStartFlagId) || flags[0];
-  const durationMilliseconds = parseIsoDurationMilliseconds(props.sessionDuration);
-  const remainingMilliseconds = selectedFlag?.time && durationMilliseconds !== undefined
-    ? Math.max(0, selectedFlag.time.getTime() + durationMilliseconds - now)
-    : 0;
+  const selectedFlag =
+    flags.find((flag) => flag.id.toString() === props.selectedStartFlagId) ||
+    flags[0];
+  const durationMilliseconds = parseIsoDurationMilliseconds(
+    props.sessionDuration,
+  );
+  const remainingMilliseconds =
+    selectedFlag?.time && durationMilliseconds !== undefined
+      ? Math.max(0, selectedFlag.time.getTime() + durationMilliseconds - now)
+      : 0;
 
   React.useEffect(() => {
     const intervalId = window.setInterval(() => setNow(Date.now()), 250);
@@ -1055,10 +1490,24 @@ const CountdownClockReport = (props: {
   }, []);
 
   return (
-    <section className="countdown-clock-report" aria-label="Countdown Clock Report">
-      {!durationMilliseconds ? <p>This session is not configured for a time countdown because no event duration is set.</p> : null}
-      {durationMilliseconds && flags.length === 0 ? <p>No flag events are available for this session.</p> : null}
-      {durationMilliseconds && selectedFlag ? <output className="countdown-clock-report__time" aria-live="polite">{formatCountdown(remainingMilliseconds)}</output> : null}
+    <section
+      className="countdown-clock-report"
+      aria-label="Countdown Clock Report"
+    >
+      {!durationMilliseconds ? (
+        <p>
+          This session is not configured for a time countdown because no event
+          duration is set.
+        </p>
+      ) : null}
+      {durationMilliseconds && flags.length === 0 ? (
+        <p>No flag events are available for this session.</p>
+      ) : null}
+      {durationMilliseconds && selectedFlag ? (
+        <output className="countdown-clock-report__time" aria-live="polite">
+          {formatCountdown(remainingMilliseconds)}
+        </output>
+      ) : null}
     </section>
   );
 };
@@ -1069,14 +1518,21 @@ const CountdownStartFlagSelector = (props: {
   raceRecords: TimeRecord[];
   selectedStartFlagId?: string;
 }): React.ReactElement => {
-  const flags: FlagRecord[] = React.useMemo(() => getCountdownFlags(props.raceRecords), [props.raceRecords]);
-  const selectedFlag = flags.find((flag) => flag.id.toString() === props.selectedStartFlagId) || flags[0];
+  const flags: FlagRecord[] = React.useMemo(
+    () => getCountdownFlags(props.raceRecords),
+    [props.raceRecords],
+  );
+  const selectedFlag =
+    flags.find((flag) => flag.id.toString() === props.selectedStartFlagId) ||
+    flags[0];
   return (
     <SelectTextField
       className="countdown-clock-report__flag-select"
       label="Countdown start flag"
-      slotProps={{ select: { 'aria-label': 'Countdown Clock Start Flag', native: true } }}
-      value={selectedFlag?.id.toString() || ''}
+      slotProps={{
+        select: { "aria-label": "Countdown Clock Start Flag", native: true },
+      }}
+      value={selectedFlag?.id.toString() || ""}
       onChange={(event) => props.onStartFlagChange(event.target.value)}
     >
       {flags.map((flag) => (
@@ -1089,26 +1545,44 @@ const CountdownStartFlagSelector = (props: {
 };
 
 export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
-  const isMotorsport = props.event?.discipline === 'motorsport';
-  const isCycling = props.event?.discipline === 'cycling';
+  const isMotorsport = props.event?.discipline === "motorsport";
+  const isCycling = props.event?.discipline === "cycling";
   const useParticipantIdentity = isMotorsport || isCycling;
-  const participantLabel = isMotorsport ? 'Driver' : isCycling ? 'Participant' : 'Entrant';
-  const timelineParticipantLabel = isMotorsport ? 'Driver' : 'Participant';
-  const numberLabel = isMotorsport ? 'No.' : 'Plate';
-  const excludedCategoryKeys = React.useMemo(() => getExcludedCategoryKeys(props.raceState, props.categories), [props.categories, props.raceState]);
+  const participantLabel = isMotorsport
+    ? "Driver"
+    : isCycling
+      ? "Participant"
+      : "Entrant";
+  const timelineParticipantLabel = isMotorsport ? "Driver" : "Participant";
+  const numberLabel = isMotorsport ? "No." : "Plate";
+  const excludedCategoryKeys = React.useMemo(
+    () => getExcludedCategoryKeys(props.raceState, props.categories),
+    [props.categories, props.raceState],
+  );
   const categories = React.useMemo(() => {
     return dedupeCategoryOptions(props.categories);
   }, [props.categories]);
-  const categoryColors = React.useMemo(() => getCategoryColors(categories, excludedCategoryKeys), [categories, excludedCategoryKeys]);
+  const categoryColors = React.useMemo(
+    () => getCategoryColors(categories, excludedCategoryKeys),
+    [categories, excludedCategoryKeys],
+  );
   const [localViewState, setLocalViewState] = React.useState<ReportsViewState>({
     ...createDefaultReportsViewState(),
-    selectedCategory: props.selectedCategoryId && categories.some(
-      (category: CategoryOption): boolean => category.id === props.selectedCategoryId,
-    ) ? props.selectedCategoryId : 'overall',
+    selectedCategory:
+      props.selectedCategoryId &&
+      categories.some(
+        (category: CategoryOption): boolean =>
+          category.id === props.selectedCategoryId,
+      )
+        ? props.selectedCategoryId
+        : "overall",
   });
   const viewState = props.viewState || localViewState;
   const updateViewState = (changes: Partial<ReportsViewState>): void => {
-    setLocalViewState((currentState: ReportsViewState): ReportsViewState => ({ ...currentState, ...changes }));
+    setLocalViewState((currentState: ReportsViewState): ReportsViewState => ({
+      ...currentState,
+      ...changes,
+    }));
     props.onViewStateChange?.(changes);
   };
   const selectedCategory = viewState.selectedCategory;
@@ -1118,21 +1592,39 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
   const handicapShowFilter = viewState.handicapShowFilter;
 
   React.useEffect(() => {
-    if (selectedCategory !== 'overall' && !categories.some((category) => category.id === selectedCategory)) {
-      updateViewState({ selectedCategory: 'overall' });
+    if (
+      selectedCategory !== "overall" &&
+      !categories.some((category) => category.id === selectedCategory)
+    ) {
+      updateViewState({ selectedCategory: "overall" });
     }
   }, [categories, selectedCategory]);
 
-  const raceStateContentSignature = getRaceStateContentSignature(props.raceState);
+  const raceStateContentSignature = getRaceStateContentSignature(
+    props.raceState,
+  );
   const allRows = React.useMemo(() => {
-    return buildEntrantRows(props.raceState, props.catalogEntrants, props.catalogEntries || [], excludedCategoryKeys);
-  }, [excludedCategoryKeys, props.catalogEntries, props.catalogEntrants, props.raceState, raceStateContentSignature]);
+    return buildEntrantRows(
+      props.raceState,
+      props.catalogEntrants,
+      props.catalogEntries || [],
+      excludedCategoryKeys,
+    );
+  }, [
+    excludedCategoryKeys,
+    props.catalogEntries,
+    props.catalogEntrants,
+    props.raceState,
+    raceStateContentSignature,
+  ]);
 
   const rows = React.useMemo(() => {
-    if (selectedCategory === 'overall') {
+    if (selectedCategory === "overall") {
       return allRows;
     }
-    const categoryName = categories.find((category) => category.id === selectedCategory)?.name || selectedCategory;
+    const categoryName =
+      categories.find((category) => category.id === selectedCategory)?.name ||
+      selectedCategory;
     const categoryKey = categoryKeyFromName(categoryName);
     return allRows.filter((row) => row.categoryKeys.includes(categoryKey));
   }, [allRows, categories, selectedCategory]);
@@ -1145,15 +1637,27 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     return map;
   }, [rows]);
 
-  const reportParticipants = React.useMemo(() => rows.map((row) => ({
-    categoryIds: row.categoryIds,
-    id: row.entrantId,
-    name: row.entrantName,
-    participantIds: row.memberDetails.map((member) => member.participantId),
-    participantNames: row.memberDetails.map((member) => member.participantDisplayName),
-    raceNumber: Array.from(new Set(row.memberDetails.map((member) => member.racePlate).filter((value): value is string => !!value))).join(' / '),
-    teamName: row.entrantName,
-  })), [rows]);
+  const reportParticipants = React.useMemo(
+    () =>
+      rows.map((row) => ({
+        categoryIds: row.categoryIds,
+        id: row.entrantId,
+        name: row.entrantName,
+        participantIds: row.memberDetails.map((member) => member.participantId),
+        participantNames: row.memberDetails.map(
+          (member) => member.participantDisplayName,
+        ),
+        raceNumber: Array.from(
+          new Set(
+            row.memberDetails
+              .map((member) => member.racePlate)
+              .filter((value): value is string => !!value),
+          ),
+        ).join(" / "),
+        teamName: row.entrantName,
+      })),
+    [rows],
+  );
 
   const fastestLapTimelineRows = React.useMemo(() => {
     return buildFastestLapTimeline(rows, ignoreFirstLapForTimeline);
@@ -1163,23 +1667,34 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
     return buildFastestLapReportRows(rows, ignoreFirstLapForFastestLaps);
   }, [ignoreFirstLapForFastestLaps, rows]);
 
-  const yellowFlagPeriods = React.useMemo(() => calculateYellowFlagPeriods(
-    props.raceState.records,
-    rows.map((row) => ({
-      laps: row.laps,
-      name: getRowDriverName(row) || row.entrantName,
-    })),
-    selectedCategory === 'overall' ? undefined : selectedCategory as EventCategoryId,
-  ), [props.raceState.records, rows, selectedCategory]);
+  const yellowFlagPeriods = React.useMemo(
+    () =>
+      calculateYellowFlagPeriods(
+        props.raceState.records,
+        rows.map((row) => ({
+          laps: row.laps,
+          name: getRowDriverName(row) || row.entrantName,
+        })),
+        selectedCategory === "overall"
+          ? undefined
+          : (selectedCategory as EventCategoryId),
+      ),
+    [props.raceState.records, rows, selectedCategory],
+  );
 
   const eventParticipantNames = React.useMemo(() => {
-    return reportParticipants.map((participant) => participant.name).filter((name) => name.length > 0);
+    return reportParticipants
+      .map((participant) => participant.name)
+      .filter((name) => name.length > 0);
   }, [reportParticipants]);
 
   return (
     <section className="events-screen">
       <h1>Reports</h1>
-      <p>Category-scoped reports for fastest laps, participant lap times, and lap chart.</p>
+      <p>
+        Category-scoped reports for fastest laps, participant lap times, and lap
+        chart.
+      </p>
       <section className="events-panel">
         <div className="events-actions">
           <EventSessionSelector
@@ -1192,25 +1707,32 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             label="Report"
             slotProps={{
               select: {
-                'aria-label': 'Reports View Type',
+                "aria-label": "Reports View Type",
               },
             }}
             value={reportType}
-            onChange={(event) => updateViewState({ reportType: event.target.value as ReportType })}
+            onChange={(event) =>
+              updateViewState({ reportType: event.target.value as ReportType })
+            }
           >
             <MenuItem value="countdown-clock">Countdown Clock</MenuItem>
+            <MenuItem value="event-replay">Event Replay</MenuItem>
             <MenuItem value="fastest-laps">Fastest Laps</MenuItem>
-            <MenuItem value="fastest-lap-timeline">Fastest Lap Timeline</MenuItem>
+            <MenuItem value="fastest-lap-timeline">
+              Fastest Lap Timeline
+            </MenuItem>
             <MenuItem value="lap-times">Lap Times</MenuItem>
             <MenuItem value="lap-chart">Lap Chart</MenuItem>
             <MenuItem value="yellow-flag-periods">Yellow Flag periods</MenuItem>
             <MenuItem value="track-map">Track Map</MenuItem>
             <MenuItem value="handicap-data">Handicap Data</MenuItem>
           </SelectTextField>
-          {reportType === 'countdown-clock' ? (
+          {reportType === "countdown-clock" ? (
             <CountdownStartFlagSelector
               eventTimeZone={props.event?.timeZone}
-              onStartFlagChange={(countdownStartFlagId: string) => updateViewState({ countdownStartFlagId })}
+              onStartFlagChange={(countdownStartFlagId: string) =>
+                updateViewState({ countdownStartFlagId })
+              }
               raceRecords={props.raceState.records}
               selectedStartFlagId={viewState.countdownStartFlagId}
             />
@@ -1220,9 +1742,11 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             hidden
             value={reportType}
             onChange={(event: React.ChangeEvent<HTMLSelectElement>): void =>
-              updateViewState({ reportType: event.target.value as ReportType })}
+              updateViewState({ reportType: event.target.value as ReportType })
+            }
           >
             <option value="countdown-clock">Countdown Clock</option>
+            <option value="event-replay">Event Replay</option>
             <option value="fastest-laps">Fastest Laps</option>
             <option value="fastest-lap-timeline">Fastest Lap Timeline</option>
             <option value="lap-times">Lap Times</option>
@@ -1231,26 +1755,41 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <option value="track-map">Track Map</option>
             <option value="handicap-data">Handicap Data</option>
           </select>
-          {reportType !== 'countdown-clock' && reportType !== 'handicap-data' ? (
-            <CategorySelector categories={categories} selectedCategory={selectedCategory} onSelectCategory={(category: CategoryFilter) => updateViewState({ selectedCategory: category })} />
-          ) : null}
-          {reportType === 'handicap-data' ? (
+          {reportType !== "countdown-clock" &&
+          reportType !== "event-replay" &&
+          reportType !== "handicap-data" ? (
+              <CategorySelector
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onSelectCategory={(category: CategoryFilter) =>
+                  updateViewState({ selectedCategory: category })
+                }
+              />
+            ) : null}
+          {reportType === "handicap-data" ? (
             <label className="page-filter-label">
               Show
               <select
                 aria-label="Handicap Show Filter"
                 value={handicapShowFilter}
-                onChange={(event) => updateViewState({ handicapShowFilter: event.target.value as 'all' | 'event-participants-only' })}
+                onChange={(event) =>
+                  updateViewState({
+                    handicapShowFilter: event.target.value as
+                      "all" | "event-participants-only",
+                  })
+                }
               >
                 <option value="all">All known participants</option>
-                <option value="event-participants-only">Event participants only</option>
+                <option value="event-participants-only">
+                  Event participants only
+                </option>
               </select>
             </label>
           ) : null}
         </div>
       </section>
 
-      {reportType === 'countdown-clock' ? (
+      {reportType === "countdown-clock" ? (
         <CountdownClockReport
           raceRecords={props.raceState.records}
           selectedStartFlagId={viewState.countdownStartFlagId}
@@ -1258,7 +1797,22 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
         />
       ) : null}
 
-      {reportType === 'fastest-laps' ? (
+      {reportType === "event-replay" ? (
+        <EventReplayReport
+          eventId={props.event?.id}
+          mode={viewState.replayMode}
+          onModeChange={(replayMode: ReplayReportMode): void =>
+            updateViewState({ replayMode })
+          }
+          onSpeedChange={(replaySpeed: number): void =>
+            updateViewState({ replaySpeed })
+          }
+          sessionId={props.session?.id}
+          speed={viewState.replaySpeed}
+        />
+      ) : null}
+
+      {reportType === "fastest-laps" ? (
         <section className="events-panel">
           <h2>Fastest Laps</h2>
           <label className="lap-chart-line-toggle">
@@ -1266,7 +1820,11 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
               aria-label="Ignore first lap"
               type="checkbox"
               checked={ignoreFirstLapForFastestLaps}
-              onChange={(event) => updateViewState({ ignoreFirstLapForFastestLaps: event.target.checked })}
+              onChange={(event) =>
+                updateViewState({
+                  ignoreFirstLapForFastestLaps: event.target.checked,
+                })
+              }
             />
             Ignore first lap
           </label>
@@ -1284,11 +1842,15 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <tbody>
               {fastestLapRows.map((row) => (
                 <tr key={row.entrantId}>
-                  <td>{getRowRaceNumber(row) || row.fastestLapPlate || '-'}</td>
-                  <td>{useParticipantIdentity ? getRowDriverName(row) || '-' : row.entrantName}</td>
+                  <td>{getRowRaceNumber(row) || row.fastestLapPlate || "-"}</td>
+                  <td>
+                    {useParticipantIdentity
+                      ? getRowDriverName(row) || "-"
+                      : row.entrantName}
+                  </td>
                   <td>{row.categoryName}</td>
                   <td>{formatDuration(row.fastestLap)}</td>
-                  <td>{row.fastestLapNo || '-'}</td>
+                  <td>{row.fastestLapNo || "-"}</td>
                   <td>{row.lapCount}</td>
                 </tr>
               ))}
@@ -1297,7 +1859,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
         </section>
       ) : null}
 
-      {reportType === 'fastest-lap-timeline' ? (
+      {reportType === "fastest-lap-timeline" ? (
         <section className="events-panel">
           <h2>Fastest Lap Timeline</h2>
           <label className="lap-chart-line-toggle">
@@ -1305,7 +1867,11 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
               aria-label="Ignore first lap"
               type="checkbox"
               checked={ignoreFirstLapForTimeline}
-              onChange={(event) => updateViewState({ ignoreFirstLapForTimeline: event.target.checked })}
+              onChange={(event) =>
+                updateViewState({
+                  ignoreFirstLapForTimeline: event.target.checked,
+                })
+              }
             />
             Ignore first lap
           </label>
@@ -1323,10 +1889,12 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             </thead>
             <tbody>
               {fastestLapTimelineRows.map((row) => (
-                <tr key={`${row.participantId}-${row.lapNo}-${row.elapsedTime}`}>
+                <tr
+                  key={`${row.participantId}-${row.lapNo}-${row.elapsedTime}`}
+                >
                   <td>{row.raceNumber}</td>
                   <td>{row.participantName}</td>
-                  <td>{row.teamName || '-'}</td>
+                  <td>{row.teamName || "-"}</td>
                   <td>{tableTimeString(row.time)}</td>
                   <td>{formatDuration(row.elapsedTime)}</td>
                   <td>{row.lapNo}</td>
@@ -1338,35 +1906,43 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
         </section>
       ) : null}
 
-      {reportType === 'lap-times' ? (
+      {reportType === "lap-times" ? (
         <LapTimesReport
           participants={reportParticipants}
           categories={categories}
-          onStateChange={(lapTimes: LapTimesReportState) => updateViewState({ lapTimes })}
+          onStateChange={(lapTimes: LapTimesReportState) =>
+            updateViewState({ lapTimes })
+          }
           passings={lapTimePassings}
           state={viewState.lapTimes}
         />
       ) : null}
 
-      {reportType === 'lap-chart' ? (
+      {reportType === "lap-chart" ? (
         <LapChartPanel
           allRows={allRows}
           drawLineChart={viewState.drawLineChart}
-          onDrawLineChartChange={(drawLineChart: boolean) => updateViewState({ drawLineChart })}
+          onDrawLineChartChange={(drawLineChart: boolean) =>
+            updateViewState({ drawLineChart })
+          }
           rows={rows}
           tableAriaLabel="Reports Lap Chart Table"
         />
       ) : null}
 
-      {reportType === 'handicap-data' ? (
+      {reportType === "handicap-data" ? (
         <section className="events-panel">
           <HandicapView
-            participantNames={handicapShowFilter === 'event-participants-only' ? eventParticipantNames : undefined}
+            participantNames={
+              handicapShowFilter === "event-participants-only"
+                ? eventParticipantNames
+                : undefined
+            }
           />
         </section>
       ) : null}
 
-      {reportType === 'yellow-flag-periods' ? (
+      {reportType === "yellow-flag-periods" ? (
         <section className="events-panel">
           <h2>Yellow Flag periods</h2>
           <table aria-label="Yellow Flag Periods Report Table">
@@ -1383,22 +1959,32 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <tbody>
               {yellowFlagPeriods.map((period, index) => (
                 <tr key={`yellow-flag-period-${index}`}>
-                  <td>{period.fromLap ?? '-'}</td>
-                  <td>{tableTimeString(period.fromTime, props.event?.timeZone)}</td>
+                  <td>{period.fromLap ?? "-"}</td>
+                  <td>
+                    {tableTimeString(period.fromTime, props.event?.timeZone)}
+                  </td>
                   <td>{formatDuration(period.duration)}</td>
-                  <td>{period.leaderAtFlag || '-'}</td>
-                  <td>{period.untilLap ?? '-'}</td>
-                  <td>{tableTimeString(period.untilTime, props.event?.timeZone)}</td>
+                  <td>{period.leaderAtFlag || "-"}</td>
+                  <td>{period.untilLap ?? "-"}</td>
+                  <td>
+                    {tableTimeString(period.untilTime, props.event?.timeZone)}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </section>
       ) : null}
-      {reportType === 'track-map' ? (
+      {reportType === "track-map" ? (
         <section className="events-panel">
           <h2>Track Map</h2>
-          <TrackMapReport categoryColors={categoryColors} catalogEntries={props.catalogEntries} catalogEntrants={props.catalogEntrants} event={props.event} raceState={props.raceState} />
+          <TrackMapReport
+            categoryColors={categoryColors}
+            catalogEntries={props.catalogEntries}
+            catalogEntrants={props.catalogEntrants}
+            event={props.event}
+            raceState={props.raceState}
+          />
         </section>
       ) : null}
     </section>

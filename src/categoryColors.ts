@@ -1,19 +1,24 @@
-const CATEGORY_COLORS: readonly string[] = [
-  '#0057b8',
-  '#b00020',
-  '#217a34',
-  '#7a4cc2',
-  '#a65f00',
-  '#007a78',
-];
+import {
+  DEFAULT_CATEGORY_COLORS,
+  packedRgbToCssColor,
+} from "./defaultCategoryColors.js";
+
+const CATEGORY_COLORS: readonly string[] =
+  DEFAULT_CATEGORY_COLORS.map(packedRgbToCssColor);
 
 const getCategoryColorIndex = (categoryKey: string): number => {
-  return Array.from(categoryKey).reduce<number>((hash: number, character: string): number => (
-    (hash * 31 + character.charCodeAt(0)) >>> 0
-  ), 0) % CATEGORY_COLORS.length;
+  return (
+    Array.from(categoryKey).reduce<number>(
+      (hash: number, character: string): number =>
+        (hash * 31 + character.charCodeAt(0)) >>> 0,
+      0,
+    ) % CATEGORY_COLORS.length
+  );
 };
 
-export const getCategoryColor = (categoryKey: string | undefined): string | undefined => {
+export const getCategoryColor = (
+  categoryKey: string | undefined,
+): string | undefined => {
   if (!categoryKey) {
     return undefined;
   }
@@ -21,6 +26,5 @@ export const getCategoryColor = (categoryKey: string | undefined): string | unde
   return CATEGORY_COLORS[getCategoryColorIndex(categoryKey)];
 };
 
-export const getCategoryPaletteColor = (index: number): string => (
-  CATEGORY_COLORS[index % CATEGORY_COLORS.length]!
-);
+export const getCategoryPaletteColor = (index: number): string =>
+  CATEGORY_COLORS[index % CATEGORY_COLORS.length]!;
