@@ -14,7 +14,10 @@ import {
   EVENT_SESSION_END,
 } from "../../model/timerecord.js";
 import { createGreenFlagEvent } from "../../processing/flag.js";
-import { createTrackPlaybackIndex } from "./trackPlayback.js";
+import {
+  createTrackPlaybackIndex,
+  getTrackLeaderLapTimelineMarkers,
+} from "./trackPlayback.js";
 
 const participant: EventParticipant = {
   categoryId: createCategoryId("track-category"),
@@ -92,6 +95,39 @@ describe("track playback index", () => {
     expect(firstLap.entrantId).toBe(participant.entrantId);
     expect(firstLap.lapCount).toBe(0);
     expect(firstLap.progress).toBeCloseTo(0.5, 4);
+  });
+
+  it("creates leader lap markers with elapsed and time-of-day values", () => {
+    const raceState = {
+      categories: [],
+      getEntrantIdForParticipant: () => participant.entrantId,
+      getFinishLineNumbers: () => [1],
+      getParticipantById: () => participant,
+      participants: [participant],
+      records: [
+        passing("leader-lap-1", 1, 0, 1, 60_000),
+        passing("leader-lap-2", 1, 60, 2, 60_000),
+      ],
+      teams: [],
+    } as unknown as RaceState & RaceStateLookup;
+    const index = createTrackPlaybackIndex(raceState, [
+      { lineNumber: 1, progress: 0 },
+    ]);
+
+    expect(getTrackLeaderLapTimelineMarkers(raceState, index)).toEqual([
+      expect.objectContaining({
+        elapsedTime: 0,
+        entrantId: participant.entrantId,
+        lapCount: 1,
+        time: new Date("2026-07-17T10:00:00.000Z").getTime(),
+      }),
+      expect.objectContaining({
+        elapsedTime: 60_000,
+        entrantId: participant.entrantId,
+        lapCount: 2,
+        time: new Date("2026-07-17T10:01:00.000Z").getTime(),
+      }),
+    ]);
   });
 
   it("incrementally applies reached records, retains the next passing, and rebuilds when seeking backwards", () => {
@@ -206,8 +242,8 @@ describe("track playback index", () => {
         .seek(index.endTime)
         .entrants.find(
           (entrant) => entrant.entrantId === continuingParticipant.entrantId,
-        )?.didNotFinish,
-    ).toBe(false);
+        ),
+    ).toBeUndefined();
     expect(
       index
         .seek(index.startTime + 60_000)
@@ -244,7 +280,7 @@ describe("track playback index", () => {
     expect(index.seek(index.endTime).entrants[0]?.didNotFinish).toBe(false);
   });
 
-  it("does not classify an entrant as DNF after they cross the finish line following the chequered flag", () => {
+  it("removes an entrant from the map after they cross the finish line following the chequered flag", () => {
     const raceState = {
       categories: [],
       getEntrantIdForParticipant: (participantId: string) =>
@@ -275,9 +311,11 @@ describe("track playback index", () => {
     expect(
       index
         .seek(index.endTime)
-        .entrants.find((entrant) => entrant.entrantId === participant.entrantId)
-        ?.didNotFinish,
-    ).toBe(false);
+        .entrants.find(
+          (entrant) => entrant.entrantId === participant.entrantId,
+        ),
+    ).toBeUndefined();
+    expect(index.estimatedFinalLapEndTime).toBeUndefined();
   });
 
   it("projects an unfinished entrant through their final lap after the chequered flag", () => {
@@ -317,5 +355,8 @@ describe("track playback index", () => {
     expect(projected?.didNotFinish).toBe(false);
     expect(projected?.estimatedFinalLap).toBe(true);
     expect(projected?.progress).toBeCloseTo(0.5, 4);
+    expect(index.estimatedFinalLapEndTime).toBe(
+      new Date("2026-07-17T10:05:00.000Z").getTime(),
+    );
   });
 });

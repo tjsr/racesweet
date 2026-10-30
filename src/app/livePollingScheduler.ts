@@ -17,7 +17,10 @@ export interface ScheduledLivePoll extends LivePollingSource {
 
 export interface LivePollingContext extends LivePollingTarget {
   getLiveSource: (sourceId: string) => LivePollingSource | undefined;
-  loadSource: (source: LivePollingSource, target: LivePollingTarget) => Promise<void>;
+  loadSource: (
+    source: LivePollingSource,
+    target: LivePollingTarget,
+  ) => Promise<void>;
   sources: LivePollingSource[];
 }
 
@@ -28,6 +31,17 @@ interface TimerHost {
     delayMilliseconds: number,
   ) => ReturnType<typeof setTimeout>;
 }
+
+const defaultTimerHost: TimerHost = {
+  clearTimeout: (timer: ReturnType<typeof setTimeout>): void => {
+    globalThis.clearTimeout(timer);
+  },
+  setTimeout: (
+    callback: () => void,
+    delayMilliseconds: number,
+  ): ReturnType<typeof setTimeout> =>
+    globalThis.setTimeout(callback, delayMilliseconds),
+};
 
 export interface LivePollingSchedulerOptions {
   now?: () => Date;
@@ -43,7 +57,9 @@ const getPollDelayMilliseconds = (source: LivePollingSource): number => {
 export class LivePollingScheduler {
   private context: LivePollingContext | undefined;
   private readonly now: () => Date;
-  private readonly onScheduleChanged: (scheduledPolls: ScheduledLivePoll[]) => void;
+  private readonly onScheduleChanged: (
+    scheduledPolls: ScheduledLivePoll[],
+  ) => void;
   private readonly onSourceError: (error: Error) => void;
   private readonly scheduledPolls = new Map<string, ScheduledLivePoll>();
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -53,10 +69,7 @@ export class LivePollingScheduler {
     this.now = options.now || (() => new Date());
     this.onScheduleChanged = options.onScheduleChanged || (() => undefined);
     this.onSourceError = options.onSourceError || (() => undefined);
-    this.timerHost = options.timerHost || {
-      clearTimeout,
-      setTimeout,
-    };
+    this.timerHost = options.timerHost || defaultTimerHost;
   }
 
   public dispose = (): void => {
@@ -95,14 +108,18 @@ export class LivePollingScheduler {
       return;
     }
 
-    const source: LivePollingSource | undefined = context.getLiveSource(sourceId);
+    const source: LivePollingSource | undefined =
+      context.getLiveSource(sourceId);
     if (!source) {
       return;
     }
 
-    context.loadSource(source, target)
+    context
+      .loadSource(source, target)
       .catch((error: unknown): void => {
-        this.onSourceError(error instanceof Error ? error : new Error(String(error)));
+        this.onSourceError(
+          error instanceof Error ? error : new Error(String(error)),
+        );
       })
       .finally((): void => {
         const nextContext: LivePollingContext | undefined = this.context;
@@ -145,10 +162,11 @@ export class LivePollingScheduler {
     this.timers.set(
       source.id,
       this.timerHost.setTimeout(
-        (): void => this.execute(source.id, {
-          eventId: context.eventId,
-          sessionId: context.sessionId,
-        }),
+        (): void =>
+          this.execute(source.id, {
+            eventId: context.eventId,
+            sessionId: context.sessionId,
+          }),
         delayMilliseconds,
       ),
     );

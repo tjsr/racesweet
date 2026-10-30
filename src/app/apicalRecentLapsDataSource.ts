@@ -13,7 +13,7 @@ import type { EventParticipant } from "../model/eventparticipant.js";
 import { createTimeRecordId } from "../model/ids.js";
 import type { EventId } from "../model/raceevent.js";
 import type { RaceState } from "../model/racestate.js";
-import { RECORD_TX_CROSSING, type TimeRecord } from "../model/timerecord.js";
+import type { TimeRecord } from "../model/timerecord.js";
 import {
   apicalTimeOfDayToDate,
   apicalTimeToMilliseconds,
@@ -507,98 +507,18 @@ export const mergeApicalRecentLapsRaceState = (
   };
 };
 
-const getCompetitorAverageLapTimes = (
-  raceState: Partial<RaceState>,
-): number[] => {
-  const crossingTimesByParticipant: Map<string, number[]> = new Map<
-    string,
-    number[]
-  >();
-  (raceState.records || []).forEach((record: TimeRecord): void => {
-    if (
-      (record.recordType & RECORD_TX_CROSSING) === 0 ||
-      !("participantId" in record) ||
-      !record.participantId ||
-      !record.time
-    ) {
-      return;
-    }
-    const participantId: string = record.participantId.toString();
-    crossingTimesByParticipant.set(participantId, [
-      ...(crossingTimesByParticipant.get(participantId) || []),
-      record.time.getTime(),
-    ]);
-  });
-
-  return Array.from(crossingTimesByParticipant.values()).flatMap(
-    (times: number[]): number[] => {
-      const orderedTimes: number[] = [...times].sort(
-        (left: number, right: number): number => left - right,
-      );
-      const lapTimes: number[] = orderedTimes
-        .slice(1)
-        .map(
-          (time: number, index: number): number => time - orderedTimes[index]!,
-        )
-        .filter((duration: number): boolean => duration > 0);
-      return lapTimes.length > 0
-        ? [
-            lapTimes.reduce(
-              (total: number, duration: number): number => total + duration,
-              0,
-            ) / lapTimes.length,
-          ]
-        : [];
-    },
-  );
-};
-
 export const getApicalRecentLapsPollingDecision = (
-  raceState: Partial<RaceState>,
+  _raceState: Partial<RaceState>,
   sessionStatus: EventCatalogSession["status"],
-  now: Date = new Date(),
-  pollingResumedAt?: string,
+  _now: Date = new Date(),
+  _pollingResumedAt?: string,
 ): ApicalRecentLapsPollingDecision => {
   if (sessionStatus === "completed") {
     return { reason: "The active session is complete.", shouldStop: true };
   }
 
-  const competitorAverages: number[] = getCompetitorAverageLapTimes(raceState);
-  const crossingTimes: number[] = (raceState.records || [])
-    .filter(
-      (record: TimeRecord): boolean =>
-        (record.recordType & RECORD_TX_CROSSING) > 0 && !!record.time,
-    )
-    .map((record: TimeRecord): number => record.time!.getTime());
-  if (competitorAverages.length === 0 || crossingTimes.length === 0) {
-    return { shouldStop: false };
-  }
-
-  const averageLapTimeMilliseconds: number =
-    competitorAverages.reduce(
-      (total: number, duration: number): number => total + duration,
-      0,
-    ) / competitorAverages.length;
-  const resumedAtMilliseconds: number = pollingResumedAt
-    ? new Date(pollingResumedAt).getTime()
-    : 0;
-  const inactivityStartMilliseconds: number = Math.max(
-    ...crossingTimes,
-    Number.isFinite(resumedAtMilliseconds) ? resumedAtMilliseconds : 0,
-  );
-  const inactivityMilliseconds: number = Math.max(
-    0,
-    now.getTime() - inactivityStartMilliseconds,
-  );
-  const shouldStop: boolean =
-    inactivityMilliseconds > averageLapTimeMilliseconds * 1.75;
-
-  return {
-    averageLapTimeMilliseconds,
-    inactivityMilliseconds,
-    reason: shouldStop
-      ? "No new laps arrived within 175% of the competitors' previous average lap time."
-      : undefined,
-    shouldStop,
-  };
+  // A live Apical feed can have a gap between records that is longer than the
+  // previous lap average. Keep its configured interval alive until the session
+  // itself is explicitly completed so late records are not missed.
+  return { shouldStop: false };
 };

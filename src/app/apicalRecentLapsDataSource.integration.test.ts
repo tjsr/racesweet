@@ -213,7 +213,7 @@ describe("Apical Recent Laps import orchestration", (): void => {
         "live",
         new Date("2026-08-25T10:37:31+10:00"),
       ).shouldStop,
-    ).toBe(true);
+    ).toBe(false);
     expect(onPersistedLedger).toHaveBeenCalledTimes(1);
     fetchMock.mockRestore();
   });

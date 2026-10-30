@@ -54,8 +54,17 @@ export interface TrackPlaybackSnapshot {
 
 export interface TrackPlaybackIndex {
   endTime: number;
+  estimatedFinalLapEndTime?: number;
+  latestRecordTime: number;
   seek: (time: number) => TrackPlaybackSnapshot;
   startTime: number;
+}
+
+export interface TrackLeaderLapTimelineMarker {
+  elapsedTime: number;
+  entrantId: EventEntrantId;
+  lapCount: number;
+  time: number;
 }
 
 interface PreparedPassing {
@@ -139,11 +148,11 @@ export const createTrackPlaybackIndex = (
     recordsWithTimes.length > 0
       ? Math.min(...recordsWithTimes.map((record) => record.time!.getTime()))
       : Date.now();
-  const endTime = Math.max(
-    ...recordsWithTimes.map((record) => record.time!.getTime()),
-    startTime,
-    referenceTime,
-  );
+  const latestRecordTime =
+    recordsWithTimes.length > 0
+      ? Math.max(...recordsWithTimes.map((record) => record.time!.getTime()))
+      : startTime;
+  const endTime = Math.max(latestRecordTime, referenceTime);
   const configuredProgressByLine = new Map(
     configuredTimingLines.map((line) => [
       line.lineNumber,
@@ -255,6 +264,56 @@ export const createTrackPlaybackIndex = (
   const preparedPassings = Array.from(passingsByEntrant.values())
     .flat()
     .sort((left, right) => comparePassingTime(left.passing, right.passing));
+  const estimatedFinalLapEndTime = Array.from(passingsByEntrant.values())
+    .flatMap((entrantPassings: PreparedPassing[]): number[] => {
+      const lastPassing: PreparedPassing | undefined = entrantPassings.at(-1);
+      const lastPassingTime: number | undefined =
+        lastPassing?.passing.time?.getTime();
+      const finishTime: number | undefined = getFinishTime(
+        lastPassing?.categoryId,
+      );
+      const completedAfterFinish: boolean =
+        lastPassing !== undefined &&
+        lastPassingTime !== undefined &&
+        finishTime !== undefined &&
+        lastPassingTime > finishTime &&
+        isFinishLinePassing(
+          lastPassing.passing,
+          raceState.getFinishLineNumbers?.(),
+        );
+      if (completedAfterFinish) {
+        return [];
+      }
+      const recentLapTimes: number[] = entrantPassings
+        .map(
+          (prepared: PreparedPassing): number | null | undefined =>
+            prepared.passing.lapTime,
+        )
+        .filter(
+          (lapTime: number | null | undefined): lapTime is number =>
+            lapTime !== undefined && lapTime !== null && lapTime > 0,
+        )
+        .slice(-3);
+      if (lastPassingTime === undefined || recentLapTimes.length === 0) {
+        return [];
+      }
+      const estimatedLapTime: number =
+        recentLapTimes.reduce(
+          (total: number, lapTime: number): number => total + lapTime,
+          0,
+        ) / recentLapTimes.length;
+      return [lastPassingTime + estimatedLapTime];
+    })
+    .reduce(
+      (
+        latestEstimatedEndTime: number | undefined,
+        estimatedEndTime: number,
+      ): number | undefined =>
+        latestEstimatedEndTime === undefined
+          ? estimatedEndTime
+          : Math.max(latestEstimatedEndTime, estimatedEndTime),
+      undefined,
+    );
   const mutableStateByEntrant = new Map<EventEntrantId, MutableEntrantState>();
   let appliedRecordCursor = -1;
   let currentTime = startTime;
@@ -347,6 +406,9 @@ export const createTrackPlaybackIndex = (
           passingIndex: -1,
           recentLapTimes: [],
         };
+        if (state.completedAfterFinish) {
+          return [];
+        }
         const previous =
           state.passingIndex >= 0 ? passings[state.passingIndex] : undefined;
         const next = passings[state.passingIndex + 1];
@@ -412,5 +474,64 @@ export const createTrackPlaybackIndex = (
   };
 
   reset();
-  return { endTime, seek, startTime };
+  return {
+    endTime,
+    estimatedFinalLapEndTime,
+    latestRecordTime,
+    seek,
+    startTime,
+  };
 };
+
+export const getTrackLeaderLapTimelineMarkers = (
+  raceState: RaceState & RaceStateLookup,
+  playbackIndex: TrackPlaybackIndex,
+): TrackLeaderLapTimelineMarker[] =>
+  raceState.records
+    .filter(isCrossingRecord)
+    .filter(
+      (record): record is ParticipantPassingRecord =>
+        "participantId" in record &&
+        !!record.participantId &&
+        record.time !== undefined &&
+        isFinishLinePassing(record, raceState.getFinishLineNumbers?.()),
+    )
+    .sort(comparePassingTime)
+    .flatMap(
+      (passing: ParticipantPassingRecord): TrackLeaderLapTimelineMarker[] => {
+        const participant = raceState.getParticipantById(
+          passing.participantId!,
+        );
+        const time: number | undefined = passing.time?.getTime();
+        if (!participant || time === undefined) {
+          return [];
+        }
+        const entrantId =
+          raceState.getEntryIdForParticipant?.(participant.id) ||
+          getParticipantEntryId(participant);
+        const leader = playbackIndex
+          .seek(time)
+          .entrants.find(
+            (entrant: TrackPlaybackEntrantState): boolean =>
+              entrant.position === 1,
+          );
+        if (
+          !leader ||
+          leader.entrantId !== entrantId ||
+          leader.lapCount === 0
+        ) {
+          return [];
+        }
+        return [
+          {
+            elapsedTime:
+              leader.raceElapsedTime ??
+              passing.elapsedTime ??
+              Math.max(0, time - playbackIndex.startTime),
+            entrantId,
+            lapCount: leader.lapCount,
+            time,
+          },
+        ];
+      },
+    );

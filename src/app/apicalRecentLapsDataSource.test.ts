@@ -218,35 +218,12 @@ describe("Apical Recent Laps data source", (): void => {
     fetchMock.mockRestore();
   });
 
-  it("stops for completed sessions or after 175% of the prior competitor average", async (): Promise<void> => {
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response(JSON.stringify(laps), { status: 200 }));
-    const raceState: Partial<RaceState> = await fetchApicalRecentLapsRaceState(
-      source,
-      eventId,
-      "2026-08-25",
-      "Australia/Sydney",
+  it("keeps polling live sessions despite record gaps and stops completed sessions", (): void => {
+    expect(getApicalRecentLapsPollingDecision({}, "live").shouldStop).toBe(
+      false,
     );
-
-    expect(
-      getApicalRecentLapsPollingDecision(
-        raceState,
-        "live",
-        new Date("2026-08-25T10:37:31+10:00"),
-      ).shouldStop,
-    ).toBe(true);
-    expect(
-      getApicalRecentLapsPollingDecision(
-        raceState,
-        "live",
-        new Date("2026-08-25T10:37:31+10:00"),
-        "2026-08-25T00:35:00.000Z",
-      ).shouldStop,
-    ).toBe(false);
-    expect(
-      getApicalRecentLapsPollingDecision(raceState, "completed").shouldStop,
-    ).toBe(true);
-    fetchMock.mockRestore();
+    expect(getApicalRecentLapsPollingDecision({}, "completed").shouldStop).toBe(
+      true,
+    );
   });
 });

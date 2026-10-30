@@ -1,3 +1,4 @@
+import { Button } from "@mui/material";
 import React from "react";
 import { getCategoryColor } from "../../categoryColors.js";
 
@@ -12,6 +13,7 @@ import type {
 } from "../../catalog/eventCatalog.js";
 import type { EventEntrantId } from "../../model/entrant.js";
 import { getParticipantEntryId } from "../../model/entry.js";
+import type { EventParticipant } from "../../model/eventparticipant.js";
 import type { RaceState, RaceStateLookup } from "../../model/racestate.js";
 import { getEffectiveParticipantCategoryId } from "../../model/racestate.js";
 import { getParticipantNumber } from "../../processing/participant.js";
@@ -24,6 +26,7 @@ import {
 import {
   type TrackPlaybackEntrantState,
   createTrackPlaybackIndex,
+  getTrackLeaderLapTimelineMarkers,
 } from "./trackPlayback.js";
 import { createTrackStatusSegments } from "./trackStatus.js";
 
@@ -115,11 +118,23 @@ export const TrackMapReport = (
     () => createTrackMapGeometry(props.event?.trackMap),
     [props.event?.trackMap],
   );
+  const playbackEndTime: number = Math.max(
+    playbackIndex.latestRecordTime,
+    playbackIndex.estimatedFinalLapEndTime || 0,
+  );
+  const duration = Math.max(0, playbackEndTime - playbackIndex.startTime);
   const statusSegments = React.useMemo(
-    () => createTrackStatusSegments(props.raceState, playbackIndex),
+    () =>
+      createTrackStatusSegments(props.raceState, {
+        ...playbackIndex,
+        endTime: playbackEndTime,
+      }),
+    [playbackEndTime, playbackIndex, props.raceState],
+  );
+  const leaderLapMarkers = React.useMemo(
+    () => getTrackLeaderLapTimelineMarkers(props.raceState, playbackIndex),
     [playbackIndex, props.raceState],
   );
-  const duration = Math.max(0, playbackIndex.endTime - playbackIndex.startTime);
   const [elapsed, setElapsed] = React.useState<number>(0);
   const [isPlaying, setIsPlaying] = React.useState<boolean>(false);
   const [playbackSpeed, setPlaybackSpeed] = React.useState<number>(1);
@@ -177,6 +192,52 @@ export const TrackMapReport = (
   const entrantNames = new Map(
     props.catalogEntrants.map((entrant) => [entrant.id, entrant.name]),
   );
+  const selectedCatalogEntry: EventCatalogEntry | undefined =
+    selectedEntrantId === undefined
+      ? undefined
+      : props.catalogEntries?.find((entry) => entry.id === selectedEntrantId);
+  const selectedParticipants: EventParticipant[] =
+    selectedEntrantId === undefined
+      ? []
+      : props.raceState.participants.filter(
+          (participant: EventParticipant): boolean =>
+            (props.raceState.getEntryIdForParticipant?.(participant.id) ||
+              getParticipantEntryId(participant)) === selectedEntrantId,
+        );
+  const selectedCatalogEntrant: EventCatalogEntrant | undefined =
+    props.catalogEntrants.find(
+      (entrant: EventCatalogEntrant): boolean =>
+        entrant.id === selectedCatalogEntry?.entrantId ||
+        selectedParticipants.some(
+          (participant: EventParticipant): boolean =>
+            participant.entrantId === entrant.id,
+        ),
+    );
+  const selectedTeamEntrant: EventCatalogEntrant | undefined =
+    selectedCatalogEntrant?.entrantType === "team"
+      ? selectedCatalogEntrant
+      : props.catalogEntrants.find(
+          (entrant: EventCatalogEntrant): boolean =>
+            entrant.id === selectedCatalogEntrant?.teamEntrantId,
+        );
+  const selectedRiderNumber: string | undefined =
+    selectedCatalogEntry?.raceNumber ||
+    selectedParticipants
+      .map((participant: EventParticipant): string | undefined =>
+        getParticipantNumber(participant)?.toString(),
+      )
+      .find((number: string | undefined): number is string => !!number) ||
+    (selectedEntrant
+      ? getMarkerLabel(
+          selectedEntrant.entrantId,
+          props.raceState,
+          props.catalogEntries,
+        )
+      : undefined);
+  const selectedEntrantName: string | undefined =
+    selectedCatalogEntrant?.name ||
+    selectedCatalogEntry?.name ||
+    (selectedEntrant ? entrantNames.get(selectedEntrant.entrantId) : undefined);
   const categoryIdByEntrant = React.useMemo(() => {
     const categoryIdByEntrant = new Map<EventEntrantId, string>();
     const categoryIdByEntry = new Map(
@@ -204,6 +265,12 @@ export const TrackMapReport = (
   const updateElapsed = (nextElapsed: number): void => {
     elapsedRef.current = nextElapsed;
     setElapsed(nextElapsed);
+  };
+
+  const playLive = (): void => {
+    const liveTime: number = Math.min(Date.now(), playbackEndTime);
+    updateElapsed(Math.max(0, liveTime - playbackIndex.startTime));
+    setIsPlaying(liveTime < playbackEndTime);
   };
 
   const renderMarker = (
@@ -351,9 +418,15 @@ export const TrackMapReport = (
             style={{ gridColumn: 2, gridRow: 1 }}
           >
             <h3>
-              {entrantNames.get(selectedEntrant.entrantId) ||
+              {selectedEntrantName ||
                 `Entrant ${getMarkerLabel(selectedEntrant.entrantId, props.raceState)}`}
             </h3>
+            {selectedRiderNumber ? (
+              <p>Rider number: {selectedRiderNumber}</p>
+            ) : null}
+            {selectedTeamEntrant ? (
+              <p>Team: {selectedTeamEntrant.name}</p>
+            ) : null}
             <p>
               Race position:{" "}
               {selectedEntrant.didNotFinish ? "DNF" : selectedEntrant.position}
@@ -423,8 +496,10 @@ export const TrackMapReport = (
           style={{
             display: "flex",
             height: "0.75rem",
+            marginBottom: "2rem",
             marginTop: "0.25rem",
-            overflow: "hidden",
+            overflow: "visible",
+            position: "relative",
             width: "100%",
           }}
         >
@@ -447,8 +522,71 @@ export const TrackMapReport = (
               }}
             />
           ))}
+          {duration > 0 ? (
+            <div
+              aria-label="Track Map Leader Lap Markers"
+              style={{
+                inset: "0",
+                pointerEvents: "none",
+                position: "absolute",
+              }}
+            >
+              {leaderLapMarkers.map((marker) => {
+                const left: number = Math.max(
+                  0,
+                  Math.min(
+                    100,
+                    ((marker.time - playbackIndex.startTime) / duration) * 100,
+                  ),
+                );
+                return (
+                  <div
+                    aria-label={`Leader lap ${marker.lapCount}: ${millisecondsToTime(marker.elapsedTime)} at ${tableTimeString(new Date(marker.time), props.event?.timeZone)}`}
+                    key={`${marker.entrantId}-${marker.lapCount}-${marker.time}`}
+                    style={{
+                      left: `${left}%`,
+                      position: "absolute",
+                      top: "0",
+                      transform: "translateX(-50%)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        background: "#1565c0",
+                        border: "1px solid #fff",
+                        borderRadius: "50%",
+                        height: "0.75rem",
+                        width: "0.75rem",
+                      }}
+                    />
+                    <div
+                      style={{
+                        fontSize: "0.7rem",
+                        lineHeight: 1.1,
+                        marginTop: "0.25rem",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {millisecondsToTime(marker.elapsedTime)} ·{" "}
+                      {tableTimeString(
+                        new Date(marker.time),
+                        props.event?.timeZone,
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
         <div className="events-actions">
+          <Button
+            aria-label="Jump to Live Track Map Playback"
+            onClick={playLive}
+            variant="contained"
+          >
+            Live
+          </Button>
           <button
             aria-label="Check Track Map Line Order"
             onClick={() =>
