@@ -63,13 +63,13 @@ describe("track playback index", () => {
     const raceStart = new Date("2026-07-17T10:00:00.000Z");
     const raceState = {
       categories: [],
-      getEntrantIdForParticipant: (participantId: string) => participantId === participant.id
-        ? participant.entrantId
-        : continuingParticipant.entrantId,
+      getEntrantIdForParticipant: (participantId: string) =>
+        participantId === participant.id
+          ? participant.entrantId
+          : continuingParticipant.entrantId,
       getFinishLineNumbers: () => [1],
-      getParticipantById: (participantId: string) => participantId === participant.id
-        ? participant
-        : continuingParticipant,
+      getParticipantById: (participantId: string) =>
+        participantId === participant.id ? participant : continuingParticipant,
       participants: [participant, continuingParticipant],
       records: [
         createGreenFlagEvent({
@@ -103,13 +103,13 @@ describe("track playback index", () => {
     records[1]!.isLapCompletion = false;
     const raceState = {
       categories: [],
-      getEntrantIdForParticipant: (participantId: string) => participantId === participant.id
-        ? participant.entrantId
-        : continuingParticipant.entrantId,
+      getEntrantIdForParticipant: (participantId: string) =>
+        participantId === participant.id
+          ? participant.entrantId
+          : continuingParticipant.entrantId,
       getFinishLineNumbers: () => [1],
-      getParticipantById: (participantId: string) => participantId === participant.id
-        ? participant
-        : continuingParticipant,
+      getParticipantById: (participantId: string) =>
+        participantId === participant.id ? participant : continuingParticipant,
       participants: [participant, continuingParticipant],
       records,
       teams: [],
@@ -135,7 +135,33 @@ describe("track playback index", () => {
     expect(rewound.fastestLap).toBe(60_000);
   });
 
-  it("moves entrants with no future crossing to DNF after three minutes and restores them when rewound", () => {
+  it("extrapolates an entrant to the current time from the average of their last three laps", () => {
+    const raceState = {
+      categories: [],
+      getEntrantIdForParticipant: () => participant.entrantId,
+      getFinishLineNumbers: () => [1],
+      getParticipantById: () => participant,
+      participants: [participant],
+      records: [
+        passing("lap-1", 1, 0, 1, 40_000),
+        passing("lap-2", 1, 50, 2, 50_000),
+        passing("lap-3", 1, 110, 3, 60_000),
+      ],
+      teams: [],
+    } as unknown as RaceState & RaceStateLookup;
+    const index = createTrackPlaybackIndex(
+      raceState,
+      [{ lineNumber: 1, progress: 0 }],
+      new Date("2026-07-17T10:03:10.000Z").getTime(),
+    );
+
+    const extrapolated = index.seek(index.endTime).entrants[0]!;
+    expect(extrapolated.didNotFinish).toBe(false);
+    expect(extrapolated.estimatedFinalLap).toBe(true);
+    expect(extrapolated.progress).toBeCloseTo(0.6, 4);
+  });
+
+  it("marks an entrant DNF only after a presented finish flag and more than 190% of their last lap", () => {
     const participants = [participant, continuingParticipant];
     const raceState = {
       categories: [],
@@ -148,7 +174,14 @@ describe("track playback index", () => {
       participants,
       records: [
         passing("stopped-entrant", 1, 0, 1, 60_000),
-        passing("continuing-entrant", 1, 241, 1, 60_000, continuingParticipant),
+        {
+          flagType: "chequered",
+          id: createTimeRecordId("track-dnf-chequered"),
+          recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_END,
+          source: createTimeRecordSourceId("track-source"),
+          time: new Date("2026-07-17T10:01:40.000Z"),
+        },
+        passing("continuing-entrant", 1, 300, 1, 60_000, continuingParticipant),
       ],
       teams: [],
     } as unknown as RaceState & RaceStateLookup;
@@ -158,13 +191,13 @@ describe("track playback index", () => {
 
     expect(
       index
-        .seek(index.startTime + 180_000)
+        .seek(index.startTime + 114_000)
         .entrants.find((entrant) => entrant.entrantId === participant.entrantId)
         ?.didNotFinish,
     ).toBe(false);
     expect(
       index
-        .seek(index.startTime + 180_001)
+        .seek(index.startTime + 114_001)
         .entrants.find((entrant) => entrant.entrantId === participant.entrantId)
         ?.didNotFinish,
     ).toBe(true);
@@ -181,6 +214,34 @@ describe("track playback index", () => {
         .entrants.find((entrant) => entrant.entrantId === participant.entrantId)
         ?.didNotFinish,
     ).toBe(false);
+  });
+
+  it("does not mark an entrant DNF for a finish flag that was not presented", () => {
+    const raceState = {
+      categories: [],
+      getEntrantIdForParticipant: () => participant.entrantId,
+      getFinishLineNumbers: () => [1],
+      getParticipantById: () => participant,
+      participants: [participant],
+      records: [
+        passing("stopped-entrant", 1, 0, 1, 60_000),
+        {
+          flagType: "chequered",
+          id: createTimeRecordId("track-unpresented-chequered"),
+          recordType: EVENT_SESSION_END,
+          source: createTimeRecordSourceId("track-source"),
+          time: new Date("2026-07-17T10:01:40.000Z"),
+        },
+      ],
+      teams: [],
+    } as unknown as RaceState & RaceStateLookup;
+    const index = createTrackPlaybackIndex(
+      raceState,
+      [{ lineNumber: 1, progress: 0 }],
+      new Date("2026-07-17T10:05:00.000Z").getTime(),
+    );
+
+    expect(index.seek(index.endTime).entrants[0]?.didNotFinish).toBe(false);
   });
 
   it("does not classify an entrant as DNF after they cross the finish line following the chequered flag", () => {
@@ -222,13 +283,13 @@ describe("track playback index", () => {
   it("projects an unfinished entrant through their final lap after the chequered flag", () => {
     const raceState = {
       categories: [],
-      getEntrantIdForParticipant: (participantId: string) => participantId === participant.id
-        ? participant.entrantId
-        : continuingParticipant.entrantId,
+      getEntrantIdForParticipant: (participantId: string) =>
+        participantId === participant.id
+          ? participant.entrantId
+          : continuingParticipant.entrantId,
       getFinishLineNumbers: () => [1],
-      getParticipantById: (participantId: string) => participantId === participant.id
-        ? participant
-        : continuingParticipant,
+      getParticipantById: (participantId: string) =>
+        participantId === participant.id ? participant : continuingParticipant,
       participants: [participant, continuingParticipant],
       records: [
         passing("lap-1", 1, 60, 1, 60_000),

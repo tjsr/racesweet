@@ -9,6 +9,7 @@ import {
 } from "../../model/racestate.js";
 import type { ParticipantPassingRecord } from "../../model/timerecord.js";
 import {
+  EVENT_FLAG_DISPLAYED,
   EVENT_FLAG_RETRACTED,
   EVENT_SESSION_END,
 } from "../../model/timerecord.js";
@@ -37,7 +38,7 @@ export interface TrackPlaybackEntrantState {
   raceElapsedTime?: number;
 }
 
-const DNF_INACTIVITY_MILLISECONDS = 3 * 60 * 1000;
+const DNF_LAST_LAP_MULTIPLIER = 1.9;
 
 const isFinishFlag = (record: {
   flagType?: string;
@@ -66,11 +67,13 @@ interface PreparedPassing {
 }
 
 interface MutableEntrantState {
+  completedAfterFinish: boolean;
   fastestLap?: number;
   lastLapTime?: number;
   lapCount: number;
   passingIndex: number;
   raceElapsedTime?: number;
+  recentLapTimes: number[];
 }
 
 const comparePassingTime = (
@@ -127,6 +130,7 @@ const interpolateProgress = (
 export const createTrackPlaybackIndex = (
   raceState: RaceState & RaceStateLookup,
   configuredTimingLines: EventTrackTimingLine[],
+  referenceTime: number = Date.now(),
 ): TrackPlaybackIndex => {
   const recordsWithTimes = raceState.records.filter(
     (record) => record.time !== undefined,
@@ -138,6 +142,7 @@ export const createTrackPlaybackIndex = (
   const endTime = Math.max(
     ...recordsWithTimes.map((record) => record.time!.getTime()),
     startTime,
+    referenceTime,
   );
   const configuredProgressByLine = new Map(
     configuredTimingLines.map((line) => [
@@ -181,6 +186,7 @@ export const createTrackPlaybackIndex = (
     (flag) =>
       flag.deleted !== true &&
       (flag.recordType & EVENT_FLAG_RETRACTED) === 0 &&
+      (flag.recordType & EVENT_FLAG_DISPLAYED) !== 0 &&
       flag.time !== undefined &&
       isFinishFlag(flag),
   );
@@ -192,7 +198,6 @@ export const createTrackPlaybackIndex = (
       .map((flag) => flag.time!.getTime())
       .sort((left, right) => left - right)[0];
   const passingsByEntrant = new Map<EventEntrantId, PreparedPassing[]>();
-  const completedAfterFinishByEntrant = new Set<EventEntrantId>();
   const startTimeByEntrant = new Map<EventEntrantId, number>();
 
   recordsWithTimes
@@ -231,14 +236,6 @@ export const createTrackPlaybackIndex = (
             : Math.min(existingStartTime, categoryStartTime),
         );
       }
-      if (
-        finishTime !== undefined &&
-        passingTime !== undefined &&
-        passingTime > finishTime &&
-        isFinishLinePassing(passing, raceState.getFinishLineNumbers?.())
-      ) {
-        completedAfterFinishByEntrant.add(entrantId);
-      }
       const lineNumber = getPassingLineNumber(passing);
       entrantPassings.push({
         categoryId,
@@ -258,24 +255,6 @@ export const createTrackPlaybackIndex = (
   const preparedPassings = Array.from(passingsByEntrant.values())
     .flat()
     .sort((left, right) => comparePassingTime(left.passing, right.passing));
-  const averageLapTimeByEntrant = new Map<EventEntrantId, number>();
-  passingsByEntrant.forEach((passings, entrantId) => {
-    const validLapTimes = passings
-      .filter((prepared) => isCountedLapPassing(
-        prepared.passing,
-        raceState.getFinishLineNumbers?.(),
-        (candidate) => getSourceLapCompletion(candidate, raceState.getTimeRecordSourceById?.(candidate.source)),
-      ))
-      .map((prepared) => prepared.passing.lapTime)
-      .filter((lapTime): lapTime is number => typeof lapTime === "number" && lapTime > 0)
-      .slice(-3);
-    if (validLapTimes.length > 0) {
-      averageLapTimeByEntrant.set(
-        entrantId,
-        validLapTimes.reduce((total, lapTime) => total + lapTime, 0) / validLapTimes.length,
-      );
-    }
-  });
   const mutableStateByEntrant = new Map<EventEntrantId, MutableEntrantState>();
   let appliedRecordCursor = -1;
   let currentTime = startTime;
@@ -283,15 +262,22 @@ export const createTrackPlaybackIndex = (
   const reset = (): void => {
     mutableStateByEntrant.clear();
     passingsByEntrant.forEach((_passings, entrantId) => {
-      mutableStateByEntrant.set(entrantId, { lapCount: 0, passingIndex: -1 });
+      mutableStateByEntrant.set(entrantId, {
+        completedAfterFinish: false,
+        lapCount: 0,
+        passingIndex: -1,
+        recentLapTimes: [],
+      });
     });
     appliedRecordCursor = -1;
   };
 
   const applyPassing = (prepared: PreparedPassing): void => {
     const state = mutableStateByEntrant.get(prepared.entrantId) || {
+      completedAfterFinish: false,
       lapCount: 0,
       passingIndex: -1,
+      recentLapTimes: [],
     };
     state.passingIndex = prepared.entrantIndex;
     const passing = prepared.passing;
@@ -312,17 +298,29 @@ export const createTrackPlaybackIndex = (
       state.lastLapTime = passing.lapTime || undefined;
       state.raceElapsedTime = passing.elapsedTime || undefined;
       if (typeof passing.lapTime === "number" && passing.lapTime > 0) {
+        state.recentLapTimes = [...state.recentLapTimes, passing.lapTime].slice(
+          -3,
+        );
         state.fastestLap =
           state.fastestLap === undefined
             ? passing.lapTime
             : Math.min(state.fastestLap, passing.lapTime);
       }
     }
+    const finishTime = getFinishTime(prepared.categoryId);
+    if (
+      finishTime !== undefined &&
+      passing.time !== undefined &&
+      passing.time.getTime() > finishTime &&
+      isFinishLinePassing(passing, raceState.getFinishLineNumbers?.())
+    ) {
+      state.completedAfterFinish = true;
+    }
     mutableStateByEntrant.set(prepared.entrantId, state);
   };
 
   const seek = (requestedTime: number): TrackPlaybackSnapshot => {
-    const time = Math.max(startTime, Math.min(endTime, requestedTime));
+    const time = Math.max(startTime, requestedTime);
     if (time < currentTime) {
       reset();
     }
@@ -344,40 +342,54 @@ export const createTrackPlaybackIndex = (
           return [];
         }
         const state = mutableStateByEntrant.get(entrantId) || {
+          completedAfterFinish: false,
           lapCount: 0,
           passingIndex: -1,
+          recentLapTimes: [],
         };
         const previous =
           state.passingIndex >= 0 ? passings[state.passingIndex] : undefined;
         const next = passings[state.passingIndex + 1];
         const lastPassingTime = previous?.passing.time?.getTime();
         const finishTime = getFinishTime(previous?.categoryId);
+        const estimatedLapTime =
+          state.recentLapTimes.length > 0
+            ? state.recentLapTimes.reduce(
+                (total, lapTime) => total + lapTime,
+                0,
+              ) / state.recentLapTimes.length
+            : undefined;
         const estimatedFinalLap =
-          finishTime !== undefined &&
-          time >= finishTime &&
-          !completedAfterFinishByEntrant.has(entrantId) &&
-          lastPassingTime !== undefined &&
+          previous !== undefined &&
           next === undefined &&
-          averageLapTimeByEntrant.has(entrantId);
-        const estimatedLapTime = averageLapTimeByEntrant.get(entrantId);
-        const estimatedProgress = estimatedFinalLap && previous && estimatedLapTime
-          ? (previous.progress + Math.max(0, Math.min(1, (time - lastPassingTime!) / estimatedLapTime))) % 1
-          : undefined;
+          lastPassingTime !== undefined &&
+          estimatedLapTime !== undefined;
+        const estimatedProgress =
+          estimatedFinalLap && previous && estimatedLapTime
+            ? (previous.progress +
+                Math.max(0, (time - lastPassingTime!) / estimatedLapTime)) %
+              1
+            : undefined;
+        const finishFlagPresented =
+          finishTime !== undefined && time >= finishTime;
         return [
           {
             didNotFinish:
-              !estimatedFinalLap &&
-              !completedAfterFinishByEntrant.has(entrantId) &&
+              finishFlagPresented &&
+              !state.completedAfterFinish &&
               lastPassingTime !== undefined &&
-              next === undefined &&
-              time - lastPassingTime > DNF_INACTIVITY_MILLISECONDS,
+              state.lastLapTime !== undefined &&
+              time - lastPassingTime >
+                state.lastLapTime * DNF_LAST_LAP_MULTIPLIER,
             entrantId,
             estimatedFinalLap,
             fastestLap: state.fastestLap,
             lastLapTime: state.lastLapTime,
             lapCount: state.lapCount,
             position: 0,
-            progress: estimatedProgress ?? interpolateProgress(previous, next, time, entrantStartTime),
+            progress:
+              estimatedProgress ??
+              interpolateProgress(previous, next, time, entrantStartTime),
             raceElapsedTime: state.raceElapsedTime,
           },
         ];

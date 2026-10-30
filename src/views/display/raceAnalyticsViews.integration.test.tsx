@@ -33,6 +33,8 @@ import {
   CROSSING_FLAG_LAP_UNDER_MINIMUM,
   CROSSING_UNRELATED_AFTER_FINISH,
   CROSSING_UNRELATED_LAP_UNDER_MINIMUM,
+  EVENT_FLAG_DISPLAYED,
+  EVENT_SESSION_END,
   type EventTimeRecord,
   type ParticipantPassingRecord,
   RECORD_TX_CROSSING,
@@ -2052,7 +2054,16 @@ describe("race analytics views integration", () => {
     const trackRaceState = {
       ...raceState,
       getFinishLineNumbers: () => [1],
-      records: trackRecords,
+      records: [
+        ...trackRecords,
+        {
+          flagType: "chequered",
+          id: createTimeRecordId("track-map-chequered"),
+          recordType: EVENT_FLAG_DISPLAYED | EVENT_SESSION_END,
+          source: createTimeRecordSourceId("track-map-flags"),
+          time: new Date("2026-06-12T10:05:00.000Z"),
+        },
+      ],
     } as unknown as Session & RaceStateLookup;
     const event: EventCatalogEvent = {
       categoryIds: [createCategoryId("cat-a"), createCategoryId("cat-b")],
