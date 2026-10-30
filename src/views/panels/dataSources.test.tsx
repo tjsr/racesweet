@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { act } from "react";
 import { flushSync } from "react-dom";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -83,6 +84,118 @@ describe("DataSourcesPanel", () => {
       ),
     ).toBeTruthy();
     expect(container.textContent).toContain("Add Data Source");
+  });
+
+  it("shows an in-button spinner while Apical events are loading", async () => {
+    let finishLoading: (() => void) | undefined;
+    const onLoadApicalEvents = vi.fn(
+      () =>
+        new Promise<void>((resolve: () => void): void => {
+          finishLoading = resolve;
+        }),
+    );
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <DataSourcesPanel
+          dataSources={dataSources}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={onLoadApicalEvents}
+          onReprocessApicalData={vi.fn()}
+          onSaveSource={vi.fn()}
+        />,
+      );
+    });
+
+    const fetchEventsButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find(
+      (button: HTMLButtonElement): boolean =>
+        button.textContent === "Fetch Apical Events",
+    );
+    expect(fetchEventsButton).toBeDefined();
+
+    await act(async (): Promise<void> => {
+      fetchEventsButton?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(onLoadApicalEvents).toHaveBeenCalledWith("source-apical");
+    expect(fetchEventsButton?.disabled).toBe(true);
+    expect(
+      container.querySelector('[aria-label="Fetching Apical events"]'),
+    ).toBeTruthy();
+
+    await act(async (): Promise<void> => {
+      finishLoading?.();
+      await Promise.resolve();
+    });
+
+    expect(fetchEventsButton?.disabled).toBe(false);
+    expect(
+      container.querySelector('[aria-label="Fetching Apical events"]'),
+    ).toBeNull();
+  });
+
+  it("shows an in-button spinner while linked Apical sessions are loading", async () => {
+    let finishLoading: (() => void) | undefined;
+    const onReprocessApicalData = vi.fn(
+      () =>
+        new Promise<void>((resolve: () => void): void => {
+          finishLoading = resolve;
+        }),
+    );
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+
+    flushSync(() => {
+      root?.render(
+        <DataSourcesPanel
+          dataSources={[{ ...dataSources[0]!, apicalDataFilePath: "C:/RaceSweet/apical-1001.xlsx" }]}
+          onCreateSource={vi.fn()}
+          onDeleteSource={vi.fn()}
+          onFetchApicalDataNow={vi.fn()}
+          onLoadApicalEvents={vi.fn()}
+          onReprocessApicalData={onReprocessApicalData}
+          onSaveSource={vi.fn()}
+        />,
+      );
+    });
+
+    const reloadButton = Array.from(container.querySelectorAll("button")).find(
+      (button: HTMLButtonElement): boolean =>
+        button.textContent === "Re-load linked sessions",
+    );
+    expect(reloadButton).toBeDefined();
+
+    await act(async (): Promise<void> => {
+      reloadButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(onReprocessApicalData).toHaveBeenCalledWith("source-apical");
+    expect(reloadButton?.disabled).toBe(true);
+    expect(
+      container.querySelector('[aria-label="Loading linked Apical sessions"]'),
+    ).toBeTruthy();
+
+    await act(async (): Promise<void> => {
+      finishLoading?.();
+      await Promise.resolve();
+    });
+
+    expect(reloadButton?.disabled).toBe(false);
+    expect(
+      container.querySelector('[aria-label="Loading linked Apical sessions"]'),
+    ).toBeNull();
   });
 
   it("imports the selected Apical event and re-loads its linked sessions", () => {

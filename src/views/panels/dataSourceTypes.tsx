@@ -1,10 +1,11 @@
-import { Button, MenuItem } from "@mui/material";
+import { MenuItem } from "@mui/material";
 import React from "react";
 import {
   type DataSourceType,
   getDataSourceTypeLabel,
 } from "../../app/systemConfig.js";
 import { SelectTextField } from "../../controls/selectTextField.js";
+import { AsyncButton } from "../asyncButton.js";
 
 interface DataSourceTypesPanelProps {
   newSourceType: DataSourceType;
@@ -61,11 +62,12 @@ export const DataSourceTypesPanel = (
         </option>
       ))}
     </select>
-    <Button
+    <AsyncButton
+      loadingAriaLabel="Adding data source"
+      onAsyncClick={() => props.onCreateSource(props.newSourceType)}
       type="button"
-      onClick={() => props.onCreateSource(props.newSourceType)}
     >
       Add Data Source
-    </Button>
+    </AsyncButton>
   </div>
 );

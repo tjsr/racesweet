@@ -1,10 +1,4 @@
-import {
-  Button,
-  FormControlLabel,
-  MenuItem,
-  Switch,
-  TextField,
-} from "@mui/material";
+import { FormControlLabel, MenuItem, Switch, TextField } from "@mui/material";
 import React from "react";
 import { formatErrorForDisplay } from "../../app/stackTrace.js";
 import {
@@ -20,6 +14,7 @@ import type {
   MrScatsDataFileSummary,
 } from "../../parsers/mrScats/fileInventory.js";
 import type { MrScatsDataFilePreview } from "../../parsers/mrScats/filePreview.js";
+import { AsyncButton } from "../asyncButton.js";
 import { DataSourceTypesPanel } from "./dataSourceTypes.js";
 import { FileSelectionField } from "./fileSelectionField.js";
 import type { InlineLoadingProgress } from "./InlineLoadingIndicator.js";
@@ -602,24 +597,26 @@ export const DataSourcesPanel = (
                     <>
                       <h4>RFID Decoder Listener</h4>
                       <div className="events-actions">
-                        <Button
+                        <AsyncButton
                           disabled={isRfidDecoderListening || !source.enabled}
-                          onClick={() => {
-                            void props.onStartRfidDecoderListener?.(source.id);
-                          }}
+                          loadingAriaLabel="Starting RFID decoder listener"
+                          onAsyncClick={() =>
+                            props.onStartRfidDecoderListener?.(source.id)
+                          }
                           variant="contained"
                         >
                           Start
-                        </Button>
-                        <Button
+                        </AsyncButton>
+                        <AsyncButton
                           disabled={!isRfidDecoderListening}
-                          onClick={() => {
-                            void props.onStopRfidDecoderListener?.(source.id);
-                          }}
+                          loadingAriaLabel="Stopping RFID decoder listener"
+                          onAsyncClick={() =>
+                            props.onStopRfidDecoderListener?.(source.id)
+                          }
                           variant="outlined"
                         >
                           Stop
-                        </Button>
+                        </AsyncButton>
                       </div>
                       <label>
                         Listen port
@@ -796,28 +793,31 @@ export const DataSourcesPanel = (
                         Import placeholder entrant for unknown transmitters
                       </label>
                       <div className="events-actions">
-                        <button
+                        <AsyncButton
                           type="button"
                           disabled={
                             !source.fileConfig?.filePath ||
                             !props.onPreviewDorianCtcSrtFile
                           }
-                          onClick={() => {
-                            void handlePreviewDorianCtcSrtFile(source);
-                          }}
+                          loadingAriaLabel="Loading Dorian CTC preview"
+                          onAsyncClick={() =>
+                            handlePreviewDorianCtcSrtFile(source)
+                          }
+                          variant="outlined"
                         >
                           Preview
-                        </button>
+                        </AsyncButton>
                         {props.onLoadDorianCtcSrtFile ? (
-                          <Button
+                          <AsyncButton
                             disabled={!source.fileConfig?.filePath}
-                            onClick={() => {
-                              void props.onLoadDorianCtcSrtFile?.(source.id);
-                            }}
+                            loadingAriaLabel="Importing Dorian CTC data"
+                            onAsyncClick={() =>
+                              props.onLoadDorianCtcSrtFile?.(source.id)
+                            }
                             variant="contained"
                           >
                             Import into selected session
-                          </Button>
+                          </AsyncButton>
                         ) : null}
                       </div>
                     </>
@@ -1073,33 +1073,40 @@ export const DataSourcesPanel = (
                         label="Live polling"
                       />
                       <div className="events-actions">
-                        <Button
-                          onClick={() => handleLoadApicalEvents(source.id)}
+                        <AsyncButton
+                          loadingAriaLabel="Fetching Apical events"
+                          onAsyncClick={() => handleLoadApicalEvents(source.id)}
                           variant="outlined"
                         >
                           Fetch Apical Events
-                        </Button>
-                        <Button
+                        </AsyncButton>
+                        <AsyncButton
                           disabled={!selectedApicalEventId}
-                          onClick={() => {
-                            void props.onFetchApicalDataNow(source.id);
-                          }}
+                          loadingAriaLabel={
+                            isApicalRecentLaps
+                              ? "Reloading Apical data"
+                              : "Importing Apical event"
+                          }
+                          onAsyncClick={() =>
+                            props.onFetchApicalDataNow(source.id)
+                          }
                           variant="contained"
                         >
                           {isApicalRecentLaps
                             ? "Reload now and resume polling"
                             : "Import selected event"}
-                        </Button>
+                        </AsyncButton>
                         {!isApicalRecentLaps ? (
-                          <Button
+                          <AsyncButton
                             disabled={!source.apicalDataFilePath}
-                            onClick={() => {
-                              void props.onReprocessApicalData(source.id);
-                            }}
+                            loadingAriaLabel="Loading linked Apical sessions"
+                            onAsyncClick={() =>
+                              props.onReprocessApicalData(source.id)
+                            }
                             variant="outlined"
                           >
                             Re-load linked sessions
-                          </Button>
+                          </AsyncButton>
                         ) : null}
                       </div>
                       <p>
@@ -1194,7 +1201,9 @@ export const DataSourcesPanel = (
                             onChange={(
                               event: React.ChangeEvent<HTMLSelectElement>,
                             ): void => {
-                              const eventId: number = Number(event.target.value);
+                              const eventId: number = Number(
+                                event.target.value,
+                              );
                               if (!eventId) {
                                 return;
                               }
@@ -1215,14 +1224,15 @@ export const DataSourcesPanel = (
                             ))}
                           </select>
                           {!isApicalRecentLaps ? (
-                            <Button
+                            <AsyncButton
                               disabled={
                                 !selectedApicalEventId ||
                                 !props.onCreateApicalSourceFrom
                               }
-                              onClick={() => {
+                              loadingAriaLabel="Creating Apical data source"
+                              onAsyncClick={() => {
                                 if (selectedApicalEventId) {
-                                  void props.onCreateApicalSourceFrom?.(
+                                  return props.onCreateApicalSourceFrom?.(
                                     source.id,
                                     selectedApicalEventId,
                                   );
@@ -1231,7 +1241,7 @@ export const DataSourcesPanel = (
                               variant="contained"
                             >
                               Create new from
-                            </Button>
+                            </AsyncButton>
                           ) : null}
                         </div>
                       ) : null}
@@ -1309,13 +1319,14 @@ export const DataSourcesPanel = (
                   )}
 
                   <div className="events-actions">
-                    <Button
+                    <AsyncButton
                       color="error"
-                      onClick={() => props.onDeleteSource(source.id)}
+                      loadingAriaLabel="Deleting data source"
+                      onAsyncClick={() => props.onDeleteSource(source.id)}
                       variant="outlined"
                     >
                       Delete Source
-                    </Button>
+                    </AsyncButton>
                   </div>
                 </>
               );

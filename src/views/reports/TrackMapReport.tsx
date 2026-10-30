@@ -531,7 +531,7 @@ export const TrackMapReport = (
                 position: "absolute",
               }}
             >
-              {leaderLapMarkers.map((marker) => {
+              {leaderLapMarkers.map((marker, markerIndex: number) => {
                 const left: number = Math.max(
                   0,
                   Math.min(
@@ -542,7 +542,7 @@ export const TrackMapReport = (
                 return (
                   <div
                     aria-label={`Leader lap ${marker.lapCount}: ${millisecondsToTime(marker.elapsedTime)} at ${tableTimeString(new Date(marker.time), props.event?.timeZone)}`}
-                    key={`${marker.entrantId}-${marker.lapCount}-${marker.time}`}
+                    key={`${marker.entrantId}-${marker.lapCount}-${marker.time}-${markerIndex}`}
                     style={{
                       left: `${left}%`,
                       position: "absolute",

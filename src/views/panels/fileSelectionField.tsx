@@ -1,5 +1,6 @@
-import { Button, TextField } from '@mui/material';
-import React from 'react';
+import { TextField } from "@mui/material";
+import React from "react";
+import { AsyncButton } from "../asyncButton.js";
 
 interface FileSelectionAction {
   disabled?: boolean;
@@ -19,15 +20,21 @@ interface FileSelectionFieldProps {
   value: string;
 }
 
-export const FileSelectionField = (props: FileSelectionFieldProps): React.ReactElement => {
+export const FileSelectionField = (
+  props: FileSelectionFieldProps,
+): React.ReactElement => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const actions: FileSelectionAction[] = [
     ...(props.actions || []),
-    ...(props.onSelectFile ? [{
-      disabled: props.disabled,
-      label: 'Select File',
-      onClick: (): void => fileInputRef.current?.click(),
-    }] : []),
+    ...(props.onSelectFile
+      ? [
+        {
+          disabled: props.disabled,
+          label: "Select File",
+          onClick: (): void => fileInputRef.current?.click(),
+        },
+      ]
+      : []),
   ];
 
   return (
@@ -36,38 +43,41 @@ export const FileSelectionField = (props: FileSelectionFieldProps): React.ReactE
         fullWidth
         label={props.label}
         placeholder={props.placeholder}
-        slotProps={{ htmlInput: { 'aria-label': props.ariaLabel, readOnly: true } }}
+        slotProps={{
+          htmlInput: { "aria-label": props.ariaLabel, readOnly: true },
+        }}
         value={props.value}
       />
       {props.onSelectFile ? (
         <input
           accept={props.accept}
-          aria-label={props.fileInputAriaLabel || `${props.ariaLabel} File input`}
+          aria-label={
+            props.fileInputAriaLabel || `${props.ariaLabel} File input`
+          }
           className="file-selection-field__native-input"
           onChange={(event) => {
             const file = event.target.files?.[0];
             if (file) {
               void props.onSelectFile!(file);
             }
-            event.target.value = '';
+            event.target.value = "";
           }}
           ref={fileInputRef}
           type="file"
         />
       ) : null}
       {actions.map((action) => (
-        <Button
+        <AsyncButton
           aria-label={`${props.ariaLabel} ${action.label}`}
           disabled={action.disabled}
           key={action.label}
-          onClick={() => {
-            void action.onClick();
-          }}
+          loadingAriaLabel={`${action.label} in progress`}
+          onAsyncClick={action.onClick}
           type="button"
           variant="outlined"
         >
           {action.label}
-        </Button>
+        </AsyncButton>
       ))}
     </div>
   );
