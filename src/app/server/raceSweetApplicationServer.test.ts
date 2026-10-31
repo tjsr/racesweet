@@ -1,9 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createConnection, createServer as createNetServer } from "node:net";
 import type { AddressInfo, Socket } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { dateStringInTimeZone, getSystemTimeZone, tableTimeStringInTimeZone } from "../utils/timeutils.js";
 import type { EventCatalogMutation } from "../../ledger/eventCatalogLedger.js";
 import { createEventId, createId } from "../../model/ids.js";
 import {
@@ -138,6 +140,89 @@ describe("RaceSweetApplicationServer", () => {
 
   beforeEach(async () => {
     testServer = await startTestServer();
+  });
+
+  it("authenticates, persists, and deduplicates manual crossing submissions", async () => {
+    const eventResponse: Response = await jsonRequest(
+      testServer.origin,
+      "/api/v1/catalog/events",
+      {},
+      testServer.adminCookie,
+    );
+    const eventPayload: { catalog: { events: Array<{ id: string }> } } = await eventResponse.json();
+    const eventId: string = eventPayload.catalog.events[0]!.id;
+    const sessionResponse: Response = await jsonRequest(
+      testServer.origin,
+      `/api/v1/catalog/events/${eventId}/sessions`,
+      {},
+      testServer.adminCookie,
+    );
+    const sessionPayload: { catalog: { sessions: Array<{ id: string }> } } = await sessionResponse.json();
+    const sessionId: string = sessionPayload.catalog.sessions[0]!.id;
+    const localZone: string = getSystemTimeZone();
+    const crossingInstant: Date = new Date("2026-01-01T12:00:00.000Z");
+    const submission: {
+      crossing: {
+        eventId: string; identifierKind: string; identifierValue: string;
+        lineNumber: number; localDate: string; localTime: string;
+        sessionId: string; status: string; time: string; timeZone: string;
+      };
+      crossingId: string;
+      mutationId: string;
+    } = {
+      crossing: {
+        eventId,
+        identifierKind: "transmitter",
+        identifierValue: "UNKNOWN-42",
+        lineNumber: 1,
+        localDate: dateStringInTimeZone(crossingInstant, localZone),
+        localTime: tableTimeStringInTimeZone(crossingInstant, localZone),
+        sessionId,
+        status: "needs-attention",
+        time: crossingInstant.toISOString(),
+        timeZone: localZone,
+      },
+      crossingId: randomUUID(),
+      mutationId: randomUUID(),
+    };
+    const unauthenticated: Response = await jsonRequest(
+      testServer.origin, "/api/v1/timing/manual-crossings", submission,
+    );
+    expect(unauthenticated.status).toBe(401);
+
+    const accepted: Response = await jsonRequest(
+      testServer.origin, "/api/v1/timing/manual-crossings", submission, testServer.adminCookie,
+    );
+    expect(accepted.status).toBe(200);
+    await expect(accepted.json()).resolves.toEqual({
+      crossingId: submission.crossingId,
+      mutationId: submission.mutationId,
+      status: "accepted",
+    });
+    const repeated: Response = await jsonRequest(
+      testServer.origin, "/api/v1/timing/manual-crossings", submission, testServer.adminCookie,
+    );
+    expect(repeated.status).toBe(200);
+    await expect(repeated.json()).resolves.toEqual(expect.objectContaining({ status: "already-accepted" }));
+    const conflict: Response = await jsonRequest(
+      testServer.origin,
+      "/api/v1/timing/manual-crossings",
+      { ...submission, crossing: { ...submission.crossing, identifierValue: "OTHER" } },
+      testServer.adminCookie,
+    );
+    expect(conflict.status).toBe(409);
+    const invalid: Response = await jsonRequest(
+      testServer.origin,
+      "/api/v1/timing/manual-crossings",
+      { ...submission, mutationId: randomUUID(), crossing: { ...submission.crossing, lineNumber: 0 } },
+      testServer.adminCookie,
+    );
+    expect(invalid.status).toBe(400);
+
+    const ledger: { mutations: EventCatalogMutation[] } = JSON.parse(
+      await readFile(path.join(testServer.dataDirectory, "event-catalog.json"), "utf8"),
+    ) as { mutations: EventCatalogMutation[] };
+    expect(ledger.mutations.filter((mutation: EventCatalogMutation): boolean => mutation.id === submission.mutationId)).toHaveLength(1);
   });
 
   it("resolves Forge renderer assets from the development server origin", () => {

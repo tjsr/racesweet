@@ -1,7 +1,7 @@
 import { validate as validateUuid } from "uuid";
 
 import type { MasterEntrantProfile } from "../app/systemConfig.js";
-import { getSystemTimeZone } from "../app/utils/timeutils.js";
+import { dateStringInTimeZone, getSystemTimeZone, tableTimeStringInTimeZone } from "../app/utils/timeutils.js";
 import {
   type CategoryDistanceRule,
   type CategoryTeamRules,
@@ -47,11 +47,14 @@ import {
   createEventParticipantId,
   createId,
   createSessionId,
+  createTimeRecordId,
   rewriteImportedObjectIds,
 } from "../model/ids.js";
 import { getParticipantDisplayName } from "../model/participantDisplay.js";
 import { EventId, SessionId } from "../model/raceevent.js";
+import type { EffectiveManualCrossing, ManualCrossing, ManualCrossingInput } from "../model/manualCrossing.js";
 import type { RaceState } from "../model/racestate.js";
+import type { TimeRecordId } from "../model/timerecord.js";
 import type { EventTimeRecord, TimeRecord } from "../model/timerecord.js";
 import {
   MR_SCATS_DEFAULT_TIME_ZONE,
@@ -59,6 +62,7 @@ import {
 } from "../parsers/mrScats/catalogImport.js";
 import type { EventCatalogPersistence } from "../persistence/eventCatalogPersistence.js";
 import { addMissingLinkedCategoryPlaceholders } from "../service/sessionSourceReload.js";
+import { mergeManualCrossingsIntoRaceState } from "../processing/manualCrossings.js";
 
 interface ApicalCatalogImport {
   apicalDataFilePath?: string;
@@ -2100,6 +2104,9 @@ export class EventCatalogService {
     eventId: EventId,
     sessionId: SessionId,
   ): ImportedRaceStateMetadata | undefined {
+    const manualCrossings: EffectiveManualCrossing[] = (this.state.manualCrossings || []).filter(
+      (crossing: EffectiveManualCrossing): boolean => crossing.eventId === eventId && crossing.sessionId === sessionId,
+    );
     const mutation = [...this.ledger.mutations].reverse().find((candidate) => {
       return (
         candidate.type === "race-state-imported" &&
@@ -2108,13 +2115,16 @@ export class EventCatalogService {
       );
     });
 
-    if (mutation?.type !== "race-state-imported") {
+    if (mutation?.type !== "race-state-imported" && manualCrossings.length === 0) {
       return undefined;
     }
 
     return {
-      apicalDataFilePath: mutation.apicalDataFilePath,
-      raceState: reviveRaceStateDates(mutation.raceState),
+      apicalDataFilePath: mutation?.type === "race-state-imported" ? mutation.apicalDataFilePath : undefined,
+      raceState: mergeManualCrossingsIntoRaceState(
+        mutation?.type === "race-state-imported" ? reviveRaceStateDates(mutation.raceState) : {},
+        manualCrossings,
+      ),
     };
   }
 
@@ -2123,6 +2133,162 @@ export class EventCatalogService {
     sessionId: SessionId,
   ): Partial<RaceState> | undefined {
     return this.getImportedRaceStateMetadata(eventId, sessionId)?.raceState;
+  }
+
+  public async recordManualCrossing(
+    input: ManualCrossingInput,
+    identity: { crossingId?: TimeRecordId; mutationId?: string } = {},
+  ): Promise<EventCatalogState> {
+    const crossing: ManualCrossing = {
+      ...input,
+      crossingId: identity.crossingId || createTimeRecordId(),
+    };
+    this.validateManualCrossing(crossing);
+    if (this.state.manualCrossings?.some((current: EffectiveManualCrossing): boolean => current.crossingId === crossing.crossingId)) {
+      throw new Error(`Manual crossing ${crossing.crossingId} already exists.`);
+    }
+    this.assertNoDuplicateManualCrossing(crossing);
+    return this.appendMutations([{
+      crossing,
+      id: identity.mutationId || createMutationId(),
+      timestamp: createTimestamp(),
+      type: "manual-crossing-recorded",
+    }]);
+  }
+
+  public async correctManualCrossing(
+    crossingId: TimeRecordId,
+    input: ManualCrossingInput,
+  ): Promise<EventCatalogState> {
+    const current: EffectiveManualCrossing | undefined = this.state.manualCrossings?.find(
+      (crossing: EffectiveManualCrossing): boolean => crossing.crossingId === crossingId,
+    );
+    if (!current || current.reversed) {
+      throw new Error(`Manual crossing ${crossingId} cannot be corrected.`);
+    }
+    const crossing: ManualCrossing = { ...input, crossingId };
+    this.validateManualCrossing(crossing);
+    if (current.eventId !== crossing.eventId || current.sessionId !== crossing.sessionId) {
+      throw new Error('A manual crossing correction cannot move it to another event or session.');
+    }
+    this.assertNoDuplicateManualCrossing(crossing);
+    return this.appendMutations([{
+      crossing,
+      id: createMutationId(),
+      timestamp: createTimestamp(),
+      type: "manual-crossing-corrected",
+    }]);
+  }
+
+  public async reverseManualCrossing(
+    crossingId: TimeRecordId,
+    reason?: string,
+  ): Promise<EventCatalogState> {
+    const current: EffectiveManualCrossing | undefined = this.state.manualCrossings?.find(
+      (crossing: EffectiveManualCrossing): boolean => crossing.crossingId === crossingId,
+    );
+    if (!current || current.reversed) {
+      throw new Error(`Manual crossing ${crossingId} cannot be reversed.`);
+    }
+    return this.appendMutations([{
+      crossingId,
+      id: createMutationId(),
+      reason: reason?.trim() || undefined,
+      timestamp: createTimestamp(),
+      type: "manual-crossing-reversed",
+    }]);
+  }
+
+  public async reconcileManualCrossing(
+    crossingId: TimeRecordId,
+    entrantId: EventEntrantId,
+    participantId?: EventParticipant["id"],
+  ): Promise<EventCatalogState> {
+    const current: EffectiveManualCrossing | undefined = this.state.manualCrossings?.find(
+      (crossing: EffectiveManualCrossing): boolean => crossing.crossingId === crossingId,
+    );
+    if (!current || current.reversed || current.status !== 'needs-attention') {
+      throw new Error(`Manual crossing ${crossingId} does not need reconciliation.`);
+    }
+    return this.correctManualCrossing(crossingId, {
+      entrantId,
+      eventId: current.eventId,
+      identifierKind: current.identifierKind,
+      identifierValue: current.identifierValue,
+      lineNumber: current.lineNumber,
+      localDate: current.localDate,
+      localTime: current.localTime,
+      loopNumber: current.loopNumber,
+      participantId,
+      sessionId: current.sessionId,
+      status: 'scored',
+      time: current.time,
+      timeZone: current.timeZone,
+    });
+  }
+
+  private validateManualCrossing(crossing: ManualCrossing): void {
+    const event = this.state.events.find((candidate) => candidate.id === crossing.eventId);
+    const session = this.state.sessions.find((candidate) => candidate.id === crossing.sessionId);
+    if (!event || !session || session.eventId !== event.id) {
+      throw new Error('Manual crossing event and session must belong together.');
+    }
+    if (!Number.isSafeInteger(crossing.lineNumber) || crossing.lineNumber < 1 ||
+      (crossing.loopNumber !== undefined && (!Number.isSafeInteger(crossing.loopNumber) || crossing.loopNumber < 1))) {
+      throw new Error('Manual crossing checkpoint and loop must be positive integers.');
+    }
+    if (!crossing.identifierValue.trim() || !Number.isFinite(Date.parse(crossing.time)) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(crossing.localDate) || !/^\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?$/.test(crossing.localTime) ||
+      !crossing.timeZone.trim()) {
+      throw new Error('Manual crossing identifier and local timestamp are required.');
+    }
+    if (crossing.timeZone !== (event.timeZone || getSystemTimeZone())) {
+      throw new Error('Manual crossing timezone must match the selected event.');
+    }
+    const instant: Date = new Date(crossing.time);
+    const localDate: string = dateStringInTimeZone(instant, crossing.timeZone);
+    const localTime: string = tableTimeStringInTimeZone(instant, crossing.timeZone);
+    const timeParts: RegExpMatchArray | null = crossing.localTime.match(/^(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/);
+    const normalizedTime: string = timeParts
+      ? `${timeParts[1]}:${timeParts[2]}:${timeParts[3] || '00'}.${(timeParts[4] || '0').padEnd(3, '0')}`
+      : '';
+    if (localDate !== crossing.localDate || localTime !== normalizedTime) {
+      throw new Error('Manual crossing instant does not match the entered event-local time.');
+    }
+    if (crossing.status === 'scored' && !crossing.entrantId && !crossing.participantId) {
+      throw new Error('A scored manual crossing must identify an entrant or participant.');
+    }
+    if (crossing.entrantId) {
+      const entrant = this.state.entrants.find((candidate) => candidate.id === crossing.entrantId);
+      if (!entrant || entrant.eventId !== event.id || (entrant.sessionIds?.length && !entrant.sessionIds.includes(session.id))) {
+        throw new Error('Manual crossing entrant is not assigned to the selected event and session.');
+      }
+    }
+    if (crossing.participantId) {
+      const memberships: ParticipantEntrantMembership[] = getParticipantEntrantMemberships(
+        this.state,
+        crossing.participantId,
+        { eventId: event.id, includeTeamParents: true },
+      );
+      if (!memberships.some((membership: ParticipantEntrantMembership): boolean =>
+        membership.sessions.some((assignedSession: EventCatalogSession): boolean => assignedSession.id === session.id) &&
+        (!crossing.entrantId || membership.entrant.id === crossing.entrantId))) {
+        throw new Error('Manual crossing participant is not assigned to the selected entrant and session.');
+      }
+    }
+  }
+
+  private assertNoDuplicateManualCrossing(crossing: ManualCrossing): void {
+    const duplicate: EffectiveManualCrossing | undefined = this.state.manualCrossings?.find(
+      (current: EffectiveManualCrossing): boolean => !current.reversed && current.crossingId !== crossing.crossingId &&
+        current.eventId === crossing.eventId && current.sessionId === crossing.sessionId &&
+        current.lineNumber === crossing.lineNumber && current.loopNumber === crossing.loopNumber &&
+        current.time === crossing.time && current.identifierKind === crossing.identifierKind &&
+        current.identifierValue.trim().toLowerCase() === crossing.identifierValue.trim().toLowerCase(),
+    );
+    if (duplicate) {
+      throw new Error(`Manual crossing duplicates ${duplicate.crossingId}; correct that record instead.`);
+    }
   }
 
   public findEntrantMembershipsForParticipant(

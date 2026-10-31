@@ -10,12 +10,14 @@ import {
 } from "node:https";
 import type { AddressInfo, Socket } from "node:net";
 import { randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import path from "node:path";
 import type { EventCatalogState } from "../../catalog/eventCatalog.js";
 import type { EventCatalogMutation } from "../../ledger/eventCatalogLedger.js";
 import type { CategoryId } from "../../processing/category.js";
 import type { EventEntrantId } from "../../model/entrant.js";
 import type { EventId, SessionId } from "../../model/raceevent.js";
+import type { ParticipantPassingRecord } from "../../model/timerecord.js";
 import type {
   EventTimeRecord,
   TimeRecord,
@@ -60,6 +62,7 @@ import {
   EventReplayHub,
 } from "./eventReplayHub.js";
 import { UploadStore } from "./uploadStore.js";
+import { parseManualCrossingSubmission, type ManualCrossingSubmission } from "./manualCrossingRequest.js";
 import {
   formatRfidDecoderBytesForDisplay,
   RfidDecoderListenerService,
@@ -1064,6 +1067,10 @@ export class RaceSweetApplicationServer {
       await this.handleMutations(request, response, url);
       return;
     }
+    if (url.pathname === "/api/v1/timing/manual-crossings") {
+      await this.handleManualCrossing(request, response);
+      return;
+    }
     if (url.pathname === "/api/v1/timing/crossing") {
       const user: AuthenticatedUser | undefined = this.requireUser(
         request,
@@ -1126,6 +1133,67 @@ export class RaceSweetApplicationServer {
       return;
     }
     sendProblem(response, 404, "API resource not found.");
+  };
+
+  private handleManualCrossing = async (
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): Promise<void> => {
+    if (!this.requireUser(request, response, 'race:write')) {
+      return;
+    }
+    if (request.method !== 'POST') {
+      sendProblem(response, 405, 'Only POST is supported.');
+      return;
+    }
+    this.assertInitialized();
+    const submission: ManualCrossingSubmission = parseManualCrossingSubmission(await readRequestBody<unknown>(request));
+    const result: { status: 'accepted' | 'already-accepted' | 'conflict' } = { status: 'accepted' };
+    await this.enqueueCommand(async (): Promise<void> => {
+      const catalogService: EventCatalogService = this.eventCatalogService!;
+      const existing: EventCatalogMutation | undefined = catalogService.mutations.find(
+        (mutation: EventCatalogMutation): boolean => mutation.id === submission.mutationId,
+      );
+      if (existing) {
+        result.status = existing.type === 'manual-crossing-recorded' &&
+          existing.crossing.crossingId === submission.crossingId &&
+          isDeepStrictEqual({ ...submission.crossing, crossingId: submission.crossingId }, existing.crossing)
+          ? 'already-accepted'
+          : 'conflict';
+        return;
+      }
+      await catalogService.recordManualCrossing(submission.crossing, {
+        crossingId: submission.crossingId,
+        mutationId: submission.mutationId,
+      });
+      const accepted: EventCatalogMutation | undefined = catalogService.mutations.find(
+        (mutation: EventCatalogMutation): boolean => mutation.id === submission.mutationId,
+      );
+      if (accepted) {
+        this.eventHub.publish('catalog', 'catalog.mutations-applied', jsonValue({ mutations: [accepted] }));
+      }
+      if (submission.crossing.status === 'scored') {
+        const record: ParticipantPassingRecord | undefined = catalogService
+          .getImportedRaceState(submission.crossing.eventId, submission.crossing.sessionId)
+          ?.records?.find((candidate: TimeRecord): boolean => candidate.id === submission.crossingId) as ParticipantPassingRecord | undefined;
+        if (record) {
+          this.eventReplayHub.publish({
+            eventId: submission.crossing.eventId,
+            record,
+            sessionId: submission.crossing.sessionId,
+          });
+        }
+      }
+    });
+    if (result.status === 'conflict') {
+      sendProblem(response, 409, 'The mutationId has already been used for another crossing.');
+      return;
+    }
+    sendJson(response, 200, {
+      crossingId: submission.crossingId,
+      mutationId: submission.mutationId,
+      status: result.status,
+    });
   };
 
   private handleEventReplay = async (

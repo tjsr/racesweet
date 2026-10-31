@@ -4,6 +4,7 @@ import type { EventEntry, EventEntryId } from "../model/entry.js";
 import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
 import type { EventParticipant } from "../model/eventparticipant.js";
 import { EventParticipantId } from "../model/eventparticipant.js";
+import type { EffectiveManualCrossing } from "../model/manualCrossing.js";
 import { EventId, SessionId } from "../model/raceevent.js";
 import { type ISO8601Duration, IdType } from "../model/types.js";
 import { isValidId } from "../validators/isValidId.js";
@@ -216,6 +217,7 @@ export interface EventCatalogState {
   entries?: EventCatalogEntry[];
   entrants: EventCatalogEntrant[];
   events: EventCatalogEvent[];
+  manualCrossings?: EffectiveManualCrossing[];
   sessions: EventCatalogSession[];
 }
 
@@ -239,6 +241,7 @@ export const createDefaultEventCatalogState = (): EventCatalogState => ({
   entries: [],
   entrants: [],
   events: [],
+  manualCrossings: [],
   sessions: [],
 });
 

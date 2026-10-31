@@ -200,10 +200,10 @@ export const TrackMapReport = (
     selectedEntrantId === undefined
       ? []
       : props.raceState.participants.filter(
-          (participant: EventParticipant): boolean =>
-            (props.raceState.getEntryIdForParticipant?.(participant.id) ||
+        (participant: EventParticipant): boolean =>
+          (props.raceState.getEntryIdForParticipant?.(participant.id) ||
               getParticipantEntryId(participant)) === selectedEntrantId,
-        );
+      );
   const selectedCatalogEntrant: EventCatalogEntrant | undefined =
     props.catalogEntrants.find(
       (entrant: EventCatalogEntrant): boolean =>
@@ -217,9 +217,9 @@ export const TrackMapReport = (
     selectedCatalogEntrant?.entrantType === "team"
       ? selectedCatalogEntrant
       : props.catalogEntrants.find(
-          (entrant: EventCatalogEntrant): boolean =>
-            entrant.id === selectedCatalogEntrant?.teamEntrantId,
-        );
+        (entrant: EventCatalogEntrant): boolean =>
+          entrant.id === selectedCatalogEntrant?.teamEntrantId,
+      );
   const selectedRiderNumber: string | undefined =
     selectedCatalogEntry?.raceNumber ||
     selectedParticipants
@@ -229,10 +229,10 @@ export const TrackMapReport = (
       .find((number: string | undefined): number is string => !!number) ||
     (selectedEntrant
       ? getMarkerLabel(
-          selectedEntrant.entrantId,
-          props.raceState,
-          props.catalogEntries,
-        )
+        selectedEntrant.entrantId,
+        props.raceState,
+        props.catalogEntries,
+      )
       : undefined);
   const selectedEntrantName: string | undefined =
     selectedCatalogEntrant?.name ||

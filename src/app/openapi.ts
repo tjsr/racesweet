@@ -283,6 +283,38 @@ const openApiOptions: OAS3Options = {
           tags: ["Timing"],
         },
       },
+      "/api/v1/timing/manual-crossings": {
+        post: {
+          description: "Record one manual crossing through the Event Catalog ledger. Repeating the same mutationId and payload returns already-accepted.",
+          operationId: "submitManualCrossing",
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["crossing", "crossingId", "mutationId"],
+                  properties: {
+                    crossing: { type: "object" },
+                    crossingId: { type: "string" },
+                    mutationId: { type: "string" },
+                  },
+                },
+              },
+            },
+            required: true,
+          },
+          responses: {
+            200: { description: "Accepted or previously accepted manual crossing." },
+            400: { description: "Invalid crossing or catalog context." },
+            401: { description: "Authentication required." },
+            403: { description: "Race write permission required." },
+            409: { description: "Mutation ID already identifies another crossing." },
+          },
+          security: [{ raceSweetSession: [] }],
+          summary: "Submit an idempotent manual crossing",
+          tags: ["Timing"],
+        },
+      },
       "/api/v1/events": {
         get: {
           description:

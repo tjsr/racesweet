@@ -2,6 +2,7 @@ import { normalizeCategoryResultExclusion } from "../processing/category.js";
 import type { EventEntrantId } from "../model/entrant.js";
 import type { EventEntryId } from "../model/entry.js";
 import type { EventCategoryId } from "../model/eventcategory.js";
+import type { ManualCrossing } from "../model/manualCrossing.js";
 import type { EventId, SessionId } from "../model/raceevent.js";
 import type { RaceState } from "../model/racestate.js";
 import type { IdType } from "../model/types.js";
@@ -102,6 +103,22 @@ export interface RaceStateImportedMutation extends EventCatalogMutationBase {
   raceState: Partial<RaceState>;
   sessionId: SessionId;
   type: "race-state-imported";
+}
+
+export interface ManualCrossingRecordedMutation extends EventCatalogMutationBase {
+  crossing: ManualCrossing;
+  type: "manual-crossing-recorded";
+}
+
+export interface ManualCrossingCorrectedMutation extends EventCatalogMutationBase {
+  crossing: ManualCrossing;
+  type: "manual-crossing-corrected";
+}
+
+export interface ManualCrossingReversedMutation extends EventCatalogMutationBase {
+  crossingId: ManualCrossing["crossingId"];
+  reason?: string;
+  type: "manual-crossing-reversed";
 }
 
 export interface CategoryCreatedMutation extends EventCatalogMutationBase {
@@ -223,6 +240,9 @@ export type EventCatalogMutation =
   | EventCreatedMutation
   | EventDeletedMutation
   | EventUpdatedMutation
+  | ManualCrossingCorrectedMutation
+  | ManualCrossingRecordedMutation
+  | ManualCrossingReversedMutation
   | RaceStateImportedMutation
   | SessionActivatedMutation
   | SessionCreatedMutation
@@ -613,6 +633,43 @@ export const applyEventCatalogMutation = (
     }
     case "race-state-imported": {
       return currentState;
+    }
+    case "manual-crossing-recorded": {
+      if (currentState.manualCrossings?.some((crossing) => crossing.crossingId === mutation.crossing.crossingId)) {
+        return currentState;
+      }
+      return {
+        ...currentState,
+        manualCrossings: [...(currentState.manualCrossings || []), {
+          ...mutation.crossing,
+          lastMutationId: mutation.id,
+          reversed: false,
+        }],
+      };
+    }
+    case "manual-crossing-corrected": {
+      if (!currentState.manualCrossings?.some((crossing) => crossing.crossingId === mutation.crossing.crossingId && !crossing.reversed)) {
+        return currentState;
+      }
+      return {
+        ...currentState,
+        manualCrossings: currentState.manualCrossings.map((crossing) =>
+          crossing.crossingId === mutation.crossing.crossingId && !crossing.reversed
+            ? { ...mutation.crossing, lastMutationId: mutation.id, reversed: false }
+            : crossing),
+      };
+    }
+    case "manual-crossing-reversed": {
+      if (!currentState.manualCrossings?.some((crossing) => crossing.crossingId === mutation.crossingId && !crossing.reversed)) {
+        return currentState;
+      }
+      return {
+        ...currentState,
+        manualCrossings: currentState.manualCrossings.map((crossing) =>
+          crossing.crossingId === mutation.crossingId
+            ? { ...crossing, lastMutationId: mutation.id, reversed: true, reversalReason: mutation.reason }
+            : crossing),
+      };
     }
     default: {
       return currentState;
