@@ -36,6 +36,15 @@ import {
 import { incrementLoadingMetric } from "../loadingMetrics.js";
 import type { LoadingProgressCallback } from "../loadingProgress.js";
 import { EventEntrantId } from "../model/entrant.js";
+import {
+  type DisplayComponent,
+  type DisplayScreenRevision,
+  type DisplayScreenTemplate,
+  type DisplayShareLink,
+  generateDisplayToken,
+  hashDisplayToken,
+  validateDisplayLayout,
+} from '../model/displayScreen.js';
 import type { EventEntryId } from "../model/entry.js";
 import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
 import type { EventParticipant } from "../model/eventparticipant.js";
@@ -2133,6 +2142,170 @@ export class EventCatalogService {
     sessionId: SessionId,
   ): Partial<RaceState> | undefined {
     return this.getImportedRaceStateMetadata(eventId, sessionId)?.raceState;
+  }
+
+  public async createDisplayTemplate(name: string): Promise<EventCatalogState> {
+    const trimmedName: string = name.trim();
+    this.validateDisplayTemplateName(trimmedName);
+    const timestamp: string = createTimestamp();
+    const template: DisplayScreenTemplate = {
+      archived: false,
+      createdAt: timestamp,
+      draft: { items: [], revision: 1, savedAt: timestamp },
+      id: createId('displayTemplateId'),
+      name: trimmedName,
+      publishedRevisions: [],
+      updatedAt: timestamp,
+    };
+    return this.appendMutations([{ id: createMutationId(), template, timestamp, type: 'display-template-created' }]);
+  }
+
+  public async saveDisplayDraft(
+    templateId: string,
+    name: string,
+    items: DisplayComponent[],
+  ): Promise<EventCatalogState> {
+    const template: DisplayScreenTemplate = this.requireDisplayTemplate(templateId);
+    const trimmedName: string = name.trim();
+    this.validateDisplayTemplateName(trimmedName, templateId);
+    validateDisplayLayout(items);
+    const timestamp: string = createTimestamp();
+    const draft: DisplayScreenRevision = {
+      items: structuredClone(items),
+      revision: template.draft.revision + 1,
+      savedAt: timestamp,
+    };
+    return this.appendMutations([{ draft, id: createMutationId(), name: trimmedName, templateId, timestamp, type: 'display-template-draft-updated' }]);
+  }
+
+  public async publishDisplayTemplate(templateId: string): Promise<EventCatalogState> {
+    const template: DisplayScreenTemplate = this.requireDisplayTemplate(templateId);
+    validateDisplayLayout(template.draft.items, false);
+    const timestamp: string = createTimestamp();
+    const revision: DisplayScreenRevision = {
+      items: structuredClone(template.draft.items),
+      revision: (template.publishedRevisions.at(-1)?.revision || 0) + 1,
+      savedAt: timestamp,
+    };
+    return this.appendMutations([{ id: createMutationId(), revision, templateId, timestamp, type: 'display-template-published' }]);
+  }
+
+  public async unpublishDisplayTemplate(templateId: string): Promise<EventCatalogState> {
+    const template: DisplayScreenTemplate = this.requireDisplayTemplate(templateId);
+    if (template.publishedRevision === undefined) {
+      throw new Error('Display template is not published.');
+    }
+    return this.appendMutations([{ id: createMutationId(), templateId, timestamp: createTimestamp(), type: 'display-template-unpublished' }]);
+  }
+
+  public async archiveDisplayTemplate(templateId: string, archived: boolean = true): Promise<EventCatalogState> {
+    this.requireDisplayTemplate(templateId, true);
+    return this.appendMutations([{ archived, id: createMutationId(), templateId, timestamp: createTimestamp(), type: 'display-template-archived' }]);
+  }
+
+  public async createDisplayShareLink(
+    templateId: string,
+    eventId: EventId,
+    sessionId?: SessionId,
+    expiresAt?: string,
+  ): Promise<{ catalog: EventCatalogState; link: DisplayShareLink; token: string }> {
+    const template: DisplayScreenTemplate = this.requireDisplayTemplate(templateId);
+    if (template.publishedRevision === undefined) {
+      throw new Error('Publish the display template before sharing it.');
+    }
+    this.validateDisplayBinding(eventId, sessionId);
+    if (expiresAt !== undefined && (!Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now())) {
+      throw new Error('Display share link expiry must be a future date and time.');
+    }
+    const token: string = generateDisplayToken();
+    const link: DisplayShareLink = {
+      active: true,
+      createdAt: createTimestamp(),
+      eventId,
+      expiresAt,
+      id: createId('displayShareId'),
+      revision: template.publishedRevision,
+      sessionId,
+      templateId,
+      tokenHash: await hashDisplayToken(token),
+    };
+    const catalog: EventCatalogState = await this.appendMutations([{
+      id: createMutationId(), link, timestamp: createTimestamp(), type: 'display-share-created',
+    }]);
+    return { catalog, link, token };
+  }
+
+  public async rotateDisplayShareLink(linkId: string): Promise<{ catalog: EventCatalogState; token: string }> {
+    this.requireDisplayShareLink(linkId);
+    const token: string = generateDisplayToken();
+    const catalog: EventCatalogState = await this.appendMutations([{
+      id: createMutationId(), linkId, timestamp: createTimestamp(), tokenHash: await hashDisplayToken(token), type: 'display-share-rotated',
+    }]);
+    return { catalog, token };
+  }
+
+  public async revokeDisplayShareLink(linkId: string): Promise<EventCatalogState> {
+    this.requireDisplayShareLink(linkId);
+    return this.appendMutations([{ id: createMutationId(), linkId, timestamp: createTimestamp(), type: 'display-share-revoked' }]);
+  }
+
+  public async resolveDisplayShareToken(token: string): Promise<{
+    eventId: EventId;
+    link: DisplayShareLink;
+    revision: DisplayScreenRevision;
+    sessionId?: SessionId;
+    template: DisplayScreenTemplate;
+  } | undefined> {
+    if (!/^[a-f0-9]{64}$/u.test(token)) return undefined;
+    const tokenHash: string = await hashDisplayToken(token);
+    const link: DisplayShareLink | undefined = this.state.displayShareLinks?.find((candidate: DisplayShareLink): boolean =>
+      candidate.active && candidate.tokenHash === tokenHash &&
+      (candidate.expiresAt === undefined || Date.parse(candidate.expiresAt) > Date.now()));
+    if (!link) return undefined;
+    const template: DisplayScreenTemplate | undefined = this.state.displayScreenTemplates?.find(
+      (candidate: DisplayScreenTemplate): boolean => candidate.id === link.templateId && !candidate.archived &&
+        candidate.publishedRevision !== undefined,
+    );
+    const revision: DisplayScreenRevision | undefined = template?.publishedRevisions.find(
+      (candidate: DisplayScreenRevision): boolean => candidate.revision === link.revision,
+    );
+    if (!template || !revision) return undefined;
+    if (!this.state.events.some((event) => event.id === link.eventId) ||
+      (link.sessionId && !this.state.sessions.some((session) => session.id === link.sessionId && session.eventId === link.eventId))) {
+      return undefined;
+    }
+    return { eventId: link.eventId, link, revision, sessionId: link.sessionId, template };
+  }
+
+  private requireDisplayTemplate(templateId: string, includeArchived: boolean = false): DisplayScreenTemplate {
+    const template: DisplayScreenTemplate | undefined = this.state.displayScreenTemplates?.find(
+      (candidate: DisplayScreenTemplate): boolean => candidate.id === templateId,
+    );
+    if (!template || (template.archived && !includeArchived)) throw new Error('Display template is unavailable.');
+    return template;
+  }
+
+  private requireDisplayShareLink(linkId: string): DisplayShareLink {
+    const link: DisplayShareLink | undefined = this.state.displayShareLinks?.find(
+      (candidate: DisplayShareLink): boolean => candidate.id === linkId && candidate.active,
+    );
+    if (!link) throw new Error('Display share link is unavailable.');
+    this.requireDisplayTemplate(link.templateId);
+    return link;
+  }
+
+  private validateDisplayTemplateName(name: string, exceptId?: string): void {
+    if (!name || name.length > 100 || this.state.displayScreenTemplates?.some(
+      (template: DisplayScreenTemplate): boolean => template.id !== exceptId && !template.archived &&
+        template.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
+    )) throw new Error('Display template name must be unique and 1 to 100 characters.');
+  }
+
+  private validateDisplayBinding(eventId: EventId, sessionId?: SessionId): void {
+    if (!this.state.events.some((event) => event.id === eventId) ||
+      (sessionId && !this.state.sessions.some((session) => session.id === sessionId && session.eventId === eventId))) {
+      throw new Error('Display event and session binding is invalid.');
+    }
   }
 
   public async recordManualCrossing(

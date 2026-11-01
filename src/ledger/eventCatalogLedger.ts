@@ -2,6 +2,7 @@ import { normalizeCategoryResultExclusion } from "../processing/category.js";
 import type { EventEntrantId } from "../model/entrant.js";
 import type { EventEntryId } from "../model/entry.js";
 import type { EventCategoryId } from "../model/eventcategory.js";
+import type { DisplayScreenRevision, DisplayScreenTemplate, DisplayShareLink } from "../model/displayScreen.js";
 import type { ManualCrossing } from "../model/manualCrossing.js";
 import type { EventId, SessionId } from "../model/raceevent.js";
 import type { RaceState } from "../model/racestate.js";
@@ -121,6 +122,51 @@ export interface ManualCrossingReversedMutation extends EventCatalogMutationBase
   type: "manual-crossing-reversed";
 }
 
+export interface DisplayTemplateCreatedMutation extends EventCatalogMutationBase {
+  template: DisplayScreenTemplate;
+  type: 'display-template-created';
+}
+
+export interface DisplayTemplateDraftUpdatedMutation extends EventCatalogMutationBase {
+  draft: DisplayScreenRevision;
+  name: string;
+  templateId: string;
+  type: 'display-template-draft-updated';
+}
+
+export interface DisplayTemplatePublishedMutation extends EventCatalogMutationBase {
+  revision: DisplayScreenRevision;
+  templateId: string;
+  type: 'display-template-published';
+}
+
+export interface DisplayTemplateUnpublishedMutation extends EventCatalogMutationBase {
+  templateId: string;
+  type: 'display-template-unpublished';
+}
+
+export interface DisplayTemplateArchivedMutation extends EventCatalogMutationBase {
+  archived: boolean;
+  templateId: string;
+  type: 'display-template-archived';
+}
+
+export interface DisplayShareCreatedMutation extends EventCatalogMutationBase {
+  link: DisplayShareLink;
+  type: 'display-share-created';
+}
+
+export interface DisplayShareRotatedMutation extends EventCatalogMutationBase {
+  linkId: string;
+  tokenHash: string;
+  type: 'display-share-rotated';
+}
+
+export interface DisplayShareRevokedMutation extends EventCatalogMutationBase {
+  linkId: string;
+  type: 'display-share-revoked';
+}
+
 export interface CategoryCreatedMutation extends EventCatalogMutationBase {
   category: EventCatalogCategory;
   type: "category-created";
@@ -229,6 +275,14 @@ export type EventCatalogMutation =
   | CategoryCreatedMutation
   | CategoryDeletedMutation
   | CategoryUpdatedMutation
+  | DisplayShareCreatedMutation
+  | DisplayShareRevokedMutation
+  | DisplayShareRotatedMutation
+  | DisplayTemplateArchivedMutation
+  | DisplayTemplateCreatedMutation
+  | DisplayTemplateDraftUpdatedMutation
+  | DisplayTemplatePublishedMutation
+  | DisplayTemplateUnpublishedMutation
   | EntrantCreatedMutation
   | EntrantDeletedMutation
   | EntrantsDeletedMutation
@@ -336,6 +390,61 @@ export const applyEventCatalogMutation = (
   mutation: EventCatalogMutation,
 ): EventCatalogState => {
   switch (mutation.type) {
+    case 'display-template-created':
+      return currentState.displayScreenTemplates?.some((template) => template.id === mutation.template.id)
+        ? currentState
+        : { ...currentState, displayScreenTemplates: [...(currentState.displayScreenTemplates || []), mutation.template] };
+    case 'display-template-draft-updated':
+      return {
+        ...currentState,
+        displayScreenTemplates: (currentState.displayScreenTemplates || []).map((template) => template.id === mutation.templateId
+          ? { ...template, draft: mutation.draft, name: mutation.name, updatedAt: mutation.timestamp }
+          : template),
+      };
+    case 'display-template-published':
+      return {
+        ...currentState,
+        displayScreenTemplates: (currentState.displayScreenTemplates || []).map((template) => template.id === mutation.templateId
+          ? {
+            ...template,
+            publishedRevision: mutation.revision.revision,
+            publishedRevisions: [...template.publishedRevisions, mutation.revision],
+            updatedAt: mutation.timestamp,
+          }
+          : template),
+      };
+    case 'display-template-unpublished':
+      return {
+        ...currentState,
+        displayScreenTemplates: (currentState.displayScreenTemplates || []).map((template) => template.id === mutation.templateId
+          ? { ...template, publishedRevision: undefined, updatedAt: mutation.timestamp }
+          : template),
+      };
+    case 'display-template-archived':
+      return {
+        ...currentState,
+        displayScreenTemplates: (currentState.displayScreenTemplates || []).map((template) => template.id === mutation.templateId
+          ? { ...template, archived: mutation.archived, updatedAt: mutation.timestamp }
+          : template),
+      };
+    case 'display-share-created':
+      return currentState.displayShareLinks?.some((link) => link.id === mutation.link.id)
+        ? currentState
+        : { ...currentState, displayShareLinks: [...(currentState.displayShareLinks || []), mutation.link] };
+    case 'display-share-rotated':
+      return {
+        ...currentState,
+        displayShareLinks: (currentState.displayShareLinks || []).map((link) => link.id === mutation.linkId
+          ? { ...link, tokenHash: mutation.tokenHash }
+          : link),
+      };
+    case 'display-share-revoked':
+      return {
+        ...currentState,
+        displayShareLinks: (currentState.displayShareLinks || []).map((link) => link.id === mutation.linkId
+          ? { ...link, active: false }
+          : link),
+      };
     case "event-created": {
       if (currentState.deletedEventIds.includes(mutation.event.id)) {
         return currentState;

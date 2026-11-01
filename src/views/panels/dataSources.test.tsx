@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
 
 import { act } from "react";
-import { flushSync } from "react-dom";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type DataSourceConfig } from "../../app/systemConfig.js";
 import { DataSourcesPanel } from "./dataSources.js";
+
+declare global {
+  var IS_REACT_ACT_ENVIRONMENT: boolean | undefined;
+}
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const dataSources: DataSourceConfig[] = [
   {
@@ -45,7 +50,7 @@ describe("DataSourcesPanel", () => {
   let root: Root | undefined;
 
   afterEach(() => {
-    root?.unmount();
+    act((): void => root?.unmount());
     container?.remove();
     root = undefined;
     container = undefined;
@@ -56,7 +61,7 @@ describe("DataSourcesPanel", () => {
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <DataSourcesPanel
           dataSources={dataSources}
@@ -98,7 +103,7 @@ describe("DataSourcesPanel", () => {
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <DataSourcesPanel
           dataSources={dataSources}
@@ -156,7 +161,7 @@ describe("DataSourcesPanel", () => {
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <DataSourcesPanel
           dataSources={[{ ...dataSources[0]!, apicalDataFilePath: "C:/RaceSweet/apical-1001.xlsx" }]}
@@ -198,14 +203,14 @@ describe("DataSourcesPanel", () => {
     ).toBeNull();
   });
 
-  it("imports the selected Apical event and re-loads its linked sessions", () => {
+  it("imports the selected Apical event and re-loads its linked sessions", async () => {
     const onFetchApicalDataNow = vi.fn();
     const onReprocessApicalData = vi.fn();
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <DataSourcesPanel
           dataSources={[
@@ -235,16 +240,17 @@ describe("DataSourcesPanel", () => {
     expect(importButton).toBeDefined();
     expect(reloadButton).toBeDefined();
 
-    flushSync(() => {
+    await act(async (): Promise<void> => {
       importButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       reloadButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
     });
 
     expect(onFetchApicalDataNow).toHaveBeenCalledWith("source-apical");
     expect(onReprocessApicalData).toHaveBeenCalledWith("source-apical");
   });
 
-  it("uses MUI controls to reload and resume an Apical Recent Laps source", (): void => {
+  it("uses MUI controls to reload and resume an Apical Recent Laps source", async (): Promise<void> => {
     const onFetchApicalDataNow = vi.fn();
     const recentSource: DataSourceConfig = {
       ...dataSources[0]!,
@@ -263,7 +269,7 @@ describe("DataSourcesPanel", () => {
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync((): void => {
+    act((): void => {
       root?.render(
         <DataSourcesPanel
           dataSources={[recentSource]}
@@ -288,17 +294,20 @@ describe("DataSourcesPanel", () => {
       (button: HTMLButtonElement): boolean =>
         button.textContent === "Reload now and resume polling",
     );
-    reloadButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await act(async (): Promise<void> => {
+      reloadButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
     expect(onFetchApicalDataNow).toHaveBeenCalledWith("source-recent");
   });
 
-  it("creates an Apical source cloned for the selected event", () => {
+  it("creates an Apical source cloned for the selected event", async () => {
     const onCreateApicalSourceFrom = vi.fn();
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <DataSourcesPanel
           dataSources={dataSources}
@@ -319,8 +328,9 @@ describe("DataSourcesPanel", () => {
     );
     expect(createButton).toBeDefined();
 
-    flushSync(() => {
+    await act(async (): Promise<void> => {
       createButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
     });
 
     expect(onCreateApicalSourceFrom).toHaveBeenCalledWith(
@@ -349,7 +359,7 @@ describe("DataSourcesPanel", () => {
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <DataSourcesPanel
           dataSources={[...dataSources, ctcSource]}
@@ -368,7 +378,7 @@ describe("DataSourcesPanel", () => {
     const ctcRow = Array.from(container.querySelectorAll("tbody tr")).find(
       (row) => row.textContent?.includes("CTC Source"),
     );
-    flushSync(() => {
+    act(() => {
       ctcRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     const updateRadio = Array.from(
@@ -376,7 +386,7 @@ describe("DataSourcesPanel", () => {
     ).find((input) => input.parentElement?.textContent?.includes("Update"));
 
     expect(updateRadio).toBeTruthy();
-    flushSync(() => {
+    act(() => {
       updateRadio?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
@@ -395,7 +405,7 @@ describe("DataSourcesPanel", () => {
       )
       ?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
     expect(placeholderCheckbox).toBeTruthy();
-    flushSync(() => {
+    act(() => {
       placeholderCheckbox?.dispatchEvent(
         new MouseEvent("click", { bubbles: true }),
       );
@@ -413,8 +423,9 @@ describe("DataSourcesPanel", () => {
         button.textContent === "Import into selected session",
     );
     expect(importButton).toBeDefined();
-    flushSync(() => {
+    await act(async (): Promise<void> => {
       importButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
     });
     expect(onLoadDorianCtcSrtFile).toHaveBeenCalledWith("source-dorian-ctc");
 
@@ -427,10 +438,10 @@ describe("DataSourcesPanel", () => {
       'button[aria-label="Dorian CTC TRACK.CFG File Path source-dorian-ctc Select File"]',
     );
     expect(trackConfigButton).toBeDefined();
-    trackConfigButton?.dispatchEvent(
-      new MouseEvent("click", { bubbles: true }),
-    );
-    await Promise.resolve();
+    await act(async (): Promise<void> => {
+      trackConfigButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
     expect(onSelectDorianCtcTrackConfigFile).toHaveBeenCalled();
     expect(onSaveSource).toHaveBeenCalledWith("source-dorian-ctc", {
       fileConfig: {
@@ -455,7 +466,7 @@ describe("DataSourcesPanel", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    flushSync(() => {
+    act(() => {
       root?.render(
         <DataSourcesPanel
           dataSources={[durtSource]}
@@ -490,15 +501,17 @@ describe("DataSourcesPanel", () => {
       'a[href="https://github.com/evanmiller/fmptools/releases"]',
     );
     expect(releaseLink?.textContent).toBe("fmptools releases");
-    releaseLink?.dispatchEvent(
-      new MouseEvent("click", { bubbles: true, cancelable: true }),
-    );
+    act((): void => {
+      releaseLink?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    });
     expect(onOpenExternalUrl).toHaveBeenCalledWith(
       "https://github.com/evanmiller/fmptools/releases",
     );
-    databaseButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    extractorButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await Promise.resolve();
+    await act(async (): Promise<void> => {
+      databaseButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      extractorButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
     expect(onSaveSource).toHaveBeenCalledWith("source-durt", {
       durtFileMakerConfig: {
         databaseFilePath: "C:/DURT/event.fp7",
@@ -552,7 +565,7 @@ describe("DataSourcesPanel", () => {
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <DataSourcesPanel
           dataSources={[...dataSources, ctcSource]}
@@ -569,7 +582,7 @@ describe("DataSourcesPanel", () => {
     const ctcRow = Array.from(container.querySelectorAll("tbody tr")).find(
       (row) => row.textContent?.includes("CTC Source"),
     );
-    flushSync(() => {
+    act(() => {
       ctcRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
@@ -594,7 +607,7 @@ describe("DataSourcesPanel", () => {
       'input[aria-label="CTC South Network line 5 loop 1 lap finish"]',
     ) as HTMLInputElement;
     expect(lapFinishCheckbox.checked).toBe(false);
-    flushSync(() => {
+    act(() => {
       lapFinishCheckbox.dispatchEvent(
         new MouseEvent("click", { bubbles: true }),
       );
@@ -651,7 +664,7 @@ describe("DataSourcesPanel", () => {
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <DataSourcesPanel
           dataSources={dataSources}
@@ -670,7 +683,7 @@ describe("DataSourcesPanel", () => {
       (row) => row.textContent?.includes("MR-SCATS Source"),
     );
     expect(mrScatsRow).toBeDefined();
-    flushSync(() => {
+    act(() => {
       mrScatsRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
@@ -684,9 +697,9 @@ describe("DataSourcesPanel", () => {
       'input[aria-label="MR-SCATS Ignore Line 1 NO1 Crossings source-mr-scats"]',
     ) as HTMLInputElement;
     expect(ignoreLineOneCheckbox?.checked).toBe(true);
-    ignoreLineOneCheckbox.dispatchEvent(
-      new MouseEvent("click", { bubbles: true }),
-    );
+    act((): void => {
+      ignoreLineOneCheckbox.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
     await Promise.resolve();
     expect(onSaveSource).toHaveBeenCalledWith("source-mr-scats", {
       mrScatsConfig: {
@@ -708,10 +721,10 @@ describe("DataSourcesPanel", () => {
     ).find((button) => button.textContent === "Select Archive");
     expect(selectDirectoryButton).toBeDefined();
     expect(selectArchiveButton).toBeDefined();
-    selectDirectoryButton?.dispatchEvent(
-      new MouseEvent("click", { bubbles: true }),
-    );
-    await Promise.resolve();
+    await act(async (): Promise<void> => {
+      selectDirectoryButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
 
     expect(onSelectMrScatsDataDirectory).toHaveBeenCalled();
     expect(onSaveSource).toHaveBeenCalledWith("source-mr-scats", {
@@ -735,7 +748,7 @@ describe("DataSourcesPanel", () => {
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <DataSourcesPanel
           dataSources={dataSources.map((source) =>
@@ -787,7 +800,7 @@ describe("DataSourcesPanel", () => {
       (row) => row.textContent?.includes("MR-SCATS Source"),
     );
     expect(mrScatsRow).toBeDefined();
-    flushSync(() => {
+    act(() => {
       mrScatsRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
@@ -804,7 +817,7 @@ describe("DataSourcesPanel", () => {
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <DataSourcesPanel
           dataSources={dataSources.map((source) =>
@@ -906,7 +919,7 @@ describe("DataSourcesPanel", () => {
       (row) => row.textContent?.includes("MR-SCATS Source"),
     );
     expect(mrScatsRow).toBeDefined();
-    flushSync(() => {
+    act(() => {
       mrScatsRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
@@ -958,7 +971,7 @@ describe("DataSourcesPanel", () => {
     document.body.append(container);
     root = createRoot(container);
 
-    flushSync(() => {
+    act(() => {
       root?.render(
         <DataSourcesPanel
           dataSources={dataSources.map((source) =>
@@ -1016,7 +1029,7 @@ describe("DataSourcesPanel", () => {
       (row) => row.textContent?.includes("MR-SCATS Source"),
     );
     expect(mrScatsRow).toBeDefined();
-    flushSync(() => {
+    act(() => {
       mrScatsRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
@@ -1024,21 +1037,15 @@ describe("DataSourcesPanel", () => {
       container.querySelectorAll("button"),
     ).find((button) => button.textContent === "DRIVERS.DBF");
     expect(previewFileButton).toBeDefined();
-    previewFileButton?.dispatchEvent(
-      new MouseEvent("click", { bubbles: true }),
-    );
-    for (let attempt: number = 0; attempt < 120; attempt += 1) {
-      if (
-        container
-          .querySelector('[role="dialog"]')
-          ?.textContent?.includes("Alice Rider")
-      ) {
-        break;
+    await act(async (): Promise<void> => {
+      previewFileButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      for (let attempt: number = 0; attempt < 120; attempt += 1) {
+        if (container?.querySelector('[role="dialog"]')?.textContent?.includes("Alice Rider")) break;
+        await new Promise<void>((resolve): void => {
+          setTimeout(resolve, 10);
+        });
       }
-      await new Promise<void>((resolve): void => {
-        setTimeout(resolve, 10);
-      });
-    }
+    });
 
     expect(onPreviewMrScatsDataFile).toHaveBeenCalledWith(
       "source-mr-scats",

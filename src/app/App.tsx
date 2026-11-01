@@ -20,6 +20,7 @@ import {
   getSessionsForEvent,
 } from "../catalog/eventCatalog.ts";
 import { fetchApicalEvents } from "../processing/apical/getResultListJson.ts";
+import { type DisplayProjection, buildDisplayProjection } from '../processing/displayProjection.js';
 import { CategoryId } from "../processing/category.ts";
 import {
   type LoadingMetricsState,
@@ -37,6 +38,7 @@ import {
   waitForLoadingProgressPaint,
 } from "../loadingProgress.ts";
 import { type EventCategory, EventCategoryId } from "../model/eventcategory.ts";
+import type { DisplayComponent } from '../model/displayScreen.js';
 import { getParticipantEntryId } from "../model/entry.ts";
 import {
   type EventParticipant,
@@ -4962,6 +4964,26 @@ export const RaceSweetMainApp = () => {
     }
 
     if (activeSection === "Reports") {
+      const displayService: EventCatalogService | undefined = eventCatalogService;
+      const displayProjection: DisplayProjection | undefined = displayService && selectedResultsEventId &&
+        eventCatalogState.events.some((event) => event.id === selectedResultsEventId)
+        ? buildDisplayProjection(
+          eventCatalogState,
+          selectedResultsEventId,
+          selectedResultsSessionId,
+          (eventId: EventId, sessionId: SessionId): Partial<RaceState> | undefined =>
+            eventId === selectedResultsEventId && sessionId === selectedResultsSessionId
+              ? displayedAnalyticsRaceState
+              : displayService.getImportedRaceState(eventId, sessionId),
+        )
+        : undefined;
+      const saveDisplayState = (operation: (service: EventCatalogService) => Promise<EventCatalogState>): Promise<void> =>
+        displayService ? operation(displayService).then((catalog: EventCatalogState): void => setEventCatalogState(catalog))
+          : Promise.reject(new Error('Display catalog is unavailable.'));
+      const shareBaseUrl: string = systemConfigState.remoteServer?.baseUrl?.trim() ||
+        (systemConfigState.listenerServer?.httpPort
+          ? `http://localhost:${systemConfigState.listenerServer.httpPort}`
+          : window.location.origin === 'null' ? '' : window.location.origin);
       return (
         <ReportsContext
           categories={sessionScopedCategories}
@@ -4977,6 +4999,45 @@ export const RaceSweetMainApp = () => {
           event={timingEvent}
           session={selectedResultsSession}
           onSelectEventSession={selectAnalyticsEventSession}
+          displayScreens={displayService ? {
+            categories: getCategoriesForEvent(eventCatalogState, selectedResultsEventId)
+              .map((category): { id: string; name: string } => ({ id: category.id, name: category.name })),
+            eventId: selectedResultsEventId,
+            eventSessionOptions,
+            links: eventCatalogState.displayShareLinks || [],
+            onArchive: (templateId: string): Promise<void> => saveDisplayState((service: EventCatalogService) =>
+              service.archiveDisplayTemplate(templateId)),
+            onCreate: (name: string): Promise<string> => displayService.createDisplayTemplate(name)
+              .then((catalog: EventCatalogState): string => {
+                setEventCatalogState(catalog);
+                return catalog.displayScreenTemplates!.at(-1)!.id;
+              }),
+            onCreateLink: (templateId: string, eventId: EventId, sessionId?: SessionId, expiresAt?: string): Promise<string> =>
+              displayService.createDisplayShareLink(templateId, eventId, sessionId, expiresAt)
+                .then((result): string => {
+                  setEventCatalogState(result.catalog);
+                  return result.token;
+                }),
+            onPublish: (templateId: string): Promise<void> => saveDisplayState((service: EventCatalogService) =>
+              service.publishDisplayTemplate(templateId)),
+            onRevokeLink: (linkId: string): Promise<void> => saveDisplayState((service: EventCatalogService) =>
+              service.revokeDisplayShareLink(linkId)),
+            onRotateLink: (linkId: string): Promise<string> => displayService.rotateDisplayShareLink(linkId)
+              .then((result): string => {
+                setEventCatalogState(result.catalog);
+                return result.token;
+              }),
+            onSave: (templateId: string, name: string, items: DisplayComponent[]): Promise<void> =>
+              saveDisplayState((service: EventCatalogService) => service.saveDisplayDraft(templateId, name, items)),
+            onSelectEventSession: selectAnalyticsEventSession,
+            onUnpublish: (templateId: string): Promise<void> => saveDisplayState((service: EventCatalogService) =>
+              service.unpublishDisplayTemplate(templateId)),
+            projection: displayProjection,
+            selectedEventSessionValue,
+            sessionId: selectedResultsSessionId,
+            shareBaseUrl,
+            templates: eventCatalogState.displayScreenTemplates || [],
+          } : undefined}
           raceState={displayedAnalyticsRaceState}
           selectedCategoryId={selectedCategoryId}
           selectedEventSessionValue={selectedEventSessionValue}

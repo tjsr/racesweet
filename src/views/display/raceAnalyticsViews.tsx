@@ -987,7 +987,8 @@ const CategorySelector = (props: {
   );
 };
 
-const EventSessionSelector = (props: {
+export const EventSessionSelector = (props: {
+  label?: string;
   onSelectEventSession?: (value: string) => void;
   options?: EventSessionOption[];
   selectedValue?: string;
@@ -1011,7 +1012,7 @@ const EventSessionSelector = (props: {
     <>
       <SelectTextField
         className="page-filter-label"
-        label="Event/Session"
+        label={props.label || "Event/Session"}
         slotProps={{
           select: {
             "aria-label": "Race View Event Session",

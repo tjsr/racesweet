@@ -3,6 +3,7 @@ import { EventEntrantId } from "../model/entrant.js";
 import type { EventEntry, EventEntryId } from "../model/entry.js";
 import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
 import type { EventParticipant } from "../model/eventparticipant.js";
+import type { DisplayScreenTemplate, DisplayShareLink } from "../model/displayScreen.js";
 import { EventParticipantId } from "../model/eventparticipant.js";
 import type { EffectiveManualCrossing } from "../model/manualCrossing.js";
 import { EventId, SessionId } from "../model/raceevent.js";
@@ -214,6 +215,8 @@ export interface EventCatalogState {
   activeSessionId?: SessionId;
   categories: EventCatalogCategory[];
   deletedEventIds: EventId[];
+  displayScreenTemplates?: DisplayScreenTemplate[];
+  displayShareLinks?: DisplayShareLink[];
   entries?: EventCatalogEntry[];
   entrants: EventCatalogEntrant[];
   events: EventCatalogEvent[];
@@ -238,6 +241,8 @@ export const createDefaultEventCatalogState = (): EventCatalogState => ({
   activeSessionId: undefined,
   categories: [],
   deletedEventIds: [],
+  displayScreenTemplates: [],
+  displayShareLinks: [],
   entries: [],
   entrants: [],
   events: [],

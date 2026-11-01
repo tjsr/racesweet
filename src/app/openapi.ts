@@ -315,6 +315,78 @@ const openApiOptions: OAS3Options = {
           tags: ["Timing"],
         },
       },
+      "/api/v1/displays/templates": {
+        post: {
+          operationId: "createDisplayTemplate",
+          responses: { 200: { description: "Created catalog template." }, 401: { description: "Authentication required." }, 403: { description: "Race write permission required." } },
+          security: [{ raceSweetSession: [] }],
+          summary: "Create a reusable display template",
+          tags: ["Displays"],
+        },
+      },
+      "/api/v1/displays/templates/{templateId}/draft": {
+        put: {
+          operationId: "saveDisplayDraft",
+          parameters: [{ in: "path", name: "templateId", required: true, schema: { type: "string" } }],
+          responses: { 200: { description: "Saved private draft revision." }, 400: { description: "Invalid layout or name." } },
+          security: [{ raceSweetSession: [] }],
+          summary: "Save a display draft",
+          tags: ["Displays"],
+        },
+      },
+      "/api/v1/displays/templates/{templateId}/{action}": {
+        post: {
+          operationId: "changeDisplayPublication",
+          parameters: [
+            { in: "path", name: "templateId", required: true, schema: { type: "string" } },
+            { in: "path", name: "action", required: true, schema: { enum: ["publish", "unpublish", "archive"], type: "string" } },
+          ],
+          responses: { 200: { description: "Published, unpublished, or archived template." } },
+          security: [{ raceSweetSession: [] }],
+          summary: "Manage display publication",
+          tags: ["Displays"],
+        },
+      },
+      "/api/v1/displays/shares": {
+        post: {
+          operationId: "createDisplayShare",
+          responses: { 200: { description: "Created a bound link and returned its token once." } },
+          security: [{ raceSweetSession: [] }],
+          summary: "Create a display share link",
+          tags: ["Displays"],
+        },
+      },
+      "/api/v1/displays/shares/{linkId}/{action}": {
+        post: {
+          operationId: "changeDisplayShare",
+          parameters: [
+            { in: "path", name: "linkId", required: true, schema: { type: "string" } },
+            { in: "path", name: "action", required: true, schema: { enum: ["rotate", "revoke"], type: "string" } },
+          ],
+          responses: { 200: { description: "Rotated or revoked the link." } },
+          security: [{ raceSweetSession: [] }],
+          summary: "Manage a display share link",
+          tags: ["Displays"],
+        },
+      },
+      "/api/v1/displays/view/{token}/snapshot": {
+        get: {
+          operationId: "getPublicDisplaySnapshot",
+          parameters: [{ in: "path", name: "token", required: true, schema: { type: "string" } }],
+          responses: { 200: { description: "Token-scoped published layout and calculated display data." }, 404: { description: "Display unavailable." } },
+          summary: "Read a public display snapshot",
+          tags: ["Displays"],
+        },
+      },
+      "/api/v1/displays/view/{token}/events": {
+        get: {
+          operationId: "streamPublicDisplay",
+          parameters: [{ in: "path", name: "token", required: true, schema: { type: "string" } }],
+          responses: { 200: { description: "Token-scoped snapshot and unavailable SSE events." }, 404: { description: "Display unavailable." } },
+          summary: "Stream a public display",
+          tags: ["Displays"],
+        },
+      },
       "/api/v1/events": {
         get: {
           description:

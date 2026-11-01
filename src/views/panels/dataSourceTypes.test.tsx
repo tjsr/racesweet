@@ -62,7 +62,10 @@ describe('DataSourceTypesPanel', () => {
 
     const button = Array.from(container.querySelectorAll('button')).find((element) => element.textContent === 'Add Data Source');
     expect(button).toBeDefined();
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await act(async (): Promise<void> => {
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
     expect(onCreateSource).toHaveBeenCalledWith('api-apical-excel-file');
   });
 });

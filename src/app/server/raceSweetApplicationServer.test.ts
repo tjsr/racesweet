@@ -142,6 +142,102 @@ describe("RaceSweetApplicationServer", () => {
     testServer = await startTestServer();
   });
 
+  it('publishes token-scoped displays without exposing drafts or allowing revoked links', async () => {
+    const eventResponse: Response = await jsonRequest(
+      testServer.origin, '/api/v1/catalog/events', {}, testServer.adminCookie,
+    );
+    const eventPayload: { catalog: { events: Array<{ id: string; name: string }> } } = await eventResponse.json();
+    const eventId: string = eventPayload.catalog.events[0]!.id;
+    const templateResponse: Response = await jsonRequest(
+      testServer.origin, '/api/v1/displays/templates', { name: 'Results wall' }, testServer.adminCookie,
+    );
+    expect(templateResponse.status).toBe(200);
+    const templatePayload: { catalog: { displayScreenTemplates: Array<{ id: string }> } } = await templateResponse.json();
+    const templateId: string = templatePayload.catalog.displayScreenTemplates[0]!.id;
+    const title: object = {
+      height: 2, id: 'title', settings: { showSession: false }, type: 'event-title',
+      width: 12, x: 0, y: 0, zIndex: 0,
+    };
+    const draftResponse: Response = await fetch(`${testServer.origin}/api/v1/displays/templates/${templateId}/draft`, {
+      body: JSON.stringify({ items: [title], name: 'Results wall' }),
+      headers: { 'content-type': 'application/json', cookie: testServer.adminCookie, origin: testServer.origin },
+      method: 'PUT',
+    });
+    expect(draftResponse.status).toBe(200);
+    const forbiddenShare: Response = await jsonRequest(
+      testServer.origin, '/api/v1/displays/shares', { eventId, templateId }, testServer.adminCookie,
+    );
+    expect(forbiddenShare.status).toBe(400);
+    const unauthenticated: Response = await jsonRequest(
+      testServer.origin, `/api/v1/displays/templates/${templateId}/publish`, {},
+    );
+    expect(unauthenticated.status).toBe(401);
+    const publishResponse: Response = await jsonRequest(
+      testServer.origin, `/api/v1/displays/templates/${templateId}/publish`, {}, testServer.adminCookie,
+    );
+    expect(publishResponse.status).toBe(200);
+    const shareResponse: Response = await jsonRequest(
+      testServer.origin, '/api/v1/displays/shares', { eventId, templateId }, testServer.adminCookie,
+    );
+    expect(shareResponse.status).toBe(200);
+    const sharePayload: { catalog: { displayShareLinks: Array<{ id: string; tokenHash: string }> }; token: string } = await shareResponse.json();
+    const token: string = sharePayload.token;
+    const linkId: string = sharePayload.catalog.displayShareLinks[0]!.id;
+    expect(sharePayload.catalog.displayShareLinks[0]!.tokenHash).not.toBe(token);
+    const snapshotResponse: Response = await fetch(`${testServer.origin}/api/v1/displays/view/${token}/snapshot`);
+    expect(snapshotResponse.status).toBe(200);
+    const snapshot: { items: object[]; projection: { eventName: string }; revision: number } = await snapshotResponse.json();
+    expect(snapshot.items).toEqual([title]);
+    expect(snapshot.projection.eventName).toBe('New Event');
+    const otherEventResponse: Response = await jsonRequest(
+      testServer.origin, '/api/v1/catalog/events', {}, testServer.adminCookie,
+    );
+    const otherEventPayload: { catalog: { events: Array<{ id: string }> } } = await otherEventResponse.json();
+    const otherEventId: string = otherEventPayload.catalog.events.at(-1)!.id;
+    await fetch(`${testServer.origin}/api/v1/catalog/events/${otherEventId}`, {
+      body: JSON.stringify({ changes: { name: 'Other Event' } }),
+      headers: { 'content-type': 'application/json', cookie: testServer.adminCookie, origin: testServer.origin },
+      method: 'PATCH',
+    });
+    const isolatedResponse: Response = await fetch(
+      `${testServer.origin}/api/v1/displays/view/${token}/snapshot?eventId=${otherEventId}`,
+    );
+    const isolatedSnapshot: { projection: { eventName: string } } = await isolatedResponse.json();
+    expect(isolatedSnapshot.projection.eventName).toBe('New Event');
+    expect(await fetch(`${testServer.origin}/display/${token}`).then((response: Response): number => response.status)).toBe(200);
+    expect(await fetch(`${testServer.origin}/display/invalid`).then((response: Response): number => response.status)).toBe(404);
+
+    const stream: Response = await fetch(`${testServer.origin}/api/v1/displays/view/${token}/events`);
+    expect(stream.status).toBe(200);
+    const reader: ReadableStreamDefaultReader<Uint8Array> = stream.body!.getReader();
+    await readSseEvent(reader, 'snapshot');
+    const eventUpdate: Response = await fetch(`${testServer.origin}/api/v1/catalog/events/${eventId}`, {
+      body: JSON.stringify({ changes: { name: 'Updated Event' } }),
+      headers: { 'content-type': 'application/json', cookie: testServer.adminCookie, origin: testServer.origin },
+      method: 'PATCH',
+    });
+    expect(eventUpdate.status).toBe(200);
+    expect(await readSseEvent(reader, 'snapshot')).toContain('Updated Event');
+
+    const rotation: Response = await jsonRequest(
+      testServer.origin, `/api/v1/displays/shares/${linkId}/rotate`, {}, testServer.adminCookie,
+    );
+    const rotated: { token: string } = await rotation.json();
+    expect(rotation.status).toBe(200);
+    expect(await readSseEvent(reader, 'unavailable')).toContain('event: unavailable');
+    expect(await fetch(`${testServer.origin}/api/v1/displays/view/${token}/snapshot`).then((response: Response): number => response.status)).toBe(404);
+    expect(await fetch(`${testServer.origin}/api/v1/displays/view/${rotated.token}/snapshot`).then((response: Response): number => response.status)).toBe(200);
+    await jsonRequest(testServer.origin, `/api/v1/displays/templates/${templateId}/unpublish`, {}, testServer.adminCookie);
+    expect(await fetch(`${testServer.origin}/api/v1/displays/view/${rotated.token}/snapshot`).then((response: Response): number => response.status)).toBe(404);
+    await jsonRequest(testServer.origin, `/api/v1/displays/templates/${templateId}/publish`, {}, testServer.adminCookie);
+    await jsonRequest(testServer.origin, `/api/v1/displays/templates/${templateId}/archive`, {}, testServer.adminCookie);
+    expect(await fetch(`${testServer.origin}/api/v1/displays/view/${rotated.token}/snapshot`).then((response: Response): number => response.status)).toBe(404);
+    await jsonRequest(testServer.origin, `/api/v1/displays/templates/${templateId}/archive`, { archived: false }, testServer.adminCookie);
+    await jsonRequest(testServer.origin, `/api/v1/displays/shares/${linkId}/revoke`, {}, testServer.adminCookie);
+    expect(await fetch(`${testServer.origin}/api/v1/displays/view/${rotated.token}/snapshot`).then((response: Response): number => response.status)).toBe(404);
+    await reader.cancel();
+  });
+
   it("authenticates, persists, and deduplicates manual crossing submissions", async () => {
     const eventResponse: Response = await jsonRequest(
       testServer.origin,

@@ -14,9 +14,11 @@ import { isDeepStrictEqual } from "node:util";
 import path from "node:path";
 import type { EventCatalogState } from "../../catalog/eventCatalog.js";
 import type { EventCatalogMutation } from "../../ledger/eventCatalogLedger.js";
+import type { DisplayComponent } from '../../model/displayScreen.js';
 import type { CategoryId } from "../../processing/category.js";
 import type { EventEntrantId } from "../../model/entrant.js";
 import type { EventId, SessionId } from "../../model/raceevent.js";
+import { buildDisplayProjection, type DisplaySnapshot } from '../../processing/displayProjection.js';
 import type { ParticipantPassingRecord } from "../../model/timerecord.js";
 import type {
   EventTimeRecord,
@@ -400,6 +402,7 @@ export class RaceSweetApplicationServer {
   private readonly dataDirectory: string;
   private readonly eventHub: DomainEventHub;
   private readonly eventReplayHub = new EventReplayHub();
+  private readonly displayStreams = new Map<ServerResponse, { interval: NodeJS.Timeout; token: string }>();
   private readonly externalAssetSource: string | undefined;
   private activeListenerConfig: ListenerServerConfig | undefined;
   private eventCatalogService: EventCatalogService | undefined;
@@ -458,6 +461,7 @@ export class RaceSweetApplicationServer {
         path.join(this.dataDirectory, "event-catalog.json"),
       ),
     );
+    this.eventCatalogService.setOnPersistedLedger(async (): Promise<void> => this.refreshDisplayStreams());
     this.systemConfigService = await SystemConfigService.create(
       new NodeJsonSystemConfigPersistence(
         path.join(this.dataDirectory, "system-config.json"),
@@ -575,6 +579,11 @@ export class RaceSweetApplicationServer {
   public close = async (): Promise<void> => {
     this.eventHub.close();
     this.eventReplayHub.close();
+    this.displayStreams.forEach(({ interval }, response): void => {
+      clearInterval(interval);
+      response.end();
+    });
+    this.displayStreams.clear();
     await this.rfidDecoderListeners.close();
     await this.uploadStore.close();
     const servers: ListenerServer[] = [
@@ -976,6 +985,19 @@ export class RaceSweetApplicationServer {
         await this.serveSwaggerDocumentation(response);
         return;
       }
+      const displayMatch: RegExpMatchArray | null = url.pathname.match(/^\/display\/([a-f0-9]{64})$/u);
+      if (url.pathname.startsWith('/display/')) {
+        response.setHeader('referrer-policy', 'no-referrer');
+        const resolved = displayMatch
+          ? await this.eventCatalogService?.resolveDisplayShareToken(displayMatch[1]!)
+          : undefined;
+        if (!resolved) {
+          sendHtml(response, 404, getUnavailablePage('Display unavailable', 'This display is unavailable.', 'Check the link with the event operator.'));
+          return;
+        }
+        await this.serveApplication('/', response, assetSource);
+        return;
+      }
       await this.serveApplication(url.pathname, response, assetSource);
     } catch (error: unknown) {
       if (!response.headersSent) {
@@ -1015,6 +1037,14 @@ export class RaceSweetApplicationServer {
     }
     if (url.pathname.startsWith("/api/v1/auth/")) {
       await this.handleAuthentication(request, response, url);
+      return;
+    }
+    if (url.pathname.startsWith('/api/v1/displays/view/')) {
+      await this.handlePublicDisplay(request, response, url);
+      return;
+    }
+    if (url.pathname.startsWith('/api/v1/displays/')) {
+      await this.handleDisplayManagement(request, response, url);
       return;
     }
 
@@ -1133,6 +1163,139 @@ export class RaceSweetApplicationServer {
       return;
     }
     sendProblem(response, 404, "API resource not found.");
+  };
+
+  private getDisplaySnapshot = async (token: string): Promise<DisplaySnapshot | undefined> => {
+    const catalogService: EventCatalogService | undefined = this.eventCatalogService;
+    const resolved = await catalogService?.resolveDisplayShareToken(token);
+    if (!catalogService || !resolved) return undefined;
+    return {
+      items: resolved.revision.items,
+      projection: buildDisplayProjection(
+        catalogService.catalog,
+        resolved.eventId,
+        resolved.sessionId,
+        (eventId: EventId, sessionId: SessionId) => catalogService.getImportedRaceState(eventId, sessionId),
+      ),
+      revision: resolved.revision.revision,
+    };
+  };
+
+  private writeDisplayStream = async (response: ServerResponse, token: string): Promise<void> => {
+    if (response.destroyed || response.writableEnded) return;
+    try {
+      const snapshot: DisplaySnapshot | undefined = await this.getDisplaySnapshot(token);
+      if (!snapshot) {
+        response.write('event: unavailable\ndata: {}\n\n');
+        response.end();
+        return;
+      }
+      response.write(`event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`);
+    } catch {
+      if (!response.destroyed && !response.writableEnded) {
+        response.write('event: unavailable\ndata: {}\n\n');
+        response.end();
+      }
+    }
+  };
+
+  private refreshDisplayStreams = (): Promise<void> => Promise.all(
+    [...this.displayStreams.entries()].map(([response, stream]): Promise<void> =>
+      this.writeDisplayStream(response, stream.token).catch((): void => undefined)),
+  ).then((): void => undefined);
+
+  private handlePublicDisplay = async (
+    request: IncomingMessage,
+    response: ServerResponse,
+    url: URL,
+  ): Promise<void> => {
+    if (request.method !== 'GET') {
+      sendProblem(response, 405, 'Only GET is supported.');
+      return;
+    }
+    const match: RegExpMatchArray | null = url.pathname.match(/^\/api\/v1\/displays\/view\/([a-f0-9]{64})\/(snapshot|events)$/u);
+    response.setHeader('referrer-policy', 'no-referrer');
+    const token: string = match?.[1] || '';
+    if (!match) {
+      sendProblem(response, 404, 'Display unavailable.');
+      return;
+    }
+    const snapshot: DisplaySnapshot | undefined = await this.getDisplaySnapshot(token).catch((): undefined => undefined);
+    if (!snapshot) {
+      sendProblem(response, 404, 'Display unavailable.');
+      return;
+    }
+    if (match[2] === 'snapshot') {
+      sendJson(response, 200, snapshot);
+      return;
+    }
+    response.writeHead(200, {
+      'cache-control': 'no-cache, no-transform',
+      connection: 'keep-alive',
+      'content-type': 'text/event-stream; charset=utf-8',
+      'x-accel-buffering': 'no',
+    });
+    response.write(`retry: 2000\nevent: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`);
+    const interval: NodeJS.Timeout = setInterval((): void => {
+      void this.writeDisplayStream(response, token);
+    }, 2_000);
+    this.displayStreams.set(response, { interval, token });
+    response.once('close', (): void => {
+      clearInterval(interval);
+      this.displayStreams.delete(response);
+    });
+  };
+
+  private handleDisplayManagement = async (
+    request: IncomingMessage,
+    response: ServerResponse,
+    url: URL,
+  ): Promise<void> => {
+    if (!this.requireUser(request, response, 'race:write')) return;
+    this.assertInitialized();
+    const service: EventCatalogService = this.eventCatalogService!;
+    const body: JsonObject = await readRequestBody<JsonObject>(request);
+    const beforeCount: number = service.mutations.length;
+    let token: string | undefined;
+    await this.enqueueCommand(async (): Promise<void> => {
+      const templateMatch: RegExpMatchArray | null = url.pathname.match(/^\/api\/v1\/displays\/templates(?:\/([^/]+)(?:\/(draft|publish|unpublish|archive))?)?$/u);
+      const shareMatch: RegExpMatchArray | null = url.pathname.match(/^\/api\/v1\/displays\/shares(?:\/([^/]+)\/(rotate|revoke))?$/u);
+      if (request.method === 'POST' && templateMatch && !templateMatch[1] && typeof body.name === 'string') {
+        await service.createDisplayTemplate(body.name);
+      } else if (request.method === 'PUT' && templateMatch?.[2] === 'draft' &&
+        typeof body.name === 'string' && Array.isArray(body.items)) {
+        // The service validates every field of these untrusted JSON items before writing the ledger.
+        await service.saveDisplayDraft(templateMatch[1]!, body.name, body.items as unknown as DisplayComponent[]);
+      } else if (request.method === 'POST' && templateMatch?.[2] === 'publish') {
+        await service.publishDisplayTemplate(templateMatch[1]!);
+      } else if (request.method === 'POST' && templateMatch?.[2] === 'unpublish') {
+        await service.unpublishDisplayTemplate(templateMatch[1]!);
+      } else if (request.method === 'POST' && templateMatch?.[2] === 'archive') {
+        await service.archiveDisplayTemplate(templateMatch[1]!, body.archived !== false);
+      } else if (request.method === 'POST' && shareMatch && !shareMatch[1] &&
+        typeof body.templateId === 'string' && typeof body.eventId === 'string' &&
+        (body.sessionId === undefined || typeof body.sessionId === 'string') &&
+        (body.expiresAt === undefined || typeof body.expiresAt === 'string')) {
+        token = (await service.createDisplayShareLink(
+          body.templateId, body.eventId, body.sessionId as SessionId | undefined, body.expiresAt,
+        )).token;
+      } else if (request.method === 'POST' && shareMatch?.[2] === 'rotate') {
+        token = (await service.rotateDisplayShareLink(shareMatch[1]!)).token;
+      } else if (request.method === 'POST' && shareMatch?.[2] === 'revoke') {
+        await service.revokeDisplayShareLink(shareMatch[1]!);
+      } else {
+        throw new Error('Unsupported display management command.');
+      }
+      const accepted: EventCatalogMutation[] = service.mutations.slice(beforeCount);
+      if (accepted.length > 0) {
+        this.eventHub.publish('catalog', 'catalog.mutations-applied', jsonValue({ mutations: accepted }));
+      }
+    });
+    sendJson(response, 200, {
+      catalog: service.catalog,
+      mutations: service.mutations.slice(beforeCount),
+      token,
+    });
   };
 
   private handleManualCrossing = async (
@@ -1505,6 +1668,7 @@ export class RaceSweetApplicationServer {
         ),
       );
       await this.eventCatalogService!.applyRemoteMutations(mutations);
+      await this.refreshDisplayStreams();
       const accepted: EventCatalogMutation[] = mutations.filter(
         (mutation: EventCatalogMutation): boolean =>
           !knownIds.has(mutation.id.toString()),

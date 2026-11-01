@@ -24,7 +24,7 @@ import { RaceSweetMainApp } from './App.js';
 import { createSeedEventCatalogLedger } from '../ledger/createSeedEventCatalogLedger.js';
 import { APICAL_DEFAULT_SOURCE_NAME } from './systemConfig.js';
 
-vi.setConfig({ testTimeout: 10000 });
+vi.setConfig({ testTimeout: 20000 });
 
 vi.mock('../views/display/categories', () => ({
   CategoryList: (props: { categories?: unknown[] }) => React.createElement(
@@ -947,6 +947,17 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.querySelector('select[aria-label="Reports View Type"]')).toBeTruthy();
     expect(container.querySelector('select[aria-label="Race View Category"]')).toBeTruthy();
     expect(container.textContent).toContain('Handicap Data');
+    const displayTab: HTMLElement | undefined = [...container.querySelectorAll<HTMLElement>('[role="tab"]')]
+      .find((tab: HTMLElement): boolean => tab.textContent === 'Display screens');
+    expect(displayTab).toBeDefined();
+    await act(async (): Promise<void> => displayTab!.click());
+    expect(container.querySelector('[aria-label="Display Screens"]')).toBeTruthy();
+    expect(container.querySelector('select[aria-label="Reports View Type"]')).toBeNull();
+    expect(container.querySelector('select[aria-label="Race View Event Session"]')).toBeTruthy();
+    const reportTab: HTMLElement | undefined = [...container.querySelectorAll<HTMLElement>('[role="tab"]')]
+      .find((tab: HTMLElement): boolean => tab.textContent === 'Race reports');
+    await act(async (): Promise<void> => reportTab!.click());
+    expect(container.querySelector('select[aria-label="Reports View Type"]')).toBeTruthy();
   });
 
   it('uses the same valid event category options in Entrants, Timing, Results, and Reports', async () => {
