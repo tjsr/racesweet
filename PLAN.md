@@ -5,6 +5,12 @@ feature should use the service and immutable ledger flows required by the
 repository's `AGENTS.md` instructions, and include UI, persistence, and
 integration coverage.
 
+The checklists below describe the original feature scope and are not the
+current completion record. The implemented manual-crossing backend is scoped in
+`specs/01-manual-timing-entry.md`; its remaining operator workflow and durable
+delivery requirements are in `specs/07-manual-timing-operator-workflow.md`.
+Use the numbered specifications for implementation scope and acceptance.
+
 ## 1. Manual timing entry
 
 ### Core timing workflow
