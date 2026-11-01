@@ -9,6 +9,9 @@ The checklists below describe the original feature scope and are not the
 current completion record. The implemented manual-crossing backend is scoped in
 `specs/01-manual-timing-entry.md`; its remaining operator workflow and durable
 delivery requirements are in `specs/07-manual-timing-operator-workflow.md`.
+The implemented replay transport and controls are scoped in
+`specs/03-event-replay-mode.md`; the remaining protocol, seeking, and
+subscriber requirements are in `specs/08-event-replay-protocol-and-seeking.md`.
 Use the numbered specifications for implementation scope and acceptance.
 
 ## 1. Manual timing entry
