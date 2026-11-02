@@ -402,6 +402,30 @@ describe('EntrantsPage integration', () => {
     expect(onDeleteEntrant).toHaveBeenCalledWith('event-2', 'ent-2');
   });
 
+  it('shows a selected entrant shared individual link without changing race data', async () => {
+    const linkedCatalog: EventCatalogState = {
+      ...catalog,
+      individualLinks: [{
+        createdAt: '2026-06-12T00:00:00.000Z', displayName: 'Pat Rider', entrantId: 'ent-1',
+        eventId: 'event-1', id: 'link-1', individualId: 'individual-1', removed: false,
+        updatedAt: '2026-06-12T00:00:00.000Z',
+      }],
+      officials: [{
+        archived: false, availability: [], createdAt: '2026-06-12T00:00:00.000Z',
+        displayName: 'Pat R.', id: 'individual-1', notes: '', position: '', responsibilities: [],
+        updatedAt: '2026-06-12T00:00:00.000Z',
+      }],
+    };
+    await act(async (): Promise<void> => root.render(<EntrantsPage
+      catalog={linkedCatalog} onCreateEntrant={(): void => undefined} onDeleteEntrant={(): void => undefined}
+      onSelectEntrant={(): void => undefined} onSelectEvent={(): void => undefined}
+      onUpdateEntrant={(): void => undefined} selectedEntrantId="ent-1" selectedEventId="event-1"
+      raceState={raceState} />));
+    expect(container.textContent).toContain('Linked individuals');
+    expect(container.textContent).toContain('Pat Rider → Pat R.');
+    expect(raceState.participants).toHaveLength(4);
+  });
+
   it('edits rider profile fields and updates team composition payloads', async () => {
     const onCreateEntrant = vi.fn();
     const onDeleteEntrant = vi.fn();

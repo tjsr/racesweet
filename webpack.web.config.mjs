@@ -34,6 +34,7 @@ const config = {
     ],
   },
   output: {
+    chunkFilename: 'chunk.[contenthash].js',
     clean: true,
     filename: 'app.[contenthash].js',
     path: path.resolve('dist', 'web'),

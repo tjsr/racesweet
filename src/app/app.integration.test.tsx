@@ -913,10 +913,19 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.textContent).toContain('Event Details');
     expect(container.textContent).toContain('Session List');
 
-    await clickSectionButton(container, 'Entrants');
+    await clickSectionButton(container, 'Participants');
     expect(container.querySelector('h1')?.textContent).toBe('Entrants');
     expect(container.textContent).toContain('Create Driver');
     expect(container.querySelector('input[aria-label="Entrant Name"]')).toBeTruthy();
+    const individualsTab: HTMLButtonElement | undefined = [...container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button: HTMLButtonElement): boolean => button.textContent === 'Individuals');
+    expect(individualsTab).toBeDefined();
+    await act(async (): Promise<void> => individualsTab!.click());
+    expect(container.textContent).toContain('Officials');
+    expect(container.textContent).toContain('Create individual');
+    const entrantsTab: HTMLButtonElement | undefined = [...container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button: HTMLButtonElement): boolean => button.textContent === 'Entrants');
+    await act(async (): Promise<void> => entrantsTab!.click());
 
     await clickSectionButton(container, 'Categories');
     expect(container.querySelector('h1')?.textContent).toBe('Categories');
@@ -966,7 +975,7 @@ describe('RaceSweetMainApp integration', () => {
     });
     await waitForLoadedApp(container);
 
-    await clickSectionButton(container, 'Entrants');
+    await clickSectionButton(container, 'Participants');
     const entrantCategorySelect = container.querySelector('select[aria-label="Entrants Category"]') as HTMLSelectElement;
     const entrantCategories = Array.from(entrantCategorySelect.options)
       .filter((option) => option.value !== 'all' && option.value !== 'unassigned')
@@ -1452,7 +1461,7 @@ describe('RaceSweetMainApp integration', () => {
     });
 
     await waitForLoadedApp(container);
-    await clickSectionButton(container, 'Entrants');
+    await clickSectionButton(container, 'Participants');
     await waitForText(container, 'Entrant List');
 
     const individualCards = getIndividualEntrantCards(container)
@@ -1486,7 +1495,7 @@ describe('RaceSweetMainApp integration', () => {
     });
 
     await waitForLoadedApp(container);
-    await clickSectionButton(container, 'Entrants');
+    await clickSectionButton(container, 'Participants');
     await clickButtonByText(container, 'Create Driver');
     await waitForInputValue(container, 'input[aria-label="Entrant Name"]', 'New Driver');
 
@@ -1853,7 +1862,7 @@ describe('RaceSweetMainApp integration', () => {
     await waitForLoadedApp(container);
     expect(container.textContent).not.toContain('Error loading content');
 
-    await clickSectionButton(container, 'Entrants');
+    await clickSectionButton(container, 'Participants');
     const entrantNameInput = container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement;
     expect(entrantNameInput).toBeTruthy();
 
@@ -1895,7 +1904,7 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.querySelector('h1')?.textContent).toBe('Reports');
     expect(container.textContent).toContain('Category-scoped reports for fastest laps, participant lap times, and lap chart.');
 
-    await clickSectionButton(container, 'Entrants');
+    await clickSectionButton(container, 'Participants');
     expect(container.querySelector('h1')?.textContent).toBe('Entrants');
     await waitForInputValue(container, 'input[aria-label="Entrant Name"]', 'Renderer Regression Entrant');
 
@@ -2071,7 +2080,7 @@ describe('RaceSweetMainApp integration', () => {
     await waitForLoadedApp(container);
     expect(container.textContent).not.toContain('Error loading content');
 
-    await clickSectionButton(container, 'Entrants');
+    await clickSectionButton(container, 'Participants');
     await clickButtonByText(container, 'Create Driver');
     await waitForText(container, 'New Driver');
 
@@ -2093,7 +2102,7 @@ describe('RaceSweetMainApp integration', () => {
     await waitForTextNotPresent(container, 'New Category');
     expect(container.querySelector('[aria-label="Categories for selected event"]')?.textContent).not.toContain('New Category');
 
-    await clickSectionButton(container, 'Entrants');
+    await clickSectionButton(container, 'Participants');
     expect(Array.from((container.querySelector('select[aria-label="Entrants Category"]') as HTMLSelectElement).options)
       .map((option) => option.textContent)).not.toContain('New Category');
 
@@ -2113,7 +2122,7 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.querySelector('h1')?.textContent).toBe('System');
     expect(container.textContent).toContain('Configured Data Sources');
 
-    await clickSectionButton(container, 'Entrants');
+    await clickSectionButton(container, 'Participants');
     expect(container.querySelector('h1')?.textContent).toBe('Entrants');
     expect(container.querySelector('input[aria-label="Entrant Name"]')).toBeTruthy();
 
@@ -2128,7 +2137,7 @@ describe('RaceSweetMainApp integration', () => {
     });
 
     await waitForLoadedApp(container);
-    await clickSectionButton(container, 'Entrants');
+    await clickSectionButton(container, 'Participants');
     await clickButtonByText(container, 'Create Driver');
     await waitForInputValue(container, 'input[aria-label="Entrant Name"]', 'New Driver');
     await clickButtonByText(container, 'Delete Entrant');
@@ -2573,7 +2582,7 @@ describe('RaceSweetMainApp integration', () => {
     await waitForLoadedApp(container);
     expect(container.textContent).not.toContain('Error loading content');
 
-    await clickSectionButton(container, 'Entrants');
+    await clickSectionButton(container, 'Participants');
 
     const firstNameInput = container.querySelector('input[aria-label="Entrant First Name"]') as HTMLInputElement;
     const surnameInput = container.querySelector('input[aria-label="Entrant Surname"]') as HTMLInputElement;
@@ -2600,7 +2609,7 @@ describe('RaceSweetMainApp integration', () => {
     await clickSectionButton(container, 'System');
     expect(container.querySelector('h1')?.textContent).toBe('System');
 
-    await clickSectionButton(container, 'Entrants');
+    await clickSectionButton(container, 'Participants');
     await waitForInputValue(container, 'input[aria-label="Entrant First Name"]', 'Integrated');
     await waitForInputValue(container, 'input[aria-label="Entrant Surname"]', 'Rider');
     await waitForInputValue(container, 'select[aria-label="Entrant Gender"]', 'female');
@@ -3257,7 +3266,7 @@ describe('RaceSweetMainApp integration', () => {
   it('scaffolds entrants and categories for fetched Apical event data', async () => {
     const { apicalData, expectedCategoryCount, expectedEntrantCount } = await renderAndFetchApicalImport(root, container);
 
-    await clickSectionButton(container, 'Entrants');
+    await clickSectionButton(container, 'Participants');
     await waitForText(container, 'Apical Downloaded Round');
     expect(container.querySelectorAll('[aria-label="Entrants for selected event"] .events-list-item')).toHaveLength(expectedEntrantCount);
     expect(container.textContent).toContain(apicalData[0]!.ParticipantViewModels[0]!.TeamNameDisplay);

@@ -60,8 +60,17 @@ import {
   rewriteImportedObjectIds,
 } from "../model/ids.js";
 import { getParticipantDisplayName } from "../model/participantDisplay.js";
+import type { IndividualLink, IndividualLinkInput } from '../model/individualLink.js';
 import { EventId, SessionId } from "../model/raceevent.js";
 import type { EffectiveManualCrossing, ManualCrossing, ManualCrossingInput } from "../model/manualCrossing.js";
+import {
+  type OfficialAssignment,
+  type OfficialAssignmentInput,
+  type OfficialProfile,
+  type OfficialProfileInput,
+  normalizeOfficialAssignment,
+  normalizeOfficialProfile,
+} from '../model/official.js';
 import type { RaceState } from "../model/racestate.js";
 import type { TimeRecordId } from "../model/timerecord.js";
 import type { EventTimeRecord, TimeRecord } from "../model/timerecord.js";
@@ -1797,6 +1806,43 @@ const validateEventCatalogStateIds = (state: EventCatalogState): void => {
       }
     });
   });
+  const officialsById: Map<string, OfficialProfile> = new Map<string, OfficialProfile>(
+    (state.officials || []).map((official: OfficialProfile): [string, OfficialProfile] => [official.id, official]),
+  );
+  (state.officials || []).forEach((official: OfficialProfile): void => {
+    assertUuid(errors, 'official.id', official.id);
+  });
+  (state.officialAssignments || []).forEach((assignment: OfficialAssignment): void => {
+    assertUuid(errors, 'officialAssignment.id', assignment.id);
+    assertUuid(errors, `officialAssignment ${assignment.id} officialId`, assignment.officialId);
+    assertUuid(errors, `officialAssignment ${assignment.id} eventId`, assignment.eventId);
+    if (assignment.sessionId) assertUuid(errors, `officialAssignment ${assignment.id} sessionId`, assignment.sessionId);
+    if (!officialsById.has(assignment.officialId)) {
+      errors.push(`officialAssignment ${assignment.id} references a missing official.`);
+    }
+    if (!eventsById.has(assignment.eventId) && !deletedEventIds.has(assignment.eventId)) {
+      errors.push(`officialAssignment ${assignment.id} references a missing event.`);
+    }
+    const session: EventCatalogSession | undefined = assignment.sessionId
+      ? sessionsById.get(assignment.sessionId)
+      : undefined;
+    if (session && session.eventId !== assignment.eventId) {
+      errors.push(`officialAssignment ${assignment.id} references a session in another event.`);
+    }
+  });
+  (state.individualLinks || []).forEach((link: IndividualLink): void => {
+    assertUuid(errors, 'individualLink.id', link.id);
+    assertUuid(errors, `individualLink ${link.id} individualId`, link.individualId);
+    assertUuid(errors, `individualLink ${link.id} eventId`, link.eventId);
+    assertUuid(errors, `individualLink ${link.id} entrantId`, link.entrantId);
+    if (link.participantId) assertUuid(errors, `individualLink ${link.id} participantId`, link.participantId);
+    if (!officialsById.has(link.individualId)) {
+      errors.push(`individualLink ${link.id} references a missing individual.`);
+    }
+    if (!eventsById.has(link.eventId) && !deletedEventIds.has(link.eventId)) {
+      errors.push(`individualLink ${link.id} references a missing event.`);
+    }
+  });
   if (state.activeEventId) {
     assertUuid(errors, "activeEventId", state.activeEventId);
     if (!eventsById.has(state.activeEventId)) {
@@ -2142,6 +2188,164 @@ export class EventCatalogService {
     sessionId: SessionId,
   ): Partial<RaceState> | undefined {
     return this.getImportedRaceStateMetadata(eventId, sessionId)?.raceState;
+  }
+
+  public async createOfficialProfile(input: OfficialProfileInput): Promise<EventCatalogState> {
+    const normalized: OfficialProfileInput = normalizeOfficialProfile(input);
+    const timestamp: string = createTimestamp();
+    const official: OfficialProfile = {
+      ...normalized,
+      archived: false,
+      createdAt: timestamp,
+      id: createId('officialId'),
+      updatedAt: timestamp,
+    };
+    return this.appendMutations([{
+      id: createMutationId(), official, timestamp, type: 'official-profile-created',
+    }]);
+  }
+
+  public async updateOfficialProfile(officialId: string, input: OfficialProfileInput): Promise<EventCatalogState> {
+    const current: OfficialProfile = this.requireOfficialProfile(officialId);
+    const timestamp: string = createTimestamp();
+    const official: OfficialProfile = {
+      ...current,
+      ...normalizeOfficialProfile(input),
+      updatedAt: timestamp,
+    };
+    return this.appendMutations([{
+      id: createMutationId(), official, timestamp, type: 'official-profile-updated',
+    }]);
+  }
+
+  public async archiveOfficialProfile(officialId: string, archived: boolean = true): Promise<EventCatalogState> {
+    const current: OfficialProfile = this.requireOfficialProfile(officialId);
+    if (current.archived === archived) return this.state;
+    return this.appendMutations([{
+      archived, id: createMutationId(), officialId, timestamp: createTimestamp(), type: 'official-profile-archived',
+    }]);
+  }
+
+  public async createOfficialAssignment(input: OfficialAssignmentInput): Promise<EventCatalogState> {
+    const normalized: OfficialAssignmentInput = this.validateOfficialAssignment(input);
+    const timestamp: string = createTimestamp();
+    const assignment: OfficialAssignment = {
+      ...normalized,
+      createdAt: timestamp,
+      id: createId('officialAssignmentId'),
+      removed: false,
+      updatedAt: timestamp,
+    };
+    return this.appendMutations([{
+      assignment, id: createMutationId(), timestamp, type: 'official-assignment-created',
+    }]);
+  }
+
+  public async updateOfficialAssignment(assignmentId: string, input: OfficialAssignmentInput): Promise<EventCatalogState> {
+    const current: OfficialAssignment = this.requireOfficialAssignment(assignmentId);
+    if (input.officialId !== current.officialId || input.eventId !== current.eventId) {
+      throw new Error('Move an official assignment by removing it and creating a new one.');
+    }
+    const normalized: OfficialAssignmentInput = this.validateOfficialAssignment(input, assignmentId);
+    const timestamp: string = createTimestamp();
+    const assignment: OfficialAssignment = { ...current, ...normalized, updatedAt: timestamp };
+    return this.appendMutations([{
+      assignment, id: createMutationId(), timestamp, type: 'official-assignment-updated',
+    }]);
+  }
+
+  public async removeOfficialAssignment(assignmentId: string): Promise<EventCatalogState> {
+    this.requireOfficialAssignment(assignmentId);
+    return this.appendMutations([{
+      assignmentId, id: createMutationId(), timestamp: createTimestamp(), type: 'official-assignment-removed',
+    }]);
+  }
+
+  public async linkIndividualToEntrant(input: IndividualLinkInput): Promise<EventCatalogState> {
+    const individual: OfficialProfile = this.requireOfficialProfile(input.individualId);
+    if (individual.archived) throw new Error('Archived individuals cannot receive new entrant links.');
+    if (this.state.deletedEventIds.includes(input.eventId)) {
+      throw new Error('The selected event is no longer active.');
+    }
+    const entrant: EventCatalogEntrant | undefined = getEntrantsForEvent(this.state, input.eventId)
+      .find((candidate: EventCatalogEntrant): boolean => candidate.id === input.entrantId);
+    if (!entrant) throw new Error('Entrant was not found in the selected event.');
+    if (entrant.entrantType === 'rider' && input.participantId) {
+      throw new Error('Link an individual entrant directly, without a team-member ID.');
+    }
+    if (entrant.entrantType === 'team' && !input.participantId) {
+      throw new Error('Select a named team member rather than the team.');
+    }
+    if (input.participantId && !entrant.memberParticipantIds.includes(input.participantId) &&
+      !entrant.teamMembers?.some((member: NonNullable<EventCatalogEntrant['teamMembers']>[number]): boolean =>
+        member.participantId === input.participantId)) {
+      throw new Error('Team member does not belong to the selected entrant.');
+    }
+    if (this.state.individualLinks?.some((link: IndividualLink): boolean =>
+      !link.removed && link.entrantId === input.entrantId && link.participantId === input.participantId)) {
+      throw new Error('This entrant or team member is already linked to an individual.');
+    }
+    const member = input.participantId
+      ? entrant.teamMembers?.find((candidate: NonNullable<EventCatalogEntrant['teamMembers']>[number]): boolean =>
+        candidate.participantId === input.participantId)
+      : undefined;
+    const displayName: string = member
+      ? [member.firstName, member.lastName].filter(Boolean).join(' ').trim()
+      : entrant.entrantType === 'team' ? `Member of ${entrant.name}` : entrant.name;
+    const timestamp: string = createTimestamp();
+    const link: IndividualLink = {
+      ...input, createdAt: timestamp, displayName, id: createId('individualLinkId'), removed: false,
+      updatedAt: timestamp,
+    };
+    return this.appendMutations([{
+      id: createMutationId(), link, timestamp, type: 'individual-linked',
+    }]);
+  }
+
+  public async unlinkIndividualFromEntrant(linkId: string): Promise<EventCatalogState> {
+    if (!this.state.individualLinks?.some((link: IndividualLink): boolean => link.id === linkId && !link.removed)) {
+      throw new Error('Individual entrant link was not found.');
+    }
+    return this.appendMutations([{
+      id: createMutationId(), linkId, timestamp: createTimestamp(), type: 'individual-unlinked',
+    }]);
+  }
+
+  private requireOfficialProfile(officialId: string): OfficialProfile {
+    const official: OfficialProfile | undefined = this.state.officials?.find(
+      (candidate: OfficialProfile): boolean => candidate.id === officialId,
+    );
+    if (!official) throw new Error('Official was not found.');
+    return official;
+  }
+
+  private requireOfficialAssignment(assignmentId: string): OfficialAssignment {
+    const assignment: OfficialAssignment | undefined = this.state.officialAssignments?.find(
+      (candidate: OfficialAssignment): boolean => candidate.id === assignmentId && !candidate.removed,
+    );
+    if (!assignment) throw new Error('Official assignment was not found.');
+    return assignment;
+  }
+
+  private validateOfficialAssignment(input: OfficialAssignmentInput, exceptId?: string): OfficialAssignmentInput {
+    const normalized: OfficialAssignmentInput = normalizeOfficialAssignment(input);
+    const official: OfficialProfile = this.requireOfficialProfile(normalized.officialId);
+    if (official.archived) throw new Error('Archived officials cannot receive or edit assignments.');
+    if (!this.state.events.some((event): boolean => event.id === normalized.eventId &&
+      !this.state.deletedEventIds.includes(event.id))) {
+      throw new Error('Official assignment event was not found.');
+    }
+    if (normalized.sessionId && !this.state.sessions.some((session): boolean =>
+      session.id === normalized.sessionId && session.eventId === normalized.eventId)) {
+      throw new Error('Official assignment session does not belong to its event.');
+    }
+    if (this.state.officialAssignments?.some((assignment: OfficialAssignment): boolean =>
+      !assignment.removed && assignment.id !== exceptId && assignment.officialId === normalized.officialId &&
+      assignment.eventId === normalized.eventId && assignment.sessionId === normalized.sessionId &&
+      assignment.role.toLocaleLowerCase() === normalized.role.toLocaleLowerCase())) {
+      throw new Error('An equivalent official assignment already exists.');
+    }
+    return normalized;
   }
 
   public async createDisplayTemplate(name: string): Promise<EventCatalogState> {

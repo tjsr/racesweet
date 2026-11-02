@@ -28,8 +28,33 @@ results calculations.
   profile can be assigned to many events without becoming an entrant.
 - **Assignment cardinality:** officials and roles are many-to-many at both
   event-wide and optional session scope.
+- **Assignment identity:** editing an assignment may change its role, notes,
+  responsibility override, or session within its event. Moving it to another
+  official or event requires remove and create mutations so historical
+  attribution remains clear.
 - **Contact output:** the initial release provides print, CSV, and generated PDF
   from one filtered contact-list projection.
+- **Navigation:** rename the existing Entrants section to Participants. Keep
+  Entrants as its first tab, and add an Individuals tab containing Officials.
+  Officials and Entrants remain distinct areas. One person may participate in
+  one event and officiate in another; official roles belong to event/session
+  assignments rather than to the directory profile.
+- **Shared identity:** add explicit immutable links from an Individual profile
+  to an event entrant or a named team member. Linking never turns the official
+  assignment into a race entry and never changes participant calculations.
+- **PDF implementation:** use the shared client-side `tabularReport` utility
+  backed by `pdfmake`; the same ordered report columns and rows feed CSV,
+  browser print, and generated PDF.
+
+### Clarifications resolved during implementation
+
+- The Participants navigation section has separate Entrants and Individuals
+  areas. The Individuals directory may hold a person who is an entrant in one
+  event and an official in another.
+- Add shared-identity links in spec 04. Each link names the event, entrant,
+  optional team-member participant ID, and shared profile. A team itself
+  cannot be linked as a person. A given entrant or team member may have only
+  one active link; remove and create mutations change that relationship.
 
 ## Requirements and design
 
@@ -49,6 +74,10 @@ results calculations.
   mutations, reducers, and Event Catalog service methods. Archive preserves
   profile/assignment history but prevents new assignments; unarchive is an
   explicit immutable update.
+- Add immutable `individual-linked` and `individual-unlinked` mutations. The
+  link stores a name snapshot for historical display and remains outside race
+  state. An archived directory profile cannot receive a new link. Links are
+  managed from Individuals and can refer to entrants in any event.
 - Validate official existence, event/session ownership, duplicate equivalent
   assignments, email/phone formats when provided, and availability ranges.
 
@@ -60,6 +89,8 @@ results calculations.
 - Use event and session dropdowns from the catalog rather than editable IDs.
   Show archived historical assignments with a clear archived label and prevent
   creating new ones from them.
+- Use an entrant/team-member dropdown for identity links. Show a profile's
+  links across events so its participant and official roles remain clear.
 - Build one filtered contact-list projection for screen, print, CSV, and PDF.
   Include name, position, role, event/session, contact details, responsibilities,
   availability summary, and notes only when the operator selects the detailed
@@ -81,19 +112,22 @@ results calculations.
 ## Test plan
 
 - Unit-test profile/assignment validation, mutation replay, archive semantics,
-  event/session scoping, availability, and contact-list projection.
+  event/session scoping, availability, identity links, and contact-list
+  projection.
 - Service tests prove every write persists, rebuilds catalog state, and invokes
   the configured upstream callback.
 - UI integration-test create, edit, search, archive, many-to-many assignment,
   session filtering, and disabled assignment for archived profiles.
 - Add regressions proving officials are excluded from entrant counts, session
-  participants, start-list rows, grids, and result calculations.
+  participants, start-list rows, grids, and result calculations. Identity links
+  must also leave imported race state and entrant membership unchanged.
 - Test print/CSV/PDF export content, field escaping, privacy layout selection,
   and no catalog mutation during export.
 
 ## Implementation checklist
 
 - Extend Event Catalog types, mutations, reducers, persistence, and services.
-- Add Participants Officials UI and shared contact export projection/PDF utility.
+- Add Participants > Individuals > Officials UI and shared contact export
+  projection/PDF utility.
 - Add the full service, UI, export, and race-exclusion test coverage; run
   TypeScript and lint checks.

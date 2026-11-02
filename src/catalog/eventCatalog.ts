@@ -6,6 +6,8 @@ import type { EventParticipant } from "../model/eventparticipant.js";
 import type { DisplayScreenTemplate, DisplayShareLink } from "../model/displayScreen.js";
 import { EventParticipantId } from "../model/eventparticipant.js";
 import type { EffectiveManualCrossing } from "../model/manualCrossing.js";
+import type { IndividualLink } from "../model/individualLink.js";
+import type { OfficialAssignment, OfficialProfile } from "../model/official.js";
 import { EventId, SessionId } from "../model/raceevent.js";
 import { type ISO8601Duration, IdType } from "../model/types.js";
 import { isValidId } from "../validators/isValidId.js";
@@ -220,7 +222,10 @@ export interface EventCatalogState {
   entries?: EventCatalogEntry[];
   entrants: EventCatalogEntrant[];
   events: EventCatalogEvent[];
+  individualLinks?: IndividualLink[];
   manualCrossings?: EffectiveManualCrossing[];
+  officialAssignments?: OfficialAssignment[];
+  officials?: OfficialProfile[];
   sessions: EventCatalogSession[];
 }
 
@@ -246,7 +251,10 @@ export const createDefaultEventCatalogState = (): EventCatalogState => ({
   entries: [],
   entrants: [],
   events: [],
+  individualLinks: [],
   manualCrossings: [],
+  officialAssignments: [],
+  officials: [],
   sessions: [],
 });
 

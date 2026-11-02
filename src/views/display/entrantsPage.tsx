@@ -1,3 +1,4 @@
+import { Box, Typography } from '@mui/material';
 import React from 'react';
 import {
   type EntrantType,
@@ -14,6 +15,8 @@ import {
 import { type EntrantImportRecord, parseEntrantImportBuffer } from '../../processing/entrantImport.js';
 import { SelectTextField } from '../../controls/selectTextField.js';
 import { EventEntrantId } from '../../model/entrant.js';
+import type { IndividualLink } from '../../model/individualLink.js';
+import type { OfficialProfile } from '../../model/official.js';
 import type { EventEntryId } from '../../model/entry.js';
 import { type EventCategoryId } from '../../model/eventcategory.js';
 import { type EventParticipant, type EventParticipantId, type ParticipantIdentifierUpdate } from '../../model/eventparticipant.js';
@@ -168,6 +171,8 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   const filteredTeamEntrants = filteredEventEntrants.filter((entrant) => entrant.entrantType === 'team');
   const teamsEnabled = eventSupportsTeams(props.catalog, selectedEvent?.id);
   const selectedEntrant = filteredEventEntrants.find((entrant) => entrant.id === props.selectedEntrantId) ?? filteredEventEntrants[0];
+  const selectedIndividualLinks: IndividualLink[] = (props.catalog.individualLinks || []).filter((link: IndividualLink): boolean =>
+    !link.removed && link.eventId === selectedEvent?.id && link.entrantId === selectedEntrant?.id);
   const selectedEntrants = multiSelectedEntrantIds.size > 1
     ? filteredEventEntrants.filter((entrant) => multiSelectedEntrantIds.has(entrant.id))
     : selectedEntrant ? [selectedEntrant] : [];
@@ -472,6 +477,17 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           teamsEnabled={teamsEnabled}
         />
         <div className="event-summary-column">
+          {selectedIndividualLinks.length > 0 && <Box sx={{ mb: 1, p: 1 }}>
+            <Typography variant="subtitle2">Linked individuals</Typography>
+            {selectedIndividualLinks.map((link: IndividualLink): React.ReactElement => {
+              const profile: OfficialProfile | undefined = props.catalog.officials?.find(
+                (candidate: OfficialProfile): boolean => candidate.id === link.individualId,
+              );
+              return <Typography key={link.id} variant="body2">
+                {link.displayName} → {profile?.displayName || 'Unknown individual'}{profile?.archived ? ' (archived)' : ''}
+              </Typography>;
+            })}
+          </Box>}
           {hasMultipleSelectedEntrants ? <SelectedEntrantsPanel
             categories={eventCategories}
             deleteError={bulkDeleteError}

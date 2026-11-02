@@ -4,6 +4,8 @@ import type { EventEntryId } from "../model/entry.js";
 import type { EventCategoryId } from "../model/eventcategory.js";
 import type { DisplayScreenRevision, DisplayScreenTemplate, DisplayShareLink } from "../model/displayScreen.js";
 import type { ManualCrossing } from "../model/manualCrossing.js";
+import type { IndividualLink } from "../model/individualLink.js";
+import type { OfficialAssignment, OfficialProfile } from "../model/official.js";
 import type { EventId, SessionId } from "../model/raceevent.js";
 import type { RaceState } from "../model/racestate.js";
 import type { IdType } from "../model/types.js";
@@ -167,6 +169,47 @@ export interface DisplayShareRevokedMutation extends EventCatalogMutationBase {
   type: 'display-share-revoked';
 }
 
+export interface OfficialProfileCreatedMutation extends EventCatalogMutationBase {
+  official: OfficialProfile;
+  type: 'official-profile-created';
+}
+
+export interface OfficialProfileUpdatedMutation extends EventCatalogMutationBase {
+  official: OfficialProfile;
+  type: 'official-profile-updated';
+}
+
+export interface OfficialProfileArchivedMutation extends EventCatalogMutationBase {
+  archived: boolean;
+  officialId: string;
+  type: 'official-profile-archived';
+}
+
+export interface OfficialAssignmentCreatedMutation extends EventCatalogMutationBase {
+  assignment: OfficialAssignment;
+  type: 'official-assignment-created';
+}
+
+export interface OfficialAssignmentUpdatedMutation extends EventCatalogMutationBase {
+  assignment: OfficialAssignment;
+  type: 'official-assignment-updated';
+}
+
+export interface OfficialAssignmentRemovedMutation extends EventCatalogMutationBase {
+  assignmentId: string;
+  type: 'official-assignment-removed';
+}
+
+export interface IndividualLinkedMutation extends EventCatalogMutationBase {
+  link: IndividualLink;
+  type: 'individual-linked';
+}
+
+export interface IndividualUnlinkedMutation extends EventCatalogMutationBase {
+  linkId: string;
+  type: 'individual-unlinked';
+}
+
 export interface CategoryCreatedMutation extends EventCatalogMutationBase {
   category: EventCatalogCategory;
   type: "category-created";
@@ -294,9 +337,17 @@ export type EventCatalogMutation =
   | EventCreatedMutation
   | EventDeletedMutation
   | EventUpdatedMutation
+  | IndividualLinkedMutation
+  | IndividualUnlinkedMutation
   | ManualCrossingCorrectedMutation
   | ManualCrossingRecordedMutation
   | ManualCrossingReversedMutation
+  | OfficialAssignmentCreatedMutation
+  | OfficialAssignmentRemovedMutation
+  | OfficialAssignmentUpdatedMutation
+  | OfficialProfileArchivedMutation
+  | OfficialProfileCreatedMutation
+  | OfficialProfileUpdatedMutation
   | RaceStateImportedMutation
   | SessionActivatedMutation
   | SessionCreatedMutation
@@ -390,6 +441,53 @@ export const applyEventCatalogMutation = (
   mutation: EventCatalogMutation,
 ): EventCatalogState => {
   switch (mutation.type) {
+    case 'individual-linked':
+      return currentState.individualLinks?.some((link: IndividualLink): boolean => link.id === mutation.link.id)
+        ? currentState
+        : { ...currentState, individualLinks: [...(currentState.individualLinks || []), mutation.link] };
+    case 'individual-unlinked':
+      return {
+        ...currentState,
+        individualLinks: (currentState.individualLinks || []).map((link: IndividualLink): IndividualLink =>
+          link.id === mutation.linkId ? { ...link, removed: true, updatedAt: mutation.timestamp } : link),
+      };
+    case 'official-profile-created':
+      return currentState.officials?.some((official: OfficialProfile): boolean => official.id === mutation.official.id)
+        ? currentState
+        : { ...currentState, officials: [...(currentState.officials || []), mutation.official] };
+    case 'official-profile-updated':
+      return {
+        ...currentState,
+        officials: (currentState.officials || []).map((official: OfficialProfile): OfficialProfile =>
+          official.id === mutation.official.id ? mutation.official : official),
+      };
+    case 'official-profile-archived':
+      return {
+        ...currentState,
+        officials: (currentState.officials || []).map((official: OfficialProfile): OfficialProfile =>
+          official.id === mutation.officialId
+            ? { ...official, archived: mutation.archived, updatedAt: mutation.timestamp }
+            : official),
+      };
+    case 'official-assignment-created':
+      return currentState.officialAssignments?.some((assignment: OfficialAssignment): boolean =>
+        assignment.id === mutation.assignment.id)
+        ? currentState
+        : { ...currentState, officialAssignments: [...(currentState.officialAssignments || []), mutation.assignment] };
+    case 'official-assignment-updated':
+      return {
+        ...currentState,
+        officialAssignments: (currentState.officialAssignments || []).map((assignment: OfficialAssignment): OfficialAssignment =>
+          assignment.id === mutation.assignment.id && !assignment.removed ? mutation.assignment : assignment),
+      };
+    case 'official-assignment-removed':
+      return {
+        ...currentState,
+        officialAssignments: (currentState.officialAssignments || []).map((assignment: OfficialAssignment): OfficialAssignment =>
+          assignment.id === mutation.assignmentId
+            ? { ...assignment, removed: true, updatedAt: mutation.timestamp }
+            : assignment),
+      };
     case 'display-template-created':
       return currentState.displayScreenTemplates?.some((template) => template.id === mutation.template.id)
         ? currentState

@@ -172,7 +172,7 @@ import { type EventSessionOption } from "./views/results/resultsPage.tsx";
 type AppSection =
   | "System"
   | "Events"
-  | "Entrants"
+  | "Participants"
   | "Categories"
   | "Sessions"
   | "Timing"
@@ -241,7 +241,7 @@ interface PageErrorBoundaryState {
 const appSections: Array<{ icon: string; id: AppSection; label: string }> = [
   { icon: "SYS", id: "System", label: "System" },
   { icon: "EVT", id: "Events", label: "Events" },
-  { icon: "ENT", id: "Entrants", label: "Entrants" },
+  { icon: "PER", id: "Participants", label: "Participants" },
   { icon: "CAT", id: "Categories", label: "Categories" },
   { icon: "SES", id: "Sessions", label: "Sessions" },
   { icon: "TIM", id: "Timing", label: "Timing" },
@@ -4585,10 +4585,32 @@ export const RaceSweetMainApp = () => {
       );
     }
 
-    if (activeSection === "Entrants") {
+    if (activeSection === "Participants") {
+      const saveOfficialState = (operation: (service: EventCatalogService) => Promise<EventCatalogState>): Promise<void> =>
+        eventCatalogService
+          ? operation(eventCatalogService).then((catalog: EventCatalogState): void => setEventCatalogState(catalog))
+          : Promise.reject(new Error('Event Catalog is still loading.'));
       return (
         <EntrantsContext
           catalog={eventCatalogState}
+          officials={{
+            onArchiveProfile: (officialId: string, archived: boolean): Promise<void> =>
+              saveOfficialState((service: EventCatalogService) => service.archiveOfficialProfile(officialId, archived)),
+            onCreateAssignment: (input): Promise<void> =>
+              saveOfficialState((service: EventCatalogService) => service.createOfficialAssignment(input)),
+            onCreateProfile: (input): Promise<void> =>
+              saveOfficialState((service: EventCatalogService) => service.createOfficialProfile(input)),
+            onLinkIndividual: (input): Promise<void> =>
+              saveOfficialState((service: EventCatalogService) => service.linkIndividualToEntrant(input)),
+            onRemoveAssignment: (assignmentId: string): Promise<void> =>
+              saveOfficialState((service: EventCatalogService) => service.removeOfficialAssignment(assignmentId)),
+            onUnlinkIndividual: (linkId: string): Promise<void> =>
+              saveOfficialState((service: EventCatalogService) => service.unlinkIndividualFromEntrant(linkId)),
+            onUpdateAssignment: (assignmentId: string, input): Promise<void> =>
+              saveOfficialState((service: EventCatalogService) => service.updateOfficialAssignment(assignmentId, input)),
+            onUpdateProfile: (officialId: string, input): Promise<void> =>
+              saveOfficialState((service: EventCatalogService) => service.updateOfficialProfile(officialId, input)),
+          }}
           onCreateEntrant={(eventId, entrantType) => {
             if (!eventCatalogService) {
               return;
@@ -4810,7 +4832,7 @@ export const RaceSweetMainApp = () => {
           onSelectEntrant={setSelectedEntrantId}
           onSelectEvent={selectEntrantsEvent}
           onUnsavedChangesGuardChange={(guard) =>
-            setUnsavedChangesGuard("Entrants", guard)
+            setUnsavedChangesGuard("Participants", guard)
           }
           onUpdateParticipantIdentifiers={(
             participantId,
