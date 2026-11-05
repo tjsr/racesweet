@@ -50,18 +50,18 @@ export const getOfficialContactRows = (
       const sessionName: string = assignment.sessionId
         ? catalog.sessions.find((session): boolean => session.id === assignment.sessionId)?.name || ''
         : 'Event-wide';
-      const responsibilities: string = assignment.responsibilityOverride || official.responsibilities.join('; ');
+      const responsibilities: string = assignment.responsibilityOverride || official.responsibilities?.join('; ') || '';
       const row: OfficialContactRow = {
         archived: official.archived,
         assignmentId: assignment.id,
-        availability: summarizeOfficialAvailability(official.availability),
+        availability: summarizeOfficialAvailability(assignment.availability || official.availability || []),
         displayName: official.displayName,
         email: official.email || '',
         eventName,
         notes: [official.notes, assignment.notes].filter(Boolean).join('; '),
         officialId: official.id,
         phone: official.phone || '',
-        position: official.position,
+        position: assignment.position || official.position || assignment.role,
         responsibilities,
         role: assignment.role,
         sessionName,

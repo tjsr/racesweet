@@ -40,7 +40,7 @@ describe('OfficialsPanel', () => {
     container?.remove();
   });
 
-  it('creates, assigns, searches, and archives through persisted catalog services', async () => {
+  it('assigns event roles through the catalog ledger without profile editing controls', async () => {
     let saved: EventCatalogLedger = createSeedEventCatalogLedger();
     const persistence: EventCatalogPersistence = {
       load: vi.fn(async (): Promise<EventCatalogLedger> => saved),
@@ -50,64 +50,53 @@ describe('OfficialsPanel', () => {
     };
     const onPersistedLedger = vi.fn(async (_ledger: EventCatalogLedger): Promise<void> => undefined);
     const service: EventCatalogService = await EventCatalogService.create(persistence, { onPersistedLedger });
+    await service.createOfficialProfile({
+      displayName: 'Alex Marshal', notes: '',
+    });
+    await service.createOfficialProfile({
+      displayName: 'Taylor Timekeeper', notes: '',
+    });
+    const individualId: string = service.catalog.officials![0]!.id;
+    onPersistedLedger.mockClear();
+    const onOpenIndividual = vi.fn();
     const Harness = (): React.ReactElement => {
       const [catalog, setCatalog] = React.useState<EventCatalogState>(service.catalog);
+      const [selectedId, setSelectedId] = React.useState<string | undefined>(individualId);
       const write = (operation: () => Promise<EventCatalogState>): Promise<void> =>
         operation().then((next: EventCatalogState): void => setCatalog(next));
-      return <OfficialsPanel catalog={catalog} selectedEventId={catalog.events[0]?.id}
-        onArchiveProfile={(officialId: string, archived: boolean): Promise<void> =>
-          write((): Promise<EventCatalogState> => service.archiveOfficialProfile(officialId, archived))}
-        onCreateAssignment={(input): Promise<void> =>
-          write((): Promise<EventCatalogState> => service.createOfficialAssignment(input))}
-        onCreateProfile={(input): Promise<void> =>
-          write((): Promise<EventCatalogState> => service.createOfficialProfile(input))}
-        onLinkIndividual={(input): Promise<void> =>
-          write((): Promise<EventCatalogState> => service.linkIndividualToEntrant(input))}
+      return <OfficialsPanel catalog={catalog} eventId={catalog.events[0]?.id}
+        onCreateAssignment={(input): Promise<void> => write((): Promise<EventCatalogState> => service.createOfficialAssignment(input))}
+        onOpenIndividual={onOpenIndividual}
         onRemoveAssignment={(assignmentId: string): Promise<void> =>
           write((): Promise<EventCatalogState> => service.removeOfficialAssignment(assignmentId))}
-        onUnlinkIndividual={(linkId: string): Promise<void> =>
-          write((): Promise<EventCatalogState> => service.unlinkIndividualFromEntrant(linkId))}
+        onSelectIndividual={setSelectedId}
         onUpdateAssignment={(assignmentId: string, input): Promise<void> =>
           write((): Promise<EventCatalogState> => service.updateOfficialAssignment(assignmentId, input))}
-        onUpdateProfile={(officialId: string, input): Promise<void> =>
-          write((): Promise<EventCatalogState> => service.updateOfficialProfile(officialId, input))} />;
+        selectedIndividualId={selectedId} />;
     };
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
     await act(async (): Promise<void> => root.render(<Harness />));
-    await act(async (): Promise<void> => {
-      enter(inputByLabel(container, 'Name'), 'Alex Marshal');
-      enter(inputByLabel(container, 'Position'), 'Chief marshal');
-    });
-    await act(async (): Promise<void> => click(container, 'Create individual'));
-    expect(service.catalog.officials).toHaveLength(1);
-    expect(onPersistedLedger).toHaveBeenCalledTimes(1);
-    await act(async (): Promise<void> => click(container, 'Alex Marshal'));
-    await act(async (): Promise<void> => enter(inputByLabel(container, 'Position'), 'Senior marshal'));
-    await act(async (): Promise<void> => click(container, 'Save individual'));
-    expect(service.catalog.officials![0]?.position).toBe('Senior marshal');
-    await act(async (): Promise<void> => enter(inputByLabel(container, 'Role'), 'Start marshal'));
+    expect(container.textContent).not.toContain('License numbers');
+    expect(container.textContent).not.toContain('Create individual');
+    expect(inputByLabel(container, 'Search and select individual')).toBeTruthy();
+    expect(container.textContent).not.toContain('Matching individuals');
+    await act(async (): Promise<void> => click(container, 'Edit individual details'));
+    expect(onOpenIndividual).toHaveBeenCalledTimes(1);
+    await act(async (): Promise<void> => enter(inputByLabel(container, 'Position / duty'), 'Start line'));
+    await act(async (): Promise<void> => click(container, 'Add availability slot'));
     await act(async (): Promise<void> => click(container, 'Add assignment'));
     expect(service.catalog.officialAssignments).toHaveLength(1);
-    expect(container.textContent).toContain('1 assignment in contact list');
+    expect(service.catalog.officialAssignments![0]?.availability).toEqual([{ status: 'available' }]);
+    expect(container.textContent).toContain('Start line');
     await act(async (): Promise<void> => click(container, 'New assignment'));
-    await act(async (): Promise<void> => enter(inputByLabel(container, 'Role'), 'Finish marshal'));
+    await act(async (): Promise<void> => enter(inputByLabel(container, 'Position / duty'), 'Finish line'));
     await act(async (): Promise<void> => click(container, 'Add assignment'));
     expect(service.catalog.officialAssignments).toHaveLength(2);
-    await act(async (): Promise<void> => enter(inputByLabel(container, 'Search individuals'), 'nobody'));
-    expect(container.textContent).toContain('0 assignments in contact list');
-    await act(async (): Promise<void> => enter(inputByLabel(container, 'Search individuals'), 'Alex'));
-    await act(async (): Promise<void> => click(container, 'Archive individual'));
-    expect(service.catalog.officials![0]?.archived).toBe(true);
-    expect(container.textContent).toContain('Alex Marshal (archived)');
-    const addAssignment: HTMLButtonElement = [...container.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button: HTMLButtonElement): boolean => button.textContent?.trim() === 'Add assignment')!;
-    expect(addAssignment.disabled).toBe(true);
-    expect(onPersistedLedger).toHaveBeenCalledTimes(5);
-    expect(saved.mutations.slice(-5).map((mutation) => mutation.type)).toEqual([
-      'official-profile-created', 'official-profile-updated', 'official-assignment-created',
-      'official-assignment-created', 'official-profile-archived',
+    expect(onPersistedLedger).toHaveBeenCalledTimes(2);
+    expect(saved.mutations.slice(-2).map((mutation) => mutation.type)).toEqual([
+      'official-assignment-created', 'official-assignment-created',
     ]);
   });
 });

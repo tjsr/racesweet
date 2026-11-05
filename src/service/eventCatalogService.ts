@@ -60,7 +60,7 @@ import {
   rewriteImportedObjectIds,
 } from "../model/ids.js";
 import { getParticipantDisplayName } from "../model/participantDisplay.js";
-import type { IndividualLink, IndividualLinkInput } from '../model/individualLink.js';
+import type { IndividualLink, IndividualLinkInput, IndividualLinkTargetInput } from '../model/individualLink.js';
 import { EventId, SessionId } from "../model/raceevent.js";
 import type { EffectiveManualCrossing, ManualCrossing, ManualCrossingInput } from "../model/manualCrossing.js";
 import {
@@ -70,6 +70,7 @@ import {
   type OfficialProfileInput,
   normalizeOfficialAssignment,
   normalizeOfficialProfile,
+  splitIndividualName,
 } from '../model/official.js';
 import type { RaceState } from "../model/racestate.js";
 import type { TimeRecordId } from "../model/timerecord.js";
@@ -154,6 +155,7 @@ export interface EventCatalogServiceOptions {
   onPersistedLedger?: (ledger: EventCatalogLedger) => Promise<void>;
   onProgress?: LoadingProgressCallback;
   persistAppliedRemoteMutations?: boolean;
+  reconcileEntrantIndividualsOnLoad?: boolean;
 }
 
 const assertEventCatalogPersistence = (
@@ -2123,7 +2125,11 @@ export class EventCatalogService {
     const state = options.onProgress
       ? await applyEventCatalogLedgerWithProgress(ledger, options.onProgress)
       : undefined;
-    return new EventCatalogService(persistence, ledger, options, state);
+    const service = new EventCatalogService(persistence, ledger, options, state);
+    if (options.reconcileEntrantIndividualsOnLoad) {
+      await service.reconcileLoadedEntrantIndividuals();
+    }
+    return service;
   }
 
   public get catalog(): EventCatalogState {
@@ -2213,9 +2219,14 @@ export class EventCatalogService {
       ...normalizeOfficialProfile(input),
       updatedAt: timestamp,
     };
+    const links: IndividualLink[] = (this.state.individualLinks || []).filter((link: IndividualLink): boolean =>
+      !link.removed && link.individualId === officialId);
+    const personKeys: Array<keyof Pick<OfficialProfile, 'dateOfBirth' | 'displayName' | 'firstName' | 'gender' | 'lastName'>> =
+      ['dateOfBirth', 'displayName', 'firstName', 'gender', 'lastName'];
+    const personChanged: boolean = personKeys.some((key): boolean => current[key] !== official[key]);
     return this.appendMutations([{
       id: createMutationId(), official, timestamp, type: 'official-profile-updated',
-    }]);
+    }, ...(personChanged ? this.getLinkedPersonMutations(official, links, timestamp) : [])]);
   }
 
   public async archiveOfficialProfile(officialId: string, archived: boolean = true): Promise<EventCatalogState> {
@@ -2264,6 +2275,258 @@ export class EventCatalogService {
   public async linkIndividualToEntrant(input: IndividualLinkInput): Promise<EventCatalogState> {
     const individual: OfficialProfile = this.requireOfficialProfile(input.individualId);
     if (individual.archived) throw new Error('Archived individuals cannot receive new entrant links.');
+    const displayName: string = this.getIndividualLinkDisplayName(input);
+    const timestamp: string = createTimestamp();
+    const link: IndividualLink = {
+      ...input, createdAt: timestamp, displayName, id: createId('individualLinkId'), removed: false,
+      updatedAt: timestamp,
+    };
+    return this.appendMutations([{
+      id: createMutationId(), link, timestamp, type: 'individual-linked',
+    }, ...this.getLinkedPersonMutations(individual, [link], timestamp, true)]);
+  }
+
+  public async createIndividualFromEntrant(input: IndividualLinkTargetInput): Promise<EventCatalogState> {
+    const displayName: string = this.getIndividualLinkDisplayName(input);
+    const entrant: EventCatalogEntrant = this.state.entrants.find((candidate: EventCatalogEntrant): boolean =>
+      candidate.id === input.entrantId)!;
+    const member: NonNullable<EventCatalogEntrant['teamMembers']>[number] | undefined = input.participantId
+      ? entrant.teamMembers?.find((candidate: NonNullable<EventCatalogEntrant['teamMembers']>[number]): boolean =>
+        candidate.participantId === input.participantId)
+      : undefined;
+    const name: { firstName: string; lastName: string } = splitIndividualName(displayName);
+    const timestamp: string = createTimestamp();
+    const individual: OfficialProfile = {
+      ...normalizeOfficialProfile({
+        dateOfBirth: member?.dateOfBirth || entrant.dateOfBirth,
+        displayName, emergencyContacts: [], firstName: member?.firstName || entrant.firstName || name.firstName,
+        gender: member?.gender || entrant.gender, lastName: member?.lastName || entrant.lastName || name.lastName,
+        licenses: [], notes: '',
+      }),
+      archived: false, createdAt: timestamp, id: createId('officialId'), updatedAt: timestamp,
+    };
+    const link: IndividualLink = {
+      ...input, createdAt: timestamp, displayName, id: createId('individualLinkId'),
+      individualId: individual.id, removed: false, updatedAt: timestamp,
+    };
+    return this.appendMutations([
+      { id: createMutationId(), official: individual, timestamp, type: 'official-profile-created' },
+      { id: createMutationId(), link, timestamp, type: 'individual-linked' },
+    ]);
+  }
+
+  /** Creates one shared Individual and link for every loaded entrant person that lacks one. */
+  public async reconcileLoadedEntrantIndividuals(): Promise<EventCatalogState> {
+    const activeLinks: IndividualLink[] = (this.state.individualLinks || [])
+      .filter((link: IndividualLink): boolean => !link.removed);
+    const linkedTargets: Set<string> = new Set(activeLinks
+      .map((link: IndividualLink): string => `${link.entrantId}|${link.participantId || ''}`));
+    const profileIdsByPersonKey: Map<string, string> = new Map();
+    activeLinks.forEach((link: IndividualLink): void => {
+      const entrant: EventCatalogEntrant | undefined = this.state.entrants.find((candidate: EventCatalogEntrant): boolean =>
+        candidate.id === link.entrantId && candidate.eventId === link.eventId);
+      if (entrant && this.state.officials?.some((profile: OfficialProfile): boolean => profile.id === link.individualId)) {
+        profileIdsByPersonKey.set(this.getEntrantIndividualPersonKey(entrant, link.participantId), link.individualId);
+      }
+    });
+    const duplicateLinkReplacements: Array<{ canonicalIndividualId: string; link: IndividualLink }> = [];
+    const linksByPersonKey: Map<string, IndividualLink[]> = new Map();
+    activeLinks.forEach((link: IndividualLink): void => {
+      const entrant: EventCatalogEntrant | undefined = this.state.entrants.find((candidate: EventCatalogEntrant): boolean =>
+        candidate.id === link.entrantId && candidate.eventId === link.eventId);
+      if (!entrant) return;
+      const personKey: string = this.getEntrantIndividualPersonKey(entrant, link.participantId);
+      linksByPersonKey.set(personKey, [...(linksByPersonKey.get(personKey) || []), link]);
+    });
+    linksByPersonKey.forEach((links: IndividualLink[], personKey: string): void => {
+      const canonicalLink: IndividualLink | undefined = [...links].sort((first: IndividualLink, second: IndividualLink): number =>
+        this.getActiveOfficialAssignmentCount(second.individualId) - this.getActiveOfficialAssignmentCount(first.individualId) ||
+        first.createdAt.localeCompare(second.createdAt))[0];
+      if (!canonicalLink) return;
+      profileIdsByPersonKey.set(personKey, canonicalLink.individualId);
+      links.filter((link: IndividualLink): boolean => link.individualId !== canonicalLink.individualId)
+        .forEach((link: IndividualLink): void => {
+          duplicateLinkReplacements.push({ canonicalIndividualId: canonicalLink.individualId, link });
+        });
+    });
+    const targets: IndividualLinkTargetInput[] = [];
+    this.state.entrants.filter((entrant: EventCatalogEntrant): boolean => !entrant.deleted)
+      .forEach((entrant: EventCatalogEntrant): void => {
+        if (entrant.entrantType === 'rider') {
+          targets.push({ entrantId: entrant.id, eventId: entrant.eventId });
+          return;
+        }
+        [...new Set([
+          ...entrant.memberParticipantIds,
+          ...(entrant.teamMembers || []).map((member: NonNullable<EventCatalogEntrant['teamMembers']>[number]) =>
+            member.participantId),
+        ])].forEach((participantId): void => {
+          targets.push({ entrantId: entrant.id, eventId: entrant.eventId, participantId });
+        });
+      });
+    const missingTargets: IndividualLinkTargetInput[] = targets.filter((target: IndividualLinkTargetInput): boolean =>
+      !linkedTargets.has(`${target.entrantId}|${target.participantId || ''}`));
+    const linkedProfileNames: Set<string> = new Set(activeLinks.flatMap((link: IndividualLink): string[] => {
+      const profile: OfficialProfile | undefined = this.state.officials?.find((candidate: OfficialProfile): boolean =>
+        candidate.id === link.individualId);
+      return profile ? [profile.displayName.trim().toLocaleLowerCase()] : [];
+    }));
+    const archiveDuplicateProfiles: OfficialProfile[] = (this.state.officials || []).filter((profile: OfficialProfile): boolean =>
+      !profile.archived && !activeLinks.some((link: IndividualLink): boolean => link.individualId === profile.id) &&
+      linkedProfileNames.has(profile.displayName.trim().toLocaleLowerCase()) && this.isEmptyIndividualProfile(profile));
+    if (missingTargets.length === 0 && archiveDuplicateProfiles.length === 0 && duplicateLinkReplacements.length === 0) return this.state;
+    const timestamp: string = createTimestamp();
+    const mutations: EventCatalogLedger['mutations'] = missingTargets.flatMap((target: IndividualLinkTargetInput) => {
+      const entrant: EventCatalogEntrant | undefined = this.state.entrants.find((candidate: EventCatalogEntrant): boolean =>
+        candidate.id === target.entrantId && candidate.eventId === target.eventId);
+      if (!entrant) return [];
+      const member: NonNullable<EventCatalogEntrant['teamMembers']>[number] | undefined = target.participantId
+        ? entrant.teamMembers?.find((candidate: NonNullable<EventCatalogEntrant['teamMembers']>[number]): boolean =>
+          candidate.participantId === target.participantId)
+        : undefined;
+      const displayName: string = member
+        ? [member.firstName, member.lastName].filter(Boolean).join(' ').trim()
+        : entrant.name;
+      const name: { firstName: string; lastName: string } = splitIndividualName(displayName);
+      const personKey: string = this.getEntrantIndividualPersonKey(entrant, target.participantId);
+      const matchingProfile: OfficialProfile | undefined = this.findMatchingIndividualProfile(
+        displayName, member?.dateOfBirth || entrant.dateOfBirth, member?.gender || entrant.gender,
+      );
+      const existingIndividualId: string | undefined = profileIdsByPersonKey.get(personKey) || matchingProfile?.id;
+      const individual: OfficialProfile = {
+        ...normalizeOfficialProfile({
+          dateOfBirth: member?.dateOfBirth || entrant.dateOfBirth,
+          displayName,
+          emergencyContacts: [],
+          firstName: member?.firstName || entrant.firstName || name.firstName,
+          gender: member?.gender || entrant.gender,
+          lastName: member?.lastName || entrant.lastName || name.lastName,
+          licenses: [],
+          notes: '',
+        }),
+        archived: false,
+        createdAt: timestamp,
+        id: createId('officialId'),
+        updatedAt: timestamp,
+      };
+      const link: IndividualLink = {
+        ...target,
+        createdAt: timestamp,
+        displayName,
+        id: createId('individualLinkId'),
+        individualId: existingIndividualId || individual.id,
+        removed: false,
+        updatedAt: timestamp,
+      };
+      if (existingIndividualId) {
+        return [{ id: createMutationId(), link, timestamp, type: 'individual-linked' as const }];
+      }
+      profileIdsByPersonKey.set(personKey, individual.id);
+      return [
+        { id: createMutationId(), official: individual, timestamp, type: 'official-profile-created' as const },
+        { id: createMutationId(), link, timestamp, type: 'individual-linked' as const },
+      ];
+    });
+    mutations.push(...archiveDuplicateProfiles.map((profile: OfficialProfile) => ({
+      archived: true, id: createMutationId(), officialId: profile.id, timestamp, type: 'official-profile-archived' as const,
+    })));
+    const duplicateProfileIds: Set<string> = new Set(duplicateLinkReplacements.map(({ link }) => link.individualId));
+    duplicateLinkReplacements.forEach(({ canonicalIndividualId, link }): void => {
+      const replacement: IndividualLink = {
+        ...link, createdAt: timestamp, id: createId('individualLinkId'), individualId: canonicalIndividualId,
+        removed: false, updatedAt: timestamp,
+      };
+      mutations.push(
+        { id: createMutationId(), linkId: link.id, timestamp, type: 'individual-unlinked' },
+        { id: createMutationId(), link: replacement, timestamp, type: 'individual-linked' },
+      );
+    });
+    duplicateProfileIds.forEach((individualId: string): void => {
+      const onlyDuplicateLinks: boolean = activeLinks.filter((link: IndividualLink): boolean => link.individualId === individualId)
+        .every((link: IndividualLink): boolean => duplicateLinkReplacements.some((replacement) => replacement.link.id === link.id));
+      if (onlyDuplicateLinks && this.getActiveOfficialAssignmentCount(individualId) === 0) {
+        mutations.push({ archived: true, id: createMutationId(), officialId: individualId, timestamp, type: 'official-profile-archived' });
+      }
+    });
+    return mutations.length === 0 ? this.state : this.appendMutations(mutations);
+  }
+
+  private getEntrantIndividualPersonKey(
+    entrant: EventCatalogEntrant,
+    participantId: string | undefined,
+  ): string {
+    const teamEntrantId: string | undefined = entrant.entrantType === 'team'
+      ? entrant.id
+      : entrant.teamEntrantId;
+    const memberParticipantId: string | undefined = participantId || entrant.memberParticipantIds[0];
+    return teamEntrantId && memberParticipantId
+      ? `team-member:${teamEntrantId}:${memberParticipantId}`
+      : `entrant:${entrant.id}`;
+  }
+
+  private findMatchingIndividualProfile(
+    displayName: string,
+    dateOfBirth: string | undefined,
+    gender: string | undefined,
+  ): OfficialProfile | undefined {
+    const normalizedName: string = displayName.trim().toLocaleLowerCase();
+    return (this.state.officials || []).find((profile: OfficialProfile): boolean =>
+      !profile.archived && profile.displayName.trim().toLocaleLowerCase() === normalizedName &&
+      (!dateOfBirth || !profile.dateOfBirth || profile.dateOfBirth === dateOfBirth) &&
+      (!gender || !profile.gender || profile.gender.toLocaleLowerCase() === gender.toLocaleLowerCase()));
+  }
+
+  private isEmptyIndividualProfile(profile: OfficialProfile): boolean {
+    return !profile.dateOfBirth && !profile.email && !profile.gender && !profile.notes && !profile.phone &&
+      (profile.emergencyContacts?.length || 0) === 0 && (profile.licenses?.length || 0) === 0;
+  }
+
+  private getActiveOfficialAssignmentCount(individualId: string): number {
+    return (this.state.officialAssignments || []).filter((assignment: OfficialAssignment): boolean =>
+      !assignment.removed && assignment.officialId === individualId).length;
+  }
+
+  private getLinkedPersonMutations(
+    individual: OfficialProfile,
+    links: IndividualLink[],
+    timestamp: string,
+    preserveMissing: boolean = false,
+  ): EventCatalogMutation[] {
+    const name: { firstName: string; lastName: string } = splitIndividualName(individual.displayName);
+    const firstName: string = individual.firstName ?? name.firstName;
+    const lastName: string = individual.lastName ?? name.lastName;
+    const changesByEntrant: Map<string, Partial<EventCatalogEntrant>> = new Map();
+    links.forEach((link: IndividualLink): void => {
+      const entrant: EventCatalogEntrant | undefined = this.state.entrants.find((candidate: EventCatalogEntrant): boolean =>
+        candidate.id === link.entrantId && candidate.eventId === link.eventId && !candidate.deleted);
+      if (!entrant) return;
+      if (entrant.entrantType === 'rider') {
+        changesByEntrant.set(entrant.id, {
+          dateOfBirth: preserveMissing ? individual.dateOfBirth || entrant.dateOfBirth : individual.dateOfBirth,
+          firstName, gender: preserveMissing ? individual.gender || entrant.gender : individual.gender, lastName,
+          name: individual.displayName,
+        });
+        return;
+      }
+      if (!link.participantId) return;
+      const existingChanges: Partial<EventCatalogEntrant> | undefined = changesByEntrant.get(entrant.id);
+      const members: NonNullable<EventCatalogEntrant['teamMembers']> = existingChanges?.teamMembers || entrant.teamMembers || [];
+      if (!members.some((member: NonNullable<EventCatalogEntrant['teamMembers']>[number]): boolean =>
+        member.participantId === link.participantId)) return;
+      changesByEntrant.set(entrant.id, {
+        teamMembers: members.map((member: NonNullable<EventCatalogEntrant['teamMembers']>[number]) =>
+          member.participantId === link.participantId ? {
+            ...member, dateOfBirth: preserveMissing ? individual.dateOfBirth || member.dateOfBirth : individual.dateOfBirth,
+            firstName, gender: preserveMissing ? individual.gender || member.gender : individual.gender, lastName,
+          } : member),
+      });
+    });
+    return [...changesByEntrant.entries()].map(([entrantId, changes]: [string, Partial<EventCatalogEntrant>]): EventCatalogMutation => ({
+      changes: normalizeEntrantChanges(changes), entrantId, id: createMutationId(), timestamp, type: 'entrant-updated',
+    }));
+  }
+
+  private getIndividualLinkDisplayName(input: IndividualLinkTargetInput): string {
     if (this.state.deletedEventIds.includes(input.eventId)) {
       throw new Error('The selected event is no longer active.');
     }
@@ -2289,17 +2552,9 @@ export class EventCatalogService {
       ? entrant.teamMembers?.find((candidate: NonNullable<EventCatalogEntrant['teamMembers']>[number]): boolean =>
         candidate.participantId === input.participantId)
       : undefined;
-    const displayName: string = member
+    return member
       ? [member.firstName, member.lastName].filter(Boolean).join(' ').trim()
       : entrant.entrantType === 'team' ? `Member of ${entrant.name}` : entrant.name;
-    const timestamp: string = createTimestamp();
-    const link: IndividualLink = {
-      ...input, createdAt: timestamp, displayName, id: createId('individualLinkId'), removed: false,
-      updatedAt: timestamp,
-    };
-    return this.appendMutations([{
-      id: createMutationId(), link, timestamp, type: 'individual-linked',
-    }]);
   }
 
   public async unlinkIndividualFromEntrant(linkId: string): Promise<EventCatalogState> {

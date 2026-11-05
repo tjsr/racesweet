@@ -1,4 +1,4 @@
-import { Button, TextField } from '@mui/material';
+import { Button, TextField, Typography } from '@mui/material';
 import React from 'react';
 
 import type { EventCatalogCategory, EventCatalogEntrant, EventCatalogEntry } from '../../catalog/eventCatalog.js';
@@ -8,12 +8,10 @@ import type { EventEntryId } from '../../model/entry.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
 
 type EntryChanges = Partial<Pick<EventCatalogEntry, 'categoryId' | 'identifiers' | 'name' | 'raceNumber' | 'startOrder' | 'vehicle'>>;
-type DriverChanges = Partial<Pick<EventCatalogEntrant, 'firstName' | 'lastName' | 'name'>>;
-
 interface EntrantEntriesPanelProps {
   categories: EventCatalogCategory[];
   entries: EventCatalogEntry[];
-  onUpdateDriver: (entrantId: EventEntrantId, changes: DriverChanges) => void | Promise<void>;
+  onOpenIndividuals?: (entrantId: EventEntrantId) => void;
   onUpdateEntry: (entryId: EventEntryId, changes: EntryChanges) => void | Promise<void>;
   participants: EventParticipant[];
   riderEntrants: EventCatalogEntrant[];
@@ -41,47 +39,6 @@ const getEntryDraft = (entry: EventCatalogEntry): EntryDraft => ({
   transmitter: getEntryTransmitter(entry),
   vehicle: entry.vehicle || '',
 });
-
-const DriverEditor = (props: {
-  driver: EventCatalogEntrant;
-  onUpdateDriver: EntrantEntriesPanelProps['onUpdateDriver'];
-}): React.ReactElement => {
-  const [firstName, setFirstName] = React.useState(props.driver.firstName || '');
-  const [lastName, setLastName] = React.useState(props.driver.lastName || '');
-
-  React.useEffect(() => {
-    setFirstName(props.driver.firstName || '');
-    setLastName(props.driver.lastName || '');
-  }, [props.driver]);
-
-  return (
-    <fieldset className="entry-driver-form">
-      <legend>Driver</legend>
-      <TextField
-        label="First Name"
-        slotProps={{ htmlInput: { 'aria-label': `Entry Driver First Name ${props.driver.id}` } }}
-        value={firstName}
-        onChange={(event) => setFirstName(event.target.value)}
-      />
-      <TextField
-        label="Surname"
-        slotProps={{ htmlInput: { 'aria-label': `Entry Driver Surname ${props.driver.id}` } }}
-        value={lastName}
-        onChange={(event) => setLastName(event.target.value)}
-      />
-      <Button
-        type="button"
-        onClick={() => void props.onUpdateDriver(props.driver.id, {
-          firstName: firstName || undefined,
-          lastName: lastName || undefined,
-          name: `${firstName} ${lastName}`.trim() || props.driver.name,
-        })}
-      >
-        Save Driver
-      </Button>
-    </fieldset>
-  );
-};
 
 const EntryEditor = (props: EntrantEntriesPanelProps & { entry: EventCatalogEntry }): React.ReactElement => {
   const [draft, setDraft] = React.useState<EntryDraft>(() => getEntryDraft(props.entry));
@@ -165,7 +122,12 @@ const EntryEditor = (props: EntrantEntriesPanelProps & { entry: EventCatalogEntr
       <Button type="button" onClick={saveEntry}>Save Entry</Button>
       <div className="entry-driver-list">
         {drivers.map((driver) => (
-          <DriverEditor driver={driver} key={driver.id} onUpdateDriver={props.onUpdateDriver} />
+          <React.Fragment key={driver.id}>
+            <Typography variant="body2">Driver: {driver.name}</Typography>
+            {props.onOpenIndividuals && <Button onClick={(): void => props.onOpenIndividuals?.(driver.id)}>
+              Open {driver.name} in Individuals
+            </Button>}
+          </React.Fragment>
         ))}
         {drivers.length === 0 && participantNames.map((name) => (
           <p className="readonly-summary" key={name}>Driver: {name}</p>

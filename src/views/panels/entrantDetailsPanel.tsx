@@ -1,4 +1,4 @@
-import { Button, CircularProgress, TextField } from '@mui/material';
+import { Button, CircularProgress, TextField, Typography } from '@mui/material';
 import React from 'react';
 import { type EventCatalogEntrant } from '../../catalog/eventCatalog.js';
 import { SelectTextField } from '../../controls/selectTextField.js';
@@ -27,6 +27,7 @@ interface EntrantDetailsPanelProps {
   deleteStatus?: 'idle' | 'pending' | 'succeeded' | 'failed';
   eventCategories: EventCategory[];
   onDeleteEntrant: () => void | Promise<void>;
+  onOpenIndividuals?: () => void;
   onSaveEntrant: () => void | Promise<void>;
   onSetEntrantDraft: React.Dispatch<React.SetStateAction<EntrantDraft>>;
   selectedEntrant?: EventCatalogEntrant;
@@ -40,7 +41,6 @@ interface EntrantDetailsPanelProps {
   warningModal?: React.ReactNode;
 }
 
-const UNSPECIFIED_GENDER = 'unspecified';
 const isActiveCategory = (category: EventCategory): boolean => category.deleted !== true;
 
 const ReadOnlyList = (props: { emptyText: string; items: string[] }): React.ReactElement => {
@@ -68,43 +68,19 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
       <h2>{isDriver ? `${entrantLabel} Details` : `${parentLabel} Details`}</h2>
       {props.selectedEntrant ? (
         <>
-          {!props.isMotorsport || !isDriver ? <TextField
-            label={isDriver ? `${entrantLabel} Name` : `${parentLabel} Name`}
+          {!isDriver ? <TextField
+            label={`${parentLabel} Name`}
             slotProps={{ htmlInput: { 'aria-label': 'Entrant Name' } }}
             value={props.entrantDraft.name}
             onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, name: event.target.value }))}
-          /> : null}
+          /> : <>
+            <TextField label={`${entrantLabel} Name`} value={props.selectedEntrant.name}
+              slotProps={{ htmlInput: { 'aria-label': 'Entrant Name', readOnly: true } }} />
+            <Typography variant="body2">Edit personal details in Individuals.</Typography>
+            {props.onOpenIndividuals && <Button onClick={props.onOpenIndividuals}>Open Individuals</Button>}
+          </>}
           {isDriver ? (
             <>
-              <TextField
-                label="First Name"
-                slotProps={{ htmlInput: { 'aria-label': 'Entrant First Name' } }}
-                value={props.entrantDraft.firstName}
-                onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, firstName: event.target.value }))}
-              />
-              <TextField
-                label="Surname"
-                slotProps={{ htmlInput: { 'aria-label': 'Entrant Surname' } }}
-                value={props.entrantDraft.lastName}
-                onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, lastName: event.target.value }))}
-              />
-              <SelectTextField
-                label="Gender"
-                slotProps={{ select: { 'aria-label': 'Entrant Gender', native: true } }}
-                value={props.entrantDraft.gender}
-                onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, gender: event.target.value }))}
-              >
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value={UNSPECIFIED_GENDER}>Unspecified</option>
-              </SelectTextField>
-              <TextField
-                label="Date of Birth"
-                slotProps={{ htmlInput: { 'aria-label': 'Entrant Date Of Birth' }, inputLabel: { shrink: true } }}
-                type="date"
-                value={props.entrantDraft.dateOfBirth}
-                onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, dateOfBirth: event.target.value }))}
-              />
               {!props.isMotorsport ? <TextField
                 label="Start Order"
                 slotProps={{ htmlInput: { 'aria-label': 'Entrant Start Order', min: 1 } }}
@@ -195,7 +171,7 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
               {props.deleteError ? <span className="error entrant-delete-error" role="alert">{props.deleteError}</span> : null}
             </div>
           </div>
-          <div className="entrant-id">Id: {props.selectedEntrant.id}</div>
+          <TextField label="Entrant ID" slotProps={{ htmlInput: { readOnly: true } }} value={props.selectedEntrant.id} />
           {props.warningModal}
         </>
       ) : (

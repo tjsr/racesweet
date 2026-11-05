@@ -51,6 +51,7 @@ interface TimingContextProps {
 }
 
 export const TimingContext = (props: TimingContextProps): React.ReactElement => {
+  const timingEventTimeZone: string = props.timingEvent?.timeZone || props.eventTimeZone;
   const sortedSessions = [...props.sessions].sort((left, right) => {
     const leftTime = Date.parse(left.scheduledStart);
     const rightTime = Date.parse(right.scheduledStart);
@@ -68,7 +69,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
   const sessionDayKeyFormatter = new Intl.DateTimeFormat('en-AU', {
     day: '2-digit',
     month: '2-digit',
-    timeZone: props.eventTimeZone,
+    timeZone: timingEventTimeZone,
     weekday: 'short',
     year: 'numeric',
   });
@@ -76,10 +77,10 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
     hour: '2-digit',
     hour12: false,
     minute: '2-digit',
-    timeZone: props.eventTimeZone,
+    timeZone: timingEventTimeZone,
   });
   const sessionWeekdayFormatter = new Intl.DateTimeFormat('en-AU', {
-    timeZone: props.eventTimeZone,
+    timeZone: timingEventTimeZone,
     weekday: 'short',
   });
   const multipleSessionDays = new Set(
@@ -108,7 +109,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
     hour12: false,
     minute: '2-digit',
     second: '2-digit',
-    timeZone: props.eventTimeZone,
+    timeZone: timingEventTimeZone,
   });
 
   return (
@@ -187,7 +188,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
         currentEventId={props.timingEvent?.id}
         currentSessionId={props.timingSessionValue}
         eventDiscipline={props.timingEvent?.discipline}
-        eventTimeZone={props.eventTimeZone}
+        eventTimeZone={timingEventTimeZone}
         fastestTimeIndicatorColors={props.fastestTimeIndicatorColors}
         onAddRecord={props.onAddRecord}
         onEditRecord={props.onEditRecord}

@@ -915,14 +915,21 @@ describe('RaceSweetMainApp integration', () => {
 
     await clickSectionButton(container, 'Participants');
     expect(container.querySelector('h1')?.textContent).toBe('Entrants');
+    expect(container.querySelector('select[aria-label="Participants Event"]')).toBeTruthy();
+    expect(container.querySelector('select[aria-label="Entrants Event"]')).toBeNull();
     expect(container.textContent).toContain('Create Driver');
     expect(container.querySelector('input[aria-label="Entrant Name"]')).toBeTruthy();
     const individualsTab: HTMLButtonElement | undefined = [...container.querySelectorAll<HTMLButtonElement>('button')]
       .find((button: HTMLButtonElement): boolean => button.textContent === 'Individuals');
     expect(individualsTab).toBeDefined();
     await act(async (): Promise<void> => individualsTab!.click());
-    expect(container.textContent).toContain('Officials');
     expect(container.textContent).toContain('Create individual');
+    expect(container.textContent).toContain('License numbers');
+    const officialsTab: HTMLButtonElement | undefined = [...container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button: HTMLButtonElement): boolean => button.textContent === 'Officials');
+    await act(async (): Promise<void> => officialsTab!.click());
+    expect(container.textContent).toContain('Assign an official');
+    expect(container.querySelector('select[aria-label="Participants Event"]')).toBeTruthy();
     const entrantsTab: HTMLButtonElement | undefined = [...container.querySelectorAll<HTMLButtonElement>('button')]
       .find((button: HTMLButtonElement): boolean => button.textContent === 'Entrants');
     await act(async (): Promise<void> => entrantsTab!.click());
@@ -1075,7 +1082,9 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.textContent).toContain('Real Event Without Imported Data');
     expect(container.textContent).not.toContain('Category A');
     expect(container.textContent).not.toContain('Category B');
-    expect(writtenFiles.filter((write) => getCatalogWriteFileName(write.filePath) === 'event-catalog.json')).toEqual([]);
+    const persistedLedger = getPersistedCatalogLedger(writtenFiles);
+    expect(persistedLedger?.mutations.filter((mutation: PersistedCatalogMutation): boolean =>
+      mutation.type === 'official-profile-created' || mutation.type === 'individual-linked')).toHaveLength(2);
   });
 
   it('hydrates persisted CTC timing records and the current category after an application restart', async () => {
@@ -1489,6 +1498,40 @@ describe('RaceSweetMainApp integration', () => {
     expect(selectedRacePlateInput?.getAttribute('aria-label')).toContain(secondCardName);
   });
 
+  it('uses one Participants event selector across tabs and guards unsaved entrant changes', async () => {
+    await act(async (): Promise<void> => root.render(<RaceSweetMainApp />));
+    await waitForLoadedApp(container);
+    await clickSectionButton(container, 'Events');
+    await clickButtonByText(container, 'New');
+    await waitForText(container, 'New Event');
+    await clickSectionButton(container, 'Participants');
+    const eventSelect: HTMLSelectElement = container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Participants Event"]',
+    )!;
+    const entrantEvent: HTMLOptionElement = [...eventSelect.options]
+      .find((option: HTMLOptionElement): boolean => option.textContent !== 'New Event')!;
+    await act(async (): Promise<void> => setSelectValue(eventSelect, entrantEvent.value));
+    const otherEvent: HTMLOptionElement | undefined = [...eventSelect.options]
+      .find((option: HTMLOptionElement): boolean => option.value !== eventSelect.value);
+    expect(otherEvent).toBeDefined();
+    await act(async (): Promise<void> => setInputValue(
+      container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Entrant Notes"]')!, 'Unsaved entry note',
+    ));
+    await clickButtonByText(container, 'Individuals');
+    expect(container.querySelector('[aria-label="Unsaved entrant changes"]')).toBeTruthy();
+    await clickButtonByText(container, 'Cancel');
+    expect(container.querySelector('h1')?.textContent).toBe('Entrants');
+    await act(async (): Promise<void> => setSelectValue(eventSelect, otherEvent!.value));
+    expect(container.querySelector('[aria-label="Unsaved entrant changes"]')).toBeTruthy();
+    await clickButtonByText(container, 'Discard');
+    expect(eventSelect.value).toBe(otherEvent!.value);
+    await clickButtonByText(container, 'Individuals');
+    expect(container.textContent).toContain('New individual');
+    await clickButtonByText(container, 'Officials');
+    expect(container.querySelector<HTMLSelectElement>('select[aria-label="Participants Event"]')?.value)
+      .toBe(otherEvent!.value);
+  });
+
   it('adds identifiers for a selected driver before that driver has a race-state participant', async () => {
     await act(async () => {
       root.render(<RaceSweetMainApp />);
@@ -1863,15 +1906,15 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.textContent).not.toContain('Error loading content');
 
     await clickSectionButton(container, 'Participants');
-    const entrantNameInput = container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement;
-    expect(entrantNameInput).toBeTruthy();
+    const entrantNotesInput = container.querySelector('textarea[aria-label="Entrant Notes"]') as HTMLTextAreaElement;
+    expect(entrantNotesInput).toBeTruthy();
 
     await act(async () => {
-      setInputValue(entrantNameInput, 'Renderer Regression Entrant');
+      setInputValue(entrantNotesInput, 'Renderer regression entry note');
     });
 
     await clickButtonByText(container, 'Save Entrant');
-    await waitForInputValue(container, 'input[aria-label="Entrant Name"]', 'Renderer Regression Entrant');
+    await waitForInputValue(container, 'textarea[aria-label="Entrant Notes"]', 'Renderer regression entry note');
 
     await clickSectionButton(container, 'Categories');
     expect(container.querySelector('h1')?.textContent).toBe('Categories');
@@ -1906,7 +1949,7 @@ describe('RaceSweetMainApp integration', () => {
 
     await clickSectionButton(container, 'Participants');
     expect(container.querySelector('h1')?.textContent).toBe('Entrants');
-    await waitForInputValue(container, 'input[aria-label="Entrant Name"]', 'Renderer Regression Entrant');
+    await waitForInputValue(container, 'textarea[aria-label="Entrant Notes"]', 'Renderer regression entry note');
 
     await clickSectionButton(container, 'Categories');
     expect(container.querySelector('h1')?.textContent).toBe('Categories');
@@ -2572,7 +2615,7 @@ describe('RaceSweetMainApp integration', () => {
     expect(errorLog.value).toContain('Cached Apical Excel spreadsheet was not found');
   });
 
-  it('persists enriched entrant profile edits across panel switches', async () => {
+  it('persists shared Individual details across panel switches and mirrors the linked rider name', async () => {
     await ensureAppStylesLoaded();
 
     await act(async () => {
@@ -2583,37 +2626,42 @@ describe('RaceSweetMainApp integration', () => {
     expect(container.textContent).not.toContain('Error loading content');
 
     await clickSectionButton(container, 'Participants');
-
-    const firstNameInput = container.querySelector('input[aria-label="Entrant First Name"]') as HTMLInputElement;
-    const surnameInput = container.querySelector('input[aria-label="Entrant Surname"]') as HTMLInputElement;
-    const genderInput = container.querySelector('select[aria-label="Entrant Gender"]') as HTMLSelectElement;
-    const dobInput = container.querySelector('input[aria-label="Entrant Date Of Birth"]') as HTMLInputElement;
+    await clickButtonByText(container, 'Open Individuals');
+    expect(container.textContent).toContain('Save individual');
+    const firstNameInput = container.querySelector('input[aria-label="Individual First Name"]') as HTMLInputElement;
+    const surnameInput = container.querySelector('input[aria-label="Individual Surname"]') as HTMLInputElement;
+    const genderInput = container.querySelector('input[aria-label="Individual Gender"]') as HTMLInputElement;
+    const dobInput = container.querySelector('input[aria-label="Individual Date Of Birth"]') as HTMLInputElement;
+    const licenseInput = container.querySelector('input[aria-label="Individual License Number 1"]') as HTMLInputElement;
     expect(firstNameInput).toBeTruthy();
-    expect(surnameInput).toBeTruthy();
-    expect(genderInput).toBeTruthy();
-    expect(dobInput).toBeTruthy();
+    expect(licenseInput).toBeTruthy();
 
     await act(async () => {
       setInputValue(firstNameInput, 'Integrated');
       setInputValue(surnameInput, 'Rider');
-      setSelectValue(genderInput, 'female');
+      setInputValue(genderInput, 'female');
       setInputValue(dobInput, '2001-01-15');
+      setInputValue(licenseInput, 'LIC-2001');
     });
 
-    await clickButtonByText(container, 'Save Entrant');
-    await waitForInputValue(container, 'input[aria-label="Entrant First Name"]', 'Integrated');
-    await waitForInputValue(container, 'input[aria-label="Entrant Surname"]', 'Rider');
-    await waitForInputValue(container, 'select[aria-label="Entrant Gender"]', 'female');
-    await waitForInputValue(container, 'input[aria-label="Entrant Date Of Birth"]', '2001-01-15');
+    await clickButtonByText(container, 'Save individual');
+    await waitForInputValue(container, 'input[aria-label="Individual First Name"]', 'Integrated');
+    await waitForInputValue(container, 'input[aria-label="Individual License Number 1"]', 'LIC-2001');
 
     await clickSectionButton(container, 'System');
     expect(container.querySelector('h1')?.textContent).toBe('System');
 
     await clickSectionButton(container, 'Participants');
-    await waitForInputValue(container, 'input[aria-label="Entrant First Name"]', 'Integrated');
-    await waitForInputValue(container, 'input[aria-label="Entrant Surname"]', 'Rider');
-    await waitForInputValue(container, 'select[aria-label="Entrant Gender"]', 'female');
-    await waitForInputValue(container, 'input[aria-label="Entrant Date Of Birth"]', '2001-01-15');
+    await waitForInputValue(container, 'input[aria-label="Entrant Name"]', 'Integrated Rider');
+    await clickButtonByText(container, 'Open Individuals');
+    await waitForInputValue(container, 'input[aria-label="Individual First Name"]', 'Integrated');
+    await waitForInputValue(container, 'input[aria-label="Individual Surname"]', 'Rider');
+    await waitForInputValue(container, 'input[aria-label="Individual Gender"]', 'female');
+    await waitForInputValue(container, 'input[aria-label="Individual Date Of Birth"]', '2001-01-15');
+    await waitForInputValue(container, 'input[aria-label="Individual License Number 1"]', 'LIC-2001');
+    await clickButtonByText(container, 'Officials');
+    await clickButtonByText(container, 'Edit individual details');
+    await waitForInputValue(container, 'input[aria-label="Individual First Name"]', 'Integrated');
   });
 
   it('keeps app usable when admin overrides file is missing and Apical event list fetch fails', async () => {

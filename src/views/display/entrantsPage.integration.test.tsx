@@ -411,22 +411,23 @@ describe('EntrantsPage integration', () => {
         updatedAt: '2026-06-12T00:00:00.000Z',
       }],
       officials: [{
-        archived: false, availability: [], createdAt: '2026-06-12T00:00:00.000Z',
-        displayName: 'Pat R.', id: 'individual-1', notes: '', position: '', responsibilities: [],
+        archived: false, createdAt: '2026-06-12T00:00:00.000Z', displayName: 'Pat R.', id: 'individual-1', notes: '',
         updatedAt: '2026-06-12T00:00:00.000Z',
       }],
     };
     await act(async (): Promise<void> => root.render(<EntrantsPage
       catalog={linkedCatalog} onCreateEntrant={(): void => undefined} onDeleteEntrant={(): void => undefined}
+      onLinkIndividual={async (): Promise<void> => undefined}
       onSelectEntrant={(): void => undefined} onSelectEvent={(): void => undefined}
+      onUnlinkIndividual={async (): Promise<void> => undefined}
       onUpdateEntrant={(): void => undefined} selectedEntrantId="ent-1" selectedEventId="event-1"
       raceState={raceState} />));
-    expect(container.textContent).toContain('Linked individuals');
+    expect(container.textContent).toContain('Individual membership');
     expect(container.textContent).toContain('Pat Rider → Pat R.');
     expect(raceState.participants).toHaveLength(4);
   });
 
-  it('edits rider profile fields and updates team composition payloads', async () => {
+  it('keeps person fields in Individuals while editing entry notes and team category', async () => {
     const onCreateEntrant = vi.fn();
     const onDeleteEntrant = vi.fn();
     const onSelectEntrant = vi.fn();
@@ -452,32 +453,27 @@ describe('EntrantsPage integration', () => {
       );
     });
 
-    const firstNameInput = container.querySelector('input[aria-label="Entrant First Name"]') as HTMLInputElement;
-    const surnameInput = container.querySelector('input[aria-label="Entrant Surname"]') as HTMLInputElement;
-    const genderInput = container.querySelector('select[aria-label="Entrant Gender"]') as HTMLSelectElement;
-    const dobInput = container.querySelector('input[aria-label="Entrant Date Of Birth"]') as HTMLInputElement;
+    const notesInput = container.querySelector('textarea[aria-label="Entrant Notes"]') as HTMLTextAreaElement;
     const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Entrant');
 
-    expect(container.querySelector('input[aria-label="Entrant Name"]')).toBeNull();
+    expect((container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement).readOnly).toBe(true);
+    expect(container.querySelector('input[aria-label="Entrant First Name"]')).toBeNull();
+    expect(container.querySelector('input[aria-label="Entrant Surname"]')).toBeNull();
+    expect(container.querySelector('select[aria-label="Entrant Gender"]')).toBeNull();
+    expect(container.querySelector('input[aria-label="Entrant Date Of Birth"]')).toBeNull();
     expect(container.querySelector('input[aria-label="Entrant Start Order"]')).toBeNull();
     expect(container.querySelector('input[aria-label="Entrant Vehicle"]')).toBeNull();
     expect(container.querySelector('select[aria-label="Entrant Category"]')).toBeNull();
 
     await act(async () => {
-      setInputValue(firstNameInput, 'Jordan');
-      setInputValue(surnameInput, 'Taylor');
-      setSelectValue(genderInput, 'female');
-      setInputValue(dobInput, '1998-12-24');
+      setInputValue(notesInput, 'Event entry note');
       saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(onUpdateEntrant).toHaveBeenCalledWith('ent-1', expect.objectContaining({
-      dateOfBirth: '1998-12-24',
-      firstName: 'Jordan',
-      gender: 'female',
-      lastName: 'Taylor',
-      name: 'Jordan Taylor',
+      notes: 'Event entry note',
     }));
+    expect(onUpdateEntrant.mock.calls[0]![1]).not.toHaveProperty('firstName');
 
     await act(async () => {
       root.render(
@@ -831,7 +827,7 @@ describe('EntrantsPage integration', () => {
     expect(container.textContent).toContain('Entrant: Penske Racing');
   });
 
-  it('renders and edits each motorsport Entry and its Driver independently', async () => {
+  it('edits each motorsport Entry while showing driver identities read-only', async () => {
     const onUpdateEntrant = vi.fn();
     const onUpdateEntry = vi.fn();
     const entryCatalog: EventCatalogState = {
@@ -952,16 +948,13 @@ describe('EntrantsPage integration', () => {
     const secondStartOrder = container.querySelector('input[aria-label="Entry Start Order entry-5"]') as HTMLInputElement;
     expect(secondVehicle.value).toBe('Penske PC-18B');
     expect(secondStartOrder.value).toBe('3');
-    expect(container.querySelector('input[aria-label="Entry Driver First Name driver-3"]')).toBeTruthy();
-    const secondDriverSurname = container.querySelector('input[aria-label="Entry Driver Surname driver-5"]') as HTMLInputElement;
+    expect(container.textContent).toContain('Driver: Emerson Fittipaldi');
+    expect(container.querySelector('input[aria-label="Entry Driver First Name driver-3"]')).toBeNull();
 
     await act(async () => {
       setInputValue(secondVehicle, 'Penske PC-19');
       setInputValue(secondStartOrder, '7');
       Array.from(secondVehicle.closest('fieldset')!.querySelectorAll('button')).find((button) => button.textContent === 'Save Entry')!
-        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      setInputValue(secondDriverSurname, 'Fittipaldi Jr');
-      Array.from(secondDriverSurname.closest('fieldset')!.querySelectorAll('button')).find((button) => button.textContent === 'Save Driver')!
         .dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
@@ -971,11 +964,7 @@ describe('EntrantsPage integration', () => {
       startOrder: 7,
       vehicle: 'Penske PC-19',
     }));
-    expect(onUpdateEntrant).toHaveBeenCalledWith('driver-5', expect.objectContaining({
-      firstName: 'Emerson',
-      lastName: 'Fittipaldi Jr',
-      name: 'Emerson Fittipaldi Jr',
-    }));
+    expect(onUpdateEntrant).not.toHaveBeenCalled();
   });
 
   it('loads an entrant spreadsheet beside the event selector and forwards detected records', async () => {
@@ -1305,7 +1294,8 @@ describe('EntrantsPage integration', () => {
     });
 
     await act(async () => {
-      setInputValue(container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement, 'Pat Edited');
+      setInputValue(container.querySelector('textarea[aria-label="Entrant Notes"]') as HTMLTextAreaElement,
+        'Pat entry note');
     });
 
     const eventSelect = container.querySelector('select[aria-label="Entrants Event"]') as HTMLSelectElement;
@@ -1325,7 +1315,7 @@ describe('EntrantsPage integration', () => {
       await Promise.resolve();
     });
 
-    expect(onUpdateEntrant).toHaveBeenCalledWith('ent-1', expect.objectContaining({ name: 'Pat Edited' }));
+    expect(onUpdateEntrant).toHaveBeenCalledWith('ent-1', expect.objectContaining({ notes: 'Pat entry note' }));
     expect((container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement).value).toBe('Team Blue');
   });
 

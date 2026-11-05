@@ -1,4 +1,3 @@
-import { Box, Typography } from '@mui/material';
 import React from 'react';
 import {
   type EntrantType,
@@ -15,8 +14,7 @@ import {
 import { type EntrantImportRecord, parseEntrantImportBuffer } from '../../processing/entrantImport.js';
 import { SelectTextField } from '../../controls/selectTextField.js';
 import { EventEntrantId } from '../../model/entrant.js';
-import type { IndividualLink } from '../../model/individualLink.js';
-import type { OfficialProfile } from '../../model/official.js';
+import type { IndividualLinkInput } from '../../model/individualLink.js';
 import type { EventEntryId } from '../../model/entry.js';
 import { type EventCategoryId } from '../../model/eventcategory.js';
 import { type EventParticipant, type EventParticipantId, type ParticipantIdentifierUpdate } from '../../model/eventparticipant.js';
@@ -26,6 +24,7 @@ import { EntrantListPanel, getParticipantsForEntrant } from '../panels/entrantLi
 import { EntrantDetailsPanel, type EntrantDraft } from '../panels/entrantDetailsPanel.js';
 import { EntrantEntriesPanel } from '../panels/entrantEntriesPanel.js';
 import { IdentificationPanel } from '../panels/identificationPanel.js';
+import { EntrantIndividualLinksPanel } from '../panels/EntrantIndividualLinksPanel.js';
 import { FileSelectionField } from '../panels/fileSelectionField.js';
 import { SelectedEntrantIdentificationPanel, SelectedEntrantSessionsPanel } from '../panels/selectedEntrantSummaries.js';
 import { SelectedEntrantsPanel } from '../panels/selectedEntrantsPanel.js';
@@ -35,16 +34,20 @@ import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedCha
 interface EntrantsPageProps {
   catalog: EventCatalogState;
   enableMultiplePlates?: boolean;
+  hideEventSelector?: boolean;
   onCreateEntrant: (eventId: EventId, entrantType?: EntrantType) => void | Promise<void>;
   onDeleteEntrant: (eventId: EventId, entrantId: EventEntrantId) => void | Promise<void>;
   onDeleteEntrants?: (eventId: EventId, entrantIds: EventEntrantId[]) => void | Promise<void>;
   onImportEntrants?: (eventId: EventId, records: EntrantImportRecord[], fileName: string, defaultCategoryId?: EventCategoryId) => void | Promise<void>;
+  onLinkIndividual?: (input: IndividualLinkInput) => Promise<void>;
+  onOpenIndividuals?: (entrantId: EventEntrantId) => void;
   onSelectEntrant: (entrantId: EventEntrantId) => void;
   onSelectEvent: (eventId: EventId) => void;
   onUnsavedChangesGuardChange?: (guard: UnsavedChangesGuard | undefined) => void;
   onUpdateParticipantIdentifiers?: (participantId: EventParticipantId, identifierType: 'racePlate' | 'txNo', values: ParticipantIdentifierUpdate[]) => void | Promise<void>;
   onUpdateEntrant: (entrantId: EventEntrantId, changes: Partial<Pick<EventCatalogEntrant, 'categoryId' | 'categoryIds' | 'dateOfBirth' | 'entrantType' | 'firstName' | 'gender' | 'identifiers' | 'lastName' | 'memberParticipantIds' | 'name' | 'notes' | 'startOrder' | 'teamEntrantId' | 'teamMembers' | 'vehicle'>>) => void | Promise<void>;
   onUpdateEntry?: (entryId: EventEntryId, changes: Partial<Pick<EventCatalogEntry, 'categoryId' | 'identifiers' | 'name' | 'raceNumber' | 'startOrder' | 'vehicle'>>) => void | Promise<void>;
+  onUnlinkIndividual?: (linkId: string) => Promise<void>;
   raceState?: Partial<RaceState>;
   selectedCategoryId?: EventCategoryId;
   selectedEntrantId?: EventEntrantId;
@@ -171,8 +174,6 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   const filteredTeamEntrants = filteredEventEntrants.filter((entrant) => entrant.entrantType === 'team');
   const teamsEnabled = eventSupportsTeams(props.catalog, selectedEvent?.id);
   const selectedEntrant = filteredEventEntrants.find((entrant) => entrant.id === props.selectedEntrantId) ?? filteredEventEntrants[0];
-  const selectedIndividualLinks: IndividualLink[] = (props.catalog.individualLinks || []).filter((link: IndividualLink): boolean =>
-    !link.removed && link.eventId === selectedEvent?.id && link.entrantId === selectedEntrant?.id);
   const selectedEntrants = multiSelectedEntrantIds.size > 1
     ? filteredEventEntrants.filter((entrant) => multiSelectedEntrantIds.has(entrant.id))
     : selectedEntrant ? [selectedEntrant] : [];
@@ -275,13 +276,6 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
 
     await props.onUpdateEntrant(selectedEntrant.id, {
       categoryId: isMotorsport ? undefined : entrantDraft.categoryId || undefined,
-      dateOfBirth: entrantDraft.dateOfBirth || undefined,
-      firstName: entrantDraft.firstName || undefined,
-      gender: entrantDraft.gender === UNSPECIFIED_GENDER ? undefined : entrantDraft.gender,
-      lastName: entrantDraft.lastName || undefined,
-      name: isMotorsport
-        ? `${entrantDraft.firstName} ${entrantDraft.lastName}`.trim() || selectedEntrant.name
-        : entrantDraft.name,
       notes: entrantDraft.notes || undefined,
       startOrder: isMotorsport ? undefined : entrantDraft.startOrder ? Number(entrantDraft.startOrder) : undefined,
       teamEntrantId: isMotorsport ? selectedEntrant.teamEntrantId : entrantDraft.teamEntrantId || undefined,
@@ -419,7 +413,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
   return (
     <section className="events-screen">
       <h1>Entrants</h1>
-      <SelectTextField
+      {!props.hideEventSelector && <SelectTextField
         className="page-filter-label"
         label="Event"
         slotProps={{ select: { 'aria-label': 'Entrants Event', native: true } }}
@@ -432,7 +426,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
         {props.catalog.events.map((event) => (
           <option key={event.id} value={event.id}>{event.name}</option>
         ))}
-      </SelectTextField>
+      </SelectTextField>}
       <FileSelectionField
         accept=".csv,.txt,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain"
         ariaLabel="Entrants Import File"
@@ -477,17 +471,6 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           teamsEnabled={teamsEnabled}
         />
         <div className="event-summary-column">
-          {selectedIndividualLinks.length > 0 && <Box sx={{ mb: 1, p: 1 }}>
-            <Typography variant="subtitle2">Linked individuals</Typography>
-            {selectedIndividualLinks.map((link: IndividualLink): React.ReactElement => {
-              const profile: OfficialProfile | undefined = props.catalog.officials?.find(
-                (candidate: OfficialProfile): boolean => candidate.id === link.individualId,
-              );
-              return <Typography key={link.id} variant="body2">
-                {link.displayName} → {profile?.displayName || 'Unknown individual'}{profile?.archived ? ' (archived)' : ''}
-              </Typography>;
-            })}
-          </Box>}
           {hasMultipleSelectedEntrants ? <SelectedEntrantsPanel
             categories={eventCategories}
             deleteError={bulkDeleteError}
@@ -504,6 +487,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
             deleteStatus={isDeletingSelectedEntrant ? deleteStatus : 'idle'}
             eventCategories={eventCategories}
             onDeleteEntrant={() => requestFormExit(deleteEntrant)}
+            onOpenIndividuals={selectedEntrant ? (): void => props.onOpenIndividuals?.(selectedEntrant.id) : undefined}
             onSaveEntrant={() => {
               void saveEntrant();
             }}
@@ -518,11 +502,14 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
             teamMembers={selectedTeamMembers}
             warningModal={warningModal}
           />}
+          {!hasMultipleSelectedEntrants && selectedEntrant && props.onLinkIndividual && props.onUnlinkIndividual &&
+            <EntrantIndividualLinksPanel catalog={props.catalog} entrant={selectedEntrant}
+              onLink={props.onLinkIndividual} onUnlink={props.onUnlinkIndividual} />}
           {!hasMultipleSelectedEntrants && isMotorsport && selectedEntrant?.isEntryOwner && props.onUpdateEntry ? (
             <EntrantEntriesPanel
               categories={eventCategories}
               entries={selectedEntrantEntries}
-              onUpdateDriver={props.onUpdateEntrant}
+              onOpenIndividuals={props.onOpenIndividuals}
               onUpdateEntry={props.onUpdateEntry}
               participants={raceStateParticipants}
               riderEntrants={eventEntrants.filter((entrant) => entrant.entrantType === 'rider')}

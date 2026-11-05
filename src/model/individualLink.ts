@@ -10,6 +10,8 @@ export interface IndividualLinkInput {
   participantId?: EventParticipantId;
 }
 
+export type IndividualLinkTargetInput = Omit<IndividualLinkInput, 'individualId'>;
+
 export interface IndividualLink extends IndividualLinkInput {
   createdAt: string;
   displayName: string;

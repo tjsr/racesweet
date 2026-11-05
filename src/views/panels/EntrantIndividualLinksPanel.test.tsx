@@ -8,11 +8,11 @@ import { createSeedEventCatalogLedger } from '../../ledger/createSeedEventCatalo
 import type { EventCatalogLedger } from '../../ledger/eventCatalogLedger.js';
 import type { EventCatalogPersistence } from '../../persistence/eventCatalogPersistence.js';
 import { EventCatalogService } from '../../service/eventCatalogService.js';
-import { IndividualLinksEditor } from './IndividualLinksEditor.js';
+import { EntrantIndividualLinksPanel } from './EntrantIndividualLinksPanel.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-describe('IndividualLinksEditor', () => {
+describe('EntrantIndividualLinksPanel', () => {
   let root: Root;
   let container: HTMLDivElement;
   afterEach(async (): Promise<void> => {
@@ -20,7 +20,7 @@ describe('IndividualLinksEditor', () => {
     container?.remove();
   });
 
-  it('links and unlinks an entrant through catalog persistence and upstream callback', async () => {
+  it('links and unlinks a rider through catalog persistence and upstream callback', async () => {
     let saved: EventCatalogLedger = createSeedEventCatalogLedger();
     const persistence: EventCatalogPersistence = {
       load: vi.fn(async (): Promise<EventCatalogLedger> => saved),
@@ -31,15 +31,14 @@ describe('IndividualLinksEditor', () => {
     const onPersistedLedger = vi.fn(async (_ledger: EventCatalogLedger): Promise<void> => undefined);
     const service: EventCatalogService = await EventCatalogService.create(persistence, { onPersistedLedger });
     await service.createOfficialProfile({
-      availability: [], displayName: 'Alex', notes: '', position: '', responsibilities: [],
+      displayName: 'Alex', notes: '',
     });
     onPersistedLedger.mockClear();
     const Harness = (): React.ReactElement => {
       const [catalog, setCatalog] = React.useState<EventCatalogState>(service.catalog);
       const write = (operation: () => Promise<EventCatalogState>): Promise<void> =>
         operation().then((next: EventCatalogState): void => setCatalog(next));
-      return <IndividualLinksEditor catalog={catalog} eventId={catalog.events[0]!.id}
-        selected={catalog.officials![0]}
+      return <EntrantIndividualLinksPanel catalog={catalog} entrant={catalog.entrants[0]!}
         onLink={(input): Promise<void> => write((): Promise<EventCatalogState> => service.linkIndividualToEntrant(input))}
         onUnlink={(linkId: string): Promise<void> =>
           write((): Promise<EventCatalogState> => service.unlinkIndividualFromEntrant(linkId))} />;
@@ -48,27 +47,23 @@ describe('IndividualLinksEditor', () => {
     document.body.appendChild(container);
     root = createRoot(container);
     await act(async (): Promise<void> => root.render(<Harness />));
-    const select: HTMLElement = container.querySelector<HTMLElement>('[role="combobox"]')!;
+    const selector: HTMLElement = container.querySelector<HTMLElement>('[role="combobox"]')!;
     await act(async (): Promise<void> => {
-      select.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      selector.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     });
-    const entrantName: string = service.catalog.entrants[0]!.name;
     const option: HTMLElement = [...document.querySelectorAll<HTMLElement>('[role="option"]')]
-      .find((candidate: HTMLElement): boolean => candidate.textContent === entrantName)!;
-    expect(option).toBeDefined();
+      .find((candidate: HTMLElement): boolean => candidate.textContent === 'Alex')!;
     await act(async (): Promise<void> => option.click());
-    const linkButton: HTMLButtonElement = [...container.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button: HTMLButtonElement): boolean => button.textContent?.trim() === 'Link participant')!;
-    await act(async (): Promise<void> => linkButton.click());
+    const button = (label: string): HTMLButtonElement => [...container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((candidate: HTMLButtonElement): boolean => candidate.textContent?.trim() === label)!;
+    await act(async (): Promise<void> => button('Link individual').click());
     expect(service.catalog.individualLinks).toHaveLength(1);
-    expect(container.textContent).toContain(entrantName);
-    const unlinkButton: HTMLButtonElement = [...container.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button: HTMLButtonElement): boolean => button.textContent?.trim() === 'Unlink')!;
-    await act(async (): Promise<void> => unlinkButton.click());
+    expect(container.textContent).toContain('→ Alex');
+    await act(async (): Promise<void> => button('Unlink').click());
     expect(service.catalog.individualLinks![0]?.removed).toBe(true);
     expect(onPersistedLedger).toHaveBeenCalledTimes(2);
-    expect(saved.mutations.slice(-2).map((mutation) => mutation.type)).toEqual([
-      'individual-linked', 'individual-unlinked',
+    expect(saved.mutations.slice(-3).map((mutation) => mutation.type)).toEqual([
+      'individual-linked', 'entrant-updated', 'individual-unlinked',
     ]);
   });
 });

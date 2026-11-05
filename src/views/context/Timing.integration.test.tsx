@@ -211,6 +211,7 @@ describe('TimingContext integration', () => {
       id: 'event-1',
       name: 'RaceSweet Test Event',
       sessionIds: ['session-2', 'session-3', 'session-1'],
+      timeZone: 'Australia/Sydney',
     };
     const sessions: EventCatalogState['sessions'] = [
       {
@@ -261,7 +262,7 @@ describe('TimingContext integration', () => {
         <TimingContext
           activeSession={sessions[2]}
           categoryListSelected={() => undefined}
-          eventTimeZone="Australia/Sydney"
+          eventTimeZone="UTC"
           events={[event]}
           onAddRecord={() => undefined}
           onEditRecord={() => undefined}

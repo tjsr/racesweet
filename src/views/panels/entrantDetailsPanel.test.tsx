@@ -91,11 +91,12 @@ describe('EntrantDetailsPanel', () => {
     container = undefined;
   });
 
-  it('renders rider fields and routes save/delete actions', async () => {
+  it('shows the rider identity read-only and routes entry save/delete actions', async () => {
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
     const onDeleteEntrant = vi.fn();
+    const onOpenIndividuals = vi.fn();
     const onSaveEntrant = vi.fn();
     const entrantDraft: EntrantDraft = {
       categoryId: 'category-1',
@@ -116,6 +117,7 @@ describe('EntrantDetailsPanel', () => {
           entrantDraft={entrantDraft}
           eventCategories={categories}
           onDeleteEntrant={onDeleteEntrant}
+          onOpenIndividuals={onOpenIndividuals}
           onSaveEntrant={onSaveEntrant}
           onSetEntrantDraft={() => undefined}
           selectedEntrant={riderEntrant}
@@ -127,26 +129,24 @@ describe('EntrantDetailsPanel', () => {
     });
 
     expect(container.textContent).toContain('Driver Details');
-    expect(container.textContent).toContain('First Name');
+    expect(container.textContent).toContain('Edit personal details in Individuals');
     expect(container.textContent).toContain('Team: Fast Friends');
     expect(await getMuiOptionLabels(getMuiSelect(container, 'Driver Entrant'))).toContain('Fast Friends (team-1)');
 
     const nameInput = container.querySelector<HTMLInputElement>('input[aria-label="Entrant Name"]');
-    const dateOfBirthInput = container.querySelector<HTMLInputElement>('input[aria-label="Entrant Date Of Birth"]');
     expect(nameInput?.value).toBe('Rider One');
-    expect(dateOfBirthInput?.value).toBe('');
-    expect(
-      container.querySelector(
-        `label[for="${dateOfBirthInput?.id}"]`,
-      )?.classList.contains('MuiInputLabel-shrink'),
-    ).toBe(true);
+    expect(nameInput?.readOnly).toBe(true);
+    expect(container.querySelector('input[aria-label="Entrant Date Of Birth"]')).toBeNull();
 
     const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Save Entrant');
     const deleteButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Delete Entrant');
+    const openButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Open Individuals');
+    openButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     deleteButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(onSaveEntrant).toHaveBeenCalledTimes(1);
     expect(onDeleteEntrant).toHaveBeenCalledTimes(1);
+    expect(onOpenIndividuals).toHaveBeenCalledTimes(1);
   });
 
   it('renders team members for team entrants', () => {
@@ -255,7 +255,7 @@ describe('EntrantDetailsPanel', () => {
 
     expect(container.textContent).toContain('Driver Details');
     expect(container.textContent).toContain('Entrant: Fast Friends');
-    expect(container.querySelector('input[aria-label="Entrant Name"]')).toBeNull();
+    expect((container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement).readOnly).toBe(true);
     expect(container.querySelector('[aria-label="Entrant Category"]')).toBeNull();
     expect(container.querySelector('input[aria-label="Entrant Vehicle"]')).toBeNull();
     expect(container.textContent).not.toContain('Team: Fast Friends');

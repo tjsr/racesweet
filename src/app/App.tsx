@@ -359,6 +359,7 @@ const loadEventCatalogService = async (
   return EventCatalogService.create(persistence, {
     onProgress,
     persistAppliedRemoteMutations: false,
+    reconcileEntrantIndividualsOnLoad: true,
   });
 };
 
@@ -4590,6 +4591,17 @@ export const RaceSweetMainApp = () => {
         eventCatalogService
           ? operation(eventCatalogService).then((catalog: EventCatalogState): void => setEventCatalogState(catalog))
           : Promise.reject(new Error('Event Catalog is still loading.'));
+      const createIndividualWithId = (
+        operation: (service: EventCatalogService) => Promise<EventCatalogState>,
+        getId: (catalog: EventCatalogState) => string | undefined,
+      ): Promise<string> => eventCatalogService
+        ? operation(eventCatalogService).then((catalog: EventCatalogState): string => {
+          setEventCatalogState(catalog);
+          const individualId: string | undefined = getId(catalog);
+          if (!individualId) throw new Error('Created individual was not found.');
+          return individualId;
+        })
+        : Promise.reject(new Error('Event Catalog is still loading.'));
       return (
         <EntrantsContext
           catalog={eventCatalogState}
@@ -4598,8 +4610,14 @@ export const RaceSweetMainApp = () => {
               saveOfficialState((service: EventCatalogService) => service.archiveOfficialProfile(officialId, archived)),
             onCreateAssignment: (input): Promise<void> =>
               saveOfficialState((service: EventCatalogService) => service.createOfficialAssignment(input)),
-            onCreateProfile: (input): Promise<void> =>
-              saveOfficialState((service: EventCatalogService) => service.createOfficialProfile(input)),
+            onCreateFromEntrant: (target): Promise<string> => createIndividualWithId(
+              (service: EventCatalogService) => service.createIndividualFromEntrant(target),
+              (catalog: EventCatalogState): string | undefined => catalog.individualLinks?.at(-1)?.individualId,
+            ),
+            onCreateProfile: (input): Promise<string> => createIndividualWithId(
+              (service: EventCatalogService) => service.createOfficialProfile(input),
+              (catalog: EventCatalogState): string | undefined => catalog.officials?.at(-1)?.id,
+            ),
             onLinkIndividual: (input): Promise<void> =>
               saveOfficialState((service: EventCatalogService) => service.linkIndividualToEntrant(input)),
             onRemoveAssignment: (assignmentId: string): Promise<void> =>
