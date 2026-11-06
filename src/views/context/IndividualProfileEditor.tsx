@@ -1,5 +1,6 @@
 import { Box, Button, Stack, TextField, Typography } from '@mui/material';
 import React from 'react';
+import { IdentifierDisplay } from '../../controls/identifierDisplay.js';
 import { splitIndividualName } from '../../model/official.js';
 import type {
   IndividualEmergencyContact,
@@ -96,7 +97,7 @@ export const IndividualProfileEditor = ({ draft, onArchive, onChange, onSave, se
     onChange({ ...draft, [key]: value });
   return <Stack spacing={1.5}>
     <Typography variant="h6">{selected ? 'Edit individual' : 'New individual'}</Typography>
-    {selected && <TextField label="Individual ID" slotProps={{ htmlInput: { readOnly: true } }} value={selected.id} />}
+    {selected && <IdentifierDisplay label="Individual ID" value={selected.id} />}
     <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))' }}>
       <TextField label="First name" required value={draft.firstName || ''}
         slotProps={{ htmlInput: { 'aria-label': 'Individual First Name' } }}

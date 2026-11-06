@@ -6,6 +6,7 @@ export interface FileWriteOperationContext {
 }
 
 export interface FileWriteOptions {
+  atomic?: boolean;
   context?: FileWriteOperationContext;
 }
 

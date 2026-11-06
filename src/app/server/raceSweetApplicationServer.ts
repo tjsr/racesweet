@@ -14,6 +14,7 @@ import { isDeepStrictEqual } from "node:util";
 import path from "node:path";
 import type { EventCatalogState } from "../../catalog/eventCatalog.js";
 import type { EventCatalogMutation } from "../../ledger/eventCatalogLedger.js";
+import type { ReplaySeekTarget } from '../../model/eventReplay.js';
 import type { DisplayComponent } from '../../model/displayScreen.js';
 import type { CategoryId } from "../../processing/category.js";
 import type { EventEntrantId } from "../../model/entrant.js";
@@ -377,7 +378,7 @@ const getReplayMode = (value: string | null): EventReplayMode => {
 };
 
 const getReplaySpeed = (value: string | null): number => {
-  if (value === null || value === "") {
+  if (value === null) {
     return 1;
   }
   const speed: number = Number(value);
@@ -1310,25 +1311,44 @@ export class RaceSweetApplicationServer {
       return;
     }
     this.assertInitialized();
-    const submission: ManualCrossingSubmission = parseManualCrossingSubmission(await readRequestBody<unknown>(request));
-    const result: { status: 'accepted' | 'already-accepted' | 'conflict' } = { status: 'accepted' };
+    let submission: ManualCrossingSubmission;
+    try { submission = parseManualCrossingSubmission(await readRequestBody<unknown>(request)); }
+    catch { sendJson(response, 400, { status: 'rejected', reason: 'The manual timing request is invalid.' }); return; }
+    const result: { status: 'accepted' | 'already-accepted' | 'conflict' | 'rejected'; reason?: string } = { status: 'accepted' };
     await this.enqueueCommand(async (): Promise<void> => {
       const catalogService: EventCatalogService = this.eventCatalogService!;
       const existing: EventCatalogMutation | undefined = catalogService.mutations.find(
         (mutation: EventCatalogMutation): boolean => mutation.id === submission.mutationId,
       );
       if (existing) {
-        result.status = existing.type === 'manual-crossing-recorded' &&
-          existing.crossing.crossingId === submission.crossingId &&
-          isDeepStrictEqual({ ...submission.crossing, crossingId: submission.crossingId }, existing.crossing)
+        const action: string = submission.action || 'record';
+        const matching: boolean = action === 'reverse'
+          ? existing.type === 'manual-crossing-reversed' && existing.crossingId === submission.crossingId && existing.reason === (submission.reason?.trim() || undefined)
+          : existing.type === (action === 'record' ? 'manual-crossing-recorded' : 'manual-crossing-corrected') &&
+            'crossing' in existing && existing.crossing.crossingId === submission.crossingId &&
+            isDeepStrictEqual(jsonValue({ ...submission.crossing, crossingId: submission.crossingId }), jsonValue(existing.crossing));
+        result.status = matching
           ? 'already-accepted'
           : 'conflict';
         return;
       }
-      await catalogService.recordManualCrossing(submission.crossing, {
-        crossingId: submission.crossingId,
-        mutationId: submission.mutationId,
-      });
+      try {
+        switch (submission.action || 'record') {
+        case 'record': await catalogService.recordManualCrossing(submission.crossing, {
+          crossingId: submission.crossingId, mutationId: submission.mutationId,
+        }); break;
+        case 'correct': await catalogService.correctManualCrossing(submission.crossingId, submission.crossing, submission.mutationId); break;
+        case 'reverse': await catalogService.reverseManualCrossing(submission.crossingId, submission.reason, submission.mutationId); break;
+        case 'reconcile':
+          if (!submission.crossing.entrantId) throw new Error('Select an eligible entrant before reconciliation.');
+          await catalogService.reconcileManualCrossing(submission.crossingId, submission.crossing.entrantId, submission.crossing.participantId, submission.mutationId); break;
+        }
+      } catch (error: unknown) {
+        result.status = 'rejected';
+        result.reason = error instanceof Error && /^(?:Manual crossing|A manual crossing|The mutationId|Select an eligible)/u.test(error.message)
+          ? error.message : 'The manual crossing could not be saved. Check the selected context and retry.';
+        return;
+      }
       const accepted: EventCatalogMutation | undefined = catalogService.mutations.find(
         (mutation: EventCatalogMutation): boolean => mutation.id === submission.mutationId,
       );
@@ -1349,13 +1369,14 @@ export class RaceSweetApplicationServer {
       }
     });
     if (result.status === 'conflict') {
-      sendProblem(response, 409, 'The mutationId has already been used for another crossing.');
+      sendJson(response, 409, { crossingId: submission.crossingId, mutationId: submission.mutationId, status: 'conflict', reason: 'The mutationId has already been used for another crossing.' });
       return;
     }
-    sendJson(response, 200, {
+    sendJson(response, result.status === 'rejected' ? 400 : 200, {
       crossingId: submission.crossingId,
       mutationId: submission.mutationId,
       status: result.status,
+      reason: result.reason,
     });
   };
 
@@ -1416,15 +1437,20 @@ export class RaceSweetApplicationServer {
         );
       },
     );
-    const dispose: () => void = this.eventReplayHub.subscribe(
-      response,
-      { eventId, sessionId },
-      getReplayMode(url.searchParams.get("mode")),
-      getReplaySpeed(url.searchParams.get("speed")),
-      records,
-      url.searchParams.get("streamId") || randomUUID(),
-    );
-    response.once("close", dispose);
+    try {
+      const dispose: () => void = this.eventReplayHub.subscribe(
+        response,
+        { eventId, sessionId },
+        getReplayMode(url.searchParams.get("mode")),
+        getReplaySpeed(url.searchParams.get("speed")),
+        records,
+        url.searchParams.get("streamId") ?? randomUUID(),
+      );
+      response.once("close", dispose);
+    } catch (error: unknown) {
+      const message: string = error instanceof Error ? error.message : 'Replay subscription failed.';
+      sendProblem(response, message.includes('different event') ? 409 : 400, message);
+    }
   };
 
   private handleEventReplayControl = async (
@@ -1441,22 +1467,27 @@ export class RaceSweetApplicationServer {
     }
     const body: {
       command?: EventReplayCommand;
+      position?: number;
       speed?: number;
       streamId?: string;
+      timestamp?: string;
     } = await readRequestBody<{
       command?: EventReplayCommand;
+      position?: number;
       speed?: number;
       streamId?: string;
+      timestamp?: string;
     }>(request);
     const commands: EventReplayCommand[] = [
       "pause",
       "reset",
       "resume",
+      "seek",
       "set-speed",
       "start",
     ];
     if (
-      !body.streamId ||
+      typeof body.streamId !== 'string' || !body.streamId.trim() ||
       !body.command ||
       !commands.includes(body.command)
     ) {
@@ -1468,10 +1499,20 @@ export class RaceSweetApplicationServer {
       return;
     }
     try {
+      if (body.command !== 'seek' && (body.position !== undefined || body.timestamp !== undefined)) {
+        throw new Error('Seek targets are only valid for seek commands.');
+      }
+      if (body.command === 'seek' && (body.position === undefined) === (body.timestamp === undefined)) {
+        throw new Error('Seek requires exactly one position or timestamp.');
+      }
+      const target: ReplaySeekTarget | undefined = body.command === 'seek'
+        ? body.position !== undefined ? { position: body.position } : { timestamp: body.timestamp! }
+        : undefined;
       const state = this.eventReplayHub.control(
         body.streamId,
         body.command,
         body.speed,
+        target,
       );
       sendJson(response, 200, { state });
     } catch (error: unknown) {

@@ -51,6 +51,17 @@
   overflow: hidden;
 }
 
+@media (max-width: 599.95px) {
+  .app-shell {
+    box-sizing: border-box;
+    padding-top: 56px;
+  }
+
+  .section-content {
+    padding: 0.75rem;
+  }
+}
+
 .section-nav {
   border-right: 1px solid rgba(127, 127, 127, 0.35);
   display: flex;
@@ -271,6 +282,58 @@
       18rem,
       24rem
     );
+}
+
+.admin-master-detail [hidden] {
+  display: none !important;
+}
+
+.admin-detail-panes {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.admin-master-detail .events-panel {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 960px) {
+  .admin-detail-panes {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  }
+}
+
+@media (max-width: 599.95px) {
+  .events-screen .MuiFormControl-root {
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .events-actions {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .events-actions button,
+  .events-screen button,
+  .events-screen label {
+    min-height: 48px;
+  }
+
+  .events-screen input,
+  .events-screen textarea {
+    font-size: 16px;
+  }
+}
+
+.events-screen :focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .events-layout.two-panel {
@@ -1049,6 +1112,36 @@
 
 .reload-summary-table th:first-child {
   text-align: left;
+}
+
+.contextual-help-root {
+  min-width: 0;
+  position: relative;
+}
+
+.contextual-control-help,
+.contextual-page-help {
+  background: var(--color-surface, #fff);
+  border: 1px solid currentColor;
+  color: #1769aa;
+  font-size: 0.75rem;
+  font-weight: 700;
+  height: 26px;
+  min-height: 26px;
+  min-width: 26px;
+  padding: 0;
+  position: absolute;
+  width: 26px;
+  z-index: 4;
+}
+
+.contextual-control-help {
+  position: fixed;
+}
+
+.contextual-page-help {
+  right: 8px;
+  top: 8px;
 }
 
 @media (max-width: 980px) {

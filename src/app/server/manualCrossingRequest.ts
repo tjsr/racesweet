@@ -1,11 +1,14 @@
 import { validate as validateUuid } from "uuid";
 
 import type { ManualCrossingInput } from "../../model/manualCrossing.js";
+import type { ManualCrossingAction } from "../../model/manualCrossing.js";
 
 export interface ManualCrossingSubmission {
+  action?: ManualCrossingAction;
   crossing: ManualCrossingInput;
   crossingId: string;
   mutationId: string;
+  reason?: string;
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -25,6 +28,14 @@ export const parseManualCrossingSubmission = (
     throw new Error("A crossing, crossingId, and mutationId are required.");
   }
   const crossing: Record<string, unknown> = value.crossing;
+  if (
+    (value.action !== undefined &&
+      !["record", "correct", "reverse", "reconcile"].includes(
+        String(value.action),
+      )) ||
+    (value.reason !== undefined && typeof value.reason !== "string")
+  )
+    throw new Error("The manual timing action is invalid.");
   const requiredStrings: string[] = [
     "eventId",
     "identifierValue",
@@ -74,9 +85,29 @@ export const parseManualCrossingSubmission = (
   if (crossing.participantId !== undefined) {
     parsed.participantId = crossing.participantId as string;
   }
+  if (crossing.entryMethod !== undefined) {
+    if (!["keyboard", "keypad", "voice"].includes(String(crossing.entryMethod)))
+      throw new Error("Invalid entry method.");
+    parsed.entryMethod =
+      crossing.entryMethod as ManualCrossingInput["entryMethod"];
+  }
+  if (crossing.captureInstant !== undefined) {
+    if (typeof crossing.captureInstant !== "string")
+      throw new Error("Invalid capture instant.");
+    parsed.captureInstant = crossing.captureInstant;
+  }
+  if (crossing.operatorLabel !== undefined) {
+    if (typeof crossing.operatorLabel !== "string")
+      throw new Error("Invalid operator label.");
+    parsed.operatorLabel = crossing.operatorLabel;
+  }
   return {
+    ...(value.action === undefined
+      ? {}
+      : { action: value.action as ManualCrossingAction }),
     crossing: parsed,
     crossingId: value.crossingId,
     mutationId: value.mutationId,
+    ...(value.reason === undefined ? {} : { reason: value.reason as string }),
   };
 };

@@ -60,6 +60,25 @@ const createInput = (service: EventCatalogService): ManualCrossingInput => {
 };
 
 describe("manual crossing catalog flow", (): void => {
+  it('reuses caller IDs for every action and rejects conflicts after replica-first arrival', async (): Promise<void> => {
+    const fixture = createFixture();
+    const service = await EventCatalogService.create(fixture.persistence);
+    const input: ManualCrossingInput = createInput(service);
+    const crossingId: string = createTimeRecordId();
+    await service.recordManualCrossing(input, { crossingId, mutationId: 'record-stable' });
+    await service.recordManualCrossing(input, { crossingId, mutationId: 'record-stable' });
+    const corrected: ManualCrossingInput = { ...input, identifierValue: '1002', captureInstant: '2026-01-01T12:01:00.000Z', entryMethod: 'keypad' };
+    await service.correctManualCrossing(crossingId, corrected, 'correct-stable');
+    await service.correctManualCrossing(crossingId, corrected, 'correct-stable');
+    await expect(service.correctManualCrossing(crossingId, { ...corrected, identifierValue: 'other' }, 'correct-stable')).rejects.toThrow(/mutationId/);
+    await service.reverseManualCrossing(crossingId, 'duplicate', 'reverse-stable');
+    await service.reverseManualCrossing(crossingId, 'duplicate', 'reverse-stable');
+    expect(service.mutations.filter((mutation): boolean => mutation.type.startsWith('manual-crossing'))).toHaveLength(3);
+    const replica = await EventCatalogService.create(createFixture().persistence);
+    await replica.applyRemoteMutations(service.mutations.filter((mutation): boolean => mutation.type.startsWith('manual-crossing')));
+    await replica.correctManualCrossing(crossingId, corrected, 'correct-stable');
+    expect(replica.catalog.manualCrossings?.[0]).toMatchObject({ entryMethod: 'keypad', reversed: true });
+  });
   it("records, corrects, reverses, reloads, and retains an immutable audit trail", async (): Promise<void> => {
     const fixture = createFixture();
     const service: EventCatalogService = await EventCatalogService.create(
@@ -163,7 +182,8 @@ describe("manual crossing catalog flow", (): void => {
       /duplicates/,
     );
 
-    await service.reconcileManualCrossing(crossingId, known.entrantId!);
+    await service.reconcileManualCrossing(crossingId, known.entrantId!, undefined, 'reconcile-stable');
+    await service.reconcileManualCrossing(crossingId, known.entrantId!, undefined, 'reconcile-stable');
     expect(
       (
         service

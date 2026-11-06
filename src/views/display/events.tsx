@@ -1,4 +1,5 @@
 import React from 'react';
+import { AdminPageLayout } from '../admin/adminPrimitives.js';
 import {
   type EventCatalogEvent,
   type EventCatalogState,
@@ -151,7 +152,7 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
   return (
     <section className="events-screen">
       <h1>Events</h1>
-      <div className="events-layout">
+      <AdminPageLayout detailLabel="event details" listLabel="events" selectedId={selectedEvent?.id}>
         <EventListPanel
           activeEventId={props.catalog.activeEventId}
           events={props.catalog.events}
@@ -219,7 +220,7 @@ export const EventsScreen = (props: EventsScreenProps): React.ReactElement => {
             title="Category Summary"
           />
         </div>
-      </div>
+      </AdminPageLayout>
     </section>
   );
 };

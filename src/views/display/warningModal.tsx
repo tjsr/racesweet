@@ -1,4 +1,6 @@
 import React from 'react';
+import { Button, DialogActions, DialogContent, DialogTitle } from '@mui/material';
+import { ResponsiveDialog } from '../admin/adminPrimitives.js';
 
 export interface WarningModalAction {
   label: string;
@@ -13,20 +15,16 @@ interface WarningModalProps {
 }
 
 export const WarningModal = (props: WarningModalProps): React.ReactElement => (
-  <div className="warning-modal-backdrop">
-    <section className="warning-modal error" role="dialog" aria-modal="true" aria-label={props.ariaLabel}>
-      <div className="warning-modal-heading">
-        <span className="warning-icon" aria-hidden="true">!</span>
-        <h2>{props.title}</h2>
-      </div>
-      <p>{props.message}</p>
-      <div className="events-actions warning-modal-actions">
-        {props.actions.map((action) => (
-          <button key={action.label} type="button" onClick={action.onClick}>
-            {action.label}
-          </button>
-        ))}
-      </div>
-    </section>
-  </div>
+  <ResponsiveDialog aria-label={props.ariaLabel} className="warning-modal-backdrop" disablePortal open
+    slotProps={{ paper: { 'aria-label': props.ariaLabel, className: 'warning-modal error', role: 'dialog' } }}>
+    <DialogTitle>{props.title}</DialogTitle>
+    <DialogContent>{props.message}</DialogContent>
+    <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
+      {props.actions.map((action) => (
+        <Button key={action.label} type="button" onClick={action.onClick} sx={{ minHeight: 48 }}>
+          {action.label}
+        </Button>
+      ))}
+    </DialogActions>
+  </ResponsiveDialog>
 );

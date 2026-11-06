@@ -1,6 +1,6 @@
 import {
   Alert, Box, Button, Card, CardActionArea, CardContent, Checkbox, Chip,
-  FormControlLabel, MenuItem, Stack, TextField, Typography,
+  FormControlLabel, Menu, MenuItem, Stack, TextField, Tooltip, Typography,
 } from '@mui/material';
 import React from 'react';
 import type { EventCatalogEntrant, EventCatalogState } from '../../catalog/eventCatalog.js';
@@ -24,24 +24,53 @@ export interface IndividualsPanelProps {
   selectedProfileId?: string;
 }
 
-const IndividualCard = ({ card, onSelect, selected }: {
+interface CardIdentifier {
+  label: string;
+  value: string;
+}
+
+interface IndividualCardContextMenu {
   card: IndividualDirectoryCard;
+  mouseX: number;
+  mouseY: number;
+}
+
+const getCardIdentifier = (card: IndividualDirectoryCard): CardIdentifier | undefined => {
+  if (card.profile) {
+    return { label: 'Individual ID', value: card.profile.id };
+  }
+
+  return card.target?.entrantId
+    ? { label: 'Entrant ID', value: card.target.entrantId }
+    : undefined;
+};
+
+const IndividualCard = ({ card, onOpenContextMenu, onSelect, selected }: {
+  card: IndividualDirectoryCard;
+  onOpenContextMenu: (event: React.MouseEvent<HTMLElement>, card: IndividualDirectoryCard) => void;
   onSelect: () => void;
   selected: boolean;
-}): React.ReactElement => <Card variant="outlined" sx={{ borderColor: selected ? 'primary.main' : 'divider' }}>
-  <CardActionArea onClick={onSelect}>
-    <CardContent>
-      <Typography variant="subtitle1">{card.label}{card.profile?.archived ? ' (archived)' : ''}</Typography>
-      <Typography variant="caption">{card.profile ? `Individual ID: ${card.profile.id}` : `Entrant ID: ${card.target?.entrantId || ''}`}</Typography>
-      <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', mt: 0.5 }}>
-        {card.target && <Chip size="small" label="Needs profile" />}
-        {card.participantLabel && <Chip size="small" label={`Participant: ${card.participantLabel}`} />}
-        {card.officialRoles.map((role: string, index: number): React.ReactElement =>
-          <Chip key={`${role}-${index}`} size="small" label={`Official: ${role}`} />)}
-      </Stack>
-    </CardContent>
-  </CardActionArea>
-</Card>;
+}): React.ReactElement => {
+  const identifier: CardIdentifier | undefined = getCardIdentifier(card);
+  const tooltipTitle: string = identifier ? `${identifier.label}: ${identifier.value}` : card.label;
+
+  return <Tooltip enterDelay={0} title={tooltipTitle}>
+    <Card variant="outlined" sx={{ borderColor: selected ? 'primary.main' : 'divider' }}>
+      <CardActionArea aria-label={`Individual card: ${card.label}`} onClick={onSelect}
+        onContextMenu={(event: React.MouseEvent<HTMLElement>): void => onOpenContextMenu(event, card)}>
+        <CardContent>
+          <Typography variant="subtitle1">{card.label}{card.profile?.archived ? ' (archived)' : ''}</Typography>
+          <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', mt: 0.5 }}>
+            {card.target && <Chip size="small" label="Needs profile" />}
+            {card.participantLabel && <Chip size="small" label={`Participant: ${card.participantLabel}`} />}
+            {card.officialRoles.map((role: string, index: number): React.ReactElement =>
+              <Chip key={`${role}-${index}`} size="small" label={`Official: ${role}`} />)}
+          </Stack>
+        </CardContent>
+      </CardActionArea>
+    </Card>
+  </Tooltip>;
+};
 
 interface EntrantProfilePreview {
   dateOfBirth?: string;
@@ -80,6 +109,7 @@ export const IndividualsPanel = (props: IndividualsPanelProps): React.ReactEleme
   const [linkProfileId, setLinkProfileId] = React.useState<string>('');
   const [draft, setDraft] = React.useState<OfficialProfileInput>(createEmptyIndividualDraft);
   const [error, setError] = React.useState<string>('');
+  const [contextMenu, setContextMenu] = React.useState<IndividualCardContextMenu | undefined>(undefined);
   const cards: IndividualDirectoryCard[] = getIndividualDirectoryCards(props.catalog, props.eventId);
   const visibleCards: IndividualDirectoryCard[] = cards.filter((card: IndividualDirectoryCard): boolean =>
     (includeArchived || !card.profile?.archived) &&
@@ -143,6 +173,21 @@ export const IndividualsPanel = (props: IndividualsPanelProps): React.ReactEleme
     props.onArchiveProfile(selected.id, !selected.archived)
       .catch((failure: Error): void => setError(failure.message));
   };
+  const openCardContextMenu = (event: React.MouseEvent<HTMLElement>, card: IndividualDirectoryCard): void => {
+    event.preventDefault();
+    setContextMenu({ card, mouseX: event.clientX - 2, mouseY: event.clientY - 4 });
+  };
+  const closeCardContextMenu = (): void => setContextMenu(undefined);
+  const copyCardIdentifier = (): void => {
+    const identifier: CardIdentifier | undefined = contextMenu ? getCardIdentifier(contextMenu.card) : undefined;
+    if (identifier) {
+      void navigator.clipboard.writeText(identifier.value);
+    }
+    closeCardContextMenu();
+  };
+  const contextMenuIdentifier: CardIdentifier | undefined = contextMenu
+    ? getCardIdentifier(contextMenu.card)
+    : undefined;
 
   return <Stack spacing={2} sx={{ minWidth: 0, p: 2 }}>
     <Typography variant="h5">Individuals</Typography>
@@ -163,7 +208,8 @@ export const IndividualsPanel = (props: IndividualsPanelProps): React.ReactEleme
         }}>New individual</Button>
         <Typography variant="body2">{visibleCards.length} individual{visibleCards.length === 1 ? '' : 's'}</Typography>
         {visibleCards.map((card: IndividualDirectoryCard): React.ReactElement =>
-          <IndividualCard key={card.id} card={card} onSelect={(): void => selectCard(card)}
+          <IndividualCard key={card.id} card={card} onOpenContextMenu={openCardContextMenu}
+            onSelect={(): void => selectCard(card)}
             selected={card.id === unlinkedCardId || (!!card.profile && card.profile.id === props.selectedProfileId)} />)}
       </Stack>
       {unlinkedCard?.target ? <Stack spacing={1}>
@@ -189,5 +235,15 @@ export const IndividualsPanel = (props: IndividualsPanelProps): React.ReactEleme
       </Stack> : <IndividualProfileEditor draft={draft} onArchive={archiveProfile} onChange={setDraft}
         onSave={selected ? updateProfile : createProfile} selected={selected} />}
     </Box>
+    <Menu
+      anchorPosition={contextMenu ? { left: contextMenu.mouseX, top: contextMenu.mouseY } : undefined}
+      anchorReference="anchorPosition"
+      onClose={closeCardContextMenu}
+      open={contextMenu !== undefined}
+    >
+      {contextMenuIdentifier ? <MenuItem onClick={copyCardIdentifier}>
+        Copy {contextMenuIdentifier.label}
+      </MenuItem> : null}
+    </Menu>
   </Stack>;
 };

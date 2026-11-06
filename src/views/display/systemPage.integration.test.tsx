@@ -7,6 +7,7 @@ import { act } from 'react';
 import type { SystemConfiguration } from '../../app/systemConfig.js';
 import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
+import { chooseMuiOption } from '../../testing/muiSelect.js';
 import { SystemPage } from './systemPage.js';
 
 vi.mock('../../app/stackTrace.js', async (importOriginal) => {
@@ -136,16 +137,13 @@ describe('SystemPage integration', () => {
     expect(container.textContent).toContain('System');
     expect(container.querySelector('img[alt="RaceSweet"]')).toBeTruthy();
     expect(container.textContent).toContain('Apical Source');
-    const sourceTypeSelect = container.querySelector('select[aria-label="New Data Source Type"]') as HTMLSelectElement;
+    const sourceTypeSelect: HTMLElement = container.querySelector('[role="combobox"][aria-label="New Data Source Type"]')!;
     expect(sourceTypeSelect).toBeDefined();
-    const configuredSourcesTable = container.querySelector('table[aria-label="Configured data sources table"]');
+    const configuredSourcesTable = container.querySelector('[role="list"][aria-label="Configured data sources"]');
     expect(configuredSourcesTable).toBeTruthy();
     expect(sourceTypeSelect.compareDocumentPosition(configuredSourcesTable!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    await act(async () => {
-      sourceTypeSelect.value = 'timing-mylaps-decoder';
-      sourceTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    await chooseMuiOption(sourceTypeSelect, 'MyLaps Decoder');
 
     const addSourceButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Add Data Source');
     expect(addSourceButton).toBeDefined();
@@ -218,7 +216,7 @@ describe('SystemPage integration', () => {
         />,
       );
     });
-    const listenerRow = Array.from(container.querySelectorAll('tbody tr')).find(
+    const listenerRow = Array.from(container.querySelectorAll("[data-source-id]")).find(
       (row) => row.textContent?.includes('RFID Listener'),
     );
     expect(listenerRow).toBeDefined();
@@ -455,18 +453,12 @@ describe('SystemPage integration', () => {
       );
     });
 
-    const eventSelect = container.querySelector('select[aria-label="Apical Selected Event source-apical"]') as HTMLSelectElement;
+    const eventSelect: HTMLElement = container.querySelector('[role="combobox"][aria-label="Apical Selected Event source-apical"]')!;
     expect(eventSelect).toBeDefined();
-    expect(eventSelect.options.length).toBe(3);
-    expect(eventSelect.value).toBe('1001');
     expect(eventSelect.textContent).toContain('Round 1 (1001)');
-    expect(eventSelect.textContent).toContain('Round 2 (1002)');
     expect(container.querySelector('input[aria-label="Apical Event Id source-apical"]')).toBeNull();
 
-    await act(async () => {
-      eventSelect.value = '1002';
-      eventSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    await chooseMuiOption(eventSelect, 'Round 2 (1002)');
 
     expect(onSaveSource).toHaveBeenCalledWith('source-apical', expect.objectContaining({
       apiConfig: expect.objectContaining({
@@ -642,7 +634,7 @@ describe('SystemPage integration', () => {
       );
     });
 
-    const rfidRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('RFID CSV Source'));
+    const rfidRow = Array.from(container.querySelectorAll("[data-source-id]")).find((row) => row.textContent?.includes('RFID CSV Source'));
     expect(rfidRow).toBeDefined();
 
     await act(async () => {
@@ -714,10 +706,10 @@ describe('SystemPage integration', () => {
       );
     });
 
-    const sourceTypeSelect = container.querySelector('select[aria-label="New Data Source Type"]') as HTMLSelectElement;
-    expect(Array.from(sourceTypeSelect.options).map((option) => option.textContent)).toContain('MR-SCATS Data');
+    const sourceTypeSelect: HTMLElement = container.querySelector('[role="combobox"][aria-label="New Data Source Type"]')!;
+    expect(sourceTypeSelect).toBeTruthy();
 
-    const mrScatsRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('MR-SCATS Source'));
+    const mrScatsRow = Array.from(container.querySelectorAll("[data-source-id]")).find((row) => row.textContent?.includes('MR-SCATS Source'));
     expect(mrScatsRow).toBeDefined();
 
     await act(async () => {

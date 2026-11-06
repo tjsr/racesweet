@@ -8,6 +8,9 @@ export type ManualCrossingIdentifierKind =
 export type ManualCrossingStatus = "needs-attention" | "scored";
 
 export interface ManualCrossing {
+  captureInstant?: string;
+  entryMethod?: "keyboard" | "keypad" | "voice";
+  operatorLabel?: string;
   crossingId: TimeRecordId;
   entrantId?: EventEntrantId;
   eventId: EventId;
@@ -22,6 +25,24 @@ export interface ManualCrossing {
   status: ManualCrossingStatus;
   time: string;
   timeZone: string;
+}
+
+export type ManualCrossingAction =
+  "record" | "correct" | "reverse" | "reconcile";
+
+export interface ManualCrossingCommand {
+  action: ManualCrossingAction;
+  crossing: ManualCrossingInput;
+  crossingId: string;
+  mutationId: string;
+  reason?: string;
+}
+
+export interface ManualCrossingAcknowledgement {
+  crossingId: string;
+  mutationId: string;
+  reason?: string;
+  status: "accepted" | "already-accepted" | "rejected" | "conflict";
 }
 
 export type ManualCrossingInput = Omit<ManualCrossing, "crossingId">;

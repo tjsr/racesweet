@@ -42,6 +42,7 @@ import {
 import { CategoryId } from "../../processing/category.js";
 import { createGreenFlagEvent } from "../../processing/flag.js";
 import { useUiConsoleGuards } from "../../testing/uiConsoleGuards.js";
+import { createStartListFixture } from '../../testing/startListFixture.js';
 import {
   ReportsPage,
   type ReportsViewState,
@@ -340,6 +341,23 @@ describe("race analytics views integration", () => {
       root.unmount();
     });
     container.remove();
+  });
+
+  it('inherits the Reports event/session selection for start lists and updates when the parent selection changes', async (): Promise<void> => {
+    const catalog = createStartListFixture();
+    const viewState: ReportsViewState = { ...createDefaultReportsViewState(), reportType: 'start-lists-grids' };
+    await act(async (): Promise<void> => root.render(<ReportsPage catalog={catalog} catalogEntries={catalog.entries}
+      catalogEntrants={catalog.entrants} categories={catalog.categories} event={catalog.events[0]} raceState={raceState}
+      session={catalog.sessions[0]} viewState={viewState} />));
+    expect(container.textContent).toContain('5 start list rows');
+    expect(container.textContent).toContain('Car, "One"');
+    expect(container.textContent).not.toContain('Other person');
+    await act(async (): Promise<void> => root.render(<ReportsPage catalog={catalog} catalogEntries={catalog.entries}
+      catalogEntrants={catalog.entrants} categories={catalog.categories} event={catalog.events[1]} raceState={raceState}
+      session={catalog.sessions[1]} viewState={viewState} />));
+    expect(container.textContent).toContain('1 start list row');
+    expect(container.textContent).toContain('Other person');
+    expect(container.textContent).not.toContain('Car, "One"');
   });
 
   it("shows correct overall and per-category standings for team and individual entrants", async () => {
@@ -1745,7 +1763,7 @@ describe("race analytics views integration", () => {
     expect(container.querySelector("svg.lap-chart-line-overlay")).toBeFalsy();
   });
 
-  it("counts down from the selected flag event without showing a negative duration", async () => {
+  it("counts down from the first session start without showing a negative duration", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-12T10:00:00.000Z"));
     const session: EventCatalogSession = {
@@ -1758,31 +1776,33 @@ describe("race analytics views integration", () => {
       scheduledStart: "2026-06-12T09:59:00.000Z",
       status: "live",
     };
-    const earlyFlag = createGreenFlagEvent({
-      id: createTimeRecordId("countdown-early"),
+    const nonStartFlag = createGreenFlagEvent({
+      id: createTimeRecordId("countdown-non-start"),
+      indicatesRaceStart: false,
       sequence: 1,
+      source: createTimeRecordSourceId("countdown"),
+      time: new Date("2026-06-12T09:59:00.000Z"),
+    });
+    const firstStartFlag = createGreenFlagEvent({
+      id: createTimeRecordId("countdown-early"),
+      sequence: 2,
       source: createTimeRecordSourceId("countdown"),
       time: new Date("2026-06-12T09:59:30.000Z"),
     });
-    const laterFlag = createGreenFlagEvent({
+    const laterStartFlag = createGreenFlagEvent({
       id: createTimeRecordId("countdown-later"),
-      sequence: 2,
+      sequence: 3,
       source: createTimeRecordSourceId("countdown"),
       time: new Date("2026-06-12T09:59:50.000Z"),
     });
-    let countdownViewState: ReportsViewState = {
+    const countdownViewState: ReportsViewState = {
       ...createDefaultReportsViewState(),
       reportType: "countdown-clock",
-    };
-    const onCountdownViewStateChange = (
-      changes: Partial<ReportsViewState>,
-    ): void => {
-      countdownViewState = { ...countdownViewState, ...changes };
     };
     const onSelectEventSession = vi.fn();
     const countdownRaceState = {
       ...raceState,
-      records: [earlyFlag, laterFlag],
+      records: [nonStartFlag, firstStartFlag, laterStartFlag],
     } as unknown as Session & RaceStateLookup;
 
     await act(async () => {
@@ -1800,7 +1820,6 @@ describe("race analytics views integration", () => {
             },
           ]}
           onSelectEventSession={onSelectEventSession}
-          onViewStateChange={onCountdownViewStateChange}
           raceState={countdownRaceState}
           selectedEventSessionValue="session:event-1:session-1"
           session={session}
@@ -1813,38 +1832,14 @@ describe("race analytics views integration", () => {
       'output[aria-live="polite"]',
     ) as HTMLOutputElement;
     expect(clock.textContent).toBe("0:00:30");
+    expect(container.textContent).not.toContain("no session duration is set");
     const sessionSelect = container.querySelector(
       'select[aria-label="Race View Event Session"]',
     ) as HTMLSelectElement;
     expect(sessionSelect).toBeTruthy();
-    const flagSelect = container.querySelector(
-      'select[aria-label="Countdown Clock Start Flag"]',
-    ) as HTMLSelectElement;
-    await act(async () => {
-      setSelectValue(flagSelect, laterFlag.id.toString());
-      root.render(
-        <ReportsPage
-          categories={categories}
-          catalogEntrants={catalogEntrants}
-          eventSessionOptions={[
-            {
-              eventId: createEventId("event-1"),
-              eventName: "Winter Round",
-              sessionId: createSessionId("session-1"),
-              sessionName: "Feature Race",
-              value: "session:event-1:session-1",
-            },
-          ]}
-          onSelectEventSession={onSelectEventSession}
-          onViewStateChange={onCountdownViewStateChange}
-          raceState={countdownRaceState}
-          selectedEventSessionValue="session:event-1:session-1"
-          session={session}
-          viewState={countdownViewState}
-        />,
-      );
-    });
-    expect(clock.textContent).toBe("0:00:50");
+    expect(
+      container.querySelector('select[aria-label="Countdown Clock Start Flag"]'),
+    ).toBeFalsy();
 
     await act(async () => {
       vi.advanceTimersByTime(60_000);

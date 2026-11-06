@@ -1,8 +1,10 @@
 import React from 'react';
+import { Accordion, AccordionDetails, AccordionSummary, Button, Checkbox, FormControlLabel, TextField } from '@mui/material';
 import type { DataSourceConfig } from '../../app/systemConfig.js';
 import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
 import type { MrScatsDataFilePreview, MrScatsPreviewValue } from '../../parsers/mrScats/filePreview.js';
 import type { InlineLoadingProgress } from './InlineLoadingIndicator.js';
+import { ResponsiveDataList, type ResponsiveDataRow, ResponsiveDialog } from '../admin/adminPrimitives.js';
 import { FileSelectionField } from './fileSelectionField.js';
 
 interface MrScatsDataSourcePanelProps {
@@ -166,39 +168,16 @@ export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): Reac
   const previewTitle = preview?.fileName || previewLoadingFile || 'MR-SCATS file preview';
   const { generalFiles, sessionGroups } = groupMrScatsFiles(config.files);
 
-  const renderFileTable = (files: MrScatsDataFileSummary[], ariaLabel: string): React.ReactElement => (
-    <table aria-label={ariaLabel}>
-      <thead>
-        <tr>
-          <th>File</th>
-          <th>Kind</th>
-          <th>Size</th>
-          <th>Records</th>
-        </tr>
-      </thead>
-      <tbody>
-        {files.map((file) => (
-          <tr key={file.relativePath}>
-            <td>
-              <button
-                type="button"
-                className="link-button"
-                onClick={() => {
-                  void handlePreviewFile(file);
-                }}
-                disabled={!props.onPreviewDataFile}
-              >
-                {file.relativePath}
-              </button>
-            </td>
-            <td>{file.kind}</td>
-            <td>{file.size}</td>
-            <td>{file.dbf?.recordCount ?? '-'}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
+  const renderFileTable = (files: MrScatsDataFileSummary[], ariaLabel: string): React.ReactElement =>
+    <ResponsiveDataList label={ariaLabel} rows={files.map((file: MrScatsDataFileSummary): ResponsiveDataRow => ({
+      cells: [
+        { label: 'File', value: <Button disabled={!props.onPreviewDataFile} onClick={(): void => {
+          void handlePreviewFile(file);
+        }}
+        sx={{ minHeight: 48, overflowWrap: 'anywhere' }}>{file.relativePath}</Button> },
+        { label: 'Kind', value: file.kind }, { label: 'Size', value: file.size }, { label: 'Records', value: file.dbf?.recordCount ?? '-' },
+      ], id: file.relativePath,
+    }))} />;
 
   return (
     <>
@@ -213,57 +192,55 @@ export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): Reac
         placeholder="No file or directory selected"
         value={config.dataLocationPath || ''}
       />
-      <label>
-        Finish line numbers
-        <input
-          aria-label={`MR-SCATS Finish Line Numbers ${props.source.id}`}
-          defaultValue={finishLineNumbersValue}
-          onBlur={(event) => {
-            void props.onSaveSource(props.source.id, {
-              finishLineNumbers: parseFinishLineNumbers(event.target.value),
-            });
-          }}
-          type="text"
-        />
-      </label>
-      <label>
-        <input
-          aria-label={`MR-SCATS Ignore Line 1 NO1 Crossings ${props.source.id}`}
-          checked={ignoreLineOneNo1CrossingsWhenDbfPresent}
-          onChange={(event) => {
-            void props.onSaveSource(props.source.id, {
-              mrScatsConfig: {
-                ...config,
-                ignoreLineOneNo1CrossingsWhenDbfPresent: event.target.checked,
-              },
-            });
-          }}
-          type="checkbox"
-        />
-        ignore Line 1 from NO1 files if DBF file is present
-      </label>
+      <TextField label="Finish line numbers"
+        slotProps={{ htmlInput: { 'aria-label': `MR-SCATS Finish Line Numbers ${props.source.id}`, inputMode: 'numeric' } }}
+        defaultValue={finishLineNumbersValue}
+        onBlur={(event) => {
+          void props.onSaveSource(props.source.id, {
+            finishLineNumbers: parseFinishLineNumbers(event.target.value),
+          });
+        }}
+        type="text"
+      />
+      <FormControlLabel control={<Checkbox
+        slotProps={{ input: { 'aria-label': `MR-SCATS Ignore Line 1 NO1 Crossings ${props.source.id}` } }}
+        checked={ignoreLineOneNo1CrossingsWhenDbfPresent}
+        onChange={(event) => {
+          void props.onSaveSource(props.source.id, {
+            mrScatsConfig: {
+              ...config,
+              ignoreLineOneNo1CrossingsWhenDbfPresent: event.target.checked,
+            },
+          });
+        }}
+      />} label="ignore Line 1 from NO1 files if DBF file is present" />
       <div className="events-actions">
       </div>
       <p>{formatFileCount(inventory)}</p>
       {config.files.length > 0 ? (
         <div className="mr-scats-file-groups">
-          <details open>
-            <summary>General ({generalFiles.length})</summary>
-            {generalFiles.length > 0
-              ? renderFileTable(generalFiles, `MR-SCATS General Data Files ${props.source.id}`)
-              : <p>No general data files found.</p>}
-          </details>
+          <Accordion defaultExpanded>
+            <AccordionSummary>General ({generalFiles.length})</AccordionSummary>
+            <AccordionDetails>
+              {generalFiles.length > 0
+                ? renderFileTable(generalFiles, `MR-SCATS General Data Files ${props.source.id}`)
+                : <p>No general data files found.</p>}
+            </AccordionDetails>
+          </Accordion>
           {sessionGroups.map((group) => (
-            <details key={group.key}>
-              <summary>{group.label} ({group.files.length})</summary>
-              {renderFileTable(group.files, `MR-SCATS Session Data Files ${group.label} ${props.source.id}`)}
-            </details>
+            <Accordion key={group.key}>
+              <AccordionSummary>{group.label} ({group.files.length})</AccordionSummary>
+              <AccordionDetails>
+                {renderFileTable(group.files, `MR-SCATS Session Data Files ${group.label} ${props.source.id}`)}
+              </AccordionDetails>
+            </Accordion>
           ))}
         </div>
       ) : null}
       {preview || previewError || previewLoadingFile ? (
-        <div className="warning-modal-backdrop">
-          <section className="warning-modal reload-summary-dialog mr-scats-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="mr-scats-preview-title">
+        <ResponsiveDialog open disablePortal aria-labelledby="mr-scats-preview-title" fullWidth maxWidth="xl"
+          slotProps={{ paper: { className: 'mr-scats-preview-dialog' } }}>
+          <section className="warning-modal reload-summary-dialog mr-scats-preview-dialog">
             <div className="warning-modal-heading">
               <h2 id="mr-scats-preview-title">{previewTitle}</h2>
             </div>
@@ -309,10 +286,10 @@ export const MrScatsDataSourcePanel = (props: MrScatsDataSourcePanelProps): Reac
               ) : null}
             </div>
             <div className="events-actions warning-modal-actions">
-              <button type="button" onClick={closePreview}>Close</button>
+              <Button onClick={closePreview}>Close</Button>
             </div>
           </section>
-        </div>
+        </ResponsiveDialog>
       ) : null}
     </>
   );

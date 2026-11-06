@@ -305,6 +305,20 @@ describe('SessionsPage integration', () => {
 
     expect(onSaveSessionAssignment).toHaveBeenCalledWith('session-3', 'specific', ['source-a']);
 
+    const sessionDataSourceSelector = container.querySelector<HTMLElement>('[aria-label="Session Data Sources"]');
+    expect(sessionDataSourceSelector).toBeTruthy();
+    await act(async (): Promise<void> => {
+      sessionDataSourceSelector!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+    const archiveFeedOption: HTMLElement | undefined = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'))
+      .find((option: HTMLElement): boolean => option.textContent?.includes('Archive Feed') === true);
+    expect(archiveFeedOption).toBeDefined();
+    await act(async (): Promise<void> => {
+      archiveFeedOption!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+    });
+    expect(onSaveSessionAssignment).toHaveBeenCalledWith('session-3', 'specific', ['source-a', 'source-b']);
+
     const applySourcesButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Apply Assigned Sources To Session');
     expect(applySourcesButton).toBeDefined();
 
@@ -357,6 +371,12 @@ describe('SessionsPage integration', () => {
 
     await act(async () => {
       removeCategoryButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const confirmRemovalButton = document.querySelector<HTMLButtonElement>('[aria-label="Confirm removal from session"]');
+    expect(confirmRemovalButton).toBeDefined();
+    await act(async () => {
+      confirmRemovalButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(onSaveSessionCategoryAssignment).toHaveBeenCalledWith('session-3', 'category-5', false);

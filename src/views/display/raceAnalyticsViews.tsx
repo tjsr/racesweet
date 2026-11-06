@@ -1,6 +1,6 @@
 import type { RaceState, RaceStateLookup } from "../../model/racestate.js";
 
-import { Button, MenuItem } from "@mui/material";
+import { MenuItem } from "@mui/material";
 import React from "react";
 import {
   millisecondsToTime,
@@ -11,6 +11,7 @@ import type {
   EventCatalogEntry,
   EventCatalogEvent,
   EventCatalogSession,
+  EventCatalogState,
 } from "../../catalog/eventCatalog.js";
 import {
   getCategoryColor,
@@ -23,7 +24,6 @@ import type {
   EventParticipant,
   EventParticipantId,
 } from "../../model/eventparticipant.js";
-import type { FlagRecord } from "../../model/flag.js";
 import { EventCategoryId } from "../../model/index.js";
 import { EventId, SessionId } from "../../model/raceevent.js";
 import type {
@@ -31,7 +31,7 @@ import type {
   TimeRecord,
 } from "../../model/timerecord.js";
 import { shouldExcludeCategoryFromResults } from "../../processing/category.js";
-import { getFlagEvents } from "../../processing/flag.js";
+import { isStartRecord } from "../../processing/session.js";
 import {
   getSourceLapCompletion,
   isCountedLapPassing,
@@ -43,6 +43,8 @@ import {
   type LapTimesReportState,
 } from "../reports/LapTimesReport.js";
 import { TrackMapReport } from "../reports/TrackMapReport.js";
+import { EventReplayPanel } from '../reports/EventReplayPanel.js';
+import { StartListsGridsReport } from '../reports/StartListsGridsReport.js';
 import { HandicapView } from "./handicap.js";
 
 interface CategoryOption {
@@ -164,6 +166,7 @@ interface LapChartLineSegment {
 }
 
 interface BaseRaceAnalyticsProps {
+  catalog?: EventCatalogState;
   categories: CategoryOption[];
   catalogEntries?: EventCatalogEntry[];
   catalogEntrants: EventCatalogEntrant[];
@@ -180,6 +183,7 @@ interface ResultsPageProps extends BaseRaceAnalyticsProps {
 }
 
 export type ReportType =
+  | "start-lists-grids"
   | "countdown-clock"
   | "event-replay"
   | "fastest-laps"
@@ -227,142 +231,6 @@ interface ReportsPageProps extends BaseRaceAnalyticsProps {
 
 type CategoryFilter = "overall" | string;
 type ReplayReportMode = "live" | "replay";
-type ReplayControlCommand = "pause" | "reset" | "resume" | "set-speed" | "start";
-
-interface EventReplayReportProps {
-  eventId?: EventId;
-  mode: ReplayReportMode;
-  onModeChange: (mode: ReplayReportMode) => void;
-  onSpeedChange: (speed: number) => void;
-  sessionId?: SessionId;
-  speed: number;
-}
-
-const getReplayStreamPath = (
-  eventId: EventId,
-  sessionId: SessionId | undefined,
-  mode: ReplayReportMode,
-  speed: number,
-  streamId: string,
-): string => {
-  const parameters: URLSearchParams = new URLSearchParams({
-    eventId: eventId.toString(),
-    mode,
-    speed: speed.toString(),
-    streamId,
-  });
-  if (sessionId) {
-    parameters.set("sessionId", sessionId.toString());
-  }
-  return `/api/v1/reports/replay?${parameters.toString()}`;
-};
-
-const createReplayStreamId = (): string => globalThis.crypto?.randomUUID?.() ||
-  `replay-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-const sendReplayControl = (
-  streamId: string,
-  command: ReplayControlCommand,
-  speed?: number,
-): Promise<string> => fetch("/api/v1/reports/replay/control", {
-  body: JSON.stringify({ command, speed, streamId }),
-  headers: { "content-type": "application/json" },
-  method: "POST",
-}).then((response: Response): Promise<{ state?: { status?: string } | undefined; error?: string | undefined }> =>
-  response.json() as Promise<{ state?: { status?: string } | undefined; error?: string | undefined }>,
-).then((payload: { state?: { status?: string } | undefined; error?: string | undefined }): string => {
-  if (payload.error) {
-    throw new Error(payload.error);
-  }
-  return `Replay is ${payload.state?.status || "updated"}.`;
-});
-
-const EventReplayReport = (
-  props: EventReplayReportProps,
-): React.ReactElement => {
-  const [streamId, setStreamId] = React.useState<string>(createReplayStreamId);
-  const [controlMessage, setControlMessage] = React.useState<string>("");
-  if (!props.eventId) {
-    return (
-      <section className="events-panel">
-        <h2>Event Replay</h2>
-        <p>Select an event or session above to create a replay stream.</p>
-      </section>
-    );
-  }
-  const controlReplay = (command: ReplayControlCommand): void => {
-    void sendReplayControl(streamId, command, command === "set-speed" ? props.speed : undefined)
-      .then((message: string): void => setControlMessage(message))
-      .catch((error: Error): void => setControlMessage(error.message));
-  };
-  const streamPath: string = getReplayStreamPath(
-    props.eventId,
-    props.sessionId,
-    props.mode,
-    props.speed,
-    streamId,
-  );
-  return (
-    <section className="events-panel">
-      <h2>Event Replay</h2>
-      <p>
-        Remote clients can subscribe to this authenticated Server-Sent Event
-        stream. Replay preserves recorded intervals; live mode sends newly
-        accepted crossing records as they arrive.
-      </p>
-      <div className="events-actions">
-        <SelectTextField
-          className="page-filter-label"
-          label="Replay mode"
-          slotProps={{ select: { "aria-label": "Event Replay Mode" } }}
-          value={props.mode}
-          onChange={(event) =>
-            props.onModeChange(event.target.value as ReplayReportMode)
-          }
-        >
-          <MenuItem value="replay">Replay recorded data</MenuItem>
-          <MenuItem value="live">Live crossing stream</MenuItem>
-        </SelectTextField>
-        <SelectTextField
-          className="page-filter-label"
-          label="Replay speed"
-          slotProps={{ select: { "aria-label": "Event Replay Speed" } }}
-          value={props.speed.toString()}
-          onChange={(event) => props.onSpeedChange(Number(event.target.value))}
-        >
-          <MenuItem value="0.5">0.5×</MenuItem>
-          <MenuItem value="1">Real time (1×)</MenuItem>
-          <MenuItem value="2">2×</MenuItem>
-          <MenuItem value="4">4×</MenuItem>
-          <MenuItem value="8">8×</MenuItem>
-        </SelectTextField>
-        {props.mode === "replay" ? (
-          <>
-            <Button onClick={(): void => controlReplay("start")} variant="contained">
-              Start
-            </Button>
-            <Button onClick={(): void => controlReplay("pause")} variant="outlined">
-              Pause
-            </Button>
-            <Button onClick={(): void => controlReplay("resume")} variant="outlined">
-              Resume
-            </Button>
-            <Button onClick={(): void => controlReplay("reset")} variant="outlined">
-              Reset
-            </Button>
-            <Button onClick={(): void => setStreamId(createReplayStreamId())} variant="text">
-              New stream
-            </Button>
-          </>
-        ) : null}
-      </div>
-      {controlMessage ? <p aria-live="polite">{controlMessage}</p> : null}
-      <p>
-        <code aria-label="Event Replay Stream URL">{streamPath}</code>
-      </p>
-    </section>
-  );
-};
 
 const normalizeText = (value: string): string => value.trim().toLowerCase();
 
@@ -770,10 +638,11 @@ const formatCountdown = (remainingMilliseconds: number): string => {
   return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 };
 
-const getCountdownFlags = (records: TimeRecord[]): FlagRecord[] => {
-  return getFlagEvents(records)
-    .filter((flag) => flag.time !== undefined)
-    .sort((left, right) => left.time!.getTime() - right.time!.getTime());
+const getFirstSessionStartTime = (records: TimeRecord[]): Date | undefined => {
+  return records
+    .filter((record) => record.time !== undefined && isStartRecord(record))
+    .sort((left, right) => left.time!.getTime() - right.time!.getTime())[0]
+    ?.time;
 };
 
 const getRaceStateContentSignature = (
@@ -1467,22 +1336,18 @@ export const ResultsPage = (props: ResultsPageProps): React.ReactElement => {
 
 const CountdownClockReport = (props: {
   raceRecords: TimeRecord[];
-  selectedStartFlagId?: string;
   sessionDuration?: string;
 }): React.ReactElement => {
   const [now, setNow] = React.useState<number>(() => Date.now());
-  const flags: FlagRecord[] = React.useMemo(() => {
-    return getCountdownFlags(props.raceRecords);
+  const firstStartTime: Date | undefined = React.useMemo(() => {
+    return getFirstSessionStartTime(props.raceRecords);
   }, [props.raceRecords]);
-  const selectedFlag =
-    flags.find((flag) => flag.id.toString() === props.selectedStartFlagId) ||
-    flags[0];
   const durationMilliseconds = parseIsoDurationMilliseconds(
     props.sessionDuration,
   );
   const remainingMilliseconds =
-    selectedFlag?.time && durationMilliseconds !== undefined
-      ? Math.max(0, selectedFlag.time.getTime() + durationMilliseconds - now)
+    firstStartTime && durationMilliseconds !== undefined
+      ? Math.max(0, firstStartTime.getTime() + durationMilliseconds - now)
       : 0;
 
   React.useEffect(() => {
@@ -1497,51 +1362,19 @@ const CountdownClockReport = (props: {
     >
       {!durationMilliseconds ? (
         <p>
-          This session is not configured for a time countdown because no event
+          This session is not configured for a time countdown because no session
           duration is set.
         </p>
       ) : null}
-      {durationMilliseconds && flags.length === 0 ? (
-        <p>No flag events are available for this session.</p>
+      {durationMilliseconds && !firstStartTime ? (
+        <p>This session has not started yet.</p>
       ) : null}
-      {durationMilliseconds && selectedFlag ? (
+      {durationMilliseconds && firstStartTime ? (
         <output className="countdown-clock-report__time" aria-live="polite">
           {formatCountdown(remainingMilliseconds)}
         </output>
       ) : null}
     </section>
-  );
-};
-
-const CountdownStartFlagSelector = (props: {
-  eventTimeZone?: string;
-  onStartFlagChange: (flagId: string) => void;
-  raceRecords: TimeRecord[];
-  selectedStartFlagId?: string;
-}): React.ReactElement => {
-  const flags: FlagRecord[] = React.useMemo(
-    () => getCountdownFlags(props.raceRecords),
-    [props.raceRecords],
-  );
-  const selectedFlag =
-    flags.find((flag) => flag.id.toString() === props.selectedStartFlagId) ||
-    flags[0];
-  return (
-    <SelectTextField
-      className="countdown-clock-report__flag-select"
-      label="Countdown start flag"
-      slotProps={{
-        select: { "aria-label": "Countdown Clock Start Flag", native: true },
-      }}
-      value={selectedFlag?.id.toString() || ""}
-      onChange={(event) => props.onStartFlagChange(event.target.value)}
-    >
-      {flags.map((flag) => (
-        <option key={flag.id} value={flag.id}>
-          {`${flag.flagType} ${flag.flagValue} — ${tableTimeString(flag.time, props.eventTimeZone)}`}
-        </option>
-      ))}
-    </SelectTextField>
   );
 };
 
@@ -1718,6 +1551,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
           >
             <MenuItem value="countdown-clock">Countdown Clock</MenuItem>
             <MenuItem value="event-replay">Event Replay</MenuItem>
+            <MenuItem value="start-lists-grids">Start Lists &amp; Grids</MenuItem>
             <MenuItem value="fastest-laps">Fastest Laps</MenuItem>
             <MenuItem value="fastest-lap-timeline">
               Fastest Lap Timeline
@@ -1728,16 +1562,6 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <MenuItem value="track-map">Track Map</MenuItem>
             <MenuItem value="handicap-data">Handicap Data</MenuItem>
           </SelectTextField>
-          {reportType === "countdown-clock" ? (
-            <CountdownStartFlagSelector
-              eventTimeZone={props.event?.timeZone}
-              onStartFlagChange={(countdownStartFlagId: string) =>
-                updateViewState({ countdownStartFlagId })
-              }
-              raceRecords={props.raceState.records}
-              selectedStartFlagId={viewState.countdownStartFlagId}
-            />
-          ) : null}
           <select
             aria-label="Reports View Type"
             hidden
@@ -1748,6 +1572,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
           >
             <option value="countdown-clock">Countdown Clock</option>
             <option value="event-replay">Event Replay</option>
+            <option value="start-lists-grids">Start Lists &amp; Grids</option>
             <option value="fastest-laps">Fastest Laps</option>
             <option value="fastest-lap-timeline">Fastest Lap Timeline</option>
             <option value="lap-times">Lap Times</option>
@@ -1757,6 +1582,7 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
             <option value="handicap-data">Handicap Data</option>
           </select>
           {reportType !== "countdown-clock" &&
+          reportType !== "start-lists-grids" &&
           reportType !== "event-replay" &&
           reportType !== "handicap-data" ? (
               <CategorySelector
@@ -1790,16 +1616,21 @@ export const ReportsPage = (props: ReportsPageProps): React.ReactElement => {
         </div>
       </section>
 
+      {reportType === 'start-lists-grids' ? <StartListsGridsReport
+        catalog={props.catalog || {
+          categories: [], deletedEventIds: [], entrants: props.catalogEntrants, entries: props.catalogEntries || [],
+          events: props.event ? [props.event] : [], sessions: props.session ? [props.session] : [],
+        }} eventId={props.event?.id} sessionId={props.session?.id} /> : null}
+
       {reportType === "countdown-clock" ? (
         <CountdownClockReport
           raceRecords={props.raceState.records}
-          selectedStartFlagId={viewState.countdownStartFlagId}
           sessionDuration={props.session?.duration}
         />
       ) : null}
 
       {reportType === "event-replay" ? (
-        <EventReplayReport
+        <EventReplayPanel
           eventId={props.event?.id}
           mode={viewState.replayMode}
           onModeChange={(replayMode: ReplayReportMode): void =>

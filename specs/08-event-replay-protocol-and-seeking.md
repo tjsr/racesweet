@@ -1,6 +1,6 @@
 # Event replay protocol, seeking, and subscriber experience
 
-**Status:** Planned. This completes the replay feature on top of the
+**Status:** Implemented. This completes the replay feature on top of the
 implemented SSE and control foundation in
 [03-event-replay-mode.md](03-event-replay-mode.md).
 
@@ -161,13 +161,17 @@ subscriber must not gain replay control or mutate race data.
 
 ## Implementation checklist
 
-- [ ] Add shared typed protocol payloads and normalized record ordering.
-- [ ] Update hub event sequence, snapshots, lifecycle events, errors, and
+- [x] Add shared typed protocol payloads and normalized record ordering.
+- [x] Update hub event sequence, snapshots, lifecycle events, errors, and
       timer/command serialization.
-- [ ] Add position and timestamp seeking to the control API.
-- [ ] Add the Reports SSE subscriber, status display, and seek controls.
-- [ ] Update OpenAPI and replace foundation event-name assumptions in tests.
+- [x] Add position and timestamp seeking to the control API.
+- [x] Add the Reports SSE subscriber, status display, and seek controls.
+- [x] Update OpenAPI and replace foundation event-name assumptions in tests.
 - [ ] Add contract, service, server, and UI regressions; run Vitest,
       TypeScript, lint, and build checks.
-- [ ] Update the restart-required version gate because server protocol code
+- [x] Update the restart-required version gate because server protocol code
       requires a full application-process restart.
+
+Vitest, TypeScript, lint, and the web bundle pass. The repository's full build
+is pending a Windows Electron Forge ARM64 staging failure while it renames the
+generated renderer bundle.

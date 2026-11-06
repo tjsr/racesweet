@@ -1,4 +1,5 @@
 import React from "react";
+import { AdminPageLayout } from "../admin/adminPrimitives.js";
 import {
   type EventCatalogSession,
   type EventCatalogState,
@@ -218,7 +219,11 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
           </option>
         ))}
       </SelectTextField>
-      <div className="events-layout">
+      <AdminPageLayout
+        detailLabel="session details"
+        listLabel="sessions"
+        selectedId={selectedSession?.id}
+      >
         <SessionListPanel
           activeSessionId={props.catalog.activeSessionId}
           allowCreateSession={true}
@@ -291,6 +296,7 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
         />
         <SessionCategoriesPanel
           categories={sessionCategories}
+          eventTimeZone={selectedEvent?.timeZone}
           eventSessions={eventSessions}
           onRemoveCategoryFromSession={(categoryId) => {
             if (selectedSession) {
@@ -313,7 +319,7 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
           }}
           selectedSession={selectedSession}
         />
-      </div>
+      </AdminPageLayout>
     </section>
   );
 };

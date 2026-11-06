@@ -1,4 +1,4 @@
-import { access, constants, mkdir, writeFile } from 'node:fs/promises';
+import { access, constants, mkdir, rename, writeFile } from 'node:fs/promises';
 import { userInfo } from 'node:os';
 import path from 'node:path';
 
@@ -99,7 +99,11 @@ export const writeApplicationFile = async (
     try {
       await mkdir(parentDirectoryPath, { recursive: true });
       await access(parentDirectoryPath, constants.W_OK);
-      await writeFile(resolvedPath, fileContents);
+      if (request.options?.atomic) {
+        const temporaryPath: string = `${resolvedPath}.${attemptId}.tmp`;
+        await writeFile(temporaryPath, fileContents, { flush: true });
+        await rename(temporaryPath, resolvedPath);
+      } else await writeFile(resolvedPath, fileContents);
       const diagnostics = createDiagnostics({ message: 'File written successfully.' }, queueWaitMilliseconds, queuedBehindApplicationWrite);
       console.info('File write succeeded', diagnostics);
       return diagnostics;

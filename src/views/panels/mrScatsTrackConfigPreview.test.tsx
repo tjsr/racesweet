@@ -86,7 +86,7 @@ describe('MR-SCATS TRACK.CFG preview', () => {
       );
     });
 
-    const sourceRow = Array.from(container.querySelectorAll('tbody tr')).find((row) => row.textContent?.includes('MR-SCATS Source'));
+    const sourceRow = Array.from(container.querySelectorAll("[data-source-id]")).find((row) => row.textContent?.includes('MR-SCATS Source'));
     expect(sourceRow).toBeDefined();
     flushSync(() => {
       sourceRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

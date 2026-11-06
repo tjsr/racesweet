@@ -1,4 +1,7 @@
-import { FormControlLabel, MenuItem, Switch, TextField } from "@mui/material";
+import {
+  Accordion, AccordionDetails, AccordionSummary, Button, Checkbox, FormControlLabel, MenuItem,
+  Radio, RadioGroup, Switch, TextField,
+} from "@mui/material";
 import React from "react";
 import { formatErrorForDisplay } from "../../app/stackTrace.js";
 import {
@@ -7,7 +10,7 @@ import {
   type DataSourceType,
   getDataSourceTypeLabel,
 } from "../../app/systemConfig.js";
-import type { CtcTrackConfig } from "../../model/ctcTrackConfig.js";
+import type { CtcTrackConfig, CtcTrackConfigLine, CtcTrackConfigLoop, CtcTrackConfigNetwork } from "../../model/ctcTrackConfig.js";
 import { TimeRecordSourceId } from "../../model/types.js";
 import type {
   MrScatsDataFileInventory,
@@ -15,6 +18,7 @@ import type {
 } from "../../parsers/mrScats/fileInventory.js";
 import type { MrScatsDataFilePreview } from "../../parsers/mrScats/filePreview.js";
 import { AsyncButton } from "../asyncButton.js";
+import { AdminPageLayout, ResponsiveDataList, type ResponsiveDataRow, ResponsiveDialog } from '../admin/adminPrimitives.js';
 import { DataSourceTypesPanel } from "./dataSourceTypes.js";
 import { FileSelectionField } from "./fileSelectionField.js";
 import type { InlineLoadingProgress } from "./InlineLoadingIndicator.js";
@@ -90,7 +94,8 @@ interface DraftInputProps {
 }
 
 const DraftInput = (props: DraftInputProps): React.ReactElement => {
-  const [draft, setDraft] = React.useState(props.value);
+  const [draft, setDraft] = React.useState<string>(props.value);
+  const [error, setError] = React.useState<string>('');
 
   React.useEffect(() => {
     setDraft(props.value);
@@ -98,12 +103,16 @@ const DraftInput = (props: DraftInputProps): React.ReactElement => {
 
   const commit = (): void => {
     if (draft !== props.value) {
-      void props.onCommit(draft);
+      setError('');
+      Promise.resolve().then((): void | Promise<void> => props.onCommit(draft))
+        .catch((failure: Error): void => setError(failure.message));
     }
   };
 
   return (
     <TextField
+      label={props.ariaLabel.replace(/ [^ ]+$/u, '')}
+      error={Boolean(error)} helperText={error}
       slotProps={{ htmlInput: { "aria-label": props.ariaLabel } }}
       onBlur={commit}
       onChange={(event) => setDraft(event.target.value)}
@@ -112,6 +121,18 @@ const DraftInput = (props: DraftInputProps): React.ReactElement => {
     />
   );
 };
+
+const ImportModeControls = (props: {
+  name: string;
+  onChange: (mode: DataImportMode) => void | Promise<void>;
+  value: DataImportMode;
+}): React.ReactElement => <RadioGroup aria-label="Data import mode" name={props.name} value={props.value}
+  onChange={(_event: React.ChangeEvent<HTMLInputElement>, value: string): void => {
+    void props.onChange(value as DataImportMode);
+  }}>
+  <FormControlLabel control={<Radio />} label="Import — replace imported state for the selected session." value="import" />
+  <FormControlLabel control={<Radio />} label="Update — retain existing data and update or add matching file records." value="update" />
+</RadioGroup>;
 
 const countCtcTrackConfigLines = (trackConfig: CtcTrackConfig): number =>
   trackConfig.networks.reduce(
@@ -130,108 +151,42 @@ const countCtcTrackConfigLoops = (trackConfig: CtcTrackConfig): number =>
     0,
   );
 
-const CtcTrackConfigDetails = ({
-  onSave,
-  source,
-}: {
+const CtcTrackConfigDetails = ({ onSave, source }: {
   onSave: (trackConfig: CtcTrackConfig) => void;
   source: DataSourceConfig;
 }): React.ReactElement | null => {
-  const trackConfig = source.fileConfig?.ctcTrackConfig;
-  if (!trackConfig) {
-    return source.fileConfig?.trackConfigFilePath ? (
-      <p>
-        No TRACK.CFG metadata has been loaded for this source yet. Re-select the
-        TRACK.CFG file or import the CTC file to parse it.
-      </p>
-    ) : null;
-  }
-
-  const lineCount = countCtcTrackConfigLines(trackConfig);
-  const loopCount = countCtcTrackConfigLoops(trackConfig);
-
-  return (
-    <details open>
-      <summary>
-        TRACK.CFG metadata: {trackConfig.networks.length} network
-        {trackConfig.networks.length === 1 ? "" : "s"}, {lineCount} line
-        {lineCount === 1 ? "" : "s"}, {loopCount} loop
-        {loopCount === 1 ? "" : "s"}
-      </summary>
-      <table aria-label={`Dorian CTC TRACK.CFG Metadata ${source.id}`}>
-        <thead>
-          <tr>
-            <th>Network</th>
-            <th>Line</th>
-            <th>Line name</th>
-            <th>Loop</th>
-            <th>Site address</th>
-            <th>Card</th>
-            <th>Com port</th>
-            <th>Lap/finish</th>
-          </tr>
-        </thead>
-        <tbody>
-          {trackConfig.networks.flatMap((network) =>
-            network.lines.flatMap((line) =>
-              line.loops.map((loop) => (
-                <tr
-                  key={`${network.name}-${line.line}-${line.name}-${loop.loopNumber}-${loop.siteAddress}-${loop.card}-${loop.comPort}`}
-                >
-                  <td>{network.name}</td>
-                  <td>{line.line}</td>
-                  <td>{line.name}</td>
-                  <td>{loop.loopNumber}</td>
-                  <td>{loop.siteAddress}</td>
-                  <td>{loop.card}</td>
-                  <td>{loop.comPort}</td>
-                  <td>
-                    <input
-                      aria-label={`CTC ${network.name} line ${line.line} loop ${loop.loopNumber} lap finish`}
-                      checked={loop.isLapCompletion === true}
-                      onChange={(event) => {
-                        const nextTrackConfig: CtcTrackConfig = {
-                          ...trackConfig,
-                          networks: trackConfig.networks.map(
-                            (candidateNetwork) =>
-                              candidateNetwork === network
-                                ? {
-                                  ...candidateNetwork,
-                                  lines: candidateNetwork.lines.map(
-                                    (candidateLine) =>
-                                      candidateLine === line
-                                        ? {
-                                          ...candidateLine,
-                                          loops: candidateLine.loops.map(
-                                            (candidateLoop) =>
-                                              candidateLoop === loop
-                                                ? {
-                                                  ...candidateLoop,
-                                                  isLapCompletion:
-                                                          event.target.checked,
-                                                }
-                                                : candidateLoop,
-                                          ),
-                                        }
-                                        : candidateLine,
-                                  ),
-                                }
-                                : candidateNetwork,
-                          ),
-                        };
-                        onSave(nextTrackConfig);
-                      }}
-                      type="checkbox"
-                    />
-                  </td>
-                </tr>
-              )),
-            ),
-          )}
-        </tbody>
-      </table>
-    </details>
-  );
+  const trackConfig: CtcTrackConfig | undefined = source.fileConfig?.ctcTrackConfig;
+  if (!trackConfig) return source.fileConfig?.trackConfigFilePath
+    ? <p>No TRACK.CFG metadata has been loaded for this source yet. Re-select the TRACK.CFG file or import the CTC file to parse it.</p>
+    : null;
+  const setLapFinish = (networkIndex: number, lineIndex: number, loopIndex: number, checked: boolean): void => {
+    onSave({ ...trackConfig, networks: trackConfig.networks.map((network: CtcTrackConfigNetwork, ni: number): CtcTrackConfigNetwork =>
+      ni !== networkIndex ? network : { ...network, lines: network.lines.map((line: CtcTrackConfigLine, li: number): CtcTrackConfigLine =>
+        li !== lineIndex ? line : { ...line, loops: line.loops.map((loop: CtcTrackConfigLoop, lpi: number): CtcTrackConfigLoop =>
+          lpi !== loopIndex ? loop : { ...loop, isLapCompletion: checked }) }) }) });
+  };
+  const rows: ResponsiveDataRow[] = trackConfig.networks.flatMap((network: CtcTrackConfigNetwork, ni: number): ResponsiveDataRow[] =>
+    network.lines.flatMap((line: CtcTrackConfigLine, li: number): ResponsiveDataRow[] =>
+      line.loops.map((loop: CtcTrackConfigLoop, lpi: number): ResponsiveDataRow => ({
+        cells: [
+          { label: 'Network', value: network.name }, { label: 'Line', value: line.line },
+          { label: 'Line name', value: line.name }, { label: 'Loop', value: loop.loopNumber },
+          { label: 'Site address', value: loop.siteAddress }, { label: 'Card', value: loop.card },
+          { label: 'Com port', value: loop.comPort },
+          { label: 'Lap/finish', value: <FormControlLabel control={<Checkbox
+            slotProps={{ input: { 'aria-label': `CTC ${network.name} line ${line.line} loop ${loop.loopNumber} lap finish` } }}
+            checked={loop.isLapCompletion === true}
+            onChange={(_event: React.ChangeEvent<HTMLInputElement>, checked: boolean): void => setLapFinish(ni, li, lpi, checked)} />}
+          label="Completes lap" /> },
+        ], id: `${ni}-${li}-${lpi}`,
+      }))));
+  const lineCount: number = countCtcTrackConfigLines(trackConfig);
+  const loopCount: number = countCtcTrackConfigLoops(trackConfig);
+  return <Accordion defaultExpanded>
+    <AccordionSummary>TRACK.CFG metadata: {trackConfig.networks.length} network{trackConfig.networks.length === 1 ? '' : 's'},
+      {' '}{lineCount} line{lineCount === 1 ? '' : 's'}, {loopCount} loop{loopCount === 1 ? '' : 's'}</AccordionSummary>
+    <AccordionDetails><ResponsiveDataList label={`Dorian CTC TRACK.CFG Metadata ${source.id}`} rows={rows} /></AccordionDetails>
+  </Accordion>;
 };
 
 interface RfidDecoderOutputFieldProps {
@@ -493,7 +448,8 @@ export const DataSourcesPanel = (
   return (
     <section className="events-panel">
       <h2>Configured Data Sources</h2>
-      <div className="events-layout two-panel">
+      <AdminPageLayout className="events-layout two-panel" selectedId={selectedSourceId}
+        listLabel="data sources" detailLabel="source details">
         <section className="events-panel">
           <DataSourceTypesPanel
             newSourceType={newSourceType}
@@ -503,32 +459,14 @@ export const DataSourcesPanel = (
           {props.dataSources.length === 0 ? (
             <p>No data sources configured yet.</p>
           ) : (
-            <table aria-label="Configured data sources table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Enabled</th>
-                </tr>
-              </thead>
-              <tbody>
-                {props.dataSources.map((source) => {
-                  const isSelected = source.id === selectedSourceId;
-                  return (
-                    <tr
-                      key={source.id}
-                      aria-selected={isSelected}
-                      onClick={() => setSelectedSourceId(source.id)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <td>{source.name}</td>
-                      <td>{getDataSourceTypeLabel(source.type)}</td>
-                      <td>{source.enabled ? "Yes" : "No"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <ResponsiveDataList label="Configured data sources" rows={props.dataSources.map((source: DataSourceConfig) => ({
+              cells: [
+                { label: 'Name', value: <Button aria-pressed={source.id === selectedSourceId} data-source-id={source.id}
+                  onClick={(): void => setSelectedSourceId(source.id)} sx={{ minHeight: 48, overflowWrap: 'anywhere' }}>{source.name}</Button> },
+                { label: 'Type', value: getDataSourceTypeLabel(source.type) },
+                { label: 'Enabled', value: source.enabled ? 'Yes' : 'No' },
+              ], id: source.id,
+            }))} />
           )}
         </section>
 
@@ -564,7 +502,7 @@ export const DataSourcesPanel = (
                 <>
                   <h3>{source.name}</h3>
                   <p>{getDataSourceTypeLabel(source.type)}</p>
-                  <label>
+                  <div className="admin-source-field">
                     Source Name
                     <DraftInput
                       ariaLabel={`Source Name ${source.id}`}
@@ -573,7 +511,7 @@ export const DataSourcesPanel = (
                         props.onSaveSource(source.id, { name: value })
                       }
                     />
-                  </label>
+                  </div>
                   <FormControlLabel
                     control={
                       <Switch
@@ -618,7 +556,7 @@ export const DataSourcesPanel = (
                           Stop
                         </AsyncButton>
                       </div>
-                      <label>
+                      <div className="admin-source-field">
                         Listen port
                         <DraftInput
                           ariaLabel={`RFID Decoder Listen Port ${source.id}`}
@@ -636,8 +574,8 @@ export const DataSourcesPanel = (
                             })
                           }
                         />
-                      </label>
-                      <label>
+                      </div>
+                      <div className="admin-source-field">
                         Raw TCP capture file
                         <DraftInput
                           ariaLabel={`RFID Decoder Capture File ${source.id}`}
@@ -653,7 +591,7 @@ export const DataSourcesPanel = (
                             })
                           }
                         />
-                      </label>
+                      </div>
                       <RfidDecoderOutputField
                         sourceId={source.id}
                         value={props.rfidDecoderOutput?.[source.id] || ""}
@@ -745,53 +683,22 @@ export const DataSourcesPanel = (
                         }}
                         source={source}
                       />
-                      <fieldset>
-                        <legend>Data import mode</legend>
-                        <label>
-                          <input
-                            checked={
-                              (source.fileConfig?.importMode || "import") ===
-                              "import"
-                            }
-                            name={`dorian-ctc-import-mode-${source.id}`}
-                            onChange={() =>
-                              handleSaveDorianCtcImportMode(source, "import")
-                            }
-                            type="radio"
-                          />
-                          Import — remove the selected session&apos;s existing
-                          imported data before loading the file.
-                        </label>
-                        <label>
-                          <input
-                            checked={source.fileConfig?.importMode === "update"}
-                            name={`dorian-ctc-import-mode-${source.id}`}
-                            onChange={() =>
-                              handleSaveDorianCtcImportMode(source, "update")
-                            }
-                            type="radio"
-                          />
-                          Update — retain existing data and update or add
-                          matching file records where possible.
-                        </label>
-                      </fieldset>
-                      <label>
-                        <input
-                          checked={
-                            source.fileConfig
-                              ?.importPlaceholderEntrantsForUnknownTransmitters ===
+                      <ImportModeControls name={`dorian-ctc-import-mode-${source.id}`}
+                        onChange={(mode: DataImportMode): void => handleSaveDorianCtcImportMode(source, mode)}
+                        value={source.fileConfig?.importMode || 'import'} />
+                      <FormControlLabel control={<Checkbox
+                        checked={
+                          source.fileConfig
+                            ?.importPlaceholderEntrantsForUnknownTransmitters ===
                             true
-                          }
-                          onChange={(event) =>
-                            handleSaveDorianCtcPlaceholderEntrants(
-                              source,
-                              event.target.checked,
-                            )
-                          }
-                          type="checkbox"
-                        />
-                        Import placeholder entrant for unknown transmitters
-                      </label>
+                        }
+                        onChange={(event) =>
+                          handleSaveDorianCtcPlaceholderEntrants(
+                            source,
+                            event.target.checked,
+                          )
+                        }
+                      />} label="Import placeholder entrant for unknown transmitters" />
                       <div className="events-actions">
                         <AsyncButton
                           type="button"
@@ -844,45 +751,47 @@ export const DataSourcesPanel = (
                           source.durtFileMakerConfig?.databaseFilePath || ""
                         }
                       />
-                      <label>
+                      <div className="admin-source-field">
                         fmp2json executable (bundled)
-                        <details className="inline-info">
-                          <summary
+                        <Accordion className="inline-info">
+                          <AccordionSummary
                             aria-label="About fmp2json"
                             title="About the required fmp2json extractor"
                           >
                             ⓘ
-                          </summary>
-                          <p>
+                          </AccordionSummary>
+                          <AccordionDetails>
+                            <p>
                             FileMaker databases are proprietary binary files.
                             RaceSweet uses fmp2json to read their tables safely,
                             then converts DURT entrants and crossings into the
                             RaceSweet ledger.
-                          </p>
-                          <p>
+                            </p>
+                            <p>
                             RaceSweet packages fmp2json with the Windows app, so
                             normal users do not need a compiler or separate
                             installation. Developers can create that package
                             with npm run build:fmptools:win32; the build runs
                             entirely in Docker.
-                          </p>
-                          <p>
+                            </p>
+                            <p>
                             The bundled binary is built from{" "}
-                            <a
-                              href="https://github.com/evanmiller/fmptools/releases"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                void props.onOpenExternalUrl?.(
-                                  "https://github.com/evanmiller/fmptools/releases",
-                                );
-                              }}
-                            >
+                              <a
+                                href="https://github.com/evanmiller/fmptools/releases"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  void props.onOpenExternalUrl?.(
+                                    "https://github.com/evanmiller/fmptools/releases",
+                                  );
+                                }}
+                              >
                               fmptools releases
-                            </a>
+                              </a>
                             . A custom executable can be selected below only
                             when troubleshooting or testing a different build.
-                          </p>
-                        </details>
+                            </p>
+                          </AccordionDetails>
+                        </Accordion>
                         <FileSelectionField
                           actions={[
                             {
@@ -898,56 +807,17 @@ export const DataSourcesPanel = (
                             source.durtFileMakerConfig?.extractorPath || ""
                           }
                         />
-                      </label>
-                      <fieldset>
-                        <legend>Data import mode</legend>
-                        <label>
-                          <input
-                            checked={
-                              (source.durtFileMakerConfig?.importMode ||
-                                "import") === "import"
-                            }
-                            name={`durt-import-mode-${source.id}`}
-                            onChange={() =>
-                              props.onSaveSource(source.id, {
-                                durtFileMakerConfig: {
-                                  ...source.durtFileMakerConfig,
-                                  importMode: "import",
-                                },
-                              })
-                            }
-                            type="radio"
-                          />
-                          Import — replace imported state for the selected
-                          session.
-                        </label>
-                        <label>
-                          <input
-                            checked={
-                              source.durtFileMakerConfig?.importMode ===
-                              "update"
-                            }
-                            name={`durt-import-mode-${source.id}`}
-                            onChange={() =>
-                              props.onSaveSource(source.id, {
-                                durtFileMakerConfig: {
-                                  ...source.durtFileMakerConfig,
-                                  importMode: "update",
-                                },
-                              })
-                            }
-                            type="radio"
-                          />
-                          Update — merge imported records into the selected
-                          session.
-                        </label>
-                      </fieldset>
+                      </div>
+                      <ImportModeControls name={`durt-import-mode-${source.id}`}
+                        onChange={(mode: DataImportMode): void => {
+                          void props.onSaveSource(source.id, { durtFileMakerConfig: { ...source.durtFileMakerConfig, importMode: mode } });
+                        }} value={source.durtFileMakerConfig?.importMode || 'import'} />
                       <div className="events-actions"></div>
                     </>
                   ) : isApicalApi && source.apiConfig ? (
                     <>
                       <h4>Apical Endpoint</h4>
-                      <label>
+                      <div className="admin-source-field">
                         Base URL
                         <DraftInput
                           ariaLabel={`Apical Base URL ${source.id}`}
@@ -961,8 +831,8 @@ export const DataSourcesPanel = (
                             })
                           }
                         />
-                      </label>
-                      <label>
+                      </div>
+                      <div className="admin-source-field">
                         Auth Header Name
                         <DraftInput
                           ariaLabel={`Apical Auth Header Name ${source.id}`}
@@ -976,8 +846,8 @@ export const DataSourcesPanel = (
                             })
                           }
                         />
-                      </label>
-                      <label>
+                      </div>
+                      <div className="admin-source-field">
                         Auth Header Value
                         <DraftInput
                           ariaLabel={`Apical Auth Header Value ${source.id}`}
@@ -991,8 +861,8 @@ export const DataSourcesPanel = (
                             })
                           }
                         />
-                      </label>
-                      <label>
+                      </div>
+                      <div className="admin-source-field">
                         Company Id
                         <DraftInput
                           ariaLabel={`Apical Company Id ${source.id}`}
@@ -1007,8 +877,8 @@ export const DataSourcesPanel = (
                             })
                           }
                         />
-                      </label>
-                      <label>
+                      </div>
+                      <div className="admin-source-field">
                         Poll Interval (seconds)
                         <DraftInput
                           ariaLabel={`Apical Poll Interval ${source.id}`}
@@ -1023,8 +893,8 @@ export const DataSourcesPanel = (
                             })
                           }
                         />
-                      </label>
-                      <label>
+                      </div>
+                      <div className="admin-source-field">
                         HTTP Timeout (seconds)
                         <DraftInput
                           ariaLabel={`Apical Http Timeout ${source.id}`}
@@ -1039,7 +909,7 @@ export const DataSourcesPanel = (
                             })
                           }
                         />
-                      </label>
+                      </div>
                       <FormControlLabel
                         control={
                           <Switch
@@ -1144,7 +1014,7 @@ export const DataSourcesPanel = (
                         <div className="inline-error" role="alert">
                           <p>{sourceFetchError.title}:</p>
                           <pre>{sourceFetchError.details}</pre>
-                          <button
+                          <Button
                             type="button"
                             onClick={() => {
                               setSourceFetchErrors((current) => {
@@ -1155,7 +1025,7 @@ export const DataSourcesPanel = (
                             }}
                           >
                             Dismiss
-                          </button>
+                          </Button>
                         </div>
                       ) : null}
                       {listedEvents.length > 0 ? (
@@ -1166,7 +1036,7 @@ export const DataSourcesPanel = (
                             label="Apical Event"
                             select
                             slotProps={{
-                              htmlInput: {
+                              select: {
                                 "aria-label": `Apical Selected Event ${source.id}`,
                               },
                             }}
@@ -1194,35 +1064,6 @@ export const DataSourcesPanel = (
                               </MenuItem>
                             ))}
                           </TextField>
-                          <select
-                            aria-label={`Apical Selected Event ${source.id}`}
-                            hidden
-                            value={selectedApicalEventId || ""}
-                            onChange={(
-                              event: React.ChangeEvent<HTMLSelectElement>,
-                            ): void => {
-                              const eventId: number = Number(
-                                event.target.value,
-                              );
-                              if (!eventId) {
-                                return;
-                              }
-                              void props.onSaveSource(source.id, {
-                                apiConfig: {
-                                  ...source.apiConfig!,
-                                  apicalEventId: eventId,
-                                  selectedEventIds: [eventId],
-                                },
-                              });
-                            }}
-                          >
-                            <option value="">Select Apical event</option>
-                            {listedEvents.map((eventItem) => (
-                              <option key={eventItem.id} value={eventItem.id}>
-                                {eventItem.name} ({eventItem.id})
-                              </option>
-                            ))}
-                          </select>
                           {!isApicalRecentLaps ? (
                             <AsyncButton
                               disabled={
@@ -1253,10 +1094,10 @@ export const DataSourcesPanel = (
                         Used as fallback when imported timing data does not
                         contain full entrant profile fields.
                       </p>
-                      <label>
+                      <div className="admin-source-field">
                         Profiles JSON
-                        <textarea
-                          aria-label={`Master Entrant Profiles ${source.id}`}
+                        <TextField multiline minRows={6} fullWidth label="Profiles JSON"
+                          slotProps={{ htmlInput: { "aria-label": `Master Entrant Profiles ${source.id}` } }}
                           defaultValue={masterProfilesJson}
                           onBlur={(event) => {
                             try {
@@ -1289,14 +1130,14 @@ export const DataSourcesPanel = (
                             }
                           }}
                         />
-                      </label>
+                      </div>
                       {masterProfileDraftErrors[source.id] ? (
                         <div className="inline-error" role="alert">
                           <p>
                             Failed to parse profiles:{" "}
                             {masterProfileDraftErrors[source.id]}
                           </p>
-                          <button
+                          <Button
                             type="button"
                             onClick={() => {
                               setMasterProfileDraftErrors((current) => {
@@ -1307,7 +1148,7 @@ export const DataSourcesPanel = (
                             }}
                           >
                             Dismiss
-                          </button>
+                          </Button>
                         </div>
                       ) : null}
                     </>
@@ -1335,15 +1176,14 @@ export const DataSourcesPanel = (
             <p>Select a data source from the table to edit details.</p>
           )}
         </section>
-      </div>
+      </AdminPageLayout>
       {dorianCtcPreview ||
       dorianCtcPreviewError ||
       dorianCtcPreviewLoadingFile ? (
-          <div className="warning-modal-backdrop">
+          <ResponsiveDialog open disablePortal aria-labelledby="mr-scats-preview-title" maxWidth="xl" fullWidth
+            slotProps={{ paper: { className: 'mr-scats-preview-dialog' } }}>
             <section
               className="warning-modal reload-summary-dialog mr-scats-preview-dialog"
-              role="dialog"
-              aria-modal="true"
               aria-labelledby="mr-scats-preview-title"
             >
               <div className="warning-modal-heading">
@@ -1396,7 +1236,7 @@ export const DataSourcesPanel = (
                 ) : null}
               </div>
               <div className="events-actions warning-modal-actions">
-                <button
+                <Button
                   type="button"
                   onClick={() => {
                     setDorianCtcPreview(undefined);
@@ -1405,10 +1245,10 @@ export const DataSourcesPanel = (
                   }}
                 >
                 Close
-                </button>
+                </Button>
               </div>
             </section>
-          </div>
+          </ResponsiveDialog>
         ) : null}
     </section>
   );

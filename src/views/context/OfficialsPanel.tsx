@@ -1,9 +1,10 @@
 import {
   Alert, Autocomplete, Box, Button, Card, CardActionArea, CardContent, Checkbox, FormControlLabel,
-  MenuItem, Stack, TextField, Typography,
+  Menu, MenuItem, Stack, TextField, Tooltip, Typography,
 } from '@mui/material';
 import React from 'react';
 import type { EventCatalogState } from '../../catalog/eventCatalog.js';
+import { IdentifierDisplay, copyToClipboard } from '../../controls/identifierDisplay.js';
 import { createOfficialContactReport } from '../../export/officialContactReport.js';
 import { createReportPdf, downloadReportBlob, printReport, toReportCsv } from '../../export/tabularReport.js';
 import type {
@@ -50,6 +51,12 @@ const toLocalDateTime = (value: string | undefined): string => {
 
 const fromLocalDateTime = (value: string): string | undefined => value ? new Date(value).toISOString() : undefined;
 
+interface OfficialCardContextMenu {
+  mouseX: number;
+  mouseY: number;
+  row: OfficialContactRow;
+}
+
 const AvailabilityFields = ({ slots, onChange }: {
   onChange: (slots: OfficialAvailabilitySlot[]) => void;
   slots: OfficialAvailabilitySlot[];
@@ -88,6 +95,7 @@ export const OfficialsPanel = (props: OfficialsPanelProps): React.ReactElement =
   const [assignmentId, setAssignmentId] = React.useState<string | undefined>(undefined);
   const [draft, setDraft] = React.useState<OfficialAssignmentInput | undefined>(undefined);
   const [error, setError] = React.useState<string>('');
+  const [contextMenu, setContextMenu] = React.useState<OfficialCardContextMenu | undefined>(undefined);
   React.useEffect((): void => {
     setSessionId(undefined);
     setAssignmentId(undefined);
@@ -142,6 +150,15 @@ export const OfficialsPanel = (props: OfficialsPanelProps): React.ReactElement =
     new Blob([toReportCsv(report)], { type: 'text/csv;charset=utf-8' }), 'official-contacts.csv');
   const exportPdf = (): void => run((): Promise<void> => createReportPdf(report)
     .then((blob: Blob): void => downloadReportBlob(blob, 'official-contacts.pdf')));
+  const openCardContextMenu = (event: React.MouseEvent<HTMLElement>, row: OfficialContactRow): void => {
+    event.preventDefault();
+    setContextMenu({ mouseX: event.clientX - 2, mouseY: event.clientY - 4, row });
+  };
+  const closeCardContextMenu = (): void => setContextMenu(undefined);
+  const copyContextMenuIdentifier = (identifier: string): void => {
+    copyToClipboard(identifier);
+    closeCardContextMenu();
+  };
 
   return <Stack spacing={2} sx={{ minWidth: 0, p: 2 }}>
     <Typography variant="h5">Officials</Typography>
@@ -160,24 +177,27 @@ export const OfficialsPanel = (props: OfficialsPanelProps): React.ReactElement =
         </TextField>
         <Typography variant="subtitle2">Assignments for this event</Typography>
         {rows.map((row: OfficialContactRow): React.ReactElement =>
-          <Card key={row.assignmentId} variant="outlined" sx={{ borderColor: row.assignmentId === assignmentId ? 'primary.main' : 'divider' }}>
-            <CardActionArea onClick={(): void => {
-              const assignment: OfficialAssignment | undefined = assignments.find((candidate: OfficialAssignment): boolean =>
-                candidate.id === row.assignmentId);
-              if (assignment) selectAssignment(assignment);
-            }}>
-              <CardContent>
-                <Typography variant="subtitle1">{row.displayName}{row.archived ? ' (archived)' : ''}</Typography>
-                <Typography variant="body2">{row.role} · {row.sessionName}</Typography>
-                <Typography variant="body2">{row.position}</Typography>
-                <Typography variant="caption">Individual ID: {row.officialId} / Assignment ID: {row.assignmentId}</Typography>
-                <Typography variant="body2">{row.email} {row.phone}</Typography>
-                <Typography variant="body2">{row.responsibilities}</Typography>
-                <Typography variant="body2">{row.availability}</Typography>
-                {detailed && <Typography variant="body2">{row.notes}</Typography>}
-              </CardContent>
-            </CardActionArea>
-          </Card>)}
+          <Tooltip enterDelay={0} key={row.assignmentId} title={<Stack spacing={0}>
+            <Typography variant="caption">Individual ID: {row.officialId}</Typography>
+          </Stack>}>
+            <Card variant="outlined" sx={{ borderColor: row.assignmentId === assignmentId ? 'primary.main' : 'divider' }}>
+              <CardActionArea aria-label={`Official assignment card: ${row.displayName}`} onClick={(): void => {
+                const assignment: OfficialAssignment | undefined = assignments.find((candidate: OfficialAssignment): boolean =>
+                  candidate.id === row.assignmentId);
+                if (assignment) selectAssignment(assignment);
+              }} onContextMenu={(event: React.MouseEvent<HTMLElement>): void => openCardContextMenu(event, row)}>
+                <CardContent>
+                  <Typography variant="subtitle1">{row.displayName}{row.archived ? ' (archived)' : ''}</Typography>
+                  <Typography variant="body2">{row.role} · {row.sessionName}</Typography>
+                  <Typography variant="body2">{row.position}</Typography>
+                  <Typography variant="body2">{row.email} {row.phone}</Typography>
+                  <Typography variant="body2">{row.responsibilities}</Typography>
+                  <Typography variant="body2">{row.availability}</Typography>
+                  {detailed && <Typography variant="body2">{row.notes}</Typography>}
+                </CardContent>
+              </CardActionArea>
+            </Card>
+          </Tooltip>)}
         {rows.length === 0 && <Typography variant="body2">No matching assignments.</Typography>}
       </Stack>
       <Stack spacing={1} sx={{ minWidth: 0 }}>
@@ -185,15 +205,15 @@ export const OfficialsPanel = (props: OfficialsPanelProps): React.ReactElement =
         <Autocomplete filterOptions={(profiles: OfficialProfile[], state: { inputValue: string }): OfficialProfile[] =>
           profiles.filter((profile: OfficialProfile): boolean => [profile.displayName, profile.email, profile.phone]
             .filter(Boolean).join(' ').toLocaleLowerCase().includes(state.inputValue.trim().toLocaleLowerCase()))}
-          getOptionLabel={(profile: OfficialProfile): string => profile.displayName}
-          isOptionEqualToValue={(left: OfficialProfile, right: OfficialProfile): boolean => left.id === right.id}
-          onChange={(_event: React.SyntheticEvent, profile: OfficialProfile | null): void => selectIndividual(profile?.id || '')}
-          options={matchingProfiles} renderInput={(params): React.ReactElement =>
-            <TextField {...params} label="Search and select individual" placeholder="Type a name, email, or phone" />}
-          renderOption={(optionProps: React.HTMLAttributes<HTMLLIElement>, profile: OfficialProfile): React.ReactElement =>
-            <li {...optionProps} key={profile.id}>{profile.displayName}{profile.archived ? ' (archived)' : ''} — {profile.id}</li>}
-          value={selected || null} />
-        {selected && <TextField label="Individual ID" slotProps={{ htmlInput: { readOnly: true } }} value={selected.id} />}
+        getOptionLabel={(profile: OfficialProfile): string => profile.displayName}
+        isOptionEqualToValue={(left: OfficialProfile, right: OfficialProfile): boolean => left.id === right.id}
+        onChange={(_event: React.SyntheticEvent, profile: OfficialProfile | null): void => selectIndividual(profile?.id || '')}
+        options={matchingProfiles} renderInput={(params): React.ReactElement =>
+          <TextField {...params} label="Search and select individual" placeholder="Type a name, email, or phone" />}
+        renderOption={(optionProps: React.HTMLAttributes<HTMLLIElement>, profile: OfficialProfile): React.ReactElement =>
+          <li {...optionProps} key={profile.id}>{profile.displayName}{profile.archived ? ' (archived)' : ''} — {profile.id}</li>}
+        value={selected || null} />
+        {selected && <IdentifierDisplay label="Individual ID" value={selected.id} />}
         <Button disabled={!selected} onClick={props.onOpenIndividual}>Edit individual details</Button>
         {currentDraft && <>
           <TextField select label="Session" value={currentDraft.sessionId || ''} onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
@@ -202,7 +222,6 @@ export const OfficialsPanel = (props: OfficialsPanelProps): React.ReactElement =
             {props.catalog.sessions.filter((session): boolean => session.eventId === props.eventId).map((session): React.ReactElement =>
               <MenuItem key={session.id} value={session.id}>{session.name}</MenuItem>)}
           </TextField>
-          {selectedAssignment && <TextField label="Assignment ID" slotProps={{ htmlInput: { readOnly: true } }} value={selectedAssignment.id} />}
           <TextField helperText="The duty or station this person will cover, for example Start marshal or Pit exit."
             label="Position / duty" required value={currentDraft.position} onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
               setDraft({ ...currentDraft, position: event.target.value, role: event.target.value })} />
@@ -234,5 +253,15 @@ export const OfficialsPanel = (props: OfficialsPanelProps): React.ReactElement =
       <Button disabled={!props.eventId} onClick={exportPdf}>PDF</Button>
     </Stack>
     <Typography variant="body2">{rows.length} assignment{rows.length === 1 ? '' : 's'} in contact list</Typography>
+    <Menu
+      anchorPosition={contextMenu ? { left: contextMenu.mouseX, top: contextMenu.mouseY } : undefined}
+      anchorReference="anchorPosition"
+      onClose={closeCardContextMenu}
+      open={contextMenu !== undefined}
+    >
+      {contextMenu ? <>
+        <MenuItem onClick={(): void => copyContextMenuIdentifier(contextMenu.row.officialId)}>Copy Individual ID</MenuItem>
+      </> : null}
+    </Menu>
   </Stack>;
 };

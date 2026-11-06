@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 
-import React from 'react';
+import React, { act } from 'react';
 import { flushSync } from 'react-dom';
 import { type Root, createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type EntrantType, type EventCatalogEntrant, type EventCatalogState } from '../../catalog/eventCatalog.js';
 import { type EventParticipant } from '../../model/eventparticipant.js';
 import { EntrantListPanel } from './entrantList.js';
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const riderEntrant: EventCatalogEntrant = {
   categoryId: 'category-1',
@@ -74,12 +76,15 @@ describe('EntrantListPanel', () => {
     container = undefined;
   });
 
-  it('renders rider and team entrant cards and routes create and select actions through the guard', () => {
+  it('renders copyable entrant card details and routes create and select actions through the guard', async () => {
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
     const onCreateEntrant = vi.fn();
     const onSelectEntrant = vi.fn();
+    const writeText = vi.fn(async (_text: string): Promise<void> => undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const participantWithDistinctId: EventParticipant = { ...participant, id: 'participant-1' };
     const requestFormExit = vi.fn((action: () => void | Promise<void>) => {
       void action();
     });
@@ -94,7 +99,7 @@ describe('EntrantListPanel', () => {
           filteredTeamEntrants={[teamEntrant]}
           onCreateEntrant={onCreateEntrant}
           onSelectEntrant={onSelectEntrant}
-          raceStateParticipants={[participant]}
+          raceStateParticipants={[participantWithDistinctId]}
           requestFormExit={requestFormExit}
           riderEntrants={[riderEntrant]}
           selectedEntrant={riderEntrant}
@@ -117,6 +122,26 @@ describe('EntrantListPanel', () => {
     expect(container.textContent).toContain('Team: Fast Friends');
     expect(container.textContent).toContain('#73');
     expect(container.textContent).toContain('Tx1234');
+    const riderCard = Array.from(container.querySelectorAll<HTMLButtonElement>('button.events-list-item'))
+      .find((button: HTMLButtonElement): boolean => button.textContent?.includes('Rider One') === true)!;
+    expect(riderCard.textContent).not.toContain('Entrant ID: rider-1');
+    await act(async (): Promise<void> => {
+      riderCard.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      await new Promise<void>((resolve: () => void): number => window.setTimeout(resolve, 0));
+    });
+    expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('Entrant ID: rider-1');
+    expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('Participant ID: participant-1');
+    await act(async (): Promise<void> => {
+      riderCard.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 60 }));
+    });
+    const copyParticipantDetails: HTMLElement | undefined = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((item: HTMLElement): boolean => item.textContent?.trim() === 'Copy participant details');
+    expect(copyParticipantDetails).toBeDefined();
+    await act(async (): Promise<void> => {
+      copyParticipantDetails!.click();
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenCalledWith('Entrant ID: rider-1\nParticipant ID: participant-1\nRace number: #73\nTiming devices: Tx1234');
 
     const createKindSelect = container.querySelector<HTMLSelectElement>('select[aria-label="Create Entrant Kind"]');
     expect(createKindSelect).not.toBeNull();

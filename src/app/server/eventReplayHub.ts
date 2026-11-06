@@ -1,355 +1,407 @@
-import type { ServerResponse } from 'node:http';
-import type { EventTimeRecord, TimeRecord } from '../../model/timerecord.js';
+import type { ServerResponse } from "node:http";
 
-const HEARTBEAT_INTERVAL_MS: number = 15_000;
-const MAXIMUM_TIMER_DELAY_MS: number = 2_147_483_647;
+import {
+  REPLAY_PROTOCOL_VERSION,
+  type ReplayCommand,
+  type ReplayEventName,
+  type ReplayEventPayloads,
+  type ReplayMode,
+  type ReplayRecord,
+  type ReplaySeekTarget,
+  type ReplaySelection,
+  type ReplayState,
+  isReplayTimestamp,
+} from "../../model/eventReplay.js";
+import type {
+  EventTimeRecord,
+  ParticipantPassingRecord,
+  TimeRecord,
+} from "../../model/timerecord.js";
 
-export type EventReplayCommand = 'pause' | 'reset' | 'resume' | 'set-speed' | 'start';
-export type EventReplayMode = 'live' | 'replay';
-export type EventReplayStatus = 'completed' | 'paused' | 'replaying';
-
+export type EventReplayCommand = ReplayCommand;
+export type EventReplayMode = ReplayMode;
+export type EventReplayState = ReplayState;
 export interface EventReplayRecord {
   eventId: string;
   record: TimeRecord;
   sessionId: string;
 }
+export type EventReplaySelection = ReplaySelection;
 
-export interface EventReplaySelection {
-  eventId: string;
-  sessionId?: string;
-}
-
-export interface EventReplayState extends EventReplaySelection {
-  emittedRecordCount: number;
-  recordCount: number;
-  speed: number;
-  status: EventReplayStatus;
-  streamId: string;
-}
-
-interface LiveSubscriber extends EventReplaySelection {
-  dispose: () => void;
-  response: ServerResponse;
-}
-
-interface ReplayStream extends EventReplayState {
-  emittedRecords: EventReplayRecord[];
-  records: EventReplayRecord[];
+interface ReplayStream extends ReplayState {
+  intervalRemaining: number;
+  intervalStarted: number;
+  records: ReplayRecord[];
   subscriberDisposers: Map<ServerResponse, () => void>;
-  subscribers: Set<ServerResponse>;
   timer?: NodeJS.Timeout;
+  timerGeneration: number;
 }
-
-const formatEvent = (type: string, payload: object): string => [
-  `event: ${type}`,
-  `data: ${JSON.stringify(payload)}`,
-  '',
-  '',
-].join('\n');
-
+const MAXIMUM_TIMER_DELAY_MS: number = 2_147_483_647;
+const formatEvent = <TName extends ReplayEventName>(
+  name: TName,
+  payload: ReplayEventPayloads[TName],
+): string => `event: ${name}\ndata: ${JSON.stringify(payload)}\n\n`;
+const normalizeRecord = (
+  input: EventReplayRecord,
+): ReplayRecord | undefined => {
+  const record: Partial<ParticipantPassingRecord> = input.record;
+  const time: Date | undefined = input.record.time;
+  if (!time || !Number.isFinite(time.getTime())) return undefined;
+  return {
+    entrantId: record.entrantId || undefined,
+    entryId: record.entryId || undefined,
+    eventId: input.eventId,
+    id: input.record.id.toString(),
+    lineNumber: record.lineNumber,
+    loopNumber: record.loopNumber,
+    participantId: record.participantId || undefined,
+    recordType: input.record.recordType,
+    sequence: (input.record as Partial<EventTimeRecord>).sequence || 0,
+    sessionId: input.sessionId,
+    timestamp: time.toISOString(),
+  };
+};
 const matchesSelection = (
-  record: EventReplayRecord,
-  selection: EventReplaySelection,
-): boolean => record.eventId === selection.eventId &&
-  (selection.sessionId === undefined || record.sessionId === selection.sessionId);
-
-const recordSequence = (record: EventReplayRecord): number => {
-  const sequence: number | undefined = (record.record as Partial<EventTimeRecord>).sequence;
-  return sequence === undefined ? 0 : sequence;
-};
-
-const recordTimestamp = (record: EventReplayRecord): number => {
-  const timestamp: number | undefined = record.record.time?.getTime();
-  return timestamp === undefined || Number.isNaN(timestamp) ? 0 : timestamp;
-};
-
-const sortRecords = (
-  records: EventReplayRecord[],
-  selection: EventReplaySelection,
-): EventReplayRecord[] => [...records]
-  .filter((record: EventReplayRecord): boolean => matchesSelection(record, selection))
-  .sort((left: EventReplayRecord, right: EventReplayRecord): number => {
-    const timestampDifference: number = recordTimestamp(left) - recordTimestamp(right);
-    return timestampDifference !== 0
-      ? timestampDifference
-      : recordSequence(left) - recordSequence(right);
-  });
-
-const replayState = (stream: ReplayStream): EventReplayState => ({
-  emittedRecordCount: stream.emittedRecordCount,
+  record: ReplaySelection,
+  selection: ReplaySelection,
+): boolean =>
+  record.eventId === selection.eventId &&
+  (!selection.sessionId || record.sessionId === selection.sessionId);
+const compareRecords = (left: ReplayRecord, right: ReplayRecord): number =>
+  Date.parse(left.timestamp) - Date.parse(right.timestamp) ||
+  left.sequence - right.sequence ||
+  left.id.localeCompare(right.id);
+const replayState = (stream: ReplayStream): ReplayState => ({
+  emittedRecordCount: stream.position,
   eventId: stream.eventId,
-  recordCount: stream.recordCount,
+  mode: stream.mode,
+  position: stream.position,
+  recordCount: stream.records.length,
+  serverTimestamp: new Date().toISOString(),
   sessionId: stream.sessionId,
   speed: stream.speed,
   status: stream.status,
   streamId: stream.streamId,
 });
 
+/** Controls and timer callbacks are synchronous atomic turns on the server event loop. */
 export class EventReplayHub {
-  private readonly liveSubscribers = new Set<LiveSubscriber>();
-  private readonly replayStreams = new Map<string, ReplayStream>();
+  private readonly streams: Map<string, ReplayStream> = new Map();
 
   public control = (
     streamId: string,
-    command: EventReplayCommand,
+    command: ReplayCommand,
     speed?: number,
-  ): EventReplayState => {
-    const stream: ReplayStream | undefined = this.replayStreams.get(streamId);
-    if (!stream) {
-      throw new Error(`Replay stream ${streamId} was not found.`);
+    target?: ReplaySeekTarget,
+  ): ReplayState => {
+    const stream: ReplayStream | undefined = this.streams.get(streamId);
+    if (!stream) throw new Error("Replay stream was not found.");
+    if (stream.mode !== "replay")
+      throw new Error("Live streams cannot be controlled.");
+    if (
+      !["start", "pause", "resume", "reset", "set-speed", "seek"].includes(
+        command,
+      )
+    )
+      throw new Error("Invalid replay command.");
+    if (command !== "seek" && target)
+      throw new Error("Seek targets are only valid for seek commands.");
+    let position: number | undefined;
+    if (command === "seek") {
+      if (
+        !target ||
+        (target.position === undefined) === (target.timestamp === undefined)
+      )
+        throw new Error("Seek requires exactly one target.");
+      if (target.position !== undefined) {
+        if (
+          !Number.isInteger(target.position) ||
+          target.position < 0 ||
+          target.position > stream.records.length
+        )
+          throw new Error("Seek position is out of range.");
+        position = target.position;
+      } else {
+        if (!isReplayTimestamp(target.timestamp))
+          throw new Error(
+            "Seek timestamp must be an ISO instant with an offset.",
+          );
+        const found: number = stream.records.findIndex(
+          (record: ReplayRecord): boolean =>
+            Date.parse(record.timestamp) >= Date.parse(target.timestamp),
+        );
+        position = found < 0 ? stream.records.length : found;
+      }
     }
-    if (command === 'pause') {
-      if (stream.status === 'replaying') {
-        this.clearTimer(stream);
-        stream.status = 'paused';
-      }
-    } else if (command === 'resume') {
-      if (stream.status === 'paused') {
-        stream.status = 'replaying';
-        this.scheduleNextRecord(stream);
-      }
-    } else if (command === 'set-speed') {
-      if (speed === undefined || !Number.isFinite(speed) || speed < 0.01 || speed > 1_000) {
-        throw new Error('Replay speed must be a number between 0.01 and 1000.');
-      }
-      stream.speed = speed;
-      if (stream.status === 'replaying') {
-        this.clearTimer(stream);
-        this.scheduleNextRecord(stream);
-      }
-    } else if (command === 'reset' || command === 'start') {
-      this.clearTimer(stream);
-      stream.emittedRecordCount = 0;
-      stream.emittedRecords = [];
-      stream.status = 'replaying';
-      this.broadcast(stream, 'replay-reset', replayState(stream));
-      this.scheduleNextRecord(stream);
+    if (
+      command === "set-speed" &&
+      (speed === undefined ||
+        !Number.isFinite(speed) ||
+        speed < 0.01 ||
+        speed > 1000)
+    ) {
+      throw new Error("Replay speed must be a number between 0.01 and 1000.");
     }
-    const state: EventReplayState = replayState(stream);
-    this.broadcast(stream, 'replay-state', state);
-    return state;
+    this.clearTimer(stream, true);
+    if (command === "pause" && stream.status === "replaying")
+      stream.status = "paused";
+    if (command === "resume" && stream.status === "paused")
+      stream.status = "replaying";
+    if (command === "set-speed") stream.speed = speed!;
+    if (command === "seek") {
+      stream.position = position!;
+      stream.intervalRemaining = this.recordInterval(stream);
+      this.broadcast(stream, "replay-seek", {
+        position: stream.position,
+        records: stream.records.slice(0, stream.position),
+        snapshotBoundary: stream.position,
+        state: replayState(stream),
+        target: target!,
+      });
+    }
+    if (command === "reset" || command === "start") {
+      stream.position = 0;
+      stream.intervalRemaining = 0;
+      stream.status = "replaying";
+      this.broadcast(stream, "replay-reset", {
+        position: 0,
+        state: replayState(stream),
+      });
+    }
+    this.broadcast(stream, "replay-state", replayState(stream));
+    if (stream.status === "replaying") this.scheduleNextRecord(stream);
+    return replayState(stream);
   };
 
-  public publish = (record: EventReplayRecord): void => {
-    this.liveSubscribers.forEach((subscriber: LiveSubscriber): void => {
-      if (matchesSelection(record, subscriber)) {
-        subscriber.response.write(formatEvent('race-record', record));
-      }
+  public publish = (input: EventReplayRecord): void => {
+    const record: ReplayRecord | undefined = normalizeRecord(input);
+    if (!record) return;
+    this.streams.forEach((stream: ReplayStream): void => {
+      if (
+        stream.mode !== "live" ||
+        !matchesSelection(record, stream) ||
+        stream.records.some(
+          (existing: ReplayRecord): boolean => existing.id === record.id,
+        )
+      )
+        return;
+      stream.records.push(record);
+      stream.records.sort(compareRecords);
+      stream.position = stream.records.length;
+      this.broadcast(stream, "race-update", {
+        record,
+        state: replayState(stream),
+      });
     });
   };
 
   public subscribe = (
     response: ServerResponse,
-    selection: EventReplaySelection,
-    mode: EventReplayMode,
+    selection: ReplaySelection,
+    mode: ReplayMode,
     speed: number,
-    records: EventReplayRecord[],
+    inputs: EventReplayRecord[],
     streamId: string,
   ): (() => void) => {
+    if (!streamId.trim() || streamId.length > 200)
+      throw new Error("Invalid replay stream ID.");
+    if (
+      !["live", "replay"].includes(mode) ||
+      !Number.isFinite(speed) ||
+      speed < 0.01 ||
+      speed > 1000
+    )
+      throw new Error("Invalid replay mode or speed.");
+    let stream: ReplayStream | undefined = this.streams.get(streamId);
+    if (
+      stream &&
+      (stream.eventId !== selection.eventId ||
+        stream.sessionId !== selection.sessionId ||
+        stream.mode !== mode)
+    ) {
+      throw new Error(
+        "Replay stream targets a different event, session, or mode.",
+      );
+    }
+    if (stream?.mode === "live") {
+      stream.records = inputs
+        .flatMap((input: EventReplayRecord): ReplayRecord[] => {
+          const record: ReplayRecord | undefined = normalizeRecord(input);
+          return record && matchesSelection(record, selection) ? [record] : [];
+        })
+        .sort(compareRecords);
+      stream.position = stream.records.length;
+    }
+    if (!stream) {
+      const records: ReplayRecord[] = inputs
+        .flatMap((input: EventReplayRecord): ReplayRecord[] => {
+          const record: ReplayRecord | undefined = normalizeRecord(input);
+          return record && matchesSelection(record, selection) ? [record] : [];
+        })
+        .sort(compareRecords);
+      stream = {
+        ...selection,
+        emittedRecordCount: 0,
+        intervalRemaining: 0,
+        intervalStarted: 0,
+        mode,
+        position: mode === "live" ? records.length : 0,
+        recordCount: records.length,
+        records,
+        serverTimestamp: new Date().toISOString(),
+        speed,
+        status: "replaying",
+        streamId,
+        subscriberDisposers: new Map(),
+        timerGeneration: 0,
+      };
+      this.streams.set(streamId, stream);
+    }
     response.writeHead(200, {
-      'cache-control': 'no-cache, no-transform',
-      connection: 'keep-alive',
-      'content-type': 'text/event-stream; charset=utf-8',
-      'x-accel-buffering': 'no',
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive",
+      "content-type": "text/event-stream; charset=utf-8",
+      "x-accel-buffering": "no",
     });
-    response.write('retry: 2000\n\n');
-
-    if (mode === 'live') {
-      return this.subscribeLive(response, selection, streamId);
-    }
-
-    const stream: ReplayStream = this.getOrCreateReplayStream(
-      selection,
-      speed,
-      records,
-      streamId,
+    response.write("retry: 2000\n\n");
+    const state: ReplayState = replayState(stream);
+    response.write(
+      formatEvent("replay-connected", {
+        mode,
+        protocolVersion: REPLAY_PROTOCOL_VERSION,
+        selection,
+        serverTimestamp: state.serverTimestamp,
+        state,
+        streamId,
+      }),
     );
-    stream.subscribers.add(response);
-    response.write(formatEvent('replay-ready', {
-      ...replayState(stream),
-      mode,
-    }));
-    response.write(formatEvent('replay-snapshot', {
-      records: stream.emittedRecords,
-      state: replayState(stream),
-    }));
-    response.write(formatEvent('replay-state', replayState(stream)));
-    const dispose: () => void = this.createSubscriberDisposer(response, stream);
+    response.write(
+      formatEvent("replay-snapshot", {
+        records: stream.records.slice(0, stream.position),
+        state,
+      }),
+    );
+    response.write(formatEvent("replay-state", state));
+    const dispose: () => void = this.createDisposer(response, stream);
     stream.subscriberDisposers.set(response, dispose);
-    if (stream.status === 'completed') {
-      response.write(formatEvent('replay-complete', replayState(stream)));
+    if (stream.status === "completed") {
+      response.write(formatEvent("replay-complete", { state }));
       dispose();
-    }
+    } else if (!stream.timer && stream.mode === "replay")
+      this.scheduleNextRecord(stream);
     return dispose;
   };
 
   public close = (): void => {
-    this.liveSubscribers.forEach((subscriber: LiveSubscriber): void => {
-      subscriber.dispose();
-    });
-    this.liveSubscribers.clear();
-    this.replayStreams.forEach((stream: ReplayStream): void => {
-      this.clearTimer(stream);
-      [...stream.subscriberDisposers.values()].forEach((dispose: () => void): void => {
-        dispose();
+    this.streams.forEach((stream: ReplayStream): void => {
+      this.clearTimer(stream, false);
+      this.broadcast(stream, "replay-error", {
+        code: "server-shutdown",
+        message: "Replay server is shutting down.",
+        state: replayState(stream),
       });
-      stream.subscriberDisposers.clear();
-      stream.subscribers.clear();
+      [...stream.subscriberDisposers.values()].forEach(
+        (dispose: () => void): void => dispose(),
+      );
     });
-    this.replayStreams.clear();
+    this.streams.clear();
   };
 
-  private broadcast = (
+  private broadcast = <TName extends ReplayEventName>(
     stream: ReplayStream,
-    type: string,
-    payload: object,
+    name: TName,
+    payload: ReplayEventPayloads[TName],
   ): void => {
-    const serialized: string = formatEvent(type, payload);
-    stream.subscribers.forEach((response: ServerResponse): void => {
-      if (!response.destroyed && !response.writableEnded) {
-        response.write(serialized);
-      }
-    });
+    const data: string = formatEvent(name, payload);
+    stream.subscriberDisposers.forEach(
+      (_dispose: () => void, response: ServerResponse): void => {
+        if (!response.destroyed && !response.writableEnded)
+          response.write(data);
+      },
+    );
   };
-
-  private clearTimer = (stream: ReplayStream): void => {
+  private clearTimer = (
+    stream: ReplayStream,
+    retainInterval: boolean,
+  ): void => {
     if (stream.timer) {
       clearTimeout(stream.timer);
       stream.timer = undefined;
+      if (retainInterval)
+        stream.intervalRemaining = Math.max(
+          0,
+          stream.intervalRemaining -
+            (Date.now() - stream.intervalStarted) * stream.speed,
+        );
     }
+    stream.timerGeneration += 1;
   };
-
-  private createSubscriberDisposer = (
+  private createDisposer = (
     response: ServerResponse,
     stream: ReplayStream,
   ): (() => void) => {
     let disposed: boolean = false;
     const heartbeat: NodeJS.Timeout = setInterval((): void => {
-      if (!response.destroyed && !response.writableEnded) {
-        response.write(': heartbeat\n\n');
-      }
-    }, HEARTBEAT_INTERVAL_MS);
+      if (!response.destroyed && !response.writableEnded)
+        response.write(": heartbeat\n\n");
+    }, 15000);
     return (): void => {
-      if (disposed) {
-        return;
-      }
+      if (disposed) return;
       disposed = true;
       clearInterval(heartbeat);
-      stream.subscribers.delete(response);
       stream.subscriberDisposers.delete(response);
-      if (!response.destroyed && !response.writableEnded) {
-        response.end();
-      }
+      if (!response.destroyed && !response.writableEnded) response.end();
     };
   };
-
-  private getOrCreateReplayStream = (
-    selection: EventReplaySelection,
-    speed: number,
-    records: EventReplayRecord[],
-    streamId: string,
-  ): ReplayStream => {
-    const existing: ReplayStream | undefined = this.replayStreams.get(streamId);
-    if (existing) {
-      if (existing.eventId !== selection.eventId || existing.sessionId !== selection.sessionId) {
-        throw new Error(`Replay stream ${streamId} targets a different event or session.`);
-      }
-      return existing;
-    }
-    const orderedRecords: EventReplayRecord[] = sortRecords(records, selection);
-    const stream: ReplayStream = {
-      emittedRecordCount: 0,
-      emittedRecords: [],
-      eventId: selection.eventId,
-      recordCount: orderedRecords.length,
-      records: orderedRecords,
-      sessionId: selection.sessionId,
-      speed,
-      status: 'replaying',
-      streamId,
-      subscriberDisposers: new Map<ServerResponse, () => void>(),
-      subscribers: new Set<ServerResponse>(),
-    };
-    this.replayStreams.set(streamId, stream);
-    this.scheduleNextRecord(stream);
-    return stream;
-  };
-
-  private scheduleNextRecord = (stream: ReplayStream): void => {
-    if (stream.status !== 'replaying') {
-      return;
-    }
-    const record: EventReplayRecord | undefined = stream.records[stream.emittedRecordCount];
-    if (!record) {
-      stream.status = 'completed';
-      this.broadcast(stream, 'replay-complete', replayState(stream));
-      this.broadcast(stream, 'replay-state', replayState(stream));
-      [...stream.subscriberDisposers.values()].forEach((dispose: () => void): void => {
-        dispose();
-      });
-      return;
-    }
-    const previousRecord: EventReplayRecord | undefined = stream.records[stream.emittedRecordCount - 1];
-    const delay: number = previousRecord
-      ? Math.max(0, (recordTimestamp(record) - recordTimestamp(previousRecord)) / stream.speed)
+  private recordInterval = (stream: ReplayStream): number => {
+    const next: ReplayRecord | undefined = stream.records[stream.position];
+    const previous: ReplayRecord | undefined =
+      stream.records[stream.position - 1];
+    return next && previous
+      ? Math.max(0, Date.parse(next.timestamp) - Date.parse(previous.timestamp))
       : 0;
+  };
+  private scheduleNextRecord = (stream: ReplayStream): void => {
+    if (stream.status !== "replaying" || stream.mode !== "replay") return;
+    const record: ReplayRecord | undefined = stream.records[stream.position];
+    if (!record) {
+      stream.status = "completed";
+      this.broadcast(stream, "replay-state", replayState(stream));
+      this.broadcast(stream, "replay-complete", { state: replayState(stream) });
+      [...stream.subscriberDisposers.values()].forEach(
+        (dispose: () => void): void => dispose(),
+      );
+      return;
+    }
+    const delay: number = Math.min(
+      stream.intervalRemaining / stream.speed,
+      MAXIMUM_TIMER_DELAY_MS,
+    );
+    const generation: number = stream.timerGeneration;
+    stream.intervalStarted = Date.now();
     stream.timer = setTimeout((): void => {
       stream.timer = undefined;
-      if (stream.status !== 'replaying') {
+      if (
+        generation !== stream.timerGeneration ||
+        stream.status !== "replaying"
+      )
+        return;
+      stream.intervalRemaining = Math.max(
+        0,
+        stream.intervalRemaining -
+          (Date.now() - stream.intervalStarted) * stream.speed,
+      );
+      if (stream.intervalRemaining > 0) {
+        this.scheduleNextRecord(stream);
         return;
       }
-      stream.emittedRecords.push(record);
-      stream.emittedRecordCount += 1;
-      this.broadcast(stream, 'race-record', record);
+      stream.position += 1;
+      this.broadcast(stream, "race-update", {
+        record,
+        state: replayState(stream),
+      });
+      stream.intervalRemaining = this.recordInterval(stream);
       this.scheduleNextRecord(stream);
-    }, Math.min(delay, MAXIMUM_TIMER_DELAY_MS));
-  };
-
-  private subscribeLive = (
-    response: ServerResponse,
-    selection: EventReplaySelection,
-    streamId: string,
-  ): (() => void) => {
-    let disposed: boolean = false;
-    const heartbeat: NodeJS.Timeout = setInterval((): void => {
-      if (!response.destroyed && !response.writableEnded) {
-        response.write(': heartbeat\n\n');
-      }
-    }, HEARTBEAT_INTERVAL_MS);
-    let subscriber: LiveSubscriber;
-    const dispose = (): void => {
-      if (disposed) {
-        return;
-      }
-      disposed = true;
-      clearInterval(heartbeat);
-      this.liveSubscribers.delete(subscriber);
-      if (!response.destroyed && !response.writableEnded) {
-        response.end();
-      }
-    };
-    subscriber = { ...selection, dispose, response };
-    this.liveSubscribers.add(subscriber);
-    response.write(formatEvent('replay-ready', {
-      eventId: selection.eventId,
-      mode: 'live',
-      recordCount: 0,
-      sessionId: selection.sessionId || null,
-      speed: 1,
-      streamId,
-    }));
-    response.write(formatEvent('replay-snapshot', {
-      records: [],
-      state: {
-        emittedRecordCount: 0,
-        eventId: selection.eventId,
-        recordCount: 0,
-        sessionId: selection.sessionId,
-        speed: 1,
-        status: 'replaying',
-        streamId,
-      } satisfies EventReplayState,
-    }));
-    return dispose;
+    }, delay);
   };
 }

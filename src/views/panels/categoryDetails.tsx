@@ -3,16 +3,16 @@ import {
   Checkbox,
   CircularProgress,
   FormControlLabel,
-  Stack,
   TextField,
-  Typography,
 } from "@mui/material";
 import React from "react";
+import { AdminActionBar, AdminFieldGrid, AdminFormSection } from '../admin/adminPrimitives.js';
 import {
   type CategoryDistanceRule,
   type EventCatalogCategory,
 } from "../../catalog/eventCatalog.js";
-import { NumericInput } from "../../controls/numericInput.js";
+import { IdentifierDisplay } from "../../controls/identifierDisplay.js";
+import { MinMaxSelect, type MinMaxSelectOption } from "../../controls/minMaxSelect.js";
 import { SelectTextField } from "../../controls/selectTextField.js";
 import { type SessionId } from "../../model/raceevent.js";
 import { type CategoryDraft } from "../display/categoriesPage.js";
@@ -29,6 +29,14 @@ interface CategoryDetailsPanelProps {
   selectedCategory?: EventCatalogCategory;
   warningModal?: React.ReactNode;
 }
+
+const riderAgeOptions: readonly MinMaxSelectOption[] = Array.from({ length: 121 }, (_value: undefined, age: number): MinMaxSelectOption => ({
+  label: `${age} years`, value: age.toString(),
+}));
+
+const teamSizeOptions: readonly MinMaxSelectOption[] = Array.from({ length: 99 }, (_value: undefined, teamSize: number): MinMaxSelectOption => ({
+  label: `${teamSize + 2}`, value: `${teamSize + 2}`,
+}));
 
 export const CategoryDetailsPanel = (
   props: CategoryDetailsPanelProps,
@@ -62,10 +70,9 @@ export const CategoryDetailsPanel = (
       );
   };
   return (
-    <section className="events-panel">
-      <h2>Category Details</h2>
+    <AdminFormSection className="events-panel" title="Category Details">
       {props.selectedCategory ? (
-        <>
+        <><AdminFieldGrid>
           <TextField
             fullWidth
             label="Category Name"
@@ -189,69 +196,55 @@ export const CategoryDetailsPanel = (
               }
             />
           ) : null}
-          <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-            <SelectTextField
-              fullWidth
-              label="Entrant Identity"
-              slotProps={{
-                select: {
-                  "aria-label": "Category Entrant Identity",
-                  native: true,
-                },
-              }}
-              sx={{ flex: 1 }}
-              value={props.categoryDraft.identityMode}
-              onChange={(event) =>
-                update(
-                  "identityMode",
-                  event.target.value as "single" | "multiple",
-                )
-              }
-            >
-              <option value="single">Single identity</option>
-              <option value="multiple">Multiple identity</option>
-            </SelectTextField>
-            <Stack
-              direction="row"
-              spacing={2}
-              sx={{ alignItems: "center", flexShrink: 0 }}
-            >
-              <Typography component="label" htmlFor="category-max-team-size">
-                Max Team Size
-              </Typography>
-              <NumericInput
-                ariaLabel="Category Max Team Size"
-                disabled={props.categoryDraft.identityMode === "single"}
-                id="category-max-team-size"
-                onChange={(value) => update("maxTeamSize", value)}
-                value={props.categoryDraft.maxTeamSize}
-              />
-            </Stack>
-          </Stack>
-          <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-            <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-              <Typography component="label" htmlFor="category-min-rider-age">
-                Minimum Rider Age
-              </Typography>
-              <NumericInput
-                ariaLabel="Category Min Rider Age"
-                id="category-min-rider-age"
-                onChange={(value) => update("minRiderAge", value)}
-                value={props.categoryDraft.minRiderAge}
-              />
-            </Stack>
-            <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-              <Typography component="label" htmlFor="category-max-rider-age">
-                Maximum Rider Age
-              </Typography>
-              <NumericInput
-                ariaLabel="Category Max Rider Age"
-                id="category-max-rider-age"
-                onChange={(value) => update("maxRiderAge", value)}
-                value={props.categoryDraft.maxRiderAge}
-              />
-            </Stack>
-          </Stack>
+          <SelectTextField
+            fullWidth
+            label="Entrant Identity"
+            slotProps={{
+              select: {
+                "aria-label": "Category Entrant Identity",
+                native: true,
+              },
+            }}
+            value={props.categoryDraft.identityMode}
+            onChange={(event) =>
+              update(
+                "identityMode",
+                event.target.value as "single" | "multiple",
+              )
+            }
+          >
+            <option value="single">Single identity</option>
+            <option value="multiple">Multiple identity</option>
+          </SelectTextField>
+          <SelectTextField
+            disabled={props.categoryDraft.identityMode === "single"}
+            fullWidth
+            label="Maximum team size"
+            slotProps={{
+              select: { "aria-label": "Category Max Team Size", native: true },
+            }}
+            value={props.categoryDraft.maxTeamSize}
+            onChange={(event) => update("maxTeamSize", event.target.value)}
+          >
+            <option value="">No maximum</option>
+            {teamSizeOptions.map((option: MinMaxSelectOption) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </SelectTextField>
+          <MinMaxSelect
+            maxAriaLabel="Category Max Rider Age"
+            maxEmptyLabel="No maximum age"
+            maxLabel="Maximum rider age"
+            maxValue={props.categoryDraft.maxRiderAge}
+            minAriaLabel="Category Min Rider Age"
+            minEmptyLabel="No minimum age"
+            minLabel="Minimum rider age"
+            minValue={props.categoryDraft.minRiderAge}
+            onMaxChange={(value: string): void => update("maxRiderAge", value)}
+            onMinChange={(value: string): void => update("minRiderAge", value)}
+            options={riderAgeOptions}
+            sx={{ gridColumn: "1 / -1" }}
+          />
           <TextField
             fullWidth
             label="Team Gender Rules"
@@ -294,74 +287,72 @@ export const CategoryDetailsPanel = (
               </option>
             ))}
           </SelectTextField>
-          <div className="events-actions">
-            <div className="category-save-status">
-              <Button
-                disabled={saveStatus === "pending"}
-                endIcon={
-                  saveStatus === "pending" ? (
-                    <CircularProgress aria-label="Saving category" size={16} />
-                  ) : saveStatus === "succeeded" ? (
-                    <span aria-label="Category saved" role="img">
+        </AdminFieldGrid><AdminActionBar error={props.deleteError} pending={saveStatus === 'pending'}>
+          <div className="category-save-status">
+            <Button
+              disabled={saveStatus === "pending"}
+              endIcon={
+                saveStatus === "pending" ? (
+                  <CircularProgress aria-label="Saving category" size={16} />
+                ) : saveStatus === "succeeded" ? (
+                  <span aria-label="Category saved" role="img">
                       ✓
-                    </span>
-                  ) : saveStatus === "failed" ? (
-                    <span aria-label="Category save failed" role="img">
+                  </span>
+                ) : saveStatus === "failed" ? (
+                  <span aria-label="Category save failed" role="img">
                       !
-                    </span>
-                  ) : undefined
-                }
-                onClick={saveCategory}
-                variant="contained"
-              >
+                  </span>
+                ) : undefined
+              }
+              onClick={saveCategory}
+              variant="contained"
+            >
                 Save Category
-              </Button>
-              {saveError || props.formError ? (
-                <div className="error category-save-error" role="alert">
-                  <p>{saveError || props.formError}</p>
-                </div>
-              ) : null}
-            </div>
-            <div className="category-delete-status">
-              <Button
-                color="error"
-                disabled={props.deleteStatus === "pending"}
-                endIcon={
-                  props.deleteStatus === "pending" ? (
-                    <CircularProgress
-                      aria-label="Deleting category"
-                      size={16}
-                    />
-                  ) : props.deleteStatus === "succeeded" ? (
-                    <span aria-label="Category deleted" role="img">
-                      ✓
-                    </span>
-                  ) : props.deleteStatus === "failed" ? (
-                    <span aria-label="Category deletion failed" role="img">
-                      !
-                    </span>
-                  ) : undefined
-                }
-                onClick={() => props.onDeleteCategory()}
-                variant="outlined"
-              >
-                Delete Category
-              </Button>
-              {props.deleteError ? (
-                <span className="error category-delete-error" role="alert">
-                  {props.deleteError}
-                </span>
-              ) : null}
-            </div>
-            <span className="category-id-display">
-              Category ID: {props.selectedCategory.id.toString()}
-            </span>
+            </Button>
+            {saveError || props.formError ? (
+              <div className="error category-save-error" role="alert">
+                <p>{saveError || props.formError}</p>
+              </div>
+            ) : null}
           </div>
-          {props.warningModal}
+          <div className="category-delete-status">
+            <Button
+              color="error"
+              disabled={props.deleteStatus === "pending"}
+              endIcon={
+                props.deleteStatus === "pending" ? (
+                  <CircularProgress
+                    aria-label="Deleting category"
+                    size={16}
+                  />
+                ) : props.deleteStatus === "succeeded" ? (
+                  <span aria-label="Category deleted" role="img">
+                      ✓
+                  </span>
+                ) : props.deleteStatus === "failed" ? (
+                  <span aria-label="Category deletion failed" role="img">
+                      !
+                  </span>
+                ) : undefined
+              }
+              onClick={() => props.onDeleteCategory()}
+              variant="outlined"
+            >
+                Delete Category
+            </Button>
+            {props.deleteError ? (
+              <span className="error category-delete-error" role="alert">
+                {props.deleteError}
+              </span>
+            ) : null}
+          </div>
+          <IdentifierDisplay label="Category ID" value={props.selectedCategory.id.toString()} />
+        </AdminActionBar>
+        {props.warningModal}
         </>
       ) : (
         <p>No categories are defined for this event.</p>
       )}
-    </section>
+    </AdminFormSection>
   );
 };

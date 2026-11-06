@@ -42,6 +42,8 @@ describe('IndividualsPanel', () => {
   });
 
   it('shows unlinked participant cards and saves shared license and emergency details', async () => {
+    const writeText = vi.fn(async (_text: string): Promise<void> => undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
     let saved: EventCatalogLedger = createSeedEventCatalogLedger();
     const persistence: EventCatalogPersistence = {
       load: vi.fn(async (): Promise<EventCatalogLedger> => saved),
@@ -95,6 +97,38 @@ describe('IndividualsPanel', () => {
     expect(service.catalog.officials![0]?.displayName).toBe(rider.name);
     expect(service.catalog.individualLinks![0]?.individualId).toBe(service.catalog.officials![0]?.id);
     expect(container.textContent).not.toContain('Needs profile');
+    const individualId: string = service.catalog.officials![0]!.id;
+    const individualIdDisplay: HTMLElement = container.querySelector<HTMLElement>('[aria-label="Individual ID"]')!;
+    const copyIndividualIdButton: HTMLButtonElement = container.querySelector<HTMLButtonElement>('button[aria-label="Copy Individual ID"]')!;
+    expect(individualIdDisplay.textContent).toContain(`Individual ID: ${individualId}`);
+    expect([...container.querySelectorAll<HTMLInputElement>('input')]
+      .some((input: HTMLInputElement): boolean => input.value === individualId)).toBe(false);
+    expect(copyIndividualIdButton.textContent).toBe('');
+    await act(async (): Promise<void> => {
+      copyIndividualIdButton.click();
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenCalledWith(individualId);
+    const individualCard: HTMLButtonElement = container.querySelector<HTMLButtonElement>(`button[aria-label="Individual card: ${rider.name}"]`)!;
+    expect(individualCard.textContent).not.toContain(individualId);
+    await act(async (): Promise<void> => {
+      individualCard.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      await new Promise<void>((resolve: () => void): number => window.setTimeout(resolve, 0));
+    });
+    expect(document.querySelector('[role="tooltip"]')?.textContent).toBe(`Individual ID: ${individualId}`);
+
+    await act(async (): Promise<void> => {
+      individualCard.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 60 }));
+    });
+    const copyIndividualIdMenuItem: HTMLElement | undefined = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((item: HTMLElement): boolean => item.textContent?.trim() === 'Copy Individual ID');
+    expect(copyIndividualIdMenuItem).toBeDefined();
+    await act(async (): Promise<void> => {
+      copyIndividualIdMenuItem!.click();
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenCalledWith(individualId);
+
     expect(inputByLabel(container, 'First name').value).toBe('Rider');
     expect(inputByLabel(container, 'Surname').value).toBe('101');
     await act(async (): Promise<void> => {

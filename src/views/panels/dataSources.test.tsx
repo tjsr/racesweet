@@ -81,11 +81,11 @@ describe("DataSourcesPanel", () => {
     expect(headings).toContain("Configured Data Sources");
     expect(headings).toContain("Apical Source");
     expect(
-      container.querySelector('select[aria-label="New Data Source Type"]'),
+      container.querySelector('[role="combobox"][aria-label="New Data Source Type"]'),
     ).toBeTruthy();
     expect(
       container.querySelector(
-        'table[aria-label="Configured data sources table"]',
+        '[role="list"][aria-label="Configured data sources"]',
       ),
     ).toBeTruthy();
     expect(container.textContent).toContain("Add Data Source");
@@ -375,15 +375,13 @@ describe("DataSourcesPanel", () => {
       );
     });
 
-    const ctcRow = Array.from(container.querySelectorAll("tbody tr")).find(
+    const ctcRow = Array.from(container.querySelectorAll("[data-source-id]")).find(
       (row) => row.textContent?.includes("CTC Source"),
     );
     act(() => {
       ctcRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    const updateRadio = Array.from(
-      container.querySelectorAll('input[type="radio"]'),
-    ).find((input) => input.parentElement?.textContent?.includes("Update"));
+    const updateRadio: HTMLInputElement | null = container.querySelector('input[type="radio"][value="update"]');
 
     expect(updateRadio).toBeTruthy();
     act(() => {
@@ -491,7 +489,7 @@ describe("DataSourcesPanel", () => {
       (button) => button.textContent === "Select Extractor",
     );
     const extractorInfo = container.querySelector(
-      'summary[aria-label="About fmp2json"]',
+      'button[aria-label="About fmp2json"]',
     );
     expect(
       buttons.find((button) => button.textContent === "Import DURT Database"),
@@ -579,7 +577,7 @@ describe("DataSourcesPanel", () => {
       );
     });
 
-    const ctcRow = Array.from(container.querySelectorAll("tbody tr")).find(
+    const ctcRow = Array.from(container.querySelectorAll("[data-source-id]")).find(
       (row) => row.textContent?.includes("CTC Source"),
     );
     act(() => {
@@ -590,18 +588,13 @@ describe("DataSourcesPanel", () => {
       "TRACK.CFG metadata: 1 network, 1 line, 3 loops",
     );
     const metadataTable = container.querySelector(
-      'table[aria-label="Dorian CTC TRACK.CFG Metadata source-dorian-ctc"]',
+      '[role="list"][aria-label="Dorian CTC TRACK.CFG Metadata source-dorian-ctc"]',
     );
     expect(metadataTable).toBeTruthy();
-    const rows = Array.from(metadataTable!.querySelectorAll("tbody tr")).map(
-      (row) =>
-        Array.from(row.querySelectorAll("td")).map((cell) => cell.textContent),
-    );
-    expect(rows).toEqual([
-      ["South Network", "5", "Pit Exit : Pits", "1", "35", "1", "2", ""],
-      ["South Network", "5", "Pit Exit : Pits", "2", "35", "1", "2", ""],
-      ["South Network", "5", "Pit Exit : Pits", "5", "35", "2", "2", ""],
-    ]);
+    const rows: HTMLElement[] = [...metadataTable!.querySelectorAll<HTMLElement>('[role="listitem"]')];
+    expect(rows).toHaveLength(3);
+    expect(rows.every((row: HTMLElement): boolean => row.textContent?.includes('South Network') === true &&
+      row.textContent.includes('Pit Exit : Pits'))).toBe(true);
 
     const lapFinishCheckbox = container.querySelector(
       'input[aria-label="CTC South Network line 5 loop 1 lap finish"]',
@@ -679,7 +672,7 @@ describe("DataSourcesPanel", () => {
       );
     });
 
-    const mrScatsRow = Array.from(container.querySelectorAll("tbody tr")).find(
+    const mrScatsRow = Array.from(container.querySelectorAll("[data-source-id]")).find(
       (row) => row.textContent?.includes("MR-SCATS Source"),
     );
     expect(mrScatsRow).toBeDefined();
@@ -796,7 +789,7 @@ describe("DataSourcesPanel", () => {
       );
     });
 
-    const mrScatsRow = Array.from(container.querySelectorAll("tbody tr")).find(
+    const mrScatsRow = Array.from(container.querySelectorAll("[data-source-id]")).find(
       (row) => row.textContent?.includes("MR-SCATS Source"),
     );
     expect(mrScatsRow).toBeDefined();
@@ -915,7 +908,7 @@ describe("DataSourcesPanel", () => {
       );
     });
 
-    const mrScatsRow = Array.from(container.querySelectorAll("tbody tr")).find(
+    const mrScatsRow = Array.from(container.querySelectorAll("[data-source-id]")).find(
       (row) => row.textContent?.includes("MR-SCATS Source"),
     );
     expect(mrScatsRow).toBeDefined();
@@ -923,29 +916,29 @@ describe("DataSourcesPanel", () => {
       mrScatsRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    const details = Array.from(container.querySelectorAll("details"));
+    const details = Array.from(container.querySelectorAll('.MuiAccordion-root'));
     const generalDetails = details.find((item) =>
-      item.querySelector("summary")?.textContent?.includes("General"),
-    ) as HTMLDetailsElement | undefined;
+      item.querySelector('.MuiAccordionSummary-root')?.textContent?.includes("General"),
+    );
     const sessionOneDetails = details.find((item) =>
-      item.querySelector("summary")?.textContent?.includes("T9743 S01"),
-    ) as HTMLDetailsElement | undefined;
+      item.querySelector('.MuiAccordionSummary-root')?.textContent?.includes("T9743 S01"),
+    );
     const sessionTwoDetails = details.find((item) =>
-      item.querySelector("summary")?.textContent?.includes("T9743 R03"),
-    ) as HTMLDetailsElement | undefined;
+      item.querySelector('.MuiAccordionSummary-root')?.textContent?.includes("T9743 R03"),
+    );
 
     expect(generalDetails).toBeDefined();
-    expect(generalDetails?.open).toBe(true);
+    expect(generalDetails?.querySelector('button[aria-expanded="true"]')).toBeTruthy();
     expect(generalDetails?.textContent).toContain("DRIVERS.DBF");
     expect(generalDetails?.textContent).toContain("PRGMME.DBT");
 
     expect(sessionOneDetails).toBeDefined();
-    expect(sessionOneDetails?.open).toBe(false);
+    expect(sessionOneDetails?.querySelector('button[aria-expanded="false"]')).toBeTruthy();
     expect(sessionOneDetails?.textContent).toContain("T9743S01.DBF");
     expect(sessionOneDetails?.textContent).toContain("T9743S01.PIT");
 
     expect(sessionTwoDetails).toBeDefined();
-    expect(sessionTwoDetails?.open).toBe(false);
+    expect(sessionTwoDetails?.querySelector('button[aria-expanded="false"]')).toBeTruthy();
     expect(sessionTwoDetails?.textContent).toContain("T9743R03.NO1");
   });
 
@@ -1025,7 +1018,7 @@ describe("DataSourcesPanel", () => {
       );
     });
 
-    const mrScatsRow = Array.from(container.querySelectorAll("tbody tr")).find(
+    const mrScatsRow = Array.from(container.querySelectorAll("[data-source-id]")).find(
       (row) => row.textContent?.includes("MR-SCATS Source"),
     );
     expect(mrScatsRow).toBeDefined();

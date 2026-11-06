@@ -9,6 +9,8 @@ import {
   useState,
 } from "react";
 import { validate as validateUuid } from "uuid";
+import { AdminThemeProvider } from '../views/admin/adminPrimitives.js';
+import { ResponsiveSectionNavigation } from '../views/admin/ResponsiveSectionNavigation.js';
 import {
   type EventCatalogEntrant,
   type EventCatalogState,
@@ -116,6 +118,9 @@ import { ResultsContext } from "../views/context/Results.tsx";
 import { SessionsContext } from "../views/context/Sessions.tsx";
 import { SystemContext } from "../views/context/System.tsx";
 import { TimingContext } from "../views/context/Timing.tsx";
+import { ConnectedManualTimingPanel } from '../views/timing/ConnectedManualTimingPanel.js';
+import { useManualTimingOutbox } from './manualTimingOutbox.js';
+import { mergeManualCrossingsIntoRaceState } from '../processing/manualCrossings.js';
 import { ReloadSummaryDialog } from "../views/display/reloadSummaryDialog.tsx";
 import {
   type ReportsViewState,
@@ -123,6 +128,7 @@ import {
 } from "../views/display/raceAnalyticsViews.tsx";
 import { type UnsavedChangesGuard } from "../views/display/unsavedChangesWarning.tsx";
 import { LoadingProgress } from "../views/panels/LoadingProgress.tsx";
+import { ContextualHelpOverlay } from "../views/help/ContextualHelpOverlay.js";
 import {
   PulledApicalRaceState,
   createApicalCatalogEventId,
@@ -740,6 +746,21 @@ export const RaceSweetMainApp = () => {
     raceState: timingRaceState || sessionState,
     sessionId: selectedTimingSessionId as SessionId | undefined,
   };
+
+  const manualTimingConnection = useManualTimingOutbox({
+    onCatalog: (catalog, command): void => {
+      setEventCatalogState(catalog);
+      if (command.crossing.eventId !== (selectedTimingEventId || catalog.activeEventId) ||
+        command.crossing.sessionId !== (selectedTimingSessionId || catalog.activeSessionId)) return;
+      setTimingRaceState((current) => sessionFromPartialRaceState(mergeManualCrossingsIntoRaceState(
+        current || sessionState || {}, (catalog.manualCrossings || []).filter((crossing) =>
+          crossing.eventId === command.crossing.eventId && crossing.sessionId === command.crossing.sessionId),
+      )));
+    },
+    serverUrl: window.api.persistenceMode === 'native' ? systemConfigState.remoteServer?.baseUrl : undefined,
+    service: eventCatalogService,
+    storageDirectory: systemConfigState.localStorageDirectoryPath,
+  });
 
   useEffect(() => {
     const remoteServerUrl = systemConfigState.remoteServer?.baseUrl?.trim();
@@ -2621,27 +2642,8 @@ export const RaceSweetMainApp = () => {
   }, []);
 
   const renderShell = (content: ReactElement): ReactElement => (
-    <div className="app-shell">
-      <nav className="section-nav" aria-label="Application sections">
-        {appSections.map((section) => {
-          const isActive = activeSection === section.id;
-          return (
-            <button
-              key={section.id}
-              type="button"
-              className={`section-tile${isActive ? " active" : ""}`}
-              onClick={() => changeActiveSection(section.id)}
-              aria-current={isActive ? "page" : undefined}
-              aria-label={section.label}
-            >
-              <span className="section-icon" aria-hidden="true">
-                {section.icon}
-              </span>
-              <span className="section-label">{section.label}</span>
-            </button>
-          );
-        })}
-      </nav>
+    <AdminThemeProvider><div className="app-shell">
+      <ResponsiveSectionNavigation items={appSections} onSelect={changeActiveSection} selectedId={activeSection} />
       <main className="section-content">
         {loadWarnings.length > 0 && (
           <div
@@ -2660,7 +2662,7 @@ export const RaceSweetMainApp = () => {
             </button>
           </div>
         )}
-        {content}
+        <ContextualHelpOverlay section={activeSection}>{content}</ContextualHelpOverlay>
       </main>
       {reloadSummary ? (
         <ReloadSummaryDialog
@@ -2668,7 +2670,7 @@ export const RaceSweetMainApp = () => {
           summary={reloadSummary}
         />
       ) : null}
-    </div>
+    </div></AdminThemeProvider>
   );
 
   const displayedTimingRaceState = timingRaceState || sessionState;
@@ -3063,6 +3065,14 @@ export const RaceSweetMainApp = () => {
       ) : (
         <TimingContext
           activeSession={activeSession}
+          manualTiming={eventCatalogService && timingEvent && timingSessionValue && <ConnectedManualTimingPanel
+            catalog={eventCatalogState}
+            checkpoints={timingEvent.trackMap?.timingLines?.length ? timingEvent.trackMap.timingLines
+              : (getFinishLineNumbersForSession(systemConfigState, timingEvent.id, timingSessionValue) || []).map((lineNumber: number) => ({ lineNumber, progress: 1 }))}
+            eventId={timingEvent.id}
+            connection={manualTimingConnection}
+            sessionId={timingSessionValue}
+          />}
           categoryListSelected={handleCategoryListSelected}
           eventTimeZone={timingEvent?.timeZone || getSystemTimeZone()}
           events={eventCatalogState.events}
@@ -5026,6 +5036,7 @@ export const RaceSweetMainApp = () => {
           : window.location.origin === 'null' ? '' : window.location.origin);
       return (
         <ReportsContext
+          catalog={eventCatalogState}
           categories={sessionScopedCategories}
           catalogEntries={getEntriesForEvent(
             eventCatalogState,

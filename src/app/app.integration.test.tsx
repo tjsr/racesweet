@@ -2187,7 +2187,8 @@ describe('RaceSweetMainApp integration', () => {
     await waitForTextNotPresent(container, 'New Driver');
 
     const displayedEntrantName = (container.querySelector('input[aria-label="Entrant Name"]') as HTMLInputElement).value;
-    const displayedEntrantId = container.querySelector('.entrant-id')?.textContent?.replace('Id: ', '');
+    const displayedEntrantId: string | undefined = container.querySelector('[aria-label="Entrant ID"]')?.textContent
+      ?.replace('Entrant ID:', '').trim();
     const displayedEntrantCard = Array.from(container.querySelectorAll<HTMLButtonElement>('[aria-label="Entrants for selected event"] button.events-list-item'))
       .find((card) => card.dataset.entrantId === displayedEntrantId);
 
@@ -3685,7 +3686,7 @@ describe('RaceSweetMainApp integration', () => {
     expect(sectionNavStyle.scrollbarWidth).toBe('none');
 
     await clickSectionButton(container, 'Events');
-    const eventsLayout = container.querySelector('.events-layout') as HTMLElement;
+    const eventsLayout = container.querySelector('.admin-master-detail') as HTMLElement;
     expect(eventsLayout).toBeTruthy();
     expect(getComputedStyle(eventsLayout).display).toBe('grid');
 

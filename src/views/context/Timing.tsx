@@ -21,6 +21,7 @@ type TimingRaceState = RaceStateLookup & {
 };
 
 interface TimingContextProps {
+  manualTiming?: React.ReactNode;
   activeSession?: EventCatalogSession;
   categoryListSelected: (ids: Set<EventCategoryId>) => void;
   eventTimeZone: string;
@@ -115,6 +116,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
   return (
     <>
       <h1>Timing</h1>
+      {props.manualTiming}
       <div className="timing-context-row">
         <div className="page-filter-label">
           <span className="timing-selection-select-row">

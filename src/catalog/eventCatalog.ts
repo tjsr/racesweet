@@ -3,7 +3,10 @@ import { EventEntrantId } from "../model/entrant.js";
 import type { EventEntry, EventEntryId } from "../model/entry.js";
 import type { EventCategory, EventCategoryId } from "../model/eventcategory.js";
 import type { EventParticipant } from "../model/eventparticipant.js";
-import type { DisplayScreenTemplate, DisplayShareLink } from "../model/displayScreen.js";
+import type {
+  DisplayScreenTemplate,
+  DisplayShareLink,
+} from "../model/displayScreen.js";
 import { EventParticipantId } from "../model/eventparticipant.js";
 import type { EffectiveManualCrossing } from "../model/manualCrossing.js";
 import type { IndividualLink } from "../model/individualLink.js";
@@ -167,7 +170,13 @@ export interface SessionStartSequenceCategoryItem {
 
 export interface SessionStartSequenceWaveItem {
   id: string;
+  /**
+   * The elapsed interval after scratch. Values accept seconds or mm:ss. This
+   * is retained for backwards compatibility when a wave uses a time of day.
+   */
   offset: string;
+  /** A local event clock time (HH:mm:ss). When present, it takes precedence over offset. */
+  timeOfDay?: string;
   type: "start-wave";
 }
 

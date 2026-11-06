@@ -98,3 +98,14 @@ grid position: only explicit `startOrder` values produce grid positions.
 - Extend Reports state/navigation and implement the three MUI layouts.
 - Add print styles and CSV/PDF actions, then run relevant Vitest, TypeScript,
   and lint checks.
+
+## Implementation status
+
+Implemented in Reports using the parent event/session selection. Projection,
+layout, filtering, export parity, empty-export confirmation, and two-event
+isolation regressions accompany the feature. Explicit positions remain the
+only source of grid placement; rows without them stay Unassigned.
+
+Empty legacy session assignments use category membership. A missing explicit
+start sequence produces an Unassigned start group. These defaults preserve
+existing catalog semantics.

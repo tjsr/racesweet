@@ -1,5 +1,7 @@
 import { Button, CircularProgress, TextField, Typography } from '@mui/material';
 import React from 'react';
+import { IdentifierDisplay } from '../../controls/identifierDisplay.js';
+import { AdminActionBar, AdminFieldGrid, AdminFormSection } from '../admin/adminPrimitives.js';
 import { type EventCatalogEntrant } from '../../catalog/eventCatalog.js';
 import { SelectTextField } from '../../controls/selectTextField.js';
 import { type CategoryId } from '../../processing/category.js';
@@ -62,20 +64,19 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
   const teamMemberLabel = props.teamMemberLabel || 'Drivers';
   const parentLabel = props.isMotorsport ? 'Entrant' : 'Team';
   const isDriver = props.selectedEntrant?.entrantType === 'rider';
-
   return (
-    <section className="events-panel">
-      <h2>{isDriver ? `${entrantLabel} Details` : `${parentLabel} Details`}</h2>
+    <AdminFormSection className="events-panel" title={isDriver ? `${entrantLabel} Details` : `${parentLabel} Details`}>
       {props.selectedEntrant ? (
-        <>
+        <><AdminFieldGrid>
           {!isDriver ? <TextField
             label={`${parentLabel} Name`}
             slotProps={{ htmlInput: { 'aria-label': 'Entrant Name' } }}
+            sx={{ gridColumn: '1 / -1' }}
             value={props.entrantDraft.name}
             onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, name: event.target.value }))}
           /> : <>
             <TextField label={`${entrantLabel} Name`} value={props.selectedEntrant.name}
-              slotProps={{ htmlInput: { 'aria-label': 'Entrant Name', readOnly: true } }} />
+              slotProps={{ htmlInput: { 'aria-label': 'Entrant Name', readOnly: true } }} sx={{ gridColumn: '1 / -1' }} />
             <Typography variant="body2">Edit personal details in Individuals.</Typography>
             {props.onOpenIndividuals && <Button onClick={props.onOpenIndividuals}>Open Individuals</Button>}
           </>}
@@ -144,39 +145,40 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
           <TextField
             label="Notes"
             multiline
+            rows={3}
             slotProps={{ htmlInput: { 'aria-label': 'Entrant Notes' } }}
             value={props.entrantDraft.notes}
             onChange={(event) => props.onSetEntrantDraft((current) => ({ ...current, notes: event.target.value }))}
           />
-          <div className="events-actions">
-            <Button
-              type="button"
-              onClick={() => {
-                void props.onSaveEntrant();
-              }}
-            >
+        </AdminFieldGrid><AdminActionBar error={props.deleteError} pending={props.deleteStatus === 'pending'}>
+          <Button
+            type="button"
+            onClick={() => {
+              void props.onSaveEntrant();
+            }}
+          >
               Save Entrant
-            </Button>
-            <div className="entrant-delete-status">
-              <Button
-                color="error"
-                disabled={props.deleteStatus === 'pending'}
-                endIcon={props.deleteStatus === 'pending' ? <CircularProgress aria-label="Deleting entrant" size={16} /> : props.deleteStatus === 'succeeded' ? <span aria-label="Entrant deleted" role="img">✓</span> : props.deleteStatus === 'failed' ? <span aria-label="Entrant deletion failed" role="img">!</span> : undefined}
-                onClick={props.onDeleteEntrant}
-                type="button"
-                variant="outlined"
-              >
+          </Button>
+          <div className="entrant-delete-status">
+            <Button
+              color="error"
+              disabled={props.deleteStatus === 'pending'}
+              endIcon={props.deleteStatus === 'pending' ? <CircularProgress aria-label="Deleting entrant" size={16} /> : props.deleteStatus === 'succeeded' ? <span aria-label="Entrant deleted" role="img">✓</span> : props.deleteStatus === 'failed' ? <span aria-label="Entrant deletion failed" role="img">!</span> : undefined}
+              onClick={props.onDeleteEntrant}
+              type="button"
+              variant="outlined"
+            >
                 Delete Entrant
-              </Button>
-              {props.deleteError ? <span className="error entrant-delete-error" role="alert">{props.deleteError}</span> : null}
-            </div>
+            </Button>
+            {props.deleteError ? <span className="error entrant-delete-error" role="alert">{props.deleteError}</span> : null}
           </div>
-          <TextField label="Entrant ID" slotProps={{ htmlInput: { readOnly: true } }} value={props.selectedEntrant.id} />
-          {props.warningModal}
+        </AdminActionBar>
+        <IdentifierDisplay label="Entrant ID" value={props.selectedEntrant.id.toString()} />
+        {props.warningModal}
         </>
       ) : (
         <p>No entrants are defined for this event.</p>
       )}
-    </section>
+    </AdminFormSection>
   );
 };

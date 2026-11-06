@@ -8,6 +8,27 @@ import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 import { EventsScreen } from './events.js';
 
+const toggleDataSource = async (container: HTMLElement, sourceLabel: string): Promise<void> => {
+  const selector: HTMLElement | null = container.querySelector('[aria-label="Event Data Sources"]');
+  if (!selector) {
+    throw new Error('Missing event data source selector.');
+  }
+
+  await act(async (): Promise<void> => {
+    selector.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  });
+  const option: HTMLElement | undefined = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'))
+    .find((candidate: HTMLElement): boolean => candidate.textContent?.includes(sourceLabel) === true);
+  if (!option) {
+    throw new Error(`Missing data source option ${sourceLabel}.`);
+  }
+
+  await act(async (): Promise<void> => {
+    option.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+  });
+};
+
 const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: string): void => {
   const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
   const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
@@ -368,12 +389,7 @@ describe('EventsScreen integration', () => {
 
     expect(onMakeSessionActive).toHaveBeenCalledWith('event-2', 'session-3');
 
-    const eventSourceCheckbox = container.querySelector('input[aria-label="Event Source event-2 source-a"]') as HTMLInputElement;
-    expect(eventSourceCheckbox).toBeDefined();
-
-    await act(async () => {
-      eventSourceCheckbox.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
+    await toggleDataSource(container, 'Apical Source A');
 
     expect(onSaveEventAssignment).toHaveBeenCalledWith('event-2', []);
 
@@ -436,16 +452,21 @@ describe('EventsScreen integration', () => {
       root.render(<Harness />);
     });
 
-    const event1Checkbox = container.querySelector('input[aria-label="Event Source event-1 source-a"]') as HTMLInputElement;
-    expect(event1Checkbox).toBeDefined();
-    expect(event1Checkbox.checked).toBe(false);
+    const eventDataSourceSelector = (): HTMLElement => {
+      const sourceInput: HTMLElement | null = container.querySelector('[aria-label="Event Data Sources"]');
+      const selectDisplay: HTMLElement | null | undefined = sourceInput?.closest('.MuiInputBase-root')
+        ?.querySelector<HTMLElement>('.MuiSelect-select');
+      if (!selectDisplay) {
+        throw new Error('Missing event data source selection display.');
+      }
 
-    await act(async () => {
-      event1Checkbox.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
+      return selectDisplay;
+    };
+    expect(eventDataSourceSelector().textContent).toContain('No data sources selected');
 
-    const event1CheckboxAfterAssign = container.querySelector('input[aria-label="Event Source event-1 source-a"]') as HTMLInputElement;
-    expect(event1CheckboxAfterAssign.checked).toBe(true);
+    await toggleDataSource(container, 'Apical Source A');
+
+    expect(eventDataSourceSelector().textContent).toContain('Apical Source A');
 
     const springTestButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Spring Test'));
     expect(springTestButton).toBeDefined();
@@ -454,16 +475,11 @@ describe('EventsScreen integration', () => {
       springTestButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    const event2Checkbox = container.querySelector('input[aria-label="Event Source event-2 source-a"]') as HTMLInputElement;
-    expect(event2Checkbox).toBeDefined();
-    expect(event2Checkbox.checked).toBe(true);
+    expect(eventDataSourceSelector().textContent).toContain('Apical Source A');
 
-    await act(async () => {
-      event2Checkbox.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
+    await toggleDataSource(container, 'Apical Source A');
 
-    const event2CheckboxAfterClear = container.querySelector('input[aria-label="Event Source event-2 source-a"]') as HTMLInputElement;
-    expect(event2CheckboxAfterClear.checked).toBe(false);
+    expect(eventDataSourceSelector().textContent).toContain('No data sources selected');
 
     const winterRoundButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Winter Round'));
     expect(winterRoundButton).toBeDefined();
@@ -472,8 +488,7 @@ describe('EventsScreen integration', () => {
       winterRoundButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    const event1CheckboxFinal = container.querySelector('input[aria-label="Event Source event-1 source-a"]') as HTMLInputElement;
-    expect(event1CheckboxFinal.checked).toBe(true);
+    expect(eventDataSourceSelector().textContent).toContain('Apical Source A');
   });
 
   it('creates and selects a new event from the event list pane', async () => {

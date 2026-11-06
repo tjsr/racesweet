@@ -314,11 +314,29 @@ describe("RaceSweetApplicationServer", () => {
       testServer.adminCookie,
     );
     expect(invalid.status).toBe(400);
+    await expect(invalid.json()).resolves.toMatchObject({ status: 'rejected', reason: expect.stringContaining('checkpoint') });
+    const correctedSubmission = { ...submission, action: 'correct', mutationId: randomUUID(),
+      crossing: { ...submission.crossing, identifierValue: 'UNKNOWN-43', entryMethod: 'keypad', captureInstant: crossingInstant.toISOString() } };
+    const corrected: Response = await jsonRequest(testServer.origin, '/api/v1/timing/manual-crossings', correctedSubmission, testServer.adminCookie);
+    expect(corrected.status).toBe(200);
+    const correctRetry: Response = await jsonRequest(testServer.origin, '/api/v1/timing/manual-crossings', correctedSubmission, testServer.adminCookie);
+    await expect(correctRetry.json()).resolves.toMatchObject({ status: 'already-accepted' });
+    const rejectedReconcile: Response = await jsonRequest(testServer.origin, '/api/v1/timing/manual-crossings', {
+      ...correctedSubmission, action: 'reconcile', mutationId: randomUUID(),
+    }, testServer.adminCookie);
+    await expect(rejectedReconcile.json()).resolves.toMatchObject({ status: 'rejected' });
+    const reversal = { ...correctedSubmission, action: 'reverse', mutationId: randomUUID(), reason: 'False trigger' };
+    const reversed: Response = await jsonRequest(testServer.origin, '/api/v1/timing/manual-crossings', reversal, testServer.adminCookie);
+    expect(reversed.status).toBe(200);
+    const reverseRetry: Response = await jsonRequest(testServer.origin, '/api/v1/timing/manual-crossings', reversal, testServer.adminCookie);
+    await expect(reverseRetry.json()).resolves.toMatchObject({ status: 'already-accepted' });
 
     const ledger: { mutations: EventCatalogMutation[] } = JSON.parse(
       await readFile(path.join(testServer.dataDirectory, "event-catalog.json"), "utf8"),
     ) as { mutations: EventCatalogMutation[] };
     expect(ledger.mutations.filter((mutation: EventCatalogMutation): boolean => mutation.id === submission.mutationId)).toHaveLength(1);
+    expect(ledger.mutations.filter((mutation: EventCatalogMutation): boolean => mutation.id === correctedSubmission.mutationId)).toHaveLength(1);
+    expect(ledger.mutations.filter((mutation: EventCatalogMutation): boolean => mutation.id === reversal.mutationId)).toHaveLength(1);
   });
 
   it("resolves Forge renderer assets from the development server origin", () => {
@@ -925,7 +943,7 @@ describe("RaceSweetApplicationServer", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/event-stream");
-    await expect(response.text()).resolves.toContain("event: replay-ready");
+    await expect(response.text()).resolves.toContain("event: replay-connected");
     const controlResponse: Response = await fetch(
       `${testServer.origin}/api/v1/reports/replay/control`,
       {
@@ -960,6 +978,36 @@ describe("RaceSweetApplicationServer", () => {
       { headers: { cookie: testServer.adminCookie } },
     );
     expect(missingEventResponse.status).toBe(404);
+    const invalidBoth: Response = await jsonRequest(testServer.origin, '/api/v1/reports/replay/control',
+      { command: 'seek', position: 0, streamId, timestamp: '2026-01-01T00:00:00.000Z' }, testServer.adminCookie);
+    expect(invalidBoth.status).toBe(400);
+    const invalidSeek: Response = await jsonRequest(testServer.origin, '/api/v1/reports/replay/control',
+      { command: 'seek', position: 1, streamId }, testServer.adminCookie);
+    expect(invalidSeek.status).toBe(400);
+    const seekEnd: Response = await jsonRequest(testServer.origin, '/api/v1/reports/replay/control',
+      { command: 'seek', timestamp: '2026-01-01T00:00:00.000Z', streamId }, testServer.adminCookie);
+    expect(seekEnd.status).toBe(200);
+    expect(await seekEnd.json()).toEqual({ state: expect.objectContaining({ position: 0, recordCount: 0, streamId }) });
+    const wrongMode: Response = await fetch(`${testServer.origin}/api/v1/reports/replay?eventId=${eventId}&sessionId=${sessionId}&mode=live&streamId=${streamId}`,
+      { headers: { cookie: testServer.adminCookie } });
+    expect(wrongMode.status).toBe(409);
+    const malformedSpeed: Response = await fetch(`${testServer.origin}/api/v1/reports/replay?eventId=${eventId}&speed=NaN`,
+      { headers: { cookie: testServer.adminCookie } });
+    expect(malformedSpeed.status).toBe(400);
+    await jsonRequest(testServer.origin, '/api/v1/auth/users', {
+      password: 'viewer password is long enough', role: 'viewer', username: 'replay-viewer',
+    }, testServer.adminCookie);
+    const login: Response = await jsonRequest(testServer.origin, '/api/v1/auth/login', {
+      password: 'viewer password is long enough', username: 'replay-viewer',
+    });
+    const viewerCookie: string = (login.headers.get('set-cookie') || '').split(';')[0];
+    const viewerSubscription: Response = await fetch(`${testServer.origin}/api/v1/reports/replay?eventId=${eventId}&sessionId=${sessionId}&streamId=${streamId}`,
+      { headers: { cookie: viewerCookie } });
+    expect(viewerSubscription.status).toBe(200);
+    expect(await viewerSubscription.text()).toContain('replay-snapshot');
+    const viewerControl: Response = await jsonRequest(testServer.origin, '/api/v1/reports/replay/control',
+      { command: 'reset', streamId }, viewerCookie);
+    expect(viewerControl.status).toBe(403);
   });
 
   it("persists catalog commands and broadcasts the accepted mutations over SSE", async () => {

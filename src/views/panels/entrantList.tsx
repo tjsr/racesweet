@@ -343,6 +343,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
                   categoryName={getCategoryName(props.catalog, categoryId)}
                   allowSelectedClick={!!props.selectedEntrantIds && props.selectedEntrantIds.size > 1}
                   isSelected={props.selectedEntrantIds?.has(entrant.id) || entrant.id === props.selectedEntrant?.id}
+                  participantId={participant?.id.toString()}
                   raceNumber={participant ? getParticipantNumber(participant) : undefined}
                   onSelect={(event) => props.requestFormExit(() => event.shiftKey
                     ? props.onSelectEntrant(entrant.id, 'range', displayedEntrantIds)
@@ -380,6 +381,7 @@ export const EntrantListPanel = (props: EntrantListPanelProps): React.ReactEleme
                   categoryName={getCategoryName(props.catalog, getEntrantCategoryId(entrant))}
                   allowSelectedClick={!!props.selectedEntrantIds && props.selectedEntrantIds.size > 1}
                   isSelected={props.selectedEntrantIds?.has(entrant.id) || entrant.id === props.selectedEntrant?.id}
+                  participantId={participant?.id.toString()}
                   onSelect={(event) => props.requestFormExit(() => event.shiftKey
                     ? props.onSelectEntrant(entrant.id, 'range', displayedEntrantIds)
                     : event.ctrlKey || event.metaKey

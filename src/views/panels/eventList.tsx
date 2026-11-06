@@ -25,7 +25,8 @@ export const EventListPanel = (props: EventListPanelProps): React.ReactElement =
         const isActive = event.id === props.activeEventId;
 
         return (
-          <button
+          <Button
+            sx={{ alignItems: 'stretch', display: 'flex', flexDirection: 'column', textAlign: 'left', textTransform: 'none' }}
             key={event.id}
             type="button"
             className={`events-list-item object-card${isSelected ? ' selected' : ''}${isActive ? ' active' : ''}`}
@@ -40,7 +41,7 @@ export const EventListPanel = (props: EventListPanelProps): React.ReactElement =
             <span>{event.date}</span>
             <span>{event.format}</span>
             {isActive ? <span className="events-badge">Active</span> : null}
-          </button>
+          </Button>
         );
       })}
     </div>

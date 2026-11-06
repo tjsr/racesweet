@@ -350,14 +350,14 @@ describe("CategoriesPage integration", () => {
       'select[aria-label="Category Entrant Identity"]',
     ) as HTMLSelectElement;
     const maxTeamSizeInput = container.querySelector(
-      'input[aria-label="Category Max Team Size"]',
-    ) as HTMLInputElement;
+      'select[aria-label="Category Max Team Size"]',
+    ) as HTMLSelectElement;
     const minRiderAgeInput = container.querySelector(
-      'input[aria-label="Category Min Rider Age"]',
-    ) as HTMLInputElement;
+      'select[aria-label="Category Min Rider Age"]',
+    ) as HTMLSelectElement;
     const maxRiderAgeInput = container.querySelector(
-      'input[aria-label="Category Max Rider Age"]',
-    ) as HTMLInputElement;
+      'select[aria-label="Category Max Rider Age"]',
+    ) as HTMLSelectElement;
     const excludeFromResultsInput = container.querySelector(
       'input[aria-label="Category Exclude From Results"]',
     ) as HTMLInputElement;
@@ -367,18 +367,10 @@ describe("CategoriesPage integration", () => {
     const sessionAssignmentsInput = container.querySelector(
       'select[aria-label="Category Session Assignments"]',
     ) as HTMLSelectElement;
-    expect(maxTeamSizeInput.inputMode).toBe("numeric");
     expect(maxTeamSizeInput.disabled).toBe(true);
-    expect(minRiderAgeInput.inputMode).toBe("numeric");
-    expect(maxRiderAgeInput.inputMode).toBe("numeric");
-    expect(
-      container.querySelector('label[for="category-min-rider-age"]')
-        ?.textContent,
-    ).toBe("Minimum Rider Age");
-    expect(
-      container.querySelector('label[for="category-max-rider-age"]')
-        ?.textContent,
-    ).toBe("Maximum Rider Age");
+    expect(maxTeamSizeInput.options[0]?.textContent).toBe("No maximum");
+    expect(minRiderAgeInput.options[0]?.textContent).toBe("No minimum age");
+    expect(maxRiderAgeInput.options[0]?.textContent).toBe("No maximum age");
     await act(async () => {
       setInputValue(categoryNameInput, "Development Cup");
       distanceRuleTypeInput.value = "time";
@@ -398,9 +390,12 @@ describe("CategoriesPage integration", () => {
     ) as HTMLInputElement;
     await act(async () => {
       setInputValue(distanceRuleValueInput, "1:30");
-      setInputValue(maxTeamSizeInput, "3");
-      setInputValue(minRiderAgeInput, "15");
-      setInputValue(maxRiderAgeInput, "55");
+      maxTeamSizeInput.value = "3";
+      maxTeamSizeInput.dispatchEvent(new Event("change", { bubbles: true }));
+      minRiderAgeInput.value = "15";
+      minRiderAgeInput.dispatchEvent(new Event("change", { bubbles: true }));
+      maxRiderAgeInput.value = "55";
+      maxRiderAgeInput.dispatchEvent(new Event("change", { bubbles: true }));
       excludeFromResultsInput.dispatchEvent(
         new MouseEvent("click", { bubbles: true }),
       );

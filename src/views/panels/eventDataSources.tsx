@@ -1,7 +1,8 @@
-import { Button, Checkbox, FormControlLabel } from '@mui/material';
+import { Button } from '@mui/material';
 import React from 'react';
 import { type DataSourceConfig } from '../../app/systemConfig.js';
 import { type EventCatalogEvent } from '../../catalog/eventCatalog.js';
+import { type EventDataSourceOption, EventsDataSourceSelector } from '../../controls/eventsDataSourceSelector.js';
 
 interface EventDataSourcesPanelProps {
   assignedSourceIds: string[];
@@ -20,12 +21,6 @@ const getEventLastLoadedAt = (event: EventCatalogEvent, sourceIds: string[]): st
     : undefined;
 };
 
-const toggleInList = (values: string[], value: string): string[] => {
-  return values.includes(value)
-    ? values.filter((item) => item !== value)
-    : [...values, value];
-};
-
 export const EventDataSourcesPanel = (props: EventDataSourcesPanelProps): React.ReactElement => (
   <section className="events-panel event-detail-panel">
     <h2>Event Data Sources</h2>
@@ -33,29 +28,22 @@ export const EventDataSourcesPanel = (props: EventDataSourcesPanelProps): React.
       props.dataSources.length === 0 ? (
         <p>No configured data sources are available yet. Add and configure them in System.</p>
       ) : (
-        <ul>
-          {(() => {
-            const selectedEventId = props.selectedEvent.id;
-            const selectedEvent = props.selectedEvent;
-            return props.dataSources.map((source) => {
-              const checked = props.assignedSourceIds.includes(source.id);
-              const lastLoadedAt = selectedEvent.dataSourceLastLoadedAt?.[source.id];
-              const eventLastLoadedAt = getEventLastLoadedAt(selectedEvent, props.assignedSourceIds);
-              return (
-                <li key={`event-source-${source.id}`}>
-                  <FormControlLabel
-                    control={<Checkbox
-                      checked={checked}
-                      onChange={() => props.onSaveEventAssignment(selectedEventId, toggleInList(props.assignedSourceIds, source.id))}
-                      slotProps={{ input: { 'aria-label': `Event Source ${selectedEventId} ${source.id}` } }}
-                    />}
-                    label={`${source.name}${lastLoadedAt && lastLoadedAt !== eventLastLoadedAt ? ` (Last loaded at ${lastLoadedAt})` : ''}`}
-                  />
-                </li>
-              );
-            });
-          })()}
-        </ul>
+        <EventsDataSourceSelector
+          ariaLabel="Event Data Sources"
+          label="Assigned data sources"
+          onChange={(sourceIds: string[]): void => {
+            void props.onSaveEventAssignment(props.selectedEvent!.id, sourceIds);
+          }}
+          options={props.dataSources.map((source: DataSourceConfig): EventDataSourceOption => {
+            const lastLoadedAt: string | undefined = props.selectedEvent!.dataSourceLastLoadedAt?.[source.id];
+            const eventLastLoadedAt: string | undefined = getEventLastLoadedAt(props.selectedEvent!, props.assignedSourceIds);
+            return {
+              id: source.id,
+              label: `${source.name}${lastLoadedAt && lastLoadedAt !== eventLastLoadedAt ? ` (Last loaded at ${lastLoadedAt})` : ''}`,
+            };
+          })}
+          sourceIds={props.assignedSourceIds}
+        />
       )
     ) : (
       <p>No events are defined.</p>

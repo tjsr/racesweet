@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@mui/material';
 import { type EventCatalogSession } from '../catalog/eventCatalog.js';
 import { type SessionId } from '../model/raceevent.js';
 
@@ -35,7 +36,8 @@ export const SessionListCard = (props: SessionListCardProps): React.ReactElement
   }
 
   return (
-    <button
+    <Button
+      sx={{ alignItems: 'stretch', display: 'flex', flexDirection: 'column', textAlign: 'left', textTransform: 'none' }}
       type="button"
       className={className}
       aria-selected={props.selected}
@@ -47,6 +49,6 @@ export const SessionListCard = (props: SessionListCardProps): React.ReactElement
       <span>{props.session.kind}</span>
       <span>{props.session.status}</span>
       {isActive ? <span className="events-badge">Active</span> : null}
-    </button>
+    </Button>
   );
 };

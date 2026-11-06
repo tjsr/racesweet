@@ -13,6 +13,55 @@ const openApiOptions: OAS3Options = {
         },
       },
       schemas: {
+        ReplaySnapshot: {
+          properties: { records: { items: { $ref: '#/components/schemas/ReplayRecord' }, type: 'array' }, state: { $ref: '#/components/schemas/ReplayState' } },
+          required: ['records', 'state'], type: 'object',
+        },
+        ReplayConnected: {
+          properties: {
+            mode: { enum: ['live', 'replay'], type: 'string' }, protocolVersion: { enum: [1], type: 'integer' },
+            selection: { properties: { eventId: { type: 'string' }, sessionId: { type: 'string' } }, required: ['eventId'], type: 'object' },
+            serverTimestamp: { format: 'date-time', type: 'string' }, state: { $ref: '#/components/schemas/ReplayState' }, streamId: { type: 'string' },
+          }, required: ['mode', 'protocolVersion', 'selection', 'serverTimestamp', 'state', 'streamId'], type: 'object',
+        },
+        ReplayUpdate: {
+          properties: { record: { $ref: '#/components/schemas/ReplayRecord' }, state: { $ref: '#/components/schemas/ReplayState' } },
+          required: ['record', 'state'], type: 'object',
+        },
+        ReplaySeek: {
+          properties: {
+            position: { minimum: 0, type: 'integer' }, snapshotBoundary: { minimum: 0, type: 'integer' },
+            records: { items: { $ref: '#/components/schemas/ReplayRecord' }, type: 'array' }, state: { $ref: '#/components/schemas/ReplayState' },
+            target: { oneOf: [
+              { additionalProperties: false, properties: { position: { minimum: 0, type: 'integer' } }, required: ['position'], type: 'object' },
+              { additionalProperties: false, properties: { timestamp: { format: 'date-time', type: 'string' } }, required: ['timestamp'], type: 'object' },
+            ] },
+          }, required: ['position', 'snapshotBoundary', 'records', 'state', 'target'], type: 'object',
+        },
+        ReplayError: {
+          properties: { code: { type: 'string' }, message: { type: 'string' }, state: { $ref: '#/components/schemas/ReplayState' } },
+          required: ['code', 'message'], type: 'object',
+        },
+        ReplayState: {
+          properties: {
+            emittedRecordCount: { minimum: 0, type: 'integer' }, eventId: { type: 'string' },
+            mode: { enum: ['live', 'replay'], type: 'string' }, position: { minimum: 0, type: 'integer' },
+            recordCount: { minimum: 0, type: 'integer' }, serverTimestamp: { format: 'date-time', type: 'string' },
+            sessionId: { type: 'string' }, speed: { maximum: 1000, minimum: 0.01, type: 'number' },
+            status: { enum: ['completed', 'paused', 'replaying'], type: 'string' }, streamId: { type: 'string' },
+          },
+          required: ['emittedRecordCount', 'eventId', 'mode', 'position', 'recordCount', 'serverTimestamp', 'speed', 'status', 'streamId'],
+          type: 'object',
+        },
+        ReplayRecord: {
+          properties: {
+            id: { type: 'string' }, eventId: { type: 'string' }, sessionId: { type: 'string' },
+            timestamp: { format: 'date-time', type: 'string' }, sequence: { type: 'number' }, recordType: { type: 'number' },
+            participantId: { type: 'string' }, entrantId: { type: 'string' }, entryId: { type: 'string' },
+            lineNumber: { type: 'number' }, loopNumber: { type: 'number' },
+          },
+          required: ['id', 'eventId', 'sessionId', 'timestamp', 'sequence', 'recordType'], type: 'object',
+        },
         AuthenticatedUser: {
           properties: {
             id: { type: "string" },
@@ -285,7 +334,7 @@ const openApiOptions: OAS3Options = {
       },
       "/api/v1/timing/manual-crossings": {
         post: {
-          description: "Record one manual crossing through the Event Catalog ledger. Repeating the same mutationId and payload returns already-accepted.",
+          description: "Record, correct, reverse, or reconcile one manual crossing through the Event Catalog ledger. The action defaults to record. Repeating the same mutationId and payload returns already-accepted. Validation failures return status rejected and an operator-safe reason. All actions require race:write.",
           operationId: "submitManualCrossing",
           requestBody: {
             content: {
@@ -294,9 +343,11 @@ const openApiOptions: OAS3Options = {
                   type: "object",
                   required: ["crossing", "crossingId", "mutationId"],
                   properties: {
+                    action: { enum: ['record', 'correct', 'reverse', 'reconcile'], type: 'string' },
                     crossing: { type: "object" },
                     crossingId: { type: "string" },
                     mutationId: { type: "string" },
+                    reason: { type: 'string', description: 'Optional reversal reason.' },
                   },
                 },
               },
@@ -410,7 +461,7 @@ const openApiOptions: OAS3Options = {
       "/api/v1/reports/replay": {
         get: {
           description:
-            "Streams selected event crossing records as Server-Sent Events. Replay records retain their recorded intervals scaled by the speed query parameter; live streams emit newly accepted crossings.",
+            "Version 1 SSE protocol: replay-connected, replay-snapshot, replay-state, then race-update. Seek emits replay-seek and replay-state; reset emits replay-reset and replay-state. replay-complete closes a completed replay. replay-error contains a safe code/message. Every reconnect replaces client records from the authoritative snapshot. Live snapshots include currently accepted records. Requires race:read.",
           operationId: "streamEventReplay",
           parameters: [
             {
@@ -457,12 +508,16 @@ const openApiOptions: OAS3Options = {
           ],
           responses: {
             200: {
-              content: { "text/event-stream": { schema: { type: "string" } } },
-              description: "Replay lifecycle and race-record events.",
+              content: { "text/event-stream": {
+                example: 'event: replay-connected\ndata: {"protocolVersion":1,"streamId":"marshal-view","mode":"replay","selection":{"eventId":"event-1"},"serverTimestamp":"2026-01-01T00:00:00.000Z","state":{"streamId":"marshal-view","eventId":"event-1","mode":"replay","status":"replaying","speed":1,"recordCount":10,"emittedRecordCount":0,"position":0,"serverTimestamp":"2026-01-01T00:00:00.000Z"}}\n\n',
+                schema: { type: "string" },
+              } },
+              description: "Versioned replay lifecycle and normalized race-update events, in protocol order.",
             },
             400: { description: "Invalid replay parameters." },
             401: { description: "Authentication required." },
             404: { description: "Selected event or session was not found." },
+            409: { description: "Stream ID is bound to another event, session, or mode." },
           },
           security: [{ raceSweetSession: [] }],
           summary: "Stream live or replayed event crossings",
@@ -471,16 +526,18 @@ const openApiOptions: OAS3Options = {
       },
       "/api/v1/reports/replay/control": {
         post: {
-          description: "Controls a named replay stream. The stream must first be created by a replay subscription.",
+          description: "Any race:write user may control a known replay. Seek accepts exactly one zero-based position (0 through recordCount) or ISO timestamp with an offset. Other commands reject seek fields. A speed change preserves elapsed playback time.",
           operationId: "controlEventReplay",
           requestBody: {
             content: {
               "application/json": {
                 schema: {
                   properties: {
-                    command: { enum: ["pause", "reset", "resume", "set-speed", "start"], type: "string" },
+                    command: { enum: ["pause", "reset", "resume", "seek", "set-speed", "start"], type: "string" },
+                    position: { minimum: 0, type: "integer" },
                     speed: { maximum: 1000, minimum: 0.01, type: "number" },
                     streamId: { type: "string" },
+                    timestamp: { format: "date-time", type: "string" },
                   },
                   required: ["command", "streamId"],
                   type: "object",
@@ -490,7 +547,7 @@ const openApiOptions: OAS3Options = {
             required: true,
           },
           responses: {
-            200: { description: "Current replay state after the command." },
+            200: { content: { "application/json": { schema: { properties: { state: { $ref: '#/components/schemas/ReplayState' } }, required: ['state'], type: 'object' } } }, description: "Current replay state after the command." },
             400: { description: "Invalid replay control request." },
             401: { description: "Authentication required." },
             404: { description: "Replay stream was not found." },

@@ -44,10 +44,10 @@ configuration flows, including upstream callbacks where applicable.
 - **Control library:** standardize on MUI. The hidden native file input is the
   only permitted raw input because browsers require it for file picking; it must
   be triggered and described by a MUI button/field.
-- **Ordering:** replace hand-written HTML5 drag handling with one reorderable
-  list implementation that supports pointer, touch, and keyboard sensors. The
-  selected library and any new dependency must be evaluated for React 19 and
-  current TypeScript compatibility before adoption.
+- **Ordering:** `ReorderableAdminList` replaces hand-written HTML5 drag handling
+  with one native Pointer Events implementation for mouse, pen, and touch. It
+  also provides keyboard lift/move/drop/cancel and visible Move up/Move down
+  controls. No drag-library dependency is used in this release.
 - **Persistence:** this is a renderer/UI refactor. It does not change Event
   Catalog mutation semantics, service methods, system configuration persistence,
   or data formats. A restart-version update is not expected unless implementation
@@ -171,6 +171,36 @@ catalog/system state directly.
   repository Markdown lint command if it becomes available.
 
 ## Implementation checklist
+
+### Migrated control inventory
+
+| Administration surface | Shared implementation |
+| --- | --- |
+| Section navigation | `ResponsiveSectionNavigation`, one item model |
+| Events, Sessions, Categories, Entrants | `AdminPageLayout` |
+| Event, session, and category forms | `AdminFormSection`, `AdminFieldGrid` |
+| Save, activate, delete actions | `AdminActionBar`, existing callbacks |
+| Finite choices | MUI fields, `AdminSelectField`, MUI native variants |
+| Searchable choices | `AdminAutocompleteField` |
+| Source configuration and inventories | `ResponsiveDataList`, MUI choices |
+| Unsaved-change and preview dialogs | `ResponsiveDialog` |
+| Category and start-wave order | `ReorderableAdminList` |
+| File selection | `FileSelectionField`, hidden file input exception |
+
+The shared theme uses 600px and 960px breakpoints, 48px action targets, 16px
+editable input text, and the system light/dark preference. CSS uses the same
+breakpoints. Both list and detail panes remain mounted while hidden so Back,
+viewport changes, and orientation changes preserve drafts.
+
+The reorder implementation uses native Pointer Events for mouse, pen, and
+touch through one shared list, with keyboard lift/move/drop/cancel and visible
+Move up/Move down actions. It requires no additional library dependency.
+Failed persistence restores the previous order and announces the failure.
+
+Regression coverage includes shared primitive behavior at 360px, 600px,
+768px, 960px, and 1280px, and real service/ledger/upstream writes from Events,
+Sessions, Categories, and Entrants at 360px, 768px, and 1280px. System data
+source regressions exercise the same widths through `SystemConfigService`.
 
 - Inventory every visible administration control and map it to a shared
   responsive primitive before migration begins.

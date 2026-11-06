@@ -11,6 +11,15 @@ describe('writeApplicationFile', () => {
     resolvePath: (filename: string): string => path.resolve(filename),
   };
 
+  it('atomically replaces a durable manual timing outbox', async (): Promise<void> => {
+    const directoryPath: string = await mkdtemp(path.join(tmpdir(), 'racesweet-atomic-outbox-'));
+    const filename: string = path.join(directoryPath, 'outbox.json');
+    vi.spyOn(console, 'info').mockImplementation((): void => undefined);
+    await writeApplicationFile({ contents: '{"items":[]}', dataType: 'utf8', filename, options: { atomic: true } }, runtime);
+    await writeApplicationFile({ contents: '{"items":[1]}', dataType: 'utf8', filename, options: { atomic: true } }, runtime);
+    await expect(readFile(filename, 'utf8')).resolves.toBe('{"items":[1]}');
+  });
+
   it('creates the parent directory, writes the content, and returns resolved diagnostics', async () => {
     const directoryPath = await mkdtemp(path.join(tmpdir(), 'racesweet-file-write-'));
     const filename = path.join(directoryPath, 'nested', 'catalog.json');

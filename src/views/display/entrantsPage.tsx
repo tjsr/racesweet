@@ -1,4 +1,5 @@
 import React from 'react';
+import { AdminPageLayout } from '../admin/adminPrimitives.js';
 import {
   type EntrantType,
   type EventCatalogEntrant,
@@ -450,7 +451,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
           <option key={category.id} value={category.id}>{category.name}</option>
         ))}
       </SelectTextField>
-      <div className="events-layout">
+      <AdminPageLayout detailLabel="entrant details" listLabel="entrants" selectedId={selectedEntrant?.id}>
         <EntrantListPanel
           catalog={props.catalog}
           createKind={createKind}
@@ -529,7 +530,7 @@ export const EntrantsPage = (props: EntrantsPageProps): React.ReactElement => {
             selectedParticipant={selectedIdentificationParticipant}
           />}
         </div>
-      </div>
+      </AdminPageLayout>
     </section>
   );
 };

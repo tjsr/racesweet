@@ -2775,6 +2775,7 @@ export class EventCatalogService {
       ...input,
       crossingId: identity.crossingId || createTimeRecordId(),
     };
+    if (identity.mutationId && this.acceptExistingManualMutation(identity.mutationId, 'manual-crossing-recorded', crossing)) return this.state;
     this.validateManualCrossing(crossing);
     if (this.state.manualCrossings?.some((current: EffectiveManualCrossing): boolean => current.crossingId === crossing.crossingId)) {
       throw new Error(`Manual crossing ${crossing.crossingId} already exists.`);
@@ -2791,7 +2792,9 @@ export class EventCatalogService {
   public async correctManualCrossing(
     crossingId: TimeRecordId,
     input: ManualCrossingInput,
+    mutationId?: string,
   ): Promise<EventCatalogState> {
+    if (mutationId && this.acceptExistingManualMutation(mutationId, 'manual-crossing-corrected', { ...input, crossingId })) return this.state;
     const current: EffectiveManualCrossing | undefined = this.state.manualCrossings?.find(
       (crossing: EffectiveManualCrossing): boolean => crossing.crossingId === crossingId,
     );
@@ -2806,7 +2809,7 @@ export class EventCatalogService {
     this.assertNoDuplicateManualCrossing(crossing);
     return this.appendMutations([{
       crossing,
-      id: createMutationId(),
+      id: mutationId || createMutationId(),
       timestamp: createTimestamp(),
       type: "manual-crossing-corrected",
     }]);
@@ -2815,7 +2818,15 @@ export class EventCatalogService {
   public async reverseManualCrossing(
     crossingId: TimeRecordId,
     reason?: string,
+    mutationId?: string,
   ): Promise<EventCatalogState> {
+    if (mutationId) {
+      const existing: EventCatalogMutation | undefined = this.ledger.mutations.find((mutation): boolean => mutation.id === mutationId);
+      if (existing) {
+        if (existing.type === 'manual-crossing-reversed' && existing.crossingId === crossingId && existing.reason === (reason?.trim() || undefined)) return this.state;
+        throw new Error('The mutationId has already been used for another manual timing action.');
+      }
+    }
     const current: EffectiveManualCrossing | undefined = this.state.manualCrossings?.find(
       (crossing: EffectiveManualCrossing): boolean => crossing.crossingId === crossingId,
     );
@@ -2824,7 +2835,7 @@ export class EventCatalogService {
     }
     return this.appendMutations([{
       crossingId,
-      id: createMutationId(),
+      id: mutationId || createMutationId(),
       reason: reason?.trim() || undefined,
       timestamp: createTimestamp(),
       type: "manual-crossing-reversed",
@@ -2835,14 +2846,26 @@ export class EventCatalogService {
     crossingId: TimeRecordId,
     entrantId: EventEntrantId,
     participantId?: EventParticipant["id"],
+    mutationId?: string,
   ): Promise<EventCatalogState> {
     const current: EffectiveManualCrossing | undefined = this.state.manualCrossings?.find(
       (crossing: EffectiveManualCrossing): boolean => crossing.crossingId === crossingId,
     );
+    if (mutationId) {
+      const existing: EventCatalogMutation | undefined = this.ledger.mutations.find((mutation): boolean => mutation.id === mutationId);
+      if (existing) {
+        if (existing.type === 'manual-crossing-corrected' && existing.crossing.crossingId === crossingId &&
+          existing.crossing.entrantId === entrantId && existing.crossing.participantId === participantId && existing.crossing.status === 'scored') return this.state;
+        throw new Error('The mutationId has already been used for another manual timing action.');
+      }
+    }
     if (!current || current.reversed || current.status !== 'needs-attention') {
       throw new Error(`Manual crossing ${crossingId} does not need reconciliation.`);
     }
     return this.correctManualCrossing(crossingId, {
+      captureInstant: current.captureInstant,
+      entryMethod: current.entryMethod,
+      operatorLabel: current.operatorLabel,
       entrantId,
       eventId: current.eventId,
       identifierKind: current.identifierKind,
@@ -2856,14 +2879,34 @@ export class EventCatalogService {
       status: 'scored',
       time: current.time,
       timeZone: current.timeZone,
-    });
+    }, mutationId);
+  }
+
+  private acceptExistingManualMutation(
+    mutationId: string,
+    type: 'manual-crossing-recorded' | 'manual-crossing-corrected',
+    crossing: ManualCrossing,
+  ): boolean {
+    const existing: EventCatalogMutation | undefined = this.ledger.mutations.find((mutation): boolean => mutation.id === mutationId);
+    if (!existing) return false;
+    const keys: Array<keyof ManualCrossing> = [...new Set([...Object.keys(crossing),
+      ...('crossing' in existing ? Object.keys(existing.crossing) : [])])] as Array<keyof ManualCrossing>;
+    if (existing.type === type && keys.every((key: keyof ManualCrossing): boolean => existing.crossing[key] === crossing[key])) return true;
+    throw new Error('The mutationId has already been used for another manual timing action.');
   }
 
   private validateManualCrossing(crossing: ManualCrossing): void {
+    if ((crossing.entryMethod && !['keyboard', 'keypad', 'voice'].includes(crossing.entryMethod)) ||
+      (crossing.captureInstant && !Number.isFinite(Date.parse(crossing.captureInstant))) || (crossing.operatorLabel?.length || 0) > 150) {
+      throw new Error('Manual crossing capture metadata is invalid.');
+    }
     const event = this.state.events.find((candidate) => candidate.id === crossing.eventId);
     const session = this.state.sessions.find((candidate) => candidate.id === crossing.sessionId);
     if (!event || !session || session.eventId !== event.id) {
       throw new Error('Manual crossing event and session must belong together.');
+    }
+    if (event.trackMap?.timingLines.length && !event.trackMap.timingLines.some((line): boolean => line.lineNumber === crossing.lineNumber)) {
+      throw new Error('Manual crossing checkpoint is not configured for the selected event.');
     }
     if (!Number.isSafeInteger(crossing.lineNumber) || crossing.lineNumber < 1 ||
       (crossing.loopNumber !== undefined && (!Number.isSafeInteger(crossing.loopNumber) || crossing.loopNumber < 1))) {

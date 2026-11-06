@@ -48,20 +48,6 @@ export const DataSourceTypesPanel = (
         </MenuItem>
       ))}
     </SelectTextField>
-    <select
-      aria-label="New Data Source Type"
-      hidden
-      value={props.newSourceType}
-      onChange={(event: React.ChangeEvent<HTMLSelectElement>): void =>
-        props.onChangeNewSourceType(event.target.value as DataSourceType)
-      }
-    >
-      {sourceTypeOptions.map((type: DataSourceType) => (
-        <option key={type} value={type}>
-          {getDataSourceTypeLabel(type)}
-        </option>
-      ))}
-    </select>
     <AsyncButton
       loadingAriaLabel="Adding data source"
       onAsyncClick={() => props.onCreateSource(props.newSourceType)}

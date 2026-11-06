@@ -1,4 +1,5 @@
 import React from 'react';
+import { AdminPageLayout } from '../admin/adminPrimitives.js';
 import { getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent, } from '../../catalog/eventCatalog.js';
 import { SelectTextField } from '../../controls/selectTextField.js';
 import { buildCategoryChanges } from '../../processing/categoryDraft.js';
@@ -108,7 +109,7 @@ export const CategoriesPage = (props: CategoriesPageProps,): React.ReactElement 
       >
         {props.catalog.events.map((event) => ( <option key={event.id} value={event.id}>{event.name}</option>))}
       </SelectTextField>
-      <div className="events-layout categories-layout">
+      <AdminPageLayout detailLabel="category details" listLabel="categories" selectedId={selectedCategory?.id}>
         <CategoryListPanel
           allowCreateCategory={!!selectedEvent}
           categories={activeEventCategories}
@@ -137,7 +138,7 @@ export const CategoriesPage = (props: CategoriesPageProps,): React.ReactElement 
           />
           <EntrantsInCategoryPanel entrants={props.entrants} />
         </div>
-      </div>
+      </AdminPageLayout>
     </section>
   );
 };

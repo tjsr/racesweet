@@ -1,6 +1,6 @@
 # Manual timing operator workflow and durable delivery
 
-**Status:** Planned. This completes the user-facing feature built on the
+**Status:** Implemented. This completes the user-facing feature built on the
 implemented catalog and ingestion foundation in
 [01-manual-timing-entry.md](01-manual-timing-entry.md).
 
@@ -29,8 +29,9 @@ crossing and result calculations.
 - The catalog replica outbox synchronizes immutable mutations. The crossing
   delivery outbox specified here is a separate client record of timing API
   acknowledgements; both paths must use the same crossing and mutation IDs.
-- The selected event timezone and configured session checkpoints must be
-  available before a crossing can be scored.
+- The selected event timezone and a catalog-backed timing-line source must be
+  available before a crossing can be scored. The source is the event track map
+  timing lines, falling back to configured session finish lines.
 
 ## Resolved decisions and implementation questions
 
@@ -55,6 +56,14 @@ crossing and result calculations.
   append the existing ledger mutations through `EventCatalogService`.
 - **Voice:** speech recognition only proposes text in the shared identifier
   field. The operator confirms the parsed value before the normal Submit action.
+- **Checkpoint policy:** manual timing does not introduce a separate checkpoint
+  registry or prescribed-loop editor. It offers event track-map timing lines,
+  falling back to configured session finish lines. No checkpoint is invented;
+  loop is optional and, when entered, must be a positive integer.
+- **Native delivery:** a native installation delivers manual-timing commands to
+  its configured RaceSweet remote-server URL. It does not infer a localhost
+  listener or discover a peer. Without a configured or reachable endpoint, the
+  durable outbox retains the command as queued and never reports acceptance.
 
 ## Requirements and specifications
 
@@ -171,14 +180,34 @@ crossing and result calculations.
 
 ## Implementation checklist
 
-- [ ] Build shared Timing entry and review components with responsive Quick
+- [x] Build shared Timing entry and review components with responsive Quick
       Entry presentation.
-- [ ] Add exact scoped identifier resolution and event-local timestamp chooser.
-- [ ] Add durable web and Electron outbox adapters and recovery orchestration.
-- [ ] Wire direct timing delivery to catalog replica synchronization using the
+- [x] Add exact scoped identifier resolution and event-local timestamp chooser.
+- [x] Add durable web and Electron outbox adapters and recovery orchestration.
+- [x] Wire direct timing delivery to catalog replica synchronization using the
       same stable IDs.
-- [ ] Add authenticated correction, reversal, and reconciliation commands and
+- [x] Add authenticated correction, reversal, and reconciliation commands and
       structured rejection responses.
-- [ ] Add speech adapter, explicit confirmation, and manual fallback.
-- [ ] Add unit, UI, service, persistence, API, and restart regressions; run
+- [x] Add speech adapter, explicit confirmation, and manual fallback.
+- [x] Add unit, UI, service, persistence, API, and restart regressions; run
       Vitest, TypeScript, lint, and build checks.
+
+## Implementation decisions
+
+- Manual entry inherits Timing's selected event and session. Checkpoint choices
+  use the event track map timing lines, or the session's configured finish lines
+  where a track map is absent. No checkpoint is invented for an unconfigured
+  session. The loop number is optional and must be a positive integer.
+- One application-level outbox controller recovers pending work and retries on
+  reconnect and a bounded schedule, including while another section is open.
+  Quick Entry and normal entry subscribe to this same persisted state.
+- Native JSON writes flush a temporary file and rename it atomically beside
+  the destination. Web clients use IndexedDB transactions. Invalid saved items
+  are retained in a quarantine list and never delivered.
+- The same authenticated endpoint accepts record, correct, reverse, and
+  reconcile actions. A native client targets its configured remote server;
+  other clients use the current application's HTTP origin. Missing connectivity
+  or authentication keeps delivery queued with a visible error.
+- A server rejection retains the original action and appends a deterministic
+  local correction to `needs-attention` when the rejected action was scored.
+  This preserves audit history and excludes the rejected crossing from results.

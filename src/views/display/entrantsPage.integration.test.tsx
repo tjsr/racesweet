@@ -318,7 +318,7 @@ describe('EntrantsPage integration', () => {
     expect(sessionsForEntrantPanel.textContent).toContain('Premier Race');
     expect(sessionsForEntrantPanel.textContent).not.toContain('Practice');
     const entrantList = container.querySelector('[aria-label="Entrants for selected event"]');
-    expect(entrantList?.textContent).not.toContain('ent-1');
+    expect(entrantList?.textContent).not.toContain('Entrant ID: ent-1');
     expect(entrantList?.querySelector('.entrant-list-type')?.textContent).toBe('driver');
 
     await act(async () => {
@@ -507,6 +507,8 @@ describe('EntrantsPage integration', () => {
 
   it('shows entrant deletion progress, removes the deleted entrant, selects a remaining entrant, and reports failures inline', async () => {
     let completeDeletion: (() => void) | undefined;
+    const writeText = vi.fn(async (_text: string): Promise<void> => undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
 
     const Harness = () => {
       const [currentCatalog, setCurrentCatalog] = React.useState<EventCatalogState>(catalog);
@@ -544,6 +546,20 @@ describe('EntrantsPage integration', () => {
     await act(async () => {
       root.render(<Harness />);
     });
+    const entrantIdLabel = (): HTMLElement => container.querySelector('[aria-label="Entrant ID"]') as HTMLElement;
+    const copyEntrantIdButton = (): HTMLButtonElement => container.querySelector('button[aria-label="Copy Entrant ID"]') as HTMLButtonElement;
+    const notesInput = container.querySelector('textarea[aria-label="Entrant Notes"]') as HTMLTextAreaElement;
+
+    expect(container.querySelector('input[aria-label="Entrant ID"]')).toBeNull();
+    expect(entrantIdLabel().textContent).toContain('Entrant ID: ent-1');
+    expect(notesInput.rows).toBeGreaterThanOrEqual(3);
+
+    await act(async () => {
+      copyEntrantIdButton().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenCalledWith('ent-1');
+
     const deleteButton = (): HTMLButtonElement => Array.from(container.querySelectorAll('button'))
       .find((button) => button.textContent?.includes('Delete Entrant')) as HTMLButtonElement;
 
@@ -558,14 +574,15 @@ describe('EntrantsPage integration', () => {
     });
     expect(container.querySelector('[aria-label="Entrants for selected event"]')?.textContent).not.toContain('Pat Rider');
     expect(container.textContent).toContain('Empty Rider');
-    expect(container.textContent).toContain('Id: ent-empty');
+    expect(container.querySelector('input[aria-label="Entrant ID"]')).toBeNull();
+    expect(entrantIdLabel().textContent).toContain('Entrant ID: ent-empty');
 
     await act(async () => {
       deleteButton().dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     expect(container.querySelector('[aria-label="Entrant deletion failed"]')).toBeTruthy();
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('Entrant has published results.');
-    expect(container.textContent).toContain('Id: ent-empty');
+    expect(entrantIdLabel().textContent).toContain('Entrant ID: ent-empty');
   });
 
   it('shift-selects entrants, shows bulk summaries, updates categories, and deletes the selection', async () => {
