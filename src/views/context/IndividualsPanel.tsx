@@ -4,6 +4,7 @@ import {
 } from '@mui/material';
 import React from 'react';
 import type { EventCatalogEntrant, EventCatalogState } from '../../catalog/eventCatalog.js';
+import { copyToClipboard } from '../../controls/identifierDisplay.js';
 import type { IndividualLinkInput, IndividualLinkTargetInput } from '../../model/individualLink.js';
 import { splitIndividualName } from '../../model/official.js';
 import type { OfficialProfile, OfficialProfileInput } from '../../model/official.js';
@@ -43,6 +44,16 @@ const getCardIdentifier = (card: IndividualDirectoryCard): CardIdentifier | unde
   return card.target?.entrantId
     ? { label: 'Entrant ID', value: card.target.entrantId }
     : undefined;
+};
+
+const getCardDetails = (card: IndividualDirectoryCard): string => {
+  const identifier: CardIdentifier | undefined = getCardIdentifier(card);
+  const details: string[] = [
+    `Full name: ${card.label}`,
+    ...(identifier ? [`${identifier.label}: ${identifier.value}`] : []),
+  ];
+  if (card.profile?.email) details.push(`Email: ${card.profile.email}`);
+  return details.join('\n');
 };
 
 const IndividualCard = ({ card, onOpenContextMenu, onSelect, selected }: {
@@ -181,13 +192,28 @@ export const IndividualsPanel = (props: IndividualsPanelProps): React.ReactEleme
   const copyCardIdentifier = (): void => {
     const identifier: CardIdentifier | undefined = contextMenu ? getCardIdentifier(contextMenu.card) : undefined;
     if (identifier) {
-      void navigator.clipboard.writeText(identifier.value);
+      copyToClipboard(identifier.value);
     }
+    closeCardContextMenu();
+  };
+  const copyCardName = (): void => {
+    if (contextMenu) copyToClipboard(contextMenu.card.label);
+    closeCardContextMenu();
+  };
+  const copyCardEmail = (): void => {
+    if (contextMenu?.card.profile?.email) copyToClipboard(contextMenu.card.profile.email);
+    closeCardContextMenu();
+  };
+  const copyAllCardDetails = (): void => {
+    if (contextMenu) copyToClipboard(getCardDetails(contextMenu.card));
     closeCardContextMenu();
   };
   const contextMenuIdentifier: CardIdentifier | undefined = contextMenu
     ? getCardIdentifier(contextMenu.card)
     : undefined;
+  const contextMenuNameLabel: string = contextMenu?.card.profile
+    ? 'Copy Individual full name'
+    : 'Copy Entrant full name';
 
   return <Stack spacing={2} sx={{ minWidth: 0, p: 2 }}>
     <Typography variant="h5">Individuals</Typography>
@@ -244,6 +270,9 @@ export const IndividualsPanel = (props: IndividualsPanelProps): React.ReactEleme
       {contextMenuIdentifier ? <MenuItem onClick={copyCardIdentifier}>
         Copy {contextMenuIdentifier.label}
       </MenuItem> : null}
+      {contextMenu ? <MenuItem onClick={copyCardName}>{contextMenuNameLabel}</MenuItem> : null}
+      {contextMenu?.card.profile?.email ? <MenuItem onClick={copyCardEmail}>Copy email</MenuItem> : null}
+      {contextMenu ? <MenuItem onClick={copyAllCardDetails}>Copy all details</MenuItem> : null}
     </Menu>
   </Stack>;
 };

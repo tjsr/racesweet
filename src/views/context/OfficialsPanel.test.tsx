@@ -53,7 +53,7 @@ describe('OfficialsPanel', () => {
     const onPersistedLedger = vi.fn(async (_ledger: EventCatalogLedger): Promise<void> => undefined);
     const service: EventCatalogService = await EventCatalogService.create(persistence, { onPersistedLedger });
     await service.createOfficialProfile({
-      displayName: 'Alex Marshal', notes: '',
+      displayName: 'Alex Marshal', email: 'alex.marshal@example.test', notes: '',
     });
     await service.createOfficialProfile({
       displayName: 'Taylor Timekeeper', notes: '',
@@ -124,6 +124,42 @@ describe('OfficialsPanel', () => {
       await Promise.resolve();
     });
     expect(writeText).toHaveBeenLastCalledWith(individualId);
+
+    await act(async (): Promise<void> => {
+      officialCard.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 60 }));
+    });
+    const copyFullNameMenuItem: HTMLElement | undefined = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((item: HTMLElement): boolean => item.textContent?.trim() === 'Copy Individual full name');
+    expect(copyFullNameMenuItem).toBeDefined();
+    await act(async (): Promise<void> => {
+      copyFullNameMenuItem!.click();
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenLastCalledWith('Alex Marshal');
+
+    await act(async (): Promise<void> => {
+      officialCard.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 60 }));
+    });
+    const copyEmailMenuItem: HTMLElement | undefined = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((item: HTMLElement): boolean => item.textContent?.trim() === 'Copy email');
+    expect(copyEmailMenuItem).toBeDefined();
+    await act(async (): Promise<void> => {
+      copyEmailMenuItem!.click();
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenLastCalledWith('alex.marshal@example.test');
+
+    await act(async (): Promise<void> => {
+      officialCard.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 60 }));
+    });
+    const copyAllDetailsMenuItem: HTMLElement | undefined = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((item: HTMLElement): boolean => item.textContent?.trim() === 'Copy all details');
+    expect(copyAllDetailsMenuItem).toBeDefined();
+    await act(async (): Promise<void> => {
+      copyAllDetailsMenuItem!.click();
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenLastCalledWith(expect.stringContaining(`Individual ID: ${individualId}\nFull name: Alex Marshal\nEmail: alex.marshal@example.test`));
 
     await act(async (): Promise<void> => click(container, 'New assignment'));
     await act(async (): Promise<void> => enter(inputByLabel(container, 'Position / duty'), 'Finish line'));

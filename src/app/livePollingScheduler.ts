@@ -11,6 +11,8 @@ export interface LivePollingTarget {
 
 export interface ScheduledLivePoll extends LivePollingSource {
   eventId: string;
+  isPolling?: boolean;
+  lastPolledAt?: Date;
   nextPollAt: Date;
   sessionId: string;
 }
@@ -96,7 +98,16 @@ export class LivePollingScheduler {
 
   private execute = (sourceId: string, target: LivePollingTarget): void => {
     this.timers.delete(sourceId);
-    this.scheduledPolls.delete(sourceId);
+    const scheduledPoll: ScheduledLivePoll | undefined =
+      this.scheduledPolls.get(sourceId);
+    if (scheduledPoll) {
+      this.scheduledPolls.set(sourceId, {
+        ...scheduledPoll,
+        isPolling: true,
+        lastPolledAt: this.now(),
+        nextPollAt: this.now(),
+      });
+    }
     this.notifyScheduleChanged();
 
     const context: LivePollingContext | undefined = this.context;
@@ -152,9 +163,14 @@ export class LivePollingScheduler {
     context: LivePollingContext,
   ): void => {
     const delayMilliseconds: number = getPollDelayMilliseconds(source);
+    const previousPoll: ScheduledLivePoll | undefined = this.scheduledPolls.get(
+      source.id,
+    );
     const nextPoll: ScheduledLivePoll = {
       ...source,
       eventId: context.eventId,
+      isPolling: false,
+      lastPolledAt: previousPoll?.lastPolledAt,
       nextPollAt: new Date(this.now().getTime() + delayMilliseconds),
       sessionId: context.sessionId,
     };

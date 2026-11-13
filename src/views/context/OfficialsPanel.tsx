@@ -159,6 +159,27 @@ export const OfficialsPanel = (props: OfficialsPanelProps): React.ReactElement =
     copyToClipboard(identifier);
     closeCardContextMenu();
   };
+  const copyContextMenuName = (name: string): void => {
+    copyToClipboard(name);
+    closeCardContextMenu();
+  };
+  const copyContextMenuEmail = (email: string): void => {
+    copyToClipboard(email);
+    closeCardContextMenu();
+  };
+  const copyAllContextMenuDetails = (row: OfficialContactRow): void => {
+    const details: string[] = [
+      `Individual ID: ${row.officialId}`,
+      `Full name: ${row.displayName}`,
+      ...(row.email ? [`Email: ${row.email}`] : []),
+      ...(row.phone ? [`Phone: ${row.phone}`] : []),
+      `Role: ${row.role}`,
+      `Position: ${row.position}`,
+      `Session: ${row.sessionName}`,
+    ];
+    copyToClipboard(details.join('\n'));
+    closeCardContextMenu();
+  };
 
   return <Stack spacing={2} sx={{ minWidth: 0, p: 2 }}>
     <Typography variant="h5">Officials</Typography>
@@ -261,6 +282,9 @@ export const OfficialsPanel = (props: OfficialsPanelProps): React.ReactElement =
     >
       {contextMenu ? <>
         <MenuItem onClick={(): void => copyContextMenuIdentifier(contextMenu.row.officialId)}>Copy Individual ID</MenuItem>
+        <MenuItem onClick={(): void => copyContextMenuName(contextMenu.row.displayName)}>Copy Individual full name</MenuItem>
+        {contextMenu.row.email ? <MenuItem onClick={(): void => copyContextMenuEmail(contextMenu.row.email)}>Copy email</MenuItem> : null}
+        <MenuItem onClick={(): void => copyAllContextMenuDetails(contextMenu.row)}>Copy all details</MenuItem>
       </> : null}
     </Menu>
   </Stack>;

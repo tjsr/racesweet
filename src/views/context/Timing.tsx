@@ -1,4 +1,4 @@
-import { MenuItem } from '@mui/material';
+import { LinearProgress, MenuItem } from '@mui/material';
 import React from 'react';
 import { type ScheduledLivePoll } from '../../app/livePollingScheduler.js';
 import { type EventCatalogState } from '../../catalog/eventCatalog.js';
@@ -18,6 +18,17 @@ type EventCatalogSession = EventCatalogState['sessions'][number];
 type TimingRaceState = RaceStateLookup & {
   categories?: EventCategory[];
   records?: unknown[];
+};
+
+const formatPollCountdown = (remainingMilliseconds: number): string => {
+  const remainingSeconds: number = Math.max(
+    0,
+    Math.ceil(remainingMilliseconds / 1000),
+  );
+  const minutes: number = Math.floor(remainingSeconds / 60);
+  const seconds: number = remainingSeconds % 60;
+
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 };
 
 interface TimingContextProps {
@@ -52,6 +63,16 @@ interface TimingContextProps {
 }
 
 export const TimingContext = (props: TimingContextProps): React.ReactElement => {
+  const [goToControlContainer, setGoToControlContainer] = React.useState<HTMLSpanElement | null>(null);
+  const [currentTime, setCurrentTime] = React.useState<Date>(() => new Date());
+  React.useEffect((): (() => void) => {
+    const timer: ReturnType<typeof globalThis.setInterval> = globalThis.setInterval(
+      (): void => setCurrentTime(new Date()),
+      1000,
+    );
+
+    return (): void => globalThis.clearInterval(timer);
+  }, []);
   const timingEventTimeZone: string = props.timingEvent?.timeZone || props.eventTimeZone;
   const sortedSessions = [...props.sessions].sort((left, right) => {
     const leftTime = Date.parse(left.scheduledStart);
@@ -178,13 +199,47 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
             {props.timingSelectionLoading ? (
               <InlineLoadingIndicator ariaLabel="Loading Timing session" />
             ) : null}
-            {props.scheduledLivePolls?.map((poll: ScheduledLivePoll) => (
-              <span key={poll.id} className="timing-live-poll-status">
-                Data Source {poll.name} next poll at {pollTimeFormatter.format(poll.nextPollAt)}
-              </span>
-            ))}
           </span>
         </div>
+        <section aria-labelledby="next-data-poll-heading" className="timing-live-polls">
+          <span id="next-data-poll-heading" className="timing-live-polls-heading">
+            Next data poll in:
+          </span>
+          {props.scheduledLivePolls?.map((poll: ScheduledLivePoll) => {
+            const remainingMilliseconds: number = Math.max(
+              0,
+              poll.nextPollAt.getTime() - currentTime.getTime(),
+            );
+            const progressValue: number = poll.isPolling
+              ? 0
+              : Math.min(
+                100,
+                (remainingMilliseconds / (Math.max(1, poll.pollIntervalSeconds) * 1000)) * 100,
+              );
+            const pollStatus: string = poll.isPolling
+              ? `Polling ${poll.name} now`
+              : `${poll.name}: ${formatPollCountdown(remainingMilliseconds)}`;
+
+            return (
+              <div key={poll.id} className="timing-live-poll-status">
+                <span className="timing-live-poll-name">{poll.name}</span>
+                <LinearProgress
+                  aria-label={`Next poll for ${poll.name}`}
+                  className="timing-live-poll-progress"
+                  value={progressValue}
+                  variant="determinate"
+                />
+                <span aria-live="polite" className="timing-live-poll-countdown">
+                  {pollStatus}
+                  {poll.lastPolledAt
+                    ? ` · Last requested ${pollTimeFormatter.format(poll.lastPolledAt)}`
+                    : ''}
+                </span>
+              </div>
+            );
+          })}
+        </section>
+        <span className="timing-go-to-control" ref={setGoToControlContainer} />
       </div>
       <RecentRecords
         currentEventId={props.timingEvent?.id}
@@ -192,6 +247,7 @@ export const TimingContext = (props: TimingContextProps): React.ReactElement => 
         eventDiscipline={props.timingEvent?.discipline}
         eventTimeZone={timingEventTimeZone}
         fastestTimeIndicatorColors={props.fastestTimeIndicatorColors}
+        goToControlContainer={goToControlContainer}
         onAddRecord={props.onAddRecord}
         onEditRecord={props.onEditRecord}
         records={(props.raceState.records as EventTimeRecord[]) || []}

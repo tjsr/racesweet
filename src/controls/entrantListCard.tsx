@@ -31,7 +31,10 @@ export const EntrantListCard = (props: EntrantListCartProps): React.ReactElement
       return timingDeviceTextValue.startsWith('Tx') ? timingDeviceTextValue : `Tx${timingDeviceTextValue}`;
     }).join(', ')
     : undefined;
-  const participantDetailLines: string[] = [`Entrant ID: ${props.entrant.id}`];
+  const participantDetailLines: string[] = [
+    `Entrant ID: ${props.entrant.id}`,
+    `Entrant name: ${props.entrant.name}`,
+  ];
   if (props.participantId) {
     participantDetailLines.push(`Participant ID: ${props.participantId}`);
   }
@@ -41,8 +44,11 @@ export const EntrantListCard = (props: EntrantListCartProps): React.ReactElement
   if (timingDeviceText) {
     participantDetailLines.push(`Timing devices: ${timingDeviceText}`);
   }
-  const contextCopyLabel: string = props.participantId ? 'Copy participant details' : 'Copy entrant details';
-  const copyDetails = (): void => {
+  const copyValue = (value: string): void => {
+    copyToClipboard(value);
+    setContextMenu(undefined);
+  };
+  const copyAllDetails = (): void => {
     copyToClipboard(participantDetailLines.join('\n'));
     setContextMenu(undefined);
   };
@@ -110,7 +116,10 @@ export const EntrantListCard = (props: EntrantListCartProps): React.ReactElement
       onClose={(): void => setContextMenu(undefined)}
       open={contextMenu !== undefined}
     >
-      <MenuItem onClick={copyDetails}>{contextCopyLabel}</MenuItem>
+      <MenuItem onClick={(): void => copyValue(props.entrant.id)}>Copy Entrant ID</MenuItem>
+      {props.participantId ? <MenuItem onClick={(): void => copyValue(props.participantId!)}>Copy Participant ID</MenuItem> : null}
+      <MenuItem onClick={(): void => copyValue(props.entrant.name)}>Copy Entrant full name</MenuItem>
+      <MenuItem onClick={copyAllDetails}>Copy all details</MenuItem>
     </Menu>
   </>;
 };

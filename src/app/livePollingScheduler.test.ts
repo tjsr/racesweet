@@ -87,6 +87,50 @@ describe("LivePollingScheduler", () => {
     vi.useRealTimers();
   });
 
+  it("reports an in-progress poll before scheduling its next countdown", async () => {
+    vi.useFakeTimers();
+    let resolveLoad: (() => void) | undefined;
+    const loadSource = vi.fn<LivePollingContext["loadSource"]>(
+      (): Promise<void> =>
+        new Promise<void>((resolve: () => void): void => {
+          resolveLoad = resolve;
+        }),
+    );
+    const schedules: ScheduledLivePoll[][] = [];
+    const scheduler = new LivePollingScheduler({
+      onScheduleChanged: (scheduledPolls: ScheduledLivePoll[]): void => {
+        schedules.push(scheduledPolls);
+      },
+    });
+    const source: LivePollingSource = createSource(30);
+
+    scheduler.synchronize({
+      ...target,
+      getLiveSource: (): LivePollingSource | undefined => source,
+      loadSource,
+      sources: [source],
+    });
+    await vi.advanceTimersByTimeAsync(30000);
+
+    expect(loadSource).toHaveBeenCalledWith(source, target);
+    expect(schedules.at(-1)?.[0]).toMatchObject({
+      id: source.id,
+      isPolling: true,
+    });
+
+    resolveLoad?.();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(schedules.at(-1)?.[0]).toMatchObject({
+      id: source.id,
+      isPolling: false,
+      lastPolledAt: expect.any(Date),
+    });
+    scheduler.dispose();
+    vi.useRealTimers();
+  });
+
   it("cancels pending polls when the active session changes or live polling is disabled", () => {
     vi.useFakeTimers();
     const loadSource = vi

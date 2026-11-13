@@ -134,14 +134,21 @@ describe('EntrantListPanel', () => {
     await act(async (): Promise<void> => {
       riderCard.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 60 }));
     });
-    const copyParticipantDetails: HTMLElement | undefined = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
-      .find((item: HTMLElement): boolean => item.textContent?.trim() === 'Copy participant details');
-    expect(copyParticipantDetails).toBeDefined();
+    const contextMenuItems: HTMLElement[] = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+    expect(contextMenuItems.map((item: HTMLElement): string => item.textContent?.trim() || '')).toEqual([
+      'Copy Entrant ID',
+      'Copy Participant ID',
+      'Copy Entrant full name',
+      'Copy all details',
+    ]);
+    const copyAllDetails: HTMLElement | undefined = contextMenuItems
+      .find((item: HTMLElement): boolean => item.textContent?.trim() === 'Copy all details');
+    expect(copyAllDetails).toBeDefined();
     await act(async (): Promise<void> => {
-      copyParticipantDetails!.click();
+      copyAllDetails!.click();
       await Promise.resolve();
     });
-    expect(writeText).toHaveBeenCalledWith('Entrant ID: rider-1\nParticipant ID: participant-1\nRace number: #73\nTiming devices: Tx1234');
+    expect(writeText).toHaveBeenCalledWith('Entrant ID: rider-1\nEntrant name: Rider One\nParticipant ID: participant-1\nRace number: #73\nTiming devices: Tx1234');
 
     const createKindSelect = container.querySelector<HTMLSelectElement>('select[aria-label="Create Entrant Kind"]');
     expect(createKindSelect).not.toBeNull();

@@ -129,6 +129,18 @@ describe('IndividualsPanel', () => {
     });
     expect(writeText).toHaveBeenCalledWith(individualId);
 
+    await act(async (): Promise<void> => {
+      individualCard.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 60 }));
+    });
+    const copyFullNameMenuItem: HTMLElement | undefined = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((item: HTMLElement): boolean => item.textContent?.trim() === 'Copy Individual full name');
+    expect(copyFullNameMenuItem).toBeDefined();
+    await act(async (): Promise<void> => {
+      copyFullNameMenuItem!.click();
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenLastCalledWith(rider.name);
+
     expect(inputByLabel(container, 'First name').value).toBe('Rider');
     expect(inputByLabel(container, 'Surname').value).toBe('101');
     await act(async (): Promise<void> => {
@@ -136,6 +148,7 @@ describe('IndividualsPanel', () => {
       enter(inputByLabel(container, 'Surname'), 'Rider');
       enter(inputByLabel(container, 'Gender'), 'female');
       enter(inputByLabel(container, 'Date of birth'), '2001-01-15');
+      enter(inputByLabel(container, 'Email'), 'alex.rider@example.test');
     });
     await act(async (): Promise<void> => enter(inputByLabel(container, 'License number'), 'LIC-42'));
     await act(async (): Promise<void> => click(container, 'Add emergency contact'));
@@ -151,6 +164,29 @@ describe('IndividualsPanel', () => {
     expect(service.catalog.entrants.find((entrant): boolean => entrant.id === rider.id)).toMatchObject({
       dateOfBirth: '2001-01-15', firstName: 'Alex', gender: 'female', lastName: 'Rider', name: 'Alex Rider',
     });
+    const renamedIndividualCard: HTMLButtonElement = container.querySelector<HTMLButtonElement>('button[aria-label="Individual card: Alex Rider"]')!;
+    await act(async (): Promise<void> => {
+      renamedIndividualCard.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 60 }));
+    });
+    const copyEmailMenuItem: HTMLElement | undefined = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((item: HTMLElement): boolean => item.textContent?.trim() === 'Copy email');
+    expect(copyEmailMenuItem).toBeDefined();
+    await act(async (): Promise<void> => {
+      copyEmailMenuItem!.click();
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenLastCalledWith('alex.rider@example.test');
+    await act(async (): Promise<void> => {
+      renamedIndividualCard.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 60 }));
+    });
+    const copyAllDetailsMenuItem: HTMLElement | undefined = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((item: HTMLElement): boolean => item.textContent?.trim() === 'Copy all details');
+    expect(copyAllDetailsMenuItem).toBeDefined();
+    await act(async (): Promise<void> => {
+      copyAllDetailsMenuItem!.click();
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenLastCalledWith(`Full name: Alex Rider\nIndividual ID: ${individualId}\nEmail: alex.rider@example.test`);
     await act(async (): Promise<void> => click(container, 'New individual'));
     await act(async (): Promise<void> => {
       enter(inputByLabel(container, 'First name'), 'Morgan');

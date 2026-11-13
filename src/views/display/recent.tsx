@@ -1,4 +1,5 @@
 import React, { type JSX } from 'react';
+import { createPortal } from 'react-dom';
 
 import { TZDate } from '@date-fns/tz';
 import {
@@ -104,6 +105,7 @@ interface VirtualRecordRowWindow {
 
 interface EditableSourceOffset {
   initialTime: Date;
+  sourceDescription: string;
   sourceId: string;
   sourceName: string;
   timeZone: string;
@@ -484,7 +486,30 @@ const getRecordSourceLocation = (record: EventTimeRecord): string => {
   return record.originRecordNumber !== undefined ? `Record/line ${record.originRecordNumber}` : '';
 };
 
-const getEditableSourceOffsets = (records: EventTimeRecord[], raceStateLookup: RaceStateLookup, eventTimeZone: string | undefined): EditableSourceOffset[] => {
+const opaqueIdentifierPattern: RegExp = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
+const getSourceFileName = (filePath: string): string => filePath.split(/[\\/]/u).at(-1) || filePath;
+
+const getOffsetSourceName = (source: TimeRecordSource | undefined, sourceId: string, sourceNumber: number): string => {
+  const sourceName: string | undefined = source?.name.trim();
+  if (sourceName && sourceName !== sourceId && !opaqueIdentifierPattern.test(sourceName)) return sourceName;
+  if (source?.filePath) return getSourceFileName(source.filePath);
+  return `Timing source ${sourceNumber}`;
+};
+
+const getOffsetSourceDescription = (source: TimeRecordSource | undefined, record: EventTimeRecord, raceStateLookup: RaceStateLookup): string => {
+  if (source?.description?.trim()) return source.description.trim();
+  if (source?.filePath) return `Imported from ${getSourceFileName(source.filePath)}.`;
+  if (isCrossingRecord(record)) {
+    const timingPointName: string | undefined = getPassingTimingPointLineName(record, raceStateLookup);
+    if (timingPointName) return `First crossing at ${timingPointName}.`;
+    const lineNumber: number | undefined = getPassingLineNumber(record);
+    if (lineNumber !== undefined) return `First crossing at timing line ${lineNumber}.`;
+  }
+  return 'First time-of-day record from this timing source.';
+};
+
+export const getEditableSourceOffsets = (records: EventTimeRecord[], raceStateLookup: RaceStateLookup, eventTimeZone: string | undefined): EditableSourceOffset[] => {
   const firstRecordBySource = new Map<string, EventTimeRecord>();
   records.forEach((record) => {
     if (!record.time || firstRecordBySource.has(record.source.toString())) {
@@ -494,12 +519,13 @@ const getEditableSourceOffsets = (records: EventTimeRecord[], raceStateLookup: R
   });
 
   return Array.from(firstRecordBySource.entries())
-    .map(([sourceId, record]) => {
+    .map(([sourceId, record], index: number) => {
       const source = raceStateLookup.getTimeRecordSourceById?.(record.source);
       return {
         initialTime: record.time!,
+        sourceDescription: getOffsetSourceDescription(source, record, raceStateLookup),
         sourceId,
-        sourceName: source?.name || sourceId,
+        sourceName: getOffsetSourceName(source, sourceId, index + 1),
         timeZone: source?.timezone || eventTimeZone || 'UTC',
       };
     })
@@ -541,7 +567,10 @@ const SourceOffsetsDialog = ({
             const currentTime = offsetTimes.get(offset.sourceId) || offset.initialTime;
             return (
               <Box key={offset.sourceId} sx={{ alignItems: 'center', display: 'flex', gap: 2, mt: 2 }}>
-                <span>{offset.sourceName}</span>
+                <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 180 }}>
+                  <strong>{offset.sourceName}</strong>
+                  <span>{offset.sourceDescription}</span>
+                </Box>
                 <TextField
                   label="Date"
                   slotProps={{ inputLabel: { shrink: true } }}
@@ -2199,6 +2228,7 @@ export const RecentRecords = (
     onMarkFlagDeleted?: (flagId: TimeRecordId, deleted: boolean) => void;
     onRemoveFlagCategory?: (flagId: TimeRecordId, categoryId: EventCategoryId) => void;
     onUpdateSourceOffset?: (sourceId: string, previousTime: Date, nextTime: Date) => void;
+    goToControlContainer?: HTMLElement | null;
   }
 ) => {
   const [addRecordDialogState, setAddRecordDialogState] = React.useState<AddRecordDialogState | null>(null);
@@ -2817,6 +2847,55 @@ export const RecentRecords = (
     },
     [filterMode, selectedRecordId, sortedRecords]
   );
+  const goToControl: React.ReactElement = <>
+    <Button
+      aria-controls={goToMenuAnchor ? 'recent-records-go-to-menu' : undefined}
+      aria-expanded={goToMenuAnchor ? 'true' : undefined}
+      aria-haspopup="menu"
+      onClick={(event) => setGoToMenuAnchor(event.currentTarget)}
+      variant="outlined"
+    >
+      Go to
+    </Button>
+    <Menu anchorEl={goToMenuAnchor} id="recent-records-go-to-menu" onClose={() => setGoToMenuAnchor(null)} open={goToMenuAnchor !== null}>
+      <MenuItem disabled={recordsByTime.length === 0} onClick={() => handleGoTo('first')}>
+        First
+      </MenuItem>
+      <MenuItem disabled={recordsByTime.length === 0} onClick={() => handleGoTo('last')}>
+        Last
+      </MenuItem>
+      <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green')} onClick={() => handleGoTo('firstGreen')}>
+        First Green
+      </MenuItem>
+      <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && isFinishFlag(record))} onClick={() => handleGoTo('finish')}>
+        Finish
+      </MenuItem>
+      <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && isCautionStartFlag(record))} onClick={() => handleGoTo('nextCaution')}>
+        Next Caution
+      </MenuItem>
+      <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green')} onClick={() => handleGoTo('nextGreen')}>
+        Next Green
+      </MenuItem>
+      <MenuItem disabled={!hasTransmitterCrossing(true, false)} onClick={() => handleGoTo('previousTransmitterCrossing')}>
+        Previous crossing for this transmitter
+      </MenuItem>
+      <MenuItem disabled={!hasTransmitterCrossing(false, false)} onClick={() => handleGoTo('nextTransmitterCrossing')}>
+        Next crossing for this transmitter
+      </MenuItem>
+      <MenuItem disabled={!hasTransmitterCrossing(true, true)} onClick={() => handleGoTo('previousTransmitterCrossingOnLine')}>
+        Prev Tx crossing on this line
+      </MenuItem>
+      <MenuItem disabled={!hasTransmitterCrossing(false, true)} onClick={() => handleGoTo('nextTransmitterCrossingOnLine')}>
+        Next Tx crossing on this line
+      </MenuItem>
+      <MenuItem disabled={!hasLeaderLapTransition(false)} onClick={() => handleGoTo('leadersPreviousLap')}>
+        Leaders prev lap (B)
+      </MenuItem>
+      <MenuItem disabled={!hasLeaderLapTransition(true)} onClick={() => handleGoTo('leadersNextLap')}>
+        Leaders next lap (N)
+      </MenuItem>
+    </Menu>
+  </>;
 
   return (
     <>
@@ -2954,53 +3033,7 @@ export const RecentRecords = (
           <Button onClick={() => setOffsetsDialogOpen(true)} variant="outlined">
             Edit offsets
           </Button>
-          <Button
-            aria-controls={goToMenuAnchor ? 'recent-records-go-to-menu' : undefined}
-            aria-expanded={goToMenuAnchor ? 'true' : undefined}
-            aria-haspopup="menu"
-            onClick={(event) => setGoToMenuAnchor(event.currentTarget)}
-            variant="outlined"
-          >
-            Go to
-          </Button>
-          <Menu anchorEl={goToMenuAnchor} id="recent-records-go-to-menu" onClose={() => setGoToMenuAnchor(null)} open={goToMenuAnchor !== null}>
-            <MenuItem disabled={recordsByTime.length === 0} onClick={() => handleGoTo('first')}>
-              First
-            </MenuItem>
-            <MenuItem disabled={recordsByTime.length === 0} onClick={() => handleGoTo('last')}>
-              Last
-            </MenuItem>
-            <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green')} onClick={() => handleGoTo('firstGreen')}>
-              First Green
-            </MenuItem>
-            <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && isFinishFlag(record))} onClick={() => handleGoTo('finish')}>
-              Finish
-            </MenuItem>
-            <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && isCautionStartFlag(record))} onClick={() => handleGoTo('nextCaution')}>
-              Next Caution
-            </MenuItem>
-            <MenuItem disabled={!recordsByTime.some((record) => isFlagRecord(record) && record.flagType?.toLowerCase() === 'green')} onClick={() => handleGoTo('nextGreen')}>
-              Next Green
-            </MenuItem>
-            <MenuItem disabled={!hasTransmitterCrossing(true, false)} onClick={() => handleGoTo('previousTransmitterCrossing')}>
-              Previous crossing for this transmitter
-            </MenuItem>
-            <MenuItem disabled={!hasTransmitterCrossing(false, false)} onClick={() => handleGoTo('nextTransmitterCrossing')}>
-              Next crossing for this transmitter
-            </MenuItem>
-            <MenuItem disabled={!hasTransmitterCrossing(true, true)} onClick={() => handleGoTo('previousTransmitterCrossingOnLine')}>
-              Prev Tx crossing on this line
-            </MenuItem>
-            <MenuItem disabled={!hasTransmitterCrossing(false, true)} onClick={() => handleGoTo('nextTransmitterCrossingOnLine')}>
-              Next Tx crossing on this line
-            </MenuItem>
-            <MenuItem disabled={!hasLeaderLapTransition(false)} onClick={() => handleGoTo('leadersPreviousLap')}>
-              Leaders prev lap (B)
-            </MenuItem>
-            <MenuItem disabled={!hasLeaderLapTransition(true)} onClick={() => handleGoTo('leadersNextLap')}>
-              Leaders next lap (N)
-            </MenuItem>
-          </Menu>
+          {props.goToControlContainer ? createPortal(goToControl, props.goToControlContainer) : goToControl}
         </div>
       </div>
       {warnings?.length > 0 && <Warnings warnings={warnings} />}

@@ -426,6 +426,15 @@ describe('TimingContext integration', () => {
       nextPollAt: new Date('2026-05-29T10:06:07.000Z'),
       pollIntervalSeconds: 30,
       sessionId: session.id,
+    }, {
+      eventId: event.id,
+      id: 'source-2',
+      isPolling: true,
+      lastPolledAt: new Date('2026-05-29T10:06:07.000Z'),
+      name: 'Race control',
+      nextPollAt: new Date('2026-05-29T10:06:07.000Z'),
+      pollIntervalSeconds: 45,
+      sessionId: session.id,
     }];
 
     await act(async () => {
@@ -461,7 +470,17 @@ describe('TimingContext integration', () => {
 
     expect(container.querySelector('[role="status"][aria-label="Loading Timing event"]')).not.toBeNull();
     expect(container.querySelector('[role="status"][aria-label="Loading Timing session"]')).not.toBeNull();
-    expect(container.textContent).toContain('Data Source Apical live results next poll at 20:06:07');
+    expect(container.textContent).toContain('Next data poll in:');
+    expect(container.textContent).toContain('Apical live results:');
+    expect(container.querySelector('[aria-label="Next poll for Apical live results"]')).not.toBeNull();
+    expect(container.textContent).toContain('Polling Race control now');
+    expect(container.querySelector('[aria-label="Next poll for Race control"]')).not.toBeNull();
+    const timingContextRow: HTMLElement = container.querySelector('.timing-context-row')!;
+    expect(timingContextRow.querySelector('[aria-label="Next poll for Apical live results"]')).not.toBeNull();
+    const goToButton: HTMLButtonElement | undefined = [...timingContextRow.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button: HTMLButtonElement): boolean => button.textContent?.trim() === 'Go to');
+    expect(goToButton).toBeDefined();
+    expect(container.querySelector('.recent-records-toolbar button[aria-haspopup="menu"]')).toBeNull();
 
     const timingEventSelect = getMuiSelect(container, 'Timing Event');
     expect(timingEventSelect.getAttribute('role')).toBe('combobox');
