@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Button, TextField } from '@mui/material';
 import {
   ADMIN_BREAKPOINTS, AdminActionBar, AdminAutocompleteField, AdminChoiceGroup, AdminFieldGrid,
-  AdminFormSection, AdminMasterDetailLayout, AdminSelectField, ResponsiveDataList, ResponsiveDialog,
+  AdminFormSection, AdminMasterDetailLayout, AdminPageLayout, AdminSelectField, ResponsiveDataList, ResponsiveDialog,
 } from './adminPrimitives.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -76,5 +76,19 @@ describe('shared administration primitives', (): void => {
     expect(container.textContent).toContain('Saving');
     expect(container.querySelector('[aria-busy="true"]')).toBeTruthy();
     expect(container.querySelector('[role="listitem"]')?.textContent).toContain('DecoderFinish');
+  });
+
+  it('applies page layout classes to the master-detail grid', (): void => {
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+    act((): void => root?.render(<AdminPageLayout className="events-layout two-panel"
+      detailLabel="source details" listLabel="data sources" selectedId="source-1">
+      <div>Source list</div><div>Source details</div>
+    </AdminPageLayout>));
+    const layout: HTMLDivElement | null = container.querySelector('.admin-master-detail');
+    expect(layout?.classList.contains('events-layout')).toBe(true);
+    expect(layout?.classList.contains('two-panel')).toBe(true);
+    expect(layout?.parentElement).toBe(container);
   });
 });

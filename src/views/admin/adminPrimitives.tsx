@@ -31,6 +31,7 @@ export interface AdminOption {
 }
 
 export interface AdminMasterDetailLayoutProps {
+  className?: string;
   detail: React.ReactNode;
   detailLabel?: string;
   list: React.ReactNode;
@@ -52,7 +53,7 @@ export const AdminMasterDetailLayout = (props: AdminMasterDetailLayoutProps): Re
     props.onBack();
     setShowDetail(false);
   };
-  return <Box className="admin-master-detail" sx={{ display: 'grid', gap: 2,
+  return <Box className={`admin-master-detail ${props.className || ''}`} sx={{ display: 'grid', gap: 2,
     gridTemplateColumns: { md: 'minmax(230px, 0.35fr) minmax(0, 1fr)', xs: 'minmax(0, 1fr)' }, minWidth: 0 }}>
     <Box aria-label={props.listLabel || 'Administration list'} hidden={!desktop && showDetail} sx={{ minWidth: 0 }}>
       {props.list}
@@ -83,11 +84,10 @@ export const AdminPageLayout = (props: {
       setOpenedId(`${props.selectedId || 'selection'}:${Date.now()}`);
     }
   };
-  return <div className={props.className}>
-    <AdminMasterDetailLayout detail={<div className="admin-detail-panes">{panes.slice(1)}</div>}
-      detailLabel={props.detailLabel} list={<div onClick={openFromList}>{panes[0]}</div>} listLabel={props.listLabel}
-      onBack={(): void => undefined} selectedId={`${props.selectedId || ''}:${openedId || ''}`} />
-  </div>;
+  return <AdminMasterDetailLayout className={props.className}
+    detail={<div className="admin-detail-panes">{panes.slice(1)}</div>}
+    detailLabel={props.detailLabel} list={<div onClick={openFromList}>{panes[0]}</div>} listLabel={props.listLabel}
+    onBack={(): void => undefined} selectedId={`${props.selectedId || ''}:${openedId || ''}`} />;
 };
 
 export const AdminFormSection = (props: { children: React.ReactNode; className?: string; title: string }): React.ReactElement =>

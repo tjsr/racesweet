@@ -336,8 +336,10 @@
   outline-offset: 2px;
 }
 
-.events-layout.two-panel {
-  grid-template-columns: minmax(15rem, 18rem) minmax(24rem, 1fr);
+@media (min-width: 960px) {
+  .events-layout.two-panel {
+    grid-template-columns: minmax(24rem, 30rem) minmax(0, 1fr);
+  }
 }
 
 .events-layout.categories-layout {
