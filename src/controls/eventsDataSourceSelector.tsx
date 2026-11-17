@@ -1,5 +1,6 @@
-import { Checkbox, FormControl, InputLabel, ListItemText, MenuItem, OutlinedInput, Select, type SelectChangeEvent } from '@mui/material';
 import React from 'react';
+
+import { Checkbox, FormControl, InputLabel, ListItemText, MenuItem, OutlinedInput, Select, type SelectChangeEvent } from '@mui/material';
 
 export interface EventDataSourceOption {
   id: string;

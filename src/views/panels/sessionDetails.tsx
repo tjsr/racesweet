@@ -1,5 +1,5 @@
 import React from "react";
-import { AdminActionBar, AdminFieldGrid, AdminFormSection } from '../admin/adminPrimitives.js';
+
 
 import {
   Button,
@@ -13,13 +13,14 @@ import {
   type EventCatalogSession,
   type EventCatalogState,
 } from "../../catalog/eventCatalog.js";
-import { SelectTextField } from "../../controls/selectTextField.js";
 import { type EventDataSourceOption, EventsDataSourceSelector } from "../../controls/eventsDataSourceSelector.js";
+import { SelectTextField } from "../../controls/selectTextField.js";
 import { type EventId } from "../../model/raceevent.js";
 import {
   SESSION_SOURCE_RELOAD_OPTIONS,
   type SessionSourceReloadMode,
 } from "../../model/sessionSourceReload.js";
+import { AdminActionBar, AdminFieldGrid, AdminFormSection } from '../admin/adminPrimitives.js';
 
 interface SessionDraft {
   duration: string;
@@ -74,7 +75,7 @@ export const SessionDetailsPanel = (
     key: TKey,
     value: SessionDraft[TKey],
   ): void =>
-      props.onSetSessionDraft((current) => ({ ...current, [key]: value }));
+    props.onSetSessionDraft((current) => ({ ...current, [key]: value }));
   const saveSession = (): void => {
     setSaveError(undefined);
     setSaveStatus("pending");
@@ -277,18 +278,18 @@ export const SessionDetailsPanel = (
                   <CircularProgress aria-label="Saving session" size={16} />
                 ) : saveStatus === "succeeded" ? (
                   <span aria-label="Session saved" role="img">
-                      ✓
+                    ✓
                   </span>
                 ) : saveStatus === "failed" ? (
                   <span aria-label="Session save failed" role="img">
-                      !
+                    !
                   </span>
                 ) : undefined
               }
               onClick={saveSession}
               variant="contained"
             >
-                Save Session
+              Save Session
             </Button>
             {saveError ? (
               <span className="error session-save-error" role="alert">
@@ -301,13 +302,13 @@ export const SessionDetailsPanel = (
             onClick={() => props.onDeleteSession()}
             variant="outlined"
           >
-              Delete Session
+            Delete Session
           </Button>
           <Button
             onClick={() => props.onApplySessionSources()}
             variant="outlined"
           >
-              Apply Assigned Sources To Session
+            Apply Assigned Sources To Session
           </Button>
           <SelectTextField
             label="Reload mode"
@@ -332,7 +333,7 @@ export const SessionDetailsPanel = (
             onClick={() => props.onReloadSessionSources(reloadMode)}
             variant="outlined"
           >
-              Re-load from sources
+            Re-load from sources
           </Button>
         </AdminActionBar>
         {props.warningModal}

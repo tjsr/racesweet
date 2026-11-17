@@ -1,6 +1,8 @@
-import type { HandicapRiderSnapshot, HandicapRoundSnapshot, HandicapSnapshot } from '../../model/handicapSnapshot.js';
-import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import React, { useEffect, useMemo, useState } from 'react';
+
+import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+
+import type { HandicapRiderSnapshot, HandicapRoundSnapshot, HandicapSnapshot } from '../../model/handicapSnapshot.js';
 
 interface HandicapViewProps {
   participantNames?: string[];

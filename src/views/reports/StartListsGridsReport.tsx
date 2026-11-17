@@ -1,8 +1,10 @@
+import React from 'react';
+
 import {
   Alert, Box, Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle,
   MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography,
 } from '@mui/material';
-import React from 'react';
+
 import type { EventCatalogState } from '../../catalog/eventCatalog.js';
 import { type StartListLayout, createStartListExport } from '../../export/startListReport.js';
 import { type TabularReport, createReportPdf, downloadReportBlob, printReport, toReportCsv } from '../../export/tabularReport.js';

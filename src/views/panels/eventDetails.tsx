@@ -1,5 +1,5 @@
 import React from "react";
-import { AdminActionBar, AdminFieldGrid, AdminFormSection } from '../admin/adminPrimitives.js';
+
 
 import { Button, CircularProgress, MenuItem, TextField } from "@mui/material";
 
@@ -10,6 +10,7 @@ import {
 import { IdentifierDisplay } from "../../controls/identifierDisplay.js";
 import { SelectTextField } from "../../controls/selectTextField.js";
 import { type EventId } from "../../model/raceevent.js";
+import { AdminActionBar, AdminFieldGrid, AdminFormSection } from '../admin/adminPrimitives.js';
 
 interface EventDraft {
   date: string;
@@ -203,18 +204,18 @@ export const EventDetailsPanel = (
                   />
                 ) : saveStatus === "succeeded" ? (
                   <span aria-label="Event details saved" role="img">
-                      ✓
+                    ✓
                   </span>
                 ) : saveStatus === "failed" ? (
                   <span aria-label="Event details save failed" role="img">
-                      !
+                    !
                   </span>
                 ) : undefined
               }
               onClick={saveEventDetails}
               variant="contained"
             >
-                Save Event Details
+              Save Event Details
             </Button>
             {saveError ? (
               <span className="error event-save-error" role="alert">
@@ -236,7 +237,7 @@ export const EventDetailsPanel = (
             onClick={() => props.onDeleteEvent?.()}
             variant="outlined"
           >
-              Delete Event
+            Delete Event
           </Button>
         </AdminActionBar>
         <IdentifierDisplay label="Event ID" value={props.selectedEvent.id.toString()} />

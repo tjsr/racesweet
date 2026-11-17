@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
-import { type Root, createRoot } from 'react-dom/client';
 import React from 'react';
-import { WarningModal } from './warningModal.js';
 import { act } from 'react';
+
+import { type Root, createRoot } from 'react-dom/client';
+
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
+import { WarningModal } from './warningModal.js';
 
 describe('WarningModal', () => {
   let container: HTMLDivElement;

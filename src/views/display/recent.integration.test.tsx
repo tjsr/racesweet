@@ -6,6 +6,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { type Root, createRoot } from 'react-dom/client';
+
 import { updateCategorySelectionsForChangedParticipant } from '../../app/categoryChangeState.js';
 import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
 import type { EventCategory } from '../../model/eventcategory.js';

@@ -1,5 +1,7 @@
-import { Button, CircularProgress } from '@mui/material';
 import React from 'react';
+
+import { Button, CircularProgress } from '@mui/material';
+
 import { type EventCatalogCategory, type EventCatalogEntrant } from '../../catalog/eventCatalog.js';
 import { SelectTextField } from '../../controls/selectTextField.js';
 

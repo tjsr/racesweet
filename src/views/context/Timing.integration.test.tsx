@@ -1,17 +1,18 @@
 // @vitest-environment jsdom
 
-import { type EventCatalogState } from '../../catalog/eventCatalog.js';
+import React from 'react';
+import { act } from 'react';
+
+import { type Root, createRoot } from 'react-dom/client';
+
 import type { ScheduledLivePoll } from '../../app/livePollingScheduler.js';
 import { selectedCategoriesForParticipants } from '../../app/selectionState.js';
+import { type EventCatalogState } from '../../catalog/eventCatalog.js';
 import type { EventCategory } from '../../model/eventcategory.js';
 import type { EventParticipant } from '../../model/eventparticipant.js';
 import type { RaceStateLookup } from '../../model/racestate.js';
 import { type ParticipantPassingRecord, RECORD_TX_CROSSING } from '../../model/timerecord.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
-
-import React from 'react';
-import { type Root, createRoot } from 'react-dom/client';
-import { act } from 'react';
 import { TimingContext } from './Timing.js';
 
 const ensureMatchMedia = (): void => {

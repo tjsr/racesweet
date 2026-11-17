@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
+
 import { type Root, createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
+
 import { FileWriteFailureError } from '../../app/fileWriteDiagnostics.js';
 import { createEventId } from '../../model/ids.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';

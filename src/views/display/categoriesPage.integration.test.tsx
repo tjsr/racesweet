@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 
-import { type Root, createRoot } from 'react-dom/client';
-import { CategoriesPage } from '../context/Categories.js';
-import type { EventCatalogState } from '../../catalog/eventCatalog.js';
 import React from 'react';
 import { act } from 'react';
+
+import { type Root, createRoot } from 'react-dom/client';
+
+import type { EventCatalogState } from '../../catalog/eventCatalog.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
+import { CategoriesPage } from '../context/Categories.js';
 
 const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: string,): void => {
   const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;

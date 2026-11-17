@@ -1,5 +1,6 @@
-import { Button, type ButtonProps, CircularProgress } from "@mui/material";
 import React from "react";
+
+import { Button, type ButtonProps, CircularProgress } from "@mui/material";
 
 interface AsyncButtonProps extends Omit<
   ButtonProps,

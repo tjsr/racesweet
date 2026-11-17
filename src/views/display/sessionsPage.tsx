@@ -1,5 +1,13 @@
 import React from "react";
-import { AdminPageLayout } from "../admin/adminPrimitives.js";
+
+import {
+  type SystemConfiguration,
+  getEventAssignedSourceIds,
+} from "../../app/systemConfig.js";
+import {
+  formatMinimumLapTimeInput,
+  parseMinimumLapTimeInputToMilliseconds,
+} from "../../app/utils/timeutils.js";
 import {
   type EventCatalogSession,
   type EventCatalogState,
@@ -7,18 +15,11 @@ import {
   getCategoriesForEvent,
   getSessionsForEvent,
 } from "../../catalog/eventCatalog.js";
-import {
-  formatMinimumLapTimeInput,
-  parseMinimumLapTimeInputToMilliseconds,
-} from "../../app/utils/timeutils.js";
-import { type SessionSourceReloadMode } from "../../model/sessionSourceReload.js";
-import {
-  type SystemConfiguration,
-  getEventAssignedSourceIds,
-} from "../../app/systemConfig.js";
-import { type EventCategoryId } from "../../model/eventcategory.js";
 import { SelectTextField } from "../../controls/selectTextField.js";
+import { type EventCategoryId } from "../../model/eventcategory.js";
 import { EventId, SessionId } from "../../model/raceevent.js";
+import { type SessionSourceReloadMode } from "../../model/sessionSourceReload.js";
+import { AdminPageLayout } from "../admin/adminPrimitives.js";
 import { SessionCategoriesPanel } from "../panels/sessionCategories.js";
 import { SessionDetailsPanel } from "../panels/sessionDetails.js";
 import { SessionListPanel } from "../panels/sessionList.js";
@@ -261,7 +262,7 @@ export const SessionsPage = (props: SessionsPageProps): React.ReactElement => {
               ? (eventId) => {
                 if (selectedSession) {
                   requestFormExit(() =>
-                      props.onMoveSessionToEvent!(selectedSession.id, eventId),
+                    props.onMoveSessionToEvent!(selectedSession.id, eventId),
                   );
                 }
               }

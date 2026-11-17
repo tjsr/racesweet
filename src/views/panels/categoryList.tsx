@@ -1,8 +1,10 @@
-import { Button, Checkbox, FormControlLabel } from '@mui/material';
 import React from 'react';
+
+import { Button, Checkbox, FormControlLabel } from '@mui/material';
+
 import { type EventCatalogCategory } from '../../catalog/eventCatalog.js';
-import { type EventCategoryId } from '../../model/eventcategory.js';
 import { CategoryListCard } from '../../controls/categoryListCard.js';
+import { type EventCategoryId } from '../../model/eventcategory.js';
 
 interface CategoryListPanelProps {
   allowCreateCategory?: boolean;

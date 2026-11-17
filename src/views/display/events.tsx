@@ -1,12 +1,5 @@
 import React from 'react';
-import { AdminPageLayout } from '../admin/adminPrimitives.js';
-import {
-  type EventCatalogEvent,
-  type EventCatalogState,
-  type EventDiscipline,
-  getCategoriesForEvent,
-  getSessionsForEvent,
-} from '../../catalog/eventCatalog.js';
+
 import { type SystemConfiguration, getEventAssignedSourceIds } from '../../app/systemConfig.js';
 import {
   formatMinimumLapTimeInput,
@@ -14,14 +7,22 @@ import {
   getSystemTimeZone,
   parseMinimumLapTimeInputToMilliseconds,
 } from '../../app/utils/timeutils.js';
+import {
+  type EventCatalogEvent,
+  type EventCatalogState,
+  type EventDiscipline,
+  getCategoriesForEvent,
+  getSessionsForEvent,
+} from '../../catalog/eventCatalog.js';
 import { type EventId, type SessionId } from '../../model/raceevent.js';
-import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
+import { AdminPageLayout } from '../admin/adminPrimitives.js';
 import { CategoryListPanel } from '../panels/categoryList.js';
 import { EventDataSourcesPanel } from '../panels/eventDataSources.js';
 import { EventDetailsPanel } from '../panels/eventDetails.js';
 import { EventListPanel } from '../panels/eventList.js';
 import { EventTrackMapPanel } from '../panels/eventTrackMap.js';
 import { SessionListPanel } from '../panels/sessionList.js';
+import { type UnsavedChangesGuard, useUnsavedChangesWarning } from './unsavedChangesWarning.js';
 
 interface EventsScreenProps {
   catalog: EventCatalogState;

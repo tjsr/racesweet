@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 
-import { Root, createRoot } from 'react-dom/client';
+import { act } from 'react';
 
 import path from 'node:path';
-import { act } from 'react';
+import { Root, createRoot } from 'react-dom/client';
+
 import type { SystemConfiguration } from '../../app/systemConfig.js';
 import { createDefaultSystemConfiguration } from '../../app/systemConfig.js';
-import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 import { chooseMuiOption } from '../../testing/muiSelect.js';
+import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 import { SystemPage } from './systemPage.js';
 
 vi.mock('../../app/stackTrace.js', async (importOriginal) => {

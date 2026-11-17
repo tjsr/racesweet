@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { type RuntimeVersions, formatBuildTimestamp } from '../../app/versionInfo.js';
 
 interface RuntimeInformationPanelProps {

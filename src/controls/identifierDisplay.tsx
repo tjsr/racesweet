@@ -1,5 +1,6 @@
-import { IconButton, SvgIcon, Tooltip, Typography } from '@mui/material';
 import React from 'react';
+
+import { IconButton, SvgIcon, Tooltip, Typography } from '@mui/material';
 
 export interface IdentifierDisplayProps {
   label: string;

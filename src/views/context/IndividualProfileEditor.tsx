@@ -1,5 +1,7 @@
-import { Box, Button, Stack, TextField, Typography } from '@mui/material';
 import React from 'react';
+
+import { Box, Button, Stack, TextField, Typography } from '@mui/material';
+
 import { IdentifierDisplay } from '../../controls/identifierDisplay.js';
 import { splitIndividualName } from '../../model/official.js';
 import type {
