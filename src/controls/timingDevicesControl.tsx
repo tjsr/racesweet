@@ -1,6 +1,7 @@
 import React from 'react';
-import { IdentifierListControl } from './identifierListControl.js';
+
 import { type EventParticipant, type ParticipantTransponder } from '../model/eventparticipant.js';
+import { IdentifierListControl } from './identifierListControl.js';
 
 interface TimingDevicesControlProps {
   onUpdateTimingDevices: (participantId: string, timingDevices: ParticipantTransponder[]) => void | Promise<void>;

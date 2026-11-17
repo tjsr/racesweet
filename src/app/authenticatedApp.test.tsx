@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 
 import { act } from "react";
+
 import { type Root, createRoot } from "react-dom/client";
+
 import {
   CredentialsForm,
   StartupConnectionFailure,
@@ -55,7 +57,7 @@ describe("StartupConnectionFailure", () => {
 
 describe("CredentialsForm", () => {
   beforeEach((): void => {
-    localStorage.clear();
+    window.localStorage.clear();
   });
 
   it("prefills and checks Save credentials when credentials were saved", async () => {

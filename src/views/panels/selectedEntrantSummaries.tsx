@@ -1,7 +1,8 @@
 import React from 'react';
+
 import { type EventCatalogEntrant, type EventCatalogSession } from '../../catalog/eventCatalog.js';
-import { getParticipantNumber, getParticipantTransponders } from '../../processing/participant.js';
 import { type EventParticipant } from '../../model/eventparticipant.js';
+import { getParticipantNumber, getParticipantTransponders } from '../../processing/participant.js';
 import { getParticipantsForEntrant } from './entrantList.js';
 
 interface SelectedEntrantIdentificationPanelProps {

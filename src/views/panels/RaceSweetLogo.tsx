@@ -1,4 +1,5 @@
 import React from 'react';
+
 import raceSweetLogo from '../../../racesweet.svg';
 
 interface RaceSweetLogoProps {

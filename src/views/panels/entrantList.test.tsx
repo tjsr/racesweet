@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import React, { act } from 'react';
+
 import { type Root, createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import { type EntrantType, type EventCatalogEntrant, type EventCatalogState } from '../../catalog/eventCatalog.js';
 import { type EventParticipant } from '../../model/eventparticipant.js';
 import { EntrantListPanel } from './entrantList.js';

@@ -1,5 +1,7 @@
-import { Box, Tab, Tabs } from '@mui/material';
 import React from 'react';
+
+import { Box, Tab, Tabs } from '@mui/material';
+
 import { EntrantsPage } from '../../app/views/entrants/entrantsPage.js';
 import { SelectTextField } from '../../controls/selectTextField.js';
 import type { EventEntrantId } from '../../model/entrant.js';

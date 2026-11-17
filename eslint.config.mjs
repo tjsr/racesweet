@@ -23,6 +23,20 @@ export default tseslint.config(
   },
   rules: {
     "@stylistic/js/comma-dangle": 'off',
+    "import/order": [
+      "error",
+      {
+        alphabetize: { order: 'asc' },
+        distinctGroup: true,
+        groups: [['builtin', 'external'], ['internal', 'parent', 'sibling', 'index', 'object']],
+        'newlines-between': 'always',
+        pathGroups: [
+          { pattern: 'react', group: 'external', position: 'before' },
+          { pattern: 'react-dom', group: 'external', position: 'before' },
+        ],
+        pathGroupsExcludedImportTypes: ['builtin'],
+      },
+    ],
     "sort-imports": [
       "error",
       {

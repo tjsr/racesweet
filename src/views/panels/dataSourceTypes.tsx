@@ -1,5 +1,7 @@
-import { MenuItem } from "@mui/material";
 import React from "react";
+
+import { MenuItem } from "@mui/material";
+
 import {
   type DataSourceType,
   getDataSourceTypeLabel,

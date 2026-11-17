@@ -8,7 +8,7 @@ import {
 
 describe("saved login credentials", () => {
   beforeEach((): void => {
-    localStorage.clear();
+    window.localStorage.clear();
   });
 
   it("loads credentials saved for a future sign-in", async () => {
@@ -24,7 +24,7 @@ describe("saved login credentials", () => {
   });
 
   it("does not load malformed saved values", async () => {
-    localStorage.setItem("racesweet.saved-login-credentials", "{invalid");
+    window.localStorage.setItem("racesweet.saved-login-credentials", "{invalid");
 
     await expect(loadSavedLoginCredentials()).resolves.toBeUndefined();
   });
@@ -38,5 +38,19 @@ describe("saved login credentials", () => {
     await clearSavedLoginCredentials();
 
     await expect(loadSavedLoginCredentials()).resolves.toBeUndefined();
+  });
+
+  it("keeps credentials in browser storage", async (): Promise<void> => {
+    const credentials: { password: string; username: string } = {
+      password: "correct horse battery staple",
+      username: "admin",
+    };
+
+    await saveLoginCredentials(credentials);
+    expect(window.localStorage.getItem("racesweet.saved-login-credentials"))
+      .toBe(JSON.stringify(credentials));
+    await expect(loadSavedLoginCredentials()).resolves.toEqual(credentials);
+    await clearSavedLoginCredentials();
+    expect(window.localStorage.getItem("racesweet.saved-login-credentials")).toBeNull();
   });
 });

@@ -1,5 +1,7 @@
 import React from 'react';
+
 import { Button, Menu, MenuItem, Tooltip } from '@mui/material';
+
 import { type EventCatalogEntrant } from '../catalog/eventCatalog.js';
 import { copyToClipboard } from './identifierDisplay.js';
 

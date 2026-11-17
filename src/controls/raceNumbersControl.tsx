@@ -1,6 +1,7 @@
 import React from 'react';
-import { IdentifierListControl } from './identifierListControl.js';
+
 import { type EventParticipant } from '../model/eventparticipant.js';
+import { IdentifierListControl } from './identifierListControl.js';
 
 interface RaceNumbersControlProps {
   enableMultiplePlates?: boolean;

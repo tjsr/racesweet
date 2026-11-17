@@ -1,8 +1,10 @@
+import React from 'react';
+
 import {
   Alert, Box, Button, Card, CardActionArea, CardContent, Checkbox, Chip,
   FormControlLabel, Menu, MenuItem, Stack, TextField, Tooltip, Typography,
 } from '@mui/material';
-import React from 'react';
+
 import type { EventCatalogEntrant, EventCatalogState } from '../../catalog/eventCatalog.js';
 import { copyToClipboard } from '../../controls/identifierDisplay.js';
 import type { IndividualLinkInput, IndividualLinkTargetInput } from '../../model/individualLink.js';

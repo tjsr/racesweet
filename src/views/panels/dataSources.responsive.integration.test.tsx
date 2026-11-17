@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import React, { act } from 'react';
+
 import { type Root, createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import { type DataSourceConfig, type SystemConfiguration, createDefaultSystemConfiguration } from '../../app/systemConfig.js';
 import type { SystemConfigPersistence } from '../../persistence/systemConfigPersistence.js';
 import { SystemConfigService } from '../../service/systemConfigService.js';

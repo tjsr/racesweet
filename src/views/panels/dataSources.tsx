@@ -1,8 +1,10 @@
+import React from "react";
+
 import {
   Accordion, AccordionDetails, AccordionSummary, Button, Checkbox, FormControlLabel, MenuItem,
   Radio, RadioGroup, Switch, TextField,
 } from "@mui/material";
-import React from "react";
+
 import { formatErrorForDisplay } from "../../app/stackTrace.js";
 import {
   type DataImportMode,
@@ -17,11 +19,11 @@ import type {
   MrScatsDataFileSummary,
 } from "../../parsers/mrScats/fileInventory.js";
 import type { MrScatsDataFilePreview } from "../../parsers/mrScats/filePreview.js";
-import { AsyncButton } from "../asyncButton.js";
 import { AdminPageLayout, ResponsiveDataList, type ResponsiveDataRow, ResponsiveDialog } from '../admin/adminPrimitives.js';
+import { AsyncButton } from "../asyncButton.js";
+import type { InlineLoadingProgress } from "./InlineLoadingIndicator.js";
 import { DataSourceTypesPanel } from "./dataSourceTypes.js";
 import { FileSelectionField } from "./fileSelectionField.js";
-import type { InlineLoadingProgress } from "./InlineLoadingIndicator.js";
 import { MrScatsDataSourcePanel } from "./mrScatsDataSourcePanel.js";
 
 interface DataSourcesPanelProps {
@@ -762,20 +764,20 @@ export const DataSourcesPanel = (
                           </AccordionSummary>
                           <AccordionDetails>
                             <p>
-                            FileMaker databases are proprietary binary files.
-                            RaceSweet uses fmp2json to read their tables safely,
-                            then converts DURT entrants and crossings into the
-                            RaceSweet ledger.
+                              FileMaker databases are proprietary binary files.
+                              RaceSweet uses fmp2json to read their tables safely,
+                              then converts DURT entrants and crossings into the
+                              RaceSweet ledger.
                             </p>
                             <p>
-                            RaceSweet packages fmp2json with the Windows app, so
-                            normal users do not need a compiler or separate
-                            installation. Developers can create that package
-                            with npm run build:fmptools:win32; the build runs
-                            entirely in Docker.
+                              RaceSweet packages fmp2json with the Windows app, so
+                              normal users do not need a compiler or separate
+                              installation. Developers can create that package
+                              with npm run build:fmptools:win32; the build runs
+                              entirely in Docker.
                             </p>
                             <p>
-                            The bundled binary is built from{" "}
+                              The bundled binary is built from{" "}
                               <a
                                 href="https://github.com/evanmiller/fmptools/releases"
                                 onClick={(event) => {
@@ -785,10 +787,10 @@ export const DataSourcesPanel = (
                                   );
                                 }}
                               >
-                              fmptools releases
+                                fmptools releases
                               </a>
-                            . A custom executable can be selected below only
-                            when troubleshooting or testing a different build.
+                              . A custom executable can be selected below only
+                              when troubleshooting or testing a different build.
                             </p>
                           </AccordionDetails>
                         </Accordion>
@@ -986,11 +988,11 @@ export const DataSourcesPanel = (
                       {isApicalRecentLaps &&
                       source.apiConfig.pollingStopReason ? (
                           <p role="status">
-                          Polling stopped
+                            Polling stopped
                             {source.apiConfig.pollingStoppedAt
                               ? ` at ${source.apiConfig.pollingStoppedAt}`
                               : ""}
-                          : {source.apiConfig.pollingStopReason}
+                            : {source.apiConfig.pollingStopReason}
                           </p>
                         ) : null}
                       {source.apicalDataFilePath ? (
@@ -1244,7 +1246,7 @@ export const DataSourcesPanel = (
                     setDorianCtcPreviewLoadingFile(undefined);
                   }}
                 >
-                Close
+                  Close
                 </Button>
               </div>
             </section>

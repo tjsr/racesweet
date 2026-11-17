@@ -1,5 +1,7 @@
-import { Button, type ButtonProps, IconButton, Tooltip } from '@mui/material';
 import React from 'react';
+
+import { Button, type ButtonProps, IconButton, Tooltip } from '@mui/material';
+
 import { type EventCatalogCategory } from '../catalog/eventCatalog.js';
 
 interface CategoryListCardProps {

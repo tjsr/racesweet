@@ -1,5 +1,7 @@
-import { Box, ButtonBase, Paper, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import React from 'react';
+
+import { Box, ButtonBase, Paper, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
+
 import type { DisplayComponent } from '../../model/displayScreen.js';
 import type { DisplayProjection, DisplayResultRow } from '../../processing/displayProjection.js';
 
@@ -54,25 +56,25 @@ const DisplayTileContent = ({ component, projection }: {
   projection: DisplayProjection;
 }): React.ReactElement => {
   switch (component.type) {
-  case 'event-title':
-    return <Box sx={{ maxWidth: '100%', minWidth: 0 }}>
-      <Typography variant="h3" sx={{ fontSize: 'clamp(1.25rem, 4vw, 2.5rem)', overflowWrap: 'anywhere' }}>
-        {projection.eventName}</Typography>
-      {component.settings.showSession && projection.sessionName
-        ? <Typography variant="h5" sx={{ fontSize: 'clamp(1rem, 2.5vw, 1.5rem)', overflowWrap: 'anywhere' }}>
-          {projection.sessionName}</Typography> : null}</Box>;
-  case 'clock':
-    return <DisplayClock component={component} projection={projection} />;
-  case 'leaderboard':
-  case 'results-table':
-    return <DisplayResultTable component={component} projection={projection} />;
-  case 'sponsor-image':
-    return component.settings.mediaDataUrl
-      ? <Box component="img" alt={component.settings.alt} src={component.settings.mediaDataUrl}
-        sx={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
-      : <Typography>Choose a sponsor image</Typography>;
-  case 'text-panel':
-    return <Typography sx={{ whiteSpace: 'pre-wrap' }}>{component.settings.text}</Typography>;
+    case 'event-title':
+      return <Box sx={{ maxWidth: '100%', minWidth: 0 }}>
+        <Typography variant="h3" sx={{ fontSize: 'clamp(1.25rem, 4vw, 2.5rem)', overflowWrap: 'anywhere' }}>
+          {projection.eventName}</Typography>
+        {component.settings.showSession && projection.sessionName
+          ? <Typography variant="h5" sx={{ fontSize: 'clamp(1rem, 2.5vw, 1.5rem)', overflowWrap: 'anywhere' }}>
+            {projection.sessionName}</Typography> : null}</Box>;
+    case 'clock':
+      return <DisplayClock component={component} projection={projection} />;
+    case 'leaderboard':
+    case 'results-table':
+      return <DisplayResultTable component={component} projection={projection} />;
+    case 'sponsor-image':
+      return component.settings.mediaDataUrl
+        ? <Box component="img" alt={component.settings.alt} src={component.settings.mediaDataUrl}
+          sx={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
+        : <Typography>Choose a sponsor image</Typography>;
+    case 'text-panel':
+      return <Typography sx={{ whiteSpace: 'pre-wrap' }}>{component.settings.text}</Typography>;
   }
 };
 

@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import { act } from "react";
+
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { type DataSourceConfig } from "../../app/systemConfig.js";
 import { DataSourcesPanel } from "./dataSources.js";
 

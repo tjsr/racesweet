@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 
-import * as ReactDomClient from 'react-dom/client';
-import * as EventCatalog from '../../catalog/eventCatalog.js';
-import * as SystemConfig from '../../app/systemConfig.js';
-
 import React, { act } from 'react';
 
+import * as ReactDomClient from 'react-dom/client';
+
+import * as SystemConfig from '../../app/systemConfig.js';
+import * as EventCatalog from '../../catalog/eventCatalog.js';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 import { SessionsPage } from './sessionsPage.js';
 
