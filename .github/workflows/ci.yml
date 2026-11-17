@@ -29,7 +29,7 @@ jobs:
         run: npm install --global npm@12.2.2
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --strict-peer-deps --allow-git=root
 
       - name: Run TypeScript compile
         run: npx tsc
@@ -52,7 +52,7 @@ jobs:
         run: npm install --global npm@12.2.2
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --strict-peer-deps --allow-git=root
 
       - name: Run tests
         run: npm test -- --run
