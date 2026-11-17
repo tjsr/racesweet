@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 
 import { act } from "react";
+
 import { type Root, createRoot } from "react-dom/client";
+
 import { tableTimeString } from "../../app/utils/timeutils.js";
 import type {
   EventCatalogEntrant,
@@ -41,8 +43,8 @@ import {
 } from "../../model/timerecord.js";
 import { CategoryId } from "../../processing/category.js";
 import { createGreenFlagEvent } from "../../processing/flag.js";
-import { useUiConsoleGuards } from "../../testing/uiConsoleGuards.js";
 import { createStartListFixture } from '../../testing/startListFixture.js';
+import { useUiConsoleGuards } from "../../testing/uiConsoleGuards.js";
 import {
   ReportsPage,
   type ReportsViewState,

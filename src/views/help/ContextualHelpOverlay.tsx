@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { type ApplicationHelpSection, type HelpContent, type HelpControlKind, getConfiguredControlHelp } from '../../config/helpContent.js';
 
 interface HelpTarget {

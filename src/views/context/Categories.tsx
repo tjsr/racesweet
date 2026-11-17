@@ -1,8 +1,9 @@
 import React from 'react';
-import { AdminPageLayout } from '../admin/adminPrimitives.js';
+
 import { getCategoriesForEvent, getCategoryAssignedSessionIds, getSessionsForEvent, } from '../../catalog/eventCatalog.js';
 import { SelectTextField } from '../../controls/selectTextField.js';
 import { buildCategoryChanges } from '../../processing/categoryDraft.js';
+import { AdminPageLayout } from '../admin/adminPrimitives.js';
 import { CategoriesPageProps, CategoryDraft, dedupeCategoriesForDisplay, getCategoryDraft, } from '../display/categoriesPage.js';
 import { useUnsavedChangesWarning } from '../display/unsavedChangesWarning.js';
 import { CategoryDetailsPanel } from '../panels/categoryDetails.js';

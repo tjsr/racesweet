@@ -1,10 +1,12 @@
-import { LinearProgress, MenuItem } from '@mui/material';
 import React from 'react';
+
+import { LinearProgress, MenuItem } from '@mui/material';
+
 import { type ScheduledLivePoll } from '../../app/livePollingScheduler.js';
-import { type EventCatalogState } from '../../catalog/eventCatalog.js';
 import { type FastestTimeIndicatorColors } from '../../app/systemConfig.js';
 import { type TimeDisplayZoneMode } from '../../app/utils/timeutils.js';
 import { RecentRecords } from '../../app/views/timing/recentRecords.js';
+import { type EventCatalogState } from '../../catalog/eventCatalog.js';
 import { SelectTextField } from '../../controls/selectTextField.js';
 import { type EventCategory, type EventCategoryId } from '../../model/eventcategory.js';
 import { type EventParticipantId } from '../../model/eventparticipant.js';

@@ -1,5 +1,7 @@
 import React from 'react';
+
 import { Alert } from '@mui/material';
+
 import type { EventCatalogState, EventTrackTimingLine } from '../../catalog/eventCatalog.js';
 import type { ManualTimingOutboxConnection } from '../../model/manualCrossingOutbox.js';
 import { ManualTimingPanel } from './ManualTimingPanel.js';

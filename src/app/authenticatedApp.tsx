@@ -1,3 +1,5 @@
+import React, { type FormEvent, useEffect, useMemo, useState } from "react";
+
 import {
   Alert,
   AlertTitle,
@@ -10,7 +12,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import React, { type FormEvent, useEffect, useMemo, useState } from "react";
+
 import type {
   AuthenticatedUser,
   AuthenticationStatus,
@@ -141,8 +143,8 @@ export const CredentialsForm = ({
         location.hostname !== "127.0.0.1" &&
         location.hostname !== "localhost" ? (
             <Alert severity="warning">
-            This server is using unencrypted HTTP. Credentials and race data can
-            be observed by other devices on the network.
+              This server is using unencrypted HTTP. Credentials and race data can
+              be observed by other devices on the network.
             </Alert>
           ) : null}
         {error ? <Alert severity="error">{error}</Alert> : null}

@@ -1,7 +1,9 @@
+import React from 'react';
+
 import {
   Alert, Box, Button, FormControlLabel, MenuItem, Stack, Switch, TextField, Typography,
 } from '@mui/material';
-import React from 'react';
+
 import type { DisplayComponent, DisplayComponentType, DisplayScreenTemplate, DisplayShareLink } from '../../model/displayScreen.js';
 import { validateDisplayLayout } from '../../model/displayScreen.js';
 import { createId } from '../../model/ids.js';
@@ -44,12 +46,12 @@ const createComponent = (type: DisplayComponentType, items: DisplayComponent[]):
   const y: number = items.reduce((maximum: number, item: DisplayComponent): number => Math.max(maximum, item.y + item.height), 0);
   const base = { height: 2, id: createId('displayComponentId'), width: 12, x: 0, y, zIndex: 0 };
   switch (type) {
-  case 'event-title': return { ...base, settings: { showSession: true }, type };
-  case 'clock': return { ...base, settings: { format: 'time', timeZone: 'event' }, type };
-  case 'leaderboard':
-  case 'results-table': return { ...base, settings: { limit: 10, scope: 'overall' }, type };
-  case 'sponsor-image': return { ...base, settings: { alt: '', mediaDataUrl: '' }, type };
-  case 'text-panel': return { ...base, settings: { text: 'Text' }, type };
+    case 'event-title': return { ...base, settings: { showSession: true }, type };
+    case 'clock': return { ...base, settings: { format: 'time', timeZone: 'event' }, type };
+    case 'leaderboard':
+    case 'results-table': return { ...base, settings: { limit: 10, scope: 'overall' }, type };
+    case 'sponsor-image': return { ...base, settings: { alt: '', mediaDataUrl: '' }, type };
+    case 'text-panel': return { ...base, settings: { text: 'Text' }, type };
   }
 };
 

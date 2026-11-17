@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { type EventCatalogCategory } from '../../catalog/eventCatalog.js';
 
 interface CategorySummaryPanelProps {

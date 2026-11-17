@@ -1,12 +1,14 @@
-import { Button, CircularProgress, TextField, Typography } from '@mui/material';
 import React from 'react';
-import { IdentifierDisplay } from '../../controls/identifierDisplay.js';
-import { AdminActionBar, AdminFieldGrid, AdminFormSection } from '../admin/adminPrimitives.js';
+
+import { Button, CircularProgress, TextField, Typography } from '@mui/material';
+
 import { type EventCatalogEntrant } from '../../catalog/eventCatalog.js';
+import { IdentifierDisplay } from '../../controls/identifierDisplay.js';
 import { SelectTextField } from '../../controls/selectTextField.js';
-import { type CategoryId } from '../../processing/category.js';
 import { type EventEntrantId } from '../../model/entrant.js';
 import { type EventCategory } from '../../model/eventcategory.js';
+import { type CategoryId } from '../../processing/category.js';
+import { AdminActionBar, AdminFieldGrid, AdminFormSection } from '../admin/adminPrimitives.js';
 
 export interface EntrantDraft {
   categoryId: CategoryId;
@@ -157,7 +159,7 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
               void props.onSaveEntrant();
             }}
           >
-              Save Entrant
+            Save Entrant
           </Button>
           <div className="entrant-delete-status">
             <Button
@@ -168,7 +170,7 @@ export const EntrantDetailsPanel = (props: EntrantDetailsPanelProps): React.Reac
               type="button"
               variant="outlined"
             >
-                Delete Entrant
+              Delete Entrant
             </Button>
             {props.deleteError ? <span className="error entrant-delete-error" role="alert">{props.deleteError}</span> : null}
           </div>

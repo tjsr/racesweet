@@ -1,11 +1,13 @@
-import { Button, TextField } from "@mui/material";
 import React from "react";
-import { getParticipantIdentifiers } from "../processing/participant.js";
+
+import { Button, TextField } from "@mui/material";
+
 import {
   type EventParticipant,
   type ParticipantTransponder,
 } from "../model/eventparticipant.js";
 import { getParticipantDisplayName } from "../model/participantDisplay.js";
+import { getParticipantIdentifiers } from "../processing/participant.js";
 import { NumericInput } from "./numericInput.js";
 
 type IdentifierType = "racePlate" | "txNo";
@@ -137,9 +139,9 @@ const getSavedRows = (
           )
           .map((identifier) => {
             const identifierRecord = identifier as unknown as Record<
-                string,
+              string,
                 string | number | undefined
-              >;
+            >;
             return {
               fromTime: identifier.fromTime,
               toTime: identifier.toTime,

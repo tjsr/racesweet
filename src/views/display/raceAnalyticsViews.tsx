@@ -1,7 +1,8 @@
-import type { RaceState, RaceStateLookup } from "../../model/racestate.js";
+
+import React from "react";
 
 import { MenuItem } from "@mui/material";
-import React from "react";
+
 import {
   millisecondsToTime,
   tableTimeString,
@@ -26,25 +27,26 @@ import type {
 } from "../../model/eventparticipant.js";
 import { EventCategoryId } from "../../model/index.js";
 import { EventId, SessionId } from "../../model/raceevent.js";
+import type { RaceState, RaceStateLookup } from "../../model/racestate.js";
 import type {
   ParticipantPassingRecord,
   TimeRecord,
 } from "../../model/timerecord.js";
 import { shouldExcludeCategoryFromResults } from "../../processing/category.js";
-import { isStartRecord } from "../../processing/session.js";
 import {
   getSourceLapCompletion,
   isCountedLapPassing,
 } from "../../processing/laps.js";
 import { getParticipantNumber } from "../../processing/participant.js";
+import { isStartRecord } from "../../processing/session.js";
 import { calculateYellowFlagPeriods } from "../../processing/yellowFlagPeriods.js";
+import { EventReplayPanel } from '../reports/EventReplayPanel.js';
 import {
   LapTimesReport,
   type LapTimesReportState,
 } from "../reports/LapTimesReport.js";
-import { TrackMapReport } from "../reports/TrackMapReport.js";
-import { EventReplayPanel } from '../reports/EventReplayPanel.js';
 import { StartListsGridsReport } from '../reports/StartListsGridsReport.js';
+import { TrackMapReport } from "../reports/TrackMapReport.js";
 import { HandicapView } from "./handicap.js";
 
 interface CategoryOption {

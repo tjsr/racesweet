@@ -1,5 +1,5 @@
 import React from 'react';
-import { AdminPageLayout } from '../admin/adminPrimitives.js';
+
 import {
   type EntrantType,
   type EventCatalogEntrant,
@@ -12,21 +12,22 @@ import {
   getEventDisciplineLabels,
   getSessionsForEvent,
 } from '../../catalog/eventCatalog.js';
-import { type EntrantImportRecord, parseEntrantImportBuffer } from '../../processing/entrantImport.js';
 import { SelectTextField } from '../../controls/selectTextField.js';
 import { EventEntrantId } from '../../model/entrant.js';
-import type { IndividualLinkInput } from '../../model/individualLink.js';
 import type { EventEntryId } from '../../model/entry.js';
 import { type EventCategoryId } from '../../model/eventcategory.js';
 import { type EventParticipant, type EventParticipantId, type ParticipantIdentifierUpdate } from '../../model/eventparticipant.js';
+import type { IndividualLinkInput } from '../../model/individualLink.js';
 import { EventId } from '../../model/raceevent.js';
 import { type RaceState } from '../../model/racestate.js';
-import { EntrantListPanel, getParticipantsForEntrant } from '../panels/entrantList.js';
+import { type EntrantImportRecord, parseEntrantImportBuffer } from '../../processing/entrantImport.js';
+import { AdminPageLayout } from '../admin/adminPrimitives.js';
+import { EntrantIndividualLinksPanel } from '../panels/EntrantIndividualLinksPanel.js';
 import { EntrantDetailsPanel, type EntrantDraft } from '../panels/entrantDetailsPanel.js';
 import { EntrantEntriesPanel } from '../panels/entrantEntriesPanel.js';
-import { IdentificationPanel } from '../panels/identificationPanel.js';
-import { EntrantIndividualLinksPanel } from '../panels/EntrantIndividualLinksPanel.js';
+import { EntrantListPanel, getParticipantsForEntrant } from '../panels/entrantList.js';
 import { FileSelectionField } from '../panels/fileSelectionField.js';
+import { IdentificationPanel } from '../panels/identificationPanel.js';
 import { SelectedEntrantIdentificationPanel, SelectedEntrantSessionsPanel } from '../panels/selectedEntrantSummaries.js';
 import { SelectedEntrantsPanel } from '../panels/selectedEntrantsPanel.js';
 import { SessionListPanel } from '../panels/sessionList.js';

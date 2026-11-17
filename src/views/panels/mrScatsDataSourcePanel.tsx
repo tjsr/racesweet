@@ -1,10 +1,12 @@
 import React from 'react';
+
 import { Accordion, AccordionDetails, AccordionSummary, Button, Checkbox, FormControlLabel, TextField } from '@mui/material';
+
 import type { DataSourceConfig } from '../../app/systemConfig.js';
 import type { MrScatsDataFileInventory, MrScatsDataFileSummary } from '../../parsers/mrScats/fileInventory.js';
 import type { MrScatsDataFilePreview, MrScatsPreviewValue } from '../../parsers/mrScats/filePreview.js';
-import type { InlineLoadingProgress } from './InlineLoadingIndicator.js';
 import { ResponsiveDataList, type ResponsiveDataRow, ResponsiveDialog } from '../admin/adminPrimitives.js';
+import type { InlineLoadingProgress } from './InlineLoadingIndicator.js';
 import { FileSelectionField } from './fileSelectionField.js';
 
 interface MrScatsDataSourcePanelProps {

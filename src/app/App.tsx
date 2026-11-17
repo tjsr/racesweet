@@ -8,9 +8,9 @@ import {
   useRef,
   useState,
 } from "react";
+
 import { validate as validateUuid } from "uuid";
-import { AdminThemeProvider } from '../views/admin/adminPrimitives.js';
-import { ResponsiveSectionNavigation } from '../views/admin/ResponsiveSectionNavigation.js';
+
 import {
   type EventCatalogEntrant,
   type EventCatalogState,
@@ -21,9 +21,7 @@ import {
   getEventDisciplineLabels,
   getSessionsForEvent,
 } from "../catalog/eventCatalog.ts";
-import { fetchApicalEvents } from "../processing/apical/getResultListJson.ts";
-import { type DisplayProjection, buildDisplayProjection } from '../processing/displayProjection.js';
-import { CategoryId } from "../processing/category.ts";
+import type { EventCatalogMutation } from "../ledger/eventCatalogLedger.ts";
 import {
   type LoadingMetricsState,
   getLoadingMetricsSnapshot,
@@ -39,9 +37,9 @@ import {
   updateLoadingProgressStage,
   waitForLoadingProgressPaint,
 } from "../loadingProgress.ts";
-import { type EventCategory, EventCategoryId } from "../model/eventcategory.ts";
 import type { DisplayComponent } from '../model/displayScreen.js';
 import { getParticipantEntryId } from "../model/entry.ts";
+import { type EventCategory, EventCategoryId } from "../model/eventcategory.ts";
 import {
   type EventParticipant,
   type EventParticipantId,
@@ -56,6 +54,7 @@ import {
   Session,
   getEffectiveParticipantCategoryId,
 } from "../model/racestate.ts";
+import type { DomainEventEnvelope } from "../model/serverApi.ts";
 import {
   type EventTimeRecord,
   type TimeRecordId,
@@ -77,14 +76,18 @@ import { JsonReplicaOutboxPersistence } from "../persistence/jsonReplicaOutboxPe
 import { ElectronJsonRaceAdminPersistence } from "../persistence/raceAdminPersistence.ts";
 import type { AdministrativeChanges } from "../persistence/raceAdminPersistence.ts";
 import { ElectronJsonSystemConfigPersistence } from "../persistence/systemConfigPersistence.ts";
-import { EventCatalogService } from "../service/eventCatalogService.ts";
+import { fetchApicalEvents } from "../processing/apical/getResultListJson.ts";
+import { CategoryId } from "../processing/category.ts";
+import { type DisplayProjection, buildDisplayProjection } from '../processing/displayProjection.js';
+import { mergeManualCrossingsIntoRaceState } from '../processing/manualCrossings.js';
 import { CatalogReplicaOutbox } from "../service/catalogReplicaOutbox.ts";
+import { EventCatalogService } from "../service/eventCatalogService.ts";
 import { HttpReplicaTransport } from "../service/httpReplicaTransport.ts";
+import { RaceAdminService } from "../service/raceAdminService.ts";
+import { HttpRaceSweetApiClient } from "../service/raceSweetApiClient.ts";
 import { ReplicaLiveMutationSubscriber } from "../service/replicaLiveMutationSubscriber.ts";
 import { ReplicaSyncController } from "../service/replicaSyncController.ts";
 import { ReplicaSyncService } from "../service/replicaSyncService.ts";
-import { RaceAdminService } from "../service/raceAdminService.ts";
-import { HttpRaceSweetApiClient } from "../service/raceSweetApiClient.ts";
 import {
   type SessionSourceReloadMode,
   type SessionSourceReloadSummary,
@@ -103,13 +106,13 @@ import {
 } from "../service/sourceApplication.ts";
 import { SystemConfigService } from "../service/systemConfigService.ts";
 import { SyncStore } from "../state/syncStore.ts";
-import type { DomainEventEnvelope } from "../model/serverApi.ts";
-import type { EventCatalogMutation } from "../ledger/eventCatalogLedger.ts";
 import { ApicalElectronFile } from "../testdata/apicalElectronFile.ts";
 import {
   type TestSession,
   type TestSessionLoadProgressCallback,
 } from "../testdata/testsession.ts";
+import { ResponsiveSectionNavigation } from '../views/admin/ResponsiveSectionNavigation.js';
+import { AdminThemeProvider } from '../views/admin/adminPrimitives.js';
 import { CategoriesContext } from "../views/context/Categories.tsx";
 import { EntrantsContext } from "../views/context/Entrants.tsx";
 import { EventsContext } from "../views/context/Events.tsx";
@@ -118,17 +121,15 @@ import { ResultsContext } from "../views/context/Results.tsx";
 import { SessionsContext } from "../views/context/Sessions.tsx";
 import { SystemContext } from "../views/context/System.tsx";
 import { TimingContext } from "../views/context/Timing.tsx";
-import { ConnectedManualTimingPanel } from '../views/timing/ConnectedManualTimingPanel.js';
-import { useManualTimingOutbox } from './manualTimingOutbox.js';
-import { mergeManualCrossingsIntoRaceState } from '../processing/manualCrossings.js';
-import { ReloadSummaryDialog } from "../views/display/reloadSummaryDialog.tsx";
 import {
   type ReportsViewState,
   createDefaultReportsViewState,
 } from "../views/display/raceAnalyticsViews.tsx";
+import { ReloadSummaryDialog } from "../views/display/reloadSummaryDialog.tsx";
 import { type UnsavedChangesGuard } from "../views/display/unsavedChangesWarning.tsx";
-import { LoadingProgress } from "../views/panels/LoadingProgress.tsx";
 import { ContextualHelpOverlay } from "../views/help/ContextualHelpOverlay.js";
+import { LoadingProgress } from "../views/panels/LoadingProgress.tsx";
+import { ConnectedManualTimingPanel } from '../views/timing/ConnectedManualTimingPanel.js';
 import {
   PulledApicalRaceState,
   createApicalCatalogEventId,
@@ -159,6 +160,7 @@ import {
   type LivePollingSource,
   type ScheduledLivePoll,
 } from "./livePollingScheduler.ts";
+import { useManualTimingOutbox } from './manualTimingOutbox.js';
 import { formatErrorForDisplay } from "./stackTrace.ts";
 import {
   type DataSourceConfig,
@@ -648,7 +650,7 @@ export const RaceSweetMainApp = () => {
     useState<SystemConfiguration>(createDefaultSystemConfiguration());
   const [sessionState, setSessionState] = useState<
     (Session & RaceStateLookup) | undefined
-      >(undefined);
+  >(undefined);
   const [, setRenderTick] = useState(0);
   const [errorState, setErrorState] = useState<unknown>(undefined);
   const [displayedErrorLogEntries, setDisplayedErrorLogEntries] = useState<
@@ -705,7 +707,7 @@ export const RaceSweetMainApp = () => {
   >(undefined);
   const [timingRaceState, setTimingRaceState] = useState<
     (Session & RaceStateLookup) | undefined
-      >(undefined);
+  >(undefined);
   const [timingSessionSelection, setTimingSessionSelection] =
     useState<TimingSessionSelection>("active");
   const [timingSelectionLoading, setTimingSelectionLoading] =
@@ -723,7 +725,7 @@ export const RaceSweetMainApp = () => {
   );
   const reloadLivePollingSource = useRef<
     (sourceId: string, target: { eventId: EventId; sessionId: SessionId }) => Promise<void>
-      >(() => Promise.resolve());
+  >(() => Promise.resolve());
   if (!livePollingScheduler.current) {
     livePollingScheduler.current = new LivePollingScheduler({
       onScheduleChanged: (scheduledPolls: ScheduledLivePoll[]): void => {
@@ -1089,7 +1091,7 @@ export const RaceSweetMainApp = () => {
             const now = Date.now();
             const lastPaintAt = progressPaintTimes.get(stageId) || 0;
             const shouldPaint =
-            completed === 0 ||
+              completed === 0 ||
             completed >= update.total ||
             now - lastPaintAt >= 32;
             if (shouldPaint) {
@@ -1948,175 +1950,175 @@ export const RaceSweetMainApp = () => {
 
     for (const source of sources) {
       switch (source.type) {
-      case "file-mr-scats-data": {
-        const locationPath = source.mrScatsConfig?.dataLocationPath;
-        if (!locationPath) {
-          throw new Error(
-            `Assigned MR-SCATS source "${source.name}" has no data location configured.`,
-          );
-        }
+        case "file-mr-scats-data": {
+          const locationPath = source.mrScatsConfig?.dataLocationPath;
+          if (!locationPath) {
+            throw new Error(
+              `Assigned MR-SCATS source "${source.name}" has no data location configured.`,
+            );
+          }
 
-        const mrScatsImport = await loadMrScatsCatalogFromLocation(
-          locationPath,
-          {
-            ignoreLineOneNo1CrossingsWhenDbfPresent:
+          const mrScatsImport = await loadMrScatsCatalogFromLocation(
+            locationPath,
+            {
+              ignoreLineOneNo1CrossingsWhenDbfPresent:
                 source.mrScatsConfig?.ignoreLineOneNo1CrossingsWhenDbfPresent,
-          },
-        );
-        const importedSession = mrScatsImport.sessions.find(
-          (session) => session.id === sessionId,
-        );
-        if (importedSession) {
+            },
+          );
+          const importedSession = mrScatsImport.sessions.find(
+            (session) => session.id === sessionId,
+          );
+          if (importedSession) {
+            pulledRaceStates.push(
+              filterMrScatsRaceStateForSession(
+                mrScatsImport.raceState,
+                sessionId,
+                importedSession.categoryIds,
+              ),
+            );
+          }
+          break;
+        }
+
+        case "file-durt-filemaker": {
+          const databaseFilePath = source.durtFileMakerConfig?.databaseFilePath;
+          if (!databaseFilePath) {
+            throw new Error(
+              `Assigned DURT FileMaker source "${source.name}" has no database file configured.`,
+            );
+          }
+
           pulledRaceStates.push(
-            filterMrScatsRaceStateForSession(
-              mrScatsImport.raceState,
-              sessionId,
-              importedSession.categoryIds,
-            ),
-          );
-        }
-        break;
-      }
-
-      case "file-durt-filemaker": {
-        const databaseFilePath = source.durtFileMakerConfig?.databaseFilePath;
-        if (!databaseFilePath) {
-          throw new Error(
-            `Assigned DURT FileMaker source "${source.name}" has no database file configured.`,
-          );
-        }
-
-        pulledRaceStates.push(
-          await loadDurtFileMakerRaceState({
-            eventId,
-            executablePath:
+            await loadDurtFileMakerRaceState({
+              eventId,
+              executablePath:
                 source.durtFileMakerConfig?.extractorPath ||
                 getBundledDurtFileMakerExtractorPath(),
-            sessionId,
-            sourceFilePath: databaseFilePath,
-            timeZone: getEventTimeZone(eventId),
-          }),
-        );
-        break;
-      }
+              sessionId,
+              sourceFilePath: databaseFilePath,
+              timeZone: getEventTimeZone(eventId),
+            }),
+          );
+          break;
+        }
 
-      case "api-apical-data-file":
-      case "api-apical-excel-file":
-        pulledRaceStates.push(
-          await pullApicalRaceState(source, eventId, {
-            localStorageDirectoryPath:
+        case "api-apical-data-file":
+        case "api-apical-excel-file":
+          pulledRaceStates.push(
+            await pullApicalRaceState(source, eventId, {
+              localStorageDirectoryPath:
                 systemConfigState.localStorageDirectoryPath,
-            timeZone: getEventTimeZone(eventId),
-          }),
-        );
-        break;
-
-      case "api-apical-recent-laps": {
-        const event = eventCatalogService?.catalog.events.find(
-          (candidate): boolean => candidate.id === eventId,
-        );
-        if (!event) {
-          throw new Error(
-            `Assigned Apical Recent Laps source "${source.name}" requires an existing event.`,
+              timeZone: getEventTimeZone(eventId),
+            }),
           );
-        }
-        pulledRaceStates.push(
-          await fetchApicalRecentLapsRaceState(
-            source,
-            eventId,
-            event.date,
-            event.timeZone || getSystemTimeZone(),
-          ),
-        );
-        break;
-      }
+          break;
 
-      case "file-dorian-ctc-srt": {
-        const filePath = source.fileConfig?.filePath;
-        const catalog = eventCatalogService?.catalog;
-        const event = catalog?.events.find((item) => item.id === eventId);
-        if (!filePath || !catalog || !event) {
-          throw new Error(
-            `Assigned Dorian CTC SRT / ERF source "${source.name}" requires a configured file and event.`,
+        case "api-apical-recent-laps": {
+          const event = eventCatalogService?.catalog.events.find(
+            (candidate): boolean => candidate.id === eventId,
           );
+          if (!event) {
+            throw new Error(
+              `Assigned Apical Recent Laps source "${source.name}" requires an existing event.`,
+            );
+          }
+          pulledRaceStates.push(
+            await fetchApicalRecentLapsRaceState(
+              source,
+              eventId,
+              event.date,
+              event.timeZone || getSystemTimeZone(),
+            ),
+          );
+          break;
         }
 
-        const existingRaceState =
+        case "file-dorian-ctc-srt": {
+          const filePath = source.fileConfig?.filePath;
+          const catalog = eventCatalogService?.catalog;
+          const event = catalog?.events.find((item) => item.id === eventId);
+          if (!filePath || !catalog || !event) {
+            throw new Error(
+              `Assigned Dorian CTC SRT / ERF source "${source.name}" requires a configured file and event.`,
+            );
+          }
+
+          const existingRaceState =
             eventCatalogService?.getImportedRaceState(eventId, sessionId) || {};
-        const knownTransmitterNumbers = [
-          ...getEntrantsForEvent(catalog, eventId).flatMap((entrant) =>
-            entrant.isPlaceholder === true ||
+          const knownTransmitterNumbers = [
+            ...getEntrantsForEvent(catalog, eventId).flatMap((entrant) =>
+              entrant.isPlaceholder === true ||
               entrant.name
                 .trim()
                 .toLowerCase()
                 .startsWith("unknown participant")
-              ? []
-              : (entrant.identifiers || [])
-                .filter((identifier) => "txNo" in identifier)
-                .map(
-                  (identifier) =>
-                    (identifier as ParticipantTransponder).txNo,
-                ),
-          ),
-          ...(existingRaceState.participants || []).flatMap((participant) =>
-            participant.isPlaceholder === true ||
+                ? []
+                : (entrant.identifiers || [])
+                  .filter((identifier) => "txNo" in identifier)
+                  .map(
+                    (identifier) =>
+                      (identifier as ParticipantTransponder).txNo,
+                  ),
+            ),
+            ...(existingRaceState.participants || []).flatMap((participant) =>
+              participant.isPlaceholder === true ||
               (!participant.firstname.trim() && !participant.surname.trim())
-              ? []
-              : participant.identifiers
-                .filter((identifier) => "txNo" in identifier)
-                .map(
-                  (identifier) =>
-                    (identifier as ParticipantTransponder).txNo,
-                ),
-          ),
-        ];
-        const trackConfigFilePath = source.fileConfig?.trackConfigFilePath;
-        const trackConfig = trackConfigFilePath
-          ? await window.api
-            .requestBuffer(trackConfigFilePath)
+                ? []
+                : participant.identifiers
+                  .filter((identifier) => "txNo" in identifier)
+                  .map(
+                    (identifier) =>
+                      (identifier as ParticipantTransponder).txNo,
+                  ),
+            ),
+          ];
+          const trackConfigFilePath = source.fileConfig?.trackConfigFilePath;
+          const trackConfig = trackConfigFilePath
+            ? await window.api
+              .requestBuffer(trackConfigFilePath)
+              .then((buffer) =>
+                parseCtcTrackConfig(buffer, trackConfigFilePath),
+              )
+            : source.fileConfig?.ctcTrackConfig;
+          const importedRaceState = await window.api
+            .requestBuffer(filePath)
             .then((buffer) =>
-              parseCtcTrackConfig(buffer, trackConfigFilePath),
-            )
-          : source.fileConfig?.ctcTrackConfig;
-        const importedRaceState = await window.api
-          .requestBuffer(filePath)
-          .then((buffer) =>
-            loadDorianCtcSrtCatalogForSession(filePath, buffer, {
-              eventDate: event.date,
-              eventId,
-              importPlaceholderEntrantsForUnknownTransmitters:
+              loadDorianCtcSrtCatalogForSession(filePath, buffer, {
+                eventDate: event.date,
+                eventId,
+                importPlaceholderEntrantsForUnknownTransmitters:
                   source.fileConfig
                     ?.importPlaceholderEntrantsForUnknownTransmitters === true,
-              knownTransmitterNumbers,
-              sessionId,
-              timeZone: event.timeZone,
-              trackConfig,
-            }),
+                knownTransmitterNumbers,
+                sessionId,
+                timeZone: event.timeZone,
+                trackConfig,
+              }),
+            );
+          pulledRaceStates.push(importedRaceState);
+          break;
+        }
+
+        case "api-aws-sqs":
+        case "api-http-request":
+        case "file-apical-data-file":
+        case "file-racesweet-ledger":
+        case "file-rfid-timing-csv":
+        case "master-entrant-profiles":
+        case "timing-dorian-data1-supernode":
+        case "timing-iracing-agent":
+        case "timing-mylaps-decoder":
+        case "timing-rfid-decoder":
+          throw new Error(
+            `Re-loading assigned source "${source.name}" (${source.type}) is not implemented.`,
           );
-        pulledRaceStates.push(importedRaceState);
-        break;
-      }
 
-      case "api-aws-sqs":
-      case "api-http-request":
-      case "file-apical-data-file":
-      case "file-racesweet-ledger":
-      case "file-rfid-timing-csv":
-      case "master-entrant-profiles":
-      case "timing-dorian-data1-supernode":
-      case "timing-iracing-agent":
-      case "timing-mylaps-decoder":
-      case "timing-rfid-decoder":
-        throw new Error(
-          `Re-loading assigned source "${source.name}" (${source.type}) is not implemented.`,
-        );
-
-      default: {
-        const unsupportedSourceType: never = source.type;
-        throw new Error(
-          `Re-loading assigned source "${source.name}" (${unsupportedSourceType}) is not implemented.`,
-        );
-      }
+        default: {
+          const unsupportedSourceType: never = source.type;
+          throw new Error(
+            `Re-loading assigned source "${source.name}" (${unsupportedSourceType}) is not implemented.`,
+          );
+        }
       }
       loadedSourceIds.push(source.id);
     }

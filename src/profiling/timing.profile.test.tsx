@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 
+import React, { type ProfilerOnRenderCallback, act } from 'react';
+
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import React, { type ProfilerOnRenderCallback, act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
+
+import { type ApicalSpreadsheetLapsRow } from '../app/apicalDataSource.js';
 import { selectedCategoriesForParticipants } from '../app/selectionState.js';
-import { convertApicalSpreadsheetRowsToApicalData } from '../processing/apical/apicalSpreadsheetProcessor.js';
-import { getParticipantNumber } from '../processing/participant.js';
-import { getAutomaticIdentifier, isCrossingRecord } from '../processing/timerecord.js';
 import type { ApicalLapByCategory } from '../model/apical.js';
 import type { EventCategory, EventCategoryId } from '../model/eventcategory.js';
 import type { EventParticipant, EventParticipantId } from '../model/eventparticipant.js';
@@ -15,8 +15,10 @@ import { createEventId, createSessionId, createTimeRecordId, createTimeRecordSou
 import type { RaceStateLookup } from '../model/racestate.js';
 import type { EventTimeRecord, ParticipantPassingRecord } from '../model/timerecord.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
+import { convertApicalSpreadsheetRowsToApicalData } from '../processing/apical/apicalSpreadsheetProcessor.js';
+import { getParticipantNumber } from '../processing/participant.js';
+import { getAutomaticIdentifier, isCrossingRecord } from '../processing/timerecord.js';
 import { useUiConsoleGuards } from '../testing/uiConsoleGuards.js';
-import { type ApicalSpreadsheetLapsRow } from '../app/apicalDataSource.js';
 import { TimingContext } from '../views/context/Timing.js';
 
 interface ProfileSample {

@@ -1,15 +1,17 @@
 // @vitest-environment jsdom
 
+import React from 'react';
+import { act } from 'react';
+
 import { type Root, createRoot } from 'react-dom/client';
 import * as XLSX from 'xlsx';
-import { EntrantsPage } from './entrantsPage.js';
+
 import { type EventCatalogEntry, type EventCatalogState } from '../../catalog/eventCatalog.js';
 import { type EventCatalogLedger, applyEventCatalogLedger, createDefaultEventCatalogLedger } from '../../ledger/eventCatalogLedger.js';
 import { type EventParticipant } from '../../model/eventparticipant.js';
 import { type RaceState } from '../../model/racestate.js';
-import React from 'react';
-import { act } from 'react';
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
+import { EntrantsPage } from './entrantsPage.js';
 
 const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: string): void => {
   const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;

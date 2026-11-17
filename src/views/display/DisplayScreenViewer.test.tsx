@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import React, { act } from 'react';
+
 import { type Root, createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
+
 import { DisplayScreenViewer } from './DisplayScreenViewer.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
