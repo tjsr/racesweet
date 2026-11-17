@@ -1,5 +1,7 @@
 import React from 'react';
+
 import { Button } from '@mui/material';
+
 import { type FastestTimeIndicatorColors } from '../../app/systemConfig.js';
 
 interface FastestTimeIndicatorsPanelProps {

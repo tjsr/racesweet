@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
+
 import { type Root, createRoot } from 'react-dom/client';
 
 import { createEventEntrantId, createEventParticipantId, createTimeRecordSourceId } from '../../model/ids.js';

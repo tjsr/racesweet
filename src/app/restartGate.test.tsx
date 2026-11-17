@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
+
 import { type Root, createRoot } from 'react-dom/client';
-import { RestartGate } from './restartGate.js';
+
 import { useUiConsoleGuards } from '../testing/uiConsoleGuards.js';
+import { RestartGate } from './restartGate.js';
 
 describe('RestartGate', () => {
   let container: HTMLDivElement;

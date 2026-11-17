@@ -1,3 +1,5 @@
+import React from "react";
+
 import {
   Button,
   Checkbox,
@@ -5,8 +7,7 @@ import {
   FormControlLabel,
   TextField,
 } from "@mui/material";
-import React from "react";
-import { AdminActionBar, AdminFieldGrid, AdminFormSection } from '../admin/adminPrimitives.js';
+
 import {
   type CategoryDistanceRule,
   type EventCatalogCategory,
@@ -15,6 +16,7 @@ import { IdentifierDisplay } from "../../controls/identifierDisplay.js";
 import { MinMaxSelect, type MinMaxSelectOption } from "../../controls/minMaxSelect.js";
 import { SelectTextField } from "../../controls/selectTextField.js";
 import { type SessionId } from "../../model/raceevent.js";
+import { AdminActionBar, AdminFieldGrid, AdminFormSection } from '../admin/adminPrimitives.js';
 import { type CategoryDraft } from "../display/categoriesPage.js";
 
 interface CategoryDetailsPanelProps {
@@ -51,7 +53,7 @@ export const CategoryDetailsPanel = (
     key: TKey,
     value: CategoryDraft[TKey],
   ): void =>
-      props.onSetCategoryDraft((current) => ({ ...current, [key]: value }));
+    props.onSetCategoryDraft((current) => ({ ...current, [key]: value }));
   React.useEffect((): void => {
     setSaveError(undefined);
     setSaveStatus("idle");
@@ -296,18 +298,18 @@ export const CategoryDetailsPanel = (
                   <CircularProgress aria-label="Saving category" size={16} />
                 ) : saveStatus === "succeeded" ? (
                   <span aria-label="Category saved" role="img">
-                      ✓
+                    ✓
                   </span>
                 ) : saveStatus === "failed" ? (
                   <span aria-label="Category save failed" role="img">
-                      !
+                    !
                   </span>
                 ) : undefined
               }
               onClick={saveCategory}
               variant="contained"
             >
-                Save Category
+              Save Category
             </Button>
             {saveError || props.formError ? (
               <div className="error category-save-error" role="alert">
@@ -327,18 +329,18 @@ export const CategoryDetailsPanel = (
                   />
                 ) : props.deleteStatus === "succeeded" ? (
                   <span aria-label="Category deleted" role="img">
-                      ✓
+                    ✓
                   </span>
                 ) : props.deleteStatus === "failed" ? (
                   <span aria-label="Category deletion failed" role="img">
-                      !
+                    !
                   </span>
                 ) : undefined
               }
               onClick={() => props.onDeleteCategory()}
               variant="outlined"
             >
-                Delete Category
+              Delete Category
             </Button>
             {props.deleteError ? (
               <span className="error category-delete-error" role="alert">

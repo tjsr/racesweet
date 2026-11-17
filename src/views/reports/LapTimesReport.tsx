@@ -1,8 +1,8 @@
 import './LapTimesReport.css';
 
-import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { millisecondsToTime, tableTimeString } from '../../app/utils/timeutils.ts';
 import type { EventCategory } from '../../model/eventcategory.ts';
 import { type ParticipantPassingRecord, isPassingExcluded } from '../../model/timerecord.ts';
 

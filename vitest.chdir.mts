@@ -1,3 +1,4 @@
+import type { JSDOM } from 'jsdom';
 import { useStderrGuard } from './src/testing/stderrGuard.js';
 
 useStderrGuard();
@@ -12,6 +13,11 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 }
 
 if (typeof document !== 'undefined') {
+  const browserEnvironment: JSDOM = (globalThis as typeof globalThis & { jsdom: JSDOM }).jsdom;
+  beforeEach((): void => {
+    // Node's host storage can shadow jsdom's storage when Vitest populates globals.
+    vi.stubGlobal('localStorage', browserEnvironment.window.localStorage);
+  });
   // Mock matchMedia for jsdom environments (not provided by jsdom)
   if (typeof window.matchMedia === 'undefined') {
     window.matchMedia = () => ({

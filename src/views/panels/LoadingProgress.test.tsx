@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { flushSync } from 'react-dom';
+
 import { type Root, createRoot } from 'react-dom/client';
 
 import { createLoadingProgressState, updateLoadingProgressStage } from '../../loadingProgress.js';

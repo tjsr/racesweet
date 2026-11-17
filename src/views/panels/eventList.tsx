@@ -1,5 +1,7 @@
-import { Button } from '@mui/material';
 import React from 'react';
+
+import { Button } from '@mui/material';
+
 import { type EventCatalogEvent } from '../../catalog/eventCatalog.js';
 import { type EventId } from '../../model/raceevent.js';
 

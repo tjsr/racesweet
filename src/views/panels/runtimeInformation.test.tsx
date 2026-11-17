@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import { flushSync } from 'react-dom';
+
 import { type Root, createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
+
 import { RuntimeInformationPanel } from './runtimeInformation.js';
 
 describe('RuntimeInformationPanel', () => {

@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { type EventCatalogSession } from '../../catalog/eventCatalog.js';
 import { type SessionId } from '../../model/raceevent.js';
 import { SessionListPanel } from './sessionList.js';

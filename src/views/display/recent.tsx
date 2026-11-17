@@ -1,10 +1,12 @@
 import React, { type JSX } from 'react';
+
 import { createPortal } from 'react-dom';
 
 import { TZDate } from '@date-fns/tz';
 import {
   Alert, Box, Button, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, ListItemText, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip,
 } from '@mui/material';
+
 import { DEFAULT_FASTEST_TIME_INDICATOR_COLORS, type FastestTimeIndicatorColors } from '../../app/systemConfig.ts';
 import type { MillisecondsDuration, TimeDisplayZoneMode } from '../../app/utils/timeutils.ts';
 import {
@@ -18,19 +20,19 @@ import {
   timeOfDayInputStringInTimeZone,
 } from '../../app/utils/timeutils.ts';
 import type { EventDiscipline, EventSessionKind } from '../../catalog/eventCatalog.ts';
-import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../model';
 import { findCtcTrackLineName } from '../../model/ctcTrackConfig.ts';
 import type { EventEntry } from '../../model/entry.ts';
-import { EventCategory, EventCategoryId } from '../../model/eventcategory';
+import { EventCategory, EventCategoryId } from '../../model/eventcategory.js';
 import { EventTeam } from '../../model/eventteam.ts';
-import { FlagRecord } from '../../model/flag';
+import { FlagRecord } from '../../model/flag.js';
 import { createTimeRecordId, createTimeRecordSourceId } from '../../model/ids.ts';
+import { EventParticipant, EventParticipantId, EventTimeRecord } from '../../model/index.js';
 import { getParticipantDisplayName } from '../../model/participantDisplay.js';
 import { EventId, SessionId } from '../../model/raceevent.ts';
 import { RaceStateLookup, getEffectiveParticipantCategoryId } from '../../model/racestate.ts';
 import { EVENT_SESSION_END, ParticipantPassingRecord, RECORD_TX_CROSSING, TimeRecordId, type TimeRecordSource, isPassingExcluded, isPassingValid } from '../../model/timerecord.ts';
 import { categoriesTextFromLookupFn, shouldExcludeCategoryFromResults } from '../../processing/category.ts';
-import { isFlagRecord } from '../../processing/flag';
+import { isFlagRecord } from '../../processing/flag.js';
 import { getLapTimeCell, getPassingLineNumber, getPassingLoopNumber, getSourceLapCompletion, getTimingLineKey, isFastestLapCandidate, isFinishLinePassing, isLapCompletionPassing } from '../../processing/laps.ts';
 import { buildManualFlagRecord, buildManualPassingRecord } from '../../processing/manualRecords.ts';
 import { type MissingCrossingIndicator, estimateMissingCrossingTime, getPotentialMissingCrossingIndicators } from '../../processing/missingCrossing.ts';
@@ -1243,7 +1245,7 @@ export const PassingRecordRow = (props: PassingRecordRowProps): JSX.Element => {
         {resolvedParticipant &&
           allCategories.length > 0 && [
           <MenuItem key="cat-header" disabled sx={{ fontWeight: 'bold', opacity: '1 !important' }}>
-              Change Category
+            Change Category
           </MenuItem>,
           ...allCategories.map((cat) => (
             <MenuItem key={cat.id} onClick={() => handleChangeCategory(cat.id)} selected={getEffectiveParticipantCategoryId(props.raceStateLookup, resolvedParticipant) === cat.id} sx={{ pl: 4 }}>

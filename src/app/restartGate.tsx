@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from 'react';
 import { useEffect, useState } from 'react';
+
 import { RestartRequiredDialog } from '../views/display/restartRequiredDialog.js';
 import { RESTART_REQUIRED_AFTER, requiresApplicationRestart } from './restartVersion.js';
 

@@ -1,6 +1,6 @@
-import { Button } from "@mui/material";
 import React from "react";
-import { getCategoryColor } from "../../categoryColors.js";
+
+import { Button } from "@mui/material";
 
 import {
   millisecondsToTime,
@@ -11,6 +11,7 @@ import type {
   EventCatalogEntry,
   EventCatalogEvent,
 } from "../../catalog/eventCatalog.js";
+import { getCategoryColor } from "../../categoryColors.js";
 import type { EventEntrantId } from "../../model/entrant.js";
 import { getParticipantEntryId } from "../../model/entry.js";
 import type { EventParticipant } from "../../model/eventparticipant.js";

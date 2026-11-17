@@ -1,5 +1,6 @@
-import { WarningModal, type WarningModalAction } from './warningModal.js';
 import React from 'react';
+
+import { WarningModal, type WarningModalAction } from './warningModal.js';
 
 export type UnsavedChangesGuard = (action: () => void | Promise<void>) => void;
 

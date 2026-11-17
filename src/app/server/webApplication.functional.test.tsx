@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
 
+import { act } from 'react';
+
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer as createNetServer } from 'node:net';
 import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { act } from 'react';
-import { installServerConnectedRendererApi } from '../serverConnection.js';
+
 import { startApp } from '../mount.js';
+import { installServerConnectedRendererApi } from '../serverConnection.js';
 import { RaceSweetApplicationServer } from './raceSweetApplicationServer.js';
 
 declare global {

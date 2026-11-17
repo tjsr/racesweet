@@ -2,7 +2,9 @@
 
 import React from 'react';
 import { act } from 'react';
+
 import { type Root, createRoot } from 'react-dom/client';
+
 import { useUiConsoleGuards } from '../../testing/uiConsoleGuards.js';
 import { ReloadSummaryDialog } from './reloadSummaryDialog.js';
 
