@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import React, { act } from 'react';
-import { flushSync } from 'react-dom';
 import { type Root, createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type EntrantType, type EventCatalogEntrant, type EventCatalogState } from '../../catalog/eventCatalog.js';
@@ -69,8 +68,8 @@ describe('EntrantListPanel', () => {
   let container: HTMLDivElement | undefined;
   let root: Root | undefined;
 
-  afterEach(() => {
-    root?.unmount();
+  afterEach(async (): Promise<void> => {
+    await act(async (): Promise<void> => root?.unmount());
     container?.remove();
     root = undefined;
     container = undefined;
@@ -111,7 +110,7 @@ describe('EntrantListPanel', () => {
       );
     };
 
-    flushSync(() => {
+    await act(async (): Promise<void> => {
       root?.render(<Harness />);
     });
 
@@ -152,14 +151,16 @@ describe('EntrantListPanel', () => {
 
     const createKindSelect = container.querySelector<HTMLSelectElement>('select[aria-label="Create Entrant Kind"]');
     expect(createKindSelect).not.toBeNull();
-    flushSync(() => {
+    await act(async (): Promise<void> => {
       createKindSelect!.value = 'team';
       createKindSelect!.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
     const createButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Create Team');
     expect(createButton).not.toBeUndefined();
-    createButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await act(async (): Promise<void> => {
+      createButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
 
     expect(requestFormExit).toHaveBeenCalledTimes(1);
     expect(onCreateEntrant).toHaveBeenCalledWith('event-1', 'team');
@@ -167,13 +168,15 @@ describe('EntrantListPanel', () => {
     const teamCard = Array.from(container.querySelectorAll<HTMLButtonElement>('button.events-list-item'))
       .find((button) => button.getAttribute('aria-selected') === 'false' && button.textContent?.includes('Fast Friends'));
     expect(teamCard).not.toBeUndefined();
-    teamCard!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await act(async (): Promise<void> => {
+      teamCard!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
 
     expect(requestFormExit).toHaveBeenCalledTimes(2);
     expect(onSelectEntrant).toHaveBeenCalledWith('team-1');
   });
 
-  it('sends individual entrant card selections through the global selection listener', () => {
+  it('sends individual entrant card selections through the global selection listener', async (): Promise<void> => {
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -204,20 +207,22 @@ describe('EntrantListPanel', () => {
       );
     };
 
-    flushSync(() => {
+    await act(async (): Promise<void> => {
       root?.render(<Harness />);
     });
 
     const riderCard = Array.from(container.querySelectorAll<HTMLButtonElement>('button.events-list-item'))
       .find((button) => button.querySelector('.entrant-list-type')?.textContent === 'driver');
     expect(riderCard).not.toBeUndefined();
-    riderCard!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await act(async (): Promise<void> => {
+      riderCard!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
 
     expect(requestFormExit).toHaveBeenCalledTimes(1);
     expect(onSelectEntrant).toHaveBeenCalledWith('rider-1');
   });
 
-  it('uses catalog entrant identifiers when a race-state participant is not loaded', () => {
+  it('uses catalog entrant identifiers when a race-state participant is not loaded', async (): Promise<void> => {
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -258,7 +263,7 @@ describe('EntrantListPanel', () => {
       );
     };
 
-    flushSync(() => {
+    await act(async (): Promise<void> => {
       root?.render(<Harness />);
     });
 
@@ -266,7 +271,7 @@ describe('EntrantListPanel', () => {
     expect(container.textContent).toContain('Tx315');
   });
 
-  it('reorders entrant cards when the sort order changes', () => {
+  it('reorders entrant cards when the sort order changes', async (): Promise<void> => {
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -372,7 +377,7 @@ describe('EntrantListPanel', () => {
     const cardNames = (): string[] => Array.from(container!.querySelectorAll('.entrant-list-name'))
       .map((element) => element.textContent || '');
 
-    flushSync(() => {
+    await act(async (): Promise<void> => {
       root?.render(<Harness />);
     });
 
@@ -382,13 +387,13 @@ describe('EntrantListPanel', () => {
     expect(sortSelect).not.toBeNull();
     expect(Array.from(sortSelect!.options).map((option) => option.textContent)).toEqual(['Surname', 'Plate number', 'Grade']);
 
-    flushSync(() => {
+    await act(async (): Promise<void> => {
       sortSelect!.value = 'plateNumber';
       sortSelect!.dispatchEvent(new Event('change', { bubbles: true }));
     });
     expect(cardNames()).toEqual(['Bea Beta', 'Cal Alpha', 'Ari Zed']);
 
-    flushSync(() => {
+    await act(async (): Promise<void> => {
       sortSelect!.value = 'grade';
       sortSelect!.dispatchEvent(new Event('change', { bubbles: true }));
     });
