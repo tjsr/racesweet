@@ -47,7 +47,7 @@ describe('CTC finish line configuration', () => {
 
     expect(source.fileConfig).toEqual(expect.objectContaining({
       filePath: normalizeOptionalSystemFilePath('C:\\RaceTime\\timing\\race.SRT'),
-      trackConfigFilePath: normalizeOptionalSystemFilePath('C:\\RaceTime\\timing\\TRACK.CFG'),
+      trackConfigFilePath: normalizeOptionalSystemFilePath('C:/RaceTime/timing/TRACK.CFG'),
     }));
   });
 

@@ -1,14 +1,17 @@
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createEventId, createSessionId } from '../model/ids.js';
 import { type DurtEventCatalogImportService, type DurtFileMakerExtractor, getBundledDurtFileMakerExtractorPath, importDurtFileMakerRaceState, loadDurtFileMakerRaceState, parseFileMakerExtractorOutput } from './durtFileMakerDataSource.js';
 
 describe('DURT FileMaker data source', () => {
   it('resolves the extractor from the Windows-only npm package', () => {
-    expect(getBundledDurtFileMakerExtractorPath('C:/RaceSweet', 'x64')).toBe('C:\\RaceSweet\\packages\\fmptools-win32-x64\\bin\\fmp2json.exe');
+    const workspaceRoot: string = path.resolve('test-workspace');
+    expect(getBundledDurtFileMakerExtractorPath(workspaceRoot, 'x64')).toBe(path.join(workspaceRoot, 'packages', 'fmptools-win32-x64', 'bin', 'fmp2json.exe'));
   });
 
   it('resolves the arm64 extractor from its dedicated package', () => {
-    expect(getBundledDurtFileMakerExtractorPath('C:/RaceSweet', 'arm64')).toBe('C:\\RaceSweet\\packages\\fmptools-win32-arm64\\bin\\fmp2json.exe');
+    const workspaceRoot: string = path.resolve('test-workspace');
+    expect(getBundledDurtFileMakerExtractorPath(workspaceRoot, 'arm64')).toBe(path.join(workspaceRoot, 'packages', 'fmptools-win32-arm64', 'bin', 'fmp2json.exe'));
   });
 
   it('validates fmp2json output before converting it to race state', async () => {
