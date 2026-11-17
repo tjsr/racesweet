@@ -1275,7 +1275,7 @@ describe('RaceSweetMainApp integration', () => {
 
   it('persists the imported CTC target and restores its timing records after a cold restart', async () => {
     const sourceId = createTimeRecordSourceId('ctc-cold-restart-source');
-    const ctcFilePath = 'C:/timing/cold-restart.erf';
+    const ctcFilePath: string = path.resolve('timing/cold-restart.erf');
     const writtenFiles: CatalogWrite[] = [];
     const initialSystemConfig = {
       dataSources: [{
@@ -1353,7 +1353,7 @@ describe('RaceSweetMainApp integration', () => {
     requestBuffer.mockClear();
     await clickButtonByText(container, 'Re-load from sources');
     await waitForText(container, 'Data Reloaded');
-    expect(requestBuffer).toHaveBeenCalledWith(ctcFilePath.replace(/\//g, '\\'));
+    expect(requestBuffer).toHaveBeenCalledWith(ctcFilePath);
     expect(container.textContent).not.toContain('is not implemented');
 
     let persistedSystemConfig: { timingContextSelection?: { eventId?: string; selectionMode?: string; sessionId?: string } } | undefined;
