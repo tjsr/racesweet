@@ -560,7 +560,14 @@ describe('SystemPage integration', () => {
       );
     });
 
+    // Open the responsive detail pane before editing: hidden fields cannot receive focus.
+    const sourceButton: HTMLButtonElement = container.querySelector<HTMLButtonElement>('[data-source-id="source-apical"]')!;
+    await act(async (): Promise<void> => {
+      sourceButton.click();
+    });
+
     const sourceNameInput = container.querySelector('input[aria-label="Source Name source-apical"]') as HTMLInputElement;
+    expect(sourceNameInput.closest('[hidden]')).toBeNull();
     expect(sourceNameInput).toBeDefined();
     await act(async () => {
       sourceNameInput.focus();
