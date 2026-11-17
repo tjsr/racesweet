@@ -3678,7 +3678,8 @@ describe('RaceSweetMainApp integration', () => {
     const appShellStyle = getComputedStyle(appShell);
     const sectionNavStyle = getComputedStyle(sectionNav);
     expect(appShellStyle.display).toBe('flex');
-    expect(appShellStyle.height).toBe('100vh');
+    // jsdom resolves viewport units in computed styles, as browsers do.
+    expect(appShellStyle.height).toBe(`${window.innerHeight}px`);
     expect(appShellStyle.overflow).toBe('hidden');
     expect(sectionNavStyle.display).toBe('flex');
     expect(sectionNavStyle.flexDirection).toBe('column');
