@@ -1,4 +1,18 @@
+import { copyFile } from "node:fs/promises";
 import path from "node:path";
+
+export const prepareWindowsInstallerTools = (
+  packageDirectory: string,
+  hostArchitecture: string,
+): Promise<void> => {
+  if (hostArchitecture !== 'x64' && hostArchitecture !== 'arm64') {
+    return Promise.reject(new Error(`Unsupported installer host architecture: ${hostArchitecture}`));
+  }
+  return Promise.all(['exe', 'dll'].map((extension: string): Promise<void> => copyFile(
+    path.join(packageDirectory, 'vendor', `7z-${hostArchitecture}.${extension}`),
+    path.join(packageDirectory, 'vendor', `7z.${extension}`),
+  ))).then((): void => undefined);
+};
 
 export type NativeWindowsArchitecture = "arm64" | "x64";
 

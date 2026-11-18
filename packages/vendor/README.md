@@ -24,6 +24,10 @@ CommonJS consumers. It replaces the deprecated shim with the complete platform
 API rather than an imitation. SockJS uses the CommonJS-compatible UUID 11 API;
 the iRacing native binding uses Node-Gyp 12 for its supported Node runtimes.
 
+Forge's pre-make hook explicitly prepares Squirrel's bundled host-architecture
+7-Zip files. Installer generation therefore does not depend on an npm install
+hook running. Tests cover x64 and arm64 host selection and temporary-file cleanup.
+
 Track removal of these forks when upstream adopts maintained dependencies in
 [issue 30](https://github.com/tjsr/racesweet/issues/30). CI detection and future
 remediation PR automation are tracked in

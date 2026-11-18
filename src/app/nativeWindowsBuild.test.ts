@@ -1,3 +1,5 @@
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from "node:path";
 
 import {
@@ -5,6 +7,7 @@ import {
   getForgeMakeArguments,
   getNativeWindowsArchitectures,
   getPackagedWindowsExecutablePath,
+  prepareWindowsInstallerTools,
   verifyWindowsExecutableArchitecture,
 } from "./nativeWindowsBuild.js";
 
@@ -18,6 +21,22 @@ const createWindowsExecutable = (machine: number): Buffer => {
 };
 
 describe("nativeWindowsBuild", () => {
+  it.each<NativeWindowsArchitecture>(['x64', 'arm64'])('prepares installer tools for the %s host', async (architecture: NativeWindowsArchitecture): Promise<void> => {
+    const directory: string = await mkdtemp(path.join(os.tmpdir(), 'racesweet-installer-tools-'));
+    try {
+      await mkdir(path.join(directory, 'vendor'));
+      await Promise.all(['exe', 'dll'].map((extension: string): Promise<void> => writeFile(path.join(directory, 'vendor', `7z-${architecture}.${extension}`), `${architecture}-${extension}`)));
+      await prepareWindowsInstallerTools(directory, architecture);
+      expect(await readFile(path.join(directory, 'vendor', '7z.exe'), 'utf8')).toBe(`${architecture}-exe`);
+      expect(await readFile(path.join(directory, 'vendor', '7z.dll'), 'utf8')).toBe(`${architecture}-dll`);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects unsupported installer host architectures', async (): Promise<void> => {
+    await expect(prepareWindowsInstallerTools('unused', 'ia32')).rejects.toThrow('Unsupported installer host');
+  });
   it("builds both Windows architectures by default", () => {
     expect(getNativeWindowsArchitectures(undefined)).toEqual(["x64", "arm64"]);
   });
