@@ -1,7 +1,4 @@
-import swaggerJsdoc, { type OAS3Options } from "swagger-jsdoc";
-import YAML from "yaml";
-
-const openApiOptions: OAS3Options = {
+const openApiOptions: { apis: string[]; definition: OpenApiSpecification & Record<string, object | string> } = {
   apis: [],
   definition: {
     components: {
@@ -802,18 +799,12 @@ const openApiOptions: OAS3Options = {
 };
 
 export interface OpenApiSpecification {
-  components: { schemas: Record<string, object> };
-  info: { title: string; version: string };
+  components: { schemas: Record<string, object> } & Record<string, object>;
+  info: { title: string; version: string } & Record<string, string>;
   openapi: string;
   paths: Record<string, Record<string, object>>;
 }
 
-const prepareSwaggerJsdocYamlCompatibility = (): void => {
-  // swagger-jsdoc 6.x still accesses the YAML 1.x defaultOptions API although its dependency resolves to YAML 2.x.
-  Object.assign(YAML, { defaultOptions: {} });
-};
-
 export const getOpenApiSpecification = (): OpenApiSpecification => {
-  prepareSwaggerJsdocYamlCompatibility();
-  return swaggerJsdoc(openApiOptions) as OpenApiSpecification;
+  return structuredClone(openApiOptions.definition);
 };

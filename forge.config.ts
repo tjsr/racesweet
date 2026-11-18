@@ -1,4 +1,5 @@
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
@@ -12,10 +13,17 @@ import { WebpackPlugin } from '@electron-forge/plugin-webpack';
 import { mainConfig } from './webpack.main.config.ts';
 import { rendererConfig } from './webpack.renderer.config.ts';
 import { getRaceSweetServerPort } from './src/app/serverPort.ts';
+import { prepareWindowsInstallerTools } from './src/app/nativeWindowsBuild.ts';
+
+const resolveInstallerDependency: NodeJS.Require = createRequire(path.resolve('package.json'));
+const prepareInstallerTools = (): Promise<void> => process.platform === 'win32'
+  ? prepareWindowsInstallerTools(path.dirname(resolveInstallerDependency.resolve('electron-winstaller/package.json')), process.arch)
+  : Promise.resolve();
 
 const devServerPort = getRaceSweetServerPort();
 
 const config: ForgeConfig = {
+  hooks: { preMake: prepareInstallerTools },
   packagerConfig: {
     asar: true,
     extraResource: [

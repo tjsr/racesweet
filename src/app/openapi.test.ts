@@ -3,6 +3,14 @@ import { getOpenApiSpecification } from './openapi.js';
 import { getSwaggerUiHtml, getSwaggerUiInit } from './replicaListenerServer.js';
 
 describe('RaceSweet OpenAPI documentation', () => {
+  it('returns independent documents without mutating the inline definition', (): void => {
+    const first: ReturnType<typeof getOpenApiSpecification> = getOpenApiSpecification();
+    first.info.title = 'Changed';
+    delete first.paths['/api/v1/mutations'];
+    const second: ReturnType<typeof getOpenApiSpecification> = getOpenApiSpecification();
+    expect(second.info.title).toBe('RaceSweet API');
+    expect(second.paths['/api/v1/mutations']?.get).toBeDefined();
+  });
   it('documents authentication, application events, uploads, and mutation replication', () => {
     const specification = getOpenApiSpecification();
     const mutationPath = specification.paths['/api/v1/mutations'];
