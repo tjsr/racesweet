@@ -10,7 +10,7 @@
   "license": "ISC",
   "author": "Tim Rowe <tim@tjsr.id.au>",
   "type": "commonjs",
-  "main": ".webpack/main",
+  "main": ".webpack/main/index.cjs",
   "old.main": "index.mjs",
   "vite.main": ".vite/build/main.js",
   "scripts": {
