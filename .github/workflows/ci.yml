@@ -38,6 +38,9 @@ jobs:
       - name: Run TypeScript compile
         run: npm run typecheck
 
+      - name: Validate dependency tree
+        run: npm ls --all
+
   test:
     name: Test
     strategy:
