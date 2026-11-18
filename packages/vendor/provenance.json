@@ -1,0 +1,20 @@
+{
+  "@vercel/webpack-asset-relocator-loader": {
+    "version": "1.10.0",
+    "integrity": "sha512-CCDqnX5Jt1hmwvUhpkKm4y8oK9Z4HyEtNPthxTp37WOllawyuAxDuNCAr2X6SmwOlFpcudNzIBvuDQ29MVQuCQ==",
+    "shasum": "c2cf83be949af148109bc0753c0976e0a9a11a2c",
+    "url": "https://registry.npmjs.org/@vercel/webpack-asset-relocator-loader/-/webpack-asset-relocator-loader-1.10.0.tgz"
+  },
+  "temp": {
+    "version": "0.9.4",
+    "integrity": "sha512-yYrrsWnrXMcdsnu/7YMYAofM1ktpL5By7vZhf15CrXijWWrEYZks5AXBudalfSWJLlnen/QUJUB5aoB0kqZUGA==",
+    "shasum": "cd20a8580cb63635d0e4e9d4bd989d44286e7620",
+    "url": "https://registry.npmjs.org/temp/-/temp-0.9.4.tgz"
+  },
+  "electron-installer-common": {
+    "version": "0.10.4",
+    "integrity": "sha512-8gMNPXfAqUE5CfXg8RL0vXpLE9HAaPkgLXVoHE3BMUzogMWenf4LmwQ27BdCUrEhkjrKl+igs2IHJibclR3z3Q==",
+    "shasum": "7a81265e0ec158eafd9dd474d5bb3a13946195e7",
+    "url": "https://registry.npmjs.org/electron-installer-common/-/electron-installer-common-0.10.4.tgz"
+  }
+}
