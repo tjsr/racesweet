@@ -109,7 +109,8 @@
     "webpack": "^5.107.2",
     "temp": "file:packages/vendor/temp",
     "electron-installer-common": "file:packages/vendor/electron-installer-common",
-    "node-domexception": "file:packages/native-domexception"
+    "node-domexception": "file:packages/native-domexception",
+    "node-abort-controller": "file:packages/native-abort-controller"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
@@ -186,6 +187,10 @@
     "@irsdk-node/native": {
       "node-gyp": "^12.2.0"
     },
-    "node-domexception": "$node-domexception"
+    "node-domexception": "$node-domexception",
+    "node-abort-controller": "$node-abort-controller",
+    "fork-ts-checker-webpack-plugin": {
+      "memfs": "^4.80.1"
+    }
   }
 }

@@ -1,0 +1,8 @@
+{
+  "name": "@racesweet/native-abort-controller",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CommonJS bridge to native cancellation on supported RaceSweet runtimes",
+  "main": "index.cjs",
+  "engines": { "node": ">=24.19.0" }
+}

@@ -21,6 +21,38 @@ const readMetadata: (options: { src: string; logger: (message: string) => void }
   loadCommonJs('./packages/vendor/electron-installer-common/src/readmetadata.js') as typeof readMetadata;
 
 describe('dependency replacement compatibility', (): void => {
+  it('uses native cancellation with abort events, reasons, and throwIfAborted', (): void => {
+    const cancellation: { AbortController: typeof AbortController; AbortSignal: typeof AbortSignal } =
+      loadCommonJs('./packages/native-abort-controller/index.cjs') as typeof cancellation;
+    const controller: AbortController = new cancellation.AbortController();
+    const onAbort: () => void = vi.fn();
+    controller.signal.addEventListener('abort', onAbort, { once: true });
+    const reason: Error = new Error('Cancelled compilation');
+    controller.abort(reason);
+    expect(onAbort).toHaveBeenCalledOnce();
+    expect(controller.signal.reason).toBe(reason);
+    expect((): void => controller.signal.throwIfAborted()).toThrow(reason);
+    expect(cancellation.AbortSignal).toBe(globalThis.AbortSignal);
+  });
+
+  it('preserves the checker filesystem API with the maintained memory filesystem', (): void => {
+    interface CheckerFileSystem {
+      writeFile(file: string, data: string): void;
+      readFile(file: string, encoding: BufferEncoding): string | undefined;
+      readDir(directory: string): Array<{ name: string }>;
+      updateTimes(file: string, atime: Date, mtime: Date): void;
+      deleteFile(file: string): void;
+      exists(file: string): boolean;
+    }
+    const memory: CheckerFileSystem = (loadCommonJs('fork-ts-checker-webpack-plugin/lib/typescript/worker/lib/file-system/mem-file-system.js') as { memFileSystem: CheckerFileSystem }).memFileSystem;
+    const file: string = path.join(os.tmpdir(), 'racesweet-checker-compat', 'fixture.ts');
+    memory.writeFile(file, 'export const value = 1;');
+    expect(memory.readFile(file, 'utf8')).toBe('export const value = 1;');
+    expect(memory.readDir(path.dirname(file)).map((entry: { name: string }): string => entry.name)).toContain('fixture.ts');
+    memory.updateTimes(file, new Date(), new Date());
+    memory.deleteFile(file);
+    expect(memory.exists(file)).toBe(false);
+  });
   it('composes source maps with the maintained codec', (): void => {
     interface SourceMap { mappings: string; names: string[]; sources: string[]; sourcesContent: string[] }
     const merge: (base: SourceMap, extension: SourceMap) => SourceMap =

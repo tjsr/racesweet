@@ -23,6 +23,9 @@ The separate `native-domexception` package exports Node's native constructor for
 CommonJS consumers. It replaces the deprecated shim with the complete platform
 API rather than an imitation. SockJS uses the CommonJS-compatible UUID 11 API;
 the iRacing native binding uses Node-Gyp 12 for its supported Node runtimes.
+The webpack checker uses MemFS 4 and the separate `native-abort-controller`
+CommonJS bridge to native cancellation. Its filesystem and cancellation APIs are
+covered by compatibility tests.
 
 Forge's pre-make hook explicitly prepares Squirrel's bundled host-architecture
 7-Zip files. Installer generation therefore does not depend on an npm install
