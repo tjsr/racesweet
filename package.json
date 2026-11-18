@@ -85,7 +85,7 @@
     "babel-loader": "^10.1.1",
     "chokidar": "^5.0.0",
     "css-loader": "^7.1.5",
-    "electron": "^43.2.0",
+    "electron": "^45.3.2",
     "electron-squirrel-startup": "^1.0.1",
     "electron-winstaller": "^5.4.4",
     "eslint": "^10.7.0",
