@@ -1,5 +1,7 @@
-import { Box, type SxProps, type Theme } from '@mui/material';
 import React from 'react';
+
+import { Box, type SxProps, type Theme } from '@mui/material';
+
 import { SelectTextField } from './selectTextField.js';
 
 export interface MinMaxSelectOption {

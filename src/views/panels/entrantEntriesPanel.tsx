@@ -1,5 +1,6 @@
-import { Button, TextField, Typography } from '@mui/material';
 import React from 'react';
+
+import { Button, TextField, Typography } from '@mui/material';
 
 import type { EventCatalogCategory, EventCatalogEntrant, EventCatalogEntry } from '../../catalog/eventCatalog.js';
 import { SelectTextField } from '../../controls/selectTextField.js';

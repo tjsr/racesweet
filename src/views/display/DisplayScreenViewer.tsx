@@ -1,5 +1,7 @@
-import { Alert, Box, Typography } from '@mui/material';
 import React from 'react';
+
+import { Alert, Box, Typography } from '@mui/material';
+
 import type { DisplaySnapshot } from '../../processing/displayProjection.js';
 import { DisplayScreenCanvas } from './DisplayScreenCanvas.js';
 

@@ -37,12 +37,12 @@ import {
   parseSpokenTimingIdentifier,
   resolveManualTimingIdentifier,
 } from "../../processing/manualTimingWorkflow.js";
+import { ManualTimingKeypad } from './ManualTimingKeypad.js';
+import { ManualTimingReview } from './ManualTimingReview.js';
 import {
   type TimingSpeechAdapter,
   createTimingSpeechAdapter,
 } from "./manualTimingSpeech.js";
-import { ManualTimingKeypad } from './ManualTimingKeypad.js';
-import { ManualTimingReview } from './ManualTimingReview.js';
 
 export interface ManualTimingPanelProps {
   catalog: EventCatalogState;

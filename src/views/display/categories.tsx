@@ -1,8 +1,9 @@
-import { EventCategory, EventCategoryId } from '../../model/eventcategory.js';
 
 import Box from '@mui/material/Box';
 import { GridRowId, type GridRowSelectionModel } from '@mui/x-data-grid';
 import { DataGrid } from '@mui/x-data-grid/DataGrid';
+
+import { EventCategory, EventCategoryId } from '../../model/eventcategory.js';
 
 interface CategoryListProps {
   categories: EventCategory[];

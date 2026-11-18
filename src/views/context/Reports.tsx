@@ -1,5 +1,7 @@
-import { Box, Tab, Tabs } from '@mui/material';
 import React from 'react';
+
+import { Box, Tab, Tabs } from '@mui/material';
+
 import { ReportsPage } from '../../app/views/reports/reportsPage.js';
 import { DisplayScreensPanel, type DisplayScreensPanelProps } from './DisplayScreensPanel.js';
 

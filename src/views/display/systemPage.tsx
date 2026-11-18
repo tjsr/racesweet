@@ -1,4 +1,5 @@
 import React from "react";
+
 import {
   type DataSourceConfig,
   type DataSourceType,
@@ -16,12 +17,12 @@ import type {
   MrScatsDataFileSummary,
 } from "../../parsers/mrScats/fileInventory.js";
 import type { MrScatsDataFilePreview } from "../../parsers/mrScats/filePreview.js";
+import type { InlineLoadingProgress } from "../panels/InlineLoadingIndicator.js";
+import { RaceSweetLogo } from "../panels/RaceSweetLogo.js";
 import { DataSourcesPanel } from "../panels/dataSources.js";
 import { FastestTimeIndicatorsPanel } from "../panels/fastestTimeIndicators.js";
-import type { InlineLoadingProgress } from "../panels/InlineLoadingIndicator.js";
 import { LocalStorageLocationPanel } from "../panels/localStorageLocation.js";
 import { LogPanel } from "../panels/log.js";
-import { RaceSweetLogo } from "../panels/RaceSweetLogo.js";
 import { RuntimeInformationPanel } from "../panels/runtimeInformation.js";
 import { ServerConfigurationPanel } from "../panels/serverConfigurationPanel.js";
 

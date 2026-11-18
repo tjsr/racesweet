@@ -20,7 +20,7 @@ export const loadSavedLoginCredentials = async (): Promise<
   }
   try {
     const serializedCredentials: string | null =
-      globalThis.localStorage.getItem(SAVED_LOGIN_CREDENTIALS_KEY);
+      window.localStorage.getItem(SAVED_LOGIN_CREDENTIALS_KEY);
     if (!serializedCredentials) {
       return undefined;
     }
@@ -37,7 +37,7 @@ export const saveLoginCredentials = async (
   if (isNativePersistenceAvailable()) {
     return window.api.saveLoginCredentials(credentials);
   }
-  globalThis.localStorage.setItem(
+  window.localStorage.setItem(
     SAVED_LOGIN_CREDENTIALS_KEY,
     JSON.stringify(credentials),
   );
@@ -47,5 +47,5 @@ export const clearSavedLoginCredentials = async (): Promise<void> => {
   if (isNativePersistenceAvailable()) {
     return window.api.clearSavedLoginCredentials();
   }
-  globalThis.localStorage.removeItem(SAVED_LOGIN_CREDENTIALS_KEY);
+  window.localStorage.removeItem(SAVED_LOGIN_CREDENTIALS_KEY);
 };

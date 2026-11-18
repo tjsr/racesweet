@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
+import React, { act } from 'react';
+
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import React, { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
+
 import { getCategoriesForEvent, getEntrantsForEvent, getEntriesForEvent } from '../catalog/eventCatalog.js';
 import { createSeedEventCatalogLedger } from '../ledger/createSeedEventCatalogLedger.js';
 import type { EventCatalogLedger } from '../ledger/eventCatalogLedger.js';
@@ -15,8 +17,8 @@ import type { EventCatalogPersistence } from '../persistence/eventCatalogPersist
 import { EventCatalogService } from '../service/eventCatalogService.js';
 import { applyPulledRaceStateToSession } from '../service/sourceApplication.js';
 import { useUiConsoleGuards } from '../testing/uiConsoleGuards.js';
-import { ReportsPage, ResultsPage } from '../views/display/raceAnalyticsViews.js';
 import { TimingContext } from '../views/context/Timing.js';
+import { ReportsPage, ResultsPage } from '../views/display/raceAnalyticsViews.js';
 import { getBundledDurtFileMakerExtractorPath, loadDurtFileMakerRaceState } from './durtFileMakerDataSource.js';
 
 const interWinterDirectory: string = 'C:/Users/tim/OneDrive/Archived Timing/2013 InterWinter Round 3';

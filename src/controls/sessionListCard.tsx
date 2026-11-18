@@ -1,5 +1,7 @@
 import React from 'react';
+
 import { Button } from '@mui/material';
+
 import { type EventCatalogSession } from '../catalog/eventCatalog.js';
 import { type SessionId } from '../model/raceevent.js';
 

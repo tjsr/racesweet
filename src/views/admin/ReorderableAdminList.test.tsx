@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import React, { act } from 'react';
+
 import { type Root, createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import { ReorderableAdminList } from './ReorderableAdminList.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;

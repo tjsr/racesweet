@@ -1,5 +1,7 @@
-import { Button, MenuItem } from '@mui/material';
 import React from 'react';
+
+import { Button, MenuItem } from '@mui/material';
+
 import { type FileWriteDiagnostics, getFileWriteFailure } from '../../app/fileWriteDiagnostics.js';
 import type { EventCatalogEvent, EventTrackMap, EventTrackTimingLine } from '../../catalog/eventCatalog.js';
 import { SelectTextField } from '../../controls/selectTextField.js';

@@ -1,5 +1,6 @@
-import { EventsScreen } from '../../app/views/events/eventsScreen.js';
 import React from 'react';
+
+import { EventsScreen } from '../../app/views/events/eventsScreen.js';
 
 type EventsContextProps = React.ComponentProps<typeof EventsScreen>;
 

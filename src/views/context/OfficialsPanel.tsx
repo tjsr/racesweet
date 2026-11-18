@@ -1,8 +1,10 @@
+import React from 'react';
+
 import {
   Alert, Autocomplete, Box, Button, Card, CardActionArea, CardContent, Checkbox, FormControlLabel,
   Menu, MenuItem, Stack, TextField, Tooltip, Typography,
 } from '@mui/material';
-import React from 'react';
+
 import type { EventCatalogState } from '../../catalog/eventCatalog.js';
 import { IdentifierDisplay, copyToClipboard } from '../../controls/identifierDisplay.js';
 import { createOfficialContactReport } from '../../export/officialContactReport.js';

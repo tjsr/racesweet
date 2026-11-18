@@ -1,6 +1,7 @@
-import { Button } from '@mui/material';
 import React from 'react';
-import { getCategoryColor } from '../../categoryColors.js';
+
+import { Button } from '@mui/material';
+
 import {
   type EntrantType,
   type EventCatalogEntrant,
@@ -8,13 +9,14 @@ import {
   type EventCatalogState,
   getEntriesForEvent,
 } from '../../catalog/eventCatalog.js';
-import { type CategoryId } from '../../processing/category.js';
-import { getParticipantNumber, getParticipantTransponders } from '../../processing/participant.js';
+import { getCategoryColor } from '../../categoryColors.js';
 import { EntrantListCard } from '../../controls/entrantListCard.js';
 import { SelectTextField } from '../../controls/selectTextField.js';
 import { EventEntrantId } from '../../model/entrant.js';
 import { type EventParticipant } from '../../model/eventparticipant.js';
 import { EventId } from '../../model/raceevent.js';
+import { type CategoryId } from '../../processing/category.js';
+import { getParticipantNumber, getParticipantTransponders } from '../../processing/participant.js';
 
 interface EntrantListPanelProps {
   catalog: EventCatalogState;

@@ -1,5 +1,6 @@
-import { Dialog, DialogContent, DialogTitle, Typography } from '@mui/material';
 import type { ReactElement } from 'react';
+
+import { Dialog, DialogContent, DialogTitle, Typography } from '@mui/material';
 
 interface RestartRequiredDialogProps {
   checking?: boolean;

@@ -1,5 +1,6 @@
-import { type SxProps, TextField, type Theme } from "@mui/material";
 import React from "react";
+
+import { type SxProps, TextField, type Theme } from "@mui/material";
 
 export interface NumericInputProps {
   ariaLabel: string;

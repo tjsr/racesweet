@@ -1,8 +1,10 @@
-import { Alert, Button, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import React from 'react';
+
+import { Alert, Button, MenuItem, Stack, TextField, Typography } from '@mui/material';
+
 import type { EventCatalogEntrant, EventCatalogState } from '../../catalog/eventCatalog.js';
-import type { IndividualLink, IndividualLinkInput } from '../../model/individualLink.js';
 import type { EventParticipantId } from '../../model/eventparticipant.js';
+import type { IndividualLink, IndividualLinkInput } from '../../model/individualLink.js';
 import type { OfficialProfile } from '../../model/official.js';
 
 interface LinkTarget {

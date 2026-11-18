@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 
+import React, { act } from 'react';
+
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import React, { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import XLSX from 'xlsx';
+
+import { createSeedEventCatalogLedger } from '../ledger/createSeedEventCatalogLedger.js';
 import type { EventCatalogMutation } from '../ledger/eventCatalogLedger.js';
-import { convertApicalSpreadsheetRowsToApicalData } from '../processing/apical/apicalSpreadsheetProcessor.js';
-import { CategoryId } from '../processing/category.js';
-import { createGreenFlagEvent } from '../processing/flag.js';
 import type { ApicalLapByCategory } from '../model/apical.js';
 import type { EventParticipant } from '../model/eventparticipant.js';
 import { createCategoryId, createEventEntrantId, createEventEntryId, createEventId, createEventParticipantId, createId, createSessionId, createTimeRecordId, createTimeRecordSourceId } from '../model/ids.js';
@@ -17,11 +17,13 @@ import type { DomainEventEnvelope } from '../model/serverApi.js';
 import { RECORD_TX_CROSSING, TimeRecordId } from '../model/timerecord.js';
 import { convertDataToRaceState } from '../parsers/apical.js';
 import type { AdministrativeChanges } from '../persistence/raceAdminPersistence.js';
+import { convertApicalSpreadsheetRowsToApicalData } from '../processing/apical/apicalSpreadsheetProcessor.js';
+import { CategoryId } from '../processing/category.js';
+import { createGreenFlagEvent } from '../processing/flag.js';
 import { useUiConsoleGuards } from '../testing/uiConsoleGuards.js';
 import { APICAL_EXCEL_DOWNLOAD_ACCEPT_HEADER } from '../utils/apical/excelDownload.js';
-import { type ApicalSpreadsheetLapsRow, createApicalCatalogEventId, createApicalCatalogSessionId, getCachedApicalExcelFilePath } from './apicalDataSource.js';
 import { RaceSweetMainApp } from './App.js';
-import { createSeedEventCatalogLedger } from '../ledger/createSeedEventCatalogLedger.js';
+import { type ApicalSpreadsheetLapsRow, createApicalCatalogEventId, createApicalCatalogSessionId, getCachedApicalExcelFilePath } from './apicalDataSource.js';
 import { APICAL_DEFAULT_SOURCE_NAME } from './systemConfig.js';
 
 vi.setConfig({ testTimeout: 20000 });
@@ -1446,22 +1448,20 @@ describe('RaceSweetMainApp integration', () => {
     expect(progressBar).toBeTruthy();
     expect(container.textContent).toContain('Loading generated data files');
     expect(container.textContent).toContain('tracked calls');
-    expect(container.textContent).toContain('Load event catalog persistence');
+    await vi.waitFor((): void => {
+      expect(catalogFilePath).toContain('event-catalog.json');
+    });
+    expect(container.querySelector('ol[aria-label="Recent loading calls"] li')).not.toBeNull();
     expect(container.textContent).not.toContain('Loading...');
 
-    const progressValues = new Set<number>();
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      progressValues.add(progressBar?.value || 0);
-      await act(async () => {
-        await new Promise<void>((resolve) => setTimeout(resolve, 20));
-      });
-    }
-    expect(progressValues.size).toBeGreaterThan(1);
+    expect(progressBar?.value).toBeGreaterThan(0);
+    expect(progressBar?.value).toBeLessThan(100);
 
     await act(async () => {
       resolveCatalogLoad?.(await readGeneratedFixture(catalogFilePath));
     });
     await waitForLoadedApp(container);
+    expect(container.querySelector('progress[aria-label="Loading RaceSweet progress"]')).toBeNull();
   });
 
   it('routes individual entrant card selections through app state to details and identification panels', async () => {

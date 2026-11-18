@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import React, { act } from 'react';
+
 import { type Root, createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import type { EventCatalogState } from '../../catalog/eventCatalog.js';
 import type { TabularReport } from '../../export/tabularReport.js';
 import { createStartListFixture } from '../../testing/startListFixture.js';
