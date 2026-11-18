@@ -1,5 +1,5 @@
 {
-  "extends": ["@tsconfig/node24/tsconfig.json", "@tsconfig/node-ts/tsconfig.json"],
+  "extends": ["@tsconfig/node24/tsconfig.json"],
   "compilerOptions": {
     "allowJs": true,
     "allowImportingTsExtensions": true,
@@ -19,12 +19,23 @@
     "target": "ESNext",
     "types": ["node", "vite/client", "vitest/globals", "vitest/importMeta"],
     "verbatimModuleSyntax": false,
-    "noUncheckedSideEffectImports": true,
+    "noUncheckedSideEffectImports": true
     // "paths": {
     //   "@model/*": ["src/model/*"],
     //   "@parsers/*": ["src/parsers/*"],
     // }
   },
   "src": ["src", "test"],
-  "include": ["vitest.chdir.mts", "src/**/*.ts", "src/**/*.mts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.mts", "test/**/*.tsx", "src/utils/apical/apicalTest.mts", "src/types/**/*.d.ts", "src/@types/**/*.d.ts"],
+  "include": [
+    "vitest.chdir.mts",
+    "src/**/*.ts",
+    "src/**/*.mts",
+    "src/**/*.tsx",
+    "test/**/*.ts",
+    "test/**/*.mts",
+    "test/**/*.tsx",
+    "src/utils/apical/apicalTest.mts",
+    "src/types/**/*.d.ts",
+    "src/@types/**/*.d.ts"
+  ]
 }
