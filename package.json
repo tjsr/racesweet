@@ -132,7 +132,7 @@
     "date-fns-tz": "^3.2.0",
     "electron-context-menu": "^4.1.2",
     "electron-debug": "^4.1.0",
-    "electron-timber": "^1.0.0",
+    "electron-timber": "^2.0.0",
     "irsdk-node": "^4.4.0",
     "os-browserify": "^0.3.0",
     "path-browserify": "^1.0.1",
