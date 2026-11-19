@@ -1,4 +1,4 @@
-import type { Reporter } from 'vitest/reporters';
+import type { Reporter } from 'vitest/node';
 import { UserConsoleLog } from 'vitest';
 
 const formatEntityName = (log: UserConsoleLog): string => {
@@ -7,7 +7,7 @@ const formatEntityName = (log: UserConsoleLog): string => {
 };
 
 export const failOnStderrReporter = (): Reporter => ({
-  onUserConsoleLog: (log) => {
+  onUserConsoleLog: (log: UserConsoleLog) => {
     if (log.type !== 'stderr') {
       return;
     }
