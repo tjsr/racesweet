@@ -130,7 +130,7 @@
     "colors": "^1.4.0",
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
-    "electron-context-menu": "^4.1.2",
+    "electron-context-menu": "^5.1.0",
     "electron-debug": "^4.1.0",
     "electron-timber": "^1.0.0",
     "irsdk-node": "^4.4.0",
