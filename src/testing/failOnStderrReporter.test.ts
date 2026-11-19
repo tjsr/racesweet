@@ -1,35 +1,52 @@
-import { failOnStderrReporter } from './failOnStderrReporter';
+import type { MockInstance, UserConsoleLog } from 'vitest';
+import type { Reporter } from 'vitest/node';
 
-describe('failOnStderrReporter', () => {
-  const originalExitCode = process.exitCode;
+import { failOnStderrReporter } from './failOnStderrReporter.js';
 
-  afterEach(() => {
+const createConsoleLog = (
+  type: UserConsoleLog['type'],
+  content: string,
+  origin?: string,
+): UserConsoleLog => ({ content, origin, size: 1, taskId: 'test-id', time: 0, type });
+
+describe('failOnStderrReporter', (): void => {
+  const originalExitCode: typeof process.exitCode = process.exitCode;
+
+  afterEach((): void => {
     process.exitCode = originalExitCode;
   });
 
-  it('marks the run failed when Vitest captures stderr', () => {
-    const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    const reporter = failOnStderrReporter();
+  it('marks the run failed when Vitest captures stderr without an origin', (): void => {
+    const writeSpy: MockInstance<typeof process.stderr.write> = vi.spyOn(process.stderr, 'write')
+      .mockImplementation((): boolean => true);
+    const reporter: Reporter = failOnStderrReporter();
+    const log: UserConsoleLog = createConsoleLog('stderr', 'bad output');
 
-    reporter.onUserConsoleLog?.({
-      content: 'bad output',
-      task: { name: 'noisy test' },
-      type: 'stderr',
-    } as unknown as Parameters<NonNullable<typeof reporter.onUserConsoleLog>>[0]);
+    reporter.onUserConsoleLog?.(log);
 
     expect(process.exitCode).toBe(1);
     expect(writeSpy).toHaveBeenCalledWith('Unexpected stderr output:\nbad output\n');
   });
 
-  it('ignores stdout', () => {
-    const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    const reporter = failOnStderrReporter();
+  it('includes the origin of captured stderr', (): void => {
+    const writeSpy: MockInstance<typeof process.stderr.write> = vi.spyOn(process.stderr, 'write')
+      .mockImplementation((): boolean => true);
+    const reporter: Reporter = failOnStderrReporter();
+    const log: UserConsoleLog = createConsoleLog('stderr', 'bad output', 'noisy test');
 
-    reporter.onUserConsoleLog?.({
-      content: 'debug output',
-      task: { name: 'chatty test' },
-      type: 'stdout',
-    } as unknown as Parameters<NonNullable<typeof reporter.onUserConsoleLog>>[0]);
+    reporter.onUserConsoleLog?.(log);
+
+    expect(process.exitCode).toBe(1);
+    expect(writeSpy).toHaveBeenCalledWith('Unexpected stderr output in noisy test:\nbad output\n');
+  });
+
+  it('ignores stdout', (): void => {
+    const writeSpy: MockInstance<typeof process.stderr.write> = vi.spyOn(process.stderr, 'write')
+      .mockImplementation((): boolean => true);
+    const reporter: Reporter = failOnStderrReporter();
+    const log: UserConsoleLog = createConsoleLog('stdout', 'debug output', 'chatty test');
+
+    reporter.onUserConsoleLog?.(log);
 
     expect(process.exitCode).toBe(originalExitCode);
     expect(writeSpy).not.toHaveBeenCalled();
